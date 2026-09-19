@@ -2641,6 +2641,13 @@ struct charter_centre
 
     std::array<int32_t, charter_unspent_reason_count> unspent{};
 
+    /// NR-905: the points this centre's FIRMS left when the turn stopped because
+    /// every good still under its share could not be placed here, and the
+    /// placement reason they were booked under — the pool `share_unplaced` is
+    /// drawn from once the walk ends. 0 for every other stop.
+    int32_t                firm_stop_points = 0;
+    charter_unspent_reason firm_stop_reason = charter_unspent_reason::window_exhausted;
+
     /// The two anchor windows, built lazily and then held: neither the centre,
     /// its nation's tiles nor the settlement record move during a spend.
     bool                   centre_window_built = false;
@@ -2739,6 +2746,43 @@ bool charter_window_anchorable(const world& w, const std::vector<entity_id>& win
     return false;
 }
 
+constexpr charter_rung k_charter_rungs[] = { charter_rung::centre_window,
+                                             charter_rung::region_window };
+
+/// A rung's UNFILTERED window (built lazily, then held on @p cc).
+const std::vector<entity_id>& charter_rung_window(const world& w, const nation_component& nc,
+                                                  charter_centre& cc,
+                                                  const settlement_state* settle,
+                                                  const charter_spend_params& spend,
+                                                  charter_rung rung)
+{
+    return (rung == charter_rung::centre_window)
+        ? charter_centre_window(w, nc, cc, spend.window_radius)
+        : charter_region_window(w, nc, settle, cc);
+}
+
+/// Why a placement of @p focus at @p cc FAILS, read on the ground as it stands
+/// — READ-ONLY, drawing nothing: `province_cap` when some rung's UNFILTERED
+/// window holds anchorable ground and the province-cap filter took all of it,
+/// otherwise `window_exhausted`. With no cap in force always the latter. Asked
+/// only once a placement is known to fail (`charter_place`'s own failure, or a
+/// focus that already failed at this centre — see the turn).
+charter_unspent_reason charter_place_failure_reason(const world& w, const nation_component& nc,
+                                                    industrial_focus focus,
+                                                    const std::unordered_set<entity_id>& occupied,
+                                                    charter_centre& cc,
+                                                    const settlement_state* settle,
+                                                    const charter_spend_params& spend,
+                                                    const std::map<uint32_t, int>* by_province)
+{
+    if (by_province != nullptr)
+        for (const charter_rung rung : k_charter_rungs)
+            if (charter_window_anchorable(w, charter_rung_window(w, nc, cc, settle, spend, rung),
+                                          focus, occupied))
+                return charter_unspent_reason::province_cap;
+    return charter_unspent_reason::window_exhausted;
+}
+
 /// Place one charter's holdings on the two anchor rungs, and NOTHING wider.
 ///
 /// AN EMPTY WINDOW IS NEVER PASSED to `place_starting_assets`: that function
@@ -2747,10 +2791,14 @@ bool charter_window_anchorable(const world& w, const std::vector<entity_id>& win
 /// finds no anchorable tile consumes no randomness (place_starting_assets
 /// returns before its first draw), so rung 2 draws as if it had been first.
 ///
-/// On failure @p fail_out names why: `province_cap` when some rung's UNFILTERED
-/// window held anchorable ground and the province-cap filter took all of it
-/// (the filter emptied the window, or left only unanchorable tiles); otherwise
-/// `window_exhausted`. With no cap in force the reason is always the latter.
+/// THE PLACEMENT NEVER SEES THE GOOD, only @p focus: an extraction anchor takes
+/// the richest extractable deposit on its tile, whatever good the firm was
+/// chartered for, and a processing anchor any workable land. So whether a
+/// charter can land is a property of (centre, focus) and the ground as it
+/// stands, and a centre whose windows hold no free deposit tile OF ANY KIND
+/// can place no extraction firm at all.
+///
+/// On failure @p fail_out names why (`charter_place_failure_reason`).
 std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      industrial_focus focus,
                                      std::unordered_set<entity_id>& occupied,
@@ -2762,17 +2810,9 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      charter_rung& rung_out,
                                      charter_unspent_reason& fail_out)
 {
-    static constexpr charter_rung k_rungs[] = { charter_rung::centre_window,
-                                                charter_rung::region_window };
-    const auto base_of = [&](charter_rung rung) -> const std::vector<entity_id>& {
-        return (rung == charter_rung::centre_window)
-            ? charter_centre_window(w, nc, cc, spend.window_radius)
-            : charter_region_window(w, nc, settle, cc);
-    };
-
-    for (const charter_rung rung : k_rungs)
+    for (const charter_rung rung : k_charter_rungs)
     {
-        const std::vector<entity_id>& base = base_of(rung);
+        const std::vector<entity_id>& base = charter_rung_window(w, nc, cc, settle, spend, rung);
         std::vector<entity_id> window = (by_province != nullptr)
             ? charter_under_province_cap(w, base, *by_province)
             : base;
@@ -2787,15 +2827,8 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
     }
 
     // Nothing placed, so nothing moved: `occupied` and the windows are as they
-    // were, and the probe below reads the same ground the rungs just did.
-    fail_out = charter_unspent_reason::window_exhausted;
-    if (by_province != nullptr)
-        for (const charter_rung rung : k_rungs)
-            if (charter_window_anchorable(w, base_of(rung), focus, occupied))
-            {
-                fail_out = charter_unspent_reason::province_cap;
-                break;
-            }
+    // were, and the reason reads the same ground the rungs just did.
+    fail_out = charter_place_failure_reason(w, nc, focus, occupied, cc, settle, spend, by_province);
     return {};
 }
 
@@ -2827,6 +2860,13 @@ struct charter_body_state
     bool                              in_turn = false;
     std::vector<std::uint16_t>        turn;
     std::size_t                       turn_cursor = 0;
+
+    /// THE EVEN SHARE (NR-905; `charter_body_record::even_share`): 0 where the
+    /// ceiling does not bind. `turn_cap[r]` is what the turn fills good r to —
+    /// the per-good cap, or where the ceiling binds min(cap, r's share).
+    int32_t                           even_share = 0;
+    int32_t                           even_share_extra = 0;
+    std::array<int32_t, resource_count> turn_cap{};
 };
 
 } // namespace
@@ -3057,6 +3097,35 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             for (const std::uint16_t r : bs.goods)
                 if (r != cap_good)
                     bs.turn.push_back(r);
+
+            // THE EVEN SHARE (Ben, 2026-09-19, NR-905), fixed here with the
+            // cap. The ceiling BINDS when the body holds more firm charters than
+            // the ceiling AND the turn's per-good caps sum past it: only then
+            // can the turn outrun the ceiling. Then each good may hold at most
+            // ceiling / |turn|, the remainder one more each to the first goods
+            // of the turn (ascending resource index, the turn's own order). The
+            // yard is outside the shares (see charter_budget.hpp). Where the
+            // ceiling does not bind every good fills to the cap, as before.
+            const int64_t n_turn       = static_cast<int64_t>(bs.turn.size());
+            const int64_t charters     = bs.firm_points / spend.firm_price_points;
+            const int64_t ceiling      = bs.density_ceiling;
+            if (n_turn > 0 && charters > ceiling
+                && n_turn * static_cast<int64_t>(bs.per_good_cap) > ceiling)
+            {
+                bs.even_share       = static_cast<int32_t>(ceiling / n_turn);
+                bs.even_share_extra = static_cast<int32_t>(ceiling % n_turn);
+            }
+            for (std::size_t i = 0; i < bs.turn.size(); ++i)
+            {
+                int32_t fill = bs.per_good_cap;
+                if (bs.even_share > 0)
+                {
+                    const int32_t share = bs.even_share
+                        + (static_cast<int64_t>(i) < bs.even_share_extra ? 1 : 0);
+                    fill = std::min(fill, share);
+                }
+                bs.turn_cap[bs.turn[i]] = fill;
+            }
             break;
         }
         }
@@ -3197,12 +3266,24 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         std::mt19937 name_rng  = charter_stream(seed, k_charter_salt_firm_name,  cc.centre);
         std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_firm_stock, cc.centre);
 
-        // NR-903 (the turn only): the goods whose placement failed at THIS
-        // centre, skipped for the rest of it, and the reason each failure named.
-        // Never set under a legacy rule, whose first failed placement ends the
-        // centre.
+        // NR-903 (the turn only): the goods skipped at THIS centre for the rest
+        // of it, and the reason each skip named. Never set under a legacy rule,
+        // whose first failed placement ends the centre.
+        //
+        // A PLACEMENT FAILS BY FOCUS, NOT BY GOOD (`charter_place` never sees the
+        // good), and the ground only fills as the centre's firms land, so once a
+        // focus has failed here every later good of that focus fails too.
+        // `focus_failed` remembers it [extraction, processing], and a later good
+        // of a failed focus is skipped without re-running the placement. Its
+        // reason is still read on the ground as it stands then — `province_cap`
+        // can decay to `window_exhausted` as the centre's own holdings occupy
+        // the capped ground, never the reverse — so every skip names exactly
+        // what the placement would have, and the walk is byte-identical to
+        // attempting each good.
         std::array<bool, resource_count> skipped{};
         std::array<charter_unspent_reason, resource_count> skip_reason{};
+        std::array<bool, 2> focus_failed{};
+        std::array<charter_unspent_reason, 2> focus_reason{};
 
         for (int32_t k = 0; k < n_firms; ++k)
         {
@@ -3300,31 +3381,42 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // or no longer short, is passed over. The order is a sorted vector and
             // an index — nothing depends on a container's layout.
             //
+            // WHERE THE CEILING BINDS a good's cap here is its EVEN SHARE of the
+            // ceiling (NR-905, `turn_cap`, fixed before the walk), so a centre
+            // that has to skip some goods cannot spend their places on the
+            // others. What it cannot spend waits: see the share's gap after the
+            // walk.
+            //
             // The good's firm serves THAT good: its recipe is the best recipe for
             // the good alone (the most output of it, ties to registry order), and
             // with none the firm is an extraction firm, exactly the legacy test.
             //
             // A GOOD THAT CANNOT BE PLACED IS SKIPPED, NOT FATAL (Ben, 2026-09-19,
             // NR-903; DIGITISATION.md § 1): when this centre's windows hold no
-            // ground for it — an extraction good wants an unoccupied deposit tile,
-            // which a dense city window often lacks — the good is passed over for
-            // THE REST OF THIS CENTRE and the turn moves on to the next, in this
-            // same firm. The yard is skipped the same way, so a centre with no
-            // room for a works still charters the mines it has ground for. Skipping
-            // for the rest of the centre is not a shortcut: a failed placement
-            // moves nothing and draws nothing, and the windows only fill as firms
-            // land, so a retry here could only fail again. The loop ends — every
-            // pass through it either places, stops, or skips a good not skipped
-            // before — and THE CENTRE STOPS ONLY WHEN NO GOOD IN THE TURN CAN
-            // PLACE: what is left is booked `province_cap` if the cap took ground
-            // from any good still wanting a firm, else `window_exhausted`.
+            // ground for its firm, the good is passed over for THE REST OF THIS
+            // CENTRE and the turn moves on to the next, in this same firm. The
+            // ground a firm needs is set by its FOCUS, not its good: an extraction
+            // anchor takes whatever deposit its tile holds richest, so a window
+            // with no free deposit tile OF ANY KIND — a dense city window often
+            // has none — places no extraction good at all, and a window with no
+            // free land places no works. The yard is a works and is skipped the
+            // same way, so a centre with no room for one still charters the mines
+            // it has ground for. Skipping for the rest of the centre is not a
+            // shortcut: a failed placement moves nothing and draws nothing, and
+            // the windows only fill as firms land, so a retry here could only fail
+            // again (hence `focus_failed`, which skips the rest of a failed focus
+            // without re-running it). The loop ends — every pass through it either
+            // places, stops, or skips a good not skipped before — and THE CENTRE
+            // STOPS ONLY WHEN NO GOOD IN THE TURN CAN PLACE: what is left is booked
+            // `province_cap` if the cap took ground from any good still wanting a
+            // firm, else `window_exhausted`.
             //
             // The cursor moves only when a firm is chartered, past the good just
             // served, so a good skipped at one centre waits for the turn to come
             // round again; the next centre on the body retries it then.
             //
-            // When no good in the turn is short and under its cap, the rest is
-            // `no_gap` — unless a good OUTSIDE G is short, which only the walk's
+            // When no good in the turn is short and under its cap (or share), the
+            // rest is `no_gap` — unless a good OUTSIDE G is short, which only the walk's
             // own firms can have caused (their upkeep): the turn serves G alone,
             // so that is `late_shortfall`, a real shortfall left unserved (BL-1060).
             std::size_t            turn_at       = 0;
@@ -3343,7 +3435,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     {
                         const std::size_t at = (bs.turn_cursor + step) % n;
                         const std::size_t r  = bs.turn[at];
-                        if (bs.firms_by_resource[r] >= bs.per_good_cap)
+                        if (bs.firms_by_resource[r] >= bs.turn_cap[r])   // its cap, or its share
                             continue;
                         if (!(demand[r] > production[r]))
                             continue;
@@ -3366,15 +3458,26 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                 capped = true;
                         };
                         for (const std::uint16_t r : bs.turn)
-                            if (bs.firms_by_resource[r] < bs.per_good_cap && demand[r] > production[r])
+                            if (bs.firms_by_resource[r] < bs.turn_cap[r] && demand[r] > production[r])
                                 still_wanted(r);
+                        const bool turn_unplaceable = unplaceable;   // the yard holds no share
                         if (yard_wanted)
                             still_wanted(cap_i);
 
                         charter_unspent_reason stop_why = charter_unspent_reason::no_gap;
                         if (unplaceable)
+                        {
                             stop_why = capped ? charter_unspent_reason::province_cap
                                               : charter_unspent_reason::window_exhausted;
+                            // NR-905: where the ceiling binds these points waited
+                            // for shares this centre could not place; the walk's
+                            // end decides how many of them are the share's gap.
+                            if (bs.even_share > 0 && turn_unplaceable)
+                            {
+                                cc.firm_stop_points = left;
+                                cc.firm_stop_reason = stop_why;
+                            }
+                        }
                         else
                             for (std::size_t r = 0; r < resource_count; ++r)
                             {
@@ -3417,14 +3520,31 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 go_processing = (recipe_i >= 0)
                     && (reg.recipe_at(building_type::processing_facility, recipe_i).outputs[gap_r] > 0.0f);
                 focus = go_processing ? industrial_focus::processing : industrial_focus::extraction;
+                const std::size_t fi = go_processing ? 1 : 0;
+                const std::map<uint32_t, int>* by_province =
+                    spend.province_cap ? &bs.firms_by_province : nullptr;
 
                 // --- placement: the centre's two windows and nothing wider --------
                 charter_unspent_reason why = charter_unspent_reason::window_exhausted;
-                assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
-                                       spend.province_cap ? &bs.firms_by_province : nullptr,
-                                       rung, why);
-                if (!assets.empty())
-                    break;
+                if (bs.in_turn && focus_failed[fi])
+                {
+                    // This focus already failed here and would fail again: no
+                    // placement, only the reason, read now (see `focus_failed`).
+                    // `window_exhausted` cannot turn back into `province_cap`.
+                    if (focus_reason[fi] == charter_unspent_reason::province_cap)
+                        focus_reason[fi] = charter_place_failure_reason(w, nc, focus, occupied, cc,
+                                                                        settle, spend, by_province);
+                    why = focus_reason[fi];
+                }
+                else
+                {
+                    assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
+                                           by_province, rung, why);
+                    if (!assets.empty())
+                        break;
+                    focus_failed[fi] = true;
+                    focus_reason[fi] = why;
+                }
 
                 if (!bs.in_turn)
                 {
@@ -3506,6 +3626,52 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         }
     }
 
+    // --- NR-905: THE EVEN SHARE'S GAP ------------------------------------------
+    // Where the ceiling binds, a centre that stopped because every good still
+    // under its share could not be placed there booked its rest under the
+    // placement's reason (`firm_stop_points`). Only now is the body's gap known:
+    // the firms its still-short turn goods lack of their shares, within the room
+    // the ceiling has left. That many firms' points move to `share_unplaced`,
+    // drawn from those stops in spend order; the rest stays as booked (it waited
+    // for a share a later centre filled, or for room the ceiling never had).
+    // A booking moves between reasons within one centre, so every balance holds.
+    for (auto& [body_id, bs] : bodies)   // std::map: ascending body id
+    {
+        if (bs.even_share <= 0)
+            continue;
+        const int64_t room = std::max<int64_t>(0, static_cast<int64_t>(bs.density_ceiling) - bs.firms);
+        if (room == 0)
+            continue;
+        std::array<float, resource_count> production = {};
+        accumulate_body_production(w, reg, body_id, production);
+        std::array<float, resource_count> demand = bs.consumer_demand;
+        const std::array<float, resource_count> upkeep = body_upkeep_demand(w, reg, body_id);
+        const std::array<float, resource_count> construction_need =
+            body_construction_demand(w, reg, body_id);
+        for (std::size_t r = 0; r < resource_count; ++r)   // the walk's own sums, in its order
+            demand[r] += upkeep[r];
+        for (std::size_t r = 0; r < resource_count; ++r)
+            demand[r] += construction_need[r];
+        int64_t open = 0;
+        for (const std::uint16_t r : bs.turn)
+            if (demand[r] > production[r] && bs.firms_by_resource[r] < bs.turn_cap[r])
+                open += bs.turn_cap[r] - bs.firms_by_resource[r];
+        int64_t gap_points = std::min(room, open) * static_cast<int64_t>(spend.firm_price_points);
+        for (const std::size_t oi : order)
+        {
+            if (gap_points <= 0)
+                break;
+            charter_centre& cc = centres[oi];
+            if (cc.nation == null_entity || cc.body != body_id || cc.firm_stop_points <= 0)
+                continue;
+            const int32_t take = static_cast<int32_t>(
+                std::min<int64_t>(cc.firm_stop_points, gap_points));
+            cc.unspent[static_cast<std::size_t>(cc.firm_stop_reason)] -= take;
+            cc.unspent[static_cast<std::size_t>(charter_unspent_reason::share_unplaced)] += take;
+            gap_points -= take;
+        }
+    }
+
     // --- each body's rule and what the walk put on it (BL-1039) ---------------
     rep.cap_rule = spend.resource_cap_rule;
     for (const auto& [body_id, bs] : bodies)   // std::map: ascending body id
@@ -3518,6 +3684,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         br.reference_points  = bs.reference_points;
         br.per_good_cap      = bs.per_good_cap;
         br.density_ceiling   = bs.density_ceiling;
+        br.even_share        = bs.even_share;
+        br.even_share_extra  = bs.even_share_extra;
         br.firms             = bs.firms;
         br.firms_by_good.assign(bs.firms_by_resource.begin(), bs.firms_by_resource.end());
         rep.bodies.push_back(std::move(br));

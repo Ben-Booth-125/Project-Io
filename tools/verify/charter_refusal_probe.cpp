@@ -19,12 +19,24 @@
 //     B's per-centre term (`charter_centre_firm_points`) nets out the specialist
 //     price in whole firm charters; and the integer root beneath it, which the
 //     max(c, ...) floor hides from every cap-level check.
-//  3. THE TURN (BL-1060), on a HAND-BUILT world — one body, one nation, one
-//     centre, two recipes — through `charter_web_from_budget` itself: a good the
-//     centre's window has no deposit for is SKIPPED and the processing goods
-//     after it still charter (NR-903); the legacy rule on the same world still
-//     stops at its first failed placement; and a good only the walk's own firms
-//     made short is booked `late_shortfall`, never `no_gap`.
+//  3. THE TURN (BL-1060), on a HAND-BUILT world — one body, one nation, one or
+//     two centres, a few recipes — through `charter_web_from_budget` itself.
+//     A placement never sees the good, only the firm's FOCUS: an extraction
+//     anchor takes the richest deposit on its tile, so a window with no free
+//     deposit tile OF ANY KIND places no extraction firm, and one with no free
+//     land places no works. On that ground:
+//      * the extraction good first in the turn is SKIPPED and the processing
+//        goods after it still charter (NR-903); the legacy rule on the same
+//        world still stops at its first failed placement;
+//      * the construction yard, a works, is skipped the same way where the
+//        window is all farmland, and the mines still charter;
+//      * a stop where the province cap took one focus's ground and the window
+//        the other's books `province_cap`, not `window_exhausted`;
+//      * a second centre serves the good the first centre skipped;
+//      * where the ceiling binds each good holds its EVEN SHARE (NR-905): a
+//        first centre with no quarry leaves the ore's share for a second that
+//        has one, and where no centre has one the gap is `share_unplaced`;
+//      * a good only the walk's own firms made short is `late_shortfall`.
 //
 // Run:   bash tools/verify/build_lua_harness.sh charter_refusal_probe
 //        (or node tools/verify/build_harness.js charter_refusal_probe — it needs no Lua)
@@ -46,6 +58,8 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -104,54 +118,89 @@ charter_spend_params sqrt_spend()
 }
 
 // ---------------------------------------------------------------------------
-// Part 3's world: one body, one nation owning every tile, one centre.
+// Part 3's world: one body, one nation owning every tile, one or two centres.
 // ---------------------------------------------------------------------------
 namespace turn {
 
 constexpr int k_w = 24, k_h = 12;          // the body's grid
-constexpr int k_cx = 6, k_cy = 6;          // the centre's tile
+constexpr int k_cx = 6, k_cy = 6;          // the first centre's tile, the ground's reference
 constexpr int k_radius = 4;                // the spend's window radius
 constexpr std::size_t k_raw   = static_cast<std::size_t>(resource_type::iron_ore); // index 0: FIRST in the turn
 constexpr std::size_t k_mill1 = static_cast<std::size_t>(resource_type::steel);
 constexpr std::size_t k_mill2 = static_cast<std::size_t>(resource_type::planks);
 constexpr std::size_t k_late  = static_cast<std::size_t>(resource_type::power);    // never in G
+constexpr std::size_t k_yard  = static_cast<std::size_t>(resource_type::construction_capacity);
 
 enum class ground
 {
-    everywhere,      ///< iron-ore deposits on every tile
-    outside_window,  ///< only on tiles farther than radius 6 from the centre: the
-                     ///< window (radius 4) holds no deposit tile at all
+    everywhere,      ///< an iron-ore deposit on every tile
+    outside_window,  ///< iron ore only on tiles farther than radius 6 from (6, 6): a
+                     ///< window of radius 4 around (6, 6) or (8, 6) holds no deposit
+                     ///< tile OF ANY KIND, so no extraction firm can anchor in it
+    farmland,        ///< a farm deposit on every tile: extraction anchors anywhere,
+                     ///< and no works can (a processing anchor refuses a farm tile)
 };
 
-struct fixture
+struct centre_spec
 {
-    world           w;
+    int          x = k_cx, y = k_cy;
+    std::int32_t points = 8;
+};
+
+struct config
+{
+    ground g = ground::everywhere;
+    std::vector<centre_spec> centres{ centre_spec{} };
+    charter_cap_rule rule = charter_cap_rule::sqrt_capital;
+    std::int32_t c = 2;                    ///< per_resource_firm_cap
+    std::int32_t ceiling = 120;            ///< density_ceiling (sqrt only)
+    bool upkeep = false;                   ///< every works draws power (not in G)
+    bool yard = false;                     ///< a construction recipe, and capacity wanted per building
+    bool one_province = false;             ///< every tile in province 1 (cap 2 firms)
+};
+
+struct reading
+{
+    charter_spend_report rep;
+    std::vector<entity_id> centres;                   ///< as the config lists them
+    std::array<int, resource_count> firms{};          ///< per good, from the records
+    std::array<int, resource_count> processing{};     ///< per good, firms with a processing focus
+    std::array<long long, charter_unspent_reason_count> unspent{};
+    bool balanced = false;
+
+    /// Firms for @p good chartered by the config's centre @p i.
+    int firms_at(std::size_t i, std::size_t good) const
+    {
+        int n = 0;
+        for (const charter_record& r : rep.charters)
+            if (!r.specialist && r.good == good && r.centre == centres[i])
+                ++n;
+        return n;
+    }
+    long long u(charter_unspent_reason why) const { return unspent[static_cast<std::size_t>(why)]; }
+};
+
+reading run(const config& cfg)
+{
+    auto w = std::make_unique<world>();
     recipe_registry reg;
-    entity_id       centre = null_entity;
-};
 
-/// @p upkeep: every processing facility draws power as upkeep — a good no
-/// base installation draws, so it is not in G, and only the walk's own works
-/// can make it short.
-void build(fixture& f, ground g, bool upkeep)
-{
-    world& w = f.w;
-    const entity_id body = w.create_entity();
+    const entity_id body = w->create_entity();
     {
         body_component bc{};
         bc.name        = "FixtureBody";
         bc.grid_width  = k_w;
         bc.grid_height = k_h;
-        w.bodies[body] = bc;
+        w->bodies[body] = bc;
     }
-    const entity_id nation = w.create_entity();
+    const entity_id nation = w->create_entity();
     nation_component nc{};
     nc.name = "Veyl";
-    entity_id centre_tile = null_entity;
+    std::map<std::pair<int, int>, entity_id> at;
     for (int y = 0; y < k_h; ++y)
         for (int x = 0; x < k_w; ++x)
         {
-            const entity_id tid = w.create_entity();
+            const entity_id tid = w->create_entity();
             tile_component tc{};
             tc.body   = body;
             tc.grid_x = x;
@@ -161,22 +210,35 @@ void build(fixture& f, ground g, bool upkeep)
             if (dx > k_w / 2)
                 dx = k_w - dx;
             const int dy = y - k_cy;
-            const bool deposit = (g == ground::everywhere) || (dx * dx + dy * dy > 36);
-            if (deposit)
-                tc.resource_deposit[k_raw] = 1.0f;
-            w.tiles[tid] = tc;
+            switch (cfg.g)
+            {
+            case ground::everywhere:     tc.resource_deposit[k_raw] = 1.0f; break;
+            case ground::outside_window: if (dx * dx + dy * dy > 36) tc.resource_deposit[k_raw] = 1.0f; break;
+            case ground::farmland:
+                tc.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] = 1.0f;
+                break;
+            }
+            w->tiles[tid] = tc;
             nc.tiles.push_back(tid);   // raster order: the nation's stored order
-            w.tile_to_nation[tid] = nation;
-            if (x == k_cx && y == k_cy)
-                centre_tile = tid;
+            w->tile_to_nation[tid] = nation;
+            if (cfg.one_province)
+                w->provinces.tile_province[tid] = 1u;
+            at[{ x, y }] = tid;
         }
-    w.nations[nation] = nc;
+    w->nations[nation] = nc;
 
-    f.centre = w.create_entity();
-    population_centre_component pc{};
-    pc.scale = 5;
-    w.population_centres[f.centre]     = pc;
-    w.population_centre_tile[f.centre] = centre_tile;
+    reading out;
+    std::map<entity_id, std::int32_t> points;
+    for (const centre_spec& cs : cfg.centres)
+    {
+        const entity_id id = w->create_entity();
+        population_centre_component pc{};
+        pc.scale = 5;
+        w->population_centres[id]     = pc;
+        w->population_centre_tile[id] = at.at({ cs.x, cs.y });
+        points[id] = cs.points;
+        out.centres.push_back(id);
+    }
 
     // G = { iron ore, steel, planks }: the households want all three, far more
     // than any firm here makes (every base rate is 0), so each stays short until
@@ -186,66 +248,58 @@ void build(fixture& f, ground g, bool upkeep)
     pd.demand_basket[k_raw]   = 100.0f;
     pd.demand_basket[k_mill1] = 100.0f;
     pd.demand_basket[k_mill2] = 100.0f;
-    f.reg.set_population_demand(pd);
+    reg.set_population_demand(pd);
     recipe steelworks;
     steelworks.name = "fixture_steelworks";
     steelworks.inputs[k_raw]    = 1.0f;
     steelworks.outputs[k_mill1] = 1.0f;
-    f.reg.add_recipe(steelworks);
+    reg.add_recipe(steelworks);
     recipe sawmill;
     sawmill.name = "fixture_sawmill";
     sawmill.inputs[static_cast<std::size_t>(resource_type::timber)] = 1.0f;
     sawmill.outputs[k_mill2] = 1.0f;
-    f.reg.add_recipe(sawmill);
-    if (upkeep)
+    reg.add_recipe(sawmill);
+    if (cfg.yard)
+    {
+        // A yard makes construction capacity, and every standing building wants
+        // some: none stands before the walk, so capacity is not in G, and the
+        // yard step wants a yard from the walk's first firm on.
+        recipe yard;
+        yard.name = "fixture_yard";
+        yard.inputs[static_cast<std::size_t>(resource_type::stone)] = 1.0f;
+        yard.outputs[k_yard] = 1.0f;
+        reg.add_recipe(yard);
+        construction_params cp;
+        cp.seed_capacity_per_building = 1.0f;
+        reg.set_construction(cp);
+    }
+    if (cfg.upkeep)
     {
         building_upkeep_params up;
         up.goods[static_cast<std::size_t>(building_type::processing_facility)]
                 [static_cast<std::size_t>(era_band::any)][k_late] = 1.0f;
-        f.reg.set_building_upkeep(up);
+        reg.set_building_upkeep(up);
     }
-}
 
-/// The turn's spend: firm 1 point, a specialist no centre here can afford (100),
-/// c 2, so |G| 3 gives B_ref 6 and an 8-point budget keeps cap 2 (floor(2 x
-/// sqrt(8/6)) = 2): six firms fill G, and two points are left to book.
-charter_spend_params spend(charter_cap_rule rule)
-{
+    // Firm 1 point; a specialist no centre here can afford (100 charters).
     charter_spend_params s;
     s.firm_price_points        = 1;
     s.specialist_firm_charters = 100;
     s.window_radius            = k_radius;
     s.province_cap             = true;
-    s.resource_cap_rule        = rule;
-    s.per_resource_firm_cap    = 2;
+    s.resource_cap_rule        = cfg.rule;
+    s.per_resource_firm_cap    = cfg.c;
     s.max_firms_per_body       = 200;
-    s.density_ceiling          = (rule == charter_cap_rule::sqrt_capital) ? 120 : 0;
-    return s;
-}
+    s.density_ceiling          = (cfg.rule == charter_cap_rule::sqrt_capital) ? cfg.ceiling : 0;
 
-struct reading
-{
-    charter_spend_report rep;
-    std::array<int, resource_count> firms{};          ///< per good, from the records
-    std::array<int, resource_count> processing{};     ///< per good, firms with a processing focus
-    std::array<long long, charter_unspent_reason_count> unspent{};
-    bool balanced = false;
-};
-
-reading run(ground g, bool upkeep, charter_cap_rule rule)
-{
-    auto f = std::make_unique<fixture>();
-    build(*f, g, upkeep);
-    const charter_budget budget(std::map<entity_id, std::int32_t>{ { f->centre, 8 } });
-    reading out;
-    charter_web_from_budget(f->w, f->reg, budget, spend(rule), /*seed=*/1060u, /*settle=*/nullptr,
-                            &out.rep);
+    const charter_budget budget(points);
+    charter_web_from_budget(*w, reg, budget, s, /*seed=*/1060u, /*settle=*/nullptr, &out.rep);
     for (const charter_record& r : out.rep.charters)
     {
         if (r.specialist || r.good >= resource_count)
             continue;
         ++out.firms[r.good];
-        if (f->w.corporations.at(r.corp).focus == industrial_focus::processing)
+        if (w->corporations.at(r.corp).focus == industrial_focus::processing)
             ++out.processing[r.good];
     }
     long long unspent = 0;
@@ -254,7 +308,8 @@ reading run(ground g, bool upkeep, charter_cap_rule rule)
         out.unspent[static_cast<std::size_t>(u.reason)] += u.points;
         unspent += u.points;
     }
-    out.balanced = out.rep.points_budgeted == 8 && out.rep.points_spent + unspent == 8
+    out.balanced = out.rep.points_budgeted == budget.total()
+                && out.rep.points_spent + unspent == budget.total()
                 && out.rep.points_unspent == unspent;
     return out;
 }
@@ -262,12 +317,15 @@ reading run(ground g, bool upkeep, charter_cap_rule rule)
 void print(const char* label, const reading& r)
 {
     std::printf("  %s: firms iron_ore %d (processing %d), steel %d (processing %d), planks %d "
-                "(processing %d); unspent", label, r.firms[k_raw], r.processing[k_raw],
-                r.firms[k_mill1], r.processing[k_mill1], r.firms[k_mill2], r.processing[k_mill2]);
+                "(processing %d), yard %d; unspent", label, r.firms[k_raw], r.processing[k_raw],
+                r.firms[k_mill1], r.processing[k_mill1], r.firms[k_mill2], r.processing[k_mill2],
+                r.firms[k_yard]);
     for (int i = 0; i < charter_unspent_reason_count; ++i)
         if (r.unspent[static_cast<std::size_t>(i)] != 0)
             std::printf(" %s %lld", charter_unspent_reason_name(static_cast<charter_unspent_reason>(i)),
                         r.unspent[static_cast<std::size_t>(i)]);
+    if (!r.rep.bodies.empty() && r.rep.bodies.front().even_share > 0)
+        std::printf("; even share %d", static_cast<int>(r.rep.bodies.front().even_share));
     std::printf("%s\n", r.balanced ? "" : " [UNBALANCED]");
 }
 
@@ -489,58 +547,151 @@ int main()
     }
 
     // --- THE TURN, on a hand-built world (BL-1060) ---
-    std::printf("\nthe turn — one centre, 8 points, G = {iron_ore, steel, planks}, c 2 (cap 2)\n");
+    std::printf("\nthe turn — G = {iron_ore, steel, planks}; one centre, 8 points, c 2 (cap 2) unless named\n");
     using turn::ground;
+    using why_t = charter_unspent_reason;
     {
-        // CONTROL: ground everywhere. Iron ore is FIRST in the turn and does get
-        // an extraction firm, so the case below is not vacuous: the good is short
-        // and placeable when the window has a deposit.
-        const turn::reading r = turn::run(ground::everywhere, /*upkeep=*/false,
-                                          charter_cap_rule::sqrt_capital);
+        // CONTROL: deposits everywhere. Iron ore is FIRST in the turn and does
+        // get an extraction firm, so the cases below are not vacuous: the good is
+        // short, and placeable where the window holds a deposit.
+        turn::config cfg;
+        const turn::reading r = turn::run(cfg);
         turn::print("control, deposits everywhere", r);
         expect_true("control: iron ore holds 2 extraction firms",
                     r.firms[turn::k_raw] == 2 && r.processing[turn::k_raw] == 0);
         expect_true("control: steel and planks hold 2 processing firms each",
                     r.processing[turn::k_mill1] == 2 && r.processing[turn::k_mill2] == 2);
         expect_true("control: the 2 points left after G fills are no_gap",
-                    r.unspent[static_cast<std::size_t>(charter_unspent_reason::no_gap)] == 2
-                    && r.balanced);
+                    r.u(why_t::no_gap) == 2 && r.balanced);
     }
     {
-        // NR-903: the window holds NO deposit tile, so iron ore — the first good
-        // in the turn — cannot place. It is skipped for this centre, and the
-        // processing goods after it still charter. With a failed placement fatal,
-        // as before NR-903, this centre chartered nothing at all.
-        const turn::reading r = turn::run(ground::outside_window, /*upkeep=*/false,
-                                          charter_cap_rule::sqrt_capital);
-        turn::print("no deposit in the window", r);
+        // NR-903: the window holds no free deposit tile OF ANY KIND, so no
+        // extraction firm can anchor in it — iron ore, first in the turn, is
+        // skipped for this centre, and the processing goods after it still
+        // charter. With a failed placement fatal, as before NR-903, this centre
+        // chartered nothing at all.
+        turn::config cfg;
+        cfg.g = ground::outside_window;
+        const turn::reading r = turn::run(cfg);
+        turn::print("no deposit tile in the window", r);
         expect_true("NR-903: iron ore (first in the turn) gets no firm", r.firms[turn::k_raw] == 0);
         expect_true("NR-903: steel and planks still charter, 2 processing firms each",
                     r.processing[turn::k_mill1] == 2 && r.processing[turn::k_mill2] == 2);
         expect_true("NR-903: the centre stops only when no good can place; the rest "
                     "(4) is window_exhausted",
-                    r.unspent[static_cast<std::size_t>(charter_unspent_reason::window_exhausted)] == 4
-                    && r.unspent[static_cast<std::size_t>(charter_unspent_reason::no_gap)] == 0
-                    && r.balanced);
+                    r.u(why_t::window_exhausted) == 4 && r.u(why_t::no_gap) == 0 && r.balanced);
     }
     {
         // THE LEGACY RULE ON THE SAME WORLD, unchanged: biggest gap first picks
         // iron ore (the gaps tie, the first wins), the placement fails, and the
         // centre stops there — every point window_exhausted.
-        const turn::reading r = turn::run(ground::outside_window, /*upkeep=*/false,
-                                          charter_cap_rule::fixed);
+        turn::config cfg;
+        cfg.g    = ground::outside_window;
+        cfg.rule = charter_cap_rule::fixed;
+        const turn::reading r = turn::run(cfg);
         turn::print("legacy fixed rule, same world", r);
         expect_true("legacy: the first failed placement still ends the centre",
                     r.firms[turn::k_raw] + r.firms[turn::k_mill1] + r.firms[turn::k_mill2] == 0
-                    && r.unspent[static_cast<std::size_t>(charter_unspent_reason::window_exhausted)] == 8
-                    && r.balanced);
+                    && r.u(why_t::window_exhausted) == 8 && r.balanced);
+    }
+    {
+        // THE YARD IS SKIPPED TOO. Farmland everywhere: an extraction anchor
+        // takes a farm tile, a works cannot stand on one. From the first firm on
+        // the body wants a yard; it cannot place, so it is skipped for this centre
+        // and the turn goes on to the ore. With the yard's failure fatal the
+        // centre would stop at its second firm with one mine.
+        turn::config cfg;
+        cfg.g    = ground::farmland;
+        cfg.yard = true;
+        const turn::reading r = turn::run(cfg);
+        turn::print("farmland, a yard wanted", r);
+        expect_true("yard: no yard and no works can stand on farmland",
+                    r.firms[turn::k_yard] == 0 && r.firms[turn::k_mill1] == 0 && r.firms[turn::k_mill2] == 0);
+        expect_true("yard: skipped, so iron ore still takes both its firms", r.firms[turn::k_raw] == 2);
+        expect_true("yard: the rest (6) is window_exhausted", r.u(why_t::window_exhausted) == 6 && r.balanced);
+    }
+    {
+        // THE STOP'S REASON: province_cap WINS. Every tile is one province (2
+        // firms at most) and the window has no deposit tile: the ore fails on
+        // the WINDOW, then two works fill the province and the next works fails
+        // on the CAP. The centre stops with both reasons among its goods; the cap
+        // took ground from one of them, so the rest is province_cap.
+        turn::config cfg;
+        cfg.g            = ground::outside_window;
+        cfg.one_province = true;
+        const turn::reading r = turn::run(cfg);
+        turn::print("one province, no deposit tile", r);
+        expect_true("precedence: two works, then the province is full",
+                    r.firms[turn::k_mill1] == 1 && r.firms[turn::k_mill2] == 1 && r.firms[turn::k_raw] == 0);
+        expect_true("precedence: the rest (6) is province_cap, not window_exhausted",
+                    r.u(why_t::province_cap) == 6 && r.u(why_t::window_exhausted) == 0 && r.balanced);
+    }
+    {
+        // TWO CENTRES: the first (6 points, at (6,6)) has no deposit tile and
+        // skips the ore; the second (4 points, at (18,6)) stands on ore ground
+        // and serves it. A skip is for THAT centre only.
+        turn::config cfg;
+        cfg.g       = ground::outside_window;
+        cfg.centres = { { 6, 6, 6 }, { 18, 6, 4 } };
+        const turn::reading r = turn::run(cfg);
+        turn::print("two centres, the second on ore", r);
+        expect_true("two centres: the first charters the works, not the ore",
+                    r.firms_at(0, turn::k_raw) == 0 && r.firms_at(0, turn::k_mill1) == 2
+                    && r.firms_at(0, turn::k_mill2) == 2);
+        expect_true("two centres: the second serves the ore the first skipped",
+                    r.firms_at(1, turn::k_raw) == 2);
+        expect_true("two centres: window_exhausted 2 (first), no_gap 2 (second)",
+                    r.u(why_t::window_exhausted) == 2 && r.u(why_t::no_gap) == 2 && r.balanced);
+    }
+    {
+        // NR-905: THE CEILING BINDS. c 4, ceiling 6; 15 firm charters over 3
+        // goods whose caps sum to 12, so each good holds at most 2. The first
+        // centre (10 points) has no quarry: it charters its works up to their
+        // share and waits. The second (5 points) is on ore ground and takes the
+        // ore's share. Without the share the first centre filled the ceiling with
+        // works and the ore got nothing.
+        turn::config cfg;
+        cfg.g       = ground::outside_window;
+        cfg.c       = 4;
+        cfg.ceiling = 6;
+        cfg.centres = { { 6, 6, 10 }, { 18, 6, 5 } };
+        const turn::reading r = turn::run(cfg);
+        turn::print("ceiling 6 binds, the second centre on ore", r);
+        expect_true("NR-905: the even share is 2",
+                    !r.rep.bodies.empty() && r.rep.bodies.front().even_share == 2
+                    && r.rep.bodies.front().even_share_extra == 0);
+        expect_true("NR-905: the works stop at their share (2 each) at the first centre",
+                    r.firms_at(0, turn::k_mill1) == 2 && r.firms_at(0, turn::k_mill2) == 2);
+        expect_true("NR-905: the ore takes its share at the second centre", r.firms_at(1, turn::k_raw) == 2);
+        expect_true("NR-905: first centre's 6 window_exhausted, second's 3 density_ceiling; no gap",
+                    r.u(why_t::window_exhausted) == 6 && r.u(why_t::density_ceiling) == 3
+                    && r.u(why_t::share_unplaced) == 0 && r.balanced);
+    }
+    {
+        // NR-905, NO QUARRY ANYWHERE: the second centre (at (8,6)) has no deposit
+        // tile either. The ore's share (2) is never placed and the body ends 2
+        // below its ceiling; those 2 firms' points are the gap, share_unplaced,
+        // drawn from the first centre (spend order). The rest stays as booked.
+        turn::config cfg;
+        cfg.g       = ground::outside_window;
+        cfg.c       = 4;
+        cfg.ceiling = 6;
+        cfg.centres = { { 6, 6, 10 }, { 8, 6, 5 } };
+        const turn::reading r = turn::run(cfg);
+        turn::print("ceiling 6 binds, no quarry anywhere", r);
+        expect_true("NR-905 gap: no ore, the works at their share",
+                    r.firms[turn::k_raw] == 0 && r.firms[turn::k_mill1] == 2 && r.firms[turn::k_mill2] == 2);
+        expect_true("NR-905 gap: share_unplaced 2 (the ore's share), window_exhausted 9",
+                    r.u(why_t::share_unplaced) == 2 && r.u(why_t::window_exhausted) == 9
+                    && r.u(why_t::no_gap) == 0 && r.u(why_t::density_ceiling) == 0 && r.balanced);
     }
     {
         // BL-1060 (4): every works the walk charters draws power, which no base
         // installation did, so power is short but NOT in G, and the turn never
         // serves it. Once G fills, the rest is that shortfall — late_shortfall.
-        const turn::reading r = turn::run(ground::everywhere, /*upkeep=*/true,
-                                          charter_cap_rule::sqrt_capital);
+        turn::config cfg;
+        cfg.upkeep = true;
+        const turn::reading r = turn::run(cfg);
         turn::print("works draw power (not in G)", r);
         const bool power_outside_g =
             !r.rep.bodies.empty()
@@ -548,9 +699,7 @@ int main()
                          static_cast<std::uint16_t>(turn::k_late)) == r.rep.bodies.front().goods.end();
         expect_true("late: power is not in G", power_outside_g);
         expect_true("late: the 2 points left are late_shortfall, not no_gap",
-                    r.unspent[static_cast<std::size_t>(charter_unspent_reason::late_shortfall)] == 2
-                    && r.unspent[static_cast<std::size_t>(charter_unspent_reason::no_gap)] == 0
-                    && r.balanced);
+                    r.u(why_t::late_shortfall) == 2 && r.u(why_t::no_gap) == 0 && r.balanced);
     }
 
     std::printf("\n%s (%d failing)\n", g_fail == 0 ? "ALL PASS" : "FAILED", g_fail);
