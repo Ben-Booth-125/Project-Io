@@ -2120,12 +2120,13 @@ int main()
                   " (two bars, two answers); unsurveyed and inherited out; 0 on only-unsurveyed ground in the span; -1"
                   " only when the span never ran, and the term then keeps the seam; the fuel gate still reads the seam");
 
-            // T8.7.7 (BL-1059; Ben, 2026-09-19, NR-899, NR-900): THE TOP-THIRD
-            // BAR. Over EVERY region carrying both span-open scores, zeros
-            // included, ranked on the UNCLAMPED share: k = floor(n / 3), the
-            // bar is the ascending value at n - k, clear = share > 0 && >= bar,
-            // a tie band straddling the cut is out whole (bar = value + 1), and
-            // with fewer than three regions nothing clears. `bars_of` builds a
+            // T8.7.7 (BL-1059; Ben, 2026-09-19, NR-899, NR-900, NR-904): THE
+            // TOP-THIRD BAR. Over EVERY region carrying both span-open scores,
+            // zeros included, ranked on the UNCLAMPED share: k = floor(n / 3),
+            // the bar is max(the ascending value at n - k, 1), clear = share > 0
+            // && >= bar, so a tie at the cut CLEARS WHOLE (NR-904: a bar never
+            // empties, and a tie band may clear more than a third), and with
+            // fewer than three regions nothing clears. `bars_of` builds a
             // table from shares; the score is the share capped at 1000 (-1
             // stays unsurveyed), so the cap pile below is one tied SCORE.
             const auto table_of = [](const std::vector<int>& fuel, const std::vector<int>& forest) {
@@ -2154,9 +2155,9 @@ int main()
             const industry_ground_bars b1 = bars_of(a_fuel, { 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0 });
             // (b) THE REVIEW'S CLIFF: six of nine at the SCORE cap, their
             // shares distinct -> bar 1400 and 3 clear (ranked on the score it
-            // would be one tied band and clear none). Forest: a tie band in the
-            // SHARE straddling the cut (four at 900 of nine) -> out whole, bar
-            // 901, none clear: never more than a third, however it ties.
+            // would be one tied band). Forest: a tie band in the SHARE
+            // straddling the cut (four at 900 of nine) -> it clears WHOLE
+            // (NR-904): bar 900, 4 of 9 clear, more than a third by design.
             const std::vector<int> b_fuel = { 100, 200, 300, 1100, 1200, 1300, 1400, 1500, 1600 };
             const std::vector<int> b_forest = { 100, 200, 300, 400, 500, 900, 900, 900, 900 };
             const industry_ground_bars b2 = bars_of(b_fuel, b_forest);
@@ -2167,28 +2168,31 @@ int main()
             const industry_ground_bars b3 = bars_of(c_fuel, { 100, 200, 300, 400, 500, 600, 900, 900, 900 });
             // (d) Fewer than three regions: nothing clears. (e) A founded region
             // (forest -1) carrying fuel 5000 is not read; an all-tied forest
-            // is a tie band across the cut: nothing clears.
+            // is a tie band across the cut, and clears whole: all six.
             const industry_ground_bars b4 = bars_of({ 500, 900 }, { 300, 700 });
             const industry_ground_bars b5 = bars_of({ 1, 2, 3, 4, 5, 6, 5000 }, { 1, 1, 1, 1, 1, 1, -1 });
+            // (b) and (e) under the OLD rule (a straddling band out whole)
+            // would read 901 / 2 and clear nothing; NR-904 makes them 900 / 1.
             std::printf("      top-third bars: zeros ranked (12 regions) -> fuel %d (%d clear) forest %d; score-cap pile"
-                        " -> fuel %d (%d clear); share tie band across the cut -> forest %d (%d clear); band above the"
-                        " cut -> forest %d; 2 carriers of 9 -> fuel %d (%d clear); <3 regions -> %s/%s; founded 5000"
-                        " unread -> fuel %d; all-tied forest -> %d\n",
+                        " -> fuel %d (%d clear); share tie band across the cut -> forest %d (%d of 9 clear); band above"
+                        " the cut -> forest %d; 2 carriers of 9 -> fuel %d (%d clear); <3 regions -> %s/%s; founded"
+                        " 5000 unread -> fuel %d; all-tied forest -> %d (%d of 6 clear)\n",
                         b1.fuel_raw, clears_of(a_fuel, b1.fuel_raw), b1.forest_raw, b2.fuel_raw,
                         clears_of(b_fuel, b2.fuel_raw), b2.forest_raw, clears_of(b_forest, b2.forest_raw), b3.forest_raw,
                         b3.fuel_raw, clears_of(c_fuel, b3.fuel_raw),
                         b4.fuel_raw == industry_ground_bar_none ? "none" : "SET",
-                        b4.forest_raw == industry_ground_bar_none ? "none" : "SET", b5.fuel_raw, b5.forest_raw);
+                        b4.forest_raw == industry_ground_bar_none ? "none" : "SET", b5.fuel_raw, b5.forest_raw,
+                        clears_of({ 1, 1, 1, 1, 1, 1 }, b5.forest_raw));
             check(b1.fuel_raw == 6 && clears_of(a_fuel, b1.fuel_raw) == 4 && b1.forest_raw == 6
                       && b2.fuel_raw == 1400 && clears_of(b_fuel, b2.fuel_raw) == 3
-                      && b2.forest_raw == 901 && clears_of(b_forest, b2.forest_raw) == 0
+                      && b2.forest_raw == 900 && clears_of(b_forest, b2.forest_raw) == 4
                       && b3.forest_raw == 900 && b3.fuel_raw == 1 && clears_of(c_fuel, b3.fuel_raw) == 2
                       && b4.fuel_raw == industry_ground_bar_none && b4.forest_raw == industry_ground_bar_none
-                      && b5.fuel_raw == 5 && b5.forest_raw == 2
+                      && b5.fuel_raw == 5 && b5.forest_raw == 1 && clears_of({ 1, 1, 1, 1, 1, 1 }, b5.forest_raw) == 6
                       && !industry_ground_clears(0, 0) && !industry_ground_clears(0, 1)
                       && industry_ground_clears(7, 7) && !industry_ground_clears(6, 7),
-                  "T8.7.7  the top-third bar: floor(n/3) of EVERY read region (zeros ranked) may clear, on the"
-                  " unclamped share (a score-cap pile no longer empties it), a tie band across the cut is out whole,"
+                  "T8.7.7  the top-third bar: floor(n/3) of EVERY read region (zeros ranked) sets the cut, on the"
+                  " unclamped share (a score-cap pile no longer empties it), a tie at the cut clears WHOLE (NR-904),"
                   " a 0 never clears however rare the resource, <3 regions clear nothing, founded ground unread");
         }
 
@@ -2260,9 +2264,9 @@ int main()
         // BL-1059 FIXTURE CHANGE (the bar semantics): the shares equal the
         // scores here, and the bars are STATED at 500 on both resources, the
         // cut the old mean made on these values (900 clears, 50 and the fuel
-        // 100 do not). Derived from this toy they would clear nothing -- its
-        // forest carriers hold a 900 tie band across the cut -- which is the
-        // tie rule working, not the scenario this check is about.
+        // 100 do not). Derived from this toy the fuel bar would be 100 -- every
+        // region ties at the cut and, a tie clearing whole (NR-904), clears --
+        // which is the tie rule working, not the scenario this check is about.
         industry_ground_bars cb;
         cb.fuel_raw   = 500;
         cb.forest_raw = 500;

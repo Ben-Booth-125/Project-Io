@@ -707,8 +707,10 @@ std::vector<uint32_t> library_seeds(const char* path)
 //   own stop -- folded with `make_digitisation_output`, equals generation's own
 //   1960 close (`era_minus_one_fixture::digitisation_handoff`) field for field
 //   and table for table, with the same battle, conquest and founding counts;
-//   and the opening table differs from the handoff in the survey's two fields
-//   only, with no region left unsurveyed.
+//   and the opening table differs from the handoff in the survey's four fields
+//   only (two scores and the two unclamped shares they are taken from:
+//   BL-1059), each score the survey's own formula applied to its share, with no
+//   region left unsurveyed.
 //   This is what makes the span "the real consumer of the resume" a checked
 //   claim: the resume gates 1 and 2 prove lossless is the resume the shipped
 //   world runs, and no settlement or creed state outside the struct reaches it.
@@ -731,12 +733,22 @@ namespace fidelity
 
 using field_census = std::map<std::string, int>; ///< field -> rows differing
 
-#define FID_CMP(f)     do { if (!(a.f == b.f)) ++out[#f]; } while (0)
-#define FID_CMP_ARR(f) do { if (!std::equal(std::begin(a.f), std::end(a.f), std::begin(b.f))) ++out[#f]; } while (0)
+/// When set, every FID_CMP names its field here as well as comparing it: the
+/// list's own census of itself (`region_list_is_the_struct`).
+std::set<std::string>* fid_listed = nullptr;
+
+#define FID_CMP(f)     do { if (fid_listed) fid_listed->insert(#f); if (!(a.f == b.f)) ++out[#f]; } while (0)
+#define FID_CMP_ARR(f) do { if (fid_listed) fid_listed->insert(#f); \
+                            if (!std::equal(std::begin(a.f), std::end(a.f), std::begin(b.f))) ++out[#f]; } while (0)
 
 /// Every `region` field, one by one. A field added to `region` later is not
-/// compared until it is listed here -- the census prints the field count it
-/// knows, so a reader can see the list is the struct's.
+/// compared until it is listed here, and two checks hold the list to the
+/// struct (BL-1059 round 3): `region_member_count` fails to COMPILE unless
+/// `region` has exactly `k_region_fields` data members (a structured binding
+/// must name every one), and `region_list_is_the_struct` fails the run unless
+/// this list names that many DISTINCT fields. Together: a member added,
+/// removed, or listed twice is caught; only a list that swaps one member's
+/// name for a non-member cannot compile anyway.
 void region_fields(const region& a, const region& b, field_census& out)
 {
     FID_CMP(anchor); FID_CMP(col); FID_CMP(row); FID_CMP(domain); FID_CMP(culture);
@@ -756,8 +768,43 @@ void region_fields(const region& a, const region& b, field_census& out)
     FID_CMP(survey_fuel_q); FID_CMP(survey_forest_q); // BL-1051: the span-open survey
     FID_CMP(survey_fuel_raw); FID_CMP(survey_forest_raw); // BL-1059: the shares the bars rank
     FID_CMP(industry_points);                         // BL-1041: the located stock
+    FID_CMP(industry_points_from_treasury);           // BL-1056: the report-only treasury tally
 }
-constexpr int k_region_fields = 56; // counts the FID_CMP lines above; keep them equal
+/// `region`'s data members, and so the fields `region_fields` must list.
+constexpr int k_region_fields = 57;
+
+/// COMPILE-TIME: a structured binding of a `region` must name exactly as many
+/// members as it has, so this stops compiling the moment `region` gains or
+/// loses one -- until `k_region_fields` and the list above follow it.
+[[maybe_unused]] void region_member_count(const region& r)
+{
+    static_assert(k_region_fields == 57, "bind every region member below");
+    const auto& [m01, m02, m03, m04, m05, m06, m07, m08, m09, m10,
+                 m11, m12, m13, m14, m15, m16, m17, m18, m19, m20,
+                 m21, m22, m23, m24, m25, m26, m27, m28, m29, m30,
+                 m31, m32, m33, m34, m35, m36, m37, m38, m39, m40,
+                 m41, m42, m43, m44, m45, m46, m47, m48, m49, m50,
+                 m51, m52, m53, m54, m55, m56, m57] = r;
+    (void)m01; (void)m02; (void)m03; (void)m04; (void)m05; (void)m06; (void)m07; (void)m08; (void)m09; (void)m10;
+    (void)m11; (void)m12; (void)m13; (void)m14; (void)m15; (void)m16; (void)m17; (void)m18; (void)m19; (void)m20;
+    (void)m21; (void)m22; (void)m23; (void)m24; (void)m25; (void)m26; (void)m27; (void)m28; (void)m29; (void)m30;
+    (void)m31; (void)m32; (void)m33; (void)m34; (void)m35; (void)m36; (void)m37; (void)m38; (void)m39; (void)m40;
+    (void)m41; (void)m42; (void)m43; (void)m44; (void)m45; (void)m46; (void)m47; (void)m48; (void)m49; (void)m50;
+    (void)m51; (void)m52; (void)m53; (void)m54; (void)m55; (void)m56; (void)m57;
+}
+
+/// RUN-TIME: `region_fields` names exactly `k_region_fields` DISTINCT fields.
+bool region_list_is_the_struct(std::size_t& listed)
+{
+    std::set<std::string> names;
+    fid_listed = &names;
+    const region a, b;
+    field_census tmp;
+    region_fields(a, b, tmp);
+    fid_listed = nullptr;
+    listed = names.size();
+    return listed == static_cast<std::size_t>(k_region_fields);
+}
 
 /// Every `polity` field, one by one (same caveat as `region_fields`).
 void polity_fields(const polity& a, const polity& b, field_census& out)
@@ -1290,6 +1337,17 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                 "R = a second call opened on the struct, on the span's own captured params.\n"
                 "field lists: region %d fields, polity %d fields, every row of every other resumed table.\n\n",
                 k_region_fields, k_polity_fields);
+    {
+        std::size_t listed = 0;
+        if (!region_list_is_the_struct(listed))
+        {
+            std::printf("FAIL  the region field list names %zu distinct fields; region has %d members\n"
+                        "FIDELITY FAIL\n", listed, k_region_fields);
+            return 1;
+        }
+        std::printf("region field list: %zu distinct fields == region's %d members (the member count is"
+                    " compile-time checked)\n\n", listed, k_region_fields);
+    }
     std::fflush(stdout);
 
     std::vector<seed_fidelity> rows;
@@ -1542,6 +1600,34 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                 const field_census beyond = census_of(expect, opened, region_fields);
                 if (!beyond.empty())
                     note("span opening", "differs from the handoff beyond the survey: " + census_text(beyond));
+                // BL-1059 round 3: each score IS the survey's own formula on
+                // its share -- floor(raw * 500 * n / sum(raw)), clamped to
+                // 0-1000, 0 on a sum <= 0 (`score_against_exact_mean`,
+                // settlement.cpp), over every region the survey saw -- so the
+                // share the bars rank is the one the score came from.
+                {
+                    const int64_t n = static_cast<int64_t>(opened.size());
+                    int64_t fuel_sum = 0, forest_sum = 0;
+                    for (const region& o : opened)
+                    {
+                        fuel_sum   += std::max(o.survey_fuel_raw, 0);
+                        forest_sum += std::max(o.survey_forest_raw, 0);
+                    }
+                    const auto score_of = [n](int raw, int64_t sum) {
+                        if (sum <= 0) return 0;
+                        const int64_t r = std::max(raw, 0);
+                        return static_cast<int>(std::clamp<int64_t>((r * 500 * n) / sum, 0, 1000));
+                    };
+                    int bad_fuel = 0, bad_forest = 0;
+                    for (const region& o : opened)
+                    {
+                        if (score_of(o.survey_fuel_raw, fuel_sum)     != o.survey_fuel_q)   ++bad_fuel;
+                        if (score_of(o.survey_forest_raw, forest_sum) != o.survey_forest_q) ++bad_forest;
+                    }
+                    if (bad_fuel > 0 || bad_forest > 0)
+                        note("span opening", "score not its share's (the survey's formula): fuel on "
+                             + std::to_string(bad_fuel) + " regions, forest on " + std::to_string(bad_forest));
+                }
                 if (unsurveyed > 0)
                     note("span opening", std::to_string(unsurveyed) + " regions left unsurveyed");
             }
@@ -3128,9 +3214,12 @@ int main(int argc, char** argv)
         // BL-1059: THE TOP-THIRD BARS, per seed (NR-900: ranked over every
         // read region, zeros in, on the UNCLAMPED share). Each clearance is
         // printed of the WORLD (the regions ranked; at most a third) and of
-        // the CARRIERS (regions with a nonzero share). Not gated: R4's band.
-        // GATED at the end of the run: a bar clearing no region while three
-        // or more carry the resource, and any of the three "did not move" legs.
+        // the CARRIERS (regions with a nonzero share). Not gated: a tie at the
+        // cut clears whole (NR-904), so on a heavily wooded world more than a
+        // third of the world clears on forest, by design. GATED at the end of
+        // the run: a bar clearing no region while three or more carry the
+        // resource (impossible under NR-904; kept as a guard), and any of the
+        // three "did not move" legs.
         std::printf("\n=== BL-1059 THE TOP-THIRD BARS, per seed (fixed at the span open over every surveyed region, on the"
                     " unclamped share; clear = share > 0 && >= bar) ===\n");
         std::printf("  bar = the sim's bar in share units (fuel: coal+petroleum per-tile mean x1000; forest: land share"
@@ -3888,7 +3977,8 @@ int main(int argc, char** argv)
     for (const seed_row& r : rows)
     {
         // BL-1059: a bar that moved on any leg, or a bar that clears no region
-        // while three or more carry the resource (the review's cliff).
+        // while three or more carry the resource (the review's cliff; with a
+        // tie at the cut clearing whole, NR-904, it cannot happen -- a GUARD).
         if (r.span_ran && (!r.bars_open || !r.bars_close || r.bars_rerun == 0)) ++bars_bad;
         if (r.span_ran && ((r.fuel_carriers >= 3 && r.fuel_clear == 0)
                         || (r.forest_carriers >= 3 && r.forest_clear == 0))) ++bars_empty;

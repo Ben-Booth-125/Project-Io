@@ -1413,11 +1413,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     // opens on is surveyed ONCE, from its own tiles, for fuel
                     // and forest -- here because this is the one place both
                     // the tiles and the 1660 region table are live (the sim has
-                    // neither `world&` nor tile ids by design). It writes two
-                    // NEW fields and nothing else: `energy_q`, the treasury
-                    // endowment and every gate mean stay as Exploration left
-                    // them. INSIDE THE SWITCH, so with the span off neither
-                    // field is ever written and no digest can see it.
+                    // neither `world&` nor tile ids by design). It writes four
+                    // NEW fields and nothing else -- two scores and the two
+                    // unclamped shares they are taken from (BL-1059, NR-900):
+                    // `energy_q`, the treasury endowment and every gate mean
+                    // stay as Exploration left them. INSIDE THE SWITCH, so with the span off none of
+                    // the four is ever written and no digest can see them.
                     //
                     // AFTER the struct copy above, so the 1660 handoff value
                     // itself stays exactly the close Exploration folded (its
