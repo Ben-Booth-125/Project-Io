@@ -115,6 +115,23 @@
     "docs/generation/trees/INDUSTRY_TREE.md"
    ],
    "resolution": "RULED (Ben, 2026-09-19): option C, and founded ground stays excluded from both pulls. Each pull counts held regions in the top third of the world for its own resource, a bar fixed at the span open. Written into INDUSTRY_TREE.md § The scorer; the work is BL-1059 (top-third bar)."
+  },
+  {
+   "id": "NR-900",
+   "title": "DECISION TAKEN: the top-third bar ranks only the regions that carry the resource, and a tie band at the cut falls out whole",
+   "raised": "2026-09-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1059 (top-third bar) build lane, commit 15713143.",
+   "what": "NR-899 ruled 'the top third of every region's score'. The lane ranked the NONZERO scores only: with m nonzero, k = floor(m/3), the bar is the value at position m-k of the ascending sort; a tie band straddling the cut is pushed out whole (bar = value + 1); fewer than three nonzero scores and nothing clears. Ranking every score would put coal's cut among regions with no coal and let most coal regions clear. Result over 16 seeds: each bar clears 31.8-33.3% of carrying regions; the Fuel Doctrine split is coke 239 / charcoal 277 / neither 340 (from 142 / 373 / 341); coke realms read fuel 514, charcoal realms forest 476. The bars live on history_sim_state (never serialised) so a harness can prove they never move.",
+   "why_it_matters": "It sets which ground counts as a coalfield or a forest for the Fuel Doctrine, and so the 1960 split BL-1043 measures.",
+   "options": [],
+   "recommendation": "Keep it. Written into INDUSTRY_TREE.md § The scorer.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/trees/INDUSTRY_TREE.md"
+   ],
+   "resolution": null
   }
  ]
 }
