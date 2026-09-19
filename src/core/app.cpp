@@ -1094,14 +1094,15 @@ void app::start_new_game_prelude()
                 return static_cast<long long>(stockpile.unspent[static_cast<std::size_t>(k)]);
             };
             std::printf("[stockpile_budget] %lld points: %lld to %zu centres, %lld unspent "
-                        "(carve_dropped %lld, carve_no_tile %lld, no_carved_centre %lld, "
-                        "rejected %lld)%s%s; spent %lld of %lld%s\n",
+                        "(carve_dropped %lld, carve_no_tile %lld, razed %lld, "
+                        "no_carved_centre %lld, rejected %lld)%s%s; spent %lld of %lld%s\n",
                         static_cast<long long>(stockpile.points_total),
                         static_cast<long long>(stockpile.points_to_centres),
                         stockpile.budget.points().size(),
                         static_cast<long long>(stockpile.points_unspent()),
                         why(stockpile_unspent_reason::carve_dropped),
                         why(stockpile_unspent_reason::carve_no_tile),
+                        why(stockpile_unspent_reason::razed),
                         why(stockpile_unspent_reason::no_carved_centre),
                         why(stockpile_unspent_reason::rejected),
                         stockpile.rejected ? " REJECTED: " : "",

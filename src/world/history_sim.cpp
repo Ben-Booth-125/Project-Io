@@ -1045,8 +1045,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // urban scale, by integer largest-remainder apportionment -- a treasury
         // builds its realm's works where its people are. Landing them all on
         // the capital's region let one region hold up to 65% of a world's
-        // points. The capital still leads where it is the largest centre; a
-        // realm with no held centre carrying heads lands them there, as before.
+        // points. The capital still leads where it is the largest centre.
+        // NR-901 (RULED, Ben 2026-09-19, option A): A POLITY THAT HOLDS NO TOWN
+        // CONVERTS NOTHING -- no held region stands a centre carrying heads, so
+        // there is nowhere for its works to stand: no debit, no credit, and the
+        // treasury keeps the round's share. (It used to land the whole credit on
+        // the capital's region, townless ground no campaign centre can receive.)
         // A treasury unit is `industry_points_per_treasury_unit` points (a
         // unit choice, history_sim.hpp says why). Only inside the span (the switch,
         // from its open year) and only on in-domain constants; a conversion
@@ -1066,7 +1070,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 const int64_t credit = paid_in * params.industry_points_per_treasury_unit;
                 std::vector<std::pair<int, int64_t>> spread;
                 bool refuse = !industry_points_apportion_by_scale(regions, q.id, credit, spread);
-                if (!refuse && spread.empty()) spread.emplace_back(q.capital, credit); // no centre: the seat
+                // NR-901: no town, no conversion. Not a refusal (nothing was out
+                // of domain) and not a debit: the purse keeps the share.
+                const bool no_town = !refuse && spread.empty();
                 // Refused whole: past the ceiling on any receiving region, the
                 // apportionment's domain, or (never on a sane purse, whose base
                 // is >= 0) more than the purse holds.
@@ -1074,7 +1080,11 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                     if (regions[static_cast<std::size_t>(part.first)].industry_points
                             > industry_points_ceiling - part.second)
                         refuse = true;
-                if (refuse || paid_in > seat.treasury)
+                if (no_town)
+                {
+                    // Nothing moves: the treasury keeps the round's share.
+                }
+                else if (refuse || paid_in > seat.treasury)
                 {
                     if (spend) ++spend->industry_points_refused;
                 }

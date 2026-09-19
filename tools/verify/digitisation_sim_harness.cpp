@@ -114,6 +114,7 @@
 // ---------------------------------------------------------------------------
 
 #include "harness_params.hpp" // apply_shipped_landscape, print_shipped_landscape
+#include "world/stockpile_budget.hpp" // BL-1042: the budget reading [1] was laid from
 
 #include "scripting/lua_state.hpp"
 #include "world/components.hpp"
@@ -536,6 +537,24 @@ struct seed_row
     int     regions_original   = 0;     ///< regions at the close of each class, holding points or not
     int     regions_resurveyed = 0;
     int     regions_span_founded = 0;
+
+    // --- BL-1042: the charter budget the landscape was laid from -----------
+    // `apply_shipped_landscape` builds the world's own stockpile budget, as the
+    // app does. With the span on it is a BUDGET WORLD only when the budget is
+    // non-empty, not rejected and its spend not refused; otherwise the firms
+    // are today's legacy web and reading [1] is not the budget's cause.
+    int64_t sp_points      = 0;   ///< the region stock (points)
+    int64_t sp_to_centres  = 0;   ///< points that reached a carved centre's budget
+    int     sp_centres     = 0;   ///< centres holding a budget
+    int64_t sp_unspent[stockpile_unspent_reason_count] = {};
+    bool    sp_rejected    = false;
+    bool    ch_refused     = false;  ///< the spend params were refused
+    int64_t ch_spent       = 0;
+    int64_t ch_unspent     = 0;
+    int     ch_specialists = 0;
+    int     ch_firms       = 0;
+    /// "budget", "legacy (empty budget)", "REJECTED", "spend REFUSED".
+    const char* budget_world = "legacy (empty budget)";
 
     // --- Reading 1: density follows cities (campaign world) -----------------
     int    markets        = 0;
@@ -1954,7 +1973,8 @@ int run_resume_tier(const std::vector<uint32_t>& seeds, const world_gen_config& 
 /// NR-897): `industry_points_apportion_by_scale` sums to the credit, gives a
 /// larger centre no fewer points than a smaller one, breaks an exact tie to
 /// the lower region index, skips centreless and foreign ground, returns empty
-/// (the capital fallback) with no centre, and refuses past its domain.
+/// with no centre (no town: the caller converts nothing, NR-901), and refuses
+/// past its domain.
 bool bl1056_self_check()
 {
     bool ok = true;
@@ -2082,7 +2102,7 @@ bool bl1056_self_check()
                 (long long)sum,
                 tie.size() > 0 ? (long long)tie[0].second : -1LL, tie.size() > 1 ? (long long)tie[1].second : -1LL,
                 tie.size() > 2 ? (long long)tie[2].second : -1LL, tie.size() > 3 ? (long long)tie[3].second : -1LL,
-                n_ok ? "empty (the capital fallback)" : "WRONG", refuse_ok ? "refused" : "NOT REFUSED");
+                n_ok ? "empty (no town: nothing converts)" : "WRONG", refuse_ok ? "refused" : "NOT REFUSED");
     if (!a_ok || sum != 1001 || !shape || !t_ok || !tie_ok || !n_ok || !refuse_ok)
     {
         std::printf("FAIL  BL-1056 (2): the treasury points did not apportion exactly by urban scale\n");
@@ -2289,9 +2309,37 @@ int main(int argc, char** argv)
         world w = make_hard_coded_world(wp, &rep, cfg, /*progress=*/nullptr, &works, &fx);
 
         reg.set_era(era_band_for_epoch(wp.epoch_year)); // app::load_economy
-        const shipped_landscape land = apply_shipped_landscape(w, reg, wp.seed);
+        // BL-1042: no budget handed in, so the mirror builds the stockpile's,
+        // as the app does; the winner's charter report comes back here.
+        charter_spend_report charter_rep;
+        harness_charter_input charter_in;
+        charter_in.report = &charter_rep;
+        const shipped_landscape land = apply_shipped_landscape(
+            w, reg, wp.seed, /*search=*/true, world_gen_config{}.corporation_count, charter_in);
         std::printf("seed %u ", seed);
         print_shipped_landscape(land);
+        const stockpile_budget& sp = land.stockpile;
+        const char* budget_world = sp.rejected                  ? "REJECTED"
+                                 : sp.budget.empty()            ? "legacy (empty budget)"
+                                 : charter_rep.refused          ? "spend REFUSED"
+                                                                : "budget";
+        {
+            long long ch_unspent = 0;
+            for (const charter_unspent& u : charter_rep.unspent) ch_unspent += u.points;
+            std::printf("seed %u CHARTER BUDGET (BL-1042): %s world | stockpile %lld points -> %lld to %zu "
+                        "centres; unspent",
+                        seed, budget_world, (long long)sp.points_total, (long long)sp.points_to_centres,
+                        sp.budget.points().size());
+            for (int k = 0; k < stockpile_unspent_reason_count; ++k)
+                std::printf(" %s %lld", stockpile_unspent_reason_name(static_cast<stockpile_unspent_reason>(k)),
+                            (long long)sp.unspent[static_cast<std::size_t>(k)]);
+            if (sp.rejected) std::printf(" (REJECTED: %s)", sp.rejection.c_str());
+            std::printf(" | charter: budgeted %lld, spent %lld, unspent %lld, %zu specialists, %zu firms%s%s\n",
+                        (long long)charter_rep.points_budgeted, (long long)charter_rep.points_spent,
+                        ch_unspent, charter_rep.specialists.size(), charter_rep.firms.size(),
+                        charter_rep.refused ? " REFUSED: " : "",
+                        charter_rep.refused ? charter_rep.refusal.c_str() : "");
+        }
 
         // BL-1053 -- THE SETUP-DIFF LINE. World setup's four reads of the
         // history (grudges, stamped roads, junction corridors, treasuries)
@@ -2324,6 +2372,19 @@ int main(int argc, char** argv)
 
         seed_row row;
         row.seed     = seed;
+        // BL-1042: the budget the landscape was laid from.
+        row.sp_points     = sp.points_total;
+        row.sp_to_centres = sp.points_to_centres;
+        row.sp_centres    = static_cast<int>(sp.budget.points().size());
+        for (int k = 0; k < stockpile_unspent_reason_count; ++k)
+            row.sp_unspent[k] = sp.unspent[static_cast<std::size_t>(k)];
+        row.sp_rejected    = sp.rejected;
+        row.ch_refused     = charter_rep.refused;
+        row.ch_spent       = charter_rep.points_spent;
+        for (const charter_unspent& u : charter_rep.unspent) row.ch_unspent += u.points;
+        row.ch_specialists = static_cast<int>(charter_rep.specialists.size());
+        row.ch_firms       = static_cast<int>(charter_rep.firms.size());
+        row.budget_world   = budget_world;
         row.era_ran  = fx.ran;
         row.expl_ran = fx.exploration_ran;
         row.close_ran = span_mode ? fx.digitisation_ran : fx.exploration_ran;
@@ -3181,9 +3242,28 @@ int main(int argc, char** argv)
 
     // ---- 1 ------------------------------------------------------------------
     {
-        std::printf("[ 1] Density follows cities - MEASURED on the campaign world built on the %lld close (firms\n"
-                    "     laid by today's landscape search; the city charter budget meant to lay them does not exist,\n"
-                    "     so running past 1660 moves this reading's inputs, not its cause)\n", T);
+        // BL-1042: the firms are laid by the applied landscape search FROM THE
+        // WORLD'S OWN STOCKPILE BUDGET (apply_shipped_landscape, as the app).
+        // With the span off that budget is empty and the web is today's legacy
+        // one; with it on, a world is a budget world only when its budget is
+        // non-empty, accepted and priced. Say which, per world, so a rejected or
+        // empty budget cannot pass for a real one.
+        std::size_t budget_worlds = 0, legacy_worlds = 0, rejected_worlds = 0, refused_worlds = 0;
+        for (const seed_row& r : rows)
+        {
+            const std::string bw = r.budget_world;
+            if (bw == "budget") ++budget_worlds;
+            else if (bw == "REJECTED") ++rejected_worlds;
+            else if (bw == "spend REFUSED") ++refused_worlds;
+            else ++legacy_worlds;
+        }
+        std::printf("[ 1] Density follows cities - MEASURED on the campaign world built on the %lld close. Firms are\n"
+                    "     laid by the applied landscape search from the world's own STOCKPILE charter budget\n"
+                    "     (BL-1042; PROVISIONAL prices, BL-1044): %zu of %zu worlds are BUDGET worlds, %zu legacy (empty\n"
+                    "     budget - no stock, e.g. the span off: the firms are today's web, not the budget's cause),\n"
+                    "     %zu REJECTED, %zu spend REFUSED (both fall back to the legacy web). Per-world accounts are the\n"
+                    "     CHARTER BUDGET lines above.\n", T, budget_worlds, rows.size(), legacy_worlds,
+                    rejected_worlds, refused_worlds);
         std::printf("     firm = a corporation with >= 1 installation clearing against the market (market_for_tile);\n"
                     "     urban population = non-razed centres routed there; good count = distinct goods deposited\n"
                     "     on the catchment's tiles. Spearman rho across one world's markets:\n");
@@ -3714,6 +3794,19 @@ int main(int argc, char** argv)
                 put_rho("rho_scale_int_fuel", r.rho_scale_int_fuel, ", ");
                 put_rho("share_original", r.share_original, ", ");
                 put_rho("share_resurveyed", r.share_resurveyed, ",\n");
+                // BL-1042: the budget reading [1]'s firms were laid from.
+                std::fprintf(f, "   \"budget_world\": \"%s\", \"stockpile_points\": %lld, \"stockpile_to_centres\": %lld, "
+                                "\"stockpile_centres\": %d, \"stockpile_rejected\": %s, \"stockpile_unspent\": {",
+                             r.budget_world, (long long)r.sp_points, (long long)r.sp_to_centres, r.sp_centres,
+                             r.sp_rejected ? "true" : "false");
+                for (int k = 0; k < stockpile_unspent_reason_count; ++k)
+                    std::fprintf(f, "%s\"%s\": %lld", k ? ", " : "",
+                                 stockpile_unspent_reason_name(static_cast<stockpile_unspent_reason>(k)),
+                                 (long long)r.sp_unspent[k]);
+                std::fprintf(f, "}, \"charter_refused\": %s, \"charter_spent\": %lld, \"charter_unspent\": %lld, "
+                                "\"charter_specialists\": %d, \"charter_firms\": %d,\n",
+                             r.ch_refused ? "true" : "false", (long long)r.ch_spent, (long long)r.ch_unspent,
+                             r.ch_specialists, r.ch_firms);
                 std::fprintf(f, "   \"markets\": %d, \"markets_urban\": %d, \"corps_on_body\": %d, ",
                              r.markets, r.markets_urban, r.corps_on_body);
                 put_rho("rho_firms_urban", r.rho_firms_urban, ", ");

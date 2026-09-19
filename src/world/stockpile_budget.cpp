@@ -16,10 +16,10 @@ namespace {
 /// One carved slot of a region: a founded centre (id) or a dropped one (null).
 struct slot_ref
 {
-    int                     rank   = 0;
-    std::int64_t            key    = 0;
-    entity_id               centre = null_entity;
-    stockpile_unspent_reason drop  = stockpile_unspent_reason::carve_dropped;
+    int                      rank   = 0;
+    std::int64_t             key    = 0;
+    entity_id                centre = null_entity;
+    stockpile_unspent_reason drop   = stockpile_unspent_reason::carve_dropped;
 };
 
 stockpile_budget rejected_budget(std::int64_t points_total, std::vector<stockpile_region_row> rows,
@@ -33,6 +33,8 @@ stockpile_budget rejected_budget(std::int64_t points_total, std::vector<stockpil
     for (stockpile_region_row& r : rows)
     {
         r.to_centres = 0;
+        r.founded    = 0;
+        r.dropped    = 0;
         r.unspent    = {};
         r.unspent[static_cast<std::size_t>(stockpile_unspent_reason::rejected)] = r.points;
     }
@@ -44,17 +46,25 @@ stockpile_budget rejected_budget(std::int64_t points_total, std::vector<stockpil
 
 stockpile_budget build_stockpile_budget(const world& w)
 {
-    stockpile_budget out;
     const settlement_state* ss = w.gen_settlement.get();
-    if (ss == nullptr)
+    return build_stockpile_budget(ss != nullptr ? &ss->regions : nullptr,
+                                  w.gen_carve_centres, w.gen_carve_dropped);
+}
+
+stockpile_budget build_stockpile_budget(const std::vector<region>*             regions,
+                                        const std::map<entity_id, carve_slot>& founded,
+                                        const std::vector<carve_dropped_slot>& dropped)
+{
+    stockpile_budget out;
+    if (regions == nullptr)
         return out;   // a loaded world or a fixture: no stockpile, nothing to account
 
     // --- the stock, per region ----------------------------------------------
     std::vector<stockpile_region_row> rows;
     std::int64_t total = 0;
-    for (std::size_t ri = 0; ri < ss->regions.size(); ++ri)
+    for (std::size_t ri = 0; ri < regions->size(); ++ri)
     {
-        const std::int64_t pts = ss->regions[ri].industry_points;
+        const std::int64_t pts = (*regions)[ri].industry_points;
         if (pts == 0)
             continue;
         stockpile_region_row row;
@@ -77,20 +87,29 @@ stockpile_budget build_stockpile_budget(const world& w)
     if (total == 0)
         return out;   // THE SPAN OFF: no point anywhere, an empty budget, today's world
 
+    // A stock with points and NO carve index at all is not "regions that carved
+    // no centre": the index was lost (a snapshot copy or a load keeps the
+    // settlement record's pointer but not the index). Rejected whole, as
+    // inconsistent, so the loss is loud rather than counted as razing.
+    if (founded.empty() && dropped.empty())
+        return rejected_budget(total, std::move(rows),
+                               "inconsistent: the stockpile holds points but the carve index is empty "
+                               "(lost in a copy or a load?)");
+
     // --- the carve's slots, per region ----------------------------------------
     // Founded slots in ascending centre id (a std::map), then dropped slots in
     // carve order; each region's list is then sorted by rank, a total order, so
     // the split never depends on how the lists were filled.
     std::map<int, std::vector<slot_ref>> slots;
-    const int region_count = static_cast<int>(ss->regions.size());
-    for (const auto& [centre, cs] : w.gen_carve_centres)
+    const int region_count = static_cast<int>(regions->size());
+    for (const auto& [centre, cs] : founded)
     {
         if (cs.region < 0 || cs.region >= region_count)
             return rejected_budget(total, std::move(rows),
                                    "a carved centre names a region outside the settlement record");
         slots[cs.region].push_back({ cs.rank, cs.key, centre, stockpile_unspent_reason::carve_dropped });
     }
-    for (const carve_dropped_slot& d : w.gen_carve_dropped)
+    for (const carve_dropped_slot& d : dropped)
     {
         if (d.region < 0 || d.region >= region_count)
             return rejected_budget(total, std::move(rows),
@@ -113,7 +132,16 @@ stockpile_budget build_stockpile_budget(const world& w)
         const auto it = slots.find(row.region);
         if (it == slots.end() || it->second.empty())
         {
-            row.unspent[static_cast<std::size_t>(stockpile_unspent_reason::no_carved_centre)] = row.points;
+            // NR-901 (Ben 2026-09-19, option A): points on a region whose towns
+            // were razed are LOST WITH THEM. A region earns points only while it
+            // holds centres, so a point-holding region the carve towns nobody
+            // lost its towns after they built; `centres_razed` says history
+            // destroyed them. Anything else is the residual, a finding.
+            const region& rg = (*regions)[static_cast<std::size_t>(row.region)];
+            const stockpile_unspent_reason why = rg.centres_razed > 0
+                ? stockpile_unspent_reason::razed
+                : stockpile_unspent_reason::no_carved_centre;
+            row.unspent[static_cast<std::size_t>(why)] = row.points;
             continue;
         }
         const std::vector<slot_ref>& list = it->second;

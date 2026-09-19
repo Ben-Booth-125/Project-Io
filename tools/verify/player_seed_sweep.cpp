@@ -1323,28 +1323,38 @@ void print_stockpile_account(const world& w, const stockpile_budget& sb,
         ch_unspent += u.points;
     std::printf("      stockpile slots: %d founded, %d dropped over the point-holding regions; "
                 "richest centre %d points\n", founded, dropped, static_cast<int>(richest));
-    // WHY a region holding points carved no centre: the carve skips a region
-    // with no population or no centres at the epoch (emptied, razed or ruined
-    // after its points accrued). Read off the same settlement record.
+    // WHY a region holding points carved no centre (NR-901): per region, its
+    // points, the part the treasury paid in (`industry_points_from_treasury`),
+    // the towns history razed there (`centres_razed`) and what stands at the
+    // epoch — so the cause is on the page, not inferred. `razed` rows lost
+    // their towns to war; a `no_carved_centre` (residual) row is a finding.
     if (const settlement_state* ss = w.gen_settlement.get())
     {
-        int n = 0, no_pop = 0, no_centres = 0;
-        long long pts_no_pop = 0, pts_no_centres = 0;
+        constexpr int k_max_rows = 40;
+        int shown = 0, n = 0;
         for (const stockpile_region_row& r : sb.regions)
         {
-            const std::int64_t u =
+            const std::int64_t razed =
+                r.unspent[static_cast<std::size_t>(stockpile_unspent_reason::razed)];
+            const std::int64_t resid =
                 r.unspent[static_cast<std::size_t>(stockpile_unspent_reason::no_carved_centre)];
-            if (u == 0)
+            if (razed == 0 && resid == 0)
                 continue;
             ++n;
+            if (shown >= k_max_rows)
+                continue;
+            ++shown;
             const region& rg = ss->regions[static_cast<std::size_t>(r.region)];
-            if (rg.population <= 0) { ++no_pop; pts_no_pop += u; }
-            else if (rg.centres <= 0) { ++no_centres; pts_no_centres += u; }
+            std::printf("        region %5d %-16s points %10lld (from treasury %10lld) centres_razed %3d | "
+                        "at the epoch: centres %d, urban %lld, population %lld\n",
+                        r.region, razed != 0 ? "razed" : "NO_CARVED_CENTRE",
+                        static_cast<long long>(r.points),
+                        static_cast<long long>(rg.industry_points_from_treasury),
+                        rg.centres_razed, rg.centres, static_cast<long long>(rg.urban_population),
+                        static_cast<long long>(rg.population));
         }
-        if (n > 0)
-            std::printf("      no_carved_centre: %d regions — population 0 at the epoch %d (%lld "
-                        "points), centres 0 with people %d (%lld points), other %d\n",
-                        n, no_pop, pts_no_pop, no_centres, pts_no_centres, n - no_pop - no_centres);
+        if (n > shown)
+            std::printf("        ... %d more such regions not printed\n", n - shown);
     }
     std::printf("      ACCOUNT: stock %lld = spent %lld + charter unspent %lld + stockpile unspent %lld "
                 "(%s)\n",
@@ -1517,7 +1527,11 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                                          || !report.charters.empty();
                 if (mode == charter_mode::refused && !(search_refused && report.refused))
                     diffs += " REFUSAL-FLAG (the search or the apply did not report the refusal)";
-                if ((mode == charter_mode::empty || mode == charter_mode::zero)
+                // BL-1042 fix round: `none` too — every pinned world is span
+                // off, so the shipped path's stockpile budget is empty there
+                // and must raise no flag and write no report either.
+                if ((mode == charter_mode::empty || mode == charter_mode::zero
+                     || mode == charter_mode::none)
                     && (search_refused || report_written))
                     diffs += " EMPTY-FLAG (an empty budget raised the refusal or wrote a report)";
                 if (!unbalanced.empty())
