@@ -2633,8 +2633,11 @@ struct charter_centre
     /// and the nation's nearest region can be anywhere in the nation.
     int          anchor_region_idx    = -1;
 
-    /// Points left for background firms once the specialist price is taken.
-    int32_t      firm_points = 0;
+    /// Points left for background firms once the specialist price is taken —
+    /// UNROUNDED, so its remainder below one firm price is booked `remainder`.
+    /// Not B's per-centre term (`charter_centre_firm_points`, whole firm
+    /// charters), which is summed into the body's `firm_points`.
+    int32_t      points_after_specialist = 0;
 
     std::array<int32_t, charter_unspent_reason_count> unspent{};
 
@@ -2993,6 +2996,12 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     //    All three halves, not the consumer half alone, because the legacy cap
     //    spends 8 firms on an upkeep or construction good exactly as on a
     //    household one, and B_ref is what that cap would spend.
+    //    THE COST OF FIXING IT (BL-1060): under `sqrt_capital` the turn serves
+    //    G, so a good the walk's own firms make short — their upkeep draws a
+    //    good no base installation did — gets no firm. That shortfall is real,
+    //    so when it is all that is left a centre's rest is booked
+    //    `late_shortfall`, never `no_gap` (which says there was none). The
+    //    legacy rules pick from every good and have no such case.
     //  * B_ref = c x |G| x firm price and the per-good cap
     //    (`charter_sqrt_per_good_cap`: cap(B_ref) == c exactly, so a body whose
     //    firm spend is the legacy firm spend keeps the legacy cap), the density
@@ -3086,13 +3095,13 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         if (cc.nation == null_entity)
             continue;
         const nation_component& nc = w.nations.at(cc.nation);
-        cc.firm_points = cc.points;
+        cc.points_after_specialist = cc.points;
 
         // --- this centre's specialist, if it can afford one -------------------
         if (static_cast<int64_t>(cc.points) >= specialist_price)
         {
             const int32_t price = static_cast<int32_t>(specialist_price);   // <= points
-            cc.firm_points = cc.points - price;
+            cc.points_after_specialist = cc.points - price;
 
             // Focus and ownership from the CHARACTER region, as Passes 2 and 2b
             // read them; with none, the national-character fallback
@@ -3170,11 +3179,11 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         }
 
         // --- then what remains buys this centre's background firms -------------
-        if (cc.firm_points <= 0)
+        if (cc.points_after_specialist <= 0)
             continue;
 
-        const int32_t n_firms  = cc.firm_points / spend.firm_price_points;
-        const int32_t leftover = cc.firm_points % spend.firm_price_points;
+        const int32_t n_firms  = cc.points_after_specialist / spend.firm_price_points;
+        const int32_t leftover = cc.points_after_specialist % spend.firm_price_points;
         if (leftover > 0)
             cc.unspent[static_cast<std::size_t>(charter_unspent_reason::remainder)] += leftover;
         if (n_firms <= 0)
@@ -3187,6 +3196,13 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         std::mt19937 asset_rng = charter_stream(seed, k_charter_salt_firm_asset, cc.centre);
         std::mt19937 name_rng  = charter_stream(seed, k_charter_salt_firm_name,  cc.centre);
         std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_firm_stock, cc.centre);
+
+        // NR-903 (the turn only): the goods whose placement failed at THIS
+        // centre, skipped for the rest of it, and the reason each failure named.
+        // Never set under a legacy rule, whose first failed placement ends the
+        // centre.
+        std::array<bool, resource_count> skipped{};
+        std::array<charter_unspent_reason, resource_count> skip_reason{};
 
         for (int32_t k = 0; k < n_firms; ++k)
         {
@@ -3216,12 +3232,13 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // `per_resource_firm_cap` under `fixed` (BL-1033's cap kept), none
             // under `lifted` (cap lifted — neither the mask below nor the yard's
             // cap test applies), the square-root rule's under `sqrt_capital`. The
-            // yard's `want_yards` bound, the province cap, the body guard and the
-            // no_gap stop are the same under every rule.
+            // yard's `want_yards` bound, the province cap and the body guard are
+            // the same under every rule.
             //
             // THE ORDER: construction first under every rule; then biggest gap
             // first under the two legacy rules (Pass 6's, verbatim), or the TURN
-            // under `sqrt_capital` (below).
+            // under `sqrt_capital` (below), which alone skips a good it cannot
+            // place (NR-903) and names a late shortfall (BL-1060).
             std::array<float, resource_count> production = {};
             accumulate_body_production(w, reg, cc.body, production);
 
@@ -3240,29 +3257,33 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     if (bs.firms_by_resource[r] >= bs.per_good_cap)
                         selectable[r] = std::max(selectable[r], demand[r]);
 
+            // THE YARD, under every rule: construction capacity provisioned first,
+            // bounded by `want_yards` and the per-good cap (Pass 6's step).
+            const std::size_t cap_i = static_cast<std::size_t>(resource_type::construction_capacity);
+            const int         ci    = best_construction_recipe(reg);
+            bool yard_wanted = false;
+            if (ci >= 0
+                && (bs.per_good_cap < 0
+                    || bs.firms_by_resource[cap_i] < bs.per_good_cap))
+            {
+                const float per_yard =
+                    reg.recipe_at(building_type::processing_facility, ci).outputs[cap_i];
+                const int want_yards =
+                    (per_yard > 0.0f)
+                        ? static_cast<int>(std::ceil(demand[cap_i] / per_yard))
+                        : 0;
+                yard_wanted = bs.firms_by_resource[cap_i] < want_yards
+                           && demand[cap_i] > selectable[cap_i];
+            }
+
             std::size_t gap_r    = resource_count;
             int         recipe_i = -1;
+            // `skipped` is only ever set under the turn, so under a legacy rule
+            // this is the yard step exactly as Pass 6 has it.
+            if (yard_wanted && !skipped[cap_i])
             {
-                const std::size_t cap_i =
-                    static_cast<std::size_t>(resource_type::construction_capacity);
-                const int ci = best_construction_recipe(reg);
-                if (ci >= 0
-                    && (bs.per_good_cap < 0
-                        || bs.firms_by_resource[cap_i] < bs.per_good_cap))
-                {
-                    const float per_yard =
-                        reg.recipe_at(building_type::processing_facility, ci).outputs[cap_i];
-                    const int want_yards =
-                        (per_yard > 0.0f)
-                            ? static_cast<int>(std::ceil(demand[cap_i] / per_yard))
-                            : 0;
-                    if (bs.firms_by_resource[cap_i] < want_yards
-                        && demand[cap_i] > selectable[cap_i])
-                    {
-                        gap_r    = cap_i;
-                        recipe_i = ci;
-                    }
-                }
+                gap_r    = cap_i;
+                recipe_i = ci;
             }
 
             // THE TURN (`sqrt_capital`; Ben, 2026-09-18: "fill goods in turn: a
@@ -3276,79 +3297,157 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // where the last firm on this body left off: the first good at or
             // after the cursor that is under its cap AND still short (demand >
             // production, both re-measured this firm) gets it. A good at its cap,
-            // or no longer short, is passed over. When no good in the turn
-            // qualifies, the rest is `no_gap`, as under every rule. The order is a
-            // sorted vector and an index — nothing depends on a container's layout.
+            // or no longer short, is passed over. The order is a sorted vector and
+            // an index — nothing depends on a container's layout.
             //
             // The good's firm serves THAT good: its recipe is the best recipe for
             // the good alone (the most output of it, ties to registry order), and
             // with none the firm is an extraction firm, exactly the legacy test.
             //
-            // The cursor moves only when the firm is chartered. A placement that
-            // fails ends this centre's firms under the reason it names, as under
-            // every rule, and the next centre on the body retries the same good.
-            std::size_t turn_at   = 0;
-            bool        from_turn = false;
-            if (gap_r == resource_count && bs.in_turn)
+            // A GOOD THAT CANNOT BE PLACED IS SKIPPED, NOT FATAL (Ben, 2026-09-19,
+            // NR-903; DIGITISATION.md § 1): when this centre's windows hold no
+            // ground for it — an extraction good wants an unoccupied deposit tile,
+            // which a dense city window often lacks — the good is passed over for
+            // THE REST OF THIS CENTRE and the turn moves on to the next, in this
+            // same firm. The yard is skipped the same way, so a centre with no
+            // room for a works still charters the mines it has ground for. Skipping
+            // for the rest of the centre is not a shortcut: a failed placement
+            // moves nothing and draws nothing, and the windows only fill as firms
+            // land, so a retry here could only fail again. The loop ends — every
+            // pass through it either places, stops, or skips a good not skipped
+            // before — and THE CENTRE STOPS ONLY WHEN NO GOOD IN THE TURN CAN
+            // PLACE: what is left is booked `province_cap` if the cap took ground
+            // from any good still wanting a firm, else `window_exhausted`.
+            //
+            // The cursor moves only when a firm is chartered, past the good just
+            // served, so a good skipped at one centre waits for the turn to come
+            // round again; the next centre on the body retries it then.
+            //
+            // When no good in the turn is short and under its cap, the rest is
+            // `no_gap` — unless a good OUTSIDE G is short, which only the walk's
+            // own firms can have caused (their upkeep): the turn serves G alone,
+            // so that is `late_shortfall`, a real shortfall left unserved (BL-1060).
+            std::size_t            turn_at       = 0;
+            bool                   from_turn     = false;
+            bool                   go_processing = false;
+            industrial_focus       focus         = industrial_focus::extraction;
+            charter_rung           rung          = charter_rung::centre_window;
+            std::vector<entity_id> assets;
+            bool                   stop          = false;
+            for (;;)
             {
-                const std::size_t n = bs.turn.size();
-                for (std::size_t k = 0; k < n; ++k)
+                if (gap_r == resource_count && bs.in_turn)
                 {
-                    const std::size_t at = (bs.turn_cursor + k) % n;
-                    const std::size_t r  = bs.turn[at];
-                    if (bs.firms_by_resource[r] >= bs.per_good_cap)
-                        continue;
-                    if (!(demand[r] > production[r]))
-                        continue;
-                    gap_r     = r;
-                    turn_at   = at;
-                    from_turn = true;
-                    break;
+                    const std::size_t n = bs.turn.size();
+                    for (std::size_t step = 0; step < n; ++step)
+                    {
+                        const std::size_t at = (bs.turn_cursor + step) % n;
+                        const std::size_t r  = bs.turn[at];
+                        if (bs.firms_by_resource[r] >= bs.per_good_cap)
+                            continue;
+                        if (!(demand[r] > production[r]))
+                            continue;
+                        if (skipped[r])
+                            continue;
+                        gap_r     = r;
+                        turn_at   = at;
+                        from_turn = true;
+                        break;
+                    }
+                    if (gap_r == resource_count)
+                    {
+                        // No good in the turn can take a firm here. Name why.
+                        bool unplaceable = false, capped = false;
+                        const auto still_wanted = [&](std::size_t r) {
+                            if (!skipped[r])
+                                return;
+                            unplaceable = true;
+                            if (skip_reason[r] == charter_unspent_reason::province_cap)
+                                capped = true;
+                        };
+                        for (const std::uint16_t r : bs.turn)
+                            if (bs.firms_by_resource[r] < bs.per_good_cap && demand[r] > production[r])
+                                still_wanted(r);
+                        if (yard_wanted)
+                            still_wanted(cap_i);
+
+                        charter_unspent_reason stop_why = charter_unspent_reason::no_gap;
+                        if (unplaceable)
+                            stop_why = capped ? charter_unspent_reason::province_cap
+                                              : charter_unspent_reason::window_exhausted;
+                        else
+                            for (std::size_t r = 0; r < resource_count; ++r)
+                            {
+                                if (r == cap_i)   // the yard step serves it, in G or not
+                                    continue;
+                                if (std::binary_search(bs.goods.begin(), bs.goods.end(),
+                                                       static_cast<std::uint16_t>(r)))
+                                    continue;
+                                if (bs.firms_by_resource[r] >= bs.per_good_cap)
+                                    continue;
+                                if (demand[r] > production[r])
+                                {
+                                    stop_why = charter_unspent_reason::late_shortfall;
+                                    break;
+                                }
+                            }
+                        cc.unspent[static_cast<std::size_t>(stop_why)] += left;
+                        stop = true;
+                        break;
+                    }
+                    std::array<float, resource_count> only = {};
+                    only[gap_r] = demand[gap_r];
+                    recipe_i = best_recipe_for_gaps(reg, production, only);
                 }
+
                 if (gap_r == resource_count)
                 {
-                    // Every good in the turn is at its cap or no longer short.
-                    cc.unspent[static_cast<std::size_t>(charter_unspent_reason::no_gap)] += left;
-                    break;
+                    gap_r = biggest_gap_resource(selectable, demand);
+                    if (gap_r == resource_count)
+                    {
+                        // Nothing on this body is short: the rest of this centre's
+                        // budget has nothing to buy.
+                        cc.unspent[static_cast<std::size_t>(charter_unspent_reason::no_gap)] += left;
+                        stop = true;
+                        break;
+                    }
+                    recipe_i = best_recipe_for_gaps(reg, selectable, demand);
                 }
-                std::array<float, resource_count> only = {};
-                only[gap_r] = demand[gap_r];
-                recipe_i = best_recipe_for_gaps(reg, production, only);
-            }
 
-            if (gap_r == resource_count)
-            {
-                gap_r = biggest_gap_resource(selectable, demand);
-                if (gap_r == resource_count)
+                go_processing = (recipe_i >= 0)
+                    && (reg.recipe_at(building_type::processing_facility, recipe_i).outputs[gap_r] > 0.0f);
+                focus = go_processing ? industrial_focus::processing : industrial_focus::extraction;
+
+                // --- placement: the centre's two windows and nothing wider --------
+                charter_unspent_reason why = charter_unspent_reason::window_exhausted;
+                assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
+                                       spend.province_cap ? &bs.firms_by_province : nullptr,
+                                       rung, why);
+                if (!assets.empty())
+                    break;
+
+                if (!bs.in_turn)
                 {
-                    // Nothing on this body is short: the rest of this centre's
-                    // budget has nothing to buy.
-                    cc.unspent[static_cast<std::size_t>(charter_unspent_reason::no_gap)] += left;
+                    // THE LEGACY RULES, verbatim: the selection, the windows and
+                    // the province tallies are all unchanged by a failed placement
+                    // (and it drew nothing), so every later firm here would fail
+                    // identically: the rest of the budget is unspent, under the
+                    // reason the placement named.
+                    cc.unspent[static_cast<std::size_t>(why)] += left;
+                    stop = true;
                     break;
                 }
-                recipe_i = best_recipe_for_gaps(reg, selectable, demand);
+
+                // THE TURN (NR-903): skip this good for the rest of this centre and
+                // pick again from the same measurement.
+                skipped[gap_r]     = true;
+                skip_reason[gap_r] = why;
+                gap_r     = resource_count;
+                recipe_i  = -1;
+                from_turn = false;
             }
-
-            const bool go_processing = (recipe_i >= 0)
-                && (reg.recipe_at(building_type::processing_facility, recipe_i).outputs[gap_r] > 0.0f);
-            const industrial_focus focus = go_processing ? industrial_focus::processing
-                                                          : industrial_focus::extraction;
-
-            // --- placement: the centre's two windows and nothing wider ----------
-            charter_rung rung = charter_rung::centre_window;
-            charter_unspent_reason why = charter_unspent_reason::window_exhausted;
-            std::vector<entity_id> assets = charter_place(
-                w, nc, focus, occupied, asset_rng, cc, settle, spend,
-                spend.province_cap ? &bs.firms_by_province : nullptr, rung, why);
-            if (assets.empty())
-            {
-                // The selection, the windows and the province tallies are all
-                // unchanged by a failed placement (and it drew nothing), so every
-                // later firm here would fail identically: the rest of the budget
-                // is unspent, under the reason the placement named.
-                cc.unspent[static_cast<std::size_t>(why)] += left;
+            if (stop)
                 break;
-            }
 
             const entity_id anchor_tile = w.buildings.at(assets.front()).tile;
             const uint32_t anchor_province = w.provinces.province_of(anchor_tile);
