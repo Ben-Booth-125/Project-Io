@@ -23,8 +23,8 @@ Written 2026-09-19 at ~21:15, as Ben put the PC to sleep. **Read this, then
    and one `--charter-cost --seeds 28 --budget-scales 4 --resource-cap sqrt --density-ceilings 120
    --specialist-prices 4 --no-extra --no-forced` row (the sweep's share and overflow checks run only
    in that mode). Build each with `bash tools/verify/build_lua_harness.sh <name>`.
-   That closes **BL-1060** (R1-R8) and **BL-1042 (stockpile to budget)** (R2/R7 want the
-   main-session stockpile rows; everything else is recorded on chain 11).
+   That closes **BL-1060** (R1-R8). BL-1042 closed on chain 11 (it finished at 21:27 before the
+   sleep).
 3. **Wave 2: BL-1043 (real-stockpile charter sweep)** — quiet machine, keep-awake, serial; ends in
    NEEDS_REVIEW calls (the specialist price anchored to the seat menu; the provisional prices
    BL-1042 set in `stockpile_budget.hpp`). Then **BL-1050** and **BL-1044 (Beat 1 ships: the
@@ -40,7 +40,8 @@ Written 2026-09-19 at ~21:15, as Ben put the PC to sleep. **Read this, then
 
 - **Delivered:** BL-1034, 1036, 1037, 1038 (wave 0); BL-1039, 1040, 1041, 1051, 1053, 1056, 1059
   (wave 1).
-- **Merged, owed chain 12:** BL-1042 (stockpile to budget), BL-1060 (charter spend hardening).
+- **Delivered at the close:** BL-1042 (stockpile to budget), on chain 11.
+- **Merged, owed round 3 and chain 12:** BL-1060 (charter spend hardening).
 - **Not started:** BL-1043, BL-1050, BL-1044.
 - **Continuity pass (after Digitisation):** BL-1045, 1046, 1048, 1049, 1052, 1055, 1057 (capacity
   kind filter), 1058 (span checks that cannot fail).

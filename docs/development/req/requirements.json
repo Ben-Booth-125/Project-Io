@@ -6500,94 +6500,94 @@
    "difficulty": 4,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1042 - sprint 45 (2026-09-19)",
    "batch": "sprint-45",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-09-19",
+   "resolution": "A region's points reach its carved centres by slot key; townless ground converts nothing and razed ground is lost (NR-901); the pins held.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the carve index"
      ],
      "requirement": "carved_centre carries its slot key and rank; found_centre records a non-serialised centre -> (region, rank) index on world, beside gen_settlement.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Code (629a4b6b, fix round 6f37aa22): carved_centre carries key and rank; found_centre records a non-serialised centre -> (region, rank) index (gen_carve_centres, gen_carve_dropped) beside gen_settlement; world_copy_determinism restores both (fix round). Cold review: no divergence."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the builder",
       "headless: player_seed_sweep --charter-budget stockpile (main session)"
      ],
      "requirement": "A world/* builder splits each region's points over its carved centres by slot key with largest-remainder apportionment; anchors and coverage foundings get nothing; a carved centre dropped when its body is built out has its share counted under its own unspent reason. Every point is accounted for by a centre or a reason.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19): stockpile_budget_check ALL PASS (the split on hand-built slots: 481/240/120, a dropped slot's 160 unspent, ties to the lower rank, anchors and coverage foundings 0; the lane showed an even split fails 1.1, 1.2, 1.10); player_seed_sweep --digest --charter-budget stockpile --seeds 0,28,46: every account closes (seed 0 31,516,790 = 2,620,000 spent + 28,896,790 charter unspent + 0; seed 28 24,657,817 = 2,820,000 + 21,837,817 + 0; seed 46 57,250,014 = 2,380,000 + 54,645,852 + 224,162 carve_dropped)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: both sides",
       "review: code-reviewer (cold)"
      ],
      "requirement": "app::start_new_game_prelude and tools/verify/harness_params.hpp pass the same budget, spend and report to the 7-argument apply, the budget outliving the search; the two diffs are reviewed against each other.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "code-reviewer (cold, static, 2026-09-19): the app path and the harness mirror hand the search the same budget, spend, order and lifetime; the only difference is the report pointer, which is output-only."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: entry points"
      ],
      "requirement": "The search-less entry points (verify_api.cpp, main.cpp) state or mirror the budget; prices are named constants where the stockpile budget is built, never charter_budget.hpp defaults.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Cold review: the three search-less entry points (verify_api.cpp, main.cpp x2) state the budget and warn if non-empty; prices are named constants in stockpile_budget.hpp (the ceiling ruled 120 by NR-902, set in BL-1060)."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: comments"
      ],
      "requirement": "The stale \"nothing shipped passes a budget\" comments are corrected in the same commit (landscape_search.hpp, charter_budget.hpp, harness_params.hpp, app.cpp).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "The stale 'nothing shipped passes a budget' comments corrected in 629a4b6b (landscape_search.hpp, charter_budget.hpp, harness_params.hpp, app.cpp); cold review found none left."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep --digest-check (main session)",
       "headless: world_determinism"
      ],
      "requirement": "With the span off the stockpile is empty and the legacy branch runs first: --digest-check with stockpile == none == the BL-1031 pins, 16/16.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19): player_seed_sweep --digest-check 16/16 PASS ('none' is now the shipped stockpile path, empty with the span off, and its EMPTY-FLAG check holds); world_determinism digests unchanged. The requirement's 'stockpile == none' holds by construction with the span off (the review's wording note)."
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep --charter-budget stockpile (main session)"
      ],
      "requirement": "With the span on in a harness, a non-empty budget reaches the search on at least three library seeds, every point accounted for by spend or reason.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19): with the span on, a non-empty budget reaches the search on seeds 0, 28 and 46 (24.7M-57.3M points to 5,579-15,240 centres), every point accounted for by spend or reason (R2)."
     },
     {
      "id": "R8",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism"
      ],
      "requirement": "world_determinism folds the stockpile into its region digest.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19): stockpile_budget_check --r8 --seed 28 PASS (a non-empty budget built twice: identical budgets, identical carve index, both accounts close). world_determinism's own fold is conditional and sees no non-empty budget on its span-off worlds; --r8 is the check that can fail."
     }
    ]
   },
