@@ -225,7 +225,11 @@ net of specialist prices; the reference B_ref is 8 firms for every good with dem
 the firm price, so a body at the legacy spend keeps the legacy cap of 8. Under the ceiling, firms go
 to the goods in turn — one per good each pass, up to its cap — so the ceiling trims every good
 evenly. A ceiling that filled the biggest gaps first starved the smallest goods of any firm: breadth
-still decides which goods, and density decides how many of each.
+still decides which goods, and density decides how many of each. **A good that cannot be placed is
+skipped, not fatal (Ben, 2026-09-19, NR-903):** when a centre's window has no free site for a good —
+an extraction good wants an unoccupied deposit tile, which a dense city window often lacks — the turn
+passes that good over for this centre and moves on, and the centre stops only when no good in the
+turn can place. A city with no free quarry still charters the mills and works it has room for.
 
 **SETTLED (Ben, 2026-09-18, elicitation): a specialist's price is anchored to the SEAT MENU.** The
 price, in firm charters, is the one at which the median library world offers about as many seats as
