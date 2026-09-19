@@ -1039,13 +1039,20 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // standing has been paid for -- floored at 0: a round whose bills eat
         // its earn pays nothing in, and the stock the purse already held is
         // never taxed a second time. The share LEAVES the treasury (a
-        // conversion, not a copy) and lands on the capital's own region, where
-        // the treasury stands; the scored purchase below reads what is left.
+        // conversion, not a copy); the scored purchase below reads what is left.
+        // BL-1056 (RULED, Ben 2026-09-19, NR-897): the points SPREAD over the
+        // polity's held regions that stand centres, in proportion to their
+        // urban scale, by integer largest-remainder apportionment -- a treasury
+        // builds its realm's works where its people are. Landing them all on
+        // the capital's region let one region hold up to 65% of a world's
+        // points. The capital still leads where it is the largest centre; a
+        // realm with no held centre carrying heads lands them there, as before.
         // A treasury unit is `industry_points_per_treasury_unit` points (a
         // unit choice, history_sim.hpp says why). Only inside the span (the switch,
         // from its open year) and only on in-domain constants; a conversion
-        // that would carry the capital past `industry_points_ceiling` is
-        // refused whole and counted -- nothing moves.
+        // that would carry ANY receiving region past `industry_points_ceiling`,
+        // or whose heads leave the apportionment's domain, is refused whole and
+        // counted -- nothing moves.
         if (params.industry_points_enabled && year >= params.industry_open_year
             && industry_points_params_valid(params))
         {
@@ -1057,17 +1064,25 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             if (paid_in > 0)
             {
                 const int64_t credit = paid_in * params.industry_points_per_treasury_unit;
-                // Refused whole: past the ceiling, or (never on a sane purse,
-                // whose base is >= 0) more than the purse holds.
-                if (seat.industry_points > industry_points_ceiling - credit
-                    || paid_in > seat.treasury)
+                std::vector<std::pair<int, int64_t>> spread;
+                bool refuse = !industry_points_apportion_by_scale(regions, q.id, credit, spread);
+                if (!refuse && spread.empty()) spread.emplace_back(q.capital, credit); // no centre: the seat
+                // Refused whole: past the ceiling on any receiving region, the
+                // apportionment's domain, or (never on a sane purse, whose base
+                // is >= 0) more than the purse holds.
+                for (const auto& part : spread)
+                    if (regions[static_cast<std::size_t>(part.first)].industry_points
+                            > industry_points_ceiling - part.second)
+                        refuse = true;
+                if (refuse || paid_in > seat.treasury)
                 {
                     if (spend) ++spend->industry_points_refused;
                 }
                 else
                 {
-                    seat.treasury        -= paid_in;
-                    seat.industry_points += credit;
+                    seat.treasury -= paid_in;
+                    for (const auto& part : spread)
+                        regions[static_cast<std::size_t>(part.first)].industry_points += part.second;
                     if (spend)
                     {
                         spend->industry_points_paid_in   += credit;
@@ -6628,7 +6643,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         // held region's fuel -- the span-open survey under
                         // DEFAULT B below, energy_q with it off or where
                         // nothing was surveyed -- so a realm holding one
-                        // coalfield passes however much else it holds. And
+                        // coalfield passes the GATE however much else it
+                        // holds. The seam is the gate's reading, the re-check's
+                        // and `fuel_seen`'s; the `ground_fuel` TERM is not the
+                        // seam inside the span (BL-1056, NR-896: a share, set
+                        // at the pick below). And
                         // LABOUR (`labour_bound`): of the held
                         // non-subsistence surplus (`manpower_ceiling` — the
                         // budget muster and industry share, settlement.hpp sec
@@ -6638,11 +6657,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         // BL-1041 DEFAULT B (RULED, Ben 2026-09-18, wave 1 form):
                         // the seam reads each held region's FUEL READING -- the
                         // span-open survey where it has one, energy_q where it
-                        // has none -- so the gate, its re-check, `fuel_seen` and
-                        // `ground_fuel` (all of which read this one field) agree
-                        // with the points' fuel factor and with the Charcoal
-                        // side's surveyed forest. With nothing surveyed (every
-                        // path but the span) it IS the energy_q max.
+                        // has none -- so the gate, its re-check and `fuel_seen`
+                        // (all of which read this one field), and the
+                        // `ground_fuel` share taken off the same per-region
+                        // reading, agree with the points' fuel factor and with
+                        // the Charcoal side's surveyed forest. With nothing
+                        // surveyed (every path but the span) it IS the energy_q
+                        // max, and `ground_fuel` reads it.
                         const bool seam_reads_survey = params.industry_fuel_gate_reads_survey;
                         int64_t ceiling_sum = 0, under_arms = 0;
                         int foreign_held = 0;
@@ -6704,13 +6725,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             }
                             ir.threatened_q = clampi(threat, 0, 1000);
 
-                            // `ground_forest` (BL-1051; Ben 2026-09-18, wave 1
-                            // form): the BEST held surveyed region's forest
-                            // score (the share scored against the span-open
-                            // mean, as fuel is). No gate reads it, so only a pick needs
-                            // it; off the Digitisation span nothing is surveyed
-                            // and it reads 0, the old pin.
+                            // THE FUEL DOCTRINE'S TWO PULLS (BL-1056; Ben
+                            // 2026-09-19, NR-896): `ground_forest` and
+                            // `ground_fuel` are each the per-mille SHARE of held
+                            // regions whose span-open score clears the world
+                            // mean -- like with like, and neither grows with the
+                            // realm, where the best-of-held they replace could
+                            // only rise as it did. No gate reads either, so only
+                            // a pick needs them. Off the Digitisation span
+                            // nothing is surveyed: forest reads 0 (the old pin)
+                            // and fuel -1, which leaves the term on the seam.
                             ir.ground_forest_q = industry_ground_forest_q(ss.regions, held);
+                            ir.ground_fuel_q   = industry_ground_fuel_q(ss.regions, held, seam_reads_survey);
 
                             // `colonial_reach`: a held region the seat reaches
                             // only across water — `line_crosses_sea`, the SAME
@@ -8456,21 +8482,50 @@ bool industry_node_available(uint64_t mask, int node_idx)
 
 int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held)
 {
-    // THE BEST HELD FOREST SCORE (Ben, 2026-09-18, wave 1 form; INDUSTRY_TREE.md
-    // sec The scorer: "scored as fuel is"). The same shape as the seam: the
-    // MAX over held ground, so the Fuel Doctrine weighs a realm's best wood
-    // against its best coal, like with like. A max is order-free by itself.
-    // Unsurveyed ground (-1) is UNKNOWN, not bare, and stays out; with nothing
-    // surveyed held the reading is 0, the old pin.
-    int best = 0;
+    // THE SHARE OF HELD GROUND WOODED ABOVE THE WORLD MEAN (BL-1056; Ben,
+    // 2026-09-19, NR-896; INDUSTRY_TREE.md sec The scorer). It was the BEST
+    // held score, which can only rise as a realm grows: breadth, not ground,
+    // decided the Fuel Doctrine. A share of held regions cannot grow with the
+    // realm's size -- a region scoring under the mean only ever lowers it.
+    // Two counts, so order-free. Unsurveyed ground (-1) is UNKNOWN, not bare,
+    // and stays out of BOTH counts; with nothing surveyed held the reading is
+    // 0, the old pin.
+    int64_t surveyed = 0, clear = 0;
     for (int hi : held)
     {
         if (hi < 0 || static_cast<std::size_t>(hi) >= regions.size()) continue;
         const int f = regions[static_cast<std::size_t>(hi)].survey_forest_q;
         if (f < 0) continue;
-        best = std::max(best, std::min(f, 1000));
+        ++surveyed;
+        if (f > industry_ground_share_bar_q) ++clear;
     }
-    return best;
+    return surveyed > 0 ? static_cast<int>((clear * 1000) / surveyed) : 0;
+}
+
+int industry_ground_fuel_q(const std::vector<region>& regions, const std::vector<int>& held,
+                           bool reads_survey)
+{
+    // THE SHARE OF HELD GROUND OVER A SEAM ABOVE THE WORLD MEAN (BL-1056; Ben,
+    // 2026-09-19, NR-896), the coal pull taken exactly as the wood pull is, so
+    // the Fuel Doctrine compares like with like. Each region is read as the
+    // seam reads it (DEFAULT B: the survey, else `energy_q`), and every held
+    // region counts: unsurveyed fuel reads the `energy_q` it was founded with,
+    // the best survey there is (`industry_fuel_reading_q`), never "none".
+    // With no held region surveyed at all the span did not run: -1, and the
+    // term keeps the seam. The GATE is not this -- it still reads any seam.
+    int64_t counted = 0, clear = 0;
+    bool any_surveyed = false;
+    for (int hi : held)
+    {
+        if (hi < 0 || static_cast<std::size_t>(hi) >= regions.size()) continue;
+        const region& r = regions[static_cast<std::size_t>(hi)];
+        if (r.survey_fuel_q >= 0) any_surveyed = true;
+        const int f = reads_survey ? industry_fuel_reading_q(r) : clampi(r.energy_q, 0, 1000);
+        ++counted;
+        if (f > industry_ground_share_bar_q) ++clear;
+    }
+    if (!any_surveyed || counted == 0) return -1;
+    return static_cast<int>((clear * 1000) / counted);
 }
 
 // ---------------------------------------------------------------------------
@@ -8547,6 +8602,54 @@ int64_t industry_points_scale_credit(const region& r, int industrial_q,
     pts = (pts * industry_points_fuel_factor_q(industry_fuel_reading_q(r), p)) / 1000;
     pts = (pts * tree_mult_q) / 1000;
     return pts;
+}
+
+bool industry_points_apportion_by_scale(const std::vector<region>& regions, int holder, int64_t credit,
+                                        std::vector<std::pair<int, int64_t>>& out)
+{
+    // BL-1056 (Ben, 2026-09-19, NR-897). LARGEST REMAINDER, EXACT: region i's
+    // share is credit * w_i / W; it takes the floor, and the credit the floors
+    // leave (fewer points than regions weighed) goes one each to the largest
+    // remainders, ties to the lower region index. Staged as
+    // (credit / W) * w_i + ((credit % W) * w_i) / W so nothing leaves int64:
+    // credit % W < W <= 2^32 and w_i <= 2^31.
+    out.clear();
+    if (credit <= 0) return true;
+    int64_t total = 0;
+    for (std::size_t i = 0; i < regions.size(); ++i)
+    {
+        const region& r = regions[i];
+        if (r.nation != holder || r.centres <= 0 || r.urban_population <= 0) continue;
+        if (r.urban_population > industry_points_urban_heads_max) { out.clear(); return false; }
+        total += r.urban_population;
+        if (total > industry_points_apportion_heads_max) { out.clear(); return false; }
+        out.emplace_back(static_cast<int>(i), r.urban_population); // the weight, for now
+    }
+    if (out.empty()) return true;
+
+    const int64_t whole = credit / total, part = credit % total;
+    std::vector<int64_t> rem(out.size(), 0);
+    int64_t given = 0;
+    for (std::size_t k = 0; k < out.size(); ++k)
+    {
+        const int64_t w   = out[k].second;
+        const int64_t num = part * w;
+        out[k].second = whole * w + num / total;
+        rem[k]        = num % total;
+        given        += out[k].second;
+    }
+    int64_t left = credit - given; // 0 <= left < out.size()
+    if (left > 0)
+    {
+        std::vector<std::size_t> order(out.size());
+        for (std::size_t k = 0; k < order.size(); ++k) order[k] = k;
+        // `out` is in ascending region index, so a stable sort on the
+        // remainder alone breaks ties to the lower region index.
+        std::stable_sort(order.begin(), order.end(),
+                         [&rem](std::size_t a, std::size_t b) { return rem[a] > rem[b]; });
+        for (std::size_t k = 0; k < order.size() && left > 0; ++k, --left) ++out[order[k]].second;
+    }
+    return true;
 }
 
 industry_points_round accrue_industry_points(std::vector<region>&       regions,
@@ -8668,8 +8771,11 @@ void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
     at(scorer_term::reach_bound)      = r.reach_bound_q;
     at(scorer_term::furnace_lit)      = furnace_lit ? 1000 : 0;
     at(scorer_term::ground_ore)       = r.ground_ore_q;
-    at(scorer_term::ground_fuel)      = r.fuel_seam_q;       // the seam, not the mean
-    at(scorer_term::ground_forest)    = r.ground_forest_q;   // the span-open survey, best held score (the seam's shape)
+    // BL-1056 (NR-896): both Fuel Doctrine pulls read a SHARE of held ground
+    // above the world mean; off the span no share is taken (-1) and the coal
+    // pull keeps the seam, the old reading. The GATE still reads the seam.
+    at(scorer_term::ground_fuel)      = r.ground_fuel_q >= 0 ? r.ground_fuel_q : r.fuel_seam_q;
+    at(scorer_term::ground_forest)    = r.ground_forest_q;   // the span-open survey, share of held above the mean
     at(scorer_term::tariff_pressure)  = 0; // PINNED: no landed price at a market before the campaign
     at(scorer_term::threatened)       = r.threatened_q;
     at(scorer_term::food_bound)       = r.food_bound_q;
