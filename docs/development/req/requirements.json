@@ -6066,14 +6066,14 @@
    "difficulty": 4,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1040 - sprint 45 (2026-09-18)",
    "batch": "sprint-45",
-   "resolved": null,
+   "resolved": "2026-09-19",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "tool: seed_library.js --check",
@@ -6081,7 +6081,7 @@
      ],
      "requirement": "With digitisation_span_enabled off (its default), every world_determinism digest, every seed-library fingerprint and every BL-1031 pin is unmoved.",
      "notes": "The 16-seed --digest-check runs after BL-1039 merges, covering both.",
-     "result_metric": "Span off, on 9bc9bb9a (main session): world_determinism ALL PASS, digests unchanged; exploration_sweep --out then seed_library.js --check --from: 0 moved, 0 absent, 16 unchanged."
+     "result_metric": "Chain 8 on 849a358d (main session, 2026-09-19; BL-1039 round 2, BL-1040, BL-1041 and its fix round, BL-1051, BL-1053 merged): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; exploration_sweep --out then seed_library.js --check --from: 0 moved, 0 absent, 16 unchanged; player_seed_sweep --digest-check: 16/16 rows PASS against the BL-1031 pins, 0 threw, 3265 s."
     },
     {
      "id": "R2",
@@ -6156,7 +6156,7 @@
      "result_metric": "Cold review (code-reviewer, 2026-09-18): nothing blocking with the switch off; the 1660 records world setup still reads, and the harness/validator tightening, are BL-1053."
     }
    ],
-   "resolution": ""
+   "resolution": "The span runs as its own call; switch off, the digests, fingerprints and pins held (chain 8)."
   },
   {
    "brief": "span-open-survey",
@@ -6164,14 +6164,14 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1051 - sprint 45 (2026-09-18)",
    "batch": "sprint-45",
-   "resolved": null,
+   "resolved": "2026-09-19",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "tool: seed_library.js --check",
@@ -6179,7 +6179,7 @@
      ],
      "requirement": "With the span switch off, every digest, fingerprint and pin is unmoved.",
      "notes": "The 16-seed --digest-check and a fingerprint re-check run after BL-1039 round 2 and BL-1041 merge.",
-     "result_metric": "world_determinism ALL PASS, digests unchanged (main session, chain 7 on f98c2cea (BL-1039 fix round, BL-1051, BL-1053 merged)); lane: seed_library --check 0 moved."
+     "result_metric": "Chain 8 on 849a358d (main session, 2026-09-19; BL-1039 round 2, BL-1040, BL-1041 and its fix round, BL-1051, BL-1053 merged): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; exploration_sweep --out then seed_library.js --check --from: 0 moved, 0 absent, 16 unchanged; player_seed_sweep --digest-check: 16/16 rows PASS against the BL-1031 pins, 0 threw, 3265 s."
     },
     {
      "id": "R2",
@@ -6223,7 +6223,7 @@
      "result_metric": "Cold review (2026-09-18): nothing blocking; furnace_lit constancy and the unlike fuel/forest scales went to Ben (NR-895) and are ruled."
     }
    ],
-   "resolution": ""
+   "resolution": "Every region is surveyed at the span open; switch off, the digests, fingerprints and pins held (chain 8)."
   },
   {
    "brief": "setup-reads-span-close",
@@ -6238,7 +6238,7 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "tool: seed_library.js --check",
@@ -6246,7 +6246,7 @@
      ],
      "requirement": "With the span switch off, every digest, fingerprint and pin is unmoved.",
      "notes": "The 16-seed --digest-check runs after BL-1039 round 2 and BL-1041 merge.",
-     "result_metric": "world_determinism ALL PASS, digests unchanged (main session, chain 7 on f98c2cea (BL-1039 fix round, BL-1051, BL-1053 merged)); lane: seed_library --check 0 moved."
+     "result_metric": "Chain 8 on 849a358d (main session, 2026-09-19; BL-1039 round 2, BL-1040, BL-1041 and its fix round, BL-1051, BL-1053 merged): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; exploration_sweep --out then seed_library.js --check --from: 0 moved, 0 absent, 16 unchanged; player_seed_sweep --digest-check: 16/16 rows PASS against the BL-1031 pins, 0 threw, 3265 s."
     },
     {
      "id": "R2",
@@ -6324,14 +6324,15 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "tool: seed_library.js --check",
       "headless: player_seed_sweep --digest-check (main session)"
      ],
      "requirement": "With the span off, every digest, fingerprint and pin is unmoved; points accrue only inside the Digitisation span.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Chain 8 on 849a358d (main session, 2026-09-19; BL-1039 round 2, BL-1040, BL-1041 and its fix round, BL-1051, BL-1053 merged): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; exploration_sweep --out then seed_library.js --check --from: 0 moved, 0 absent, 16 unchanged; player_seed_sweep --digest-check: 16/16 rows PASS against the BL-1031 pins, 0 threw, 3265 s."
     },
     {
      "id": "R2",
@@ -6371,12 +6372,13 @@
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --fidelity"
      ],
      "requirement": "The fidelity gates still pass 16 of 16.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --fidelity on 849a358d (main session, chain 8): gates 1, 2 and 3 16 of 16 seeds, negative controls 3 of 3, 740 s, FIDELITY PASS."
     },
     {
      "id": "R7",
