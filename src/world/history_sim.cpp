@@ -8528,20 +8528,17 @@ void industry_ground_pull_counts(const std::vector<region>& regions, const std::
 }
 
 /// BL-1059: one resource's top-third bar over @p shares (every read region's
-/// span-open share, zeros included; sorted in place). k = floor(n / 3) may
-/// clear, the bar is the value at ascending position n - k, and a tie band
-/// straddling that cut is excluded whole (bar = value + 1) -- see
-/// `industry_ground_bars`. A 0 at the cut becomes a bar of 1: zeros never clear.
+/// span-open share, zeros included; sorted in place). k = floor(n / 3), the
+/// bar is the value at ascending position n - k, and a tie band at that value
+/// clears WHOLE (NR-904) -- see `industry_ground_bars`. A 0 at the cut becomes
+/// a bar of 1: zeros never clear, and every carrier does.
 int industry_top_third_bar(std::vector<int>& shares)
 {
     const std::size_t n = shares.size();
     const std::size_t k = n / 3;
     if (k == 0) return industry_ground_bar_none;
     std::sort(shares.begin(), shares.end());
-    const std::size_t cut = n - k; // >= 2 since n >= 3
-    const int v = shares[cut];
-    if (shares[cut - 1] != v) return v;
-    return v == industry_ground_bar_none ? industry_ground_bar_none : v + 1;
+    return std::max(shares[n - k], 1);
 }
 
 } // namespace

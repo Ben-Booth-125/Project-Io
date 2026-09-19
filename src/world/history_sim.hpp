@@ -2952,15 +2952,18 @@ inline constexpr int industry_fuel_seam_bar_q = 250;
 /// resource then clears less of the world (the rarity tilt, back).
 ///
 /// THE DEFINITION. n regions read; k = floor(n / 3); sort the shares ascending
-/// and let v be the value at position n - k. The bar is v, and a region clears
-/// iff `share > 0 && share >= bar` (`industry_ground_clears`).
-///   - TIE RULE: if the value just below position n - k EQUALS v (a tie band
-///     straddles the cut), the bar is v + 1 -- the whole band is out. So never
-///     more than k regions (a third of the world) clear; a tie band can only
-///     make fewer clear.
+/// and let v be the value at position n - k. The bar is max(v, 1), and a region
+/// clears iff `share > 0 && share >= bar` (`industry_ground_clears`).
+///   - TIE RULE (Ben, 2026-09-19, NR-904): A TIE AT THE CUT CLEARS WHOLE. Every
+///     region whose share equals v clears, so a bar can never come out empty
+///     while any region carries the resource. Where a tie band straddles the
+///     cut, MORE than a third of the world clears -- by design: the forest
+///     share tops out at a fully wooded window, and on a heavily wooded world
+///     more than a third of regions may sit there; a fully wooded region is a
+///     forest whatever its neighbours hold.
 ///   - A SHARE OF 0 NEVER CLEARS, however few regions carry the resource: when
-///     fewer than a third do, v is 0, the zeros straddle the cut, the bar is 1,
-///     and every carrier clears (fewer than a third of the world).
+///     fewer than a third do, v is 0, the bar is 1, and every carrier clears
+///     (fewer than a third of the world).
 ///   - FEWER THAN THREE regions read (k = 0): nothing clears; both bars are
 ///     `industry_ground_bar_none`.
 /// Integer only; independent of region order. A region in the read set with no
