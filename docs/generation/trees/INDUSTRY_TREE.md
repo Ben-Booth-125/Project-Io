@@ -63,7 +63,8 @@ Practice hangs off the root, which is what makes both sides of the Fuel Doctrine
 
 **The gate reads a seam, not an average.** PROPOSED (listed to Ben 2026-09-18, not overturned):
 `fuel` passes when any held region's fuel clears the bar. A mean over held ground fails a large
-realm that holds one coalfield, and *no seam under held ground* is a claim about any region.
+realm that holds one coalfield, and *no seam under held ground* is a claim about any region. That
+is the GATE only; the scorer's pull is a share, not a best (§ The scorer, Ben 2026-09-19, NR-896).
 
 ---
 
@@ -284,11 +285,15 @@ carries no landed price — and is pinned at 0.
 
 **Forest is surveyed, so the forest polity chooses Charcoal (Ben, 2026-09-18, NR-891).** A region
 carries a forest share: the share of land tiles in its survey window under forest cover, read from
-the tiles as its fuel is. **It is scored as fuel is (Ben, 2026-09-18, wave 1 form):** `ground_forest`
-is the best held region's forest share against the mean of every region at the span open, capped
-at 1000, the same shape as `ground_fuel`'s best seam, so the Fuel Doctrine compares like with like.
-A plain average share read about 212 on the median region and let almost any seam outweigh any
-forest. So a polity takes Charcoal Iron because its ground is wooded, not only because Coke is gated
+the tiles as its fuel is. **It is scored as fuel is (Ben, 2026-09-18, wave 1 form), and both read
+a SHARE (Ben, 2026-09-19, NR-896):** `ground_forest` is the share of held regions whose forest score
+clears the mean of every region at the span open, and `ground_fuel` is the same share over fuel
+scores, so the Fuel Doctrine compares like with like. A best-of-held maximum can only rise as a realm
+grows, so it let breadth rather than ground decide the fork (Charcoal outnumbered Coke 319 to 200 on
+the lane's run) and broke the rule that no term grows with the polity's size. A held mean was
+rejected because a large realm with one coalfield reads low. The `fuel` gate is unchanged: any held
+seam still opens it. A plain average share read about 212 on the median region and let almost any
+seam outweigh any forest. So a polity takes Charcoal Iron because its ground is wooded, not only because Coke is gated
 out. Inside the span every fuel read in this tree — the gate, `ground_fuel` and the seam flag —
 takes the same survey (Ben, 2026-09-18). Of the
 shared core, `threatened` is the heaviest grudge any living polity holds against this one,

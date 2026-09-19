@@ -24,11 +24,20 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*2 entries — 2 open, 0 resolved.*
+*2 entries — 0 open, 2 resolved.*
 
 ---
 
 ## Open
+
+*Nothing open.*
+
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
 
 ### NR-896 — CALL: forest and coal both read the BEST held region, which grows with realm size — and Charcoal now outnumbers Coke
 *question · raised 2026-09-18 · from BL-1041 (industry points) build lane and cold review, after the wave 1 ruling "score forest like fuel" (NR-895). Figures are the lane's 16-seed run; the main session re-runs them before quoting them as evidence.*
@@ -42,6 +51,8 @@ With forest scored like fuel (the best held region against the world mean, cappe
 - Both terms read the held MEAN of the scores — size-neutral, but a large realm with one coalfield reads low.
 
 > **Recommendation:** The share of held regions over the world mean, for both terms. It keeps "any seam opens the gate" and stops breadth from deciding the pull.
+
+> **RESOLVED.** RULED (Ben, 2026-09-19): option A. Both ground_forest and ground_fuel read the share of held regions whose score clears the world mean; the fuel gate still passes on any held seam. Written into INDUSTRY_TREE.md § The scorer; the work is BL-1056 (points size-neutral).
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/trees/INDUSTRY_TREE.md`, `docs/generation/trees/TREES.md`*
 
@@ -58,12 +69,7 @@ The lane chose, on your behalf: 1000 industry points per million urban heads per
 
 > **Recommendation:** Spread treasury points by scale over the polity's centres. A treasury builds its realm's works where its people are, and the capital still leads because it is usually the largest centre.
 
+> **RESOLVED.** RULED (Ben, 2026-09-19): option A. Treasury points spread over the polity's centres by urban scale; the lane's constants are kept. Written into DIGITISATION.md § Beat 1; the work is BL-1056 (points size-neutral).
+
 *Files: `src/world/history_sim.cpp`, `src/world/history_sim.hpp`, `docs/generation/DIGITISATION.md`*
-
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
 

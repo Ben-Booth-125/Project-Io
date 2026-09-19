@@ -600,6 +600,55 @@
     "tools/verify/survey_endowment_harness.cpp"
    ],
    "design": "CONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass run after each generation round is done — this one after Digitisation — not built mid-sprint.\n\nFOUND 2026-09-18 by BL-1051's cold review and fixed for the SPAN-OPEN SURVEY only by BL-1041. The settlement pass scores energy_q against the mean of all regions with an integer mean (settlement.cpp ~l.377-379): on a coal-poor body fuel_sum < regions.size() makes the mean 0, score_against then divides by 1, and every region with raw fuel >= 2 reads 1000. BL-1041 left a comment at the shipped site pointing at the survey's fix. Fixing it here moves every shipped world whose home body is coal-poor (energy_q feeds the treasury endowment, the fuel gates and region classification), so it waits for a re-bless it can ride. survey_endowment_harness E5 is the synthetic check to extend to the shipped path."
+  },
+  {
+   "glyph": "✓",
+   "written": "2026-09-19",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "sprint": "45",
+   "author": "Ben (2026-09-19, NR-896 and NR-897 form); Claude (item text)",
+   "requires": [
+    "BL-1041"
+   ],
+   "id": "BL-1056",
+   "short_name": "POINTS_SIZE_NEUTRAL",
+   "priority": "S",
+   "difficulty": 2,
+   "title": "The Fuel Doctrine's two pulls read a share of held regions, and treasury points spread over a polity's centres by scale",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/digitisation_sim_harness.cpp",
+    "tools/verify/exploration_sim_harness.cpp"
+   ],
+   "design": "RULED (Ben, 2026-09-19): NR-896 option A and NR-897 option A. Designs live in INDUSTRY_TREE.md § The scorer (both pulls) and DIGITISATION.md § Beat 1 (the landing).\n\nTHE WORK. (1) `ground_forest` and `ground_fuel` in the Industry scorer read the per-mille SHARE of held regions whose span-open score clears the world mean (history_sim.cpp: industry_ground_forest_q and the fuel_seam_q read that industry_term_values maps to ground_fuel). The fuel GATE and the seam flag still read any held seam - do not change them. Fix the THE SEAM / ground_forest comments to match. (2) The treasury-to-points conversion spreads its points over the polity's held regions with centres, weighted by urban scale, by largest-remainder apportionment (deterministic, integer), instead of landing on the capital's region. Constants unchanged. (3) Harness: digitisation_sim_harness reading 8 reports the Fuel Doctrine split and top-region share before/after; exploration_sim_harness T8.15's Default B check still passes; a new assertion that no term read by the Industry scorer rises when a realm gains a region below the world mean. Must land before BL-1042 and BL-1043 measure. Behind the Digitisation switch, so the shipped digests should not move - the digest check confirms it."
+  },
+  {
+   "glyph": "✓",
+   "written": "2026-09-19",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "sprint": null,
+   "author": "Claude (found by the BL-1041 fix round, 2026-09-19)",
+   "requires": [],
+   "id": "BL-1057",
+   "short_name": "CAPACITY_KIND_FILTER",
+   "priority": "C",
+   "difficulty": 2,
+   "title": "Beat 1 sums only Industry capacity nodes, once the generated tree table carries each node's diffusion kind",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/industry_tree_data.hpp",
+    "src/world/history_sim.cpp",
+    "tools/session/tree_lint.js"
+   ],
+   "design": "CONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass after Digitisation, not built mid-sprint.\n\nFOUND by BL-1041's cold review; its fix round could not make it. DIGITISATION.md § Beat 1 reads 'Industry tree CAPACITY nodes held', and the store tags each node's kind (capacity / practice / artifact). The GENERATED table industry_tree_data.hpp does not carry the kind, so industry_tree_industrial_q (history_sim.cpp, KNOWN DRIFT comment) sums every held node's industrial modifier, practice nodes included (IN-MT-1e +30, IN-LD-1b +80, IN-LD-1c -40, IN-CH-2b +40, IN-CH-2c +20). THE WORK: the generator emits the kind; the fold filters on capacity; remove the drift comment. Moves Beat 1 points, so it rides a re-bless."
   }
  ]
 }

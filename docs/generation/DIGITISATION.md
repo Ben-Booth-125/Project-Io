@@ -447,8 +447,14 @@ is a war over something real.
 round a fixed share of the capital treasury's surplus after the round's bills converts to industry
 points. No polity scores it, so it adds no verb to the grant register (`../ai/AI_OPPONENT.md` § 11).
 It is also the one input that is neither headcount nor fixed ground: points from scale and fuel
-alone would be headcount by another name, which § 1 forbids. PROPOSED: the points land on the
-capital's own region, where the treasury stands.
+alone would be headcount by another name, which § 1 forbids. **SETTLED (Ben, 2026-09-19, NR-897):
+the points spread over the polity's regions that hold centres, in proportion to their urban
+scale** — a treasury builds its realm's works where its people are. The capital still leads
+because it is usually the largest centre. Landing them all on the capital's own region let one
+region hold up to 65% of a world's points, so charters would have followed capitals, not cities.
+The constants stand: 1000 points per million urban heads per year; fuel factor
+250 + 750 × reading/1000; a 250‰ share of the round's surplus, debited; 1000 points per
+treasury unit.
 
 **PROPOSED (listed to Ben 2026-09-18, not overturned): the stock sits on each region that holds
 centres.** The sim holds a city as counts on its region, not as an entity, so *one number per
