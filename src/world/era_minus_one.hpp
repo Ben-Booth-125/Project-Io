@@ -381,7 +381,8 @@ struct era_minus_one_fixture
     /// handoff's regions with `survey_regions_at_span_open` applied, captured
     /// between the survey and the call. It differs from
     /// `exploration_handoff.regions` in `survey_fuel_q` and `survey_forest_q`
-    /// and in nothing else, and a harness resuming the span must open on it
+    /// and the shares they are taken from (`survey_fuel_raw`,
+    /// `survey_forest_raw`: BL-1059) and in nothing else, and a harness resuming the span must open on it
     /// (the survey reads tiles, which a fixture does not carry).
     std::vector<region> digitisation_open_regions;
 

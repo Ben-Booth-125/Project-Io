@@ -299,6 +299,19 @@ struct region
     /// or -1 when not surveyed. A world-relative score, not the plain share.
     int survey_forest_q = -1;
 
+    /// BL-1059 (Ben, 2026-09-19, NR-900): the UNCLAMPED quantities the two
+    /// scores above are taken from, written by the same survey in the same
+    /// pass: fuel is the window's coal + petroleum per-tile mean x1000
+    /// (`endowment::energy`, floored at 0), forest the window's land share
+    /// under forest per mille. -1 when not surveyed (ground the span founds is
+    /// never surveyed: DEFAULT A inherits the SCORE, not this). The Fuel
+    /// Doctrine's top-third bars rank these, not the scores, because a score
+    /// is capped at twice the world mean and a pile at the cap cannot be
+    /// ranked. Same footing as the scores: GENERATION SCRATCH, NOT SAVED, in
+    /// no digest.
+    int survey_fuel_raw   = -1;
+    int survey_forest_raw = -1;
+
     int64_t founded_year = 0;     ///< Calendar year settled (negative = before epoch year 0).
     int64_t industrial_year = 0;  ///< Calendar year the furnaces lit; 0 when never.
     bool    industrialised = false;
@@ -1001,7 +1014,9 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
 
 /// BL-1051 — THE SPAN-OPEN SURVEY (INDUSTRY_TREE.md sec The scorer, "Forest is
 /// surveyed"). Survey EVERY region in @p regions once, over the window
-/// `survey_endowment` reads, and write exactly two fields on each:
+/// `survey_endowment` reads, and write exactly four fields on each -- two
+/// scores and (BL-1059, NR-900) the unclamped shares they are taken from,
+/// `region::survey_fuel_raw` / `survey_forest_raw`:
 /// `region::survey_fuel_q` (coal + petroleum, scored against the mean over
 /// every region surveyed in this call on `energy_q`'s scale -- 500 at the
 /// mean, 1000 at twice it -- but against the EXACT mean, where `energy_q`'s

@@ -407,6 +407,10 @@ void survey_regions_at_span_open(const world& w, const std::vector<entity_id>& i
     {
         regions[i].survey_fuel_q   = score_against_exact_mean(raw_fuel[i],   fuel_sum,   n_regions);
         regions[i].survey_forest_q = score_against_exact_mean(raw_forest[i], forest_sum, n_regions);
+        // BL-1059 (NR-900): the unclamped share each score was taken from --
+        // what the Fuel Doctrine's top-third bars rank.
+        regions[i].survey_fuel_raw   = raw_fuel[i];
+        regions[i].survey_forest_raw = raw_forest[i];
     }
 }
 

@@ -2015,73 +2015,87 @@ int main()
 
         // T8.7.5 (BL-1056; Ben, 2026-09-19, NR-896; was the BEST held score,
         // and BL-1051's held mean before it): `ground_forest` is the per-mille
-        // SHARE of surveyed held regions whose forest score clears the world's
-        // forest bar. A region without the span-open survey of both scores
-        // (here one the span founded, inheriting fuel 70 under DEFAULT A but
-        // no forest) stays out of both counts rather than reading as bare,
-        // ground not held never counts, a region under the bar does not clear
-        // it, and nothing surveyed reads 0 (the old pin). The values are
-        // chosen so the best held (700), the held mean (500) and the share
-        // with the unheld 900 counted (500) all differ from the share (1 of 3
-        // surveyed held -> 333).
+        // SHARE of surveyed held regions whose span-open forest share clears
+        // the world's forest bar. A region without the span-open survey of
+        // both scores (here one the span founded, inheriting fuel 70 under
+        // DEFAULT A but no forest) stays out of both counts rather than
+        // reading as bare, ground not held never counts, a region under the
+        // bar does not clear it, and nothing surveyed reads 0 (the old pin).
         //
-        // BL-1059 FIXTURE CHANGE (the bar semantics): the bar was the mean,
-        // strictly (> 500); it is now each resource's own top third, fixed at
-        // the span open and passed in. This five-region toy is not a world,
-        // so its bar is STATED (forest 700, the value that used to clear the
-        // mean) rather than derived; T8.7.7 tests the derivation. "AT the mean
-        // does not clear" becomes "500, under the bar, does not clear; 700, AT
-        // the bar, does".
+        // BL-1059 FIXTURE CHANGE (the bar semantics, NR-899/NR-900): the bar
+        // was the mean, strictly (score > 500); it is now each resource's own
+        // top third, ranked on the UNCLAMPED share (`survey_*_raw`), fixed at
+        // the span open and passed in. This five-region toy is not a world, so
+        // its bars are STATED; T8.7.7 tests the derivation. The toy's shares
+        // are half its scores (raw != score, so a pull reading the score
+        // instead of the share fails). THREE bars, so reading the bar is what
+        // passes: 350 (the old cut on these values: 1 of 3 -> 333), 250 (a
+        // bar the old cut disagrees with: the 500-score region clears too ->
+        // 666; the old '> 500' read 333, a score-vs-bar read 1000), and 400
+        // (nothing held clears -> 0; the old cut read 333).
         {
             industry_ground_bars tb;
-            tb.forest_q = 700;
-            tb.fuel_q   = 700;
+            tb.forest_raw = 350;
+            tb.fuel_raw   = 350;
+            industry_ground_bars tb_low = tb, tb_high = tb;
+            tb_low.forest_raw  = 250;
+            tb_high.forest_raw = 400;
             std::vector<region> rg(5);
-            for (region& x : rg) x.survey_fuel_q = 100;
-            rg[0].survey_forest_q = 300;
-            rg[1].survey_forest_q = 700;
-            rg[2].survey_forest_q = 500; // under the bar: does not clear it
-            rg[3].survey_forest_q = -1;  // founded after the span opened
-            rg[3].survey_fuel_q   = 70;  // ... inheriting fuel, never forest
-            rg[4].survey_forest_q = 900; // not held
+            for (region& x : rg) { x.survey_fuel_q = 100; x.survey_fuel_raw = 50; }
+            const int wq[5] = { 300, 700, 500, -1, 900 }; // 500 is under 350's bar; 900 not held
+            for (int i = 0; i < 5; ++i)
+            {
+                rg[static_cast<std::size_t>(i)].survey_forest_q   = wq[i];
+                rg[static_cast<std::size_t>(i)].survey_forest_raw = wq[i] < 0 ? -1 : wq[i] / 2;
+            }
+            rg[3].survey_fuel_q   = 70;  // founded after the span opened: inheriting fuel, never forest
+            rg[3].survey_fuel_raw = -1;  // ... and never a share (DEFAULT A inherits the score)
             const std::vector<int> held_fwd = {0, 1, 2, 3};
             const std::vector<int> held_rev = {3, 2, 1, 0};
             const std::vector<int> held_none_surveyed = {3};
             const int m_fwd = industry_ground_forest_q(rg, held_fwd, tb);
             const int m_rev = industry_ground_forest_q(rg, held_rev, tb);
+            const int m_low = industry_ground_forest_q(rg, held_fwd, tb_low);
+            const int m_hi  = industry_ground_forest_q(rg, held_fwd, tb_high);
             const int m_uns = industry_ground_forest_q(rg, held_none_surveyed, tb);
             const int m_emp = industry_ground_forest_q(rg, {}, tb);
             std::vector<region> never(3); // the struct default: no span, never surveyed
             const int m_off = industry_ground_forest_q(never, {0, 1, 2}, industry_ground_bars_at_open(never));
-            std::printf("      ground_forest held share: {300,700,500,unsurveyed} (900 unheld) -> %d (reversed %d);"
-                        " only unsurveyed -> %d; none held -> %d; no span -> %d\n",
-                        m_fwd, m_rev, m_uns, m_emp, m_off);
-            check(m_fwd == 333 && m_rev == 333 && m_uns == 0 && m_emp == 0 && m_off == 0,
-                  "T8.7.5  ground_forest reads the SHARE of surveyed held ground whose forest score clears its bar,"
-                  " order-free; a score under the bar does not clear; unheld and unsurveyed stay out; none -> 0");
+            std::printf("      ground_forest held share: shares {150,350,250,unsurveyed} (450 unheld) -> bar 350 %d"
+                        " (reversed %d), bar 250 %d, bar 400 %d; only unsurveyed -> %d; none held -> %d; no span -> %d\n",
+                        m_fwd, m_rev, m_low, m_hi, m_uns, m_emp, m_off);
+            check(m_fwd == 333 && m_rev == 333 && m_low == 666 && m_hi == 0 && m_uns == 0 && m_emp == 0 && m_off == 0,
+                  "T8.7.5  ground_forest reads the SHARE of surveyed held ground whose forest share clears ITS bar"
+                  " (three bars, three answers; the old > 500 cut and a score read both fail), order-free; unheld and"
+                  " unsurveyed stay out; none -> 0");
 
             // T8.7.6 (BL-1056): `ground_fuel` is the same share over the SAME
             // regions forest reads (both span-open scores present), against its
-            // own bar (BL-1059 FIXTURE CHANGE: STATED at fuel 800, the one value
-            // here that cleared the old mean, so the expected share is
-            // unchanged). Ground with no span-open survey -- never surveyed
-            // (energy_q 900) or founded in the span (inherited fuel 900, no
-            // forest) -- is out of the pull, never counted by its energy_q or
-            // its inheritance. -1 only when the span-open survey never ran
-            // (`industry_span_survey_ran` false), and the TERM then keeps the
-            // seam (the old reading); inside the span a realm holding only
-            // unsurveyed ground reads 0. The share replaces the seam in the
-            // term but never in the gate.
+            // own bar (BL-1059 FIXTURE CHANGE: STATED; shares half the scores;
+            // bar 400 is the old cut on these values -> 333, bar 250 the one it
+            // disagrees with -> 666, where '> 500' read 333). Ground with no
+            // span-open survey -- never surveyed (energy_q 900) or founded in
+            // the span (inherited fuel 900, no forest) -- is out of the pull,
+            // never counted by its energy_q or its inheritance. -1 only when
+            // the span-open survey never ran (`industry_span_survey_ran`
+            // false), and the TERM then keeps the seam (the old reading); inside
+            // the span a realm holding only unsurveyed ground reads 0. The
+            // share replaces the seam in the term but never in the gate.
             std::vector<region> fg(5);
-            for (region& x : fg) x.survey_forest_q = 0;
+            for (region& x : fg) { x.survey_forest_q = 0; x.survey_forest_raw = 0; }
             fg[0].survey_fuel_q = 800; fg[1].survey_fuel_q = 200; fg[2].survey_fuel_q = 500;
-            fg[3].survey_fuel_q = -1;  fg[3].survey_forest_q = -1; fg[3].energy_q = 900; // never surveyed
-            fg[4].survey_fuel_q = 900; fg[4].survey_forest_q = -1;                      // founded: fuel inherited
+            fg[0].survey_fuel_raw = 400; fg[1].survey_fuel_raw = 100; fg[2].survey_fuel_raw = 250;
+            fg[3].survey_fuel_q = -1;  fg[3].survey_forest_q = -1; fg[3].survey_forest_raw = -1;
+            fg[3].energy_q = 900;                                                         // never surveyed
+            fg[4].survey_fuel_q = 900; fg[4].survey_forest_q = -1; fg[4].survey_forest_raw = -1; // founded
             const bool ran = industry_span_survey_ran(fg);
             industry_ground_bars fb;
-            fb.fuel_q = 800;
+            fb.fuel_raw = 400;
+            industry_ground_bars fb_low = fb;
+            fb_low.fuel_raw = 250;
             const int s_all = industry_ground_fuel_q(fg, {0, 1, 2, 3, 4}, fb, ran);
             const int s_rev = industry_ground_fuel_q(fg, {4, 3, 2, 1, 0}, fb, ran);
+            const int s_low = industry_ground_fuel_q(fg, {0, 1, 2, 3, 4}, fb_low, ran);
             const int s_uns = industry_ground_fuel_q(fg, {3, 4}, fb, ran);
             const int w_uns = industry_ground_forest_q(fg, {3, 4}, fb);
             std::vector<region> nf(2); nf[0].energy_q = 900; nf[1].energy_q = 100;
@@ -2095,54 +2109,87 @@ int main()
             int fov[io::industry_tree::term_count];
             industry_term_values(0, fo, fov);
             const int gf = static_cast<int>(T::ground_fuel);
-            std::printf("      ground_fuel held share: surveyed {800,200,500} + never-surveyed energy_q 900 + founded"
-                        " inherited 900 -> %d (reversed %d); only unsurveyed, in the span -> fuel %d forest %d;"
-                        " span never ran -> %d; term %d (share) / %d (no share: the seam)\n",
-                        s_all, s_rev, s_uns, w_uns, s_off, fv[gf], fov[gf]);
-            check(ran && !nf_ran && s_all == 333 && s_rev == 333 && s_uns == 0 && w_uns == 0 && s_off == -1
-                      && fv[gf] == 333 && fov[gf] == 800
+            std::printf("      ground_fuel held share: surveyed shares {400,100,250} + never-surveyed energy_q 900 +"
+                        " founded inherited 900 -> bar 400 %d (reversed %d), bar 250 %d; only unsurveyed, in the span"
+                        " -> fuel %d forest %d; span never ran -> %d; term %d (share) / %d (no share: the seam)\n",
+                        s_all, s_rev, s_low, s_uns, w_uns, s_off, fv[gf], fov[gf]);
+            check(ran && !nf_ran && s_all == 333 && s_rev == 333 && s_low == 666 && s_uns == 0 && w_uns == 0
+                      && s_off == -1 && fv[gf] == 333 && fov[gf] == 800
                       && industry_gate_open(io::industry_tree::gate_atom::fuel, fr),
-                  "T8.7.6  ground_fuel reads the SHARE of the same surveyed held ground forest reads (unsurveyed and"
-                  " inherited out; 0 on only-unsurveyed ground in the span; -1 only when the span never ran, and the"
-                  " term then keeps the seam); the fuel gate still reads the seam");
+                  "T8.7.6  ground_fuel reads the SHARE of the same surveyed held ground forest reads, against ITS bar"
+                  " (two bars, two answers); unsurveyed and inherited out; 0 on only-unsurveyed ground in the span; -1"
+                  " only when the span never ran, and the term then keeps the seam; the fuel gate still reads the seam");
 
-            // T8.7.7 (BL-1059; Ben, 2026-09-19, NR-899): THE TOP-THIRD BAR.
-            // Over each resource's NONZERO span-open scores (regions carrying
-            // both scores only): k = floor(m / 3), the bar is the ascending
-            // value at m - k, clear = score > 0 && >= bar, and a tie band
-            // straddling the cut is out whole (bar = value + 1).
-            const auto bars_of = [](const std::vector<int>& fuel, const std::vector<int>& forest) {
+            // T8.7.7 (BL-1059; Ben, 2026-09-19, NR-899, NR-900): THE TOP-THIRD
+            // BAR. Over EVERY region carrying both span-open scores, zeros
+            // included, ranked on the UNCLAMPED share: k = floor(n / 3), the
+            // bar is the ascending value at n - k, clear = share > 0 && >= bar,
+            // a tie band straddling the cut is out whole (bar = value + 1), and
+            // with fewer than three regions nothing clears. `bars_of` builds a
+            // table from shares; the score is the share capped at 1000 (-1
+            // stays unsurveyed), so the cap pile below is one tied SCORE.
+            const auto table_of = [](const std::vector<int>& fuel, const std::vector<int>& forest) {
                 std::vector<region> r(fuel.size());
-                for (std::size_t i = 0; i < r.size(); ++i) { r[i].survey_fuel_q = fuel[i]; r[i].survey_forest_q = forest[i]; }
-                return industry_ground_bars_at_open(r);
+                for (std::size_t i = 0; i < r.size(); ++i)
+                {
+                    r[i].survey_fuel_raw   = fuel[i];
+                    r[i].survey_forest_raw = forest[i];
+                    r[i].survey_fuel_q     = fuel[i]   < 0 ? -1 : std::min(fuel[i], 1000);
+                    r[i].survey_forest_q   = forest[i] < 0 ? -1 : std::min(forest[i], 1000);
+                }
+                return r;
             };
-            // fuel 1..9 plus zeros (zeros out of the ranking); forest the same
-            // values reversed (order-free).
-            const industry_ground_bars b1 = bars_of({ 0, 1, 2, 3, 0, 4, 5, 6, 7, 8, 9, 0 },
-                                                    { 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0 });
-            // A tie band at the cap straddling the cut: {100,200,300, 1000 x6}
-            // -- ">= 1000" would clear 6 of 9; the rule clears none. And a tie
-            // band wholly above the cut: {100..600, 900 x3} -> bar 900, 3 clear.
-            const industry_ground_bars b2 = bars_of({ 100, 200, 300, 1000, 1000, 1000, 1000, 1000, 1000 },
-                                                    { 100, 200, 300, 400, 500, 600, 900, 900, 900 });
-            // Fewer than three nonzero scores: nothing clears. A founded region
-            // (forest -1) carrying fuel 1000 is not read.
-            const industry_ground_bars b3 = bars_of({ 0, 500, 900, 1000 }, { 0, 0, 400, -1 });
-            const industry_ground_bars b4 = bars_of({ 1, 2, 3, 4, 5, 6, 1000 }, { 1, 1, 1, 1, 1, 1, -1 });
-            int clear_b2_fuel = 0;
-            for (int v : { 100, 200, 300, 1000, 1000, 1000, 1000, 1000, 1000 })
-                if (industry_ground_clears(v, b2.fuel_q)) ++clear_b2_fuel;
-            std::printf("      top-third bars: 1..9 with zeros -> fuel %d forest %d; cap tie band -> fuel %d, band above"
-                        " the cut -> forest %d; <3 nonzero -> %d/%d; founded 1000 ignored -> fuel %d; forest all-tied"
-                        " -> %d; clears(0, 0) %d\n",
-                        b1.fuel_q, b1.forest_q, b2.fuel_q, b2.forest_q, b3.fuel_q, b3.forest_q, b4.fuel_q,
-                        b4.forest_q, industry_ground_clears(0, 0) ? 1 : 0);
-            check(b1.fuel_q == 7 && b1.forest_q == 7 && b2.fuel_q == 1001 && clear_b2_fuel == 0
-                      && b2.forest_q == 900 && b3.fuel_q == industry_ground_bar_none_q
-                      && b3.forest_q == industry_ground_bar_none_q && b4.fuel_q == 5 && b4.forest_q == 2
-                      && !industry_ground_clears(0, 0) && industry_ground_clears(7, 7) && !industry_ground_clears(6, 7),
-                  "T8.7.7  the top-third bar: floor(m/3) of the NONZERO scores may clear (>= the value at m - k),"
-                  " a tie band straddling the cut is out whole, order-free, founded ground unread, 0 never clears");
+            const auto bars_of = [&table_of](const std::vector<int>& fuel, const std::vector<int>& forest) {
+                return industry_ground_bars_at_open(table_of(fuel, forest));
+            };
+            const auto clears_of = [](const std::vector<int>& shares, int bar) {
+                int c = 0;
+                for (int v : shares) if (industry_ground_clears(v, bar)) ++c;
+                return c;
+            };
+            // (a) Zeros RANKED: 12 regions, 9 carriers -> k 4, bar 6, and 4 of
+            // 12 clear -- a third of the WORLD, not of the carriers. Forest the
+            // same values reversed (order-free).
+            const std::vector<int> a_fuel = { 0, 1, 2, 3, 0, 4, 5, 6, 7, 8, 9, 0 };
+            const industry_ground_bars b1 = bars_of(a_fuel, { 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0 });
+            // (b) THE REVIEW'S CLIFF: six of nine at the SCORE cap, their
+            // shares distinct -> bar 1400 and 3 clear (ranked on the score it
+            // would be one tied band and clear none). Forest: a tie band in the
+            // SHARE straddling the cut (four at 900 of nine) -> out whole, bar
+            // 901, none clear: never more than a third, however it ties.
+            const std::vector<int> b_fuel = { 100, 200, 300, 1100, 1200, 1300, 1400, 1500, 1600 };
+            const std::vector<int> b_forest = { 100, 200, 300, 400, 500, 900, 900, 900, 900 };
+            const industry_ground_bars b2 = bars_of(b_fuel, b_forest);
+            // (c) A tie band wholly above the cut: {100..600, 900 x3} -> bar
+            // 900, 3 clear. RARITY: two carriers of nine -> the cut lands in
+            // the zeros, bar 1, both carriers clear (and no zero does).
+            const std::vector<int> c_fuel = { 0, 0, 0, 0, 0, 0, 0, 50, 80 };
+            const industry_ground_bars b3 = bars_of(c_fuel, { 100, 200, 300, 400, 500, 600, 900, 900, 900 });
+            // (d) Fewer than three regions: nothing clears. (e) A founded region
+            // (forest -1) carrying fuel 5000 is not read; an all-tied forest
+            // is a tie band across the cut: nothing clears.
+            const industry_ground_bars b4 = bars_of({ 500, 900 }, { 300, 700 });
+            const industry_ground_bars b5 = bars_of({ 1, 2, 3, 4, 5, 6, 5000 }, { 1, 1, 1, 1, 1, 1, -1 });
+            std::printf("      top-third bars: zeros ranked (12 regions) -> fuel %d (%d clear) forest %d; score-cap pile"
+                        " -> fuel %d (%d clear); share tie band across the cut -> forest %d (%d clear); band above the"
+                        " cut -> forest %d; 2 carriers of 9 -> fuel %d (%d clear); <3 regions -> %s/%s; founded 5000"
+                        " unread -> fuel %d; all-tied forest -> %d\n",
+                        b1.fuel_raw, clears_of(a_fuel, b1.fuel_raw), b1.forest_raw, b2.fuel_raw,
+                        clears_of(b_fuel, b2.fuel_raw), b2.forest_raw, clears_of(b_forest, b2.forest_raw), b3.forest_raw,
+                        b3.fuel_raw, clears_of(c_fuel, b3.fuel_raw),
+                        b4.fuel_raw == industry_ground_bar_none ? "none" : "SET",
+                        b4.forest_raw == industry_ground_bar_none ? "none" : "SET", b5.fuel_raw, b5.forest_raw);
+            check(b1.fuel_raw == 6 && clears_of(a_fuel, b1.fuel_raw) == 4 && b1.forest_raw == 6
+                      && b2.fuel_raw == 1400 && clears_of(b_fuel, b2.fuel_raw) == 3
+                      && b2.forest_raw == 901 && clears_of(b_forest, b2.forest_raw) == 0
+                      && b3.forest_raw == 900 && b3.fuel_raw == 1 && clears_of(c_fuel, b3.fuel_raw) == 2
+                      && b4.fuel_raw == industry_ground_bar_none && b4.forest_raw == industry_ground_bar_none
+                      && b5.fuel_raw == 5 && b5.forest_raw == 2
+                      && !industry_ground_clears(0, 0) && !industry_ground_clears(0, 1)
+                      && industry_ground_clears(7, 7) && !industry_ground_clears(6, 7),
+                  "T8.7.7  the top-third bar: floor(n/3) of EVERY read region (zeros ranked) may clear, on the"
+                  " unclamped share (a score-cap pile no longer empties it), a tie band across the cut is out whole,"
+                  " a 0 never clears however rare the resource, <3 regions clear nothing, founded ground unread");
         }
 
         // `known` is per node: Patent Grants reads 1000 only when a met polity
@@ -2192,8 +2239,8 @@ int main()
     // the rival; wooded ground takes Charcoal Iron.
     //
     // BOTH READINGS ARE THE RULED ONES. The forest is the SHARE of held
-    // ground wooded above the world mean (BL-1056, NR-896: two wooded regions
-    // of three read 666; the best-of-held it replaced read one wooded region
+    // ground clearing the world's forest bar (BL-1056, NR-896; the bar
+    // BL-1059, NR-899/NR-900: two wooded regions of three read 666; the best-of-held it replaced read one wooded region
     // of three as a wooded realm), and the seam is BL-1041 DEFAULT B's
     // `industry_fuel_reading_q`: every region is SURVEYED at 100, under the
     // bar, while its inherited energy_q (400) would have cleared it -- so the
@@ -2210,19 +2257,22 @@ int main()
         // wooded region, one open.
         std::vector<region> rg(9);
         const int wood[9] = { 900, 900, 0,  0, 50, 0,  900, 0, 0 }; // BL-1056: 666, 0, and one of three 333
-        // BL-1059 FIXTURE CHANGE (the bar semantics): the bars are STATED at
-        // 500 on both resources, the cut the old mean made on these values
-        // (900 clears, 50 and the fuel 100 do not). Derived from this toy they
-        // would clear nothing -- its nonzero forest is a 900 tie band -- which
-        // is the tie rule working, not the scenario this check is about.
+        // BL-1059 FIXTURE CHANGE (the bar semantics): the shares equal the
+        // scores here, and the bars are STATED at 500 on both resources, the
+        // cut the old mean made on these values (900 clears, 50 and the fuel
+        // 100 do not). Derived from this toy they would clear nothing -- its
+        // forest carriers hold a 900 tie band across the cut -- which is the
+        // tie rule working, not the scenario this check is about.
         industry_ground_bars cb;
-        cb.fuel_q   = 500;
-        cb.forest_q = 500;
+        cb.fuel_raw   = 500;
+        cb.forest_raw = 500;
         for (int i = 0; i < 9; ++i)
         {
-            rg[i].energy_q        = 400; // would clear the 250 bar on the old read
-            rg[i].survey_fuel_q   = 100; // the span-open survey: under it
-            rg[i].survey_forest_q = wood[i];
+            rg[i].energy_q          = 400; // would clear the 250 bar on the old read
+            rg[i].survey_fuel_q     = 100; // the span-open survey: under it
+            rg[i].survey_fuel_raw   = 100;
+            rg[i].survey_forest_q   = wood[i];
+            rg[i].survey_forest_raw = wood[i];
         }
         const std::vector<int> wooded = {0, 1, 2}, open_ground = {3, 4, 5};
 
@@ -2246,7 +2296,7 @@ int main()
                     ro.ground_forest_q, pick_o >= 0 ? io::industry_tree::nodes[pick_o].id : "-");
         check(in_mt1c >= 0 && in_mt1d >= 0 && coke_shut && rw.ground_forest_q == 666 && ro.ground_forest_q == 0
                   && pick_w == in_char && pick_o != in_char,
-              "T8.8.4  no seam either way (the survey's): the realm two-thirds wooded above the mean (share 666) takes"
+              "T8.8.4  no seam either way (the survey's): the realm two-thirds clearing the forest bar (share 666) takes"
               " Charcoal Iron, the open one (0) does not");
 
         const industry_scorer_reading r3 = reading_for({6, 7, 8});
@@ -2262,7 +2312,7 @@ int main()
         // term takes the fork (an exact tie breaks on node index, Coke first).
         industry_scorer_reading rs = rw;
         rs.fuel_seam_q   = 1000;
-        rs.ground_fuel_q = 1000; // every held region over a seam above the mean
+        rs.ground_fuel_q = 1000; // every held region clearing the fuel bar
         const int pick_s = choose_industry_node(mk, rs);
         std::printf("      NOTE  the same wooded realm WITH a seam (ground_fuel %d vs ground_forest %d) -> %s\n",
                     rs.ground_fuel_q, rs.ground_forest_q, pick_s >= 0 ? io::industry_tree::nodes[pick_s].id : "-");

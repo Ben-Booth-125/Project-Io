@@ -2931,7 +2931,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // reads these. Only regions carrying both span-open scores are read, and
     // no score is ever rewritten after the open, so a run resumed mid-span
     // re-derives the same bars. Off the span nothing is surveyed and both
-    // read `industry_ground_bar_none_q` (and nothing reads them).
+    // read `industry_ground_bar_none` (and nothing reads them).
     out.ground_bars = industry_ground_bars_at_open(ss.regions);
     const industry_ground_bars ground_bars = out.ground_bars;
 
@@ -6745,8 +6745,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             // THE FUEL DOCTRINE'S TWO PULLS (BL-1056; Ben
                             // 2026-09-19, NR-896): `ground_forest` and
                             // `ground_fuel` are each the per-mille SHARE of held
-                            // regions whose span-open score clears its own
-                            // resource's top-third bar (BL-1059, NR-899), over
+                            // regions whose span-open share clears its own
+                            // resource's top-third bar (BL-1059, NR-899,
+                            // NR-900), over
                             // the SAME held regions (those carrying the
                             // span-open survey) -- like with like, and neither grows with the realm,
                             // where the best-of-held they replace could only
@@ -8505,8 +8506,8 @@ namespace {
 
 /// BL-1056: the Fuel Doctrine's two pulls, taken over ONE region set. A held
 /// region counts only if it carries the span-open survey of BOTH scores -- the
-/// survey writes the two together. Each score is tested against ITS OWN
-/// resource's top-third bar (BL-1059, NR-899). A region the span founded has no
+/// survey writes the two together. Each span-open SHARE is tested against ITS
+/// OWN resource's top-third bar (BL-1059, NR-899, NR-900). A region the span founded has no
 /// forest reading (DEFAULT A inherits fuel only), so it is out of BOTH pulls,
 /// never in one and out of the other. Writes the two clear-counts and the
 /// count read; order-free.
@@ -8521,46 +8522,51 @@ void industry_ground_pull_counts(const std::vector<region>& regions, const std::
         const region& r = regions[static_cast<std::size_t>(hi)];
         if (r.survey_fuel_q < 0 || r.survey_forest_q < 0) continue;
         ++read;
-        if (industry_ground_clears(r.survey_fuel_q,   bars.fuel_q))   ++fuel_clear;
-        if (industry_ground_clears(r.survey_forest_q, bars.forest_q)) ++forest_clear;
+        if (industry_ground_clears(r.survey_fuel_raw,   bars.fuel_raw))   ++fuel_clear;
+        if (industry_ground_clears(r.survey_forest_raw, bars.forest_raw)) ++forest_clear;
     }
 }
 
-/// BL-1059: one resource's top-third bar over @p nonzero (the resource's
-/// nonzero span-open scores; sorted in place). k = floor(m / 3) may clear, the
-/// bar is the value at ascending position m - k, and a tie band straddling
-/// that cut is excluded whole (bar = value + 1) -- see `industry_ground_bars`.
-int industry_top_third_bar(std::vector<int>& nonzero)
+/// BL-1059: one resource's top-third bar over @p shares (every read region's
+/// span-open share, zeros included; sorted in place). k = floor(n / 3) may
+/// clear, the bar is the value at ascending position n - k, and a tie band
+/// straddling that cut is excluded whole (bar = value + 1) -- see
+/// `industry_ground_bars`. A 0 at the cut becomes a bar of 1: zeros never clear.
+int industry_top_third_bar(std::vector<int>& shares)
 {
-    const std::size_t m = nonzero.size();
-    const std::size_t k = m / 3;
-    if (k == 0) return industry_ground_bar_none_q;
-    std::sort(nonzero.begin(), nonzero.end());
-    const std::size_t cut = m - k; // >= 2 since m >= 3
-    const int v = nonzero[cut];
-    return nonzero[cut - 1] == v ? v + 1 : v;
+    const std::size_t n = shares.size();
+    const std::size_t k = n / 3;
+    if (k == 0) return industry_ground_bar_none;
+    std::sort(shares.begin(), shares.end());
+    const std::size_t cut = n - k; // >= 2 since n >= 3
+    const int v = shares[cut];
+    if (shares[cut - 1] != v) return v;
+    return v == industry_ground_bar_none ? industry_ground_bar_none : v + 1;
 }
 
 } // namespace
 
 industry_ground_bars industry_ground_bars_at_open(const std::vector<region>& regions)
 {
-    // THE TOP-THIRD BARS (BL-1059; Ben, 2026-09-19, NR-899; INDUSTRY_TREE.md
-    // sec The scorer). Read over the regions carrying both span-open scores --
-    // the set the pulls read -- and over each resource's NONZERO scores, since
-    // a 0 never clears. The sort makes the bar independent of region order.
+    // THE TOP-THIRD BARS (BL-1059; Ben, 2026-09-19, NR-899, NR-900;
+    // INDUSTRY_TREE.md sec The scorer). Read over EVERY region carrying both
+    // span-open scores -- the set the pulls read -- zeros included, so both
+    // resources clear at one rate of the world; ranked on the UNCLAMPED share,
+    // so a pile at the score's cap is not one tied value. A region with no
+    // share (a hand-built table only) ranks as 0. The sort makes each bar
+    // independent of region order.
     std::vector<int> fuel, forest;
     fuel.reserve(regions.size());
     forest.reserve(regions.size());
     for (const region& r : regions)
     {
         if (r.survey_fuel_q < 0 || r.survey_forest_q < 0) continue;
-        if (r.survey_fuel_q   > 0) fuel.push_back(r.survey_fuel_q);
-        if (r.survey_forest_q > 0) forest.push_back(r.survey_forest_q);
+        fuel.push_back(std::max(r.survey_fuel_raw, 0));
+        forest.push_back(std::max(r.survey_forest_raw, 0));
     }
     industry_ground_bars b;
-    b.fuel_q   = industry_top_third_bar(fuel);
-    b.forest_q = industry_top_third_bar(forest);
+    b.fuel_raw   = industry_top_third_bar(fuel);
+    b.forest_raw = industry_top_third_bar(forest);
     return b;
 }
 
@@ -8849,10 +8855,11 @@ void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
     at(scorer_term::furnace_lit)      = furnace_lit ? 1000 : 0;
     at(scorer_term::ground_ore)       = r.ground_ore_q;
     // BL-1056 (NR-896): both Fuel Doctrine pulls read a SHARE of held ground
-    // above the world mean; off the span no share is taken (-1) and the coal
-    // pull keeps the seam, the old reading. The GATE still reads the seam.
+    // clearing that resource's top-third bar (BL-1059, NR-899, NR-900); off
+    // the span no share is taken (-1) and the coal pull keeps the seam, the old
+    // reading. The GATE still reads the seam.
     at(scorer_term::ground_fuel)      = r.ground_fuel_q >= 0 ? r.ground_fuel_q : r.fuel_seam_q;
-    at(scorer_term::ground_forest)    = r.ground_forest_q;   // the span-open survey, share of held above the mean
+    at(scorer_term::ground_forest)    = r.ground_forest_q;   // the span-open survey, share of held clearing the forest bar
     at(scorer_term::tariff_pressure)  = 0; // PINNED: no landed price at a market before the campaign
     at(scorer_term::threatened)       = r.threatened_q;
     at(scorer_term::food_bound)       = r.food_bound_q;
