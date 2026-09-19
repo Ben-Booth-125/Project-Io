@@ -121,7 +121,7 @@
    "title": "CALL: the top-third bar — rank every region or only those carrying the resource; and a cliff at the survey's 1000 cap",
    "raised": "2026-09-19",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1059 (top-third bar) lane (commit 15713143) and its cold review, 2026-09-19. Raised first as a decision taken with a recommendation to keep it; the review showed it departs from the ruled wording, so it is re-raised as a call. Per-seed carrier counts owed from the next main-session run.",
    "what": "NR-899 ruled 'the top third of every region's score ... fuel and forest clear at the same rate world-wide'. The lane ranked only NONZERO scores (k = floor(m/3) of m carriers; a tie band straddling the cut falls out whole). Two problems. (1) RARITY TILT RETURNS, milder: with fuel in 150 of 300 regions and forest in 285, nonzero-only clears 50 fuel regions (17% of the world) against 95 forest (32%); ranking every region clears about 100 of each, which is the ruling's 'same rate world-wide'. The built split is coke 239 / charcoal 277 / neither 340 (from 142 / 373 / 341). (2) A CLIFF AT THE CAP: survey scores clamp at 1000 (twice the world mean, settlement.cpp:377); if more than a third of carriers sit at 1000 the tie rule pushes them all out, the bar becomes 1001 and fuel clears NOWHERE on that world (30 capped: 30 clear; 31: none). The 16 library seeds avoid it (each bar clears 31.8-33.3% of carriers), but nothing fails if a seed hits it.",
    "why_it_matters": "It decides which ground counts as a coalfield or a forest, so the 1960 Fuel Doctrine split BL-1043 measures and BL-1044 re-blesses.",
@@ -137,7 +137,7 @@
     "tools/verify/digitisation_sim_harness.cpp",
     "docs/generation/trees/INDUSTRY_TREE.md"
    ],
-   "resolution": null
+   "resolution": "RULED (Ben, 2026-09-19): option A. The top third is taken over every region, ranking the unclamped survey share; a region with none never clears. Written into INDUSTRY_TREE.md § The scorer; BL-1059 (top-third bar) takes a fix round before it closes."
   }
  ]
 }

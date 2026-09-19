@@ -24,26 +24,13 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*4 entries — 1 open, 3 resolved.*
+*4 entries — 0 open, 4 resolved.*
 
 ---
 
 ## Open
 
-### NR-900 — CALL: the top-third bar — rank every region or only those carrying the resource; and a cliff at the survey's 1000 cap
-*question · raised 2026-09-19 · from BL-1059 (top-third bar) lane (commit 15713143) and its cold review, 2026-09-19. Raised first as a decision taken with a recommendation to keep it; the review showed it departs from the ruled wording, so it is re-raised as a call. Per-seed carrier counts owed from the next main-session run.*
-
-NR-899 ruled 'the top third of every region's score ... fuel and forest clear at the same rate world-wide'. The lane ranked only NONZERO scores (k = floor(m/3) of m carriers; a tie band straddling the cut falls out whole). Two problems. (1) RARITY TILT RETURNS, milder: with fuel in 150 of 300 regions and forest in 285, nonzero-only clears 50 fuel regions (17% of the world) against 95 forest (32%); ranking every region clears about 100 of each, which is the ruling's 'same rate world-wide'. The built split is coke 239 / charcoal 277 / neither 340 (from 142 / 373 / 341). (2) A CLIFF AT THE CAP: survey scores clamp at 1000 (twice the world mean, settlement.cpp:377); if more than a third of carriers sit at 1000 the tie rule pushes them all out, the bar becomes 1001 and fuel clears NOWHERE on that world (30 capped: 30 clear; 31: none). The 16 library seeds avoid it (each bar clears 31.8-33.3% of carriers), but nothing fails if a seed hits it.
-
-**Why it matters.** It decides which ground counts as a coalfield or a forest, so the 1960 Fuel Doctrine split BL-1043 measures and BL-1044 re-blesses.
-
-- Rank every region's score (the ruling's words), and rank the unclamped survey share so a pile at the cap cannot empty the bar.
-- Keep nonzero-only (clears a third of CARRIERS, not of the world), and rank the unclamped share.
-- Keep as built, and make the harness fail when a bar reaches 1001 with three or more carriers.
-
-> **Recommendation:** The first: it is what NR-899 says, it makes fuel and forest clear at one rate world-wide, and ranking the unclamped share removes the cliff rather than alarming on it. The per-seed carrier counts (fuel vs forest nonzero) will show how far apart the options really are; they come from the next main-session run.
-
-*Files: `src/world/history_sim.cpp`, `src/world/settlement.cpp`, `tools/verify/digitisation_sim_harness.cpp`, `docs/generation/trees/INDUSTRY_TREE.md`*
+*Nothing open.*
 
 ---
 
@@ -102,4 +89,21 @@ NR-896 ruled both pulls read the share of held regions scoring over the world me
 > **RESOLVED.** RULED (Ben, 2026-09-19): option C, and founded ground stays excluded from both pulls. Each pull counts held regions in the top third of the world for its own resource, a bar fixed at the span open. Written into INDUSTRY_TREE.md § The scorer; the work is BL-1059 (top-third bar).
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/trees/INDUSTRY_TREE.md`*
+
+### NR-900 — CALL: the top-third bar — rank every region or only those carrying the resource; and a cliff at the survey's 1000 cap
+*question · raised 2026-09-19 · from BL-1059 (top-third bar) lane (commit 15713143) and its cold review, 2026-09-19. Raised first as a decision taken with a recommendation to keep it; the review showed it departs from the ruled wording, so it is re-raised as a call. Per-seed carrier counts owed from the next main-session run.*
+
+NR-899 ruled 'the top third of every region's score ... fuel and forest clear at the same rate world-wide'. The lane ranked only NONZERO scores (k = floor(m/3) of m carriers; a tie band straddling the cut falls out whole). Two problems. (1) RARITY TILT RETURNS, milder: with fuel in 150 of 300 regions and forest in 285, nonzero-only clears 50 fuel regions (17% of the world) against 95 forest (32%); ranking every region clears about 100 of each, which is the ruling's 'same rate world-wide'. The built split is coke 239 / charcoal 277 / neither 340 (from 142 / 373 / 341). (2) A CLIFF AT THE CAP: survey scores clamp at 1000 (twice the world mean, settlement.cpp:377); if more than a third of carriers sit at 1000 the tie rule pushes them all out, the bar becomes 1001 and fuel clears NOWHERE on that world (30 capped: 30 clear; 31: none). The 16 library seeds avoid it (each bar clears 31.8-33.3% of carriers), but nothing fails if a seed hits it.
+
+**Why it matters.** It decides which ground counts as a coalfield or a forest, so the 1960 Fuel Doctrine split BL-1043 measures and BL-1044 re-blesses.
+
+- Rank every region's score (the ruling's words), and rank the unclamped survey share so a pile at the cap cannot empty the bar.
+- Keep nonzero-only (clears a third of CARRIERS, not of the world), and rank the unclamped share.
+- Keep as built, and make the harness fail when a bar reaches 1001 with three or more carriers.
+
+> **Recommendation:** The first: it is what NR-899 says, it makes fuel and forest clear at one rate world-wide, and ranking the unclamped share removes the cliff rather than alarming on it. The per-seed carrier counts (fuel vs forest nonzero) will show how far apart the options really are; they come from the next main-session run.
+
+> **RESOLVED.** RULED (Ben, 2026-09-19): option A. The top third is taken over every region, ranking the unclamped survey share; a region with none never clears. Written into INDUSTRY_TREE.md § The scorer; BL-1059 (top-third bar) takes a fix round before it closes.
+
+*Files: `src/world/history_sim.cpp`, `src/world/settlement.cpp`, `tools/verify/digitisation_sim_harness.cpp`, `docs/generation/trees/INDUSTRY_TREE.md`*
 
