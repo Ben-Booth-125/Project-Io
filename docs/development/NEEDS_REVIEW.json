@@ -183,6 +183,25 @@
     "charter_cost_sweep.json"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-903",
+   "title": "CALL: under the goods-in-turn fill, one good that cannot be placed forfeits the centre's whole remainder",
+   "raised": "2026-09-19",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1039 round 2 cold review (static), 2026-09-19.",
+   "what": "The turn's cursor moves only on a charter, and a failed placement ends the centre (corporation_generation.cpp:3287-3289, 3343-3351, 3396-3397). A raw good with no recipe gets an EXTRACTION firm, which needs an unoccupied non-urban deposit tile in the window (placement_rules.cpp:112-122); a processing firm does not. So a city centre whose radius-4 window has land but no free deposit tile stops at agricultural_produce (a low index, reached every pass) and books the rest window_exhausted, though processing goods later in the turn would have placed; the next centre on the body starts on the same good. Legacy has the same break, but the turn brings every extraction good up every pass. On seeds 0/28/46 at 4x it costs 15-17 points (legacy 12). It follows the ruling's letter; 'forfeit vs skip' was settled in a code comment, not asked.",
+   "why_it_matters": "Once the span defaults on (BL-1044) the app runs this turn on real stockpile budgets, where dense city windows are the common case; R9's 'every good with demand holds firms' can fail there.",
+   "options": [
+    "Skip: a good that cannot be placed in this centre's window is passed over for this centre and the turn moves on; the centre ends only when no good in the turn can place.",
+    "Forfeit (as built): the centre ends at the first failed placement."
+   ],
+   "recommendation": "Skip. A dense city with no free deposit tile should still charter the mills and works it has room for; forfeiting them books a city's budget as unspent for want of a quarry.",
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

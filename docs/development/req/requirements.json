@@ -5985,21 +5985,23 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep --charter-budget synthetic (legacy modes)"
      ],
      "requirement": "The legacy cap-kept and cap-lifted synthetic modes still produce their recorded digests.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "LANE EVIDENCE ONLY: round 2 (4be0c877) re-ran the legacy synthetic 2x modes (cap kept, cap lifted) on seeds 0, 28, 46 before and after and the digests held. charter_cost_sweep.json records no digests for those rows, so the main session could not re-diff them independently; the cold review (R7) confirms the legacy rules change only report fields."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep --charter-cost (new rows)"
      ],
      "requirement": "Rows on seeds 0, 28 and 46 at 1x, 2x and 4x under the square-root rule with two ceilings, with firms per good on every row, land in charter_cost_sweep.json with their note.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "player_seed_sweep --charter-cost --seeds 0,28,46 --budget-scales 1,2,4 --resource-cap sqrt --density-ceilings 120,160 --specialist-prices 4 --no-extra --no-forced, quiet machine, main at ab9c38f8, Release /O2 MSVC 14.44.35207, serial, 7126 s (main session, 2026-09-19): 21 rows, firms per good on every row, spend rules and points balance PASS on every row, nothing threw; folded into charter_cost_sweep.json as runs.bl1039_sqrt with its note (4ffc6716)."
     },
     {
      "id": "R4",
@@ -6012,50 +6014,55 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the Pass 6 coupling is broken",
       "code: no shipped default in charter_budget.hpp"
      ],
-     "requirement": "The budget path no longer reads constants coupled to Pass 6's; Pass 6's own constants are untouched; charter_spend_params keeps no shipped default and refuses a non-positive price or rate.",
-     "notes": ""
+     "requirement": "The budget path no longer reads constants coupled to Pass 6's; Pass 6's own constants are untouched; charter_spend_params keeps no shipped default and refuses a non-positive price.",
+     "notes": "",
+     "result_metric": "code-reviewer (cold, static) on 4be0c877, 2026-09-19: no new default in charter_budget.hpp (window_radius and province_cap predate BL-1039); charter_spend_params refuses a non-positive firm price and specialist price (charter_budget.hpp:412-415); the budget path reads no Pass 6 constant. The rate this row named was removed with the capital rule (NR-895)."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "record: NEEDS_REVIEW entry"
      ],
      "requirement": "A call for the reference budget's definition and the density ceiling is filed with the rows.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Filed with the rows as NR-902 (the density ceiling, 120 or 160) on 2026-09-19; the reference budget's definition was ruled by NR-895 (B_ref = 8 x goods x firm price)."
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds no pinned path moved.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "code-reviewer (cold, static) on 4be0c877, 2026-09-19: nothing blocks; the draw path is the pre-BL-1039 code verbatim; an empty budget returns to the legacy overload before any new code (landscape_search.cpp:235-239), so no pinned path reads it. One design call (a failed placement forfeits the centre's remainder: NR-903) and low findings (BL-1060)."
     },
     {
      "id": "R8",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: charter_refusal_probe",
       "headless: player_seed_sweep smoke row"
      ],
      "requirement": "B counts firm points net of specialist prices and B_ref = 8 x |G| x firm price, so a body at the legacy firm spend gets exactly the legacy cap of 8 (a probe case proves it).",
-     "notes": ""
+     "notes": "",
+     "result_metric": "charter_refusal_probe ALL PASS on 849a358d (chain 8, main session): cap(B_ref) == c over the grid; the cold review confirms it can fail (an isqrt off-by-one or a units change trips it) and notes the missing negative-price cases (BL-1060)."
     },
     {
      "id": "R9",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep smoke row (sqrt, ceiling 120, 4x)"
      ],
      "requirement": "Under the density ceiling firms go to the goods in turn, up to each good's cap, so every good with demand holds firms and the ceiling trims them evenly.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "The 4x ceiling-120 rows (seeds 0, 28, 46): 120 firms, every good with demand holds firms, trimmed evenly to within one (seed 0: nine goods at 12, one at 11, one yard); checks at land PASS on every square-root row. Caveat: a failed placement ends the centre's walk, so an unplaceable extraction good can forfeit the remainder (NR-903)."
     }
    ],
    "resolution": ""

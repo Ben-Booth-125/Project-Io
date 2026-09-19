@@ -703,6 +703,31 @@
     "tools/verify/exploration_sim_harness.cpp"
    ],
    "design": "RULED (Ben, 2026-09-19, NR-899 option C; founded ground stays excluded). Design: INDUSTRY_TREE.md § The scorer, the NR-899 paragraph.\n\nWHY. Under BL-1056's 'score > 500' (over the world mean) the split went coke 142 / charcoal 373 / neither 341 (chain 9, 2867cdaa): coal scores sit on few regions, so few clear a mean a handful of coalfields set, while forest is widespread.\n\nTHE WORK. (1) At the span open, once, compute a per-resource bar from EVERY region's span-open score (fuel and forest separately): a region clears when its score is in the top third of the world for that resource — define it exactly and deterministically (e.g. the value at the floor(2n/3) position of the ascending-sorted scores, clearing at >= that value), a score of 0 never clears, and state how ties at the bar resolve (a tie band larger than a third must not let most of the world clear; say what the code does and pin it). Store both bars where the scorer reads them; they never change after the open. (2) ground_forest and ground_fuel read the share of held regions (the BL-1056 set: carrying the span-open survey of both scores; span-founded ground excluded from both) whose score clears that resource's bar. The fuel GATE, its re-check and the seam flag are unchanged. The span-ran flag and the -1 fallback are unchanged. (3) Harness: the BL-1056 self-check keeps holding (no pull rises when a realm gains a region that does not clear its bar); a new check that on every library seed each bar is cleared by between ~25% and ~34% of surveyed regions with a nonzero score (print the actual rates), and that the bars are identical across a re-run. Reading 8 prints the Fuel Doctrine split and mean pulls by side as now. DONE WHEN: switch off, digests and pins unmoved; the split and the two clearance rates reported per seed; exploration_sim_harness green (fixtures updated only where the bar semantics changed, each change named)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "45",
+   "written": "2026-09-19",
+   "author": "Claude (found by BL-1039 round 2's cold review, 2026-09-19)",
+   "requires": [
+    "BL-1039"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1060",
+   "short_name": "CHARTER_SPEND_HARDENING",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 1,
+   "title": "The charter spend refuses overflow-prone prices, labels a late shortfall honestly, and its probe tests every refusal",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/charter_budget.hpp",
+    "src/world/corporation_generation.cpp",
+    "tools/verify/charter_refusal_probe.cpp"
+   ],
+   "design": "FOUND 2026-09-19 by BL-1039 round 2's cold review (low; nothing blocking). Rides before BL-1044 turns the span on, because BL-1042's stockpile_charter_spend() selects sqrt_capital and so puts the turn on the play path.\n\n(1) reference_points = c x |G| x fp (corporation_generation.cpp:3025-3028; the sweep ~988) can overflow int64 (UB) and cap(B_ref) saturates once c^2 x |G| x fp > INT64_MAX, so check_charter_rules would fail a correct body: refuse c and fp above a bound that keeps both in range (unreachable at c = 8). (2) The turn serves G, fixed before the walk: a good that first falls short because of the walk's own firms (industrial upkeep draws power, timber, stone — economy.lua:565, 569) never gets a firm and its leftover is booked no_gap, whose definition (charter_budget.hpp:283) is then false — today the home body's base installations keep those goods in G, but a budgeted centre on another body hits it (the BL-708 drift). Either re-derive G as the walk adds demand or book it under its own reason. (3) charter_refusal_probe: add firm_price_points < 0 and specialist_firm_charters <= 0 with a positive firm price (the code refuses both, charter_budget.hpp:412-415, untested); the cap(B_ref - 1) == c half cannot fail while the max(c, ...) floor exists — say so or test below the floor. (4) Nits: the turn's inner k shadows the firm loop's k (C4456, :3295 vs :3191); two different 'firm_points' (per-centre int32 unrounded, per-body int64 rounded) — rename one. DONE WHEN: the probe covers every refusal and fails on a removed one; no digest moves; player_seed_sweep --digest-check 16/16."
   }
  ]
 }

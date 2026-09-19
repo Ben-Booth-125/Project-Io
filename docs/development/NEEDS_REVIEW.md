@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*6 entries — 1 open, 5 resolved.*
+*7 entries — 2 open, 5 resolved.*
 
 ---
 
@@ -44,6 +44,20 @@ At 1x and 2x the two ceilings give identical worlds: neither binds. At 4x: ceili
 > **Recommendation:** 120. A ceiling that never binds is not a brake; at 120 every good still holds firms and the dense rows cost less. BL-1043 confirms it on real budgets.
 
 *Files: `src/world/stockpile_budget.hpp`, `src/world/charter_budget.hpp`, `charter_cost_sweep.json`*
+
+### NR-903 — CALL: under the goods-in-turn fill, one good that cannot be placed forfeits the centre's whole remainder
+*question · raised 2026-09-19 · from BL-1039 round 2 cold review (static), 2026-09-19.*
+
+The turn's cursor moves only on a charter, and a failed placement ends the centre (corporation_generation.cpp:3287-3289, 3343-3351, 3396-3397). A raw good with no recipe gets an EXTRACTION firm, which needs an unoccupied non-urban deposit tile in the window (placement_rules.cpp:112-122); a processing firm does not. So a city centre whose radius-4 window has land but no free deposit tile stops at agricultural_produce (a low index, reached every pass) and books the rest window_exhausted, though processing goods later in the turn would have placed; the next centre on the body starts on the same good. Legacy has the same break, but the turn brings every extraction good up every pass. On seeds 0/28/46 at 4x it costs 15-17 points (legacy 12). It follows the ruling's letter; 'forfeit vs skip' was settled in a code comment, not asked.
+
+**Why it matters.** Once the span defaults on (BL-1044) the app runs this turn on real stockpile budgets, where dense city windows are the common case; R9's 'every good with demand holds firms' can fail there.
+
+- Skip: a good that cannot be placed in this centre's window is passed over for this centre and the turn moves on; the centre ends only when no good in the turn can place.
+- Forfeit (as built): the centre ends at the first failed placement.
+
+> **Recommendation:** Skip. A dense city with no free deposit tile should still charter the mills and works it has room for; forfeiting them books a city's budget as unspent for want of a quarry.
+
+*Files: `src/world/corporation_generation.cpp`*
 
 ---
 
