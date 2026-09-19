@@ -6231,10 +6231,10 @@
    "difficulty": 3,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1053 - sprint 45 (2026-09-18)",
    "batch": "sprint-45",
-   "resolved": null,
+   "resolved": "2026-09-19",
    "rows": [
     {
      "id": "R1",
@@ -6301,15 +6301,16 @@
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds no setup read of a 1660 record left on the span path.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "code-reviewer (cold, static, main at 2cfb1c11, 2026-09-19): no setup read of a 1660 record left on the span path. Grudges, surviving corridors and treasuries are reassigned from the 1960 close (hard_coded_world.cpp:1493-1496) and every later reader takes them; kepler_exploration is read only as the span's resume input and the validator's 'from'; no dangling pointer (without_resume_pointers nulls all eight); span-off unchanged but the loading-bar total. Two low findings (a stop-year rule that cannot fail; a hand-kept Empires-only list) filed as BL-1058."
     }
    ],
-   "resolution": ""
+   "resolution": "With the span on, setup reads the 1960 close; with it off, the pins held (chain 8); the cold review found no 1660 read left."
   },
   {
    "brief": "industry-points",
