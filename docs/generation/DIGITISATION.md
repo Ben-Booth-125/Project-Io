@@ -454,7 +454,12 @@ because it is usually the largest centre. Landing them all on the capital's own 
 region hold up to 65% of a world's points, so charters would have followed capitals, not cities.
 The constants stand: 1000 points per million urban heads per year; fuel factor
 250 + 750 × reading/1000; a 250‰ share of the round's surplus, debited; 1000 points per
-treasury unit.
+treasury unit. **A polity that holds no town converts nothing (Ben, 2026-09-19, NR-901):** there is
+nowhere for its works to stand, so its treasury keeps the round's share rather than paying for
+points on townless ground that no campaign centre can receive. **Points on a region whose towns
+were razed are lost with them:** a region earns points only while it holds centres, and if war
+later takes its towns while people remain, the works went with the towns; the handoff counts those
+points unspent as razed, a cause the map shows.
 
 **PROPOSED (listed to Ben 2026-09-18, not overturned): the stock sits on each region that holds
 centres.** The sim holds a city as counts on its region, not as an entity, so *one number per

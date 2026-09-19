@@ -24,26 +24,13 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*5 entries — 1 open, 4 resolved.*
+*5 entries — 0 open, 5 resolved.*
 
 ---
 
 ## Open
 
-### NR-901 — CALL: industry points on ground with no town reach no campaign centre — on seed 0, 44% of the stock
-*question · raised 2026-09-19 · from BL-1042 (stockpile to budget) lane and its cold review, 2026-09-19 (static). The lane's figures: seed 0 stock 56.2M, 24.97M of it 'no_carved_centre' in 13 regions; seeds 28 and 46 lose 2.2M each.*
-
-The carve makes campaign centres only on regions with people AND centres (population_generation.cpp:174), so points sitting on a region with no centres at 1960 reach nobody; BL-1042 counts them unspent. The review traced two ways points land there, and ruled out a sim/carve mismatch. (a) A region earned points, then lost its towns: scale points need centres only at the moment of credit (history_sim.cpp:8666), and a sack can round centres to 0 while people remain (settlement.cpp:2460-2465). (b) The treasury fallback: when a polity holds no region with centres, BL-1056 lands the whole round's treasury credit on its capital (history_sim.cpp:1069) — which, by the same condition, has no towns. The treasury is really debited (:1083) and the handoff then discards the points. Concentration in 13 regions points to (b); the per-region treasury tally will separate them on the next run.
-
-**Why it matters.** BL-1044 sets the charter prices against this budget; on seed 0 it is missing nearly half its stock, and (b) debits a treasury for works that never exist.
-
-- (b) converts nothing when the polity holds no town — the treasury keeps its money, since there is nowhere to build; (a) stays unspent under a 'razed' reason, because war destroyed those works.
-- Both reach the nearest carved centre of the same nation at the handoff.
-- Keep as built: both unspent under one reason; judge on BL-1043.
-
-> **Recommendation:** The first. It stops a treasury paying for works with nowhere to stand (the NR-897 principle: a treasury builds where its people are), and it gives the razed case a visible in-world cause rather than a silent loss.
-
-*Files: `src/world/history_sim.cpp`, `src/world/stockpile_budget.cpp`, `src/world/stockpile_budget.hpp`, `docs/generation/DIGITISATION.md`*
+*Nothing open.*
 
 ---
 
@@ -119,4 +106,21 @@ NR-899 ruled 'the top third of every region's score ... fuel and forest clear at
 > **RESOLVED.** RULED (Ben, 2026-09-19): option A. The top third is taken over every region, ranking the unclamped survey share; a region with none never clears. Written into INDUSTRY_TREE.md § The scorer; BL-1059 (top-third bar) takes a fix round before it closes.
 
 *Files: `src/world/history_sim.cpp`, `src/world/settlement.cpp`, `tools/verify/digitisation_sim_harness.cpp`, `docs/generation/trees/INDUSTRY_TREE.md`*
+
+### NR-901 — CALL: industry points on ground with no town reach no campaign centre — on seed 0, 44% of the stock
+*question · raised 2026-09-19 · from BL-1042 (stockpile to budget) lane and its cold review, 2026-09-19 (static). The lane's figures: seed 0 stock 56.2M, 24.97M of it 'no_carved_centre' in 13 regions; seeds 28 and 46 lose 2.2M each.*
+
+The carve makes campaign centres only on regions with people AND centres (population_generation.cpp:174), so points sitting on a region with no centres at 1960 reach nobody; BL-1042 counts them unspent. The review traced two ways points land there, and ruled out a sim/carve mismatch. (a) A region earned points, then lost its towns: scale points need centres only at the moment of credit (history_sim.cpp:8666), and a sack can round centres to 0 while people remain (settlement.cpp:2460-2465). (b) The treasury fallback: when a polity holds no region with centres, BL-1056 lands the whole round's treasury credit on its capital (history_sim.cpp:1069) — which, by the same condition, has no towns. The treasury is really debited (:1083) and the handoff then discards the points. Concentration in 13 regions points to (b); the per-region treasury tally will separate them on the next run.
+
+**Why it matters.** BL-1044 sets the charter prices against this budget; on seed 0 it is missing nearly half its stock, and (b) debits a treasury for works that never exist.
+
+- (b) converts nothing when the polity holds no town — the treasury keeps its money, since there is nowhere to build; (a) stays unspent under a 'razed' reason, because war destroyed those works.
+- Both reach the nearest carved centre of the same nation at the handoff.
+- Keep as built: both unspent under one reason; judge on BL-1043.
+
+> **Recommendation:** The first. It stops a treasury paying for works with nowhere to stand (the NR-897 principle: a treasury builds where its people are), and it gives the razed case a visible in-world cause rather than a silent loss.
+
+> **RESOLVED.** RULED (Ben, 2026-09-19): option A. A polity holding no town converts no treasury to points (the treasury keeps it); points on a region whose towns were razed are counted unspent as razed. Written into DIGITISATION.md § Beat 1; built in BL-1042 (stockpile to budget)'s fix round.
+
+*Files: `src/world/history_sim.cpp`, `src/world/stockpile_budget.cpp`, `src/world/stockpile_budget.hpp`, `docs/generation/DIGITISATION.md`*
 
