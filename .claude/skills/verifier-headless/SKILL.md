@@ -980,6 +980,21 @@ in `tools/verify/README.md`.
   invisible to a value assertion:
   `g++ -std=c++20 -O0 -g -fsanitize=address,undefined -Isrc tools/verify/nation_scorer_harness.cpp ...`.
 
+- **`stockpile_budget_check`** — Does a region's industry stock reach its campaign centres the way
+  DIGITISATION.md Part III says? (BL-1042, stockpile to budget; named here with Ben's permission,
+  2026-09-19.) `build_stockpile_budget` splits each region's points over its carved centres by slot
+  key, largest remainder, ties to the lower rank, and books every point it cannot place under a
+  reason (`carve_dropped`, `razed`, the residual `no_carved_centre`, `rejected`).
+  **Part 1 (default)** runs the builder on hand-built carve slots and checks each centre's share
+  against hand-worked values: 481/240/120 with a dropped slot's 160 unspent, an exact tie going to
+  the lower rank, anchors and coverage foundings getting nothing, a stock with points but both carve
+  lists empty rejected whole. It was confirmed by mutation — forcing an even split fails 1.1, 1.2
+  and 1.10. **Part 2 (`--r8 --seed N`)** builds a span-on world twice and compares the NON-EMPTY
+  budgets and carve indices; it is opt-in because it builds a real world, and the CTest glob gives
+  every harness 60 s. Build with `bash tools/verify/build_lua_harness.sh stockpile_budget_check`.
+  With the span off every shipped world's stock is empty, so the 16-seed `player_seed_sweep
+  --digest-check` proves nothing about the split — this harness is what does.
+
 ## Running the whole suite (CTest — BL-104)
 
 As of BL-104 every `tools/verify/*.cpp` is a registered CTest test, so the whole logic tier runs
