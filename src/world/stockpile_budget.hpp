@@ -41,25 +41,40 @@
 
 #include "charter_budget.hpp"
 #include "entity.hpp"
+#include "world.hpp"   // carve_slot, carve_dropped_slot (the carve index's types)
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
-struct world;
+struct region;   // settlement.hpp
 
-/// Why a region's industry point reached no centre's budget.
+/// Why a region's industry point reached no centre's budget. Nothing here is
+/// persistent, so the numbering follows the reading.
+///
+/// A region with points but NO CARVED CENTRE is split by cause (NR-901, Ben
+/// 2026-09-19, option A: "points on a region whose towns were razed are lost
+/// with them"). A region earns points only while it holds centres, so points on
+/// a region the carve towns nobody mean its towns were lost after they built:
+/// `razed` when history destroyed them (`region::centres_razed` > 0 — the cause
+/// the map shows). `no_carved_centre` is the RESIDUAL: points on a region that
+/// carved nothing yet records no razing. Under the ruling it should read ~0 —
+/// the treasury no longer lands points on townless ground (NR-901's other half)
+/// — so a non-zero residual is a finding, not a bucket.
 enum class stockpile_unspent_reason : std::uint8_t
 {
     carve_dropped    = 0, ///< its slot's carved centre was never founded: the body was built out
     carve_no_tile    = 1, ///< its slot's carved centre resolved to no tile (defensive; unreached)
-    no_carved_centre = 2, ///< the region held points but the carve gave it no centre at all
-                          ///< (emptied or razed by the epoch, so it towns nobody)
-    rejected         = 3, ///< the whole budget was REJECTED (a domain violation; see `rejection`)
+    razed            = 2, ///< the region carved no centre because history razed its towns
+                          ///< (`centres_razed` > 0): the works went with the towns (NR-901)
+    no_carved_centre = 3, ///< RESIDUAL: the region carved no centre and records no razing
+    rejected         = 4, ///< the whole budget was REJECTED (a domain violation or an
+                          ///< inconsistent world; see `rejection`)
 };
 
-constexpr int stockpile_unspent_reason_count = 4;
+constexpr int stockpile_unspent_reason_count = 5;
 
 inline const char* stockpile_unspent_reason_name(stockpile_unspent_reason r)
 {
@@ -67,6 +82,7 @@ inline const char* stockpile_unspent_reason_name(stockpile_unspent_reason r)
     {
     case stockpile_unspent_reason::carve_dropped:    return "carve_dropped";
     case stockpile_unspent_reason::carve_no_tile:    return "carve_no_tile";
+    case stockpile_unspent_reason::razed:            return "razed";
     case stockpile_unspent_reason::no_carved_centre: return "no_carved_centre";
     case stockpile_unspent_reason::rejected:         return "rejected";
     }
@@ -135,7 +151,19 @@ inline constexpr std::int64_t stockpile_region_keys_max = 1LL << 32;
 /// record and the carve index, writes nothing. A world with no settlement
 /// record (a loaded world, a fixture) or no points returns an EMPTY budget with
 /// nothing to account.
+///
+/// A world whose stock holds points while its carve index is EMPTY (both lists)
+/// is INCONSISTENT — the index was lost (a copy or a load that kept the
+/// settlement record but not the index) — and is REJECTED whole, so a lost
+/// index can never pass as regions that carved no centre.
 stockpile_budget build_stockpile_budget(const world& w);
+
+/// The same builder over its three inputs, for a caller holding them apart from
+/// a world (tools/verify/stockpile_budget_check's hand-built slots). @p regions
+/// may be null (no settlement record: an empty budget).
+stockpile_budget build_stockpile_budget(const std::vector<region>*            regions,
+                                        const std::map<entity_id, carve_slot>& founded,
+                                        const std::vector<carve_dropped_slot>& dropped);
 
 // --- THE SPEND ---------------------------------------------------------------
 //

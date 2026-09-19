@@ -95,8 +95,9 @@ double secs(clk::time_point a, clk::time_point b)
 }
 
 /// Copy @p src by the chosen route. The snapshot route restores what a load
-/// does not (the econ/day counters and the generation-time settlement record,
-/// which only the landscape search reads) so the comparison is about order, not
+/// does not (the econ/day counters, the generation-time settlement record and
+/// the carve index beside it, which only the landscape search and its charter
+/// budget read) so the comparison is about order, not
 /// about fields a save deliberately omits.
 std::unique_ptr<world> copy_world(const world& src, copy_by by)
 {
@@ -124,6 +125,14 @@ std::unique_ptr<world> copy_world(const world& src, copy_by by)
         dst->current_econ_tick = src.current_econ_tick;
         dst->current_day_tick  = src.current_day_tick;
         dst->gen_settlement    = src.gen_settlement;
+        // BL-1042: the carve index rides beside `gen_settlement` on the same
+        // footing — generation-time, not serialised — and the landscape search
+        // reads it for the charter budget. A snapshot copy without it would
+        // lose which centre is which region's k-th (the builder now REJECTS a
+        // world whose stockpile holds points with no carve index, so the loss
+        // could not pass silently, but the copy must still be a full copy).
+        dst->gen_carve_centres = src.gen_carve_centres;
+        dst->gen_carve_dropped = src.gen_carve_dropped;
         return dst;
     }
     }

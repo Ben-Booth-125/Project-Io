@@ -562,8 +562,9 @@ struct history_sim_params
     //   so it is no verb. The points SPREAD over the polity's held regions
     //   that stand centres, by urban scale (`industry_points_apportion_by_scale`;
     //   BL-1056, Ben 2026-09-19, NR-897): a treasury builds its realm's works
-    //   where its people are. Only a realm with no held centre carrying heads
-    //   lands them on the capital's own region.
+    //   where its people are. A realm with no held centre carrying heads
+    //   converts NOTHING (NR-901, Ben 2026-09-19): no debit, no credit, the
+    //   treasury keeps the round's share.
     //
     // OFF BY DEFAULT, and only `digitisation_sim_params` turns it on: with the
     // switch off no region's `industry_points` is written and no treasury is
@@ -3211,8 +3212,9 @@ inline constexpr int64_t industry_points_apportion_heads_max = 1LL << 32;
 /// empty) when a region's heads or the polity's total leave the domain above
 /// (`industry_points_urban_heads_max`, `industry_points_apportion_heads_max`):
 /// the caller refuses the conversion whole. With no held centre carrying heads
-/// @p out is empty and the result true: the caller lands the credit on the
-/// capital, as before the ruling.
+/// @p out is empty and the result true: the caller converts NOTHING (NR-901,
+/// Ben 2026-09-19 -- a polity that holds no town has nowhere for its works to
+/// stand, so its treasury keeps the round's share).
 bool industry_points_apportion_by_scale(const std::vector<region>& regions, int holder, int64_t credit,
                                         std::vector<std::pair<int, int64_t>>& out);
 
