@@ -2013,18 +2013,20 @@ int main()
               "T8.7.3  furnace_lit reads Coke Smelting (IN-MT-1a, by id) held: Coke alone 1000, Charcoal alone 0,"
               " root + Furnace Practice 0, and no other node lights it");
 
-        // T8.7.5 (Ben, 2026-09-18, wave 1 form; was BL-1051's held mean):
-        // `ground_forest` is the BEST held region's forest SCORE -- the same
-        // shape as the seam, so the Fuel Doctrine compares like with like.
-        // Unsurveyed ground (-1) stays out rather than reading as bare, ground
-        // not held never counts, and nothing surveyed reads 0 (the old pin).
-        // The values are chosen so the mean (266) and the best over ALL
-        // regions (900, not held) both differ from the best held (500).
+        // T8.7.5 (BL-1056; Ben, 2026-09-19, NR-896; was the BEST held score,
+        // and BL-1051's held mean before it): `ground_forest` is the per-mille
+        // SHARE of surveyed held regions whose forest score clears the world
+        // mean (strictly above 500). Unsurveyed ground (-1) stays out of both
+        // counts rather than reading as bare, ground not held never counts, a
+        // region AT the mean does not clear it, and nothing surveyed reads 0
+        // (the old pin). The values are chosen so the best held (700), the
+        // held mean (500) and the share with the unheld 900 counted (500) all
+        // differ from the share (1 of 3 surveyed held -> 333).
         {
             std::vector<region> rg(5);
             rg[0].survey_forest_q = 300;
-            rg[1].survey_forest_q = 0;
-            rg[2].survey_forest_q = 500;
+            rg[1].survey_forest_q = 700;
+            rg[2].survey_forest_q = 500; // exactly the mean: does not clear it
             rg[3].survey_forest_q = -1;  // founded after the span opened
             rg[4].survey_forest_q = 900; // not held
             const std::vector<int> held_fwd = {0, 1, 2, 3};
@@ -2036,12 +2038,39 @@ int main()
             const int m_emp = industry_ground_forest_q(rg, {});
             std::vector<region> never(3); // the struct default: no span, never surveyed
             const int m_off = industry_ground_forest_q(never, {0, 1, 2});
-            std::printf("      ground_forest held best: {300,0,500,unsurveyed} (900 unheld) -> %d (reversed %d);"
+            std::printf("      ground_forest held share: {300,700,500,unsurveyed} (900 unheld) -> %d (reversed %d);"
                         " only unsurveyed -> %d; none held -> %d; no span -> %d\n",
                         m_fwd, m_rev, m_uns, m_emp, m_off);
-            check(m_fwd == 500 && m_rev == 500 && m_uns == 0 && m_emp == 0 && m_off == 0,
-                  "T8.7.5  ground_forest reads the BEST survey_forest_q score over surveyed held ground, order-free;"
-                  " unheld and unsurveyed stay out; none -> 0");
+            check(m_fwd == 333 && m_rev == 333 && m_uns == 0 && m_emp == 0 && m_off == 0,
+                  "T8.7.5  ground_forest reads the SHARE of surveyed held ground whose forest score clears the mean,"
+                  " order-free; the mean itself does not clear; unheld and unsurveyed stay out; none -> 0");
+
+            // T8.7.6 (BL-1056): `ground_fuel` is the same share over the fuel
+            // reading the seam takes; with no held region surveyed it is -1
+            // and the TERM keeps the seam (the old reading), while a surveyed
+            // share replaces the seam in the term but never in the gate.
+            std::vector<region> fg(4);
+            fg[0].survey_fuel_q = 800; fg[1].survey_fuel_q = 200;
+            fg[2].survey_fuel_q = 500; fg[3].survey_fuel_q = -1; fg[3].energy_q = 900; // unsurveyed: energy_q
+            const int s_all = industry_ground_fuel_q(fg, {0, 1, 2, 3}, true);
+            const int s_rev = industry_ground_fuel_q(fg, {3, 2, 1, 0}, true);
+            std::vector<region> nf(2); nf[0].energy_q = 900; nf[1].energy_q = 100;
+            const int s_off = industry_ground_fuel_q(nf, {0, 1}, true);
+            industry_scorer_reading fr;
+            fr.fuel_seam_q = 800; fr.ground_fuel_q = s_all;
+            int fv[io::industry_tree::term_count];
+            industry_term_values(0, fr, fv);
+            industry_scorer_reading fo = fr; fo.ground_fuel_q = -1;
+            int fov[io::industry_tree::term_count];
+            industry_term_values(0, fo, fov);
+            const int gf = static_cast<int>(T::ground_fuel);
+            std::printf("      ground_fuel held share: surveyed {800,200,500} + unsurveyed energy_q 900 -> %d (reversed"
+                        " %d); nothing surveyed -> %d; term %d (share) / %d (no share: the seam)\n",
+                        s_all, s_rev, s_off, fv[gf], fov[gf]);
+            check(s_all == 500 && s_rev == 500 && s_off == -1 && fv[gf] == 500 && fov[gf] == 800
+                      && industry_gate_open(io::industry_tree::gate_atom::fuel, fr),
+                  "T8.7.6  ground_fuel reads the SHARE of held ground over the mean (-1 with nothing surveyed, and the"
+                  " term then keeps the seam); the fuel gate still reads the seam");
         }
 
         // `known` is per node: Patent Grants reads 1000 only when a met polity
@@ -2104,7 +2133,7 @@ int main()
         // Two three-region realms on the same poor surveyed fuel, one with a
         // wooded region, one open.
         std::vector<region> rg(6);
-        const int wood[6] = { 900, 0, 0,  0, 50, 0 };
+        const int wood[6] = { 900, 900, 0,  0, 50, 0 }; // BL-1056: two wooded of three, share 666
         for (int i = 0; i < 6; ++i)
         {
             rg[i].energy_q        = 400; // would clear the 250 bar on the old read
@@ -2119,6 +2148,7 @@ int main()
                 r.fuel_seam_q = std::max(r.fuel_seam_q, industry_fuel_reading_q(rg[static_cast<std::size_t>(hi)]));
             r.threatened_q    = 500; // the rival: Interchangeable Parts scores 500 - 100 - 1 = 399
             r.ground_forest_q = industry_ground_forest_q(rg, held);
+            r.ground_fuel_q   = industry_ground_fuel_q(rg, held, true); // BL-1056: the share, as the sim takes it
             return r;
         };
         const industry_scorer_reading rw = reading_for(wooded), ro = reading_for(open_ground);
@@ -2127,22 +2157,23 @@ int main()
         const bool coke_shut = !industry_gate_open(io::industry_tree::gate_atom::fuel, rw)
                             && !industry_gate_open(io::industry_tree::gate_atom::fuel, ro);
         std::printf("      no seam (surveyed fuel %d; energy_q %d), a rival reading threatened 500: wooded ground"
-                    " (best forest %d) -> %s; open ground (best forest %d) -> %s\n", rw.fuel_seam_q, rg[0].energy_q,
+                    " (forest share %d) -> %s; open ground (forest share %d) -> %s\n", rw.fuel_seam_q, rg[0].energy_q,
                     rw.ground_forest_q, pick_w >= 0 ? io::industry_tree::nodes[pick_w].id : "-",
                     ro.ground_forest_q, pick_o >= 0 ? io::industry_tree::nodes[pick_o].id : "-");
-        check(in_mt1c >= 0 && in_mt1d >= 0 && coke_shut && rw.ground_forest_q == 900 && ro.ground_forest_q == 50
+        check(in_mt1c >= 0 && in_mt1d >= 0 && coke_shut && rw.ground_forest_q == 666 && ro.ground_forest_q == 0
                   && pick_w == in_char && pick_o != in_char,
-              "T8.8.4  no seam either way (the survey's): the realm whose best held forest scores 900 takes Charcoal"
-              " Iron, the open one (50) does not");
+              "T8.8.4  no seam either way (the survey's): the realm two-thirds wooded above the mean (share 666) takes"
+              " Charcoal Iron, the open one (0) does not");
 
         // What a seam does to the same wooded realm, printed rather than
         // asserted: Coke reads the seam, Charcoal the forest, and the larger
         // term takes the fork (an exact tie breaks on node index, Coke first).
         industry_scorer_reading rs = rw;
-        rs.fuel_seam_q = 1000;
+        rs.fuel_seam_q   = 1000;
+        rs.ground_fuel_q = 1000; // every held region over a seam above the mean
         const int pick_s = choose_industry_node(mk, rs);
         std::printf("      NOTE  the same wooded realm WITH a seam (ground_fuel %d vs ground_forest %d) -> %s\n",
-                    rs.fuel_seam_q, rs.ground_forest_q, pick_s >= 0 ? io::industry_tree::nodes[pick_s].id : "-");
+                    rs.ground_fuel_q, rs.ground_forest_q, pick_s >= 0 ? io::industry_tree::nodes[pick_s].id : "-");
     }
 
     // T8.9: THE RATE -- isqrt64 exact, top-k, clamp first, superlinear.

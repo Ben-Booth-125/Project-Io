@@ -444,7 +444,7 @@ struct seed_row
     int    doctrine[3]       = {}; ///< living polities at the close: coke / charcoal / neither
     /// Mean of each living polity's held-ground forest reading
     /// (`industry_ground_forest_q` over the regions it holds at the close:
-    /// its best held forest score since the 2026-09-18 ruling), per doctrine
+    /// the share of its held ground wooded above the mean, BL-1056), per doctrine
     /// group; NaN for an empty group.
     double doctrine_forest[3] = { k_undef, k_undef, k_undef };
     int    charcoal_seam_seen  = 0; ///< Charcoal polities that ever passed the seam gate (fuel_seen)
@@ -1919,6 +1919,132 @@ int run_resume_tier(const std::vector<uint32_t>& seeds, const world_gen_config& 
 
 } // namespace fidelity
 
+/// BL-1056 (POINTS_SIZE_NEUTRAL) -- the two synthetic invariants the item
+/// adds, run in EVERY mode before any world generates (they need none), and
+/// GATING: a failure exits 1 whatever else the run reports.
+///
+/// (1) NO FUEL DOCTRINE PULL RISES WHEN A REALM GAINS GROUND BELOW THE WORLD
+/// MEAN (INDUSTRY_TREE.md sec The scorer, NR-896). Over every held set of up
+/// to five of a fixed nine-region table, add each region scoring at or below
+/// the mean (fuel reading <= 500 and forest <= 500 or unsurveyed) and read the
+/// `ground_fuel` and `ground_forest` TERMS the Industry scorer reads
+/// (`industry_term_values`, off the sim's own readings): neither may rise. The
+/// seam is carried too, so the gate is shown still reading any seam.
+///
+/// (2) THE TREASURY POINTS SPREAD BY SCALE, EXACTLY (DIGITISATION.md sec Beat 1,
+/// NR-897): `industry_points_apportion_by_scale` sums to the credit, gives a
+/// larger centre no fewer points than a smaller one, breaks an exact tie to
+/// the lower region index, skips centreless and foreign ground, returns empty
+/// (the capital fallback) with no centre, and refuses past its domain.
+bool bl1056_self_check()
+{
+    bool ok = true;
+
+    // (1) --------------------------------------------------------------------
+    //                      0    1    2    3    4    5    6    7    8
+    const int fuel[9]   = { 900, 100, 500, 700, 0,   300, 400, 450, 1000 };
+    const int forest[9] = { 200, 800, 500, -1,  0,   600, -1,  300, 900  };
+    std::vector<region> rg(9);
+    for (int i = 0; i < 9; ++i)
+    {
+        rg[static_cast<std::size_t>(i)].survey_fuel_q   = fuel[i];
+        rg[static_cast<std::size_t>(i)].survey_forest_q = forest[i];
+        rg[static_cast<std::size_t>(i)].energy_q        = 1000; // would read "rich" if the survey were ignored
+    }
+    const auto terms = [&rg](const std::vector<int>& held, int& gf, int& gw, bool& gate) {
+        industry_scorer_reading r;
+        for (int hi : held) r.fuel_seam_q = std::max(r.fuel_seam_q, industry_fuel_reading_q(rg[static_cast<std::size_t>(hi)]));
+        r.ground_fuel_q   = industry_ground_fuel_q(rg, held, true);
+        r.ground_forest_q = industry_ground_forest_q(rg, held);
+        int v[io::industry_tree::term_count];
+        industry_term_values(0, r, v);
+        gf   = v[static_cast<int>(io::industry_tree::scorer_term::ground_fuel)];
+        gw   = v[static_cast<int>(io::industry_tree::scorer_term::ground_forest)];
+        gate = industry_gate_open(io::industry_tree::gate_atom::fuel, r);
+    };
+    int sets = 0, adds = 0, rose = 0, gate_lost = 0;
+    for (unsigned mask = 1; mask < (1u << 9); ++mask)
+    {
+        std::vector<int> held;
+        for (int i = 0; i < 9; ++i) if (mask & (1u << i)) held.push_back(i);
+        if (held.size() > 5) continue;
+        ++sets;
+        int gf0 = 0, gw0 = 0; bool gate0 = false;
+        terms(held, gf0, gw0, gate0);
+        for (int add = 0; add < 9; ++add)
+        {
+            if (mask & (1u << add)) continue;
+            if (fuel[add] > industry_ground_share_bar_q || forest[add] > industry_ground_share_bar_q) continue;
+            std::vector<int> grown = held;
+            grown.push_back(add);
+            int gf1 = 0, gw1 = 0; bool gate1 = false;
+            terms(grown, gf1, gw1, gate1);
+            ++adds;
+            if (gf1 > gf0 || gw1 > gw0) ++rose;
+            if (gate0 && !gate1) ++gate_lost; // any held seam still opens it
+        }
+    }
+    // The shape it replaced, for the record: a best-of-held forest.
+    int gf_a = 0, gw_a = 0, gf_b = 0, gw_b = 0; bool g_a = false, g_b = false;
+    terms({4}, gf_a, gw_a, g_a);        // one bare region
+    terms({4, 1, 7}, gf_b, gw_b, g_b);  // + a wooded region + a below-mean one
+    std::printf("BL-1056 self-check (1): %d held sets, %d below-mean regions gained: ground_fuel or ground_forest rose"
+                " on %d, the fuel gate closed on %d; e.g. {bare} forest %d -> {bare, wooded, below-mean} %d\n",
+                sets, adds, rose, gate_lost, gw_a, gw_b);
+    if (rose != 0 || gate_lost != 0 || adds == 0 || gw_b != 333)
+    {
+        std::printf("FAIL  BL-1056 (1): a Fuel Doctrine pull rose on ground below the world mean\n");
+        ok = false;
+    }
+
+    // (2) --------------------------------------------------------------------
+    std::vector<region> pr(7);
+    const int     nation[7] = { 3, 3, 3, 4, 3, 3, 3 };
+    const int     centres[7]= { 1, 1, 0, 2, 1, 1, 1 };
+    const int64_t urban[7]  = { 30000, 10000, 50000, 90000, 20000, 20000, 0 };
+    for (std::size_t i = 0; i < 7; ++i)
+    {
+        pr[i].nation = nation[i]; pr[i].centres = centres[i]; pr[i].urban_population = urban[i];
+    }
+    std::vector<std::pair<int, int64_t>> out;
+    const bool a_ok = industry_points_apportion_by_scale(pr, 3, 1001, out);
+    int64_t sum = 0;
+    for (const auto& p : out) sum += p.second;
+    // Weighed: 0 (30k), 1 (10k), 4 (20k), 5 (20k); 2 has no centre, 3 is foreign,
+    // 6 has no heads. 1001 x {3,1,2,2}/8 = 375.375, 125.125, 250.25, 250.25:
+    // floors 375+125+250+250 = 1000, the one left to the largest remainder (0).
+    const bool shape = out.size() == 4 && out[0].first == 0 && out[1].first == 1 && out[2].first == 4
+                    && out[3].first == 5 && out[0].second == 376 && out[1].second == 125
+                    && out[2].second == 250 && out[3].second == 250;
+    // An exact tie: two equal centres and one point between them -- to the lower index.
+    std::vector<std::pair<int, int64_t>> tie;
+    const bool t_ok = industry_points_apportion_by_scale(pr, 3, 2, tie); // 2 x {3,1,2,2}/8
+    // 0.75, 0.25, 0.5, 0.5 -> floors all 0; two left: .75 (0), then .5 (4) and .5 (5) tie -> 4.
+    const bool tie_ok = tie.size() == 4 && tie[0].second == 1 && tie[1].second == 0
+                     && tie[2].second == 1 && tie[3].second == 0;
+    std::vector<std::pair<int, int64_t>> none;
+    const bool n_ok = industry_points_apportion_by_scale(pr, 9, 500, none) && none.empty();
+    std::vector<region> big(3);
+    for (region& r : big) { r.nation = 1; r.centres = 1; r.urban_population = 1LL << 31; }
+    std::vector<std::pair<int, int64_t>> refused;
+    const bool refuse_ok = !industry_points_apportion_by_scale(big, 1, 1000, refused) && refused.empty();
+    std::printf("BL-1056 self-check (2): 1001 points over centres {30k,10k,20k,20k} -> %lld/%lld/%lld/%lld (sum %lld);"
+                " 2 points -> %lld/%lld/%lld/%lld; no centre -> %s; past the heads domain -> %s\n",
+                out.size() > 0 ? (long long)out[0].second : -1LL, out.size() > 1 ? (long long)out[1].second : -1LL,
+                out.size() > 2 ? (long long)out[2].second : -1LL, out.size() > 3 ? (long long)out[3].second : -1LL,
+                (long long)sum,
+                tie.size() > 0 ? (long long)tie[0].second : -1LL, tie.size() > 1 ? (long long)tie[1].second : -1LL,
+                tie.size() > 2 ? (long long)tie[2].second : -1LL, tie.size() > 3 ? (long long)tie[3].second : -1LL,
+                n_ok ? "empty (the capital fallback)" : "WRONG", refuse_ok ? "refused" : "NOT REFUSED");
+    if (!a_ok || sum != 1001 || !shape || !t_ok || !tie_ok || !n_ok || !refuse_ok)
+    {
+        std::printf("FAIL  BL-1056 (2): the treasury points did not apportion exactly by urban scale\n");
+        ok = false;
+    }
+    std::printf("%s\n", ok ? "BL-1056 SELF-CHECK PASS" : "BL-1056 SELF-CHECK FAIL");
+    return ok;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -2062,6 +2188,9 @@ int main(int argc, char** argv)
     if (cfg.corporation_count != 8)
         std::printf("PARITY WARNING  world_gen.lua sets corporation_count=%d but apply_shipped_landscape "
                     "searches from 8; the landscape measured is not the app's\n", cfg.corporation_count);
+
+    // BL-1056: the item's synthetic invariants, in every mode, gating.
+    if (!bl1056_self_check()) return 1;
 
     // BL-1036: the resume-fidelity check is its own mode -- it reads the 1660
     // handoff and nothing past it, so it neither builds a campaign world nor
@@ -2766,7 +2895,8 @@ int main(int argc, char** argv)
                     "  BL-1041's DEFAULT B; with B on, every Industry fuel read takes the survey).\n"
                     "  close (1960): regions the span founded after its open are unsurveyed (-1, out of every mean);\n"
                     "  the Fuel Doctrine side each living polity holds (IN-MT-1a coke / IN-MT-1b charcoal / neither),\n"
-                    "  per side the mean over its polities of ground_forest (each polity's BEST held forest score),\n"
+                    "  per side the mean over its polities of ground_forest (each polity's SHARE of held\n"
+                    "  ground wooded above the world mean, per mille; BL-1056),\n"
                     "  and Charcoal polities that ever passed the seam gate (fuel_seen) or hold a seam at the close --\n"
                     "  they had Coke open and took Charcoal anyway.\n");
         std::printf("  seed | open (unseen) | forest min/p25/med/p75/max | any / >=500 | fuel med | seams surv/energy_q |"
@@ -2820,7 +2950,7 @@ int main(int argc, char** argv)
                     "         BL-1051 cites 404 / 118 / 340 for BL-1038's run, which this harness does not reproduce;\n"
                     "         the like-for-like split WITHOUT the survey is --fidelity's V4 column (V5 is this run).\n",
                     p_doc[0], p_doc[1], p_doc[2]);
-        std::printf("  ARE THE CHARCOAL POLITIES THE WOODED ONES? mean ground_forest (best held forest score), pooled\n"
+        std::printf("  ARE THE CHARCOAL POLITIES THE WOODED ONES? mean ground_forest (share wooded above the mean), pooled\n"
                     "         over polities: coke %.0f, charcoal %.0f, neither %.0f;\n"
                     "         charcoal wooder than coke on %d of %d seeds holding both sides; Charcoal polities that\n"
                     "         ever passed the seam gate %d, holding a seam at the close %d (of %d)\n",
@@ -3159,6 +3289,31 @@ int main(int argc, char** argv)
                          span_collect([](const seed_row& r) { return r.points_region_gini; }));
             print_spread("largest region's share of the world's points",
                          span_collect([](const seed_row& r) { return r.points_top_region; }));
+            {
+                // BL-1056 (POINTS_SIZE_NEUTRAL): the two numbers the item moves,
+                // on one line -- the Fuel Doctrine split pooled over living
+                // polities at the close, and the top region's share of its
+                // world's points (median and max over the worlds).
+                int split[3] = {};
+                std::vector<double> tops;
+                for (const seed_row& r : rows)
+                {
+                    if (!r.span_ran) continue;
+                    for (int d = 0; d < 3; ++d) split[d] += r.doctrine[d];
+                    if (r.points_on && !std::isnan(r.points_top_region)) tops.push_back(r.points_top_region);
+                }
+                std::sort(tops.begin(), tops.end());
+                double med = k_undef, mx = k_undef;
+                if (!tops.empty())
+                {
+                    const std::size_t n = tops.size();
+                    med = n % 2 ? tops[n / 2] : (tops[n / 2 - 1] + tops[n / 2]) / 2.0;
+                    mx  = tops.back();
+                }
+                std::printf("     BL-1056  Fuel Doctrine coke/charcoal/neither %d/%d/%d (living polities, pooled);"
+                            " top-region share of points median %.3f, max %.3f (over %zu worlds)\n",
+                            split[0], split[1], split[2], med, mx, tops.size());
+            }
             print_spread("Gini of points over living polities (zeros in)",
                          span_collect([](const seed_row& r) { return r.points_polity_gini; }));
             print_spread("largest polity's share of held points",
