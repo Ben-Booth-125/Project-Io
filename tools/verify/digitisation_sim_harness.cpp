@@ -488,18 +488,22 @@ struct seed_row
     // (treasury points taken out exactly, below) against the span's integrated
     // urban head-years, both taken by re-running the span harness-side.
     //
-    //  * SCALE vs TREASURY, per region, exactly: the exchange rate moves no
-    //    dynamics (it only multiplies the credit), so one re-run at 1 point per
-    //    treasury unit gives P2 = S + T per region beside the shipped close's
-    //    P1 = S + 1000 T; T = (P1 - P2) / 999, S = P2 - T.
+    //  * SCALE vs TREASURY, per region, exactly: the sim's own report-only
+    //    tally (`region::industry_points_from_treasury`, BL-1056) is T, and
+    //    S = P - T. It was an exchange-rate re-run (P at 1 point per unit
+    //    beside P at 1000) until BL-1056's largest-remainder spread made a
+    //    region's treasury points non-linear in the rate. The split must
+    //    reproduce the span's ledger exactly; a seed where it does not FAILS
+    //    the run's exit code. The re-run below is kept, at the shipped
+    //    constants, as the check that the harness-side resume IS the span.
     //  * HEAD-YEARS: the span re-run to the top of each sampled decision year
     //    (a BL-1036 capture), summing urban heads x the years the sample stands
     //    for over rounds the region HAD CENTRES (the accrual's own condition).
     //    The capture is the year's opening state, one demography year before
     //    the accrual reads it, so this is the integral to within that year.
-    bool    rerun_ok           = false; ///< the re-run's close is the shipped close outside the points
-    int     rerun_mismatch     = 0;     ///< regions whose owner/heads/treasury differ (must be 0)
-    bool    split_ok           = false; ///< every region's P1 - P2 split exactly (divisible, non-negative)
+    bool    rerun_ok           = false; ///< the re-run's close is the shipped close, points included
+    int     rerun_mismatch     = 0;     ///< regions whose owner/heads/treasury/points differ (must be 0)
+    bool    split_ok           = false; ///< every region's S = P - T >= 0, T >= 0, and both sum to the ledger
     int     integral_samples   = 0;     ///< capture years summed (0: the integral was not taken)
     int64_t integral_ms        = 0;     ///< wall clock of the re-runs, this seed (reported only)
     int     scale_regions      = 0;     ///< regions with scale points or head-years (the rho's population)
@@ -1941,20 +1945,28 @@ bool bl1056_self_check()
     bool ok = true;
 
     // (1) --------------------------------------------------------------------
-    //                      0    1    2    3    4    5    6    7    8
-    const int fuel[9]   = { 900, 100, 500, 700, 0,   300, 400, 450, 1000 };
-    const int forest[9] = { 200, 800, 500, -1,  0,   600, -1,  300, 900  };
-    std::vector<region> rg(9);
-    for (int i = 0; i < 9; ++i)
+    // Regions 9-11 carry NO span-open reading of both scores: 9 and 10 were
+    // never surveyed (energy_q 600, above the mean), 11 was founded in the span
+    // (fuel inherited at 900, no forest). The review's counterexample is held
+    // {9, 10, 11} gaining region 1 (surveyed fuel 100): before this fix the
+    // unsurveyed realm read the seam (900) and the gain read a share over
+    // energy_q -- a rise from nowhere. Here it must read 0, and stay 0.
+    constexpr int NR = 12;
+    //                       0    1    2    3    4    5    6    7    8     9    10   11
+    const int fuel[NR]   = { 900, 100, 500, 700, 0,   300, 400, 450, 1000, -1,  -1,  900 };
+    const int forest[NR] = { 200, 800, 500, -1,  0,   600, -1,  300, 900,  -1,  -1,  -1  };
+    std::vector<region> rg(NR);
+    for (int i = 0; i < NR; ++i)
     {
         rg[static_cast<std::size_t>(i)].survey_fuel_q   = fuel[i];
         rg[static_cast<std::size_t>(i)].survey_forest_q = forest[i];
-        rg[static_cast<std::size_t>(i)].energy_q        = 1000; // would read "rich" if the survey were ignored
+        rg[static_cast<std::size_t>(i)].energy_q        = i >= 9 ? 600 : 1000; // "rich" if the survey were ignored
     }
-    const auto terms = [&rg](const std::vector<int>& held, int& gf, int& gw, bool& gate) {
+    const bool survey_ran = industry_span_survey_ran(rg);
+    const auto terms = [&rg, survey_ran](const std::vector<int>& held, int& gf, int& gw, bool& gate) {
         industry_scorer_reading r;
         for (int hi : held) r.fuel_seam_q = std::max(r.fuel_seam_q, industry_fuel_reading_q(rg[static_cast<std::size_t>(hi)]));
-        r.ground_fuel_q   = industry_ground_fuel_q(rg, held, true);
+        r.ground_fuel_q   = industry_ground_fuel_q(rg, held, survey_ran);
         r.ground_forest_q = industry_ground_forest_q(rg, held);
         int v[io::industry_tree::term_count];
         industry_term_values(0, r, v);
@@ -1963,18 +1975,22 @@ bool bl1056_self_check()
         gate = industry_gate_open(io::industry_tree::gate_atom::fuel, r);
     };
     int sets = 0, adds = 0, rose = 0, gate_lost = 0;
-    for (unsigned mask = 1; mask < (1u << 9); ++mask)
+    for (unsigned mask = 1; mask < (1u << NR); ++mask)
     {
         std::vector<int> held;
-        for (int i = 0; i < 9; ++i) if (mask & (1u << i)) held.push_back(i);
+        for (int i = 0; i < NR; ++i) if (mask & (1u << i)) held.push_back(i);
         if (held.size() > 5) continue;
         ++sets;
         int gf0 = 0, gw0 = 0; bool gate0 = false;
         terms(held, gf0, gw0, gate0);
-        for (int add = 0; add < 9; ++add)
+        for (int add = 0; add < NR; ++add)
         {
             if (mask & (1u << add)) continue;
-            if (fuel[add] > industry_ground_share_bar_q || forest[add] > industry_ground_share_bar_q) continue;
+            // Below the world mean on both, or with no span-open reading of
+            // both (such ground is out of the pulls, so it cannot raise one).
+            const bool unread = fuel[add] < 0 || forest[add] < 0;
+            if (!unread && (fuel[add] > industry_ground_share_bar_q || forest[add] > industry_ground_share_bar_q))
+                continue;
             std::vector<int> grown = held;
             grown.push_back(add);
             int gf1 = 0, gw1 = 0; bool gate1 = false;
@@ -1988,10 +2004,18 @@ bool bl1056_self_check()
     int gf_a = 0, gw_a = 0, gf_b = 0, gw_b = 0; bool g_a = false, g_b = false;
     terms({4}, gf_a, gw_a, g_a);        // one bare region
     terms({4, 1, 7}, gf_b, gw_b, g_b);  // + a wooded region + a below-mean one
-    std::printf("BL-1056 self-check (1): %d held sets, %d below-mean regions gained: ground_fuel or ground_forest rose"
-                " on %d, the fuel gate closed on %d; e.g. {bare} forest %d -> {bare, wooded, below-mean} %d\n",
-                sets, adds, rose, gate_lost, gw_a, gw_b);
-    if (rose != 0 || gate_lost != 0 || adds == 0 || gw_b != 333)
+    // The review's counterexample: an unsurveyed-only realm inside the span,
+    // then the same realm gaining surveyed ground under the mean.
+    int gf_u = 0, gw_u = 0, gf_v = 0, gw_v = 0; bool g_u = false, g_v = false;
+    terms({9, 10, 11}, gf_u, gw_u, g_u);
+    terms({9, 10, 11, 1}, gf_v, gw_v, g_v);
+    std::printf("BL-1056 self-check (1): %d held sets, %d below-mean or unread regions gained: ground_fuel or"
+                " ground_forest rose on %d, the fuel gate closed on %d; e.g. {bare} forest %d -> {bare, wooded,"
+                " below-mean} %d; unsurveyed-only realm fuel/forest %d/%d (seam gate %s) -> + surveyed fuel 100:"
+                " %d/%d\n",
+                sets, adds, rose, gate_lost, gw_a, gw_b, gf_u, gw_u, g_u ? "open" : "shut", gf_v, gw_v);
+    if (rose != 0 || gate_lost != 0 || adds == 0 || gw_b != 333 || !survey_ran
+        || gf_u != 0 || gw_u != 0 || gf_v != 0 || !g_u)
     {
         std::printf("FAIL  BL-1056 (1): a Fuel Doctrine pull rose on ground below the world mean\n");
         ok = false;
@@ -2471,8 +2495,27 @@ int main(int argc, char** argv)
             // shipped span by the same construction `--fidelity`'s gate 3 proves
             // (V5: the opened table, the span's own seed and params). The first
             // checks that claim on this seed before anything is read off it.
-            const int64_t E = dpp.industry_points_per_treasury_unit;
-            if (integral_stride > 0 && row.points_on && !row.points_rejected && !open_t.empty() && E > 1)
+            // (0) SCALE vs TREASURY, off the sim's own report-only tally
+            // (BL-1056): exact per region, no re-run, whatever the stride.
+            std::vector<int64_t> S(close_t.size(), 0);
+            if (row.points_on && !row.points_rejected)
+            {
+                bool ok = true;
+                int64_t sum_s = 0, sum_t = 0;
+                for (std::size_t i = 0; i < close_t.size(); ++i)
+                {
+                    const int64_t T = close_t[i].industry_points_from_treasury;
+                    S[i] = close_t[i].industry_points - T;
+                    if (T < 0 || S[i] < 0) { ok = false; break; }
+                    sum_s += S[i];
+                    sum_t += T;
+                }
+                // The split must reproduce the span's own ledger exactly.
+                row.split_ok = ok && sum_s == dst.industry_points_from_scale
+                                  && sum_t == dst.industry_points_from_treasury;
+            }
+
+            if (integral_stride > 0 && row.points_on && !row.points_rejected && !open_t.empty())
             {
                 const auto t_int = std::chrono::steady_clock::now();
                 const exploration_output& H = fx.exploration_handoff;
@@ -2482,11 +2525,11 @@ int main(int argc, char** argv)
                 spec.live    = nullptr;
                 spec.seed    = fx.digitisation_seed;
 
-                // (1) SCALE vs TREASURY: the same span at one point per
-                // treasury unit. Nothing but the points may differ.
-                history_sim_params d1 = dpp;
-                d1.industry_points_per_treasury_unit = 1;
-                const fidelity::run_out x = fidelity::resume(fx, H, spec, dpp.stop_year, INT64_MIN, d1);
+                // (1) THE RESUME IS THE SPAN: the same span, re-run
+                // harness-side at the shipped constants, must close on the
+                // shipped close, points and the treasury tally included --
+                // the claim the head-years captures below rest on.
+                const fidelity::run_out x = fidelity::resume(fx, H, spec, dpp.stop_year, INT64_MIN, dpp);
                 const std::vector<region>& R2 = x.ss.regions;
                 if (R2.size() == close_t.size())
                     for (std::size_t i = 0; i < R2.size(); ++i)
@@ -2495,7 +2538,9 @@ int main(int argc, char** argv)
                         const region& b = R2[i];
                         if (a.nation != b.nation || a.population != b.population
                          || a.urban_population != b.urban_population || a.centres != b.centres
-                         || a.treasury != b.treasury || a.army_stock != b.army_stock)
+                         || a.treasury != b.treasury || a.army_stock != b.army_stock
+                         || a.industry_points != b.industry_points
+                         || a.industry_points_from_treasury != b.industry_points_from_treasury)
                             ++row.rerun_mismatch;
                     }
                 else
@@ -2503,33 +2548,13 @@ int main(int argc, char** argv)
                 row.rerun_ok = row.rerun_mismatch == 0 && x.hs.industry_points_refused == 0
                             && dst.industry_points_refused == 0;
 
-                std::vector<int64_t> S(close_t.size(), 0);
-                if (row.rerun_ok)
-                {
-                    bool ok = true;
-                    int64_t sum_s = 0, sum_t = 0;
-                    for (std::size_t i = 0; i < close_t.size(); ++i)
-                    {
-                        const int64_t d = close_t[i].industry_points - R2[i].industry_points; // (E - 1) T
-                        if (d < 0 || d % (E - 1) != 0) { ok = false; break; }
-                        const int64_t T = d / (E - 1);
-                        S[i] = R2[i].industry_points - T;
-                        if (S[i] < 0) { ok = false; break; }
-                        sum_s += S[i];
-                        sum_t += T;
-                    }
-                    // The split must reproduce the span's own ledger exactly.
-                    row.split_ok = ok && sum_s == dst.industry_points_from_scale
-                                      && sum_t * E == dst.industry_points_from_treasury;
-                }
-
                 // (2) HEAD-YEARS: the span re-run to the top of each sampled
                 // decision year. The open is the table the span opened on.
                 std::vector<int64_t> hy(close_t.size(), 0);
                 const int64_t step    = std::max<int64_t>(dpp.tick_bands[0].step_years, 1);
                 const int64_t advance = step * integral_stride;
                 bool captured_all = true;
-                for (int64_t Y = dpp.start_year; Y < dpp.stop_year && row.split_ok; Y += advance)
+                for (int64_t Y = dpp.start_year; Y < dpp.stop_year && row.split_ok && row.rerun_ok; Y += advance)
                 {
                     fidelity::run_out c;
                     const std::vector<region>* R = &open_t;
@@ -2549,7 +2574,7 @@ int main(int argc, char** argv)
                 }
                 if (!captured_all) row.integral_samples = 0;
 
-                if (row.split_ok && row.integral_samples > 0)
+                if (row.split_ok && row.rerun_ok && row.integral_samples > 0)
                 {
                     std::vector<double> s_v, hy_v, int_v, fuel_v;
                     for (std::size_t i = 0; i < close_t.size(); ++i)
@@ -3043,13 +3068,14 @@ int main(int argc, char** argv)
             std::printf("  %4u |  %-5s %-5s %4d    | %6d    %s      %s      | %s (%5d) %s (%5d) %s (%4d) | %9lld\n",
                         r.seed,
                         integral_stride == 0 || !r.points_on ? "-" : r.rerun_ok ? "ok" : "DIFF",
-                        integral_stride == 0 || !r.points_on ? "-" : r.split_ok ? "ok" : "BAD",
+                        !r.points_on ? "-" : r.split_ok ? "ok" : "BAD",
                         r.integral_samples, r.scale_regions, a, b,
                         so, r.regions_original, sr, r.regions_resurveyed, si, r.regions_span_founded,
                         static_cast<long long>(r.integral_ms));
         }
         if (integral_stride == 0)
-            std::printf("  (--integral-stride 0: the re-runs were not taken; rho(S,hy) and rho(S/hy,fuel) read '-')\n");
+            std::printf("  (--integral-stride 0: the re-runs were not taken; rho(S,hy) and rho(S/hy,fuel) read '-';\n"
+                        "   the split is the sim's own treasury tally and is taken regardless)\n");
     }
 
     const auto collect = [&](double (*get)(const seed_row&)) {
@@ -3636,6 +3662,25 @@ int main(int argc, char** argv)
             std::fclose(f);
             std::printf("\nWrote %s (%zu rows)\n", out_path.c_str(), rows.size());
         }
+    }
+
+    // BL-1056: the scale/treasury split is a LEDGER check, not a reading. A
+    // seed whose per-region split (the sim's treasury tally) does not
+    // reproduce the span's own ledger, or whose harness-side resume is not
+    // the span when the integral was asked for, fails the run -- a '-' in
+    // the rho columns must never be the only sign of it.
+    std::size_t split_bad = 0, rerun_bad = 0;
+    for (const seed_row& r : rows)
+    {
+        if (!r.span_ran || !r.points_on || r.points_rejected) continue;
+        if (!r.split_ok) ++split_bad;
+        if (integral_stride > 0 && !r.rerun_ok) ++rerun_bad;
+    }
+    if (split_bad > 0 || rerun_bad > 0)
+    {
+        std::printf("FAIL  BL-1056: the scale/treasury split failed on %zu seed(s), the harness-side resume differed"
+                    " from the span on %zu\n", split_bad, rerun_bad);
+        return 1;
     }
 
     std::printf("REPORT ONLY - no reading is asserted; the spread above is for judgement.\n");

@@ -443,15 +443,25 @@ struct region
     /// `industry_open_year`), by two consequences and no choice: every round,
     /// on every region with `centres > 0`, its urban scale x its fuel factor x
     /// its holder's Industry-tree industrial capacity
-    /// (`accrue_industry_points`); and, on a living polity's `capital`, a
-    /// fixed share of the treasury's surplus after the round's army and navy
-    /// bills (`run_exploration_upkeep`). Never spent: this cut carries no sink,
+    /// (`accrue_industry_points`); and, out of a living polity's `capital`
+    /// treasury, a fixed share of its surplus after the round's army and navy
+    /// bills, spread over the polity's centres by urban scale
+    /// (`run_exploration_upkeep`; BL-1056). Never spent: this cut carries no sink,
     /// and nothing in the sim reads it (DIGITISATION.md: three sinks, later).
     /// Zero on every path the span does not run. GENERATION SCRATCH, NOT SAVED:
     /// `w_region` does not write it, the same footing as `treasury` -- its one
     /// reader is the 1960 handoff (the charter budget, Part III), which must
     /// range-check before any narrowing.
     int64_t industry_points = 0;
+
+    /// BL-1056 — REPORT ONLY: the part of `industry_points` the treasury paid
+    /// in (the rest is the scale accrual's). Written beside every treasury
+    /// credit and nowhere else, read by nothing in the sim; it exists so a
+    /// harness can split a region's points into scale and treasury exactly,
+    /// which the largest-remainder spread makes impossible to recover from the
+    /// exchange rate. GENERATION SCRATCH, NOT SAVED and in no digest, on the
+    /// same footing as `industry_points` itself.
+    int64_t industry_points_from_treasury = 0;
 
     // --- BL-939: the scarcity signal -----------------------------------------
     // EXPLORATION.md sec There is no price here, only a scarcity signal.
