@@ -2926,6 +2926,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // keeps the seam) is never confused with "this polity holds no surveyed
     // ground" (it reads 0). A pure function of the opening table.
     const bool span_surveyed = industry_span_survey_ran(ss.regions);
+    // BL-1059 (Ben, 2026-09-19, NR-899): the two top-third bars, fixed ONCE
+    // here from the table the run opened on and never moved: every pull below
+    // reads these. Only regions carrying both span-open scores are read, and
+    // no score is ever rewritten after the open, so a run resumed mid-span
+    // re-derives the same bars. Off the span nothing is surveyed and both
+    // read `industry_ground_bar_none_q` (and nothing reads them).
+    out.ground_bars = industry_ground_bars_at_open(ss.regions);
+    const industry_ground_bars ground_bars = out.ground_bars;
 
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
@@ -6737,10 +6745,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             // THE FUEL DOCTRINE'S TWO PULLS (BL-1056; Ben
                             // 2026-09-19, NR-896): `ground_forest` and
                             // `ground_fuel` are each the per-mille SHARE of held
-                            // regions whose span-open score clears the world
-                            // mean, over the SAME held regions (those carrying
-                            // the span-open survey) against the SAME mean --
-                            // like with like, and neither grows with the realm,
+                            // regions whose span-open score clears its own
+                            // resource's top-third bar (BL-1059, NR-899), over
+                            // the SAME held regions (those carrying the
+                            // span-open survey) -- like with like, and neither grows with the realm,
                             // where the best-of-held they replace could only
                             // rise as it did. No gate reads either, so only a
                             // pick needs them. Off the Digitisation span nothing
@@ -6748,8 +6756,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             // 0 (the old pin) and fuel -1, which leaves the term
                             // on the seam. Inside it a realm holding no surveyed
                             // region reads 0 on both.
-                            ir.ground_forest_q = industry_ground_forest_q(ss.regions, held);
-                            ir.ground_fuel_q   = industry_ground_fuel_q(ss.regions, held, span_surveyed);
+                            ir.ground_forest_q = industry_ground_forest_q(ss.regions, held, ground_bars);
+                            ir.ground_fuel_q   = industry_ground_fuel_q(ss.regions, held, ground_bars, span_surveyed);
 
                             // `colonial_reach`: a held region the seat reaches
                             // only across water — `line_crosses_sea`, the SAME
@@ -8495,14 +8503,15 @@ bool industry_node_available(uint64_t mask, int node_idx)
 
 namespace {
 
-/// BL-1056: the Fuel Doctrine's two pulls, taken over ONE region set against
-/// ONE mean. A held region counts only if it carries the span-open survey of
-/// BOTH scores -- the survey writes the two together, and only there are both
-/// measured against the same span-open mean. A region the span founded has no
+/// BL-1056: the Fuel Doctrine's two pulls, taken over ONE region set. A held
+/// region counts only if it carries the span-open survey of BOTH scores -- the
+/// survey writes the two together. Each score is tested against ITS OWN
+/// resource's top-third bar (BL-1059, NR-899). A region the span founded has no
 /// forest reading (DEFAULT A inherits fuel only), so it is out of BOTH pulls,
 /// never in one and out of the other. Writes the two clear-counts and the
 /// count read; order-free.
 void industry_ground_pull_counts(const std::vector<region>& regions, const std::vector<int>& held,
+                                 const industry_ground_bars& bars,
                                  int64_t& read, int64_t& fuel_clear, int64_t& forest_clear)
 {
     read = fuel_clear = forest_clear = 0;
@@ -8512,12 +8521,48 @@ void industry_ground_pull_counts(const std::vector<region>& regions, const std::
         const region& r = regions[static_cast<std::size_t>(hi)];
         if (r.survey_fuel_q < 0 || r.survey_forest_q < 0) continue;
         ++read;
-        if (r.survey_fuel_q   > industry_ground_share_bar_q) ++fuel_clear;
-        if (r.survey_forest_q > industry_ground_share_bar_q) ++forest_clear;
+        if (industry_ground_clears(r.survey_fuel_q,   bars.fuel_q))   ++fuel_clear;
+        if (industry_ground_clears(r.survey_forest_q, bars.forest_q)) ++forest_clear;
     }
 }
 
+/// BL-1059: one resource's top-third bar over @p nonzero (the resource's
+/// nonzero span-open scores; sorted in place). k = floor(m / 3) may clear, the
+/// bar is the value at ascending position m - k, and a tie band straddling
+/// that cut is excluded whole (bar = value + 1) -- see `industry_ground_bars`.
+int industry_top_third_bar(std::vector<int>& nonzero)
+{
+    const std::size_t m = nonzero.size();
+    const std::size_t k = m / 3;
+    if (k == 0) return industry_ground_bar_none_q;
+    std::sort(nonzero.begin(), nonzero.end());
+    const std::size_t cut = m - k; // >= 2 since m >= 3
+    const int v = nonzero[cut];
+    return nonzero[cut - 1] == v ? v + 1 : v;
+}
+
 } // namespace
+
+industry_ground_bars industry_ground_bars_at_open(const std::vector<region>& regions)
+{
+    // THE TOP-THIRD BARS (BL-1059; Ben, 2026-09-19, NR-899; INDUSTRY_TREE.md
+    // sec The scorer). Read over the regions carrying both span-open scores --
+    // the set the pulls read -- and over each resource's NONZERO scores, since
+    // a 0 never clears. The sort makes the bar independent of region order.
+    std::vector<int> fuel, forest;
+    fuel.reserve(regions.size());
+    forest.reserve(regions.size());
+    for (const region& r : regions)
+    {
+        if (r.survey_fuel_q < 0 || r.survey_forest_q < 0) continue;
+        if (r.survey_fuel_q   > 0) fuel.push_back(r.survey_fuel_q);
+        if (r.survey_forest_q > 0) forest.push_back(r.survey_forest_q);
+    }
+    industry_ground_bars b;
+    b.fuel_q   = industry_top_third_bar(fuel);
+    b.forest_q = industry_top_third_bar(forest);
+    return b;
+}
 
 bool industry_span_survey_ran(const std::vector<region>& regions)
 {
@@ -8526,27 +8571,29 @@ bool industry_span_survey_ran(const std::vector<region>& regions)
     return false;
 }
 
-int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held)
+int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held,
+                             const industry_ground_bars& bars)
 {
-    // THE SHARE OF HELD GROUND WOODED ABOVE THE WORLD MEAN (BL-1056; Ben,
-    // 2026-09-19, NR-896; INDUSTRY_TREE.md sec The scorer). It was the BEST
-    // held score, which can only rise as a realm grows: breadth, not ground,
-    // decided the Fuel Doctrine. A share of held regions cannot grow with the
-    // realm's size -- a region scoring under the mean only ever lowers it,
+    // THE SHARE OF HELD GROUND IN THE WORLD'S TOP THIRD FOR FOREST (BL-1056,
+    // NR-896; the bar BL-1059, NR-899; INDUSTRY_TREE.md sec The scorer). It
+    // was the BEST held score, which can only rise as a realm grows: breadth,
+    // not ground, decided the Fuel Doctrine. A share of held regions cannot
+    // grow with the realm's size -- a region not clearing the bar only ever lowers it,
     // and one with no span-open reading leaves it alone. With no read region
     // held the reading is 0: off the span that is the old pin, and inside it
     // a realm on ground it has no reading of pulls toward neither side.
     int64_t read = 0, fuel_clear = 0, forest_clear = 0;
-    industry_ground_pull_counts(regions, held, read, fuel_clear, forest_clear);
+    industry_ground_pull_counts(regions, held, bars, read, fuel_clear, forest_clear);
     return read > 0 ? static_cast<int>((forest_clear * 1000) / read) : 0;
 }
 
 int industry_ground_fuel_q(const std::vector<region>& regions, const std::vector<int>& held,
-                           bool survey_ran)
+                           const industry_ground_bars& bars, bool survey_ran)
 {
-    // THE SHARE OF HELD GROUND OVER A SEAM ABOVE THE WORLD MEAN (BL-1056; Ben,
-    // 2026-09-19, NR-896), over EXACTLY the regions and the mean the forest
-    // share reads, so the Fuel Doctrine compares like with like. -1 only when
+    // THE SHARE OF HELD GROUND IN THE WORLD'S TOP THIRD FOR FUEL (BL-1056,
+    // NR-896; the bar BL-1059, NR-899), over EXACTLY the regions the forest
+    // share reads, each against its own resource's bar, so the Fuel Doctrine
+    // compares like with like. -1 only when
     // the span-open survey never happened (@p survey_ran false: every path but
     // the Digitisation span), and the term then keeps the seam, the old
     // reading. Inside the span a realm with no read region reads 0, never the
@@ -8554,7 +8601,7 @@ int industry_ground_fuel_q(const std::vector<region>& regions, const std::vector
     // The GATE is not this -- it still reads any held seam.
     if (!survey_ran) return -1;
     int64_t read = 0, fuel_clear = 0, forest_clear = 0;
-    industry_ground_pull_counts(regions, held, read, fuel_clear, forest_clear);
+    industry_ground_pull_counts(regions, held, bars, read, fuel_clear, forest_clear);
     return read > 0 ? static_cast<int>((fuel_clear * 1000) / read) : 0;
 }
 

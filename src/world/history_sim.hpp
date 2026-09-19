@@ -2928,15 +2928,46 @@ inline bool polity_holds_exploration_rim(const polity& q)
 /// only WHAT it is compared against differs: one region, not the mean.
 inline constexpr int industry_fuel_seam_bar_q = 250;
 
-/// BL-1056 (Ben, 2026-09-19, NR-896): the bar a held region's span-open score
-/// must CLEAR to count toward `ground_fuel` and `ground_forest`, which read the
-/// per-mille SHARE of held regions above it. Both scores are world-relative
-/// (500 = the world's mean region at the span open), and the test is STRICT
-/// (> 500). 500 IS A BAND, NOT A POINT: the survey scores
-/// floor(raw * 500 * n / sum), so every raw in [mean, mean * 1.002) scores
-/// exactly 500. "Clears the mean" therefore means a raw at least ~0.2% above
-/// it; a region at the mean, or a hair over, does not count.
-inline constexpr int industry_ground_share_bar_q = 500;
+/// BL-1059 (Ben, 2026-09-19, NR-899): THE TOP-THIRD BARS. A held region counts
+/// toward `ground_fuel` / `ground_forest` when its span-open score for that
+/// resource is in the world's TOP THIRD for it -- each resource against its OWN
+/// distribution, so coal's rarity no longer starves its pull (against the mean,
+/// few regions cleared a mean a handful of coalfields set). A region clears
+/// iff `score > 0 && score >= bar`. Fixed ONCE at the span open from the
+/// region table (`industry_ground_bars_at_open`), carried on
+/// `history_sim_state::ground_bars`, never moved after: a property of the map,
+/// never a rank among polities. Report-only on the state: nothing serialised,
+/// nothing digested.
+///
+/// THE DEFINITION. Read every region carrying the span-open survey of BOTH
+/// scores (the set the pulls read, which at the open is every region). A 0
+/// never clears, so the ranking is over the m NONZERO scores of the resource:
+/// sort them ascending, let k = floor(m / 3) (never more than a third), and the
+/// bar is the value at position m - k. TIE RULE: if the value just below that
+/// position is EQUAL to it (a tie band straddles the cut), the bar is that
+/// value + 1 -- the whole band is out. So never more than k regions clear, and
+/// a big tie band (fuel scores pile up at the 1000 clamp) can only make FEWER
+/// clear, never most of the world. With k = 0 (fewer than three nonzero
+/// scores) nothing clears. Why the NONZERO scores rather than all: a resource
+/// with many empty windows (coal) would otherwise put its cut inside the zeros
+/// and let every nonzero region clear -- the rarity bias again, from the other
+/// side. Integer only; independent of region order.
+inline constexpr int industry_ground_bar_none_q = 1001; ///< a bar nothing in 0-1000 clears
+
+struct industry_ground_bars
+{
+    int fuel_q   = industry_ground_bar_none_q;
+    int forest_q = industry_ground_bar_none_q;
+    bool operator==(const industry_ground_bars& o) const { return fuel_q == o.fuel_q && forest_q == o.forest_q; }
+    bool operator!=(const industry_ground_bars& o) const { return !(*this == o); }
+};
+
+/// Does @p score clear @p bar? `score > 0 && score >= bar`.
+inline bool industry_ground_clears(int score, int bar) { return score > 0 && score >= bar; }
+
+/// The two bars, from @p regions (see above). Regions without both survey
+/// scores are not read; with none read both bars are `industry_ground_bar_none_q`.
+industry_ground_bars industry_ground_bars_at_open(const std::vector<region>& regions);
 
 /// How many held regions the Industry rate reads (`industry_urban_mass`).
 ///
@@ -3017,8 +3048,9 @@ struct industry_scorer_reading
 
     /// BL-1056 (Ben, 2026-09-19, NR-896) — the `ground_fuel` TERM: the
     /// per-mille SHARE of held surveyed regions whose span-open fuel score
-    /// clears the world mean (`industry_ground_fuel_q`), so the Fuel Doctrine's
-    /// coal pull does not grow with the realm. -1 = NO SHARE TAKEN (the
+    /// clears the world's fuel bar, its top third (`industry_ground_fuel_q`;
+    /// BL-1059, NR-899), so the Fuel Doctrine's coal pull does not grow with
+    /// the realm. -1 = NO SHARE TAKEN (the
     /// span-open survey never ran: every path but the Digitisation span, or a
     /// harness reading built by hand): the term then reads `fuel_seam_q`, the
     /// old seam. Inside the span it is never -1.
@@ -3033,8 +3065,8 @@ struct industry_scorer_reading
     int many_peoples_q   = 0; ///< share of held regions whose plurality culture is not the polity's
 
     /// BL-1051 — `ground_forest`: the per-mille SHARE of surveyed held
-    /// regions whose span-open forest score clears the world mean
-    /// (`industry_ground_forest_q`; BL-1056, Ben 2026-09-19, NR-896: a share
+    /// regions whose span-open forest score clears the world's forest bar, its
+    /// top third (BL-1059, NR-899) (`industry_ground_forest_q`; BL-1056, Ben 2026-09-19, NR-896: a share
     /// over the same regions `ground_fuel` reads). 0 wherever no held region
     /// was surveyed, which includes every path the span does not run.
     int ground_forest_q  = 0;
@@ -3048,11 +3080,11 @@ struct industry_scorer_reading
 /// THE FUEL DOCTRINE'S TWO PULLS (INDUSTRY_TREE.md sec The scorer; NR-891,
 /// and a SHARE, BL-1056, Ben 2026-09-19, NR-896). Both are taken over ONE set
 /// of @p held's regions -- those carrying the span-open survey of both scores
-/// (`survey_fuel_q >= 0` and `survey_forest_q >= 0`), each a score against the
-/// span-open mean (500 at the world's mean region) -- and each is the per
-/// mille of that set whose score clears the mean (strictly above
-/// `industry_ground_share_bar_q`, a band: see there). Like with like: the same
-/// regions, the same mean. A share, never a best: a maximum can only rise as a
+/// (`survey_fuel_q >= 0` and `survey_forest_q >= 0`) -- and each is the per
+/// mille of that set whose score clears ITS OWN resource's bar, the world's
+/// top third for it fixed at the span open (`industry_ground_bars`; BL-1059,
+/// Ben 2026-09-19, NR-899). Like with like: the same regions, and each
+/// resource cleared at the same rate world-wide. A share, never a best: a maximum can only rise as a
 /// realm grows, and let breadth rather than ground decide the fork. A region
 /// with no span-open reading of both (the span did not run, or founded it
 /// after its open: DEFAULT A inherits fuel but never forest) is out of BOTH
@@ -3066,16 +3098,18 @@ struct industry_scorer_reading
 /// from "this polity holds no surveyed ground".
 bool industry_span_survey_ran(const std::vector<region>& regions);
 
-/// `ground_forest`: the share of the read set wooded above the mean, 0-1000;
-/// 0 with no read region held -- off the span that is exactly the old pin.
-int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held);
+/// `ground_forest`: the share of the read set whose forest score clears
+/// @p bars.forest_q, 0-1000; 0 with no read region held -- off the span that
+/// is exactly the old pin.
+int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held,
+                             const industry_ground_bars& bars);
 
-/// `ground_fuel`: the share of the SAME read set over a seam above the mean,
-/// 0-1000. -1 only when @p survey_ran is false (`industry_span_survey_ran`:
+/// `ground_fuel`: the share of the SAME read set whose fuel score clears
+/// @p bars.fuel_q, 0-1000. -1 only when @p survey_ran is false (`industry_span_survey_ran`:
 /// every path but the span), which leaves the term on the seam, the old
 /// reading; inside the span a realm with no read region reads 0.
 int industry_ground_fuel_q(const std::vector<region>& regions, const std::vector<int>& held,
-                           bool survey_ran);
+                           const industry_ground_bars& bars, bool survey_ran);
 
 /// `furnace_lit` (INDUSTRY_TREE.md sec The scorer; Ben, 2026-09-18, wave 1
 /// form): does the polity hold COKE SMELTING (IN-MT-1a), a coal-fired
@@ -4079,6 +4113,11 @@ struct history_sim_state
     /// `industry_points_ceiling`, or whose urban headcount left the accrual's
     /// stated domain. Must be 0; nothing moves on a refusal.
     int64_t industry_points_refused       = 0;
+    /// BL-1059: the Fuel Doctrine's two top-third bars, fixed once at the top
+    /// of the run from the table it opened on (`industry_ground_bars_at_open`)
+    /// and read by every pull after. Report-only here: never serialised, in no
+    /// digest; both `industry_ground_bar_none_q` off the span.
+    industry_ground_bars ground_bars;
     /// True when the run's industry-point constants left their stated domain
     /// (`industry_points_params_valid`): the WHOLE run then credits nothing
     /// and debits no treasury -- rejected, never clamped.
