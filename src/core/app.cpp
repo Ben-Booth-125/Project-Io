@@ -58,6 +58,7 @@
 #include "world/survey_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/landscape_search.hpp"
+#include "world/stockpile_budget.hpp" // BL-1042: the new-game charter budget
 
 #include <chrono> // poll_wizard_surface's zero-wait future probe
 #include "world/logistics.hpp"
@@ -1060,20 +1061,55 @@ void app::start_new_game_prelude()
         sp.seed                    = m_active_world_params.seed ^ 0x8A21F00Du;
         sp.start.placement_seed    = sp.seed;
         sp.start.corporation_count = m_worldgen_cfg.corporation_count;
-        // BL-1032 — NO CHARTER BUDGET REACHES THIS SEARCH, deliberately. `sp.budget`
-        // keeps its none default because the budget's one source, a centre's
-        // unspent industry-point stockpile (Beat 1, DIGITISATION.md § 1), does not
-        // exist yet, and nothing may stand in for it. When it does, a budget must
-        // reach BOTH `sp.budget` (with `sp.spend`) AND the winner's apply below —
-        // apply_landscape_candidate's budget overload — or the search scores one
-        // world and the app lays another. tools/verify/harness_params.hpp
-        // `apply_shipped_landscape` passes an instrument's budget to both.
+        // BL-1042 — THE CHARTER BUDGET: the world's own industry-point
+        // stockpile (Beat 1, DIGITISATION.md Part III), split over the carved
+        // centres by `build_stockpile_budget` and charged at
+        // `stockpile_charter_spend` (its provisional prices are named in
+        // stockpile_budget.hpp; BL-1044 sets them). ONE budget and ONE spend
+        // reach BOTH `sp` AND the winner's apply below — or the search would
+        // score one world and the app lay another — and the budget is a local
+        // of this block, so it outlives the search and the apply both.
+        //
+        // WITH THE DIGITISATION SPAN OFF (the shipped default) no region holds
+        // a point, the budget is EMPTY, the search is today's search, and the
+        // apply's legacy branch runs first: nothing moves. MIRRORED by
+        // tools/verify/harness_params.hpp `apply_shipped_landscape` — change
+        // both, and review the two diffs against each other (BL-1031's pins see
+        // world/* only, through the mirror).
         // MEASURED 2026-09-07 (placement + tier only): ~20 s for 19 evaluations,
         // ~1.1 s each. The per-round lines the search prints are the live
         // measurement now that the roster axis regenerates specialists per
         // candidate; BL-977's report carries the before/after.
+        const stockpile_budget stockpile = build_stockpile_budget(m_world);
+        const charter_spend_params spend = stockpile_charter_spend();
+        sp.budget = &stockpile.budget;
+        sp.spend  = spend;
         const landscape_search_result r = search_landscape(m_world, m_registry, sp);
-        apply_landscape_candidate(m_world, m_registry, r.winner, true);
+        charter_spend_report charter_report;
+        apply_landscape_candidate(m_world, m_registry, r.winner, true,
+                                  &stockpile.budget, spend, &charter_report);
+        if (stockpile.points_total != 0 || stockpile.rejected)
+        {
+            const auto why = [&](stockpile_unspent_reason k) {
+                return static_cast<long long>(stockpile.unspent[static_cast<std::size_t>(k)]);
+            };
+            std::printf("[stockpile_budget] %lld points: %lld to %zu centres, %lld unspent "
+                        "(carve_dropped %lld, carve_no_tile %lld, no_carved_centre %lld, "
+                        "rejected %lld)%s%s; spent %lld of %lld%s\n",
+                        static_cast<long long>(stockpile.points_total),
+                        static_cast<long long>(stockpile.points_to_centres),
+                        stockpile.budget.points().size(),
+                        static_cast<long long>(stockpile.points_unspent()),
+                        why(stockpile_unspent_reason::carve_dropped),
+                        why(stockpile_unspent_reason::carve_no_tile),
+                        why(stockpile_unspent_reason::no_carved_centre),
+                        why(stockpile_unspent_reason::rejected),
+                        stockpile.rejected ? " REJECTED: " : "",
+                        stockpile.rejected ? stockpile.rejection.c_str() : "",
+                        static_cast<long long>(charter_report.points_spent),
+                        static_cast<long long>(charter_report.points_budgeted),
+                        charter_report.refused ? " (spend REFUSED)" : "");
+        }
         // Kept for the seat (BL-1020): the shortlist gates and ranks on this
         // static score, read at each specialist's holdings, after the settle.
         m_landscape_winner_score = r.winner_score;

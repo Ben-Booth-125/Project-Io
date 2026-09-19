@@ -43,6 +43,7 @@
 #include "world/placement_rules.hpp"
 #include "world/stance.hpp"
 #include "world/survey_system.hpp"
+#include "world/stockpile_budget.hpp" // BL-1042: the budget this search-less path states
 
 #include <algorithm>
 #include <cctype>
@@ -515,6 +516,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // condition reads real recipe outputs. The seed fold matches the interactive
     // path so the verified world is the world the player would get. NOT warmed up —
     // run_verify stays deterministically cold, as its own comment below says.
+    // BL-1042 — THE CHARTER BUDGET, STATED. This path does not search, so it has
+    // no seam to spend one at. Its world is built with the Digitisation span
+    // OFF (fresh_world_params() leaves it at its default), so the stockpile
+    // budget app::start_new_game_prelude would pass is EMPTY — and an empty
+    // budget IS the legacy call below, byte for byte. The guard says so out
+    // loud if that ever stops being true.
+    if (const stockpile_budget sb = build_stockpile_budget(m_world); !sb.budget.empty() || sb.rejected)
+        std::fprintf(stderr, "[stockpile_budget] run_verify: a search-less path lays the legacy web and "
+                             "ignores a %lld-point stockpile budget\n",
+                     static_cast<long long>(sb.points_total));
     generate_background_firms(m_world, m_registry, /*seed=*/0x8A21F00Du);
 
     m_sim_loop.set_speed(0);

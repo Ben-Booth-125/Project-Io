@@ -13,6 +13,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
 #include "world/survey_system.hpp"
+#include "world/stockpile_budget.hpp" // BL-1042: the budget the search-less paths state
 #include "world/tech_gate.hpp"
 
 #ifdef _WIN32
@@ -133,6 +134,16 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
 
+    // BL-1042 — THE CHARTER BUDGET, STATED. This path does not search, so it has
+    // no seam to spend one at. Its world is built with the Digitisation span
+    // OFF (make_hard_coded_world()'s default params), so the stockpile
+    // budget app::start_new_game_prelude would pass is EMPTY — and an empty
+    // budget IS the legacy call below, byte for byte. The guard says so out
+    // loud if that ever stops being true.
+    if (const stockpile_budget sb = build_stockpile_budget(w); !sb.budget.empty() || sb.rejected)
+        std::fprintf(stderr, "[stockpile_budget] run_serve: a search-less path lays the legacy web and "
+                             "ignores a %lld-point stockpile budget\n",
+                     static_cast<long long>(sb.points_total));
     // BL-365: real background corporations, generated now that reg is loaded.
     generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
 
@@ -233,6 +244,16 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
 
+    // BL-1042 — THE CHARTER BUDGET, STATED. This path does not search, so it has
+    // no seam to spend one at. Its world is built with the Digitisation span
+    // OFF (make_hard_coded_world()'s default params), so the stockpile
+    // budget app::start_new_game_prelude would pass is EMPTY — and an empty
+    // budget IS the legacy call below, byte for byte. The guard says so out
+    // loud if that ever stops being true.
+    if (const stockpile_budget sb = build_stockpile_budget(w); !sb.budget.empty() || sb.rejected)
+        std::fprintf(stderr, "[stockpile_budget] headless run: a search-less path lays the legacy web and "
+                             "ignores a %lld-point stockpile budget\n",
+                     static_cast<long long>(sb.points_total));
     // BL-365: real background corporations, generated now that reg is loaded.
     generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
 

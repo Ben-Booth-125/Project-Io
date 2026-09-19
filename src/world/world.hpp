@@ -131,6 +131,35 @@ struct world_history_entry
     std::string   consequence;              ///< Right column — what it left behind (may be empty).
 };
 
+/// BL-1042 (stockpile to budget) — one CARVED centre's slot: which region grew
+/// it, its rank inside that region, and the key the carve sorted it on
+/// (`urban_population / rank`). Written by `generate_population_centres`'
+/// demography path; see `world::gen_carve_centres`.
+struct carve_slot
+{
+    int     region = -1; ///< Index into `settlement_state::regions` (world::gen_settlement).
+    int     rank   = 0;  ///< 1-based rank inside the region.
+    int64_t key    = 0;  ///< The carve's sort key; the charter budget's split weight.
+
+    bool operator==(const carve_slot&) const = default;
+};
+
+/// Why a carved centre was never founded (BL-1042).
+enum class carve_drop_reason : uint8_t
+{
+    body_built_out = 0, ///< no candidate ground left on the body (or the carve outran the candidates)
+    no_tile        = 1, ///< the chosen raster index resolved to no tile (defensive; unreached)
+};
+
+/// A carved centre that was never founded, with the reason.
+struct carve_dropped_slot
+{
+    int               region = -1;
+    int               rank   = 0;
+    int64_t           key    = 0;
+    carve_drop_reason reason = carve_drop_reason::body_built_out;
+};
+
 /// ECS registry. Entities are plain integer IDs; components are stored in
 /// per-type maps. The registry owns all component data for the lifetime of
 /// the simulation.
@@ -286,6 +315,30 @@ struct world
     /// copy of the world, and NOT SERIALISED — the search runs only at new-game,
     /// and a loaded world never regenerates its roster. Null after a load.
     std::shared_ptr<const settlement_state> gen_settlement;
+
+    /// BL-1042 (stockpile to budget; DIGITISATION.md Part III) — THE CARVE
+    /// INDEX: every population centre the demography carve founded, keyed by
+    /// centre id, bound to the (region, rank, key) SLOT it materialises. A
+    /// region's industry points reach its campaign centres through this index
+    /// (`build_stockpile_budget`, stockpile_budget.hpp). Centres founded any
+    /// other way — the land-area fallback, the coverage foundings, the province
+    /// anchors — are absent, and hold no share. A spilled centre is bound to the
+    /// region that GREW it, not the one it stands in (`nearest_region` would
+    /// mis-bind it).
+    ///
+    /// A GENERATION-TIME INDEX on exactly `gen_settlement`'s footing: written
+    /// once by `generate_population_centres`, read by the new-game budget, and
+    /// NOT SERIALISED (no save field, no `state_hash` or snapshot fold) — the
+    /// budget is spent at new-game and a loaded world never rebuilds it. Empty
+    /// after a load. A `std::map` so any walk over it is ascending id.
+    std::map<entity_id, carve_slot> gen_carve_centres;
+
+    /// BL-1042 — the carved centres that were NEVER founded, in carve order,
+    /// with why. Their slots' share of a region's points is counted unspent
+    /// under its own reason rather than spread over the region's founded
+    /// centres. Same footing as `gen_carve_centres`: generation-time, NOT
+    /// SERIALISED, empty after a load.
+    std::vector<carve_dropped_slot> gen_carve_dropped;
 
     /// Shared stockpile pool keyed by (corporation, body). This is the Layer 3
     /// economy's working store — extraction and processing credit/draw it, the

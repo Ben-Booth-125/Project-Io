@@ -42,6 +42,7 @@
 #include "harness_params.hpp"
 #include "world/history_sim.hpp"   // BL-1009: polity::navy_stock, exploration_output
 #include "world/settlement.hpp"    // BL-1009: region stocks on world::gen_settlement
+#include "world/stockpile_budget.hpp" // BL-1042: the stockpile folded into the region digest
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -132,6 +133,15 @@ world_metrics measure(const world& w)
 //   - road tiers         `tile_component::road_level`, per tile;
 //   - region stocks      `world::gen_settlement->regions`: `treasury`,
 //                        `port_stock_q`, `standing_army` and its owner;
+//   - the stockpile      (BL-1042) every region's `industry_points`, and the
+//                        charter budget `build_stockpile_budget` makes of them
+//                        (per centre, and every unspent reason) — FOLDED ONLY
+//                        WHEN SOME REGION HOLDS A POINT, so a span-off world
+//                        (no point anywhere) hashes exactly as it did before
+//                        the fold existed. Complete as a detector on the same
+//                        argument as the nation treasury below: two worlds
+//                        differing in any region's points have a non-zero on
+//                        at least one side, so at least one folds;
 //   - the navy           `polity::navy_stock` off the Exploration handoff;
 //   - corridor tiers     the corridor set world setup stamped roads from, per
 //                        tier and per corridor.
@@ -312,6 +322,32 @@ uint64_t deep_digest(const world& w, const era_minus_one_fixture& fx)
         fold_u32(h, 0xFFFFFFFFu);
     }
 
+    // BL-1042 — THE STOCKPILE, conditional (see the header): nothing is folded
+    // while every region holds zero points, which is every span-off world.
+    if (const settlement_state* ss = w.gen_settlement.get())
+    {
+        bool any = false;
+        for (const region& rg : ss->regions)
+            any = any || rg.industry_points != 0;
+        if (any)
+        {
+            fold_u32(h, 0x10420000u);   // a section tag: "the stockpile follows"
+            for (const region& rg : ss->regions)
+                fold_i64(h, rg.industry_points);
+            const stockpile_budget sb = build_stockpile_budget(w);
+            fold_i32(h, sb.rejected ? 1 : 0);
+            fold_i64(h, sb.points_total);
+            for (const std::int64_t u : sb.unspent)
+                fold_i64(h, u);
+            fold_u32(h, static_cast<uint32_t>(sb.budget.points().size()));
+            for (const auto& [centre, pts] : sb.budget.points())   // std::map: ascending id
+            {
+                fold_u32(h, centre);
+                fold_i32(h, pts);
+            }
+        }
+    }
+
     // The navy, off the Exploration handoff's polity table (index order).
     // Empty — and folded as a zero size — wherever the span did not run.
     fold_i32(h, fx.exploration_ran ? 1 : 0);
@@ -372,6 +408,7 @@ void print_coverage(const char* what, const world& w, const era_minus_one_fixtur
             standing += rg.standing_army;
         }
     }
+    const stockpile_budget sb = build_stockpile_budget(w);   // BL-1042
     int64_t navy = 0;
     for (const polity& p : fx.exploration_handoff.polities) navy += p.navy_stock;
 
@@ -397,6 +434,20 @@ void print_coverage(const char* what, const world& w, const era_minus_one_fixtur
     std::printf("         corridors=%zu (tier0 %d, tier1 %d, tier2 %d, tier3 %d, other %d)\n",
                 fx.setup_corridors.size(), corridor_tier[0], corridor_tier[1],
                 corridor_tier[2], corridor_tier[3], corridor_other);
+    std::printf("         stockpile (BL-1042): %lld points, %zu budgeted centres, %lld unspent%s;"
+                " carve index %zu founded / %zu dropped\n",
+                static_cast<long long>(sb.points_total), sb.budget.points().size(),
+                static_cast<long long>(sb.points_unspent()), sb.rejected ? " REJECTED" : "",
+                w.gen_carve_centres.size(), w.gen_carve_dropped.size());
+}
+
+/// BL-1042: the Digitisation span is OFF in every world this harness builds, so
+/// the stockpile must be empty — no point on any region, an empty budget, a
+/// closed account — and the stockpile fold must not have run.
+bool stockpile_empty(const world& w)
+{
+    const stockpile_budget sb = build_stockpile_budget(w);
+    return sb.points_total == 0 && sb.budget.empty() && !sb.rejected && sb.balanced();
 }
 
 int failures = 0;
@@ -631,6 +682,13 @@ int main()
                     static_cast<long long>(rep_a2.prehistory_battles),
                     static_cast<long long>(rep_a2.prehistory_conquests),
                     static_cast<long long>(rep_a2.prehistory_foundings));
+
+    // 3.7 — BL-1042: the span is off here, so the stockpile is empty and the
+    //       charter budget the new-game path would pass is today's world.
+    check(stockpile_empty(w_a1) && stockpile_empty(w_b) && stockpile_empty(w_off),
+          "R3.7 Digitisation span OFF -> the stockpile is empty (no point, empty budget) (BL-1042)");
+    check(!w_a1.gen_carve_centres.empty() && w_a1.gen_carve_centres == w_a2.gen_carve_centres,
+          "R3.7 the carve index is populated and identical across two same-seed builds (BL-1042)");
 
     // -----------------------------------------------------------------------
     // R4 — the TWO-SPAN arc (BL-747), and the generation budget (BL-754)

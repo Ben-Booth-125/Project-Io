@@ -41,7 +41,7 @@
 //      .\build\player_seed_sweep.exe --guard --seeds 46,17,11 [--reproduce N] [--fast]
 //      .\build\player_seed_sweep.exe --digest       [--seeds 46,17,11]   (BL-1031)
 //      .\build\player_seed_sweep.exe --digest-check [--seeds 46,17,11]   (BL-1031)
-//      ... --digest / --digest-check [--charter-budget none|empty|zero|synthetic|refused]
+//      ... --digest / --digest-check [--charter-budget none|empty|zero|synthetic|refused|stockpile]
 //                                    [--charter-scale X]                    (BL-1032)
 //                                    [--resource-cap on|off]                (BL-1039: the two
 //                                     legacy cap rules on a synthetic budget, for their digests)
@@ -567,10 +567,15 @@ void digest_at_seat(const app_start_world& out, const spawn_seat_result& res, wo
 /// seams between the phases; without it the path is exactly the seat sweep's.
 spawn_seat_result build_and_seat(lua_state& lua, uint32_t seed, bool fast,
                                  app_start_world& out, world_digests* dig = nullptr,
-                                 const harness_charter_input& charter = {})
+                                 const harness_charter_input& charter = {},
+                                 bool digitisation_span = false)
 {
     world_params p = fast ? no_prehistory() : world_params{};
     p.seed = seed;
+    // BL-1042: `--charter-budget stockpile` runs the Digitisation span, so the
+    // shipped path's own stockpile budget has points in it. Off otherwise —
+    // the shipped default, and the world every pin was taken on.
+    p.digitisation_span_enabled = digitisation_span;
     // app::begin_new_game + app::start_new_game_prelude: config and works, the
     // world, setup_world's writes, load_economy with its era band, the
     // landscape-search WINNER (not the seed candidate — BL-979) and the second
@@ -638,7 +643,10 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 // `--charter-budget none|empty|zero|synthetic` (default none) hands the search a
 // budget; the digests are taken exactly as without one, so a row can be checked
 // against the SAME pins:
-//   none       no budget at all — the shipped path (R1).
+//   none       no budget handed in — the shipped path (R1), which since BL-1042
+//              builds the world's own stockpile budget; with the span off (every
+//              pinned world) it is EMPTY, and a row whose stockpile holds a
+//              point FAILS.
 //   empty      an empty budget reaches the seam (R2).
 //   zero       a budget of zero entries reaches the seam; the type drops them, so
 //              it is the empty budget by construction (R2).
@@ -646,6 +654,14 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 //              corporation count, measured on a legacy build of the same seed in
 //              this process, over the non-razed centres by seeded weights (R4 —
 //              the non-vacuity reading; its digests must NOT match the pins).
+//   stockpile  BL-1042: the Digitisation span ON, and NO budget handed in, so
+//              the SHIPPED PATH's own stockpile budget (`build_stockpile_budget`
+//              at `stockpile_charter_spend`, harness_params.hpp's mirror of
+//              app.cpp) reaches the search and the apply. Its digests are
+//              EXPECTED to differ from the pins (the span moves the world); a
+//              row FAILS when the budget is empty (R7's non-vacuity) or when any
+//              point is unaccounted for — the region stock must equal the spend
+//              plus the charter reasons plus the stockpile's own reasons.
 //   refused    the SAME synthetic budget — non-empty, and one that moves the
 //              world when priced (see `synthetic`) — with the firm price ZEROED,
 //              so `charter_spend_refusal` refuses it. A refusal mutates nothing
@@ -655,7 +671,7 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 // with those prices would be refused, so a PASS also shows the refusal never
 // reads an empty budget.
 
-enum class charter_mode { none, empty, zero, synthetic, refused };
+enum class charter_mode { none, empty, zero, synthetic, refused, stockpile };
 
 const char* charter_mode_name(charter_mode m)
 {
@@ -666,6 +682,7 @@ const char* charter_mode_name(charter_mode m)
     case charter_mode::zero:      return "zero";
     case charter_mode::synthetic: return "synthetic";
     case charter_mode::refused:   return "refused";
+    case charter_mode::stockpile: return "stockpile";
     }
     return "?";
 }
@@ -1065,6 +1082,20 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
                     search.charter_refused ? "SET (unexpected)" : "clear");
         return;
     }
+    if (mode == charter_mode::stockpile)
+        std::printf("      charter budget stockpile — the Digitisation stockpile (BL-1042): %lld "
+                    "points over %zu carved centres; firm price %d, specialist %d firm charters "
+                    "(= %lld points), window radius %d, province cap %s, cap rule %s (per-good cap "
+                    "%d, density ceiling %d, guard %d) — PROVISIONAL prices (BL-1044)\n",
+                    static_cast<long long>(budget.total()), budget.points().size(),
+                    spend.firm_price_points, spend.specialist_firm_charters,
+                    static_cast<long long>(spend.specialist_price_points()), spend.window_radius,
+                    spend.province_cap ? "on" : "off",
+                    charter_cap_rule_name(spend.resource_cap_rule),
+                    static_cast<int>(spend.per_resource_firm_cap),
+                    static_cast<int>(spend.density_ceiling),
+                    static_cast<int>(spend.max_firms_per_body));
+    else  // the synthetic header, unchanged
     std::printf("      charter budget %s — SYNTHETIC TEST INPUT (seeded weights, never population): "
                 "scale %.2f x 1x %zu legacy corporations (%zu specialists + %zu firms) = %lld points "
                 "over %zu centres; firm price %d, specialist %d firm charters (= %lld points), "
@@ -1195,6 +1226,134 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
         print_charter_bodies(rep, "      ");
 }
 
+/// BL-1042 — THE STOCKPILE'S ACCOUNT, as a failing check. Empty when every
+/// point of the region stock is accounted for; otherwise each clause that broke.
+/// Re-derived from the rows, never from the totals alone:
+///  * the stockpile's own account closes (`stockpile_budget::balanced`);
+///  * each region row closes (its points = its centres' shares + its reasons);
+///  * the budget's points = what the charter report budgeted (when non-empty);
+///  * the region stock = points spent + the charter's unspent reasons + the
+///    stockpile's own reasons — "every point accounted for by spend or reason".
+std::string stockpile_account_failure(const stockpile_budget& sb, const charter_spend_report& rep)
+{
+    std::string out;
+    char buf[200];
+    if (!sb.balanced())
+    {
+        std::snprintf(buf, sizeof buf, " stockpile %lld != %lld to centres + %lld unspent (budget %lld);",
+                      static_cast<long long>(sb.points_total),
+                      static_cast<long long>(sb.points_to_centres),
+                      static_cast<long long>(sb.points_unspent()),
+                      static_cast<long long>(sb.budget.total()));
+        out += buf;
+    }
+    long long rows = 0;
+    for (const stockpile_region_row& r : sb.regions)
+    {
+        long long u = 0;
+        for (const std::int64_t v : r.unspent)
+            u += v;
+        rows += r.points;
+        if (r.points != r.to_centres + u && out.size() < 1200)
+        {
+            std::snprintf(buf, sizeof buf, " region %d: %lld points, %lld to centres + %lld unspent;",
+                          r.region, static_cast<long long>(r.points),
+                          static_cast<long long>(r.to_centres), u);
+            out += buf;
+        }
+    }
+    if (!sb.rejected && rows != sb.points_total)
+    {
+        std::snprintf(buf, sizeof buf, " the region rows sum to %lld, the stockpile totals %lld;",
+                      rows, static_cast<long long>(sb.points_total));
+        out += buf;
+    }
+    if (!sb.budget.empty())
+    {
+        long long ch_unspent = 0;
+        for (const charter_unspent& u : rep.unspent)
+            ch_unspent += u.points;
+        if (rep.points_budgeted != sb.budget.total())
+        {
+            std::snprintf(buf, sizeof buf, " the charter report budgeted %lld, the stockpile budget is %lld;",
+                          static_cast<long long>(rep.points_budgeted),
+                          static_cast<long long>(sb.budget.total()));
+            out += buf;
+        }
+        if (sb.points_total != rep.points_spent + ch_unspent + sb.points_unspent())
+        {
+            std::snprintf(buf, sizeof buf, " stock %lld != spent %lld + charter unspent %lld + "
+                          "stockpile unspent %lld;",
+                          static_cast<long long>(sb.points_total),
+                          static_cast<long long>(rep.points_spent), ch_unspent,
+                          static_cast<long long>(sb.points_unspent()));
+            out += buf;
+        }
+    }
+    return out;
+}
+
+/// One block per row: the stock, where it went, and the whole account.
+void print_stockpile_account(const world& w, const stockpile_budget& sb,
+                             const charter_spend_report& rep)
+{
+    std::printf("      stockpile (BL-1042): %lld points on %zu regions -> %lld to %zu centres",
+                static_cast<long long>(sb.points_total), sb.regions.size(),
+                static_cast<long long>(sb.points_to_centres), sb.budget.points().size());
+    for (int r = 0; r < stockpile_unspent_reason_count; ++r)
+        std::printf(", %s %lld",
+                    stockpile_unspent_reason_name(static_cast<stockpile_unspent_reason>(r)),
+                    static_cast<long long>(sb.unspent[static_cast<std::size_t>(r)]));
+    if (sb.rejected)
+        std::printf("; REJECTED: %s", sb.rejection.c_str());
+    std::printf("\n");
+    if (sb.points_total == 0)
+        return;
+    int founded = 0, dropped = 0;
+    for (const stockpile_region_row& r : sb.regions)
+    {
+        founded += r.founded;
+        dropped += r.dropped;
+    }
+    std::int32_t richest = 0;
+    for (const auto& kv : sb.budget.points())
+        richest = std::max(richest, kv.second);
+    long long ch_unspent = 0;
+    for (const charter_unspent& u : rep.unspent)
+        ch_unspent += u.points;
+    std::printf("      stockpile slots: %d founded, %d dropped over the point-holding regions; "
+                "richest centre %d points\n", founded, dropped, static_cast<int>(richest));
+    // WHY a region holding points carved no centre: the carve skips a region
+    // with no population or no centres at the epoch (emptied, razed or ruined
+    // after its points accrued). Read off the same settlement record.
+    if (const settlement_state* ss = w.gen_settlement.get())
+    {
+        int n = 0, no_pop = 0, no_centres = 0;
+        long long pts_no_pop = 0, pts_no_centres = 0;
+        for (const stockpile_region_row& r : sb.regions)
+        {
+            const std::int64_t u =
+                r.unspent[static_cast<std::size_t>(stockpile_unspent_reason::no_carved_centre)];
+            if (u == 0)
+                continue;
+            ++n;
+            const region& rg = ss->regions[static_cast<std::size_t>(r.region)];
+            if (rg.population <= 0) { ++no_pop; pts_no_pop += u; }
+            else if (rg.centres <= 0) { ++no_centres; pts_no_centres += u; }
+        }
+        if (n > 0)
+            std::printf("      no_carved_centre: %d regions — population 0 at the epoch %d (%lld "
+                        "points), centres 0 with people %d (%lld points), other %d\n",
+                        n, no_pop, pts_no_pop, no_centres, pts_no_centres, n - no_pop - no_centres);
+    }
+    std::printf("      ACCOUNT: stock %lld = spent %lld + charter unspent %lld + stockpile unspent %lld "
+                "(%s)\n",
+                static_cast<long long>(sb.points_total), static_cast<long long>(rep.points_spent),
+                ch_unspent, static_cast<long long>(sb.points_unspent()),
+                sb.points_total == rep.points_spent + ch_unspent + sb.points_unspent()
+                    ? "closes" : "DOES NOT CLOSE");
+}
+
 int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                charter_mode mode = charter_mode::none, double charter_scale = 1.0,
                bool resource_cap = true)
@@ -1203,12 +1362,16 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                 "and seated in app order (BL-1030)\n",
                 check ? "--digest-check" : "--digest", seeds.size(), k_settle_ticks);
     std::printf("BL-1032. --charter-budget %s%s\n", charter_mode_name(mode),
-                mode == charter_mode::none ? " (the shipped path: no budget reaches the search)"
+                mode == charter_mode::none ? " (the shipped path: the world's own stockpile "
+                                             "budget, empty with the span off)"
                 : mode == charter_mode::synthetic
                     ? " — SYNTHETIC TEST INPUT; its digests are EXPECTED to differ from the pins"
                 : mode == charter_mode::refused
                     ? " — the synthetic budget with a ZERO firm price: REFUSED, so the digests "
                       "must equal the pins"
+                : mode == charter_mode::stockpile
+                    ? " — the Digitisation span ON and the shipped path's own stockpile budget "
+                      "(BL-1042); its digests are EXPECTED to differ from the pins"
                     : " (an empty budget reaches the seam; the digests must equal the pins)");
     std::printf("BL-1031. FNV-1a 64: D_search the walk; D_land the snapshot as the landscape "
                 "lands; D_settle the snapshot + state_hash after the validation run; D_seat the "
@@ -1271,13 +1434,16 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                 if (mode == charter_mode::refused)
                     charter.spend.firm_price_points = 0;
             }
-            if (mode != charter_mode::none)
-            {
+            if (mode != charter_mode::none && mode != charter_mode::stockpile)
                 charter.budget = &budget;
-                charter.report = &report;
-            }
+            // BL-1042: the shipped path (none, stockpile) hands in no budget, so
+            // the mirror builds the stockpile's; every mode takes the report.
+            charter.report = &report;
             start = std::make_unique<app_start_world>();
-            build_and_seat(lua, seed, /*fast=*/false, *start, &got[i], charter);
+            build_and_seat(lua, seed, /*fast=*/false, *start, &got[i], charter,
+                           /*digitisation_span=*/mode == charter_mode::stockpile);
+            if (start->land.stockpile_path)
+                budget = start->land.stockpile.budget;   // the budget the shipped path passed
             ok[i] = true;
         }
         catch (const std::exception& e)
@@ -1303,8 +1469,18 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                     d.seat_bytes / 1048576.0);
         // BL-1039 fix round: a budget row that does not balance FAILS, in both
         // modes — checked from the budget and the records, not the report's totals.
-        const std::string unbalanced = (mode != charter_mode::none && !budget.empty())
+        std::string unbalanced = (!budget.empty())
             ? charter_balance_failure(budget, report) : std::string();
+        // BL-1042: the stockpile's own account, and the two closed together.
+        if (start->land.stockpile_path)
+        {
+            unbalanced += stockpile_account_failure(start->land.stockpile, report);
+            if (mode == charter_mode::none && start->land.stockpile.points_total != 0)
+                unbalanced += " the span is off but the stockpile holds points;";
+            if (mode == charter_mode::stockpile && budget.empty())
+                unbalanced += " the span is on but the stockpile budget is EMPTY (R7 needs a "
+                              "non-empty budget);";
+        }
         if (!unbalanced.empty())
             ++unbalanced_rows;
         if (check)
@@ -1362,8 +1538,12 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
         {
             std::printf("%s%s\n", unbalanced.empty() ? "" : "  UNBALANCED:", unbalanced.c_str());
         }
+        if (start->land.stockpile_path)
+            print_stockpile_account(start->w, start->land.stockpile, report);
         if (mode != charter_mode::none)
-            print_charter_report(start->w, mode, budget, charter.spend, report, start->land.search,
+            print_charter_report(start->w, mode, budget,
+                                 start->land.stockpile_path ? stockpile_charter_spend() : charter.spend,
+                                 report, start->land.search,
                                  legacy_specialists, legacy_firms, charter_scale);
         std::fflush(stdout);
     }
@@ -3270,7 +3450,7 @@ int main(int argc, char** argv)
                     "       %s --guard [seed_count] [--fast] (assert what the seat holds)\n"
                     "       %s --digest       [--seeds a,b,c]  (print the BL-1031 world digests)\n"
                     "       %s --digest-check [--seeds a,b,c]  (fail on any row differing from the pin)\n"
-                    "           both digest modes: [--charter-budget none|empty|zero|synthetic|refused] [--charter-scale X]\n"
+                    "           both digest modes: [--charter-budget none|empty|zero|synthetic|refused|stockpile] [--charter-scale X]\n"
                     "       %s --charter-cost [--seeds a,b,c] [--budget-scales 1,2,4] [--resource-cap on|off|both]\n"
                     "                         [--province-cap on|off|both] [--specialist-prices 4,8]\n"
                     "                         [--ladder-scales 2|all] [--no-extra] [--no-forced]\n"
@@ -3348,7 +3528,7 @@ int main(int argc, char** argv)
             std::printf("no seeds: pass --seeds a,b,c (the pin table is empty)\n");
             return 2;
         }
-        // BL-1032: `--charter-budget none|empty|zero|synthetic|refused`, `--charter-scale X`.
+        // BL-1032: `--charter-budget none|empty|zero|synthetic|refused|stockpile`, `--charter-scale X`.
         charter_mode mode  = charter_mode::none;
         double       scale = 1.0;
         bool         rcap  = true;
@@ -3381,9 +3561,10 @@ int main(int argc, char** argv)
                     else if (val == "zero")      mode = charter_mode::zero;
                     else if (val == "synthetic") mode = charter_mode::synthetic;
                     else if (val == "refused")   mode = charter_mode::refused;
+                    else if (val == "stockpile") mode = charter_mode::stockpile;
                     else
                     {
-                        std::printf("--charter-budget: '%s' is not none|empty|zero|synthetic|refused\n",
+                        std::printf("--charter-budget: '%s' is not none|empty|zero|synthetic|refused|stockpile\n",
                                     val.c_str());
                         return 2;
                     }
