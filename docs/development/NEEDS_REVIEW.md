@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*8 entries — 0 open, 8 resolved.*
+*9 entries — 0 open, 9 resolved.*
 
 ---
 
@@ -172,4 +172,21 @@ The forest share is a proportion of tiles, capped at 1000 per mille by definitio
 > **RESOLVED.** RULED (Ben, 2026-09-19): option A. Regions tied at the cut all clear. Written into INDUSTRY_TREE.md § The scorer; BL-1059 (top-third bar) carries it.
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/trees/INDUSTRY_TREE.md`*
+
+### NR-905 — CALL: skip (NR-903) plus a binding ceiling (NR-902) can leave a good with no firms
+*question · raised 2026-09-19 · from BL-1060 (charter spend hardening) cold review, 2026-09-19 (static).*
+
+If the first centre walked has no free deposit tile and its budget alone reaches the 120 ceiling, it spends everything on processing goods; later centres with quarries stop at density_ceiling on their first firm, and every extraction good ends at 0 firms — against DIGITISATION.md's 'the ceiling trims every good evenly' and NR-903's own reason.
+
+**Why it matters.** Whether every good with demand holds firms on a dense body once BL-1044 turns the spend on.
+
+- When the ceiling binds each good holds at most its even share of it; a share no centre can place is unspent under its own reason.
+- The next centre serves a skipped good first (still starves if the first centre fills the ceiling).
+- Accept as built; judge on BL-1043.
+
+> **Recommendation:** The first.
+
+> **RESOLVED.** RULED (Ben, 2026-09-19): option A. Written into DIGITISATION.md (the goods-in-turn paragraph); built in BL-1060 round 2.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/charter_budget.hpp`, `docs/generation/DIGITISATION.md`*
 

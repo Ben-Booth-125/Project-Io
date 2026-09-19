@@ -234,6 +234,10 @@ skipped, not fatal (Ben, 2026-09-19, NR-903):** when a centre's window has no fr
 an extraction good wants an unoccupied deposit tile, which a dense city window often lacks — the turn
 passes that good over for this centre and moves on, and the centre stops only when no good in the
 turn can place. A city with no free quarry still charters the mills and works it has room for.
+**When the ceiling binds, each good holds an even share of it (Ben, 2026-09-19, NR-905):** a good may
+take at most its equal part of the ceiling — 12 of 120 across ten goods — so a centre that skips the
+quarries cannot spend their share on mills before a centre that has quarries is reached. A share no
+centre on the body can place is counted unspent under its own reason, so the gap shows.
 
 **SETTLED (Ben, 2026-09-18, elicitation): a specialist's price is anchored to the SEAT MENU.** The
 price, in firm charters, is the one at which the median library world offers about as many seats as
