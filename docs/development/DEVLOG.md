@@ -10,9 +10,9 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## 2026-09-19 — Sprint 45 wave 1 lands: four items delivered, the Fuel Doctrine re-ruled twice
+## 2026-09-19 — Sprint 45 wave 1 lands: seven items delivered, the Fuel Doctrine and the charter spend ruled nine times
 
-**Runtime:** ~11 h wall clock (02:20 to 13:30, long unattended chains). Delivery — Full (two
+**Runtime:** ~19 h wall clock (02:20 to 21:15, long unattended chains). Delivery — Full (five
 worktree lanes and a fix round, two cold reviews, two main-session verification chains) with three
 design calls on elicitation forms.
 
@@ -37,15 +37,33 @@ BL-1058 for the continuity pass. The `--through 1960` readings closed **BL-1041 
   counts regions in its own resource's top third, a bar fixed at the span open. **BL-1059
   (top-third bar)** is building.
 
+- **NR-900 and NR-904.** BL-1059's first build ranked only regions carrying the resource; its cold
+  review showed that brings back a milder rarity tilt and leaves a cliff where scores pile at the
+  survey's cap. Ben ruled every region, on the unclamped share, and a tie at the cut clearing whole.
+  Chain 11 on `be5b3d72`: each bar clears a third of the world on every seed; coke 239 / charcoal
+  277 / neither 340. **BL-1059 delivered.**
+
+### The charter spend
+- **BL-1039's 21 timed rows** ran on a quiet machine once League closed (7126 s). Ceiling 160 never
+  bound — each good's own cap filled first — and cost a 12-31% dearer tick at 4x: Ben ruled **120**
+  (NR-902). With chain 11's empty/zero/refused checks, **BL-1039 delivered.**
+- **BL-1042 (stockpile to budget)** built the split of a region's points over its campaign centres.
+  Its review found 44% of seed 0's stock parked on townless ground; Ben ruled a polity with no town
+  converts nothing, and razed ground loses its points (NR-901).
+- **BL-1060 (charter spend hardening)** carries the review findings and three rulings: the turn
+  skips a good it cannot place (NR-903), and when the ceiling binds each good keeps an even share
+  (NR-905) — a reservation, not a cap (NR-906, confirmed by Ben after the cap reading held room back).
+
 ### Also
-BL-1042 (stockpile to budget) started in a lane beside BL-1059; both got requirement groups first.
-BL-1057 (capacity-kind filter) and BL-1058 were filed for the continuity pass. BL-1039's timed rows
-waited all day for a quiet machine.
+Sprint 46's 19 item drafts were written from a fresh three-lane code read
+(`docs/development/drafts/sprint-46-items.json`); the read found BL-1047 misses a seventh arc
+selector (a 1960 epoch switches Exploration, and so the span, off). `stockpile_budget_check` joined
+the verifier-headless skill with Ben's permission. BL-1057, 1058 filed for the continuity pass.
 
 ### Left open
-BL-1059 and BL-1042 (lanes), BL-1039's 21 timed rows and its R6 ceiling call, then BL-1043, BL-1050
-and BL-1044 (the re-bless), then the sprint 46 cut — its item drafts are being written from a fresh
-three-lane code read.
+BL-1060 round 3 (mid-edit in its lane at the sleep), chain 12 on the final main (closes BL-1060 and
+BL-1042), then BL-1043, BL-1050 and BL-1044 (the re-bless), then the sprint 46 cut. See
+`NEXT_SESSION.md`.
 
 ---
 
