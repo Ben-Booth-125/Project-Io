@@ -677,6 +677,32 @@
     "tools/verify/digitisation_sim_harness.cpp"
    ],
    "design": "CONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass after Digitisation, not built mid-sprint.\n\nFOUND 2026-09-19 by BL-1053's cold review (low). (1) The validator's stop-year rule (history_sim.cpp ~l.10079, rule 2b) says the fold's stop_year is 'the years the sim actually played', but `years` is params.stop_year - params.start_year set before the loop (~l.2846) and the loop has no early exit, so it reduces to dp.stop_year == params.digitisation_stop_year, which era_minus_one.cpp:438 sets by construction. It cannot fail; if an early break is ever added, a short span passes as a full close. Count the rounds played, or reword the comment to say it checks the params. (2) span_params_issues' 'every Empires-only setting is off' (digitisation_sim_harness.cpp:1143-1185) is a hand-typed list of 28 fields, not the derivation's own override list; boundary_year and span1_band_ceiling are missing (harmless today, at defaults). A new override leaking into the span would not be caught. Derive the list from era_minus_one_sim_params, or add a guard that fails when the derivation sets a field the list does not name. Harness-only; nothing shipped moves."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "45",
+   "written": "2026-09-19",
+   "author": "Ben (2026-09-19, NR-899 form); Claude (item text)",
+   "requires": [
+    "BL-1056"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1059",
+   "short_name": "TOP_THIRD_BAR",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 2,
+   "title": "The Fuel Doctrine pulls count held regions in each resource's own top third, not over the mean",
+   "authority_doc": "docs/generation/trees/INDUSTRY_TREE.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/digitisation_sim_harness.cpp",
+    "tools/verify/exploration_sim_harness.cpp"
+   ],
+   "design": "RULED (Ben, 2026-09-19, NR-899 option C; founded ground stays excluded). Design: INDUSTRY_TREE.md § The scorer, the NR-899 paragraph.\n\nWHY. Under BL-1056's 'score > 500' (over the world mean) the split went coke 142 / charcoal 373 / neither 341 (chain 9, 2867cdaa): coal scores sit on few regions, so few clear a mean a handful of coalfields set, while forest is widespread.\n\nTHE WORK. (1) At the span open, once, compute a per-resource bar from EVERY region's span-open score (fuel and forest separately): a region clears when its score is in the top third of the world for that resource — define it exactly and deterministically (e.g. the value at the floor(2n/3) position of the ascending-sorted scores, clearing at >= that value), a score of 0 never clears, and state how ties at the bar resolve (a tie band larger than a third must not let most of the world clear; say what the code does and pin it). Store both bars where the scorer reads them; they never change after the open. (2) ground_forest and ground_fuel read the share of held regions (the BL-1056 set: carrying the span-open survey of both scores; span-founded ground excluded from both) whose score clears that resource's bar. The fuel GATE, its re-check and the seam flag are unchanged. The span-ran flag and the -1 fallback are unchanged. (3) Harness: the BL-1056 self-check keeps holding (no pull rises when a realm gains a region that does not clear its bar); a new check that on every library seed each bar is cleared by between ~25% and ~34% of surveyed regions with a nonzero score (print the actual rates), and that the bars are identical across a re-run. Reading 8 prints the Fuel Doctrine split and mean pulls by side as now. DONE WHEN: switch off, digests and pins unmoved; the split and the two clearance rates reported per seed; exploration_sim_harness green (fixtures updated only where the bar semantics changed, each change named)."
   }
  ]
 }

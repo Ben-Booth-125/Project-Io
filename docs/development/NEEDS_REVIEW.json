@@ -100,7 +100,7 @@
    "title": "CALL: under the ruled share, Charcoal leads Coke 373 to 142 — and span-founded ground is left out of both Fuel Doctrine pulls",
    "raised": "2026-09-19",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1056 (points size-neutral) build, cold review and fix round; figures from the main session's chain 9 on 2867cdaa (digitisation_sim_harness --through 1960, 16 library seeds).",
    "what": "NR-896 ruled both pulls read the share of held regions scoring over the world mean, to stop breadth deciding the fork. It did that: Charcoal polities are now the wooded ones (mean forest share 666 against Coke's 271; Charcoal wooder than Coke on 14 of 16 seeds). But the split moved further toward Charcoal, not back: coke 142 / charcoal 373 / neither 341 (best-of-held was 200 / 319 / 337; before forest was scored, 391 / 132 / 333). Coal scores sit on few regions, so few realms have a large SHARE of held ground over the mean on fuel, while forest is widespread. Also taken on your behalf: regions the span founds inherit fuel at x0.7 (Default A) but no forest reading, so to keep one region set both pulls exclude them (they are 0.3% of points).",
    "why_it_matters": "The Fuel Doctrine is the tree's central fork: coke to scale and the Blast Works, charcoal to quality and a ceiling. BL-1042 and BL-1043 measure the 1960 world it manufactures; a world where Charcoal outnumbers Coke 2.6 to 1 builds fewer Blast Works.",
@@ -114,7 +114,7 @@
     "src/world/history_sim.cpp",
     "docs/generation/trees/INDUSTRY_TREE.md"
    ],
-   "resolution": null
+   "resolution": "RULED (Ben, 2026-09-19): option C, and founded ground stays excluded from both pulls. Each pull counts held regions in the top third of the world for its own resource, a bar fixed at the span open. Written into INDUSTRY_TREE.md § The scorer; the work is BL-1059 (top-third bar)."
   }
  ]
 }

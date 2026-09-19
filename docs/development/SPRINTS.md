@@ -75,6 +75,7 @@ and/or a version goal (v0.1.1 etc.).
 - BL-1041 (industry points) — Beat 1: located points on regions with centres, from scale, own fuel, Industry capacity and treasury paid in; no sink this cut.
 - BL-1053 (setup reads span close) — when the span runs, world setup reads its 1960 treasuries, grudges, roads and junction markets, not the 1660 ones; before BL-1043 so the readings measure the right map.
 - BL-1056 (points size-neutral) — Ben 2026-09-19 (NR-896, NR-897): the Fuel Doctrine pulls read a share of held regions over the world mean; treasury points spread over centres by scale. Before BL-1042 and BL-1043 measure.
+- BL-1059 (top-third bar) — Ben 2026-09-19 (NR-899): each Fuel Doctrine pull counts held regions in its own resource's top third. Before BL-1042 and BL-1043 measure.
 - BL-1042 (stockpile to budget) — region points reach campaign centres by the carve; the app and its harness mirror pass the budget. Neutral while the span is off.
 - BL-1043 (real-stockpile charter sweep) — prices and the no-specialist world measured, seat solvency at the draw; ends in calls.
 - BL-1050 (order-dependent reads) — five readers stop letting hash order reach arithmetic, so a loaded world replays; merged with BL-1044, never alone (NR-894).

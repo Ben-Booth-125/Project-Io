@@ -287,12 +287,21 @@ carries no landed price — and is pinned at 0.
 carries a forest share: the share of land tiles in its survey window under forest cover, read from
 the tiles as its fuel is. **It is scored as fuel is (Ben, 2026-09-18, wave 1 form), and both read
 a SHARE (Ben, 2026-09-19, NR-896):** `ground_forest` is the share of held regions whose forest score
-clears the mean of every region at the span open, and `ground_fuel` is the same share over fuel
-scores, so the Fuel Doctrine compares like with like. A best-of-held maximum can only rise as a realm
+clears the world's bar at the span open, and `ground_fuel` is the same share over fuel scores, so
+the Fuel Doctrine compares like with like. The bar is set below (NR-899). A best-of-held maximum can only rise as a realm
 grows, so it let breadth rather than ground decide the fork (Charcoal outnumbered Coke 319 to 200 on
 the lane's run) and broke the rule that no term grows with the polity's size. A held mean was
 rejected because a large realm with one coalfield reads low. The `fuel` gate is unchanged: any held
-seam still opens it. A plain average share read about 212 on the median region and let almost any
+seam still opens it. **The bar is each resource's own top third, not the mean (Ben, 2026-09-19,
+NR-899):** a held region counts toward a pull when its span-open score for that resource is in the
+top third of every region's score for it, and a region scoring 0 never counts. Against the mean,
+coal's rarity starved its pull — few regions clear a mean that a handful of coalfields set, while
+forest is widespread — and Charcoal led Coke 373 to 142. With a per-resource top third, fuel and
+forest clear at the same rate world-wide, so the fork compares like with like literally. The bar
+is fixed once at the span open from the world's regions: it is a property of the map, never a
+rank among polities, and it does not move as a realm grows. Both pulls count the same held
+regions: those carrying the span-open survey of both scores. Ground the span founds inherits fuel
+but carries no forest reading, so it is left out of both (Ben, 2026-09-19, NR-899). A plain average share read about 212 on the median region and let almost any
 seam outweigh any forest. So a polity takes Charcoal Iron because its ground is wooded, not only because Coke is gated
 out. Inside the span every fuel read in this tree — the gate, `ground_fuel` and the seam flag —
 takes the same survey (Ben, 2026-09-18). Of the
