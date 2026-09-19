@@ -560,5 +560,4725 @@
         }
       ]
     }
-  ]
+  ],
+  "runs": {
+    "bl1039_sqrt": {
+      "merge_note": "BL-1039 sqrt c=8 (B on firms), goods in turn, ceilings 120/160, draw capital; quiet machine, main at ab9c38f8, Release /O2 MSVC 14.44.35207, serial",
+      "tool": "player_seed_sweep --charter-cost",
+      "item": "BL-1033, BL-1039",
+      "aborted": null,
+      "synthetic_test_input": true,
+      "synthetic_note": "SYNTHETIC TEST INPUT: seeded weights, never population; 1x = the none row's chartered count on the same seed. Never a density-follows-cities reading.",
+      "build": "Release (NDEBUG)",
+      "msc_full_ver": 194435228,
+      "note": "BL-1039 sqrt c=8 (B on firms), goods in turn, ceilings 120/160, draw capital; quiet machine, main at ab9c38f8, Release /O2 MSVC 14.44.35207, serial",
+      "argv": [
+        "C:\\Users\\benbo\\Project-Io\\build_gen\\verify\\player_seed_sweep.exe",
+        "--charter-cost",
+        "--seeds",
+        "0,28,46",
+        "--budget-scales",
+        "1,2,4",
+        "--resource-cap",
+        "sqrt",
+        "--density-ceilings",
+        "120,160",
+        "--specialist-prices",
+        "4",
+        "--no-extra",
+        "--no-forced",
+        "--out",
+        "charter_cost_sweep_bl1039.json",
+        "--note",
+        "BL-1039 sqrt c=8 (B on firms), goods in turn, ceilings 120/160, draw capital; quiet machine, main at ab9c38f8, Release /O2 MSVC 14.44.35207, serial"
+      ],
+      "validation_ticks": 12,
+      "live_ticks": 8,
+      "search_thread_count": 1,
+      "firm_price_points": 1,
+      "specialist_prices_firm_charters": [
+        4
+      ],
+      "ladder_scales": [
+        2
+      ],
+      "price_note": "Every row carries firm_price_points, specialist_firm_charters and specialist_price_points (= firm x charters); null on the none row, which spends no budget. specialist_prices_firm_charters[0] is the base price; later entries are ladder rungs run at ladder_scales.",
+      "timing_note": "tick_ms times app::step_economy laps 0-5 only (phase 5 = standings + convoy credit + firm exits, compute_corp_standings mirrored). Laps 6-8 - agency comms, battle dispatches, persona counsel, the history recorders, the strategy readout - are NOT run and NOT timed, so val and live ms per tick are a LOWER BOUND on the app's step_economy that widens with density. Wall clock: only as clean as the machine was quiet.",
+      "strategic_evals_due_note": "A COUNT, not a cost driver: corporations corp_strategic_eval_due names at each live tick's day tick. post_persona_counsel evaluates at most the one open-channel corporation per tick (BL-398, session_history.cpp:206-220), so its live cost does not scale with corporation count.",
+      "rules_note": "BL-1039 (Ben's rulings 2026-09-18). resource_cap_rule: fixed = BL-1033's rcap on (per_resource_firm_cap per good per body), lifted = rcap off (no per-good cap); both fill biggest gap first. sqrt_capital = max(c, floor(c sqrt(B / B_ref))) under density_ceiling, goods filled IN TURN (a firm per good each pass, ascending resource index, up to its cap; construction capacity provisioned first, outside the turn), with c = per_resource_firm_cap, B = the body's points on FIRMS (each nation-resolved centre's points net of the specialist price it affords, in whole firm charters), G = goods whose consumer + upkeep + construction demand is > 0 on the body BEFORE the walk, B_ref = c x |G| x firm price, so cap(B_ref) == c exactly. A specialist's capital is today's draw (400 +/- 40%). bodies[].firms_by_good: firms per good as the selection chartered them; bodies[].turn: the turn's spread (sqrt only). checks: taken as the landscape lands. seat: the seated corporation's balance after the validation run and solvent = balance > 0.",
+      "tick_phases": [
+        "convoys",
+        "run_economy_step",
+        "clear_markets",
+        "apply_budget+nation_step",
+        "tech_gates",
+        "standings+credit+firm_exits"
+      ],
+      "unspent_reasons": [
+        "no_nation",
+        "window_exhausted",
+        "province_cap",
+        "no_gap",
+        "body_cap",
+        "remainder",
+        "refused",
+        "density_ceiling"
+      ],
+      "seeds": [
+        {
+          "seed": 0,
+          "threw": false,
+          "error": "",
+          "legacy_1x": 87,
+          "legacy_specialists": 6,
+          "legacy_firms": 81,
+          "configs": [
+            {
+              "label": "none (legacy)",
+              "kind": "none",
+              "scale": 1,
+              "resource_cap": true,
+              "resource_cap_rule": "fixed",
+              "density_ceiling": 0,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": null,
+              "specialist_firm_charters": null,
+              "specialist_price_points": null,
+              "threw": false,
+              "error": "",
+              "wall_ms": 174842.8,
+              "generation_ms": 42300.1,
+              "build_only": false,
+              "stopped_at_land": false,
+              "landscape": {
+                "specialists": 6,
+                "firms": 81,
+                "any_specialist": true,
+                "specialist_nations": 6,
+                "largest_nation_share": 0.1667,
+                "largest_nation": 54008,
+                "corporations_at_land": 87,
+                "background_at_land": 81,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 87,
+                "busiest_body_background_at_land": 81
+              },
+              "search": {
+                "evaluations": 19,
+                "accepted": 4,
+                "seed_eval_ms": 1457,
+                "proposal_mean_ms": 1475.8,
+                "search_ms": 28020.8,
+                "landscape_phase_ms": 28047.2,
+                "round_ms": [
+                  1457,
+                  4416.5,
+                  4483,
+                  4391,
+                  4429.8,
+                  4397.1,
+                  4446.3
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 3004.15,
+                "mean_ms": 6414.48,
+                "min_ms": 2479.68,
+                "max_ms": 41567.34,
+                "tick_ms": [
+                  2699.52,
+                  41567.34,
+                  2906.15,
+                  4204.13,
+                  3853.07,
+                  2807.19,
+                  2970.94,
+                  2479.68,
+                  3046.56,
+                  2925.31,
+                  4476.45,
+                  3037.36
+                ],
+                "phase_ms_sum": {
+                  "convoys": 44538.19,
+                  "run_economy_step": 32034.64,
+                  "clear_markets": 295.6,
+                  "apply_budget+nation_step": 104.46,
+                  "tech_gates": 0.48,
+                  "standings+credit+firm_exits": 0.34
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 3152.89,
+                "mean_ms": 3379.26,
+                "min_ms": 2671.54,
+                "max_ms": 4679.81,
+                "tick_ms": [
+                  2671.54,
+                  3118.47,
+                  4450.69,
+                  3270.64,
+                  2676.27,
+                  3187.32,
+                  4679.81,
+                  2979.34
+                ],
+                "phase_ms_sum": {
+                  "convoys": 5394.89,
+                  "run_economy_step": 21371.8,
+                  "clear_markets": 200.4,
+                  "apply_budget+nation_step": 66.42,
+                  "tech_gates": 0.31,
+                  "standings+credit+firm_exits": 0.25
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 59679,
+                "floor_unmet": false,
+                "specialists": 6,
+                "shortlist": 5,
+                "trailing_net_n": 5,
+                "trailing_net_min": -827.4,
+                "trailing_net_median": -6.9,
+                "trailing_net_max": 2177.6,
+                "trailing_net_negative_share": 0.6,
+                "corporations_at_seat": 87,
+                "background_at_seat": 81,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 87,
+                "busiest_body_background_at_seat": 81,
+                "seat_balance": 361.5329,
+                "seat_solvent": true,
+                "budget_specialists_standing": 0,
+                "budget_specialists_solvent": 0
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 22,
+                "per_live_tick": [
+                  22,
+                  22,
+                  22,
+                  22,
+                  22,
+                  22,
+                  22,
+                  22
+                ]
+              },
+              "digests": {
+                "search": "893B6977B1E9DC1F",
+                "land": "1A24D230FDDF2C7E",
+                "settle": "A392EFF987F374E2",
+                "seat": "8BBEAB8453901456",
+                "pinned": true,
+                "match": true,
+                "diff": ""
+              }
+            },
+            {
+              "label": "synthetic 1x rcap sqrt c120 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 1,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 120,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 206595.3,
+              "generation_ms": 35453.4,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 87,
+                "points_spent": 87,
+                "points_unspent": 0,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 67,
+                "richest_centre_points": 9,
+                "centres_affording_specialist": 2,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 0,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 2,
+                  "anchor_out": 0,
+                  "secondary_in": 5,
+                  "secondary_out": 0,
+                  "unresolved": 0,
+                  "farthest_tiles": 2.24
+                },
+                "holdings_firm": {
+                  "anchor_in": 78,
+                  "anchor_out": 1,
+                  "secondary_in": 125,
+                  "secondary_out": 26,
+                  "unresolved": 0,
+                  "farthest_tiles": 18.97
+                },
+                "holdings_inside_window": 210,
+                "holdings_outside_window": 27
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 120,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 79,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 8,
+                  "density_ceiling": 120,
+                  "firms": 79,
+                  "firms_by_good": {
+                    "agricultural_produce": 8,
+                    "water": 8,
+                    "timber": 8,
+                    "food_rations": 8,
+                    "charcoal": 8,
+                    "ceramics": 8,
+                    "dressed_stone": 8,
+                    "planks": 8,
+                    "leather": 7,
+                    "cloth": 7,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 7,
+                    "most": 8
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 2,
+                "firms": 79,
+                "any_specialist": true,
+                "specialist_nations": 2,
+                "largest_nation_share": 0.5,
+                "largest_nation": 54016,
+                "corporations_at_land": 81,
+                "background_at_land": 79,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 81,
+                "busiest_body_background_at_land": 79
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 1193.1,
+                "proposal_mean_ms": 1206.8,
+                "search_ms": 15675.1,
+                "landscape_phase_ms": 15683.5,
+                "round_ms": [
+                  1193.1,
+                  2605.2,
+                  2328.5,
+                  2475.2,
+                  2391.4,
+                  2360.9,
+                  2320.7
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 5262.86,
+                "mean_ms": 7473.46,
+                "min_ms": 2247.05,
+                "max_ms": 36738.15,
+                "tick_ms": [
+                  2247.05,
+                  36738.15,
+                  2556.29,
+                  3264.58,
+                  4277.08,
+                  6545.39,
+                  2814.6,
+                  5109.65,
+                  6901.31,
+                  7528.67,
+                  6282.65,
+                  5416.07
+                ],
+                "phase_ms_sum": {
+                  "convoys": 37954.51,
+                  "run_economy_step": 51337.52,
+                  "clear_markets": 283.52,
+                  "apply_budget+nation_step": 105.09,
+                  "tech_gates": 0.48,
+                  "standings+credit+firm_exits": 0.35
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 8562.13,
+                "mean_ms": 8221.39,
+                "min_ms": 5554.84,
+                "max_ms": 10356.78,
+                "tick_ms": [
+                  10356.78,
+                  9435.91,
+                  7953.45,
+                  5626.09,
+                  9896.9,
+                  9170.82,
+                  7776.31,
+                  5554.84
+                ],
+                "phase_ms_sum": {
+                  "convoys": 6532.85,
+                  "run_economy_step": 58978.45,
+                  "clear_markets": 191.06,
+                  "apply_budget+nation_step": 68.17,
+                  "tech_gates": 0.31,
+                  "standings+credit+firm_exits": 0.27
+                },
+                "between_ticks_ms_sum": 0,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 59683,
+                "floor_unmet": false,
+                "specialists": 2,
+                "shortlist": 2,
+                "trailing_net_n": 2,
+                "trailing_net_min": -1010.6,
+                "trailing_net_median": -450,
+                "trailing_net_max": 110.7,
+                "trailing_net_negative_share": 0.5,
+                "corporations_at_seat": 81,
+                "background_at_seat": 79,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 81,
+                "busiest_body_background_at_seat": 79,
+                "seat_balance": 1521.9226,
+                "seat_solvent": true,
+                "budget_specialists_standing": 2,
+                "budget_specialists_solvent": 2
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 20,
+                "per_live_tick": [
+                  19,
+                  21,
+                  19,
+                  21,
+                  19,
+                  21,
+                  19,
+                  21
+                ]
+              }
+            },
+            {
+              "label": "synthetic 1x rcap sqrt c160 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 1,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 160,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 208093,
+              "generation_ms": 36595.6,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 87,
+                "points_spent": 87,
+                "points_unspent": 0,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 67,
+                "richest_centre_points": 9,
+                "centres_affording_specialist": 2,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 0,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 2,
+                  "anchor_out": 0,
+                  "secondary_in": 5,
+                  "secondary_out": 0,
+                  "unresolved": 0,
+                  "farthest_tiles": 2.24
+                },
+                "holdings_firm": {
+                  "anchor_in": 78,
+                  "anchor_out": 1,
+                  "secondary_in": 125,
+                  "secondary_out": 26,
+                  "unresolved": 0,
+                  "farthest_tiles": 18.97
+                },
+                "holdings_inside_window": 210,
+                "holdings_outside_window": 27
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 160,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 79,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 8,
+                  "density_ceiling": 160,
+                  "firms": 79,
+                  "firms_by_good": {
+                    "agricultural_produce": 8,
+                    "water": 8,
+                    "timber": 8,
+                    "food_rations": 8,
+                    "charcoal": 8,
+                    "ceramics": 8,
+                    "dressed_stone": 8,
+                    "planks": 8,
+                    "leather": 7,
+                    "cloth": 7,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 7,
+                    "most": 8
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 2,
+                "firms": 79,
+                "any_specialist": true,
+                "specialist_nations": 2,
+                "largest_nation_share": 0.5,
+                "largest_nation": 54016,
+                "corporations_at_land": 81,
+                "background_at_land": 79,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 81,
+                "busiest_body_background_at_land": 79
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 1244.3,
+                "proposal_mean_ms": 1185.8,
+                "search_ms": 15473.7,
+                "landscape_phase_ms": 15482.7,
+                "round_ms": [
+                  1244.3,
+                  2355.2,
+                  2349.6,
+                  2355.6,
+                  2375.9,
+                  2426.6,
+                  2366.5
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 5235.51,
+                "mean_ms": 7545.11,
+                "min_ms": 2042.12,
+                "max_ms": 37708.08,
+                "tick_ms": [
+                  2042.12,
+                  37708.08,
+                  2612.92,
+                  3304.57,
+                  4326.67,
+                  6233.53,
+                  2798.61,
+                  4983.12,
+                  6548.32,
+                  7793.95,
+                  6701.56,
+                  5487.89
+                ],
+                "phase_ms_sum": {
+                  "convoys": 38439.84,
+                  "run_economy_step": 51682.28,
+                  "clear_markets": 304.3,
+                  "apply_budget+nation_step": 114.06,
+                  "tech_gates": 0.51,
+                  "standings+credit+firm_exits": 0.36
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 8284.26,
+                "mean_ms": 8183.39,
+                "min_ms": 5596.11,
+                "max_ms": 10287.88,
+                "tick_ms": [
+                  10287.88,
+                  9573.83,
+                  7711.44,
+                  5740.4,
+                  10275.44,
+                  8857.08,
+                  7424.91,
+                  5596.11
+                ],
+                "phase_ms_sum": {
+                  "convoys": 6421.05,
+                  "run_economy_step": 58767.43,
+                  "clear_markets": 202.43,
+                  "apply_budget+nation_step": 75.57,
+                  "tech_gates": 0.33,
+                  "standings+credit+firm_exits": 0.31
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 59683,
+                "floor_unmet": false,
+                "specialists": 2,
+                "shortlist": 2,
+                "trailing_net_n": 2,
+                "trailing_net_min": -1010.6,
+                "trailing_net_median": -450,
+                "trailing_net_max": 110.7,
+                "trailing_net_negative_share": 0.5,
+                "corporations_at_seat": 81,
+                "background_at_seat": 79,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 81,
+                "busiest_body_background_at_seat": 79,
+                "seat_balance": 1521.9226,
+                "seat_solvent": true,
+                "budget_specialists_standing": 2,
+                "budget_specialists_solvent": 2
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 20,
+                "per_live_tick": [
+                  19,
+                  21,
+                  19,
+                  21,
+                  19,
+                  21,
+                  19,
+                  21
+                ]
+              }
+            },
+            {
+              "label": "synthetic 2x rcap sqrt c120 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 2,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 120,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 240125,
+              "generation_ms": 36944.9,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 174,
+                "points_spent": 121,
+                "points_unspent": 53,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 123,
+                "richest_centre_points": 19,
+                "centres_affording_specialist": 5,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 53,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 5,
+                  "anchor_out": 0,
+                  "secondary_in": 8,
+                  "secondary_out": 3,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_firm": {
+                  "anchor_in": 99,
+                  "anchor_out": 2,
+                  "secondary_in": 162,
+                  "secondary_out": 30,
+                  "unresolved": 0,
+                  "farthest_tiles": 21.93
+                },
+                "holdings_inside_window": 274,
+                "holdings_outside_window": 35
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 120,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 154,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 10,
+                  "density_ceiling": 120,
+                  "firms": 101,
+                  "firms_by_good": {
+                    "agricultural_produce": 10,
+                    "water": 10,
+                    "timber": 10,
+                    "food_rations": 10,
+                    "charcoal": 10,
+                    "ceramics": 10,
+                    "dressed_stone": 10,
+                    "planks": 10,
+                    "leather": 10,
+                    "cloth": 10,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 10,
+                    "most": 10
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 5,
+                "firms": 101,
+                "any_specialist": true,
+                "specialist_nations": 4,
+                "largest_nation_share": 0.4,
+                "largest_nation": 54009,
+                "corporations_at_land": 106,
+                "background_at_land": 101,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 106,
+                "busiest_body_background_at_land": 101
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 1254.8,
+                "proposal_mean_ms": 1206.2,
+                "search_ms": 15728.9,
+                "landscape_phase_ms": 15738.9,
+                "round_ms": [
+                  1254.8,
+                  2424.5,
+                  2334.8,
+                  2398.8,
+                  2577.5,
+                  2393.5,
+                  2344.9
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 6337.77,
+                "mean_ms": 8844.74,
+                "min_ms": 2638.47,
+                "max_ms": 36738.56,
+                "tick_ms": [
+                  2638.47,
+                  36738.56,
+                  5316.2,
+                  3555.7,
+                  6294.75,
+                  4693.54,
+                  3622.42,
+                  8685.07,
+                  6380.79,
+                  8190.03,
+                  9161.3,
+                  10860.04
+                ],
+                "phase_ms_sum": {
+                  "convoys": 40921.18,
+                  "run_economy_step": 64829.55,
+                  "clear_markets": 278.98,
+                  "apply_budget+nation_step": 106.06,
+                  "tech_gates": 0.68,
+                  "standings+credit+firm_exits": 0.41
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 9593.63,
+                "mean_ms": 10162.28,
+                "min_ms": 8636.8,
+                "max_ms": 13400.93,
+                "tick_ms": [
+                  9052.71,
+                  8636.8,
+                  10000.32,
+                  12210.49,
+                  9608.33,
+                  8809.73,
+                  9578.93,
+                  13400.93
+                ],
+                "phase_ms_sum": {
+                  "convoys": 9924.96,
+                  "run_economy_step": 71099.77,
+                  "clear_markets": 200.67,
+                  "apply_budget+nation_step": 72.01,
+                  "tech_gates": 0.46,
+                  "standings+credit+firm_exits": 0.38
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 59721,
+                "floor_unmet": false,
+                "specialists": 5,
+                "shortlist": 3,
+                "trailing_net_n": 3,
+                "trailing_net_min": -55.1,
+                "trailing_net_median": -31.2,
+                "trailing_net_max": 2738.9,
+                "trailing_net_negative_share": 0.6667,
+                "corporations_at_seat": 106,
+                "background_at_seat": 101,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 106,
+                "busiest_body_background_at_seat": 101,
+                "seat_balance": 5605.4683,
+                "seat_solvent": true,
+                "budget_specialists_standing": 5,
+                "budget_specialists_solvent": 5
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 26,
+                "per_live_tick": [
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26
+                ]
+              }
+            },
+            {
+              "label": "synthetic 2x rcap sqrt c160 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 2,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 160,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 232557.8,
+              "generation_ms": 34876.4,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 174,
+                "points_spent": 121,
+                "points_unspent": 53,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 123,
+                "richest_centre_points": 19,
+                "centres_affording_specialist": 5,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 53,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 5,
+                  "anchor_out": 0,
+                  "secondary_in": 8,
+                  "secondary_out": 3,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_firm": {
+                  "anchor_in": 99,
+                  "anchor_out": 2,
+                  "secondary_in": 162,
+                  "secondary_out": 30,
+                  "unresolved": 0,
+                  "farthest_tiles": 21.93
+                },
+                "holdings_inside_window": 274,
+                "holdings_outside_window": 35
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 160,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 154,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 10,
+                  "density_ceiling": 160,
+                  "firms": 101,
+                  "firms_by_good": {
+                    "agricultural_produce": 10,
+                    "water": 10,
+                    "timber": 10,
+                    "food_rations": 10,
+                    "charcoal": 10,
+                    "ceramics": 10,
+                    "dressed_stone": 10,
+                    "planks": 10,
+                    "leather": 10,
+                    "cloth": 10,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 10,
+                    "most": 10
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 5,
+                "firms": 101,
+                "any_specialist": true,
+                "specialist_nations": 4,
+                "largest_nation_share": 0.4,
+                "largest_nation": 54009,
+                "corporations_at_land": 106,
+                "background_at_land": 101,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 106,
+                "busiest_body_background_at_land": 101
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 1191.3,
+                "proposal_mean_ms": 1196.1,
+                "search_ms": 15545,
+                "landscape_phase_ms": 15557.3,
+                "round_ms": [
+                  1191.3,
+                  2421.5,
+                  2406.8,
+                  2378.4,
+                  2318,
+                  2373.4,
+                  2455.5
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 6196.83,
+                "mean_ms": 8761.75,
+                "min_ms": 2702.65,
+                "max_ms": 36029.94,
+                "tick_ms": [
+                  2702.65,
+                  36029.94,
+                  5391.79,
+                  3747.83,
+                  6320.45,
+                  4681.94,
+                  3579.7,
+                  8376.56,
+                  6073.21,
+                  8300.01,
+                  9003.7,
+                  10933.19
+                ],
+                "phase_ms_sum": {
+                  "convoys": 40190.34,
+                  "run_economy_step": 64561.17,
+                  "clear_markets": 282.59,
+                  "apply_budget+nation_step": 105.74,
+                  "tech_gates": 0.71,
+                  "standings+credit+firm_exits": 0.41
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 9200.02,
+                "mean_ms": 9622.17,
+                "min_ms": 8607.35,
+                "max_ms": 11243.65,
+                "tick_ms": [
+                  9009.99,
+                  8607.35,
+                  9306.1,
+                  11243.65,
+                  9093.95,
+                  8923.85,
+                  9622.71,
+                  11169.74
+                ],
+                "phase_ms_sum": {
+                  "convoys": 10363.7,
+                  "run_economy_step": 66331.97,
+                  "clear_markets": 206.3,
+                  "apply_budget+nation_step": 74.46,
+                  "tech_gates": 0.49,
+                  "standings+credit+firm_exits": 0.4
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 59721,
+                "floor_unmet": false,
+                "specialists": 5,
+                "shortlist": 3,
+                "trailing_net_n": 3,
+                "trailing_net_min": -55.1,
+                "trailing_net_median": -31.2,
+                "trailing_net_max": 2738.9,
+                "trailing_net_negative_share": 0.6667,
+                "corporations_at_seat": 106,
+                "background_at_seat": 101,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 106,
+                "busiest_body_background_at_seat": 101,
+                "seat_balance": 5605.4683,
+                "seat_solvent": true,
+                "budget_specialists_standing": 5,
+                "budget_specialists_solvent": 5
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 26,
+                "per_live_tick": [
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26
+                ]
+              }
+            },
+            {
+              "label": "synthetic 4x rcap sqrt c120 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 4,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 120,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 274671.6,
+              "generation_ms": 35901.9,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 348,
+                "points_spent": 164,
+                "points_unspent": 184,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 220,
+                "richest_centre_points": 37,
+                "centres_affording_specialist": 11,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 17,
+                  "province_cap": 0,
+                  "no_gap": 0,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 167
+                },
+                "holdings_specialist": {
+                  "anchor_in": 11,
+                  "anchor_out": 0,
+                  "secondary_in": 22,
+                  "secondary_out": 4,
+                  "unresolved": 0,
+                  "farthest_tiles": 15.81
+                },
+                "holdings_firm": {
+                  "anchor_in": 118,
+                  "anchor_out": 2,
+                  "secondary_in": 173,
+                  "secondary_out": 43,
+                  "unresolved": 0,
+                  "farthest_tiles": 23.26
+                },
+                "holdings_inside_window": 324,
+                "holdings_outside_window": 49
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 120,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 304,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 14,
+                  "density_ceiling": 120,
+                  "firms": 120,
+                  "firms_by_good": {
+                    "agricultural_produce": 12,
+                    "water": 12,
+                    "timber": 12,
+                    "food_rations": 12,
+                    "charcoal": 12,
+                    "ceramics": 12,
+                    "dressed_stone": 12,
+                    "planks": 12,
+                    "leather": 12,
+                    "cloth": 11,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 11,
+                    "most": 12
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 11,
+                "firms": 120,
+                "any_specialist": true,
+                "specialist_nations": 10,
+                "largest_nation_share": 0.1818,
+                "largest_nation": 54009,
+                "corporations_at_land": 131,
+                "background_at_land": 120,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 131,
+                "busiest_body_background_at_land": 120
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 1327.1,
+                "proposal_mean_ms": 1379,
+                "search_ms": 17874.9,
+                "landscape_phase_ms": 17886.4,
+                "round_ms": [
+                  1327.1,
+                  2653.3,
+                  2807.5,
+                  2674.9,
+                  2733.5,
+                  2700.6,
+                  2977.9
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 9267.31,
+                "mean_ms": 10881.74,
+                "min_ms": 3231.33,
+                "max_ms": 35935.33,
+                "tick_ms": [
+                  3231.33,
+                  35935.33,
+                  9381.49,
+                  7655.69,
+                  11411.37,
+                  5967.28,
+                  9153.13,
+                  6130.32,
+                  7586.68,
+                  11737.28,
+                  11484.19,
+                  10906.75
+                ],
+                "phase_ms_sum": {
+                  "convoys": 49169.24,
+                  "run_economy_step": 80995.44,
+                  "clear_markets": 301.7,
+                  "apply_budget+nation_step": 112.91,
+                  "tech_gates": 1,
+                  "standings+credit+firm_exits": 0.54
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 11582.36,
+                "mean_ms": 11286.95,
+                "min_ms": 9407.62,
+                "max_ms": 12411.74,
+                "tick_ms": [
+                  10109.27,
+                  12411.74,
+                  11929.47,
+                  10736.95,
+                  9407.62,
+                  12148.28,
+                  12317.03,
+                  11235.25
+                ],
+                "phase_ms_sum": {
+                  "convoys": 15426.16,
+                  "run_economy_step": 74583.3,
+                  "clear_markets": 211.17,
+                  "apply_budget+nation_step": 73.89,
+                  "tech_gates": 0.65,
+                  "standings+credit+firm_exits": 0.44
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 59658,
+                "floor_unmet": false,
+                "specialists": 11,
+                "shortlist": 7,
+                "trailing_net_n": 7,
+                "trailing_net_min": -322.3,
+                "trailing_net_median": -63.7,
+                "trailing_net_max": 1764.6,
+                "trailing_net_negative_share": 0.7143,
+                "corporations_at_seat": 131,
+                "background_at_seat": 120,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 131,
+                "busiest_body_background_at_seat": 120,
+                "seat_balance": 3568.2749,
+                "seat_solvent": true,
+                "budget_specialists_standing": 11,
+                "budget_specialists_solvent": 11
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 32.5,
+                "per_live_tick": [
+                  33,
+                  32,
+                  33,
+                  32,
+                  33,
+                  32,
+                  33,
+                  32
+                ]
+              }
+            },
+            {
+              "label": "synthetic 4x rcap sqrt c160 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 4,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 160,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 305481.8,
+              "generation_ms": 35355.6,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 348,
+                "points_spent": 185,
+                "points_unspent": 163,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 220,
+                "richest_centre_points": 37,
+                "centres_affording_specialist": 11,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 17,
+                  "province_cap": 0,
+                  "no_gap": 146,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 11,
+                  "anchor_out": 0,
+                  "secondary_in": 21,
+                  "secondary_out": 3,
+                  "unresolved": 0,
+                  "farthest_tiles": 15.81
+                },
+                "holdings_firm": {
+                  "anchor_in": 140,
+                  "anchor_out": 1,
+                  "secondary_in": 209,
+                  "secondary_out": 41,
+                  "unresolved": 0,
+                  "farthest_tiles": 18.03
+                },
+                "holdings_inside_window": 381,
+                "holdings_outside_window": 45
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 160,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 304,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 14,
+                  "density_ceiling": 160,
+                  "firms": 141,
+                  "firms_by_good": {
+                    "agricultural_produce": 14,
+                    "water": 14,
+                    "timber": 14,
+                    "food_rations": 14,
+                    "charcoal": 14,
+                    "ceramics": 14,
+                    "dressed_stone": 14,
+                    "planks": 14,
+                    "leather": 14,
+                    "cloth": 14,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 14,
+                    "most": 14
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 11,
+                "firms": 141,
+                "any_specialist": true,
+                "specialist_nations": 10,
+                "largest_nation_share": 0.1818,
+                "largest_nation": 54009,
+                "corporations_at_land": 152,
+                "background_at_land": 141,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 152,
+                "busiest_body_background_at_land": 141
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 4,
+                "seed_eval_ms": 1351.7,
+                "proposal_mean_ms": 1358.2,
+                "search_ms": 17649.7,
+                "landscape_phase_ms": 17662.2,
+                "round_ms": [
+                  1351.7,
+                  2812.3,
+                  2634.9,
+                  2664.2,
+                  2703.3,
+                  2784.4,
+                  2698.9
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 10349.42,
+                "mean_ms": 12241.15,
+                "min_ms": 3681.23,
+                "max_ms": 39148.01,
+                "tick_ms": [
+                  3681.23,
+                  39148.01,
+                  10607.76,
+                  8090.26,
+                  11292.23,
+                  8497.48,
+                  9249.18,
+                  10091.09,
+                  6853.79,
+                  14539.45,
+                  12146.73,
+                  12696.63
+                ],
+                "phase_ms_sum": {
+                  "convoys": 55996.26,
+                  "run_economy_step": 90477.64,
+                  "clear_markets": 298.06,
+                  "apply_budget+nation_step": 120.03,
+                  "tech_gates": 1.2,
+                  "standings+credit+firm_exits": 0.64
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 12934.19,
+                "mean_ms": 13195.38,
+                "min_ms": 11906.62,
+                "max_ms": 14574.75,
+                "tick_ms": [
+                  11906.62,
+                  14574.75,
+                  12547.05,
+                  13321.34,
+                  12126.51,
+                  14565.5,
+                  12503.93,
+                  14017.36
+                ],
+                "phase_ms_sum": {
+                  "convoys": 19884.68,
+                  "run_economy_step": 85414.16,
+                  "clear_markets": 189.37,
+                  "apply_budget+nation_step": 73.63,
+                  "tech_gates": 0.75,
+                  "standings+credit+firm_exits": 0.47
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 59657,
+                "floor_unmet": false,
+                "specialists": 11,
+                "shortlist": 8,
+                "trailing_net_n": 8,
+                "trailing_net_min": -757.7,
+                "trailing_net_median": -42.1,
+                "trailing_net_max": 2470.4,
+                "trailing_net_negative_share": 0.75,
+                "corporations_at_seat": 152,
+                "background_at_seat": 141,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 152,
+                "busiest_body_background_at_seat": 141,
+                "seat_balance": 251.3811,
+                "seat_solvent": true,
+                "budget_specialists_standing": 11,
+                "budget_specialists_solvent": 11
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 37.5,
+                "per_live_tick": [
+                  38,
+                  37,
+                  38,
+                  37,
+                  38,
+                  37,
+                  38,
+                  37
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "seed": 28,
+          "threw": false,
+          "error": "",
+          "legacy_1x": 87,
+          "legacy_specialists": 6,
+          "legacy_firms": 81,
+          "configs": [
+            {
+              "label": "none (legacy)",
+              "kind": "none",
+              "scale": 1,
+              "resource_cap": true,
+              "resource_cap_rule": "fixed",
+              "density_ceiling": 0,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": null,
+              "specialist_firm_charters": null,
+              "specialist_price_points": null,
+              "threw": false,
+              "error": "",
+              "wall_ms": 129302.8,
+              "generation_ms": 23156.4,
+              "build_only": false,
+              "stopped_at_land": false,
+              "landscape": {
+                "specialists": 6,
+                "firms": 81,
+                "any_specialist": true,
+                "specialist_nations": 6,
+                "largest_nation_share": 0.1667,
+                "largest_nation": 51463,
+                "corporations_at_land": 87,
+                "background_at_land": 81,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 87,
+                "busiest_body_background_at_land": 81
+              },
+              "search": {
+                "evaluations": 19,
+                "accepted": 6,
+                "seed_eval_ms": 892.9,
+                "proposal_mean_ms": 905.7,
+                "search_ms": 17195.7,
+                "landscape_phase_ms": 17212.9,
+                "round_ms": [
+                  892.9,
+                  2672,
+                  2704.1,
+                  2728.4,
+                  2852.1,
+                  2679.4,
+                  2666.8
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 1897.25,
+                "mean_ms": 4457.39,
+                "min_ms": 1240.16,
+                "max_ms": 25850.6,
+                "tick_ms": [
+                  1240.16,
+                  25850.6,
+                  1563.39,
+                  5362.07,
+                  1805.14,
+                  1485.1,
+                  2029.81,
+                  3245.62,
+                  1745.09,
+                  1584.71,
+                  1989.36,
+                  5587.69
+                ],
+                "phase_ms_sum": {
+                  "convoys": 27090.67,
+                  "run_economy_step": 26199.5,
+                  "clear_markets": 102.48,
+                  "apply_budget+nation_step": 95.32,
+                  "tech_gates": 0.46,
+                  "standings+credit+firm_exits": 0.3
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 4121.45,
+                "mean_ms": 4374.67,
+                "min_ms": 3277.87,
+                "max_ms": 6007.6,
+                "tick_ms": [
+                  4317.43,
+                  3277.87,
+                  3925.47,
+                  6007.6,
+                  4320.74,
+                  3290.04,
+                  3870.59,
+                  5987.55
+                ],
+                "phase_ms_sum": {
+                  "convoys": 4124.97,
+                  "run_economy_step": 30737.62,
+                  "clear_markets": 71.78,
+                  "apply_budget+nation_step": 62.43,
+                  "tech_gates": 0.28,
+                  "standings+credit+firm_exits": 0.23
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 56786,
+                "floor_unmet": false,
+                "specialists": 6,
+                "shortlist": 5,
+                "trailing_net_n": 5,
+                "trailing_net_min": -618,
+                "trailing_net_median": -97.8,
+                "trailing_net_max": -56.7,
+                "trailing_net_negative_share": 1,
+                "corporations_at_seat": 87,
+                "background_at_seat": 81,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 87,
+                "busiest_body_background_at_seat": 81,
+                "seat_balance": 277.8818,
+                "seat_solvent": true,
+                "budget_specialists_standing": 0,
+                "budget_specialists_solvent": 0
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 22,
+                "per_live_tick": [
+                  22,
+                  22,
+                  22,
+                  22,
+                  22,
+                  22,
+                  22,
+                  22
+                ]
+              },
+              "digests": {
+                "search": "A99FFD1314AFDD65",
+                "land": "7271F0D606D576C8",
+                "settle": "265C48A23E313B1A",
+                "seat": "AA35460CE5894594",
+                "pinned": true,
+                "match": true,
+                "diff": ""
+              }
+            },
+            {
+              "label": "synthetic 1x rcap sqrt c120 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 1,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 120,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 283980.1,
+              "generation_ms": 25436,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 87,
+                "points_spent": 87,
+                "points_unspent": 0,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 65,
+                "richest_centre_points": 10,
+                "centres_affording_specialist": 3,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 0,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 3,
+                  "anchor_out": 0,
+                  "secondary_in": 8,
+                  "secondary_out": 0,
+                  "unresolved": 0,
+                  "farthest_tiles": 2.24
+                },
+                "holdings_firm": {
+                  "anchor_in": 75,
+                  "anchor_out": 0,
+                  "secondary_in": 115,
+                  "secondary_out": 25,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_inside_window": 201,
+                "holdings_outside_window": 25
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 120,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 75,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 8,
+                  "density_ceiling": 120,
+                  "firms": 75,
+                  "firms_by_good": {
+                    "agricultural_produce": 8,
+                    "water": 8,
+                    "timber": 8,
+                    "food_rations": 8,
+                    "charcoal": 7,
+                    "ceramics": 7,
+                    "dressed_stone": 7,
+                    "planks": 7,
+                    "leather": 7,
+                    "cloth": 7,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 7,
+                    "most": 8
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 3,
+                "firms": 75,
+                "any_specialist": true,
+                "specialist_nations": 3,
+                "largest_nation_share": 0.3333,
+                "largest_nation": 51463,
+                "corporations_at_land": 78,
+                "background_at_land": 75,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 78,
+                "busiest_body_background_at_land": 75
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 4,
+                "seed_eval_ms": 1056.8,
+                "proposal_mean_ms": 948,
+                "search_ms": 12432.7,
+                "landscape_phase_ms": 12445.5,
+                "round_ms": [
+                  1056.8,
+                  2091.4,
+                  1879.1,
+                  1832.6,
+                  1833.1,
+                  1859.8,
+                  1879.9
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 9118.3,
+                "mean_ms": 10286.67,
+                "min_ms": 1184.5,
+                "max_ms": 25973.91,
+                "tick_ms": [
+                  1184.5,
+                  25973.91,
+                  7380.33,
+                  8373.13,
+                  9863.48,
+                  3269.84,
+                  6421.07,
+                  5090.97,
+                  11496.92,
+                  18063.16,
+                  14565.75,
+                  11756.92
+                ],
+                "phase_ms_sum": {
+                  "convoys": 24664.68,
+                  "run_economy_step": 98577.43,
+                  "clear_markets": 103.83,
+                  "apply_budget+nation_step": 93.34,
+                  "tech_gates": 0.42,
+                  "standings+credit+firm_exits": 0.29
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 15942.94,
+                "mean_ms": 15331.82,
+                "min_ms": 9232.22,
+                "max_ms": 18855.09,
+                "tick_ms": [
+                  15464.5,
+                  18798.57,
+                  17217.35,
+                  11564.16,
+                  15101.27,
+                  18855.09,
+                  16421.38,
+                  9232.22
+                ],
+                "phase_ms_sum": {
+                  "convoys": 1861.03,
+                  "run_economy_step": 120648.61,
+                  "clear_markets": 80.64,
+                  "apply_budget+nation_step": 63.72,
+                  "tech_gates": 0.3,
+                  "standings+credit+firm_exits": 0.26
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 56796,
+                "floor_unmet": false,
+                "specialists": 3,
+                "shortlist": 2,
+                "trailing_net_n": 2,
+                "trailing_net_min": -83.4,
+                "trailing_net_median": 1903.1,
+                "trailing_net_max": 3889.5,
+                "trailing_net_negative_share": 0.5,
+                "corporations_at_seat": 78,
+                "background_at_seat": 75,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 78,
+                "busiest_body_background_at_seat": 75,
+                "seat_balance": 3534.4734,
+                "seat_solvent": true,
+                "budget_specialists_standing": 3,
+                "budget_specialists_solvent": 3
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 19.5,
+                "per_live_tick": [
+                  19,
+                  20,
+                  19,
+                  20,
+                  19,
+                  20,
+                  19,
+                  20
+                ]
+              }
+            },
+            {
+              "label": "synthetic 1x rcap sqrt c160 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 1,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 160,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 289102.8,
+              "generation_ms": 23392,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 87,
+                "points_spent": 87,
+                "points_unspent": 0,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 65,
+                "richest_centre_points": 10,
+                "centres_affording_specialist": 3,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 0,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 3,
+                  "anchor_out": 0,
+                  "secondary_in": 8,
+                  "secondary_out": 0,
+                  "unresolved": 0,
+                  "farthest_tiles": 2.24
+                },
+                "holdings_firm": {
+                  "anchor_in": 75,
+                  "anchor_out": 0,
+                  "secondary_in": 115,
+                  "secondary_out": 25,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_inside_window": 201,
+                "holdings_outside_window": 25
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 160,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 75,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 8,
+                  "density_ceiling": 160,
+                  "firms": 75,
+                  "firms_by_good": {
+                    "agricultural_produce": 8,
+                    "water": 8,
+                    "timber": 8,
+                    "food_rations": 8,
+                    "charcoal": 7,
+                    "ceramics": 7,
+                    "dressed_stone": 7,
+                    "planks": 7,
+                    "leather": 7,
+                    "cloth": 7,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 7,
+                    "most": 8
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 3,
+                "firms": 75,
+                "any_specialist": true,
+                "specialist_nations": 3,
+                "largest_nation_share": 0.3333,
+                "largest_nation": 51463,
+                "corporations_at_land": 78,
+                "background_at_land": 75,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 78,
+                "busiest_body_background_at_land": 75
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 4,
+                "seed_eval_ms": 890,
+                "proposal_mean_ms": 925.3,
+                "search_ms": 11994.2,
+                "landscape_phase_ms": 12007.4,
+                "round_ms": [
+                  890,
+                  1921.1,
+                  2001.3,
+                  1784.3,
+                  1772.2,
+                  1819.2,
+                  1806
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 8932.02,
+                "mean_ms": 10211.8,
+                "min_ms": 1185.95,
+                "max_ms": 26929.85,
+                "tick_ms": [
+                  1185.95,
+                  26929.85,
+                  7325.14,
+                  8281.15,
+                  9582.9,
+                  3221.19,
+                  7167.57,
+                  5445.41,
+                  11430.27,
+                  16382.54,
+                  14198.9,
+                  11390.68
+                ],
+                "phase_ms_sum": {
+                  "convoys": 24817.79,
+                  "run_economy_step": 97505.92,
+                  "clear_markets": 111.62,
+                  "apply_budget+nation_step": 105.44,
+                  "tech_gates": 0.46,
+                  "standings+credit+firm_exits": 0.32
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 17402.72,
+                "mean_ms": 16394.56,
+                "min_ms": 9112.84,
+                "max_ms": 19566.79,
+                "tick_ms": [
+                  14406.19,
+                  19078.15,
+                  19130.15,
+                  17181.3,
+                  15056.96,
+                  19566.79,
+                  17624.13,
+                  9112.84
+                ],
+                "phase_ms_sum": {
+                  "convoys": 2295.3,
+                  "run_economy_step": 128701.04,
+                  "clear_markets": 78.24,
+                  "apply_budget+nation_step": 81.07,
+                  "tech_gates": 0.41,
+                  "standings+credit+firm_exits": 0.47
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 56796,
+                "floor_unmet": false,
+                "specialists": 3,
+                "shortlist": 2,
+                "trailing_net_n": 2,
+                "trailing_net_min": -83.4,
+                "trailing_net_median": 1903.1,
+                "trailing_net_max": 3889.5,
+                "trailing_net_negative_share": 0.5,
+                "corporations_at_seat": 78,
+                "background_at_seat": 75,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 78,
+                "busiest_body_background_at_seat": 75,
+                "seat_balance": 3534.4734,
+                "seat_solvent": true,
+                "budget_specialists_standing": 3,
+                "budget_specialists_solvent": 3
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 19.5,
+                "per_live_tick": [
+                  19,
+                  20,
+                  19,
+                  20,
+                  19,
+                  20,
+                  19,
+                  20
+                ]
+              }
+            },
+            {
+              "label": "synthetic 2x rcap sqrt c120 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 2,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 120,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 389505.1,
+              "generation_ms": 23353.3,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 174,
+                "points_spent": 125,
+                "points_unspent": 49,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 119,
+                "richest_centre_points": 19,
+                "centres_affording_specialist": 6,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 49,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 6,
+                  "anchor_out": 0,
+                  "secondary_in": 12,
+                  "secondary_out": 5,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_firm": {
+                  "anchor_in": 101,
+                  "anchor_out": 0,
+                  "secondary_in": 151,
+                  "secondary_out": 30,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_inside_window": 270,
+                "holdings_outside_window": 35
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 120,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 150,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 10,
+                  "density_ceiling": 120,
+                  "firms": 101,
+                  "firms_by_good": {
+                    "agricultural_produce": 10,
+                    "water": 10,
+                    "timber": 10,
+                    "food_rations": 10,
+                    "charcoal": 10,
+                    "ceramics": 10,
+                    "dressed_stone": 10,
+                    "planks": 10,
+                    "leather": 10,
+                    "cloth": 10,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 10,
+                    "most": 10
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 6,
+                "firms": 101,
+                "any_specialist": true,
+                "specialist_nations": 4,
+                "largest_nation_share": 0.5,
+                "largest_nation": 51474,
+                "corporations_at_land": 107,
+                "background_at_land": 101,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 107,
+                "busiest_body_background_at_land": 101
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 926.3,
+                "proposal_mean_ms": 929.2,
+                "search_ms": 12076.6,
+                "landscape_phase_ms": 12093.2,
+                "round_ms": [
+                  926.3,
+                  1858.7,
+                  1899.5,
+                  1820.7,
+                  1848,
+                  1844.1,
+                  1879.2
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 12160.15,
+                "mean_ms": 14723.42,
+                "min_ms": 1543.91,
+                "max_ms": 31795.39,
+                "tick_ms": [
+                  1543.91,
+                  31795.39,
+                  7593.45,
+                  9445.96,
+                  12989.78,
+                  11330.52,
+                  7774.78,
+                  7942.24,
+                  21925.84,
+                  18373.08,
+                  24300.07,
+                  21666.01
+                ],
+                "phase_ms_sum": {
+                  "convoys": 27117.51,
+                  "run_economy_step": 149336.99,
+                  "clear_markets": 113.85,
+                  "apply_budget+nation_step": 111.48,
+                  "tech_gates": 0.74,
+                  "standings+credit+firm_exits": 0.45
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 22727.51,
+                "mean_ms": 22171.63,
+                "min_ms": 17644.33,
+                "max_ms": 24799.46,
+                "tick_ms": [
+                  23114.08,
+                  20251.77,
+                  24799.46,
+                  22340.94,
+                  23399.46,
+                  17644.33,
+                  24109.23,
+                  21713.81
+                ],
+                "phase_ms_sum": {
+                  "convoys": 3072.05,
+                  "run_economy_step": 174145.3,
+                  "clear_markets": 86.29,
+                  "apply_budget+nation_step": 68.56,
+                  "tech_gates": 0.51,
+                  "standings+credit+firm_exits": 0.36
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 56875,
+                "floor_unmet": false,
+                "specialists": 6,
+                "shortlist": 4,
+                "trailing_net_n": 4,
+                "trailing_net_min": -43,
+                "trailing_net_median": 1973.5,
+                "trailing_net_max": 2617.8,
+                "trailing_net_negative_share": 0.25,
+                "corporations_at_seat": 107,
+                "background_at_seat": 101,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 107,
+                "busiest_body_background_at_seat": 101,
+                "seat_balance": 180.6664,
+                "seat_solvent": true,
+                "budget_specialists_standing": 6,
+                "budget_specialists_solvent": 5
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 27,
+                "per_live_tick": [
+                  27,
+                  27,
+                  27,
+                  27,
+                  27,
+                  27,
+                  27,
+                  27
+                ]
+              }
+            },
+            {
+              "label": "synthetic 2x rcap sqrt c160 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 2,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 160,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 379839.8,
+              "generation_ms": 23600.9,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 174,
+                "points_spent": 125,
+                "points_unspent": 49,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 119,
+                "richest_centre_points": 19,
+                "centres_affording_specialist": 6,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 49,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 6,
+                  "anchor_out": 0,
+                  "secondary_in": 12,
+                  "secondary_out": 5,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_firm": {
+                  "anchor_in": 101,
+                  "anchor_out": 0,
+                  "secondary_in": 151,
+                  "secondary_out": 30,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_inside_window": 270,
+                "holdings_outside_window": 35
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 160,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 150,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 10,
+                  "density_ceiling": 160,
+                  "firms": 101,
+                  "firms_by_good": {
+                    "agricultural_produce": 10,
+                    "water": 10,
+                    "timber": 10,
+                    "food_rations": 10,
+                    "charcoal": 10,
+                    "ceramics": 10,
+                    "dressed_stone": 10,
+                    "planks": 10,
+                    "leather": 10,
+                    "cloth": 10,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 10,
+                    "most": 10
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 6,
+                "firms": 101,
+                "any_specialist": true,
+                "specialist_nations": 4,
+                "largest_nation_share": 0.5,
+                "largest_nation": 51474,
+                "corporations_at_land": 107,
+                "background_at_land": 101,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 107,
+                "busiest_body_background_at_land": 101
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 893.9,
+                "proposal_mean_ms": 911.6,
+                "search_ms": 11832.7,
+                "landscape_phase_ms": 11848.9,
+                "round_ms": [
+                  893.9,
+                  1819.8,
+                  1807.9,
+                  1817.4,
+                  1909.9,
+                  1788,
+                  1795.7
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 12313.58,
+                "mean_ms": 14051.91,
+                "min_ms": 1539.08,
+                "max_ms": 32256.58,
+                "tick_ms": [
+                  1539.08,
+                  32256.58,
+                  7319.35,
+                  9584.71,
+                  13162.53,
+                  11464.62,
+                  8136.83,
+                  5650.01,
+                  14916.52,
+                  17886.71,
+                  24895.18,
+                  21810.76
+                ],
+                "phase_ms_sum": {
+                  "convoys": 26364.23,
+                  "run_economy_step": 142045.83,
+                  "clear_markets": 112.58,
+                  "apply_budget+nation_step": 99.12,
+                  "tech_gates": 0.71,
+                  "standings+credit+firm_exits": 0.41
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 22242.05,
+                "mean_ms": 21970.35,
+                "min_ms": 16132.47,
+                "max_ms": 25225.44,
+                "tick_ms": [
+                  23133.76,
+                  20974.73,
+                  24390.29,
+                  21422.03,
+                  22876.67,
+                  16132.47,
+                  25225.44,
+                  21607.43
+                ],
+                "phase_ms_sum": {
+                  "convoys": 2687.08,
+                  "run_economy_step": 172929.41,
+                  "clear_markets": 77.34,
+                  "apply_budget+nation_step": 68.15,
+                  "tech_gates": 0.48,
+                  "standings+credit+firm_exits": 0.36
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 56875,
+                "floor_unmet": false,
+                "specialists": 6,
+                "shortlist": 4,
+                "trailing_net_n": 4,
+                "trailing_net_min": -43,
+                "trailing_net_median": 1973.5,
+                "trailing_net_max": 2617.8,
+                "trailing_net_negative_share": 0.25,
+                "corporations_at_seat": 107,
+                "background_at_seat": 101,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 107,
+                "busiest_body_background_at_seat": 101,
+                "seat_balance": 180.6664,
+                "seat_solvent": true,
+                "budget_specialists_standing": 6,
+                "budget_specialists_solvent": 5
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 27,
+                "per_live_tick": [
+                  27,
+                  27,
+                  27,
+                  27,
+                  27,
+                  27,
+                  27,
+                  27
+                ]
+              }
+            },
+            {
+              "label": "synthetic 4x rcap sqrt c120 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 4,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 120,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 495599.6,
+              "generation_ms": 23830,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 348,
+                "points_spent": 164,
+                "points_unspent": 184,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 213,
+                "richest_centre_points": 38,
+                "centres_affording_specialist": 11,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 15,
+                  "province_cap": 0,
+                  "no_gap": 0,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 169
+                },
+                "holdings_specialist": {
+                  "anchor_in": 11,
+                  "anchor_out": 0,
+                  "secondary_in": 21,
+                  "secondary_out": 4,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_firm": {
+                  "anchor_in": 120,
+                  "anchor_out": 0,
+                  "secondary_in": 181,
+                  "secondary_out": 41,
+                  "unresolved": 0,
+                  "farthest_tiles": 61.61
+                },
+                "holdings_inside_window": 333,
+                "holdings_outside_window": 45
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 120,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 304,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 14,
+                  "density_ceiling": 120,
+                  "firms": 120,
+                  "firms_by_good": {
+                    "agricultural_produce": 12,
+                    "water": 12,
+                    "timber": 12,
+                    "food_rations": 12,
+                    "charcoal": 12,
+                    "ceramics": 12,
+                    "dressed_stone": 12,
+                    "planks": 12,
+                    "leather": 12,
+                    "cloth": 11,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 11,
+                    "most": 12
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 11,
+                "firms": 120,
+                "any_specialist": true,
+                "specialist_nations": 7,
+                "largest_nation_share": 0.2727,
+                "largest_nation": 51473,
+                "corporations_at_land": 131,
+                "background_at_land": 120,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 131,
+                "busiest_body_background_at_land": 120
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 1056.7,
+                "proposal_mean_ms": 983.9,
+                "search_ms": 12863.9,
+                "landscape_phase_ms": 12884,
+                "round_ms": [
+                  1056.7,
+                  2159.3,
+                  2140.8,
+                  1905.8,
+                  1935.9,
+                  1829.6,
+                  1835.8
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 17260.69,
+                "mean_ms": 19933.43,
+                "min_ms": 1860.64,
+                "max_ms": 37315.13,
+                "tick_ms": [
+                  1860.64,
+                  33226.32,
+                  16600.65,
+                  9413.31,
+                  17276.88,
+                  16512.78,
+                  21911.14,
+                  12936.89,
+                  17244.49,
+                  33818.62,
+                  37315.13,
+                  21084.29
+                ],
+                "phase_ms_sum": {
+                  "convoys": 26568,
+                  "run_economy_step": 212427.2,
+                  "clear_markets": 105.79,
+                  "apply_budget+nation_step": 98.67,
+                  "tech_gates": 1.04,
+                  "standings+credit+firm_exits": 0.44
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 26633.54,
+                "mean_ms": 27459.96,
+                "min_ms": 21125.07,
+                "max_ms": 33836.9,
+                "tick_ms": [
+                  27080.94,
+                  32268.58,
+                  33836.9,
+                  21125.07,
+                  26184.03,
+                  30725.43,
+                  26186.15,
+                  22272.55
+                ],
+                "phase_ms_sum": {
+                  "convoys": 3617.04,
+                  "run_economy_step": 215922.44,
+                  "clear_markets": 72.06,
+                  "apply_budget+nation_step": 67.06,
+                  "tech_gates": 0.67,
+                  "standings+credit+firm_exits": 0.37
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 56913,
+                "floor_unmet": false,
+                "specialists": 11,
+                "shortlist": 7,
+                "trailing_net_n": 7,
+                "trailing_net_min": -2329.9,
+                "trailing_net_median": 466.8,
+                "trailing_net_max": 2880.7,
+                "trailing_net_negative_share": 0.4286,
+                "corporations_at_seat": 131,
+                "background_at_seat": 120,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 131,
+                "busiest_body_background_at_seat": 120,
+                "seat_balance": 1170.1423,
+                "seat_solvent": true,
+                "budget_specialists_standing": 11,
+                "budget_specialists_solvent": 11
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 32.38,
+                "per_live_tick": [
+                  33,
+                  32,
+                  33,
+                  32,
+                  33,
+                  32,
+                  32,
+                  32
+                ]
+              }
+            },
+            {
+              "label": "synthetic 4x rcap sqrt c160 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 4,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 160,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 570562.6,
+              "generation_ms": 22826.6,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 348,
+                "points_spent": 185,
+                "points_unspent": 163,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 213,
+                "richest_centre_points": 38,
+                "centres_affording_specialist": 11,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 15,
+                  "province_cap": 0,
+                  "no_gap": 148,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 11,
+                  "anchor_out": 0,
+                  "secondary_in": 21,
+                  "secondary_out": 4,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_firm": {
+                  "anchor_in": 141,
+                  "anchor_out": 0,
+                  "secondary_in": 214,
+                  "secondary_out": 43,
+                  "unresolved": 0,
+                  "farthest_tiles": 61.61
+                },
+                "holdings_inside_window": 387,
+                "holdings_outside_window": 47
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 160,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 304,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 14,
+                  "density_ceiling": 160,
+                  "firms": 141,
+                  "firms_by_good": {
+                    "agricultural_produce": 14,
+                    "water": 14,
+                    "timber": 14,
+                    "food_rations": 14,
+                    "charcoal": 14,
+                    "ceramics": 14,
+                    "dressed_stone": 14,
+                    "planks": 14,
+                    "leather": 14,
+                    "cloth": 14,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 14,
+                    "most": 14
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 11,
+                "firms": 141,
+                "any_specialist": true,
+                "specialist_nations": 7,
+                "largest_nation_share": 0.2727,
+                "largest_nation": 51473,
+                "corporations_at_land": 152,
+                "background_at_land": 141,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 152,
+                "busiest_body_background_at_land": 141
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 924.5,
+                "proposal_mean_ms": 964.3,
+                "search_ms": 12496.1,
+                "landscape_phase_ms": 12519.7,
+                "round_ms": [
+                  924.5,
+                  1969.7,
+                  1949.3,
+                  1939.6,
+                  1914.3,
+                  1895.6,
+                  1903.2
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 18794.16,
+                "mean_ms": 20868.6,
+                "min_ms": 2159.13,
+                "max_ms": 37831.94,
+                "tick_ms": [
+                  2159.13,
+                  34365.55,
+                  17112.08,
+                  10660.37,
+                  18187.35,
+                  17111.31,
+                  22999.22,
+                  13506.87,
+                  19400.96,
+                  35236.44,
+                  37831.94,
+                  21851.97
+                ],
+                "phase_ms_sum": {
+                  "convoys": 27538.15,
+                  "run_economy_step": 222668.13,
+                  "clear_markets": 111.06,
+                  "apply_budget+nation_step": 104.12,
+                  "tech_gates": 1.23,
+                  "standings+credit+firm_exits": 0.51
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 34614,
+                "mean_ms": 35598.39,
+                "min_ms": 23323.38,
+                "max_ms": 50355.65,
+                "tick_ms": [
+                  31139.99,
+                  36815.07,
+                  33229.13,
+                  23323.38,
+                  40695.89,
+                  50355.65,
+                  34937.23,
+                  34290.77
+                ],
+                "phase_ms_sum": {
+                  "convoys": 4907.69,
+                  "run_economy_step": 279698.76,
+                  "clear_markets": 100.79,
+                  "apply_budget+nation_step": 78.28,
+                  "tech_gates": 0.97,
+                  "standings+credit+firm_exits": 0.62
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 56913,
+                "floor_unmet": false,
+                "specialists": 11,
+                "shortlist": 7,
+                "trailing_net_n": 7,
+                "trailing_net_min": -2329.9,
+                "trailing_net_median": 630,
+                "trailing_net_max": 2909.7,
+                "trailing_net_negative_share": 0.4286,
+                "corporations_at_seat": 152,
+                "background_at_seat": 141,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 152,
+                "busiest_body_background_at_seat": 141,
+                "seat_balance": 1168.8102,
+                "seat_solvent": true,
+                "budget_specialists_standing": 11,
+                "budget_specialists_solvent": 11
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 37.5,
+                "per_live_tick": [
+                  38,
+                  37,
+                  38,
+                  37,
+                  38,
+                  37,
+                  38,
+                  37
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "seed": 46,
+          "threw": false,
+          "error": "",
+          "legacy_1x": 89,
+          "legacy_specialists": 8,
+          "legacy_firms": 81,
+          "configs": [
+            {
+              "label": "none (legacy)",
+              "kind": "none",
+              "scale": 1,
+              "resource_cap": true,
+              "resource_cap_rule": "fixed",
+              "density_ceiling": 0,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": null,
+              "specialist_firm_charters": null,
+              "specialist_price_points": null,
+              "threw": false,
+              "error": "",
+              "wall_ms": 437027.1,
+              "generation_ms": 103142.1,
+              "build_only": false,
+              "stopped_at_land": false,
+              "landscape": {
+                "specialists": 8,
+                "firms": 81,
+                "any_specialist": true,
+                "specialist_nations": 7,
+                "largest_nation_share": 0.25,
+                "largest_nation": 59499,
+                "corporations_at_land": 89,
+                "background_at_land": 81,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 89,
+                "busiest_body_background_at_land": 81
+              },
+              "search": {
+                "evaluations": 19,
+                "accepted": 4,
+                "seed_eval_ms": 2386.7,
+                "proposal_mean_ms": 2312.3,
+                "search_ms": 44008.8,
+                "landscape_phase_ms": 44032,
+                "round_ms": [
+                  2386.7,
+                  6823.2,
+                  6846.7,
+                  6771.1,
+                  6928.8,
+                  6957.8,
+                  7294.6
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 8859.41,
+                "mean_ms": 15350.55,
+                "min_ms": 5412.3,
+                "max_ms": 82744.77,
+                "tick_ms": [
+                  5412.3,
+                  82744.77,
+                  8286.92,
+                  8771.9,
+                  8329.09,
+                  8946.93,
+                  7832.32,
+                  8993.04,
+                  8426.12,
+                  9802.33,
+                  14050.19,
+                  12610.67
+                ],
+                "phase_ms_sum": {
+                  "convoys": 109821.19,
+                  "run_economy_step": 73264.02,
+                  "clear_markets": 940.22,
+                  "apply_budget+nation_step": 179.99,
+                  "tech_gates": 0.65,
+                  "standings+credit+firm_exits": 0.49
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 12733.02,
+                "mean_ms": 13122.69,
+                "min_ms": 11111.67,
+                "max_ms": 15837.65,
+                "tick_ms": [
+                  12526.33,
+                  11111.67,
+                  15199.95,
+                  12699.85,
+                  12766.19,
+                  11693.94,
+                  15837.65,
+                  13145.96
+                ],
+                "phase_ms_sum": {
+                  "convoys": 41456.18,
+                  "run_economy_step": 62670.64,
+                  "clear_markets": 717.04,
+                  "apply_budget+nation_step": 136.8,
+                  "tech_gates": 0.42,
+                  "standings+credit+firm_exits": 0.48
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 65057,
+                "floor_unmet": false,
+                "specialists": 8,
+                "shortlist": 6,
+                "trailing_net_n": 6,
+                "trailing_net_min": -1662.9,
+                "trailing_net_median": -30.4,
+                "trailing_net_max": 1006.1,
+                "trailing_net_negative_share": 0.6667,
+                "corporations_at_seat": 89,
+                "background_at_seat": 81,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 89,
+                "busiest_body_background_at_seat": 81,
+                "seat_balance": 4187.1841,
+                "seat_solvent": true,
+                "budget_specialists_standing": 0,
+                "budget_specialists_solvent": 0
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 22.5,
+                "per_live_tick": [
+                  22,
+                  23,
+                  22,
+                  23,
+                  22,
+                  23,
+                  22,
+                  23
+                ]
+              },
+              "digests": {
+                "search": "E0620F5777CB3637",
+                "land": "326DFD72ED01E15D",
+                "settle": "05B4865F46884E7C",
+                "seat": "496E75B156DC9208",
+                "pinned": true,
+                "match": true,
+                "diff": ""
+              }
+            },
+            {
+              "label": "synthetic 1x rcap sqrt c120 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 1,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 120,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 394593.3,
+              "generation_ms": 102974.8,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 89,
+                "points_spent": 89,
+                "points_unspent": 0,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 70,
+                "richest_centre_points": 9,
+                "centres_affording_specialist": 2,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 0,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 2,
+                  "anchor_out": 0,
+                  "secondary_in": 5,
+                  "secondary_out": 0,
+                  "unresolved": 0,
+                  "farthest_tiles": 3.61
+                },
+                "holdings_firm": {
+                  "anchor_in": 81,
+                  "anchor_out": 0,
+                  "secondary_in": 129,
+                  "secondary_out": 17,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_inside_window": 217,
+                "holdings_outside_window": 17
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 120,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 81,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 8,
+                  "density_ceiling": 120,
+                  "firms": 81,
+                  "firms_by_good": {
+                    "agricultural_produce": 8,
+                    "water": 8,
+                    "timber": 8,
+                    "food_rations": 8,
+                    "charcoal": 8,
+                    "ceramics": 8,
+                    "dressed_stone": 8,
+                    "planks": 8,
+                    "leather": 8,
+                    "cloth": 8,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 8,
+                    "most": 8
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 2,
+                "firms": 81,
+                "any_specialist": true,
+                "specialist_nations": 2,
+                "largest_nation_share": 0.5,
+                "largest_nation": 59464,
+                "corporations_at_land": 83,
+                "background_at_land": 81,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 83,
+                "busiest_body_background_at_land": 81
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 2,
+                "seed_eval_ms": 2561.3,
+                "proposal_mean_ms": 2560.1,
+                "search_ms": 33282.9,
+                "landscape_phase_ms": 33295.7,
+                "round_ms": [
+                  2561.3,
+                  5333.5,
+                  5275.6,
+                  4969.4,
+                  5230.1,
+                  4812.8,
+                  5100.1
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 7601.46,
+                "mean_ms": 14080.72,
+                "min_ms": 5477.8,
+                "max_ms": 87033.13,
+                "tick_ms": [
+                  5541.16,
+                  87033.13,
+                  8044.61,
+                  9256.04,
+                  7156.61,
+                  9402.94,
+                  8348.52,
+                  6571.7,
+                  6173.91,
+                  5477.8,
+                  8803.97,
+                  7158.32
+                ],
+                "phase_ms_sum": {
+                  "convoys": 98900.99,
+                  "run_economy_step": 68984.66,
+                  "clear_markets": 913.23,
+                  "apply_budget+nation_step": 168.88,
+                  "tech_gates": 0.55,
+                  "standings+credit+firm_exits": 0.38
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 10611.85,
+                "mean_ms": 11167.7,
+                "min_ms": 6550.61,
+                "max_ms": 16204.48,
+                "tick_ms": [
+                  14957.07,
+                  10694.71,
+                  12328.92,
+                  9541.58,
+                  16204.48,
+                  6550.61,
+                  10528.99,
+                  8535.26
+                ],
+                "phase_ms_sum": {
+                  "convoys": 17952.57,
+                  "run_economy_step": 70484.67,
+                  "clear_markets": 747.98,
+                  "apply_budget+nation_step": 155.44,
+                  "tech_gates": 0.49,
+                  "standings+credit+firm_exits": 0.47
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 65031,
+                "floor_unmet": false,
+                "specialists": 2,
+                "shortlist": 1,
+                "trailing_net_n": 1,
+                "trailing_net_min": -31.6,
+                "trailing_net_median": -31.6,
+                "trailing_net_max": -31.6,
+                "trailing_net_negative_share": 1,
+                "corporations_at_seat": 83,
+                "background_at_seat": 81,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 83,
+                "busiest_body_background_at_seat": 81,
+                "seat_balance": 65.6598,
+                "seat_solvent": true,
+                "budget_specialists_standing": 2,
+                "budget_specialists_solvent": 2
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 20.5,
+                "per_live_tick": [
+                  21,
+                  20,
+                  21,
+                  20,
+                  21,
+                  20,
+                  21,
+                  20
+                ]
+              }
+            },
+            {
+              "label": "synthetic 1x rcap sqrt c160 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 1,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 160,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 416686.8,
+              "generation_ms": 120963.8,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 89,
+                "points_spent": 89,
+                "points_unspent": 0,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 70,
+                "richest_centre_points": 9,
+                "centres_affording_specialist": 2,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 0,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 2,
+                  "anchor_out": 0,
+                  "secondary_in": 5,
+                  "secondary_out": 0,
+                  "unresolved": 0,
+                  "farthest_tiles": 3.61
+                },
+                "holdings_firm": {
+                  "anchor_in": 81,
+                  "anchor_out": 0,
+                  "secondary_in": 129,
+                  "secondary_out": 17,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_inside_window": 217,
+                "holdings_outside_window": 17
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 160,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 81,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 8,
+                  "density_ceiling": 160,
+                  "firms": 81,
+                  "firms_by_good": {
+                    "agricultural_produce": 8,
+                    "water": 8,
+                    "timber": 8,
+                    "food_rations": 8,
+                    "charcoal": 8,
+                    "ceramics": 8,
+                    "dressed_stone": 8,
+                    "planks": 8,
+                    "leather": 8,
+                    "cloth": 8,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 8,
+                    "most": 8
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 2,
+                "firms": 81,
+                "any_specialist": true,
+                "specialist_nations": 2,
+                "largest_nation_share": 0.5,
+                "largest_nation": 59464,
+                "corporations_at_land": 83,
+                "background_at_land": 81,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 83,
+                "busiest_body_background_at_land": 81
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 2,
+                "seed_eval_ms": 2678.7,
+                "proposal_mean_ms": 2728.3,
+                "search_ms": 35417.9,
+                "landscape_phase_ms": 35428.5,
+                "round_ms": [
+                  2678.7,
+                  5423.1,
+                  5594.2,
+                  5434.4,
+                  5459.6,
+                  5427.5,
+                  5400.4
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 8090,
+                "mean_ms": 14990.89,
+                "min_ms": 5053.14,
+                "max_ms": 90555.93,
+                "tick_ms": [
+                  5053.14,
+                  90555.93,
+                  7606.48,
+                  8491.41,
+                  7273.26,
+                  10722.61,
+                  10016.4,
+                  7688.59,
+                  7122.27,
+                  6594.06,
+                  9979.26,
+                  8787.22
+                ],
+                "phase_ms_sum": {
+                  "convoys": 104218.3,
+                  "run_economy_step": 74435.15,
+                  "clear_markets": 1062.66,
+                  "apply_budget+nation_step": 173.5,
+                  "tech_gates": 0.58,
+                  "standings+credit+firm_exits": 0.44
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 8849.31,
+                "mean_ms": 10048.85,
+                "min_ms": 6013.4,
+                "max_ms": 15796.69,
+                "tick_ms": [
+                  15796.69,
+                  7518.79,
+                  11089.47,
+                  8254.1,
+                  14677.16,
+                  6013.4,
+                  9444.53,
+                  7596.69
+                ],
+                "phase_ms_sum": {
+                  "convoys": 13611.41,
+                  "run_economy_step": 65947.99,
+                  "clear_markets": 716.25,
+                  "apply_budget+nation_step": 114.45,
+                  "tech_gates": 0.37,
+                  "standings+credit+firm_exits": 0.37
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 65031,
+                "floor_unmet": false,
+                "specialists": 2,
+                "shortlist": 1,
+                "trailing_net_n": 1,
+                "trailing_net_min": -31.6,
+                "trailing_net_median": -31.6,
+                "trailing_net_max": -31.6,
+                "trailing_net_negative_share": 1,
+                "corporations_at_seat": 83,
+                "background_at_seat": 81,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 83,
+                "busiest_body_background_at_seat": 81,
+                "seat_balance": 65.6598,
+                "seat_solvent": true,
+                "budget_specialists_standing": 2,
+                "budget_specialists_solvent": 2
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 20.5,
+                "per_live_tick": [
+                  21,
+                  20,
+                  21,
+                  20,
+                  21,
+                  20,
+                  21,
+                  20
+                ]
+              }
+            },
+            {
+              "label": "synthetic 2x rcap sqrt c120 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 2,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 120,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 401250.9,
+              "generation_ms": 100378.3,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 178,
+                "points_spent": 121,
+                "points_unspent": 57,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 128,
+                "richest_centre_points": 18,
+                "centres_affording_specialist": 5,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 57,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 5,
+                  "anchor_out": 0,
+                  "secondary_in": 11,
+                  "secondary_out": 0,
+                  "unresolved": 0,
+                  "farthest_tiles": 3.61
+                },
+                "holdings_firm": {
+                  "anchor_in": 101,
+                  "anchor_out": 0,
+                  "secondary_in": 163,
+                  "secondary_out": 24,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_inside_window": 280,
+                "holdings_outside_window": 24
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 120,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 158,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 10,
+                  "density_ceiling": 120,
+                  "firms": 101,
+                  "firms_by_good": {
+                    "agricultural_produce": 10,
+                    "water": 10,
+                    "timber": 10,
+                    "food_rations": 10,
+                    "charcoal": 10,
+                    "ceramics": 10,
+                    "dressed_stone": 10,
+                    "planks": 10,
+                    "leather": 10,
+                    "cloth": 10,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 10,
+                    "most": 10
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 5,
+                "firms": 101,
+                "any_specialist": true,
+                "specialist_nations": 5,
+                "largest_nation_share": 0.2,
+                "largest_nation": 59447,
+                "corporations_at_land": 106,
+                "background_at_land": 101,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 106,
+                "busiest_body_background_at_land": 101
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 2611.6,
+                "proposal_mean_ms": 2353.2,
+                "search_ms": 30850.2,
+                "landscape_phase_ms": 30859.8,
+                "round_ms": [
+                  2611.6,
+                  4658.4,
+                  4889.3,
+                  4967.9,
+                  4766.7,
+                  4829,
+                  4127.1
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 10137.99,
+                "mean_ms": 14670.13,
+                "min_ms": 5149.48,
+                "max_ms": 67287.95,
+                "tick_ms": [
+                  5149.48,
+                  67287.95,
+                  10003.75,
+                  9254.87,
+                  12931.3,
+                  8043.25,
+                  7688.98,
+                  9468.67,
+                  13516.59,
+                  11004.16,
+                  10272.24,
+                  11420.33
+                ],
+                "phase_ms_sum": {
+                  "convoys": 91033.23,
+                  "run_economy_step": 84105.36,
+                  "clear_markets": 744.7,
+                  "apply_budget+nation_step": 157.23,
+                  "tech_gates": 0.64,
+                  "standings+credit+firm_exits": 0.39
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 11941.87,
+                "mean_ms": 11745.12,
+                "min_ms": 10689.84,
+                "max_ms": 12632.38,
+                "tick_ms": [
+                  11969.69,
+                  11573.02,
+                  10689.84,
+                  12239.09,
+                  12052.8,
+                  11914.05,
+                  10890.13,
+                  12632.38
+                ],
+                "phase_ms_sum": {
+                  "convoys": 28303.76,
+                  "run_economy_step": 65057.72,
+                  "clear_markets": 499.7,
+                  "apply_budget+nation_step": 99.05,
+                  "tech_gates": 0.4,
+                  "standings+credit+firm_exits": 0.35
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 65030,
+                "floor_unmet": false,
+                "specialists": 5,
+                "shortlist": 4,
+                "trailing_net_n": 4,
+                "trailing_net_min": -58.6,
+                "trailing_net_median": -29.2,
+                "trailing_net_max": 1065.9,
+                "trailing_net_negative_share": 0.75,
+                "corporations_at_seat": 106,
+                "background_at_seat": 101,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 106,
+                "busiest_body_background_at_seat": 101,
+                "seat_balance": 175.7984,
+                "seat_solvent": true,
+                "budget_specialists_standing": 5,
+                "budget_specialists_solvent": 5
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 26,
+                "per_live_tick": [
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26
+                ]
+              }
+            },
+            {
+              "label": "synthetic 2x rcap sqrt c160 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 2,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 160,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 367391.4,
+              "generation_ms": 72188,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 178,
+                "points_spent": 121,
+                "points_unspent": 57,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 128,
+                "richest_centre_points": 18,
+                "centres_affording_specialist": 5,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 0,
+                  "province_cap": 0,
+                  "no_gap": 57,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 5,
+                  "anchor_out": 0,
+                  "secondary_in": 11,
+                  "secondary_out": 0,
+                  "unresolved": 0,
+                  "farthest_tiles": 3.61
+                },
+                "holdings_firm": {
+                  "anchor_in": 101,
+                  "anchor_out": 0,
+                  "secondary_in": 163,
+                  "secondary_out": 24,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_inside_window": 280,
+                "holdings_outside_window": 24
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 160,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 158,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 10,
+                  "density_ceiling": 160,
+                  "firms": 101,
+                  "firms_by_good": {
+                    "agricultural_produce": 10,
+                    "water": 10,
+                    "timber": 10,
+                    "food_rations": 10,
+                    "charcoal": 10,
+                    "ceramics": 10,
+                    "dressed_stone": 10,
+                    "planks": 10,
+                    "leather": 10,
+                    "cloth": 10,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 10,
+                    "most": 10
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 5,
+                "firms": 101,
+                "any_specialist": true,
+                "specialist_nations": 5,
+                "largest_nation_share": 0.2,
+                "largest_nation": 59447,
+                "corporations_at_land": 106,
+                "background_at_land": 101,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 106,
+                "busiest_body_background_at_land": 101
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 3,
+                "seed_eval_ms": 2190.5,
+                "proposal_mean_ms": 2198.5,
+                "search_ms": 28572,
+                "landscape_phase_ms": 28581.9,
+                "round_ms": [
+                  2190.5,
+                  4371.5,
+                  4332.4,
+                  4374.7,
+                  4419.4,
+                  4512.2,
+                  4371.3
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 9902.33,
+                "mean_ms": 14338.4,
+                "min_ms": 5115.28,
+                "max_ms": 64627.16,
+                "tick_ms": [
+                  5115.28,
+                  64627.16,
+                  9769.07,
+                  9132.75,
+                  12617.08,
+                  8056.92,
+                  7502.39,
+                  9466.81,
+                  13360.33,
+                  10953.4,
+                  10035.59,
+                  11424
+                ],
+                "phase_ms_sum": {
+                  "convoys": 88069.74,
+                  "run_economy_step": 83102.5,
+                  "clear_markets": 744.87,
+                  "apply_budget+nation_step": 142.61,
+                  "tech_gates": 0.66,
+                  "standings+credit+firm_exits": 0.41
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 11975.12,
+                "mean_ms": 11818.83,
+                "min_ms": 10724.06,
+                "max_ms": 12839.65,
+                "tick_ms": [
+                  12101.49,
+                  11747.91,
+                  10724.06,
+                  12288.52,
+                  12088.01,
+                  11862.22,
+                  10898.75,
+                  12839.65
+                ],
+                "phase_ms_sum": {
+                  "convoys": 28465,
+                  "run_economy_step": 65459.23,
+                  "clear_markets": 527.01,
+                  "apply_budget+nation_step": 98.62,
+                  "tech_gates": 0.41,
+                  "standings+credit+firm_exits": 0.34
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 65030,
+                "floor_unmet": false,
+                "specialists": 5,
+                "shortlist": 4,
+                "trailing_net_n": 4,
+                "trailing_net_min": -58.6,
+                "trailing_net_median": -29.2,
+                "trailing_net_max": 1065.9,
+                "trailing_net_negative_share": 0.75,
+                "corporations_at_seat": 106,
+                "background_at_seat": 101,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 106,
+                "busiest_body_background_at_seat": 101,
+                "seat_balance": 175.7984,
+                "seat_solvent": true,
+                "budget_specialists_standing": 5,
+                "budget_specialists_solvent": 5
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 26,
+                "per_live_tick": [
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26,
+                  26
+                ]
+              }
+            },
+            {
+              "label": "synthetic 4x rcap sqrt c120 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 4,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 120,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 420354.6,
+              "generation_ms": 76464.8,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 356,
+                "points_spent": 164,
+                "points_unspent": 192,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 233,
+                "richest_centre_points": 36,
+                "centres_affording_specialist": 11,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 2,
+                  "province_cap": 0,
+                  "no_gap": 0,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 190
+                },
+                "holdings_specialist": {
+                  "anchor_in": 11,
+                  "anchor_out": 0,
+                  "secondary_in": 20,
+                  "secondary_out": 5,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_firm": {
+                  "anchor_in": 105,
+                  "anchor_out": 15,
+                  "secondary_in": 150,
+                  "secondary_out": 64,
+                  "unresolved": 0,
+                  "farthest_tiles": 11.4
+                },
+                "holdings_inside_window": 286,
+                "holdings_outside_window": 84
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 120,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 312,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 15,
+                  "density_ceiling": 120,
+                  "firms": 120,
+                  "firms_by_good": {
+                    "agricultural_produce": 12,
+                    "water": 12,
+                    "timber": 12,
+                    "food_rations": 12,
+                    "charcoal": 12,
+                    "ceramics": 12,
+                    "dressed_stone": 12,
+                    "planks": 12,
+                    "leather": 12,
+                    "cloth": 11,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 11,
+                    "most": 12
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 11,
+                "firms": 120,
+                "any_specialist": true,
+                "specialist_nations": 10,
+                "largest_nation_share": 0.1818,
+                "largest_nation": 59464,
+                "corporations_at_land": 131,
+                "background_at_land": 120,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 131,
+                "busiest_body_background_at_land": 120
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 4,
+                "seed_eval_ms": 2064.2,
+                "proposal_mean_ms": 2204.1,
+                "search_ms": 28512.9,
+                "landscape_phase_ms": 28530.1,
+                "round_ms": [
+                  2064.2,
+                  4374.4,
+                  4437,
+                  4408.7,
+                  4420.2,
+                  4364,
+                  4444.4
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 12718.96,
+                "mean_ms": 17006.4,
+                "min_ms": 6062.07,
+                "max_ms": 70028.21,
+                "tick_ms": [
+                  6062.07,
+                  70028.21,
+                  11227.2,
+                  13294.11,
+                  12501.8,
+                  13581.79,
+                  10780.08,
+                  11052.72,
+                  12448.7,
+                  15672.15,
+                  14491.87,
+                  12936.12
+                ],
+                "phase_ms_sum": {
+                  "convoys": 115524.76,
+                  "run_economy_step": 87667.88,
+                  "clear_markets": 741.25,
+                  "apply_budget+nation_step": 141.6,
+                  "tech_gates": 0.84,
+                  "standings+credit+firm_exits": 0.48
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 13755.82,
+                "mean_ms": 13908.95,
+                "min_ms": 12616.97,
+                "max_ms": 15544.59,
+                "tick_ms": [
+                  13796.59,
+                  15544.59,
+                  13715.04,
+                  12616.97,
+                  13468.96,
+                  15257.69,
+                  14048.59,
+                  12823.16
+                ],
+                "phase_ms_sum": {
+                  "convoys": 42920.76,
+                  "run_economy_step": 67762.61,
+                  "clear_markets": 494.92,
+                  "apply_budget+nation_step": 92.32,
+                  "tech_gates": 0.56,
+                  "standings+credit+firm_exits": 0.43
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 65265,
+                "floor_unmet": false,
+                "specialists": 11,
+                "shortlist": 6,
+                "trailing_net_n": 6,
+                "trailing_net_min": -56.3,
+                "trailing_net_median": -36.5,
+                "trailing_net_max": 1291.6,
+                "trailing_net_negative_share": 0.6667,
+                "corporations_at_seat": 131,
+                "background_at_seat": 120,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 131,
+                "busiest_body_background_at_seat": 120,
+                "seat_balance": 438.2155,
+                "seat_solvent": true,
+                "budget_specialists_standing": 11,
+                "budget_specialists_solvent": 10
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 32.88,
+                "per_live_tick": [
+                  33,
+                  33,
+                  33,
+                  33,
+                  33,
+                  33,
+                  33,
+                  32
+                ]
+              }
+            },
+            {
+              "label": "synthetic 4x rcap sqrt c160 pcap on sp4",
+              "kind": "synthetic",
+              "scale": 4,
+              "resource_cap": null,
+              "resource_cap_rule": "sqrt_capital",
+              "density_ceiling": 160,
+              "province_cap": true,
+              "window_radius": 4,
+              "firm_price_points": 1,
+              "specialist_firm_charters": 4,
+              "specialist_price_points": 4,
+              "threw": false,
+              "error": "",
+              "wall_ms": 488257.1,
+              "generation_ms": 73533.3,
+              "build_only": false,
+              "stopped_at_land": false,
+              "budget": {
+                "points_budgeted": 356,
+                "points_spent": 195,
+                "points_unspent": 161,
+                "balanced": true,
+                "balance_fail": "",
+                "refused": false,
+                "centres": 233,
+                "richest_centre_points": 36,
+                "centres_affording_specialist": 11,
+                "unspent_by_reason": {
+                  "no_nation": 0,
+                  "window_exhausted": 2,
+                  "province_cap": 0,
+                  "no_gap": 159,
+                  "body_cap": 0,
+                  "remainder": 0,
+                  "refused": 0,
+                  "density_ceiling": 0
+                },
+                "holdings_specialist": {
+                  "anchor_in": 11,
+                  "anchor_out": 0,
+                  "secondary_in": 20,
+                  "secondary_out": 5,
+                  "unresolved": 0,
+                  "farthest_tiles": 5
+                },
+                "holdings_firm": {
+                  "anchor_in": 136,
+                  "anchor_out": 15,
+                  "secondary_in": 195,
+                  "secondary_out": 72,
+                  "unresolved": 0,
+                  "farthest_tiles": 11.4
+                },
+                "holdings_inside_window": 362,
+                "holdings_outside_window": 92
+              },
+              "rules": {
+                "per_resource_firm_cap": 8,
+                "max_firms_per_body": 200,
+                "density_ceiling": 160,
+                "fill": "in_turn"
+              },
+              "bodies": [
+                {
+                  "body": 15124,
+                  "firm_points": 312,
+                  "goods_with_demand": 11,
+                  "goods": [
+                    "agricultural_produce",
+                    "water",
+                    "timber",
+                    "food_rations",
+                    "charcoal",
+                    "ceramics",
+                    "dressed_stone",
+                    "planks",
+                    "leather",
+                    "cloth",
+                    "construction_capacity"
+                  ],
+                  "reference_points": 88,
+                  "per_good_cap": 15,
+                  "density_ceiling": 160,
+                  "firms": 151,
+                  "firms_by_good": {
+                    "agricultural_produce": 15,
+                    "water": 15,
+                    "timber": 15,
+                    "food_rations": 15,
+                    "charcoal": 15,
+                    "ceramics": 15,
+                    "dressed_stone": 15,
+                    "planks": 15,
+                    "leather": 15,
+                    "cloth": 15,
+                    "construction_capacity": 1
+                  },
+                  "turn": {
+                    "goods": 10,
+                    "goods_without_firm": 0,
+                    "fewest": 15,
+                    "most": 15
+                  }
+                }
+              ],
+              "checks_at_land": {
+                "pass": true,
+                "fail": ""
+              },
+              "landscape": {
+                "specialists": 11,
+                "firms": 151,
+                "any_specialist": true,
+                "specialist_nations": 10,
+                "largest_nation_share": 0.1818,
+                "largest_nation": 59464,
+                "corporations_at_land": 162,
+                "background_at_land": 151,
+                "busiest_body_at_land": 15124,
+                "busiest_body_corporations_at_land": 162,
+                "busiest_body_background_at_land": 151
+              },
+              "search": {
+                "evaluations": 13,
+                "accepted": 4,
+                "seed_eval_ms": 2332.7,
+                "proposal_mean_ms": 2362.5,
+                "search_ms": 30682.3,
+                "landscape_phase_ms": 30703.9,
+                "round_ms": [
+                  2332.7,
+                  4641.3,
+                  4609.8,
+                  5075.5,
+                  4696.1,
+                  4687.1,
+                  4639.8
+                ]
+              },
+              "validation_ticks": {
+                "n": 12,
+                "median_ms": 15781.3,
+                "mean_ms": 19907.99,
+                "min_ms": 7586.99,
+                "max_ms": 70145.81,
+                "tick_ms": [
+                  7586.99,
+                  70145.81,
+                  16568.63,
+                  14832.44,
+                  15745.15,
+                  15817.46,
+                  13803.42,
+                  15448.75,
+                  13936.55,
+                  17264.84,
+                  19065.88,
+                  18680.02
+                ],
+                "phase_ms_sum": {
+                  "convoys": 120631.89,
+                  "run_economy_step": 117318.46,
+                  "clear_markets": 786.85,
+                  "apply_budget+nation_step": 156.65,
+                  "tech_gates": 1.45,
+                  "standings+credit+firm_exits": 0.62
+                },
+                "lower_bound": true
+              },
+              "live_ticks": {
+                "n": 8,
+                "median_ms": 18003.96,
+                "mean_ms": 18138.97,
+                "min_ms": 16485.96,
+                "max_ms": 19570.61,
+                "tick_ms": [
+                  17010.02,
+                  17542.16,
+                  19474.26,
+                  18465.76,
+                  16485.96,
+                  17394.63,
+                  19168.31,
+                  19570.61
+                ],
+                "phase_ms_sum": {
+                  "convoys": 48212.48,
+                  "run_economy_step": 96293.74,
+                  "clear_markets": 508.9,
+                  "apply_budget+nation_step": 95.19,
+                  "tech_gates": 0.89,
+                  "standings+credit+firm_exits": 0.52
+                },
+                "between_ticks_ms_sum": 0.01,
+                "lower_bound": true
+              },
+              "seat": {
+                "seated": 65265,
+                "floor_unmet": false,
+                "specialists": 11,
+                "shortlist": 6,
+                "trailing_net_n": 6,
+                "trailing_net_min": -550.2,
+                "trailing_net_median": -36.5,
+                "trailing_net_max": 1284.5,
+                "trailing_net_negative_share": 0.8333,
+                "corporations_at_seat": 162,
+                "background_at_seat": 151,
+                "busiest_body_at_seat": 15124,
+                "busiest_body_corporations_at_seat": 162,
+                "busiest_body_background_at_seat": 151,
+                "seat_balance": 462.0378,
+                "seat_solvent": true,
+                "budget_specialists_standing": 11,
+                "budget_specialists_solvent": 10
+              },
+              "strategic_evals_due": {
+                "count_not_cost": true,
+                "mean": 40.38,
+                "per_live_tick": [
+                  40,
+                  41,
+                  40,
+                  41,
+                  40,
+                  41,
+                  40,
+                  40
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
 }
