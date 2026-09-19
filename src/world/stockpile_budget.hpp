@@ -172,8 +172,9 @@ stockpile_budget build_stockpile_budget(const std::vector<region>*            re
 // cost and the seat menu (DIGITISATION.md § 1: the firm price "measured against
 // live-play cost before it is fixed"; the specialist's price "anchored to the
 // seat menu"; the square root's constants and the density ceiling "read off the
-// cost table"). They are read only when the budget is non-empty, which needs the
-// Digitisation span on; with it off (the shipped default) no price is read.
+// cost table"). The density ceiling is the one already ruled (NR-902, below).
+// They are read only when the budget is non-empty, which needs the Digitisation
+// span on; with it off (the shipped default) no price is read.
 
 /// Points one background firm charter costs. PROVISIONAL (BL-1044).
 inline constexpr std::int32_t k_stockpile_firm_price_points = 10000;
@@ -184,9 +185,13 @@ inline constexpr std::int32_t k_stockpile_specialist_firm_charters = 4;
 inline constexpr std::int32_t k_stockpile_per_resource_firm_cap = 8;
 /// The anti-runaway guard per body (Pass 6's 200).
 inline constexpr std::int32_t k_stockpile_max_firms_per_body = 200;
-/// The density ceiling under the ruled square-root rule. PROVISIONAL (BL-1044):
-/// the top of the 81-150 band DIGITISATION.md § 1 names for the cost table.
-inline constexpr std::int32_t k_stockpile_density_ceiling = 150;
+/// The density ceiling under the ruled square-root rule: 120 background firms
+/// per body. RULED (Ben, 2026-09-19, NR-902; DIGITISATION.md § 1): on the cost
+/// table's square-root rows the ceiling is what binds — at four times the
+/// reference budget it trims every good evenly to 12 firms — while 160 never
+/// bound (each good's own cap of 15 filled first) and cost a 12-31% dearer
+/// economy tick for it. A ceiling that never binds is not a brake.
+inline constexpr std::int32_t k_stockpile_density_ceiling = 120;
 
 /// The spend a stockpile budget is charged at: the ruled `sqrt_capital` cap rule
 /// under the constants above, window 4, the province cap on (§ 1: "the

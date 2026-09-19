@@ -22,6 +22,7 @@
 // The prices it is charged at are named there, never defaulted here.
 // ---------------------------------------------------------------------------
 
+#include "components.hpp"   // resource_count: |G|'s bound in the refusal's range check
 #include "entity.hpp"
 
 #include <algorithm>
@@ -131,6 +132,10 @@ inline const char* charter_cap_rule_name(charter_cap_rule r)
 /// `lifted`) is refused too, so no row can carry a setting that silently did
 /// nothing.
 ///
+/// AND THE ARITHMETIC (BL-1060): a c and firm price whose B_ref, or whose square
+/// root at B_ref, could pass int64 — and a c whose c x B could, on this budget —
+/// are refused, never clamped. See the end of `charter_spend_refusal`.
+///
 /// A BUDGET SPECIALIST'S CAPITAL IS TODAY'S DRAW (Ben, 2026-09-18): 400 +/- 40%
 /// with the processing/trade premium, CORPORATION_GENERATION.md Pass 4 as
 /// written. There is no capital parameter here.
@@ -233,9 +238,13 @@ inline std::int64_t charter_isqrt(std::int64_t x)
 ///
 /// Exact integer arithmetic: floor(sqrt(y)) = isqrt(floor(y)) for y >= 0, and
 /// c^2 x B / B_ref = c x B / (|G| x fp). A body with no demanded good (|G| = 0)
-/// has no reference and keeps c. A cap too large for int32 — or a c x B past
-/// int64 — saturates at int32's maximum: any cap at or above the density ceiling
-/// already binds nothing.
+/// has no reference and keeps c. A cap too large for int32 saturates at int32's
+/// maximum, which is honest — the true cap is at least that, and any cap at or
+/// above the density ceiling already binds nothing. A c x B past int64 saturates
+/// the same way, which is NOT always honest (a large |G| x fp could bring the
+/// true cap back under int32), so a spend that could reach it is REFUSED before
+/// any mutation (`charter_spend_refusal`, BL-1060): on an accepted spend c x B,
+/// and c x B_ref at the anchor, always fit.
 inline std::int32_t charter_sqrt_per_good_cap(std::int32_t c, std::int64_t firm_points,
                                               int goods_with_demand, std::int32_t firm_price_points)
 {
@@ -256,8 +265,9 @@ inline std::int32_t charter_sqrt_per_good_cap(std::int32_t c, std::int64_t firm_
 /// B's per-centre term (see `charter_sqrt_per_good_cap`): @p points NET OF THE
 /// SPECIALIST PRICE when they afford it, rounded down to whole firm charters and
 /// expressed in points. What the walk sets aside for firms at this centre
-/// (`firm_points`), less the remainder no firm can be bought with. 0 when the
-/// firm price is not positive (such a spend is refused anyway).
+/// (`points_after_specialist`, unrounded), less the remainder no firm can be
+/// bought with. 0 when the firm price is not positive (such a spend is refused
+/// anyway).
 inline std::int64_t charter_centre_firm_points(std::int32_t points, const charter_spend_params& s)
 {
     const std::int64_t fp = s.firm_price_points;
@@ -272,8 +282,15 @@ inline std::int64_t charter_centre_firm_points(std::int32_t points, const charte
 
 /// Why a point was not spent. Ordered: a report sorts (centre, reason) on it.
 /// Nothing here is persistent, so the numbering follows the reading —
-/// `density_ceiling` is appended rather than slotted beside `body_cap`, so every
-/// reason BL-1033's table already carries keeps its column.
+/// `density_ceiling` and `late_shortfall` are appended rather than slotted beside
+/// their kin, so every reason BL-1033's table already carries keeps its column.
+///
+/// UNDER `sqrt_capital` A FAILED PLACEMENT IS NOT A STOP (NR-903): the good is
+/// skipped for that centre and the turn moves on. `window_exhausted` and
+/// `province_cap` then book what is left when EVERY good the centre could still
+/// charter failed to place — `province_cap` if the cap took ground from any of
+/// them, `window_exhausted` otherwise. Under the legacy rules they book the
+/// first failed placement, which ends the centre, as it always has.
 enum class charter_unspent_reason : std::uint8_t
 {
     no_nation        = 0, ///< the centre's tile belongs to no nation (or has no tile)
@@ -284,9 +301,16 @@ enum class charter_unspent_reason : std::uint8_t
     body_cap         = 4, ///< the body already carries `max_firms_per_body` background firms
                           ///< (the anti-runaway guard)
     remainder        = 5, ///< fewer points left than one firm costs
-    refused          = 6, ///< the spend params were refused (a price <= 0); nothing chartered
+    refused          = 6, ///< the spend params were refused (`charter_spend_refusal`: a price
+                          ///< <= 0, a cap unset or unread, the arithmetic out of range);
+                          ///< nothing chartered
     density_ceiling  = 7, ///< the body already carries `density_ceiling` background firms
                           ///< (sqrt_capital only; BL-1039)
+    late_shortfall   = 8, ///< sqrt_capital only (BL-1060): no good in the turn could take a
+                          ///< firm, but a good OUTSIDE G is short — one whose demand the
+                          ///< walk's own firms created after G was fixed (their upkeep).
+                          ///< The turn serves G alone, so that shortfall is real and
+                          ///< unserved; `no_gap` would claim there was none.
 };
 
 inline const char* charter_unspent_reason_name(charter_unspent_reason r)
@@ -301,11 +325,12 @@ inline const char* charter_unspent_reason_name(charter_unspent_reason r)
     case charter_unspent_reason::remainder:        return "remainder";
     case charter_unspent_reason::refused:          return "refused";
     case charter_unspent_reason::density_ceiling:  return "density_ceiling";
+    case charter_unspent_reason::late_shortfall:   return "late_shortfall";
     }
     return "?";
 }
 
-constexpr int charter_unspent_reason_count = 8;
+constexpr int charter_unspent_reason_count = 9;
 
 /// Which anchor rung a charter landed on. There is no third rung: a charter that
 /// finds no ground in either is UNSPENT, never scattered nation-wide.
@@ -445,6 +470,41 @@ inline const char* charter_spend_refusal(const charter_budget& b, const charter_
         break;
     default:
         return "resource_cap_rule is not a known rule";
+    }
+
+    // BL-1060 — THE ARITHMETIC STAYS IN RANGE. Past the checks above, c and the
+    // firm price are both > 0 wherever c is read. |G| is not known until a world
+    // is read, and a refusal reads none, so it is bounded by the roster: a body
+    // cannot demand more goods than `resource_count`. Hence, with
+    // lim = INT64_MAX / resource_count:
+    //  * every rule that reads c reports B_ref = c x |G| x fp, so c x fp <= lim;
+    //  * `sqrt_capital` also forms c x B, and at the anchor B = B_ref that is
+    //    c^2 x |G| x fp, so c^2 x fp <= lim — past it cap(B_ref) saturates
+    //    instead of giving c, and a correct body would read as a broken rule;
+    //  * and c x B on every body, whose B cannot exceed the budget's total, so
+    //    c x total <= INT64_MAX — `charter_sqrt_per_good_cap` never saturates
+    //    on an accepted spend (see its note).
+    // Each test is the integer form x <= floor(L / c) <=> c x x <= L, so none of
+    // them can overflow while it checks. Unreachable at c = 8: the firm price
+    // would have to pass 2.9e15 (beyond int32) or the budget 1.1e18 points.
+    if (s.resource_cap_rule == charter_cap_rule::fixed
+        || s.resource_cap_rule == charter_cap_rule::sqrt_capital)
+    {
+        constexpr std::int64_t k_max = std::numeric_limits<std::int64_t>::max();
+        constexpr std::int64_t lim   = k_max / static_cast<std::int64_t>(resource_count);
+        const std::int64_t c  = s.per_resource_firm_cap;
+        const std::int64_t fp = s.firm_price_points;
+        if (fp > lim / c)
+            return "per_resource_firm_cap x firm_price_points x |G| (B_ref) could pass int64";
+        if (s.resource_cap_rule == charter_cap_rule::sqrt_capital)
+        {
+            if (c * fp > lim / c)
+                return "per_resource_firm_cap^2 x firm_price_points x |G| (the square root at "
+                       "B = B_ref) could pass int64";
+            if (b.total() > k_max / c)
+                return "per_resource_firm_cap x the budget's total (the square root's c x B) "
+                       "could pass int64";
+        }
     }
     return nullptr;
 }
