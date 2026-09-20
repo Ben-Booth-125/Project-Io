@@ -6688,6 +6688,179 @@
      "result_metric": "chain 12 on 9a39152a (main session, 2026-09-20): the 4x cost row (seed 28, ceiling 120) reads 'the turn: 10 goods, 0 without a firm; firms per good 11..12; even share 11 each, 9 goods +1, reserved of the ceiling less 1 yard place', checks at land PASS; the three stockpile seeds each land 120 firms a body (nine goods 12, cloth 11, one yard) with no_gap 0, late_shortfall 0, share_unplaced 0 and every account closing. A ceiling under the turn is refused (probe), and the sweep now fails if more yards are chartered than places reserved."
     }
    ]
+  },
+  {
+   "brief": "real-stockpile-charter-sweep",
+   "title": "BL-1043 - Charter prices and the no-specialist world, measured on real stockpiles",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1043 - sprint 45 (2026-09-20)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: the cost mode",
+      "headless: player_seed_sweep --charter-cost (main session)"
+     ],
+     "requirement": "The cost sweep measures REAL stockpile budgets: the Digitisation span on at epoch 0 in the harness (never epoch_year 1960, the superseded arc), the budget built by the shipped builder, not a synthetic one. The matrix and any trim from the full 16 seeds x 11 rows are stated with the reason.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep --charter-cost (main session)"
+     ],
+     "requirement": "Per row and seed: specialists and shortlist size against the legacy roster (6, 6 and 8 on seeds 0, 28, 46); worlds with NO specialist; the specialist capital distribution at the 400 +/-40% draw (NR-895), including any opening at zero; unspent by reason (province_cap, density_ceiling, window_exhausted, share_unplaced, remainder, the dropped-centre reason); firms per good; the density-follows-cities reading; the tick ratio with its phase split; the seat's balance and trailing-net sign.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "record: the run note"
+     ],
+     "requirement": "The run is serial on a quiet machine with keep-awake, and each row's per-tick maximum is scanned for a sleep-length outlier; any row the PC slept through is re-run.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "tool: charter_cost_merge.js"
+     ],
+     "requirement": "The table lands in charter_cost_sweep.json (or a sibling) as its own named run with its note, every key already there unchanged (charter_cost_merge.js).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "record: NEEDS_REVIEW entries"
+     ],
+     "requirement": "NEEDS_REVIEW carries the calls with their figures: the firm price, the specialist price in firm charters, the no-specialist world, and whether the per-province cap stays.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "The shipped path does not move: world_determinism digests unchanged and player_seed_sweep --digest-check 16/16 after the harness change (main session).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds the sweep measures what it claims (the real builder, the stated matrix) and no pinned path moved.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "order-independent-reads",
+   "title": "BL-1050 - Five readers walk unordered stores in hash order, so a saved-and-loaded world ticks differently",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1050 - sprint 45 (2026-09-20)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: the five readers"
+     ],
+     "requirement": "Each of the five readers walks a sorted order or writes per key, named in the commit: body_mean_habitability's float sum over population centres; inject_population_demand's accumulation into a market; corp_ai's haul destination (a strict > over markets with no id tie-break); total_income's float sum over the cash-flow map; the corporation-generation reader.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: world_copy_determinism"
+     ],
+     "requirement": "world_copy_determinism --copy-by snapshot passes on seed 28 and on the 16 library seeds: a saved-and-loaded world settles to the same digest as its original.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: the tripwire",
+      "doc: TECH_FOUNDATIONS.md"
+     ],
+     "requirement": "faithful_unordered_map stays as the tripwire, and TECH_FOUNDATIONS.md states the rule (a loaded world replays byte for byte).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: the five readers",
+      "headless: world_determinism"
+     ],
+     "requirement": "Nothing changes but the order: each reader produces the same value as today when the underlying order already matched, shown per reader.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "record: the branch and the merge plan"
+     ],
+     "requirement": "It lands on a branch and is NEVER merged to main alone: it moves the pins every other item's checks stand on, and rides BL-1044's integration (NR-894).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no reader left in hash order where the order reaches arithmetic or a tie-break, and no behaviour change beyond the order.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep --digest-check (main session)",
+      "headless: world_determinism"
+     ],
+     "requirement": "After BL-1044's integration: player_seed_sweep --digest-check 16/16 against the NEW pins, and world_determinism's digests recorded old -> new.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
