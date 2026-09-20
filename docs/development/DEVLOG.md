@@ -10,6 +10,51 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-20 — Sprint 45's last builds: the charter spend hardened, a load that replays, and a refusal that would have gone quiet
+
+**Runtime:** ~13 h (07:50 to 20:45). Delivery — Full (three lanes with four fix rounds, four cold
+reviews, chain 12 plus three long verification runs) with four design calls on elicitation forms.
+
+### What landed
+- **BL-1060 (charter spend hardening)** took four rounds and ships the ceiling at 120 (NR-902), the
+  turn skipping a good it cannot place (NR-903), and each good keeping an even share of a binding
+  ceiling as a RESERVATION (NR-905, and NR-906 after the cap reading held room back). Chain 12 on
+  `9a39152a`: digest check 16/16, the budget modes 3/3, every body landing 120 firms with all ten
+  goods of the turn holding some.
+- **BL-1050 (order-independent reads)** is built and verified on its branch: seven readers (not the
+  five the review named — the lane found a sixth, its reviewer a seventh) now walk sorted ids, and a
+  saved-and-loaded world settles byte-identical to its original on **16 of 16 seeds**, where seed 28
+  used to diverge at tick 0. The 16-seed pin check fails on the two TICK digests only, never on
+  generation, so BL-1044's re-bless stays the shape NR-894 authorised.
+- **BL-1043 (real-stockpile charter sweep)**: the harness half merged and stage 1 started — 16 seeds
+  x three firm prices, in two parallel shards after Ben asked to halve the wait.
+
+### The review that paid for itself
+Round 3 of BL-1060 was rescued from a lane that stalled mid-edit, and its cold review found the new
+world refusal reading the UNCAPPED yard want instead of the places actually reserved. Dormant on
+today's data — and at the 0.30 seed rate `economy.lua` itself records as measured, it refuses every
+world, whereupon the search silently falls back to the legacy no-budget world. A data tune would have
+switched the charter web off with one printed line. Round 4 fixed it and the probe now fails on all
+four assertions if the old reading comes back.
+
+### What the sweep is already saying
+Legacy seat anchors run 6 to 17 specialists across the library; the budget at the provisional firm
+price opens 24, 33 and 182 on the first three seeds. So the provisional price is far too cheap, and
+20k brackets the anchor on two of three. Separately, 128 of 132 extraction buildings extract a good
+other than the one they were chartered for — so "every good holds firms", the property NR-903 and
+NR-905 protect, is bookkeeping rather than ground truth. Both go to Ben with the sweep's figures.
+
+### Also
+The phase rename Ben raised (Digitisation names computing, not 1660-1960) is filed into the sprint 46
+drafts with the name left to him. Three continuity items came out of the reviews: BL-1061, BL-1062,
+BL-1063. Two self-inflicted costs are recorded as hazards: chain 8 was re-run for ~90 minutes because
+a memory saying it had finished was not read at session start, and a chain-12 digest check 10 hours in
+was killed as a supposed orphan.
+
+### Left open
+BL-1043 stage 1 (running overnight), then its calls, then BL-1044 — the one re-bless, with BL-1050
+merging in the same integration. See `NEXT_SESSION.md`.
+
 ## 2026-09-19 — Sprint 45 wave 1 lands: seven items delivered, the Fuel Doctrine and the charter spend ruled nine times
 
 **Runtime:** ~19 h wall clock (02:20 to 21:15, long unattended chains). Delivery — Full (five
