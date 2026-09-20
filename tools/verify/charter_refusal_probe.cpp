@@ -33,9 +33,14 @@
 //      * a stop where the province cap took one focus's ground and the window
 //        the other's books `province_cap`, not `window_exhausted`;
 //      * a second centre serves the good the first centre skipped;
-//      * where the ceiling binds each good holds its EVEN SHARE (NR-905): a
+//      * where the ceiling binds each good keeps an EVEN SHARE (NR-905): a
 //        first centre with no quarry leaves the ore's share for a second that
 //        has one, and where no centre has one the gap is `share_unplaced`;
+//      * the share is a RESERVATION, not a cap (NR-906), on a ten-good body: a
+//        good that stops being short releases its share and the ceiling still
+//        fills; a good placeable nowhere holds its reservation and costs the
+//        body no more than it; a yard's place comes off the ceiling first; and
+//        a ceiling too small for the turn and its yards is refused;
 //      * a good only the walk's own firms made short is `late_shortfall`.
 //
 // Run:   bash tools/verify/build_lua_harness.sh charter_refusal_probe
@@ -47,6 +52,7 @@
 #include "world/components.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/resource_names.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -58,6 +64,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -122,14 +129,21 @@ charter_spend_params sqrt_spend()
 // ---------------------------------------------------------------------------
 namespace turn {
 
-constexpr int k_w = 24, k_h = 12;          // the body's grid
-constexpr int k_cx = 6, k_cy = 6;          // the first centre's tile, the ground's reference
-constexpr int k_radius = 4;                // the spend's window radius
+constexpr int k_cx = 6, k_cy = 6;          // the ground's reference tile (and the default centre)
 constexpr std::size_t k_raw   = static_cast<std::size_t>(resource_type::iron_ore); // index 0: FIRST in the turn
 constexpr std::size_t k_mill1 = static_cast<std::size_t>(resource_type::steel);
 constexpr std::size_t k_mill2 = static_cast<std::size_t>(resource_type::planks);
 constexpr std::size_t k_late  = static_cast<std::size_t>(resource_type::power);    // never in G
 constexpr std::size_t k_yard  = static_cast<std::size_t>(resource_type::construction_capacity);
+
+/// Ten processed goods for the ten-good body (none is iron ore, power or capacity).
+constexpr std::size_t k_ten[] = {
+    static_cast<std::size_t>(resource_type::steel),          static_cast<std::size_t>(resource_type::refined_fuel),
+    static_cast<std::size_t>(resource_type::food_rations),   static_cast<std::size_t>(resource_type::charcoal),
+    static_cast<std::size_t>(resource_type::iron_blooms),    static_cast<std::size_t>(resource_type::silicon),
+    static_cast<std::size_t>(resource_type::refined_copper), static_cast<std::size_t>(resource_type::ceramics),
+    static_cast<std::size_t>(resource_type::planks),         static_cast<std::size_t>(resource_type::tools),
+};
 
 enum class ground
 {
@@ -139,6 +153,7 @@ enum class ground
                      ///< tile OF ANY KIND, so no extraction firm can anchor in it
     farmland,        ///< a farm deposit on every tile: extraction anchors anywhere,
                      ///< and no works can (a processing anchor refuses a farm tile)
+    barren,          ///< no deposit anywhere: no extraction firm can anchor at all
 };
 
 struct centre_spec
@@ -147,15 +162,30 @@ struct centre_spec
     std::int32_t points = 8;
 };
 
+struct basket_row
+{
+    std::size_t good;
+    float       demand;        ///< per scale point
+    bool        works;         ///< a recipe makes it (a processing firm); else extraction
+};
+
 struct config
 {
     ground g = ground::everywhere;
+    int body_w = 24, body_h = 12, radius = 4;
+    int scale = 5;                         ///< each centre's scale
     std::vector<centre_spec> centres{ centre_spec{} };
+    /// G: iron ore (extraction), steel and planks (works), 100 per scale point.
+    std::vector<basket_row> basket{ { k_raw, 100.0f, false }, { k_mill1, 100.0f, true },
+                                    { k_mill2, 100.0f, true } };
     charter_cap_rule rule = charter_cap_rule::sqrt_capital;
     std::int32_t c = 2;                    ///< per_resource_firm_cap
     std::int32_t ceiling = 120;            ///< density_ceiling (sqrt only)
+    float works_rate = 0.0f;               ///< processing base rate: 0 = works make nothing
     bool upkeep = false;                   ///< every works draws power (not in G)
     bool yard = false;                     ///< a construction recipe, and capacity wanted per building
+    float yard_seed = 1.0f;                ///< capacity wanted per standing building
+    float yard_output = 1.0f;              ///< the yard recipe's capacity per batch
     bool one_province = false;             ///< every tile in province 1 (cap 2 firms)
 };
 
@@ -167,6 +197,8 @@ struct reading
     std::array<int, resource_count> processing{};     ///< per good, firms with a processing focus
     std::array<long long, charter_unspent_reason_count> unspent{};
     bool balanced = false;
+    std::size_t corporations = 0;                     ///< in the world after the spend
+    const char* world_refusal = nullptr;              ///< charter_spend_world_refusal, asked first
 
     /// Firms for @p good chartered by the config's centre @p i.
     int firms_at(std::size_t i, std::size_t good) const
@@ -178,6 +210,7 @@ struct reading
         return n;
     }
     long long u(charter_unspent_reason why) const { return unspent[static_cast<std::size_t>(why)]; }
+    int body_firms() const { return rep.bodies.empty() ? 0 : static_cast<int>(rep.bodies.front().firms); }
 };
 
 reading run(const config& cfg)
@@ -189,16 +222,16 @@ reading run(const config& cfg)
     {
         body_component bc{};
         bc.name        = "FixtureBody";
-        bc.grid_width  = k_w;
-        bc.grid_height = k_h;
+        bc.grid_width  = cfg.body_w;
+        bc.grid_height = cfg.body_h;
         w->bodies[body] = bc;
     }
     const entity_id nation = w->create_entity();
     nation_component nc{};
     nc.name = "Veyl";
     std::map<std::pair<int, int>, entity_id> at;
-    for (int y = 0; y < k_h; ++y)
-        for (int x = 0; x < k_w; ++x)
+    for (int y = 0; y < cfg.body_h; ++y)
+        for (int x = 0; x < cfg.body_w; ++x)
         {
             const entity_id tid = w->create_entity();
             tile_component tc{};
@@ -207,8 +240,8 @@ reading run(const config& cfg)
             tc.grid_y = y;
             tc.substrate = terrain_substrate::barren;
             int dx = std::abs(x - k_cx);
-            if (dx > k_w / 2)
-                dx = k_w - dx;
+            if (dx > cfg.body_w / 2)
+                dx = cfg.body_w - dx;
             const int dy = y - k_cy;
             switch (cfg.g)
             {
@@ -217,6 +250,7 @@ reading run(const config& cfg)
             case ground::farmland:
                 tc.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] = 1.0f;
                 break;
+            case ground::barren: break;
             }
             w->tiles[tid] = tc;
             nc.tiles.push_back(tid);   // raster order: the nation's stored order
@@ -233,32 +267,36 @@ reading run(const config& cfg)
     {
         const entity_id id = w->create_entity();
         population_centre_component pc{};
-        pc.scale = 5;
+        pc.scale = cfg.scale;
         w->population_centres[id]     = pc;
         w->population_centre_tile[id] = at.at({ cs.x, cs.y });
         points[id] = cs.points;
         out.centres.push_back(id);
     }
 
-    // G = { iron ore, steel, planks }: the households want all three, far more
-    // than any firm here makes (every base rate is 0), so each stays short until
-    // it reaches its cap. Iron ore has no recipe, so its firm is an extraction
-    // firm; steel and planks each have one, so theirs are processing firms.
+    // G is the basket: the households want every good in it. A good with a
+    // recipe is chartered as a works (processing firm); one without, as a mine.
     population_demand_params pd;
-    pd.demand_basket[k_raw]   = 100.0f;
-    pd.demand_basket[k_mill1] = 100.0f;
-    pd.demand_basket[k_mill2] = 100.0f;
+    for (const basket_row& b : cfg.basket)
+        pd.demand_basket[b.good] = b.demand;
     reg.set_population_demand(pd);
-    recipe steelworks;
-    steelworks.name = "fixture_steelworks";
-    steelworks.inputs[k_raw]    = 1.0f;
-    steelworks.outputs[k_mill1] = 1.0f;
-    reg.add_recipe(steelworks);
-    recipe sawmill;
-    sawmill.name = "fixture_sawmill";
-    sawmill.inputs[static_cast<std::size_t>(resource_type::timber)] = 1.0f;
-    sawmill.outputs[k_mill2] = 1.0f;
-    reg.add_recipe(sawmill);
+    for (const basket_row& b : cfg.basket)
+        if (b.works)
+        {
+            recipe rc;
+            rc.name = std::string("fixture_works_") + std::to_string(b.good);
+            rc.inputs[static_cast<std::size_t>(resource_type::timber)] = 1.0f;
+            rc.outputs[b.good] = 1.0f;
+            reg.add_recipe(rc);
+        }
+    if (cfg.works_rate > 0.0f)
+    {
+        // Every works firm opens with two processing facilities (processing_mix),
+        // each at 0.5 workforce: 2 x 0.5 x rate x 1 output a firm.
+        building_economics e;
+        e.base_rate = cfg.works_rate;
+        reg.set_economics(building_type::processing_facility, e);
+    }
     if (cfg.yard)
     {
         // A yard makes construction capacity, and every standing building wants
@@ -267,10 +305,10 @@ reading run(const config& cfg)
         recipe yard;
         yard.name = "fixture_yard";
         yard.inputs[static_cast<std::size_t>(resource_type::stone)] = 1.0f;
-        yard.outputs[k_yard] = 1.0f;
+        yard.outputs[k_yard] = cfg.yard_output;
         reg.add_recipe(yard);
         construction_params cp;
-        cp.seed_capacity_per_building = 1.0f;
+        cp.seed_capacity_per_building = cfg.yard_seed;
         reg.set_construction(cp);
     }
     if (cfg.upkeep)
@@ -281,11 +319,11 @@ reading run(const config& cfg)
         reg.set_building_upkeep(up);
     }
 
-    // Firm 1 point; a specialist no centre here can afford (100 charters).
+    // Firm 1 point; a specialist no centre here can afford (1000 charters).
     charter_spend_params s;
     s.firm_price_points        = 1;
-    s.specialist_firm_charters = 100;
-    s.window_radius            = k_radius;
+    s.specialist_firm_charters = 1000;
+    s.window_radius            = cfg.radius;
     s.province_cap             = true;
     s.resource_cap_rule        = cfg.rule;
     s.per_resource_firm_cap    = cfg.c;
@@ -293,7 +331,9 @@ reading run(const config& cfg)
     s.density_ceiling          = (cfg.rule == charter_cap_rule::sqrt_capital) ? cfg.ceiling : 0;
 
     const charter_budget budget(points);
+    out.world_refusal = charter_spend_world_refusal(*w, reg, budget, s);
     charter_web_from_budget(*w, reg, budget, s, /*seed=*/1060u, /*settle=*/nullptr, &out.rep);
+    out.corporations = w->corporations.size();
     for (const charter_record& r : out.rep.charters)
     {
         if (r.specialist || r.good >= resource_count)
@@ -317,16 +357,54 @@ reading run(const config& cfg)
 void print(const char* label, const reading& r)
 {
     std::printf("  %s: firms iron_ore %d (processing %d), steel %d (processing %d), planks %d "
-                "(processing %d), yard %d; unspent", label, r.firms[k_raw], r.processing[k_raw],
+                "(processing %d), yard %d; body %d; unspent", label, r.firms[k_raw], r.processing[k_raw],
                 r.firms[k_mill1], r.processing[k_mill1], r.firms[k_mill2], r.processing[k_mill2],
-                r.firms[k_yard]);
+                r.firms[k_yard], r.body_firms());
     for (int i = 0; i < charter_unspent_reason_count; ++i)
         if (r.unspent[static_cast<std::size_t>(i)] != 0)
             std::printf(" %s %lld", charter_unspent_reason_name(static_cast<charter_unspent_reason>(i)),
                         r.unspent[static_cast<std::size_t>(i)]);
     if (!r.rep.bodies.empty() && r.rep.bodies.front().even_share > 0)
-        std::printf("; even share %d", static_cast<int>(r.rep.bodies.front().even_share));
-    std::printf("%s\n", r.balanced ? "" : " [UNBALANCED]");
+        std::printf("; even share %d (+1 on %d), yard places %d",
+                    static_cast<int>(r.rep.bodies.front().even_share),
+                    static_cast<int>(r.rep.bodies.front().even_share_extra),
+                    static_cast<int>(r.rep.bodies.front().yard_places));
+    std::printf("%s%s\n", r.balanced ? "" : " [UNBALANCED]", r.rep.refused ? " [REFUSED]" : "");
+}
+
+void print_ten(const reading& r)
+{
+    std::printf("      by good:");
+    if (r.firms[k_raw] > 0 || r.rep.charters.empty())
+        std::printf(" iron_ore %d", r.firms[k_raw]);
+    for (const std::size_t g : k_ten)
+        std::printf(" %s %d", resource_names::name_of(static_cast<resource_type>(g)).c_str(), r.firms[g]);
+    std::printf(" | yard %d\n", r.firms[k_yard]);
+}
+
+/// The ten-good body (NR-906's check): 40 x 24 tiles of barren land, one
+/// centre at (20, 12) of scale 1 with a window of radius 12 that holds every
+/// firm it charters, works that make 1 of their good a firm, and a yard whose
+/// one firm covers every building the walk can stand up (so exactly one yard
+/// is wanted, and one is reserved).
+config ten_goods(std::int32_t points, std::int32_t c)
+{
+    config cfg;
+    cfg.g       = ground::barren;
+    cfg.body_w  = 40;
+    cfg.body_h  = 24;
+    cfg.radius  = 12;
+    cfg.scale   = 1;
+    cfg.centres = { { 20, 12, points } };
+    cfg.basket.clear();
+    for (const std::size_t g : k_ten)
+        cfg.basket.push_back({ g, 1000.0f, true });
+    cfg.c           = c;
+    cfg.works_rate  = 1.0f;
+    cfg.yard        = true;
+    cfg.yard_seed   = 0.01f;
+    cfg.yard_output = 100.0f;
+    return cfg;
 }
 
 } // namespace turn
@@ -685,6 +763,85 @@ int main()
                     r.u(why_t::share_unplaced) == 2 && r.u(why_t::window_exhausted) == 9
                     && r.u(why_t::no_gap) == 0 && r.u(why_t::density_ceiling) == 0 && r.balanced);
     }
+    // --- NR-906: THE SHARE IS A RESERVATION, on the ten-good body ---
+    std::printf("\nthe even share as a reservation (NR-906) — ten works goods, ceiling 120, one yard\n");
+    {
+        // THE RELEASE AND THE YARD. c 15 at B = B_ref = 150: cap 15; 150 charters
+        // over caps summing to 150 outrun the ceiling, so it binds. One yard is
+        // wanted, and its place comes off the ceiling first: (120 - 1) / 10 = 11,
+        // the first nine goods 12. Steel's households want only 6, which six
+        // works make: steel stops being short at 6 and RELEASES the rest of its
+        // share, so the ceiling still fills — 120, not the 114 a capping share
+        // leaves — and nothing is booked no_gap while goods are short and under
+        // their cap.
+        turn::config cfg = turn::ten_goods(150, 15);
+        cfg.basket.front().demand = 6.0f;   // steel: covered by its sixth works
+        const turn::reading r = turn::run(cfg);
+        turn::print("release: steel wants 6", r);
+        turn::print_ten(r);
+        const charter_body_record* b = r.rep.bodies.empty() ? nullptr : &r.rep.bodies.front();
+        expect_true("yard: one yard reserved, one provisioned",
+                    b != nullptr && b->yard_places == 1 && r.firms[turn::k_yard] == 1);
+        expect_true("yard: its place comes off the ceiling before the cut, 119 / 10 = 11 (+1 on 9)",
+                    b != nullptr && b->even_share == 11 && b->even_share_extra == 9);
+        expect_true("release: steel stops at 6", r.firms[turn::k_ten[0]] == 6);
+        expect_true("release: the ceiling still fills to 120", r.body_firms() == 120);
+        expect_true("release: no no_gap while goods are short and under cap; the rest (30) is "
+                    "density_ceiling",
+                    r.u(why_t::no_gap) == 0 && r.u(why_t::density_ceiling) == 30 && r.balanced);
+    }
+    {
+        // THE THRESHOLD. Iron ore joins the nine works as the first good, and the
+        // body has no deposit anywhere: iron ore is placeable nowhere. c 13 at
+        // B = B_ref = 130: cap 13. Without shares (a ceiling of 150, which 130
+        // charters cannot reach) the body reaches 9 x 13 + 1 yard = 118. With the
+        // ceiling at 120 the ore's reservation (12) holds to the end, so the body
+        // reaches 120 - 12 = 108 — no less than 118 less that reservation — and
+        // the 12 unfilled firms are share_unplaced.
+        turn::config cfg = turn::ten_goods(130, 13);
+        cfg.basket.back() = { turn::k_raw, 1000.0f, false };   // tools out, iron ore (a mine) in
+        turn::config open = cfg;
+        open.ceiling = 150;
+        const turn::reading r0 = turn::run(open);
+        turn::print("threshold, ceiling 150 (no shares)", r0);
+        const turn::reading r = turn::run(cfg);
+        turn::print("threshold, ceiling 120", r);
+        turn::print_ten(r);
+        const charter_body_record* b = r.rep.bodies.empty() ? nullptr : &r.rep.bodies.front();
+        const int reserve = (b != nullptr) ? static_cast<int>(b->even_share) + (b->even_share_extra > 0 ? 1 : 0) : -1;
+        expect_true("threshold: without shares the body reaches 118, and the ore gets nothing",
+                    r0.body_firms() == 118 && r0.firms[turn::k_raw] == 0
+                    && (r0.rep.bodies.empty() || r0.rep.bodies.front().even_share == 0));
+        expect_true("threshold: the ore's reservation is 12 (first in the turn)", reserve == 12);
+        expect_true("threshold: with shares the body reaches exactly 120 - 12 = 108",
+                    r.body_firms() == 120 - reserve);
+        expect_true("threshold: never below 118 less the ore's reservation",
+                    r.body_firms() >= r0.body_firms() - reserve);
+        expect_true("threshold: the ore's 12 unfilled firms are share_unplaced",
+                    r.u(why_t::share_unplaced) == 12 && r.u(why_t::window_exhausted) == 10 && r.balanced);
+    }
+    {
+        // THE REFUSAL. Ten goods and one yard place need a ceiling of at least 11;
+        // at 10 the spend is refused before anything is chartered — the world
+        // gains no corporation and every point is booked `refused` — and at 11 it
+        // goes ahead with a share of one each.
+        turn::config cfg = turn::ten_goods(150, 15);
+        cfg.ceiling = 10;
+        const turn::reading r = turn::run(cfg);
+        turn::print("ceiling 10 < 10 goods + 1 yard", r);
+        expect_true("refusal: charter_spend_world_refusal names the ceiling",
+                    r.world_refusal != nullptr && std::strstr(r.world_refusal, "turn goods plus") != nullptr);
+        expect_true("refusal: the spend is refused and mutates nothing",
+                    r.rep.refused && r.corporations == 0 && r.rep.charters.empty()
+                    && r.u(why_t::refused) == 150 && r.balanced);
+        cfg.ceiling = 11;
+        const turn::reading r11 = turn::run(cfg);
+        turn::print("ceiling 11 = 10 goods + 1 yard", r11);
+        expect_true("refusal: at 11 the spend goes ahead, a share of 1 each",
+                    r11.world_refusal == nullptr && !r11.rep.refused && !r11.rep.bodies.empty()
+                    && r11.rep.bodies.front().even_share == 1 && r11.body_firms() == 11);
+    }
+
     {
         // BL-1060 (4): every works the walk charters draws power, which no base
         // installation did, so power is short but NOT in G, and the turn never

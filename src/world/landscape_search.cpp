@@ -242,7 +242,13 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     // world too: the legacy overload verbatim, exactly as with no budget, and a
     // report that says every point went unspent and why. No roster is removed,
     // nothing is chartered — a refusal mutates nothing beyond today's world.
-    if (const char* why = charter_spend_refusal(*budget, spend))
+    // BL-1060: the params' refusal, then the one only the world can decide (a
+    // ceiling too small for a body's turn and yards), both read on `w` as it
+    // arrives.
+    const char* why = charter_spend_refusal(*budget, spend);
+    if (why == nullptr)
+        why = charter_spend_world_refusal(w, reg, *budget, spend);
+    if (why != nullptr)
     {
         apply_landscape_candidate(w, reg, c, regenerate_specialists);
         if (report != nullptr)
@@ -295,8 +301,12 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     // params with the budget removed, which is exactly the no-budget search
     // (all three axes, every score real), and the result says it was refused.
     // `p` is that copy on a refusal and `p_in` itself otherwise.
-    const char* const refusal = (p_in.budget != nullptr)
+    // BL-1060: then the refusal only the world can decide, on the base world
+    // every candidate is applied to (`charter_spend_world_refusal`).
+    const char* refusal = (p_in.budget != nullptr)
         ? charter_spend_refusal(*p_in.budget, p_in.spend) : nullptr;
+    if (refusal == nullptr && p_in.budget != nullptr)
+        refusal = charter_spend_world_refusal(base, reg, *p_in.budget, p_in.spend);
     landscape_search_params refused_params;
     if (refusal != nullptr)
     {

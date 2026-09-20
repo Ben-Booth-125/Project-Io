@@ -207,6 +207,22 @@ int remove_specialist_roster(world& w);
 /// @param settle  The settlement record (`world::gen_settlement`), or null.
 /// @param report  Optional; overwritten with the spend's report.
 /// @return        Every corporation chartered, ascending id.
+/// BL-1060 — the refusal a spend's params cannot decide alone: under
+/// `sqrt_capital`, a density ceiling smaller than some budgeted body's turn
+/// goods plus its yards' places, so the goods could not each keep a share of
+/// it (NR-905, NR-906). Null when the spend may go ahead (and for an empty
+/// budget, a legacy rule, or params `charter_spend_refusal` already refuses).
+///
+/// READ-ONLY, and read BEFORE ANY MUTATION: `apply_landscape_candidate` and
+/// `search_landscape` ask it on the world as they receive it, beside
+/// `charter_spend_refusal`, so a refusal is today's world there too. That world
+/// still carries world-gen's specialist roster, which the budget apply removes
+/// before it charters; removing buildings only shrinks G and the building stock,
+/// so a spend accepted here keeps every share in the walk (which re-asks it).
+const char* charter_spend_world_refusal(const world& w, const recipe_registry& reg,
+                                        const charter_budget& budget,
+                                        const charter_spend_params& spend);
+
 std::vector<entity_id> charter_web_from_budget(world& w,
                                                const recipe_registry& reg,
                                                const charter_budget& budget,
