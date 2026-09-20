@@ -6703,24 +6703,24 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the cost mode",
       "headless: player_seed_sweep --charter-cost (main session)"
      ],
      "requirement": "The cost sweep measures REAL stockpile budgets: the Digitisation span on at epoch 0 in the harness (never epoch_year 1960, the superseded arc), the budget built by the shipped builder, not a synthetic one. The matrix and any trim from the full 16 seeds x 11 rows are stated with the reason.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "The cost sweep grew a --budget stockpile mode: the Digitisation span on at epoch 0 (never 1960) and the budget built by the shipped builder, handed to the search and the winner's apply as app::start_new_game_prelude does (merged b4a0de45). MATRIX stage 1, stated on the run's face: 16 library seeds x firm price 10000/20000/40000 x specialist 4 firm charters, sqrt c=8 ceiling 120, province cap on. TRIM refused rather than dropped: budget scales, ladder scales and the forced province-cap row have no meaning for a world's own stockpile. Run as THREE parallel shards (Ben, to halve the wait): a = 46,28,11,31,40,12,37,13; b = 32,10,25,38,9,0; c = 41,43,9,0. Seeds 9 and 0 ran twice, in b and c, and agree to the digit — an unplanned cross-process determinism check."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep --charter-cost (main session)"
      ],
      "requirement": "Per row and seed: specialists and shortlist size against the legacy roster (6, 6 and 8 on seeds 0, 28, 46); worlds with NO specialist; the specialist capital distribution at the 400 +/-40% draw (NR-895), including any opening at zero; unspent by reason (province_cap, density_ceiling, window_exhausted, share_unplaced, remainder, the dropped-centre reason); firms per good; the density-follows-cities reading; the tick ratio with its phase split; the seat's balance and trailing-net sign.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Per row and seed, over 16 unique seeds: specialists against BOTH baselines (the legacy no-budget roster and a same-world span-on empty budget), firms and firms per good, the stockpile's own account (closes on every seed), unspent by reason, the specialist capital at the draw, the chartered good against the extracted one, rho(firms, population) with the upstream rho(points, population), and the tick ratio with its phase split. Rows with NO specialist: 0 of 48. Readings: legacy anchor median 9 (6-17); seats median 107.5 / 50.5 / 23.5 at 10k / 20k / 40k; the 120 ceiling binds on 16/16 rows at 10k and 11/16 at 40k."
     },
     {
      "id": "R3",
@@ -6730,17 +6730,17 @@
      ],
      "requirement": "The run is serial on a quiet machine with keep-awake, and each row's per-tick maximum is scanned for a sleep-length outlier; any row the PC slept through is re-run.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "OWED: stage 1 ran three shards in PARALLEL at Ben's request, so the per-tick milliseconds are contended and are not a timing reading. A short serial pass on 2-3 seeds at the chosen price closes this (~1 h). Keep-awake was held; the PC's 4-hour idle sleep did not fire during the run."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "tool: charter_cost_merge.js"
      ],
      "requirement": "The table lands in charter_cost_sweep.json (or a sibling) as its own named run with its note, every key already there unchanged (charter_cost_merge.js).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Folded into charter_cost_sweep.json by charter_cost_merge.js as runs.real_stockpile_bl1043_a (8 seeds, 40 rows), _b (6, 30) and _c (4, 20), each with its note; every key already in the table verified deep-equal and unchanged."
     },
     {
      "id": "R5",
@@ -6750,7 +6750,7 @@
      ],
      "requirement": "NEEDS_REVIEW carries the calls with their figures: the firm price, the specialist price in firm charters, the no-specialist world, and whether the per-province cap stays.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "NR-907 filed with the full table (one price cannot hold the seat menu across a library whose stockpiles vary 5x). The firm price, the specialist price and stage 2's band all wait on it. The no-specialist world is answered by the data so far — no seed produced one at any tested price — but remains Ben's to rule. The province cap has not been read off the charter unspent reasons yet."
     },
     {
      "id": "R6",

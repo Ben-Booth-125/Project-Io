@@ -24,13 +24,26 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*10 entries — 0 open, 10 resolved.*
+*11 entries — 1 open, 10 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-907 — CALL: one specialist price cannot hold the seat menu, because the library's stockpiles vary five-fold and seats track them
+*question · raised 2026-09-21 · from BL-1043 (real-stockpile charter sweep) stage 1: 16 library seeds x firm price 10000/20000/40000 x specialist 4 firm charters, three parallel shards, folded into charter_cost_sweep.json as runs.real_stockpile_bl1043_a/_b/_c (main session, 2026-09-20/21).*
+
+The seat-menu anchor (NR-886 and the sprint 45 elicitation) is that the MEDIAN library world offers about as many seats as a world with no budget. Measured over all 16 seeds, the legacy anchor is a median of 9 specialists (range 6-17) and does NOT track the stockpile: seed 31 holds 95.3M points and offers 6, seed 9 holds 27.5M and offers 16. The budget's seats DO track it almost proportionally. Medians: firm price 10000 -> 107.5 seats (range 20-412, 0 of 16 seeds at or under the anchor), 20000 -> 50.5 (8-167, 1 of 16), 40000 -> 23.5 (1-91, 7 of 16). Stockpiles run 24.7M (seed 28) to 133.6M (seed 11), and at 40000 the poorest world offers 1 seat while the richest offers 91. Pricing for the median (about 100000, extrapolating the halving per doubling) starves the poorer half below the legacy roster; pricing for the poorest floods the richest. The firm count is at the 120 ceiling on 16 of 16 seeds at 10000 and 11 of 16 at 40000, so the ceiling binds throughout. NO seed produced a no-specialist world at any tested price.
+
+**Why it matters.** BL-1044 pins these prices at the re-bless; the seat menu is what the player chooses from on the select-corporation screen (sprint 46).
+
+- Price a specialist as a SHARE of the world's own stockpile, so the menu is about the same size library-wide (a build, not a constant: the price stops being a fixed number and becomes a derived one, deterministic and seeded).
+- Keep a fixed price and accept the spread: a world that industrialised harder offers more seats, which is the world talking rather than a knob. Then the price is chosen against the RICHEST world's menu being usable, and the anchor's 'median' wording is what changes.
+- Keep a fixed low price and cap the MENU instead: the shortlist shows at most N seats however many the budget opens.
+
+> **Recommendation:** The first if the menu's size is a UI contract; the second if the menu is meant to read the world. I lean to the first, because the anchor was written to keep the menu comparable across worlds, and a derived price keeps that without a clamp — but it changes what 'the specialist price' means, so it is yours. Either way stage 2's prices depend on it, so stage 2 is held.
+
+*Files: `src/world/stockpile_budget.hpp`, `tools/verify/player_seed_sweep.cpp`, `docs/generation/DIGITISATION.md`, `docs/generation/CORPORATION_GENERATION.md`*
 
 ---
 
