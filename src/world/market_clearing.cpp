@@ -256,8 +256,25 @@ void inject_population_demand(world& w, const recipe_registry& reg)
     const population_demand_params& pd = reg.population_demand();
     const std::array<float, resource_count>& basket = reg.population_demand_basket();
 
-    for (const auto& [centre_id, pcc] : w.population_centres)
+    // ASCENDING CENTRE ID (BL-1050). Many centres inject into ONE market's
+    // `mc.demand[r] +=`, so this is a cross-centre float accumulation and float
+    // addition does not associate: walked in `population_centres`' bucket order
+    // the demand a market prices against would depend on that store's layout,
+    // which a save/load rebuilds (world_save.cpp re-inserts in id order) and
+    // another standard library lays out differently again. The order is now a
+    // property of the ids alone.
+    std::vector<entity_id> centre_ids;
+    centre_ids.reserve(w.population_centres.size());
+    for (const auto& [cid, pcc] : w.population_centres)
     {
+        (void)pcc;
+        centre_ids.push_back(cid);
+    }
+    std::sort(centre_ids.begin(), centre_ids.end());
+
+    for (const entity_id centre_id : centre_ids)
+    {
+        const population_centre_component& pcc = w.population_centres.at(centre_id);
         if (pcc.razed)
             continue; // BL-624 (razed settlement tier): a razed centre has no
                       // heads to feed — it injects no demand until re-settled.

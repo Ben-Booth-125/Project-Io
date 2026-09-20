@@ -24,7 +24,13 @@
 //      every lap with `--laps` — with the BL-1031 D_settle recipe
 //      (world_digest.hpp: snapshot bytes + state_hash), and names the FIRST
 //      tick and lap at which the two part.
-// A seed PASSES when the order audit is clean and every digest agrees. The ONLY
+// A seed PASSES when every digest agrees, and — for a COPY (`construct` /
+// `assign`) — the order audit is clean too. Under `--copy-by snapshot` the audit
+// is REPORTED AND NOT COUNTED, because a load re-inserts every store in
+// ascending id and therefore MUST lay them out differently; what a load has to
+// prove is the digests. (BL-1050 settled this: the header always said the audit
+// was not counted for a load and `pass()` counted it anyway. It could only be
+// made to agree once a loaded world actually ticked byte for byte.) The ONLY
 // thing copied is the world: both sides settle against the one registry.
 //
 // WHAT IT FOUND (2026-09-18, seed 28, before the fix). 13 of world's 18
@@ -36,10 +42,19 @@
 // (apply_budget, through the wages built on it) was the first lap whose digest
 // parted. The fix is the store type, src/world/faithful_unordered_map.hpp.
 //
-// `--copy-by snapshot` IS A DIAGNOSTIC, NOT A CONTRACT. A save round trip drops
-// what the save deliberately does not carry (derived caches, generation-time
-// indexes), so a divergence there is a finding about loading, reported but not
-// counted against the copy.
+// `--copy-by snapshot` IS THE LOAD CONTRACT (BL-1050), and its ORDER audit is
+// the diagnostic. A save round trip drops what the save deliberately does not
+// carry (derived caches, generation-time indexes) and re-inserts every store in
+// ascending id, so the stores MUST lie differently and `body_tile_index` must
+// come back a different size — none of that is counted. The digests are: a
+// loaded world ticks exactly as the world it was saved from.
+//
+// WHAT THAT FOUND (2026-09-20, BL-1050, before the fix). Seed 28's loaded world
+// settled to 4663417C6733EBDE against its original's 265C48A23E313B1A. BL-1034's
+// faithful_unordered_map was never the fix for this half — it makes a COPY keep
+// its source's order, and a load has no source order to keep. The fix is five
+// readers that walked an unordered store where the order reached arithmetic or a
+// tie-break; they now walk ascending ids.
 //
 // USAGE (repo root):
 //   ./build_gen/verify/world_copy_determinism.exe --seed 28
@@ -224,6 +239,7 @@ void digest_after_lap(const world& w, int lap, void* ctx)
 struct seed_result
 {
     std::uint32_t seed = 0;
+    copy_by       by = copy_by::construct;
     bool          orders_clean = true;
     int           orders_differing = 0;
     bool          land_match = true;
@@ -233,7 +249,20 @@ struct seed_result
     int           first_lap  = -1;       ///< its lap (with --laps), else the tick's end
     std::uint64_t settle_orig = 0, settle_copy = 0;
     double        seconds = 0.0;
-    bool pass() const { return orders_clean && land_match && search_match && first_tick < 0; }
+    /// THE ORDER AUDIT IS COUNTED FOR A COPY AND REPORTED FOR A LOAD (BL-1050).
+    /// The header's rule, which `pass()` used to contradict: under `--copy-by
+    /// snapshot` the stores are re-inserted in ascending id and MUST come out
+    /// laid out differently, so counting that against the seed would fail every
+    /// load by construction. What a load has to prove is the DIGESTS — that a
+    /// saved-and-loaded world ticks as the one it was saved from whatever order
+    /// its stores now lie in. Under `construct`/`assign` the audit stays a hard
+    /// requirement: it is the faithful_unordered_map tripwire, and a copy that
+    /// reorders is a copy that can silently diverge.
+    bool pass() const
+    {
+        const bool orders_ok = (by == copy_by::snapshot) || orders_clean;
+        return orders_ok && land_match && search_match && first_tick < 0;
+    }
 };
 
 std::uint64_t search_digest(const landscape_search_result& r)
@@ -256,6 +285,7 @@ seed_result run_seed(lua_state& lua, std::uint32_t seed, copy_at at, copy_by by,
 {
     seed_result res;
     res.seed = seed;
+    res.by   = by;
     const clk::time_point t_start = clk::now();
 
     world_params p{};          // the shipped start: full prehistory, as the pins
@@ -306,8 +336,9 @@ seed_result run_seed(lua_state& lua, std::uint32_t seed, copy_at at, copy_by by,
                 std::printf("         first key out of place at position %zu\n", r.first_mismatch);
         }
     res.orders_clean = res.orders_differing == 0;
-    std::printf("  order audit: %zu unordered stores, %d iterate differently in the copy\n",
-                rows.size(), res.orders_differing);
+    std::printf("  order audit: %zu unordered stores, %d iterate differently in the copy%s\n",
+                rows.size(), res.orders_differing,
+                by == copy_by::snapshot ? "  (reported, NOT counted -- see pass())" : "");
     if (at == copy_at::base)
         std::printf("  landscape search on the copy: %s the original's\n",
                     res.search_match ? "MATCHES" : "DIFFERS FROM");

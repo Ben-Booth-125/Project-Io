@@ -14,13 +14,26 @@ float body_mean_habitability(const world& w, entity_id body)
 {
     // Mirrors the accumulation apply_budget's batch used, filtered to one body, so
     // the estimate and the live budget loop read an identical mean (bit-for-bit).
-    // ORDER-DEPENDENT: a float sum in `population_centres` iteration order. That
-    // order is why a world copy must keep it (BL-1034, faithful_unordered_map.hpp):
-    // a reordered copy moved this mean two ULP on seed 28 and every wage with it.
-    float sum = 0.0f;
-    int   count = 0;
+    //
+    // ASCENDING CENTRE ID (BL-1050). This is a float sum and float addition does
+    // not associate, so the summation order must be a property of the ids and
+    // never of `population_centres`' bucket layout: a save/load re-inserts that
+    // store in id order (world_save.cpp) and lays it out differently, and another
+    // standard library lays it out differently again — so the unordered walk that
+    // was here made a LOADED world tick differently from the one it was saved
+    // from. BL-1034's faithful_unordered_map keeps a COPY in its source's order
+    // and stays as the tripwire; it never was the fix for a load or a port.
+    // A reordered read moved one body's mean two ULP on seed 28 and every wage
+    // built on it with it, which is exactly how much this is worth.
+    //
+    // The membership test (a centre on this body) is order-free; only the sum
+    // needs the order, so the filter runs first and the sort is the body's
+    // centres, not the world's.
+    std::vector<entity_id> centre_ids;
+    centre_ids.reserve(w.population_centres.size());
     for (const auto& [cid, pcc] : w.population_centres)
     {
+        (void)pcc;
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
             continue;
@@ -29,9 +42,14 @@ float body_mean_habitability(const world& w, entity_id body)
             continue;
         if (tc_it->second.body != body)
             continue;
-        sum += pcc.habitability;
-        ++count;
+        centre_ids.push_back(cid);
     }
+    std::sort(centre_ids.begin(), centre_ids.end());
+
+    float sum = 0.0f;
+    for (const entity_id cid : centre_ids)
+        sum += w.population_centres.at(cid).habitability;
+    const int count = static_cast<int>(centre_ids.size());
     return (count > 0) ? sum / static_cast<float>(count) : 1.0f;
 }
 

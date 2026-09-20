@@ -24,9 +24,24 @@ std::vector<corp_standing> compute_corp_standings(
     std::sort(corp_ids.begin(), corp_ids.end());
 
     // Tick-total income denominator for market share (0 if no trade this tick — avoids /0).
-    float total_income = 0.0f;
+    // ASCENDING CORP ID (BL-1050): a float sum, and `cash_flow` is an unordered_map
+    // whose layout the caller's own insertion order fixes — so walked as it lies,
+    // this denominator (and every market share divided by it) would move with a
+    // store layout a save/load or another standard library rebuilds differently.
+    // Its OWN keys, not `corp_ids` above: a flow may be filed for a corp that has
+    // already wound up, and dropping it would change the denominator, not just
+    // its summation order.
+    std::vector<entity_id> flow_ids;
+    flow_ids.reserve(cash_flow.size());
     for (const auto& [id, flow] : cash_flow)
-        total_income += flow.income;
+    {
+        (void)flow;
+        flow_ids.push_back(id);
+    }
+    std::sort(flow_ids.begin(), flow_ids.end());
+    float total_income = 0.0f;
+    for (const entity_id id : flow_ids)
+        total_income += cash_flow.at(id).income;
 
     std::vector<corp_standing> out;
     out.reserve(corp_ids.size());
