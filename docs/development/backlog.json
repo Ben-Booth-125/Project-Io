@@ -781,6 +781,28 @@
     "tools/session/"
    ],
    "design": "CONTINUITY PASS. BL-1050's prose asks for it and its R1-R7 do not require it, so it was not built with the item (lane report, 2026-09-20). The rule (TECH_FOUNDATIONS.md ~104-111: a loaded world replays byte for byte, and so does a copy) is today held by six hand-fixed readers and one tripwire type; nothing stops the seventh being written. THE WORK: a check that fails when a store on `world` that should be faithful_unordered_map is a plain unordered_map, and when a reader walks an unordered store into a float sum, a strict-inequality tie-break or a write order — a source scan is acceptable if it names what it cannot see. Run it in the verify suite. DONE WHEN: it fails on a deliberately reverted reader (BL-1050's own five make the fixtures) and passes on main."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-20",
+   "author": "Claude (BL-1034 cold review, carried again by BL-1050 and its review, 2026-09-20)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1063",
+   "short_name": "WORKER_THROW_MESSAGE_LOST",
+   "category": "Tech",
+   "priority": "C",
+   "difficulty": 1,
+   "title": "A throw inside a landscape-search worker reaches std::terminate and its message is dropped",
+   "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+   "files": [
+    "src/main.cpp",
+    "src/world/landscape_search.cpp"
+   ],
+   "design": "CONTINUITY PASS. FOUND by BL-1034 (world copies diverge) cold review, carried unbuilt through BL-1050 and named again by its review (2026-09-20). faithful_unordered_map throws a logic_error when a copy cannot keep its source order — the tripwire the byte-identical-replay rule stands on. Thrown inside a landscape-search worker thread it reaches std::terminate, and the handler (main.cpp ~l.383) drops the message, so the one diagnostic the tripwire exists to print is exactly what is lost. THE WORK: catch in the worker and carry the message to the joining thread (or set a failure slot the search reports), so a tripwire throw names the store and the site. DONE WHEN: a deliberately unfaithful copy inside a worker prints its message and fails the run, rather than terminating silently."
   }
  ]
 }
