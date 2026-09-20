@@ -7,181 +7,431 @@
  "amend_BL-1047": {
   "short_name": "EPOCH_FLIP_GATES",
   "add_to_design": "RE-CHECKED 2026-09-19 against 5b84aded. Cites that hold: era_minus_one.cpp:35 (arc predicate), era_band.hpp:42, hard_coded_world.cpp:813 (settlement stop = epoch_year), era_minus_one.cpp:327 (Empires start = epoch - prehistory_years), app.cpp 1170/1365 (set_era, --epoch), format.cpp:153. Cites that drifted: settlement antiquity branch now settlement.cpp:1232 (founding schedule 1265-1302, Stage 4 skip 1325); demography anchor 1240-1248; antiquity_start hard_coded_world.cpp:1854 (gates 1860/1868/1875); save seam save_game.cpp write 90-92, read 99-101. MISSING COUPLING (a seventh arc selector): era_minus_one.cpp:365-370 exploration_sim_enabled() returns false whenever the industrial span is on, and Digitisation sits inside that block (hard_coded_world.cpp:1204, 1373/1379) — a naive flip to 1960 silently skips Exploration and the Digitisation span. Also history_sim.cpp:7858 (tariff posture runs only on the two-span arc, via boundary_year) and hard_coded_world.cpp:2625 (gen budget log). SAVE SEAM: writes epoch_year, prehistory_years, industrial_years; not era_seed, exploration_sim_enabled, digitisation_span_enabled or the stop years; version 16 (save_game.hpp:159), exact match. THE WORK adds: empires_start_year as its own field read at era_minus_one.cpp:327; run_settlement's stop year its own fixed field (0 CE) at hard_coded_world.cpp:813, so antiquity, the founding schedule and the demography anchor stay byte-identical; decouple exploration_sim_enabled from the epoch; flip world_params::epoch_year to 1960 (hard_coded_world.hpp:80); save v17 drops industrial_years and adds era_seed and the span switches (save_envelope_roundtrip.cpp:150-157, 378-408). Stale comments: main.cpp:543-548, hard_coded_world.hpp:65-79 and 96-100, era_minus_one.hpp:73-95. DONE WHEN adds: nothing reads epoch_year but the calendar (format.cpp; app.cpp 1377, 1789) and era_band_for_epoch; save_envelope_roundtrip passes at v17.",
-  "add_files": ["src/core/app.cpp", "src/ui/format.cpp", "src/core/save_game.hpp", "src/core/save_game.cpp", "tools/verify/save_envelope_roundtrip.cpp"]
+  "add_files": [
+   "src/core/app.cpp",
+   "src/ui/format.cpp",
+   "src/core/save_game.hpp",
+   "src/core/save_game.cpp",
+   "tools/verify/save_envelope_roundtrip.cpp"
+  ]
  },
  "items": [
   {
    "group": "retire",
    "short_name": "TWO_SPAN_ARC_RETIRED",
    "title": "The superseded 1560->1960 two-span arc and its sim machinery are deleted outright",
-   "priority": "S", "difficulty": 3, "world_mover": false, "requires": ["BL-1047"],
+   "priority": "S",
+   "difficulty": 3,
+   "world_mover": false,
+   "requires": [
+    "BL-1047"
+   ],
    "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (2)): retire outright, no legacy field.\n\nWHY. The arc is chosen at era_minus_one.cpp:25-36 and built at 298-315 (stop = epoch, boundary = epoch - industrial_years, span1_band_ceiling = medieval, two tick bands). Machinery only it uses: history_sim_params::boundary_year and span1_band_ceiling (history_sim.hpp:182-192); sim_band_ceiling (history_sim.hpp:4288-4289; history_sim.cpp:249-258) and the ceiling argument threaded through build_stack (history_sim.cpp:289-300, 4281, 4286, 5762, 5799); the furnace-before-boundary note (history_sim.cpp:6980-6995); the two-span half of BL-976's protection derivation (~7849-7916 — the broadcast half STAYS, seed_national_tariffs reads it at hard_coded_world.cpp:1808-1821); world_params::industrial_years (hard_coded_world.hpp:96-100).\n\nTHE WORK. Delete era_minus_one_has_industrial_span, the two-span branch, industrial_years, boundary_year, span1_band_ceiling, sim_band_ceiling and the ceiling parameter; keep the protection field and broadcast. Harnesses that build the arc are rewritten or retired by the harness item: world_determinism R4 (636-685, digest '1960/two-span' at :666), era_world_harness R5 (113-118, 250-272), history_sweep's two-span reporting (1037-1075, the BL-760 section from 2159, 2509-2520, 3317), ownership_class.cpp:534, demand_census.cpp:1436, haulage_measure.cpp:178.\n\nDONE WHEN. grep industrial_years|boundary_year|span1_band_ceiling|has_industrial_span is empty in src/ and tools/; the '1960/two-span' digest is gone; the epoch-0 digests are unchanged.",
-   "files": ["src/world/era_minus_one.cpp", "src/world/era_minus_one.hpp", "src/world/history_sim.hpp", "src/world/history_sim.cpp", "src/world/hard_coded_world.hpp", "tools/verify/world_determinism.cpp", "tools/verify/era_world_harness.cpp", "tools/verify/history_sweep.cpp"]
+   "files": [
+    "src/world/era_minus_one.cpp",
+    "src/world/era_minus_one.hpp",
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.hpp",
+    "tools/verify/world_determinism.cpp",
+    "tools/verify/era_world_harness.cpp",
+    "tools/verify/history_sweep.cpp"
+   ]
   },
   {
    "group": "retire",
    "short_name": "NARRATIVE_PASSES_RETIRED",
    "title": "The three narrative passes that ran only on the superseded arc are deleted: ruptures, the Charter Act and border accord, the 1951 common tongue",
-   "priority": "A", "difficulty": 2, "world_mover": false, "requires": [],
+   "priority": "A",
+   "difficulty": 2,
+   "world_mover": false,
+   "requires": [],
    "authority_doc": "docs/lore/HISTORY.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (3)).\n\nWHY. Every call sits behind !antiquity_start (hard_coded_world.cpp:1854), so only the 1960 arc reaches them. Ruptures: settlement.cpp 1714-2128 (helpers transfer_tile, scale_abundance, flip, redact at 1719-1782), tag_rupture :189, declared settlement.hpp:1111-1136, called hard_coded_world.cpp:1860-1863; writes settlement_state::checkpoints and lacunae (settlement.hpp:801-805), saved at save_game.cpp:388-397, read by history_log.cpp:156-161 and history_sweep.cpp:1154, 3787. Charter Act and border accord: history_ladder.cpp 390-471, history_ladder.hpp:129-145, called :1868-1869; ladder_rung::charter and borders (planetology.hpp:325-326), max_rung saved at save_game.cpp:27. Common tongue: creeds.cpp 278-309 (the dated line :305), creeds.hpp:239-241, called :1875-1876. Tests: settlement_harness S5b, S6a, S6b, S8b (268-295, 355-380); era_world_harness :269; history_ladder_harness :137, 208-251, 277-305; creeds_harness C4 (170-194).\n\nTHE WORK. Delete the three functions, their calls and the antiquity_start flag. DECIDE AT THE CUT (unsure in the read): lacunae has no other writer, so it goes; checkpoints has one other writer, resolve_plague_event (settlement.cpp:2502), whose only callers found were in demography_harness — keep or drop the field and its save record. Whether ladder_rung::charter and borders go (the save's max_rung moves with them). Fix the comments at hard_coded_world.cpp:1849-1853 and :1883. Remove or rewrite C4, the charter/accord checks, S6, S8b and R5's rupture check.\n\nDONE WHEN. grep resolve_historical_ruptures|record_institutional_history|record_globalisation is empty; the harness gate is green; the epoch-0 digests are unchanged.",
-   "files": ["src/world/settlement.cpp", "src/world/settlement.hpp", "src/world/history_ladder.cpp", "src/world/history_ladder.hpp", "src/world/creeds.cpp", "src/world/creeds.hpp", "src/world/hard_coded_world.cpp", "src/world/planetology.hpp", "src/core/save_game.cpp", "tools/verify/settlement_harness.cpp", "tools/verify/history_ladder_harness.cpp", "tools/verify/creeds_harness.cpp"]
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/settlement.hpp",
+    "src/world/history_ladder.cpp",
+    "src/world/history_ladder.hpp",
+    "src/world/creeds.cpp",
+    "src/world/creeds.hpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/planetology.hpp",
+    "src/core/save_game.cpp",
+    "tools/verify/settlement_harness.cpp",
+    "tools/verify/history_ladder_harness.cpp",
+    "tools/verify/creeds_harness.cpp"
+   ]
   },
   {
    "group": "retire",
    "short_name": "HARNESSES_ON_BUILT_WORLDS",
    "title": "Every harness measures a world the game builds, and every calibration constant names a measurement on one",
-   "priority": "A", "difficulty": 3, "world_mover": false, "requires": ["BL-1047"],
+   "priority": "A",
+   "difficulty": 3,
+   "world_mover": false,
+   "requires": [
+    "BL-1047"
+   ],
    "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
    "design": "RULED (Ben, 2026-09-18, sprint 46 planned row 3).\n\nWHY. No-prehistory 1960 worlds: creeds_harness.cpp:120, history_ladder_harness.cpp:137 and 289, settlement_harness.cpp:368, demand_census.cpp:705-707 (--fast). Full 1960 arc: world_determinism R4, era_world_harness R5, ownership_class.cpp:534, demand_census.cpp:1436. --epoch takers: campaign_lapse (README.md:935), chain_conversion_probe (:105, :127), haulage_measure (default 1960 at :178), history_sweep (:911) — after the flip --epoch 1960 builds the NEW default. Warm starts: campaign_lapse --warm (:44, :777), demand_census warm_ticks — the read could not confirm which start from the superseded arc; check at the cut. Constants citing arc measurements: history_sim.hpp:429 -> capacity_band_cost (449); :647 and :680 -> invest_level_pull_q, invest_ground_pull_q (676, 695); :1721 -> work_amortise_years (1741); hard_coded_world.cpp:2125 -> kMarketJunctionDegree (2154); road_generation.cpp:180 -> kAncientRoadUses (189).\n\nTHE WORK. Point each harness at the default params with the spans on (or the wizard's handoff); decide whether --epoch survives; re-measure each constant or restate it as 'measured on the retired arc; kept'. Remember haulage_measure is the only real check on convoy traffic (goldens cannot see trade).\n\nDONE WHEN. No tools/verify file sets epoch_year = 1960 to reach the old arc; each cited constant names a measurement on a built world; the verify README lists the new invocations.",
-   "files": ["tools/verify/creeds_harness.cpp", "tools/verify/history_ladder_harness.cpp", "tools/verify/settlement_harness.cpp", "tools/verify/demand_census.cpp", "tools/verify/world_determinism.cpp", "tools/verify/era_world_harness.cpp", "tools/verify/ownership_class.cpp", "tools/verify/campaign_lapse.cpp", "tools/verify/chain_conversion_probe.cpp", "tools/verify/haulage_measure.cpp", "tools/verify/history_sweep.cpp", "tools/verify/README.md", "src/world/history_sim.hpp", "src/world/road_generation.cpp"]
+   "files": [
+    "tools/verify/creeds_harness.cpp",
+    "tools/verify/history_ladder_harness.cpp",
+    "tools/verify/settlement_harness.cpp",
+    "tools/verify/demand_census.cpp",
+    "tools/verify/world_determinism.cpp",
+    "tools/verify/era_world_harness.cpp",
+    "tools/verify/ownership_class.cpp",
+    "tools/verify/campaign_lapse.cpp",
+    "tools/verify/chain_conversion_probe.cpp",
+    "tools/verify/haulage_measure.cpp",
+    "tools/verify/history_sweep.cpp",
+    "tools/verify/README.md",
+    "src/world/history_sim.hpp",
+    "src/world/road_generation.cpp"
+   ]
+  },
+  {
+   "group": "retire",
+   "short_name": "PHASE_RENAME_DIGITISATION",
+   "title": "The 1660-1960 phase is renamed: Digitisation names computing, which belongs to the campaign, not the age before it",
+   "priority": "A",
+   "difficulty": 2,
+   "world_mover": false,
+   "requires": [
+    "BL-1044"
+   ],
+   "authority_doc": "docs/GLOSSARY.md",
+   "design": "RAISED by Ben 2026-09-20: 'digitisation isn't the best name for our period from 1660 to 1960. Perhaps we should just go with Industrialisation'. Filed into sprint 46 rather than built then, because the rename touches every identifier BL-1043, BL-1050 and BL-1044 were in flight over, and sprint 46's doc sweep rewrites these docs anyway — one pass, after the re-bless.\n\nTHE NAME IS BEN'S CALL AT THE CUT. He leans Industrialisation. The objection raised with him: the word is already taken twice inside the phase — reading 8 of digitisation_sim_harness is 'Industrialisation' (the points measurement) and a REGION industrialises (region::industrial_year, the furnace crossing, settlement.cpp Stage 4), with the Industry tree a third sense. Alternatives offered: 'The Industrial Age' (a span, so it does not collide with a region's event), or a one-word name in the register of Colonisation / Exploration ('Steam', 'The Machine Age'). Decide the name first; the work below is the same either way.\n\nTHE WORK. (1) docs/generation/DIGITISATION.md -> the new file name, and every citation of it (CLAUDE.md's doc map, GLOSSARY.md, GENERATION_STRATEGY.md, EXPLORATION.md, INDUSTRY_TREE.md, TREES.md, ERAS.md, sprints.json, this drafts file). (2) The identifiers: digitisation_span_enabled, digitisation_output, digitisation_stop_year, digitisation_params, digitisation_sim_params, digitisation_timelapse, tools/verify/digitisation_sim_harness.cpp, the --through/--fidelity help text, and the wizard's round label. A rename only — no behaviour moves, so world_determinism digests and the pins must not move, and the save seam is untouched unless a field name is serialised by name (it is not: flat binary). (3) GLOSSARY.md gets the term with its span and its boundary against the campaign era. (4) Where the phase name and the region event would now read alike, say which is which at each site (reading 8's title, region::industrial_year's comment). DONE WHEN: a grep for 'digitisation' (any case) in src/, tools/ and docs/ returns nothing but history; every harness builds and passes; --digest-check 16/16 against the post-re-bless pins."
   },
   {
    "group": "retire",
    "short_name": "GENERATION_DOC_SWEEP_46",
    "title": "The generation docs stop describing the superseded arc, preferred sellers, the old warm start, the two-span tariff timing and the retired narrative passes",
-   "priority": "A", "difficulty": 2, "world_mover": false, "requires": [],
+   "priority": "A",
+   "difficulty": 2,
+   "world_mover": false,
+   "requires": [],
    "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (8) strike preferred sellers; sprint 46 planned row 11). Corpus mode; one NEEDS_REVIEW entry per call taken.\n\nWHY (read 2026-09-19). Superseded arc: MANUAL.md:113, 410-414; HISTORY.md:34-38, 193; GENERATION_STRATEGY.md:802-858 (contradicts its own line 35); CIVILISATION.md:50-62, 832, 1001; EXPLORATION.md:29; COLONISATION.md; DIGITISATION.md; research/COLONIAL_ERA.md. Preferred sellers: LOGISTICS.md:275; EXPLORATION.md:349; DIGITISATION.md; COLONIAL_ERA.md. Stale warm start: GENERATION_STRATEGY.md:326, 867-876, 926; LOGISTICS.md:326; ERAS.md:57-91 (check); ui/STARTUP.md; CORPORATION_GENERATION.md; FINANCE.md; MARKETS.md; AI_OPPONENT.md. Two-span tariff timing: HISTORY.md:298, 345-347; GENERATION_STRATEGY.md:858, 909-910, 930. Retired passes: HISTORY.md, CREEDS.md, DIGITISATION.md, CORPORATION_GENERATION.md; rupture mentions in CONCEPT, GLOSSARY, SYSTEMS, ERAS, NATION_GENERATION, PLANETOLOGY. Code comments in the same sweep: startup_screens.cpp:36-50, main.cpp:543-548.\n\nTHE WORK. Run AFTER the retirements land, so the docs describe what is true. State-independent wording (no 'retired in sprint 46'). Grep the OLD wording, not just the cited lines — same-day rulings orphan siblings.\n\nDONE WHEN. header_graph.js --dangling shows no new danglings; a grep for 1560, two-span, preferred seller, Charter Act, common tongue and rupture in docs/ returns only history/provenance lines; MANUAL.md describes the 1960 start.",
-   "files": ["docs/MANUAL.md", "docs/lore/HISTORY.md", "docs/lore/CREEDS.md", "docs/generation/GENERATION_STRATEGY.md", "docs/generation/CIVILISATION.md", "docs/generation/EXPLORATION.md", "docs/generation/COLONISATION.md", "docs/generation/DIGITISATION.md", "docs/economy/LOGISTICS.md", "docs/economy/ERAS.md", "docs/ui/STARTUP.md"]
+   "files": [
+    "docs/MANUAL.md",
+    "docs/lore/HISTORY.md",
+    "docs/lore/CREEDS.md",
+    "docs/generation/GENERATION_STRATEGY.md",
+    "docs/generation/CIVILISATION.md",
+    "docs/generation/EXPLORATION.md",
+    "docs/generation/COLONISATION.md",
+    "docs/generation/DIGITISATION.md",
+    "docs/economy/LOGISTICS.md",
+    "docs/economy/ERAS.md",
+    "docs/ui/STARTUP.md"
+   ]
   },
   {
    "group": "wizard",
    "short_name": "ROUND_SIX_PLAYS_SPAN",
    "title": "Wizard round 6 plays the Digitisation span, 1660 to 1960, as a time-lapse round",
-   "priority": "S", "difficulty": 3, "world_mover": false, "requires": ["BL-1044"],
+   "priority": "S",
+   "difficulty": 3,
+   "world_mover": false,
+   "requires": [
+    "BL-1044"
+   ],
    "authority_doc": "docs/ui/STARTUP.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (6)); re-files BL-997 (archived unbuilt).\n\nWHY. Six rounds, two planetology (app.hpp:462-463), three lapse rounds (app.hpp:477, mirrored startup_screens.cpp:737-738), so every per-lapse array is sized 3 (app.hpp:628-688). Round headers startup_screens.cpp:791-823; loading labels stop at Exploration (:1301-1305); progress bars :1315-1344. Round 6 draws draw_pass_round_placeholder() (:838-854, called :1497). stop_after_digitisation exists (world_gen_config.hpp:109; handled hard_coded_world.cpp:1711-1717) but the UI never sets it (startup_screens.cpp:332-334). The span block is hard_coded_world.cpp:1343-1520, params era_minus_one.cpp:426-473; it runs only when Exploration ran, digitisation_span_enabled is on and stop_after_exploration is off (:1379-1380). It already feeds the live map and progress (:1431-1446, label 14), but no digitisation_timelapse is recorded on the report (:1498-1501) — adding one is a save-format change.\n\nTHE WORK. wizard_lapse_round_count to 4; 'Loading the Digitisation round'; a stop for lapse index 3 — or, better, round 6 runs the FULL build (no stop), which is what lets Begin adopt the world (the sibling item); be.digitisation_timelapse in the :1498 block with a save_game_version bump; lapse_from_report for index 3; delete the placeholder. Needs digitisation_span_enabled on, which BL-1044 does.\n\nDONE WHEN. A live click-through reaches round 6 and it plays 1660->1960 (a live check, not only a capture); a watched and an unwatched run are byte-identical; the placeholder is gone; save round-trip passes.",
-   "files": ["src/ui/startup_screens.cpp", "src/core/app.hpp", "src/ui/history_lapse.hpp", "src/ui/history_lapse.cpp", "src/world/hard_coded_world.hpp", "src/world/hard_coded_world.cpp", "src/core/save_game.cpp", "docs/ui/STARTUP.md"]
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/core/app.hpp",
+    "src/ui/history_lapse.hpp",
+    "src/ui/history_lapse.cpp",
+    "src/world/hard_coded_world.hpp",
+    "src/world/hard_coded_world.cpp",
+    "src/core/save_game.cpp",
+    "docs/ui/STARTUP.md"
+   ]
   },
   {
    "group": "wizard",
    "short_name": "BEGIN_ADOPTS_WIZARD_WORLD",
    "title": "Begin starts the game on the world the wizard built, instead of rebuilding it",
-   "priority": "S", "difficulty": 3, "world_mover": false, "requires": ["ROUND_SIX_PLAYS_SPAN"],
+   "priority": "S",
+   "difficulty": 3,
+   "world_mover": false,
+   "requires": [
+    "ROUND_SIX_PLAYS_SPAN"
+   ],
    "authority_doc": "docs/ui/STARTUP.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (5)); re-files BL-1025 (archived unbuilt).\n\nWHY. The wizard's worker calls make_hard_coded_world with a stop flag (chosen :335-338), keeps only the record and discards the world (startup_screens.cpp:345-353); a world stopped at a round has no nations, roads or corporations (:325-327; returns hard_coded_world.cpp:1688-1717). Begin (startup_screens.cpp:1648-1651, :1806) calls app::begin_new_game (app.cpp:502-561), which reloads config and rebuilds (:553-558); poll_worldgen (:617) then runs start_new_game_prelude (:653, defined :985): setup_world (:1019), economy, landscape search (:1057-1076). Invalidation already exists: m_wiz_history_stale (startup_screens.cpp:380-388), invalidate_wizard_rounds_below (app.hpp:274-287, called :971). Under --verify the wizard adopts the harness report (:292-303).\n\nTHE WORK. Measure the Release build cost first (BL-1025's 73 s was Debug). Round 6's run is the full build; keep the finished world and its report. begin_new_game moves a valid cached world into m_world and jumps to the poll_worldgen tail (prelude, validation run, seat); otherwise the async build. Any world-changing control drops the cache via the stale flag. STARTUP.md states the cache's owner, invalidation rule and memory cost (a world is large; memory caps this machine).\n\nDONE WHEN. With a valid cache Begin never calls make_hard_coded_world (log); a reroll on any round drops it; an adopted world and a cold rebuild with the same settings have the same state hash; checked live.",
-   "files": ["src/ui/startup_screens.cpp", "src/core/app.cpp", "src/core/app.hpp", "docs/ui/STARTUP.md"]
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/core/app.cpp",
+    "src/core/app.hpp",
+    "docs/ui/STARTUP.md"
+   ]
   },
   {
    "group": "wizard",
    "short_name": "PLAY_HANDOFF_CONTRACT",
    "title": "One play-handoff struct carries every row of What crosses into play, each carried or stated deferred, and world setup reads only it",
-   "priority": "S", "difficulty": 3, "world_mover": false, "requires": [],
+   "priority": "S",
+   "difficulty": 3,
+   "world_mover": false,
+   "requires": [],
    "authority_doc": "docs/generation/DIGITISATION.md",
    "design": "RULED (Ben, 2026-09-18, sprint 46 planned row 7).\n\nWHY. digitisation_output is an empty subclass of exploration_output (history_sim.hpp:5132-5134; its comment :5118-5122 says it 'does not yet carry' the play list). World setup reads four things from it: grudges, surviving corridors, treasuries, the live settlement (hard_coded_world.cpp:1493-1496). Row by row (DIGITISATION.md:700-720) today: nations/polity map READ (:1621, :1720); GDP not read (only treasury, nation_generation.cpp:1148-1171); regime stub not read (ideology from the furnace tercile, settlement.cpp:1654); garrisons partly (size from treasury, nation_generation.cpp:1415-1418); corporate web/charter budget not read (app.cpp:1063-1070 — BL-1042 changes this); price field/demand weights not read (base prices, :2287-2290); tariff posture called (:1820) but zero on the shipped arc (history_sim.cpp:7858); road tiers partly (ancient_tier rule road_generation.cpp:198, not the sim's c.tier history_sim.cpp:7782; no rail rung); culture shares partly (plurality for naming only :1655, :1665); standing war conditions not found; campaign tech state not read (polity::industry_mask history_sim.hpp:2728); per-nation Alarm not found; sea lanes not found; network strength not read; depleted reserves not read; grudges as sentiment READ (:1757-1806).\n\nTHE WORK. A play_handoff struct holding every row, each flagged carried or deferred with its reason; built from digitisation_output plus setup; world setup takes only it, not the loose kepler_* locals; validated as BL-969 validates handoffs; the contract table written into DIGITISATION.md. Land it EARLY: every carry-row item then adds one field to it.\n\nDONE WHEN. Every row is a field or on the stated-deferred list; a harness asserts the four current reads come through the struct (digitisation_sim_harness.cpp:1193+); a grep finds no setup read of sim state outside it; digests unchanged.",
-   "files": ["src/world/history_sim.hpp", "src/world/hard_coded_world.cpp", "src/world/nation_generation.cpp", "tools/verify/digitisation_sim_harness.cpp", "docs/generation/DIGITISATION.md"]
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/nation_generation.cpp",
+    "tools/verify/digitisation_sim_harness.cpp",
+    "docs/generation/DIGITISATION.md"
+   ]
   },
   {
    "group": "wizard",
    "short_name": "INDUSTRIALISATION_FROM_POINTS",
    "title": "National ideology, qualification, focus and the corporation focus pivot read Beat 1's industry points, not the calendar lag",
-   "priority": "S", "difficulty": 3, "world_mover": true, "requires": ["PLAY_HANDOFF_CONTRACT"],
+   "priority": "S",
+   "difficulty": 3,
+   "world_mover": true,
+   "requires": [
+    "PLAY_HANDOFF_CONTRACT"
+   ],
    "authority_doc": "docs/generation/DIGITISATION.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (4)).\n\nWHY (a structural zero on the shipped arc). Stage 4 skips when the settlement stop year is before 1700 (settlement.cpp:1232, :1325), so every region keeps industrial_lag_years = -1 (settlement.hpp:321); the furnace loop skips negative lags (history_sim.cpp:7012); nothing industrialises and median_industrial_year stays 0 (:7796-7805). So derive_national_character (settlement.cpp:1590-1683) sees no first furnace: every nation Isolationist (:1654), qualification 0.05 (:1675), the early-industrialiser focus bump (:1649-1651) never fires, focus falls back to all regions (:1635-1637). focus_from_region (settlement.cpp:2148; called corporation_generation.cpp:1693, :3106) needs median > 0 and never fires. Isolationist maps to ownership_class::closed (corporation_generation.cpp:1494). The road lattice's tier gate reads the qualification percentile (road_generation.cpp:298, :414).\n\nTHE WORK. A points-based industrialisation reading per region (region::industry_points, settlement.hpp:455, accrued history_sim.cpp:3496-3508, treasury share :1056-1092) — a threshold or a within-world rank, DESIGN AT THE CUT; carried on the handoff; first furnace, terciles, qualification, focus and focus_from_region re-derived from it; Stage 4's calendar lag retired with the two-span arc.\n\nDONE WHEN. Over the 16 library seeds: ideology takes more than one value, qualification is not 0.05 everywhere, the pivot fires for some corporations; the ownership-class spread is reported; lands behind the sprint's switch.",
-   "files": ["src/world/settlement.cpp", "src/world/settlement.hpp", "src/world/history_sim.cpp", "src/world/corporation_generation.cpp", "src/world/hard_coded_world.cpp", "src/world/road_generation.cpp"]
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/settlement.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/road_generation.cpp"
+   ]
   },
   {
    "group": "wizard",
    "short_name": "CAPITAL_MARKET_SHELLS",
    "title": "Capital-market shells are counted, then priced from the template or folded into their nearest carve market",
-   "priority": "B", "difficulty": 2, "world_mover": true, "requires": [],
+   "priority": "B",
+   "difficulty": 2,
+   "world_mover": true,
+   "requires": [],
    "authority_doc": "docs/economy/MARKETS.md",
    "design": "RULED (Ben, 2026-09-18, sprint 46 planned row 9): census, then price or fold.\n\nWHY. The sim marks has_market on every living capital at the close (history_sim.cpp:7825-7833); hard_coded_world.cpp:1566-1597 makes a default market_component for each, setting only body and centre_tile — no base price, no price (the comment :1570-1576 says so). The carve (:2255-2299) prices its own markets from the template and never folds these in. Endemic pricing (:2334-2358) sets base prices on every Kepler market, so a shell prices endemic goods only and is zero for the rest. Flag readers: history_sweep.cpp:1592, :2432; digitisation_sim_harness.cpp:1410.\n\nTHE WORK. Census per seed: shells, how many coincide with or sit near a carve market, whether market_for_tile routes any tile to one (landscape_score.cpp:59-87 counts markets). Then Ben picks: price shells from the template as the carve does, or fold each into its nearest carve market and drop the rest. Lands behind the sprint switch.\n\nDONE WHEN. The census is printed; after setup no market has an all-zero price vector outside endemic goods (asserted).",
-   "files": ["src/world/hard_coded_world.cpp", "src/world/landscape_score.cpp", "tools/verify/history_sweep.cpp"]
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "src/world/landscape_score.cpp",
+    "tools/verify/history_sweep.cpp"
+   ]
   },
   {
    "group": "wizard",
    "short_name": "POST_1200_FORCES_MEASURED",
    "title": "Each Empires force that is off after 1200 is measured on the Exploration and Digitisation spans, then ruled on",
-   "priority": "B", "difficulty": 2, "world_mover": false, "requires": [],
+   "priority": "B",
+   "difficulty": 2,
+   "world_mover": false,
+   "requires": [],
    "authority_doc": "docs/generation/EXPLORATION.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (9)): measure, then decide.\n\nWHY. Exploration's params are the struct defaults plus a few overrides (era_minus_one.cpp:372-413) and Digitisation copies them (:432), so every Empires override (:65-296) is off after 1200 except settle_requires_razed_ground and city_states_by_population_threshold (:409-410). Off (history_sim.hpp defaults): amphibious_weight_crossing and sea_legs_* (:1171, :1196); trade_income_per_class (:1266); army_upkeep_per_1000_heads, unpaid_army_disband_q, road_build_material_cost (:1309, :1316, :1333); supply_upgrade_* (:1788-1797); secession_supply_floor_q (:1361); universal_creed_* (:1398-1433), schism_min_regions (:1464); centre_chain_reach and its rebates (:1002); w_aggr_q (:1488), w_fear_q (:1528), turbulence_lean (:1630). Possible post-1200 analogues (inferred from names, confirm): exploration_upkeep_enabled with standing_army_upkeep_per_1000_heads_year_q (army upkeep); post_road_treasury_cost (road build cost); deterrence_alarm_weight_q (fear). digitisation_sim_harness.cpp:1147-1188 asserts all stay off in the span.\n\nTHE WORK. Add each to exploration_sweep's --set whitelist (apply_sets, :770-781); sweep off vs the Empires value through 1960 on the 16 library seeds; read battles, secessions, schisms, treasuries, industry points per span; set the EMPIRES_ONLY guard aside for the sweep only. Then an NR entry per force for Ben.\n\nDONE WHEN. A table per setting (span x off/on x metric deltas, 16 seeds) is filed with Ben's rulings; digitisation_sim_params and the harness list match the rulings.",
-   "files": ["tools/verify/exploration_sweep.cpp", "src/world/era_minus_one.cpp", "src/world/history_sim.hpp", "tools/verify/digitisation_sim_harness.cpp"]
+   "files": [
+    "tools/verify/exploration_sweep.cpp",
+    "src/world/era_minus_one.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/digitisation_sim_harness.cpp"
+   ]
   },
   {
    "group": "carry",
    "short_name": "PRICE_FIELD_AND_DEMAND_WEIGHTS",
    "title": "Markets open on the generated price field, and household demand is weighted by the catchment's culture",
-   "priority": "S", "difficulty": 3, "world_mover": true, "requires": ["PLAY_HANDOFF_CONTRACT"],
+   "priority": "S",
+   "difficulty": 3,
+   "world_mover": true,
+   "requires": [
+    "PLAY_HANDOFF_CONTRACT"
+   ],
    "authority_doc": "docs/economy/MARKETS.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 1).\n\nWHY. Generation produces region::scarcity_q and culture_preference (culture_good_preference, history_sim.hpp:4610, one row per culture and good), crossing at history_sim.hpp:4965, :5036. The campaign reads neither (nothing in hard_coded_world, market_clearing or corporation_generation). Markets open at mc.price = mc.base_price (hard_coded_world.cpp:2289, :2297) plus only the endemic gradient (:2302-2358). inject_population_demand (market_clearing.cpp:237-292) applies one registry basket to every centre (:257) — no per-market weight. Preference is keyed on region_class (farm/ore/energy/port, settlement.hpp:65-71), not resource_type.\n\nTHE WORK. A region_class -> resource mapping table (design-owed, MARKETS.md property 5 — settle at the cut); a per-market weight array from the population-weighted culture shares of each market's catchment (region shares only; centres carry none until Beat 2); stored and serialised on market_component; basket[r] multiplied by it at market_clearing.cpp:282; opening mc.price seeded from scarcity_q and the weights. Behind the sprint switch.\n\nDONE WHEN. On a 1960 world the cross-market spread of mc.price[r] is non-zero for a named good; two markets of different culture plurality inject different demand for one good at one scale; money conservation holds.",
-   "files": ["src/world/hard_coded_world.cpp", "src/world/market_clearing.cpp", "src/world/components.hpp", "src/world/world_save.cpp", "src/world/history_sim.hpp"]
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "src/world/market_clearing.cpp",
+    "src/world/components.hpp",
+    "src/world/world_save.cpp",
+    "src/world/history_sim.hpp"
+   ]
   },
   {
    "group": "carry",
    "short_name": "TARIFF_POSTURE_CARRIED",
    "title": "The Digitisation span derives each nation's tariff posture, and a tariff is charged where goods actually cross a border",
-   "priority": "A", "difficulty": 3, "world_mover": true, "requires": ["PLAY_HANDOFF_CONTRACT"],
+   "priority": "A",
+   "difficulty": 3,
+   "world_mover": true,
+   "requires": [
+    "PLAY_HANDOFF_CONTRACT"
+   ],
    "authority_doc": "docs/economy/MARKETS.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 2).\n\nWHY (three gaps). DERIVATION: protection_q is written only when boundary_year != INT64_MIN (history_sim.cpp:7858, :7876); digitisation_sim_params builds on exploration_sim_params (era_minus_one.cpp:432), which leaves it INT64_MIN (comment :321-322), so the 1960 close writes 0 and seed_national_tariffs (law.cpp:158, called hard_coded_world.cpp:1820) skips every nation (law.cpp:174). The Industry tree's tariff_pressure is pinned 0 (history_sim.cpp:8809). DIGITISATION.md:137-143 says the derivation from scarcity_q, trade_flows and culture_preference is owed to this phase. CHARGING: the only charge is on matched trades with a buyer domiciled abroad (market_clearing.cpp:1257-1291), dormant in play. CONVOY DUTY: MARKETS.md:784-794 rules a duty on convoy arrival and retires the matched-trade charge; not built (credit_arrived_convoys, supply_system.cpp:151); BL-1005 was cancelled.\n\nTHE WORK. A span-side derivation of protection_q from the three inputs at the end-of-run block (history_sim.cpp:7857ff) or the handoff; the broadcast (:7913-7919) then feeds derive_national_protection (settlement.cpp:1405) unchanged. SCOPE CALL AT THE CUT: the convoy-arrival duty (quantity x destination last price x nation_tariff_rate, a treasury transfer) and retiring the matched-trade block are what make a posture bite in play — carry them here, or state play-side charging deferred.\n\nDONE WHEN. On a 1960 world at least one LAW-IMPORT-TARIFF-* law exists; if the duty is in scope, a cross-border convoy raises the destination treasury by exactly the owner's debit (money_conservation extended) and the matched-trade block is gone.",
-   "files": ["src/world/history_sim.cpp", "src/world/settlement.cpp", "src/world/law.cpp", "src/world/supply_system.cpp", "src/world/market_clearing.cpp", "tools/verify/money_conservation.cpp"]
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/settlement.cpp",
+    "src/world/law.cpp",
+    "src/world/supply_system.cpp",
+    "src/world/market_clearing.cpp",
+    "tools/verify/money_conservation.cpp"
+   ]
   },
   {
    "group": "carry",
    "short_name": "CULTURE_LENS",
    "title": "A culture lens shows each province's people, checkered where two are nearly even, and survives a save",
-   "priority": "A", "difficulty": 3, "world_mover": false, "requires": ["PLAY_HANDOFF_CONTRACT"],
+   "priority": "A",
+   "difficulty": 3,
+   "world_mover": false,
+   "requires": [
+    "PLAY_HANDOFF_CONTRACT"
+   ],
    "authority_doc": "docs/ui/LENSES.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 3). Design: LENSES.md:569-599.\n\nWHY. No lens: overlay_mode (ui_state.hpp:34-66) has no culture entry. Region culture_shares (settlement.hpp:141) live only in world::gen_settlement, which is not serialised and is null after a load (world.hpp:275-288). Population centres carry no culture shares (population_centre_component, components.hpp ~1170). The lineage palette exists only in the wizard (history_lapse.cpp:231-326, palette::lineage_colour). BL-992 was cancelled unbuilt.\n\nTHE WORK. Persist culture shares per region (or per province at setup) as a serialised campaign field; centre shares stated deferred until Beat 2 migration; overlay_mode::culture appended before count (ui_state.hpp:66); primary fill from the lineage hue, a hard checker when second >= 0.95 x first, a legend; question_log.json and ACTIONS.json entries; a scripts/verify lua capture.\n\nDONE WHEN. After save and reload the lens draws; a 42/40 province checkers and a 42/38 one does not (capture); checked live. A save-format change, not a world-mover — unless the price-field item reads the same field.",
-   "files": ["src/ui/ui_state.hpp", "src/ui/body_surface_canvas.cpp", "src/ui/presentation.hpp", "src/world/world.hpp", "src/world/world_save.cpp", "src/world/hard_coded_world.cpp", "docs/ui/question_log.json", "docs/ai/ACTIONS.json"]
+   "files": [
+    "src/ui/ui_state.hpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/presentation.hpp",
+    "src/world/world.hpp",
+    "src/world/world_save.cpp",
+    "src/world/hard_coded_world.cpp",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ]
   },
   {
    "group": "carry",
    "short_name": "NATION_SUMMARY_GDP_TREASURY_GRUDGES",
    "title": "The nation summary shows treasury, GDP and the nation's grudges",
-   "priority": "A", "difficulty": 2, "world_mover": false, "requires": [],
+   "priority": "A",
+   "difficulty": 2,
+   "world_mover": false,
+   "requires": [],
    "authority_doc": "docs/politics/NATIONS.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 4).\n\nWHY. draw_nation_summary (entity_summary.cpp:283-327) shows tiles, ideology, expansionism, focus and top resources — none of the three. Treasury: nation_component::treasury exists (components.hpp ~1750), credited by Pass 7 (nation_generation.cpp:1148-1171); its 'Zero at generation' comment is stale. Grudges: sentiment rows seeded at hard_coded_world.cpp:1797, read by sentiment_toward (sentiment.hpp:389). GDP: only in a harness, valued_production (campaign_lapse.cpp:325; NR-774 definition :253); NATIONS.md:79-89 says the opening figure is output capacity at the seeded price field, so its value depends on the price-field item.\n\nTHE WORK. Promote a pure nation_gdp(world, registry, nation) into src/world, the one definition the harness also uses; Treasury, GDP (and per head) and a top-N 'Resents' list on the summary; question_log and ACTIONS.json entries; fix the stale comment.\n\nDONE WHEN. Selecting a nation on a 1960 world shows a non-zero treasury, a GDP equal to the harness figure on the same world, and at least one grudge where the seed carried any; checked live.",
-   "files": ["src/ui/entity_summary.cpp", "src/world/nation_gdp.hpp", "src/world/nation_gdp.cpp", "tools/verify/campaign_lapse.cpp", "src/world/components.hpp", "docs/ui/question_log.json"]
+   "files": [
+    "src/ui/entity_summary.cpp",
+    "src/world/nation_gdp.hpp",
+    "src/world/nation_gdp.cpp",
+    "tools/verify/campaign_lapse.cpp",
+    "src/world/components.hpp",
+    "docs/ui/question_log.json"
+   ]
   },
   {
    "group": "carry",
    "short_name": "SEARCH_SEED_FROM_NETWORK",
    "title": "The landscape search's seed candidate is placed by network strength, BL-879's unmet clause",
-   "priority": "A", "difficulty": 3, "world_mover": true, "requires": ["PLAY_HANDOFF_CONTRACT"],
+   "priority": "A",
+   "difficulty": 3,
+   "world_mover": true,
+   "requires": [
+    "PLAY_HANDOFF_CONTRACT"
+   ],
    "authority_doc": "docs/generation/DIGITISATION.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 5); BL-879 closed complete with this clause unbuilt.\n\nWHY. The seed candidate is arbitrary: sp.start.placement_seed = sp.seed (app.cpp:1061); landscape_candidate has only count, seed and tier (landscape_search.hpp:88-99); placement uses that RNG seed (landscape_search.cpp:211, :213). Of the three signals the row names, only corridor degree is computed, and only to gate markets (hard_coded_world.cpp:2153-2166, kMarketJunctionDegree = 3); corridor uses are carried (era_timelapse.hpp:473); sea-lane traffic does not exist (sea-lanes item). app.cpp:1063-1070's 'industry points do not exist yet' is stale (BL-1041) — BL-1042 rewrites it.\n\nTHE WORK. Per-region network strength (corridor uses, lane traffic once it exists, junction degree) computed at setup as a generation-time index beside gen_settlement; a 'seed from network' mode in landscape_search_params biasing the seed candidate's specialist and firm homes toward strong regions, deterministically, perturbation axes unchanged; the census BL-879's done-when asks for; the harness_params.hpp shipped_search_params mirror updated with the app.\n\nDONE WHEN. Seed-candidate sites correlate positively with junction degree over the 16 seeds; the winner is identical across thread counts (landscape_search_harness R2).",
-   "files": ["src/world/landscape_search.hpp", "src/world/landscape_search.cpp", "src/world/corporation_generation.cpp", "src/core/app.cpp", "src/world/hard_coded_world.cpp", "tools/verify/harness_params.hpp"]
+   "files": [
+    "src/world/landscape_search.hpp",
+    "src/world/landscape_search.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/core/app.cpp",
+    "src/world/hard_coded_world.cpp",
+    "tools/verify/harness_params.hpp"
+   ]
   },
   {
    "group": "carry",
    "short_name": "SEA_LANES_CARRIED",
    "title": "The sim records its sea legs, and the campaign opens with lanes on the water they crossed",
-   "priority": "A", "difficulty": 4, "world_mover": true, "requires": ["PLAY_HANDOFF_CONTRACT"],
+   "priority": "A",
+   "difficulty": 4,
+   "world_mover": true,
+   "requires": [
+    "PLAY_HANDOFF_CONTRACT"
+   ],
    "authority_doc": "docs/generation/EXPLORATION.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 6). Design: EXPLORATION.md:330-358. The largest carry row: the sim records nothing yet. BL-876 was cancelled.\n\nWHY. No sea-leg record in the sim (grep sea_lane in src is empty; only the sea_legs_* ration params, history_sim.hpp:1173-1223); history_corridor has no water flag (era_timelapse.hpp:469-484). Traversal uses a flat sea_leg_cost = 2.5f (logistics.cpp:18); tile_traversal_cost (logistics.cpp:94-100) already multiplies the water base by road_traversal_multiplier(tc.road_level), so a tier on water tiles discounts with no pathfinding change.\n\nTHE WORK. Record sea legs in the sim (amphibious supply, purchase-party crossings, metropole-holding traffic) as a counted table; fold it into the play handoff with validator rules; at setup stamp water tiles along each leg with a lane tier once traffic passes a threshold, by analogy with stamp_history_roads (road_generation.hpp:103); serialise it as its own field rather than overloading road_level.\n\nDONE WHEN. Lane tiles on a 1960 world > 0 and counted in the report; A* cost between two lane-joined ports falls below the unlaned cost; reach crosses the lane; digests move only behind the switch.",
-   "files": ["src/world/history_sim.hpp", "src/world/history_sim.cpp", "src/world/era_timelapse.hpp", "src/world/hard_coded_world.cpp", "src/world/road_generation.cpp", "src/world/logistics.cpp", "src/world/components.hpp", "src/world/world_save.cpp"]
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/era_timelapse.hpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/road_generation.cpp",
+    "src/world/logistics.cpp",
+    "src/world/components.hpp",
+    "src/world/world_save.cpp"
+   ]
   },
   {
    "group": "carry",
    "short_name": "DEPLETION_RETROFIT",
    "title": "Reserves open depleted where history worked the ground",
-   "priority": "B", "difficulty": 2, "world_mover": true, "requires": ["PLAY_HANDOFF_CONTRACT"],
+   "priority": "B",
+   "difficulty": 2,
+   "world_mover": true,
+   "requires": [
+    "PLAY_HANDOFF_CONTRACT"
+   ],
    "authority_doc": "docs/generation/DIGITISATION.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 7). Design: DIGITISATION.md:724-729, EXPLORATION.md:653-670 — the formula itself is unwritten; BL-945 was cancelled.\n\nWHY. resource_remaining is seeded at tile generation as deposit x deposit_reserve_factor = 400 (tile_generation.cpp:18-22, :2596-2605), before history runs, so the reserve ignores it. The inputs already cross on region: founded_year and industrial_year (settlement.hpp:302-304), dominant (:266), and corridor uses. resource_remaining is folded into state_hash (world.cpp:137).\n\nTHE WORK. Write the formula into DIGITISATION.md FIRST (named inputs, named arithmetic — a design step at the cut, Ben's call); then a pure retrofit_depletion(world, settlement, params) at setup after nations, scaling each tile's reserve by years held, class and industrialisation (Beat 1 points, per the industrialisation item); a harness assertion.\n\nDONE WHEN. Mean resource_remaining / (deposit x 400) < 1 on long-worked industrialised regions and == 1 on never-settled ground; the doc formula matches the code constants.",
-   "files": ["src/world/depletion_retrofit.hpp", "src/world/depletion_retrofit.cpp", "src/world/tile_generation.cpp", "src/world/hard_coded_world.cpp", "docs/generation/DIGITISATION.md"]
+   "files": [
+    "src/world/depletion_retrofit.hpp",
+    "src/world/depletion_retrofit.cpp",
+    "src/world/tile_generation.cpp",
+    "src/world/hard_coded_world.cpp",
+    "docs/generation/DIGITISATION.md"
+   ]
   },
   {
    "group": "carry",
    "short_name": "CAMPAIGN_TECH_STATE",
    "status": "design-owed",
    "title": "Each corporation opens holding the campaign techs its nation's Industry mask earned",
-   "priority": "A", "difficulty": 3, "world_mover": true, "requires": ["PLAY_HANDOFF_CONTRACT"],
+   "priority": "A",
+   "difficulty": 3,
+   "world_mover": true,
+   "requires": [
+    "PLAY_HANDOFF_CONTRACT"
+   ],
    "authority_doc": "docs/generation/trees/INDUSTRY_TREE.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 8): per CORPORATION through the existing earned_techs gates, not per nation. NOVELTY/SCOPE FLAG owed at the cut (NEXT_SESSION): there is no per-nation consumer and no IN-* -> E*-* mapping; the mapping needs a design session with Ben.\n\nWHY. polity::industry_mask is 45 nodes (history_sim.hpp:2719-2728; node_count industry_tree_data.hpp:12), crossing in digitisation_output::polities, read by no setup code. world::earned_techs is per-corporation and empty at setup (world.hpp:458-464), written only by advance_tech_gates (tech_gate.cpp:175-205), which also appends each tech's modify_scalar effects to corp_modifiers. The campaign gate table has 4 gates: E0-ML-01, E0-EC-01, E1-EC-01, E0-EC-03 (tech_gate.cpp:33, :79, :113, :137). The Lua campaign tree (tech_tree.hpp, load_from_lua) feeds the F9 viewer. Industry nodes unlock works rows and roster bands (industry_tree_data.hpp:57-93); IN-SP-3m 'The Renewed Line' opens the campaign tree (:43). earned_techs is erased when a corporation is regenerated (corporation_generation.cpp:2084), and the landscape search regenerates rosters (landscape_search.cpp:211).\n\nTHE WORK. Design session: the IN-node -> campaign-tech mapping. Polity -> nation by the representative-polity tally used for grudges (hard_coded_world.cpp:1761-1790). Seed each corporation from its home_nation's mask AFTER the search winner is applied (after app.cpp:1076), not in world-gen, or the regeneration wipes it; seed through a helper that also appends the tech's modifiers; 'The Renewed Line held' opens the root. Check whether state_hash folds earned_techs (unverified).\n\nDONE WHEN. On a 1960 world, corporations of a nation holding the mapped IN node have the mapped tech (has_tech) and its modifiers, corporations of one without it do not, and both survive save and load.",
-   "files": ["src/world/tech_gate.hpp", "src/world/tech_gate.cpp", "src/core/app.cpp", "src/world/hard_coded_world.cpp", "src/world/corporation_generation.cpp", "docs/generation/trees/INDUSTRY_TREE.md"]
+   "files": [
+    "src/world/tech_gate.hpp",
+    "src/world/tech_gate.cpp",
+    "src/core/app.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/corporation_generation.cpp",
+    "docs/generation/trees/INDUSTRY_TREE.md"
+   ]
   },
   {
    "group": "last",
    "short_name": "SELECT_CORPORATION_SCREEN",
    "status": "design-owed",
    "title": "The player chooses the corporation they play from a select-corporation screen after the wizard",
-   "priority": "A", "difficulty": 3, "world_mover": false, "requires": ["BEGIN_ADOPTS_WIZARD_WORLD"],
+   "priority": "A",
+   "difficulty": 3,
+   "world_mover": false,
+   "requires": [
+    "BEGIN_ADOPTS_WIZARD_WORLD"
+   ],
    "authority_doc": "docs/ui/STARTUP.md",
    "design": "RULED (Ben, 2026-09-18, NR-898 (12)): the last item of sprint 46, designed with Ben first, built last. BL-880 (cancelled) was its first design — read it at the design session. NR-885 (2026-09-17): the player is a corporation holding a seat. Not surveyed on 2026-09-19 on purpose: the design session sets its question, surface and data before any code read.\n\nDONE WHEN. Set at the design session; at minimum a question_log entry, an ACTIONS.json entry and a live click.",
-   "files": ["src/ui/startup_screens.cpp", "docs/ui/STARTUP.md", "docs/ui/question_log.json", "docs/ai/ACTIONS.json"]
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "docs/ui/STARTUP.md",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ]
   }
  ]
 }
