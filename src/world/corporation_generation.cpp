@@ -2861,15 +2861,232 @@ struct charter_body_state
     std::vector<std::uint16_t>        turn;
     std::size_t                       turn_cursor = 0;
 
-    /// THE EVEN SHARE (NR-905; `charter_body_record::even_share`): 0 where the
-    /// ceiling does not bind. `turn_cap[r]` is what the turn fills good r to —
-    /// the per-good cap, or where the ceiling binds min(cap, r's share).
+    /// THE YARDS' PLACES (NR-906; `charter_body_record::yard_places`): the most
+    /// yards the walk can provision on this body, taken off the ceiling before
+    /// the shares are cut. See `charter_yard_places`.
+    int32_t                           yard_places = 0;
+    /// The refusal's reading of the yards (`charter_yard_places`' want bound):
+    /// at least `yard_places`, and it only shrinks as buildings are removed.
+    int64_t                           yard_want_bound = 0;
+    /// THE EVEN SHARE (NR-905, NR-906; `charter_body_record::even_share`): 0
+    /// where the ceiling does not bind. `share[r]` is turn good r's RESERVATION
+    /// of the ceiling — (ceiling - yard_places) / |turn|, the remainder one more
+    /// each to the first goods of the turn — never a cap: see the turn.
     int32_t                           even_share = 0;
     int32_t                           even_share_extra = 0;
-    std::array<int32_t, resource_count> turn_cap{};
+    std::array<int32_t, resource_count> share{};
 };
 
+/// Holdings a corporation can open with: the longest `focus_asset_pattern`
+/// (`holdings_range` tops out at 4). The bound the yards' places are read at.
+constexpr int64_t k_charter_max_holdings = 4;
+
+/// THE YARDS' PLACES (NR-906): how many construction yards the walk can
+/// provision on a body, read BEFORE the walk so their places come off the
+/// ceiling before the shares are cut.
+///
+/// THE EXACT COUNT IS NOT KNOWABLE BEFORE THE WALK: the yard step wants yards
+/// against the building stock, which grows with every charter by as many
+/// holdings as that charter's draw gives it, and stops when the yards' own
+/// output covers the want. So this is an UPPER BOUND, from the yard step's
+/// three tests at the walk's most-built extreme:
+///   * the per-good cap (the step never passes it);
+///   * `want_yards` at the most buildings the walk can stand up — every
+///     building standing now plus `k_charter_max_holdings` for every
+///     corporation it can charter here (the centres that afford a specialist,
+///     and firms up to the ceiling) — at the construction seed rate per building
+///     (the consumer and upkeep draws of construction capacity as they stand);
+///   * the yards it takes to cover that demand from today's output, each yard
+///     adding at least its anchor's (`nominal_processing_batches` x the yard
+///     recipe's output), since the step stops once output covers demand.
+/// WHY AN UPPER BOUND, NOT A GUESS: reserving too few would let a late yard
+/// take a place a good was promised; reserving too many costs the fill nothing,
+/// because a share is a reservation, not a cap — the room nobody claims goes to
+/// whichever short good is next in turn. 0 where no in-band recipe makes
+/// capacity, the seed rate is 0, or no demand can outrun today's output.
+///
+/// @p want_bound_out receives the SECOND test alone (`want_yards` at the
+/// most-built extreme, uncapped): the refusal's reading. It only shrinks when
+/// buildings are removed — the budget apply removes world-gen's roster before
+/// it charters — whereas the other two tests can grow (a removed yard's output
+/// no longer covers demand; a smaller G raises the per-good cap), so the
+/// refusal asked before the removal and re-asked after it cannot disagree.
+int32_t charter_yard_places(const world& w, const recipe_registry& reg, entity_id body_id,
+                            float other_demand_now, int32_t per_good_cap, int64_t corps_max,
+                            int64_t& want_bound_out)
+{
+    want_bound_out = 0;
+    const std::size_t cap_i = static_cast<std::size_t>(resource_type::construction_capacity);
+    const int ci = best_construction_recipe(reg);
+    if (ci < 0 || per_good_cap <= 0)
+        return 0;
+    const float per_yard = reg.recipe_at(building_type::processing_facility, ci).outputs[cap_i];
+    const float per      = reg.construction().seed_capacity_per_building;
+    if (!(per_yard > 0.0f))
+        return 0;
+
+    int64_t standing = 0;   // body_construction_demand's own count
+    for (const auto& [bid, b] : w.buildings)
+    {
+        (void)bid;
+        if (b.decommissioned)
+            continue;
+        const auto t = w.tiles.find(b.tile);
+        if (t != w.tiles.end() && t->second.body == body_id)
+            ++standing;
+    }
+    const float demand_max = other_demand_now
+        + per * static_cast<float>(standing + k_charter_max_holdings * corps_max);
+
+    const double want = std::ceil(static_cast<double>(demand_max) / static_cast<double>(per_yard));
+    want_bound_out = static_cast<int64_t>(std::min<double>(want, 1e9));
+
+    std::array<float, resource_count> production = {};
+    accumulate_body_production(w, reg, body_id, production);
+    if (!(demand_max > production[cap_i]))
+        return 0;   // the step wants a yard only while demand outruns output
+
+    int64_t places = static_cast<int64_t>(std::min<double>(want, static_cast<double>(per_good_cap)));
+    const float one_yard = nominal_processing_batches(reg) * per_yard;
+    if (one_yard > 0.0f)
+    {
+        const double cover = std::ceil(static_cast<double>(demand_max - production[cap_i])
+                                       / static_cast<double>(one_yard));
+        places = std::min<int64_t>(places, static_cast<int64_t>(std::min<double>(cover, 1e9)));
+    }
+    return static_cast<int32_t>(std::max<int64_t>(0, places));
+}
+
+/// One body's density rule, FIXED BEFORE THE WALK (BL-1039, NR-905, NR-906):
+/// G and the consumer demand, B_ref, the per-good cap, the ceiling, and under
+/// `sqrt_capital` the turn, the yards' places and the even share. @p bs holds
+/// B (`firm_points`) on entry; @p specialists counts the body's
+/// nation-resolved centres that afford a specialist. ONE function, called by
+/// the walk and by `charter_spend_world_refusal`, so a refusal reads exactly
+/// the numbers the walk would.
+void charter_fix_body_rules(const world& w, const recipe_registry& reg,
+                            const charter_spend_params& spend, entity_id body_id,
+                            int64_t specialists, charter_body_state& bs)
+{
+    bs.consumer_demand = body_demand(w, reg, body_id);
+    std::array<float, resource_count> demand = bs.consumer_demand;
+    const std::array<float, resource_count> upkeep = body_upkeep_demand(w, reg, body_id);
+    for (std::size_t r = 0; r < resource_count; ++r)
+        demand[r] += upkeep[r];
+    const std::array<float, resource_count> construction_need =
+        body_construction_demand(w, reg, body_id);
+    for (std::size_t r = 0; r < resource_count; ++r)
+        demand[r] += construction_need[r];
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (demand[r] > 0.0f)
+            bs.goods.push_back(static_cast<std::uint16_t>(r));
+
+    const int g = static_cast<int>(bs.goods.size());
+    // 0 under `lifted`: its c is refused unless 0 (it applies no per-good cap).
+    bs.reference_points = (g > 0)
+        ? static_cast<int64_t>(spend.per_resource_firm_cap) * g
+              * static_cast<int64_t>(spend.firm_price_points)
+        : 0;
+    switch (spend.resource_cap_rule)
+    {
+    case charter_cap_rule::fixed:
+        bs.per_good_cap = spend.per_resource_firm_cap;
+        break;
+    case charter_cap_rule::lifted:
+        bs.per_good_cap = -1;
+        break;
+    case charter_cap_rule::sqrt_capital:
+    {
+        bs.per_good_cap = charter_sqrt_per_good_cap(spend.per_resource_firm_cap,
+                                                    bs.firm_points, g,
+                                                    spend.firm_price_points);
+        bs.density_ceiling = spend.density_ceiling;
+        // The turn: G ascending, construction capacity out (it keeps its own
+        // provisioning step, which runs before the turn — see the walk).
+        const std::uint16_t cap_good =
+            static_cast<std::uint16_t>(resource_type::construction_capacity);
+        bs.in_turn = true;
+        for (const std::uint16_t r : bs.goods)
+            if (r != cap_good)
+                bs.turn.push_back(r);
+
+        // THE YARDS' PLACES and THE EVEN SHARE (Ben, 2026-09-19, NR-905;
+        // NR-906). The ceiling BINDS when the body holds more firm charters
+        // than the ceiling AND the turn's per-good caps sum past it: only then
+        // can the turn outrun the ceiling. Then the ceiling, less the yards'
+        // places, is reserved in equal parts to the goods of the turn, the
+        // remainder one more each to the first of them (ascending resource
+        // index, the turn's own order). Where it does not bind there are no
+        // shares and the turn fills every good to its cap, as before.
+        const int64_t n_turn   = static_cast<int64_t>(bs.turn.size());
+        const int64_t charters = bs.firm_points / spend.firm_price_points;
+        const int64_t ceiling  = bs.density_ceiling;
+        const std::size_t cap_i = static_cast<std::size_t>(cap_good);
+        bs.yard_places = charter_yard_places(w, reg, body_id,
+                                             bs.consumer_demand[cap_i] + upkeep[cap_i],
+                                             bs.per_good_cap,
+                                             specialists + std::min(charters, ceiling),
+                                             bs.yard_want_bound);
+        const int64_t room = ceiling - bs.yard_places;
+        if (n_turn > 0 && room >= n_turn && charters > ceiling
+            && n_turn * static_cast<int64_t>(bs.per_good_cap) > ceiling)
+        {
+            bs.even_share       = static_cast<int32_t>(room / n_turn);
+            bs.even_share_extra = static_cast<int32_t>(room % n_turn);
+            for (std::size_t i = 0; i < bs.turn.size(); ++i)
+                bs.share[bs.turn[i]] = bs.even_share
+                    + (static_cast<int64_t>(i) < bs.even_share_extra ? 1 : 0);
+        }
+        break;
+    }
+    }
+}
+
 } // namespace
+
+const char* charter_spend_world_refusal(const world& w, const recipe_registry& reg,
+                                        const charter_budget& budget,
+                                        const charter_spend_params& spend)
+{
+    if (budget.empty() || spend.resource_cap_rule != charter_cap_rule::sqrt_capital
+        || charter_spend_refusal(budget, spend) != nullptr)
+        return nullptr;   // not a sqrt budget world, or already refused on its params
+    const int64_t specialist_price = spend.specialist_price_points();
+    std::map<entity_id, charter_body_state> bodies;   // std::map: ascending body id
+    std::map<entity_id, int64_t> specialists;
+    for (const auto& [centre_id, pts] : budget.points())
+    {
+        // The walk's own resolution: the centre's tile, its body, and the nation
+        // owning that tile (a centre without one buys nothing).
+        const auto tile_it = w.population_centre_tile.find(centre_id);
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const auto t = w.tiles.find(tile_it->second);
+        if (t == w.tiles.end())
+            continue;
+        const auto own = w.tile_to_nation.find(tile_it->second);
+        if (own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
+            continue;
+        bodies[t->second.body].firm_points += charter_centre_firm_points(pts, spend);
+        if (static_cast<int64_t>(pts) >= specialist_price)
+            ++specialists[t->second.body];
+    }
+    // THE TEST: every good of the turn must be able to keep a share of at least
+    // one firm beside the yards. The yards are read at the want bound — never
+    // below the places the shares are cut from, and never larger after the
+    // budget apply removes world-gen's roster than before it (G, too, only
+    // shrinks), so this answer, asked on the world as the apply receives it,
+    // is never reversed by the walk re-asking it after the removal.
+    for (auto& [body_id, bs] : bodies)
+    {
+        charter_fix_body_rules(w, reg, spend, body_id, specialists[body_id], bs);
+        if (static_cast<int64_t>(bs.density_ceiling)
+            < static_cast<int64_t>(bs.turn.size()) + bs.yard_want_bound)
+            return "density_ceiling is smaller than a body's turn goods plus its yards' places, so "
+                   "the goods could not each keep a share of it (NR-905)";
+    }
+    return nullptr;
+}
 
 std::vector<entity_id> charter_web_from_budget(world& w,
                                                const recipe_registry& reg,
@@ -2884,11 +3101,16 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     // --- refused params charter NOTHING, and touch nothing ------------------
     // `apply_landscape_candidate`'s budget overload decides a refusal before any
     // mutation and never reaches here with one; this guard keeps the function
-    // honest for any other caller.
-    if (const char* why = charter_spend_refusal(budget, spend))
+    // honest for any other caller. BL-1060: the world-read refusal too (a
+    // ceiling too small for a body's turn and yards), read on the world as it
+    // stands here — before anything below charters.
+    const char* refusal = charter_spend_refusal(budget, spend);
+    if (refusal == nullptr)
+        refusal = charter_spend_world_refusal(w, reg, budget, spend);
+    if (refusal != nullptr)
     {
         if (report != nullptr)
-            *report = charter_refused_report(budget, why);
+            *report = charter_refused_report(budget, refusal);
         return chartered;
     }
 
@@ -3045,7 +3267,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     //  * B_ref = c x |G| x firm price and the per-good cap
     //    (`charter_sqrt_per_good_cap`: cap(B_ref) == c exactly, so a body whose
     //    firm spend is the legacy firm spend keeps the legacy cap), the density
-    //    ceiling, and under `sqrt_capital` the TURN (see the selection below).
+    //    ceiling, and under `sqrt_capital` the TURN (see the selection below),
+    //    the yards' places and the even share (NR-905, NR-906).
+    // All of it is `charter_fix_body_rules`, the one function
+    // `charter_spend_world_refusal` reads too.
     //
     // The consumer half is also what Pass 6 captures once per body; it reads
     // only the population centres, which no charter moves, so taking it here
@@ -3054,82 +3279,13 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     for (const charter_centre& cc : centres)
         if (cc.nation != null_entity)
             bodies[cc.body].firm_points += charter_centre_firm_points(cc.points, spend);
+    // Specialists each body's centres can afford: the yards' places read them.
+    std::map<entity_id, int64_t> specialists_on_body;
+    for (const charter_centre& cc : centres)
+        if (cc.nation != null_entity && static_cast<int64_t>(cc.points) >= specialist_price)
+            ++specialists_on_body[cc.body];
     for (auto& [body_id, bs] : bodies)
-    {
-        bs.consumer_demand = body_demand(w, reg, body_id);
-        std::array<float, resource_count> demand = bs.consumer_demand;
-        const std::array<float, resource_count> upkeep = body_upkeep_demand(w, reg, body_id);
-        for (std::size_t r = 0; r < resource_count; ++r)
-            demand[r] += upkeep[r];
-        const std::array<float, resource_count> construction_need =
-            body_construction_demand(w, reg, body_id);
-        for (std::size_t r = 0; r < resource_count; ++r)
-            demand[r] += construction_need[r];
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (demand[r] > 0.0f)
-                bs.goods.push_back(static_cast<std::uint16_t>(r));
-
-        const int g = static_cast<int>(bs.goods.size());
-        // 0 under `lifted`: its c is refused unless 0 (it applies no per-good cap).
-        bs.reference_points = (g > 0)
-            ? static_cast<int64_t>(spend.per_resource_firm_cap) * g
-                  * static_cast<int64_t>(spend.firm_price_points)
-            : 0;
-        switch (spend.resource_cap_rule)
-        {
-        case charter_cap_rule::fixed:
-            bs.per_good_cap = spend.per_resource_firm_cap;
-            break;
-        case charter_cap_rule::lifted:
-            bs.per_good_cap = -1;
-            break;
-        case charter_cap_rule::sqrt_capital:
-        {
-            bs.per_good_cap = charter_sqrt_per_good_cap(spend.per_resource_firm_cap,
-                                                        bs.firm_points, g,
-                                                        spend.firm_price_points);
-            bs.density_ceiling = spend.density_ceiling;
-            // The turn: G ascending, construction capacity out (it keeps its own
-            // provisioning step, which runs before the turn — see below).
-            const std::uint16_t cap_good =
-                static_cast<std::uint16_t>(resource_type::construction_capacity);
-            bs.in_turn = true;
-            for (const std::uint16_t r : bs.goods)
-                if (r != cap_good)
-                    bs.turn.push_back(r);
-
-            // THE EVEN SHARE (Ben, 2026-09-19, NR-905), fixed here with the
-            // cap. The ceiling BINDS when the body holds more firm charters than
-            // the ceiling AND the turn's per-good caps sum past it: only then
-            // can the turn outrun the ceiling. Then each good may hold at most
-            // ceiling / |turn|, the remainder one more each to the first goods
-            // of the turn (ascending resource index, the turn's own order). The
-            // yard is outside the shares (see charter_budget.hpp). Where the
-            // ceiling does not bind every good fills to the cap, as before.
-            const int64_t n_turn       = static_cast<int64_t>(bs.turn.size());
-            const int64_t charters     = bs.firm_points / spend.firm_price_points;
-            const int64_t ceiling      = bs.density_ceiling;
-            if (n_turn > 0 && charters > ceiling
-                && n_turn * static_cast<int64_t>(bs.per_good_cap) > ceiling)
-            {
-                bs.even_share       = static_cast<int32_t>(ceiling / n_turn);
-                bs.even_share_extra = static_cast<int32_t>(ceiling % n_turn);
-            }
-            for (std::size_t i = 0; i < bs.turn.size(); ++i)
-            {
-                int32_t fill = bs.per_good_cap;
-                if (bs.even_share > 0)
-                {
-                    const int32_t share = bs.even_share
-                        + (static_cast<int64_t>(i) < bs.even_share_extra ? 1 : 0);
-                    fill = std::min(fill, share);
-                }
-                bs.turn_cap[bs.turn[i]] = fill;
-            }
-            break;
-        }
-        }
-    }
+        charter_fix_body_rules(w, reg, spend, body_id, specialists_on_body[body_id], bs);
 
     const corporation_params capital_params;   // the draw: today's starting capital, 400 +/- 40%
 
@@ -3381,11 +3537,16 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // or no longer short, is passed over. The order is a sorted vector and
             // an index — nothing depends on a container's layout.
             //
-            // WHERE THE CEILING BINDS a good's cap here is its EVEN SHARE of the
-            // ceiling (NR-905, `turn_cap`, fixed before the walk), so a centre
-            // that has to skip some goods cannot spend their places on the
-            // others. What it cannot spend waits: see the share's gap after the
-            // walk.
+            // WHERE THE CEILING BINDS each good of the turn keeps an EVEN SHARE of
+            // it (NR-905), and the share is a RESERVATION, not a cap (NR-906): a
+            // good below its share takes a firm as ever; past its share only
+            // while the room left in the ceiling still covers every other short
+            // good's unfilled share, and never past its own per-good cap. So a
+            // centre that has to skip the quarries cannot spend their places on
+            // mills — the ore's reservation holds for a centre that has quarries
+            // — while a good that stops being short releases what it did not use,
+            // and the ceiling still fills. What a centre cannot spend waits: see
+            // the share's gap after the walk.
             //
             // The good's firm serves THAT good: its recipe is the best recipe for
             // the good alone (the most output of it, ties to registry order), and
@@ -3430,16 +3591,32 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             {
                 if (gap_r == resource_count && bs.in_turn)
                 {
+                    // NR-906: what the shares still hold — every short good's
+                    // unfilled share, max(0, share - firms held), re-read this
+                    // firm — and the room the ceiling has left.
+                    int64_t reserved = 0;
+                    if (bs.even_share > 0)
+                        for (const std::uint16_t h : bs.turn)
+                            if (demand[h] > production[h] && bs.firms_by_resource[h] < bs.share[h])
+                                reserved += bs.share[h] - bs.firms_by_resource[h];
+                    const int64_t room = static_cast<int64_t>(bs.density_ceiling) - bs.firms;
+
                     const std::size_t n = bs.turn.size();
                     for (std::size_t step = 0; step < n; ++step)
                     {
                         const std::size_t at = (bs.turn_cursor + step) % n;
                         const std::size_t r  = bs.turn[at];
-                        if (bs.firms_by_resource[r] >= bs.turn_cap[r])   // its cap, or its share
+                        if (bs.firms_by_resource[r] >= bs.per_good_cap)
                             continue;
                         if (!(demand[r] > production[r]))
                             continue;
                         if (skipped[r])
+                            continue;
+                        // Past its own share only while the room left still
+                        // covers every OTHER short good's reservation (its own is
+                        // 0 by then): a share is a reservation, never a cap.
+                        if (bs.even_share > 0 && bs.firms_by_resource[r] >= bs.share[r]
+                            && room - 1 < reserved)
                             continue;
                         gap_r     = r;
                         turn_at   = at;
@@ -3458,7 +3635,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                 capped = true;
                         };
                         for (const std::uint16_t r : bs.turn)
-                            if (bs.firms_by_resource[r] < bs.turn_cap[r] && demand[r] > production[r])
+                            if (bs.firms_by_resource[r] < bs.per_good_cap && demand[r] > production[r])
                                 still_wanted(r);
                         const bool turn_unplaceable = unplaceable;   // the yard holds no share
                         if (yard_wanted)
@@ -3627,14 +3804,18 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     }
 
     // --- NR-905: THE EVEN SHARE'S GAP ------------------------------------------
-    // Where the ceiling binds, a centre that stopped because every good still
-    // under its share could not be placed there booked its rest under the
-    // placement's reason (`firm_stop_points`). Only now is the body's gap known:
-    // the firms its still-short turn goods lack of their shares, within the room
-    // the ceiling has left. That many firms' points move to `share_unplaced`,
-    // drawn from those stops in spend order; the rest stays as booked (it waited
-    // for a share a later centre filled, or for room the ceiling never had).
-    // A booking moves between reasons within one centre, so every balance holds.
+    // Where the ceiling binds, a centre that stopped because every good it could
+    // still charter failed to place there — the others held back by the shares
+    // still open — booked its rest under the placement's reason
+    // (`firm_stop_points`). Only now is the body's gap known: the firms its
+    // still-short turn goods lack of their shares at the end of the walk, within
+    // the room the ceiling has left. That many firms' points move to
+    // `share_unplaced`, drawn from those stops in spend order; the rest stays as
+    // booked (it waited for a share a later centre filled, or for room the
+    // ceiling never had). `share_unplaced` says a share went unfilled; it does
+    // not claim no centre had ground for it (a centre might have, and run out of
+    // points first). A booking moves between reasons within one centre, so every
+    // balance holds.
     for (auto& [body_id, bs] : bodies)   // std::map: ascending body id
     {
         if (bs.even_share <= 0)
@@ -3654,8 +3835,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             demand[r] += construction_need[r];
         int64_t open = 0;
         for (const std::uint16_t r : bs.turn)
-            if (demand[r] > production[r] && bs.firms_by_resource[r] < bs.turn_cap[r])
-                open += bs.turn_cap[r] - bs.firms_by_resource[r];
+            if (demand[r] > production[r] && bs.firms_by_resource[r] < bs.share[r])
+                open += bs.share[r] - bs.firms_by_resource[r];
         int64_t gap_points = std::min(room, open) * static_cast<int64_t>(spend.firm_price_points);
         for (const std::size_t oi : order)
         {
@@ -3684,6 +3865,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         br.reference_points  = bs.reference_points;
         br.per_good_cap      = bs.per_good_cap;
         br.density_ceiling   = bs.density_ceiling;
+        br.yard_places       = bs.yard_places;
         br.even_share        = bs.even_share;
         br.even_share_extra  = bs.even_share_extra;
         br.firms             = bs.firms;

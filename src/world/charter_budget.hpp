@@ -95,19 +95,26 @@ private:
 /// legible nor stable. The two legacy rules keep Pass 6's biggest-gap-first
 /// order verbatim; their worlds are pinned. See `charter_web_from_budget`.
 ///
-/// THE EVEN SHARE (Ben, 2026-09-19, NR-905): where the ceiling BINDS on a body,
-/// each good in the turn may hold at most its even share of it — ceiling /
-/// |turn|, the remainder one extra firm each to the first goods of the turn in
-/// ascending resource index — so a centre that has to skip the quarries cannot
-/// spend their share on mills before a centre with quarries is reached. The
-/// share, like the per-good cap, is FIXED BEFORE THE WALK: the ceiling binds
-/// when the body holds more firm charters than the ceiling (B / firm price) AND
-/// its turn's per-good caps sum past it — only then can the turn outrun the
-/// ceiling at all. Otherwise nothing changes. The construction yard stands
-/// outside the shares, as it stands outside the turn: it is provisioned by
-/// `want_yards` and the per-good cap, and a yard takes a place under the
-/// ceiling, so where yards stand the last goods of a pass can end short of
-/// their share when the ceiling fills — booked `density_ceiling`, as ever.
+/// THE EVEN SHARE (Ben, 2026-09-19, NR-905; a RESERVATION, NR-906): where the
+/// ceiling BINDS on a body, the ceiling less the yards' places is reserved in
+/// equal parts to the goods of the turn — (ceiling - yard places) / |turn|, the
+/// remainder one extra firm each to the first goods of the turn in ascending
+/// resource index — so a centre that has to skip the quarries cannot spend
+/// their share on mills before a centre with quarries is reached. A share is
+/// NOT a cap: a good may take a firm past its share whenever the room left in
+/// the ceiling still covers every other short good's unfilled share (max(0,
+/// share - firms held)), and never past its own per-good cap — so a good that
+/// stops being short releases what it did not use and the ceiling still fills,
+/// while an unplaceable good's reservation holds to the end of the walk.
+/// Everything the share reads is FIXED BEFORE THE WALK: the ceiling binds when
+/// the body holds more firm charters than the ceiling (B / firm price) AND its
+/// turn's per-good caps sum past it — only then can the turn outrun the ceiling
+/// at all; otherwise nothing changes. THE YARDS' PLACES come off the ceiling
+/// before the shares are cut: the yard stands outside the turn and is
+/// provisioned by its own step, so its places are an upper bound on the yards
+/// that step can provision (`charter_body_record::yard_places`). A spend whose
+/// ceiling is smaller than a body's turn goods plus its yards' places is
+/// REFUSED (`charter_spend_world_refusal`, corporation_generation.hpp).
 enum class charter_cap_rule : std::uint8_t
 {
     fixed        = 0, ///< `per_resource_firm_cap` firms per good per body, flat; biggest gap first
@@ -178,8 +185,9 @@ struct charter_spend_params
     /// provisioning bound, the province cap switch and the body guard apply.
     /// What the stop books differs: the legacy rules stop at the first failed
     /// placement and book `no_gap` when nothing is short; `sqrt_capital` skips
-    /// an unplaceable good (NR-903), holds each good to its even share where the
-    /// ceiling binds (NR-905), and names `late_shortfall` and `share_unplaced`.
+    /// an unplaceable good (NR-903), reserves each good an even share where the
+    /// ceiling binds (NR-905, NR-906), and names `late_shortfall` and
+    /// `share_unplaced`.
     charter_cap_rule resource_cap_rule = charter_cap_rule::fixed;
     /// Firms per good per body: the flat cap under `fixed`, and the floor AND the
     /// base of the square root under `sqrt_capital`. Must be > 0 on a non-empty
@@ -318,9 +326,10 @@ enum class charter_unspent_reason : std::uint8_t
     body_cap         = 4, ///< the body already carries `max_firms_per_body` background firms
                           ///< (the anti-runaway guard)
     remainder        = 5, ///< fewer points left than one firm costs
-    refused          = 6, ///< the spend params were refused (`charter_spend_refusal`: a price
-                          ///< <= 0, a cap unset or unread, the arithmetic out of range);
-                          ///< nothing chartered
+    refused          = 6, ///< the spend was refused (`charter_spend_refusal`: a price <= 0, a
+                          ///< cap unset or unread, the arithmetic out of range; or
+                          ///< `charter_spend_world_refusal`: a ceiling smaller than a
+                          ///< body's turn plus its yards' places); nothing chartered
     density_ceiling  = 7, ///< the body already carries `density_ceiling` background firms
                           ///< (sqrt_capital only; BL-1039)
     late_shortfall   = 8, ///< sqrt_capital only (BL-1060): no good in the turn could take a
@@ -328,14 +337,16 @@ enum class charter_unspent_reason : std::uint8_t
                           ///< walk's own firms created after G was fixed (their upkeep).
                           ///< The turn serves G alone, so that shortfall is real and
                           ///< unserved; `no_gap` would claim there was none.
-    share_unplaced   = 9, ///< sqrt_capital only, where the ceiling binds (NR-905): the
-                          ///< firms of a good's EVEN SHARE that no centre on the body
-                          ///< placed. A centre that stops because every good still under
-                          ///< its share cannot be placed there books its rest as
-                          ///< `window_exhausted` / `province_cap`; when the walk ends,
-                          ///< as many of those points as the body's still-short goods
-                          ///< lack of their shares (within the ceiling's room) move here,
-                          ///< centres in spend order. So this is the gap the share left.
+    share_unplaced   = 9, ///< sqrt_capital only, where the ceiling binds (NR-905, NR-906): a
+                          ///< turn good's share still unfilled at the end of the walk.
+                          ///< A centre that stops because every good it could still
+                          ///< charter fails to place there books its rest as
+                          ///< `window_exhausted` / `province_cap`; when the walk ends, as
+                          ///< many of those points as the still-short turn goods lack of
+                          ///< their shares (within the ceiling's room) move here, drawn
+                          ///< from those stops in spend order. It says the share went
+                          ///< unfilled — not that no centre had ground for it (one might
+                          ///< have, and run out of points first).
 };
 
 inline const char* charter_unspent_reason_name(charter_unspent_reason r)
@@ -415,11 +426,17 @@ struct charter_body_record
     std::int32_t per_good_cap = -1;
     /// The density ceiling in force (0: none — every legacy rule).
     std::int32_t density_ceiling = 0;
-    /// THE EVEN SHARE (NR-905), fixed before the walk: 0 where the ceiling does
-    /// not bind (every legacy rule, and a sqrt body that cannot outrun it);
-    /// otherwise ceiling / |turn|, and the first `even_share_extra` goods of the
-    /// turn (ascending resource index) hold one more. A good's share is capped
-    /// by the per-good cap as well.
+    /// THE YARDS' PLACES (NR-906), fixed before the walk under `sqrt_capital`:
+    /// an upper bound on the construction yards the walk can provision on this
+    /// body, taken off the ceiling before the shares are cut (0 under a legacy
+    /// rule). The exact count is not knowable before the walk; see
+    /// `charter_yard_places` (corporation_generation.cpp) for the bound.
+    std::int32_t yard_places      = 0;
+    /// THE EVEN SHARE (NR-905, NR-906), fixed before the walk: 0 where the
+    /// ceiling does not bind (every legacy rule, and a sqrt body that cannot
+    /// outrun it); otherwise (ceiling - yard_places) / |turn|, and the first
+    /// `even_share_extra` goods of the turn (ascending resource index) hold one
+    /// more. A RESERVATION, not a cap: a good may end past its share.
     std::int32_t even_share       = 0;
     std::int32_t even_share_extra = 0;
     /// Background firms the walk chartered on this body, in all and per good

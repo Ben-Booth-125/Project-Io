@@ -815,10 +815,14 @@ void print_charter_bodies(const charter_spend_report& rep, const char* indent)
         if (rep.cap_rule == charter_cap_rule::sqrt_capital)
         {
             const charter_turn_reading t = read_turn(b);
-            char share[96] = "none (the ceiling does not bind)";
+            char share[128];
             if (b.even_share > 0)
-                std::snprintf(share, sizeof share, "%d each, %d goods +1 (NR-905)",
-                              static_cast<int>(b.even_share), static_cast<int>(b.even_share_extra));
+                std::snprintf(share, sizeof share, "%d each, %d goods +1, reserved of the ceiling less "
+                              "%d yard places (NR-905, NR-906)", static_cast<int>(b.even_share),
+                              static_cast<int>(b.even_share_extra), static_cast<int>(b.yard_places));
+            else
+                std::snprintf(share, sizeof share, "none (the ceiling does not bind; yard places %d)",
+                              static_cast<int>(b.yard_places));
             std::printf("%s  the turn (G without construction capacity): %d goods, %d without a firm; "
                         "firms per good %d..%d; even share %s\n", indent, t.goods_in_turn,
                         t.goods_without_firm, t.fewest, t.most, share);
@@ -1074,47 +1078,38 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
                 failed(buf);
             }
         }
-        // THE EVEN SHARE (NR-905), re-derived: the ceiling binds when the body
-        // holds more firm charters than the ceiling AND the turn's per-good caps
-        // sum past it; then ceiling / |turn| each, the remainder one more to the
-        // first goods of the turn, and no turn good past min(cap, its share).
+        // THE EVEN SHARE (NR-905, NR-906), re-derived from the body's own row:
+        // the ceiling binds when the body holds more firm charters than the
+        // ceiling AND the turn's per-good caps sum past it; then (ceiling - the
+        // yards' places) / |turn| each, the remainder one more to the first goods
+        // of the turn. A share is a RESERVATION, not a cap, so a good may end
+        // past it — only the per-good cap (above) bounds a good.
         if (spend.resource_cap_rule == charter_cap_rule::sqrt_capital)
         {
             const std::size_t cap_good = static_cast<std::size_t>(resource_type::construction_capacity);
-            std::vector<std::uint16_t> turn;
+            long long n_turn = 0;
             for (const std::uint16_t gd : b.goods)
                 if (gd != cap_good)
-                    turn.push_back(gd);
-            const long long n_turn = static_cast<long long>(turn.size());
+                    ++n_turn;
             const long long ceil_n = b.density_ceiling;
-            const bool binds = n_turn > 0 && fp > 0 && b.firm_points / fp > ceil_n
+            const long long room   = ceil_n - b.yard_places;
+            if (b.yard_places < 0 || b.yard_places > ceil_n)
+                failed("the yards' places are outside 0..ceiling");
+            const bool binds = n_turn > 0 && room >= n_turn && fp > 0 && b.firm_points / fp > ceil_n
                             && n_turn * k > ceil_n;
-            const long long want_share = binds ? ceil_n / n_turn : 0;
-            const long long want_extra = binds ? ceil_n % n_turn : 0;
+            const long long want_share = binds ? room / n_turn : 0;
+            const long long want_extra = binds ? room % n_turn : 0;
             if (b.even_share != want_share || b.even_share_extra != want_extra)
             {
                 std::snprintf(buf, sizeof buf, "body %u: even share %d (+1 on %d), re-derived %lld "
-                              "(+1 on %lld)", b.body, static_cast<int>(b.even_share),
-                              static_cast<int>(b.even_share_extra), want_share, want_extra);
+                              "(+1 on %lld) from ceiling %lld less %d yard places", b.body,
+                              static_cast<int>(b.even_share), static_cast<int>(b.even_share_extra),
+                              want_share, want_extra, ceil_n, static_cast<int>(b.yard_places));
                 failed(buf);
             }
-            if (binds)
-                for (std::size_t i = 0; i < turn.size(); ++i)
-                {
-                    const long long share = want_share + (static_cast<long long>(i) < want_extra ? 1 : 0);
-                    const long long held  = turn[i] < b.firms_by_good.size() ? b.firms_by_good[turn[i]] : 0;
-                    if (held > std::min(k, share))
-                    {
-                        std::snprintf(buf, sizeof buf, "body %u: %s holds %lld firms, past its even "
-                                      "share %lld", b.body,
-                                      resource_names::name_of(static_cast<resource_type>(turn[i])).c_str(),
-                                      held, std::min(k, share));
-                        failed(buf);
-                    }
-                }
         }
-        else if (b.even_share != 0 || b.even_share_extra != 0)
-            failed("a legacy rule carries an even share");
+        else if (b.even_share != 0 || b.even_share_extra != 0 || b.yard_places != 0)
+            failed("a legacy rule carries an even share or yard places");
         if (sum != b.firms)
             failed("firms by good do not sum to the body's firms");
         if (b.density_ceiling > 0 && b.firms > b.density_ceiling)
@@ -2444,10 +2439,11 @@ void write_cost_json(const std::string& path, const cost_options& opt,
                         std::fprintf(f, "%s\"%s\"", gi ? ", " : "",
                                      resource_names::name_of(static_cast<resource_type>(br.goods[gi])).c_str());
                     std::fprintf(f, "], \"reference_points\": %lld, \"per_good_cap\": %d, "
-                                    "\"density_ceiling\": %d, \"even_share\": %d, \"even_share_extra\": %d, "
-                                    "\"firms\": %d, \"firms_by_good\": {",
+                                    "\"density_ceiling\": %d, \"yard_places\": %d, \"even_share\": %d, "
+                                    "\"even_share_extra\": %d, \"firms\": %d, \"firms_by_good\": {",
                                  static_cast<long long>(br.reference_points),
                                  static_cast<int>(br.per_good_cap), static_cast<int>(br.density_ceiling),
+                                 static_cast<int>(br.yard_places),
                                  static_cast<int>(br.even_share), static_cast<int>(br.even_share_extra),
                                  static_cast<int>(br.firms));
                     bool first_good = true;
