@@ -110,6 +110,13 @@ struct harness_charter_input
     /// Read only with a non-null `budget`; the shipped path charges the
     /// stockpile at `stockpile_charter_spend()`.
     charter_spend_params  spend{};
+    /// BL-1043 — THE SHIPPED BUDGET AT THE INSTRUMENT'S PRICES. Read ONLY when
+    /// `budget` is null, i.e. on the shipped path, where the budget is still the
+    /// one `build_stockpile_budget` built from the world's own stockpile: this
+    /// replaces `stockpile_charter_spend()` and NOTHING ELSE, so a row that sets
+    /// it is measuring the real budget at a price off the matrix, never a
+    /// synthetic budget. Null is the shipped spend.
+    const charter_spend_params* stockpile_spend = nullptr;
     /// Receives the WINNER'S spend report (the search's own evaluations report
     /// nothing) — the instrument's budget's, or on the shipped path the
     /// stockpile's. Untouched when the budget in force is empty.
@@ -193,7 +200,10 @@ inline shipped_landscape apply_shipped_landscape(
         out.stockpile      = build_stockpile_budget(w);
         out.stockpile_path = true;
         budget             = &out.stockpile.budget;
-        spend              = stockpile_charter_spend();
+        // BL-1043: the shipped spend unless the instrument named its own prices
+        // for this row. The BUDGET is the shipped builder's either way.
+        spend              = charter.stockpile_spend != nullptr ? *charter.stockpile_spend
+                                                                : stockpile_charter_spend();
     }
     sp.budget = budget;
     sp.spend  = spend;

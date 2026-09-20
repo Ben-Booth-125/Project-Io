@@ -54,6 +54,12 @@
 //                                    [--forced-radius 4] [--forced-pick sparse|richest]
 //                                    [--live-ticks 8]
 //                                    [--out file.json] [--note TEXT]        (BL-1033)
+//      .\build\player_seed_sweep.exe --charter-cost --budget stockpile      (BL-1043)
+//                                    [--seeds 28] [--firm-prices 5000,10000,20000]
+//                                    [--specialist-prices 2,4,8] [--no-span-control]
+//                                    — the REAL budget: the Digitisation span at epoch 0 and
+//                                      the budget build_stockpile_budget makes from the
+//                                      world's own stockpile. No budget scales apply.
 //
 // BL-630 (2026-08-26) ADDED THE MODE THIS FILE NOW LEADS WITH. The two default
 // conditions above ("worth playing" == a processor, and solvent) were written
@@ -86,6 +92,7 @@
 #include <algorithm>
 #include <array>
 #include <cinttypes>
+#include <cstdarg>   // the stockpile account is built as TEXT (BL-1043)
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -1359,22 +1366,36 @@ std::string stockpile_account_failure(const stockpile_budget& sb, const charter_
     return out;
 }
 
-/// One block per row: the stock, where it went, and the whole account.
-void print_stockpile_account(const world& w, const stockpile_budget& sb,
-                             const charter_spend_report& rep)
+/// printf into a std::string — the account below is built as TEXT so a caller
+/// that prints after its world is gone (the cost table's rows) can hold it.
+void text_appendf(std::string& out, const char* fmt, ...)
 {
-    std::printf("      stockpile (BL-1042): %lld points on %zu regions -> %lld to %zu centres",
-                static_cast<long long>(sb.points_total), sb.regions.size(),
-                static_cast<long long>(sb.points_to_centres), sb.budget.points().size());
+    char buf[1024];
+    va_list ap;
+    va_start(ap, fmt);
+    std::vsnprintf(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    out += buf;
+}
+
+/// One block per row: the stock, where it went, and the whole account, as text.
+/// @p indent leads every line (the nested region rows take two more spaces).
+std::string stockpile_account_text(const world& w, const stockpile_budget& sb,
+                                   const charter_spend_report& rep, const char* indent)
+{
+    std::string out;
+    text_appendf(out, "%sstockpile (BL-1042): %lld points on %zu regions -> %lld to %zu centres",
+                 indent, static_cast<long long>(sb.points_total), sb.regions.size(),
+                 static_cast<long long>(sb.points_to_centres), sb.budget.points().size());
     for (int r = 0; r < stockpile_unspent_reason_count; ++r)
-        std::printf(", %s %lld",
-                    stockpile_unspent_reason_name(static_cast<stockpile_unspent_reason>(r)),
-                    static_cast<long long>(sb.unspent[static_cast<std::size_t>(r)]));
+        text_appendf(out, ", %s %lld",
+                     stockpile_unspent_reason_name(static_cast<stockpile_unspent_reason>(r)),
+                     static_cast<long long>(sb.unspent[static_cast<std::size_t>(r)]));
     if (sb.rejected)
-        std::printf("; REJECTED: %s", sb.rejection.c_str());
-    std::printf("\n");
+        text_appendf(out, "; REJECTED: %s", sb.rejection.c_str());
+    out += "\n";
     if (sb.points_total == 0)
-        return;
+        return out;
     int founded = 0, dropped = 0;
     for (const stockpile_region_row& r : sb.regions)
     {
@@ -1387,8 +1408,8 @@ void print_stockpile_account(const world& w, const stockpile_budget& sb,
     long long ch_unspent = 0;
     for (const charter_unspent& u : rep.unspent)
         ch_unspent += u.points;
-    std::printf("      stockpile slots: %d founded, %d dropped over the point-holding regions; "
-                "richest centre %d points\n", founded, dropped, static_cast<int>(richest));
+    text_appendf(out, "%sstockpile slots: %d founded, %d dropped over the point-holding regions; "
+                 "richest centre %d points\n", indent, founded, dropped, static_cast<int>(richest));
     // WHY a region holding points carved no centre (NR-901): per region, its
     // points, the part the treasury paid in (`industry_points_from_treasury`),
     // the towns history razed there (`centres_razed`) and what stands at the
@@ -1411,23 +1432,32 @@ void print_stockpile_account(const world& w, const stockpile_budget& sb,
                 continue;
             ++shown;
             const region& rg = ss->regions[static_cast<std::size_t>(r.region)];
-            std::printf("        region %5d %-16s points %10lld (from treasury %10lld) centres_razed %3d | "
-                        "at the epoch: centres %d, urban %lld, population %lld\n",
-                        r.region, razed != 0 ? "razed" : "NO_CARVED_CENTRE",
-                        static_cast<long long>(r.points),
-                        static_cast<long long>(rg.industry_points_from_treasury),
-                        rg.centres_razed, rg.centres, static_cast<long long>(rg.urban_population),
-                        static_cast<long long>(rg.population));
+            text_appendf(out, "%s  region %5d %-16s points %10lld (from treasury %10lld) centres_razed %3d | "
+                         "at the epoch: centres %d, urban %lld, population %lld\n",
+                         indent, r.region, razed != 0 ? "razed" : "NO_CARVED_CENTRE",
+                         static_cast<long long>(r.points),
+                         static_cast<long long>(rg.industry_points_from_treasury),
+                         rg.centres_razed, rg.centres, static_cast<long long>(rg.urban_population),
+                         static_cast<long long>(rg.population));
         }
         if (n > shown)
-            std::printf("        ... %d more such regions not printed\n", n - shown);
+            text_appendf(out, "%s  ... %d more such regions not printed\n", indent, n - shown);
     }
-    std::printf("      ACCOUNT: stock %lld = spent %lld + charter unspent %lld + stockpile unspent %lld "
-                "(%s)\n",
-                static_cast<long long>(sb.points_total), static_cast<long long>(rep.points_spent),
-                ch_unspent, static_cast<long long>(sb.points_unspent()),
-                sb.points_total == rep.points_spent + ch_unspent + sb.points_unspent()
-                    ? "closes" : "DOES NOT CLOSE");
+    text_appendf(out, "%sACCOUNT: stock %lld = spent %lld + charter unspent %lld + stockpile unspent %lld "
+                 "(%s)\n",
+                 indent, static_cast<long long>(sb.points_total),
+                 static_cast<long long>(rep.points_spent),
+                 ch_unspent, static_cast<long long>(sb.points_unspent()),
+                 sb.points_total == rep.points_spent + ch_unspent + sb.points_unspent()
+                     ? "closes" : "DOES NOT CLOSE");
+    return out;
+}
+
+/// The digest modes' block, unchanged: the same text at its six-space indent.
+void print_stockpile_account(const world& w, const stockpile_budget& sb,
+                             const charter_spend_report& rep)
+{
+    std::fputs(stockpile_account_text(w, sb, rep, "      ").c_str(), stdout);
 }
 
 int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
@@ -1748,6 +1778,36 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
 // on a pinned seed, must match the pins — the proof this mode measures the
 // shipped start. A mismatch fails the run.
 //
+// BL-1043 — `--budget stockpile`, THE REAL BUDGET. The synthetic matrix above is
+// unchanged in every particular (its rows are checked in and must reproduce);
+// `--budget stockpile` runs a DIFFERENT matrix on the shipped builder's own
+// budget:
+//   * The world runs the Digitisation span at EPOCH 0
+//     (`world_params::digitisation_span_enabled`) — never epoch_year 1960, which
+//     is the superseded arc with Exploration off.
+//   * NO budget is handed to the seam, so `apply_shipped_landscape` builds the
+//     world's own (`build_stockpile_budget`, BL-1042) and hands it to BOTH the
+//     search and the winner's apply, exactly as app::start_new_game_prelude does.
+//     The row names only the PRICES and the rules it is charged at
+//     (`harness_charter_input::stockpile_spend`), never a second budget.
+//   * THE AXES are the item's: the firm price P_f in points (--firm-prices) and
+//     the specialist's price m in firm charters (--specialist-prices), under the
+//     RULED `sqrt` rule at the RULED ceiling 120 by default. BUDGET SCALES ARE
+//     NOT AN AXIS — a world's own stockpile has no scale — so --budget-scales,
+//     --ladder-scales, the extra 4x row and the forced row (a concentrated
+//     SYNTHETIC budget) are refused or not run, and the header says so.
+//   * TWO BASELINES per seed: the legacy none row (span OFF — the pinned shipped
+//     world, and the roster the seat-menu anchor is read against) and the span
+//     CONTROL (the same span world with an EMPTY budget, i.e. no budget at all),
+//     so a seat count can be read against a no-budget world that is otherwise
+//     the same world. --no-span-control drops the second.
+//   * WHAT ONLY THIS MODE PRINTS, under each budget row: the stockpile's own
+//     point account (the dropped-centre reason among its five), the seat menu
+//     against both baselines, the specialists' opening capital at the 400 +/-40%
+//     draw with any opening at zero, the chartered good against the EXTRACTED
+//     one, the density-follows-cities rho, and the tick ratio with its phase
+//     split.
+//
 // TIMINGS ARE WALL CLOCK and only as clean as the machine was quiet. `--note`
 // records the run conditions into the JSON; the build type prints on every header.
 //   search   ms per evaluation at thread_count 1 (the app's): round_ms[0] is the
@@ -1770,8 +1830,19 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
 
 struct cost_config
 {
-    enum class kind { none, synthetic, forced };
+    /// `stockpile` is BL-1043's row: the REAL budget the shipped builder makes
+    /// from the world's own stockpile, charged at this row's prices.
+    enum class kind { none, synthetic, forced, stockpile };
     kind   k             = kind::none;
+    /// BL-1043: the Digitisation span on at epoch 0 for this row's world (NEVER
+    /// epoch_year 1960, the superseded arc). Always on for a `stockpile` row —
+    /// the stockpile is empty without it — and on for the span CONTROL, a `none`
+    /// row that hands the seam an empty budget so the span world is measured
+    /// with no budget at all.
+    bool   span          = false;
+    /// BL-1043: the firm price this row's spend runs at (a --firm-prices entry;
+    /// `stockpile` rows only). 0 elsewhere: the synthetic spend's own price.
+    std::int32_t firm_price_points = 0;
     double scale         = 1.0;
     /// The per-good cap rule (BL-1039): `fixed` is BL-1033's "rcap on", `lifted`
     /// its "rcap off", `sqrt_capital` the ruled square root under `density_ceiling`.
@@ -1812,7 +1883,13 @@ std::string cost_config_label(const cost_config& c)
     switch (c.k)
     {
     case cost_config::kind::none:
-        return "none (legacy)";
+        return c.span ? "none (span ON, NO budget)" : "none (legacy)";
+    case cost_config::kind::stockpile:
+        std::snprintf(buf, sizeof buf, "stockpile Pf%d sp%d rcap %s pcap %s",
+                      static_cast<int>(c.firm_price_points),
+                      static_cast<int>(c.specialist_firm_charters), cost_cap_label(c).c_str(),
+                      c.province_cap ? "on" : "off");
+        return buf;
     case cost_config::kind::synthetic:
         std::snprintf(buf, sizeof buf, "synthetic %gx rcap %s pcap %s sp%d", c.scale,
                       cost_cap_label(c).c_str(), c.province_cap ? "on" : "off",
@@ -1965,6 +2042,32 @@ struct cost_row
     bool      seat_solvent = false, seat_found = false;
     int       specialists_at_seat = 0, specialists_solvent_at_seat = 0;
 
+    // --- BL-1043: the REAL stockpile budget. Every field here is filled on a
+    // `stockpile` row ONLY, so the synthetic rows print and write exactly what
+    // they did before this item.
+    bool        stockpile_row = false;
+    std::string stockpile_text;   ///< the point account, built while the world lived
+    std::string stockpile_fail;   ///< broken clauses of the stockpile account (empty = closes)
+    long long   stock_points_total = 0, stock_to_centres = 0;
+    int         stock_regions = 0, stock_centres = 0;
+    bool        stock_rejected = false;
+    std::array<long long, stockpile_unspent_reason_count> stock_unspent{};
+    /// The specialists' opening capital AT LAND — the 400 +/-40% draw (NR-895).
+    int    spec_cap_n = 0, spec_cap_zero = 0;
+    double spec_cap_min = 0.0, spec_cap_median = 0.0, spec_cap_max = 0.0, spec_cap_mean = 0.0;
+    /// The chartered good against the EXTRACTED one (BL-1039 round 2's caveat:
+    /// place_starting_assets anchors extraction on the tile's richest deposit).
+    int         extraction_buildings = 0, extraction_match = 0, extraction_differ = 0;
+    std::string extraction_mismatches;
+    /// Density follows cities: Spearman rho between a centre's chartered firms
+    /// and its population, over the non-razed centres and over the budgeted ones.
+    int    rho_all_n = 0, rho_budget_n = 0, centres_with_firms = 0;
+    double rho_all = 0.0, rho_budget = 0.0;
+    /// The upstream half: does the CAPITAL follow cities, before any spend does.
+    /// A weak firm rho under a strong points rho is the spend's doing, not the
+    /// budget's — so the two are read together.
+    double rho_points = 0.0;
+
     // --- the none row's fidelity check ---
     bool          digested = false, pinned = false, digest_match = false;
     world_digests dig;
@@ -1973,6 +2076,180 @@ struct cost_row
     // --- the forced row's verdict ---
     bool forced_pass = false;
 };
+
+// --- BL-1043: what only a REAL budget can be asked -----------------------------
+
+/// Spearman rank correlation, ties taking the average rank. DETERMINISTIC: the
+/// caller fixes the order (ascending centre id), the sort is stable, and equal
+/// values take the same rank whichever order they arrived in. 0 for fewer than
+/// three points or a constant series — not a correlation, and said so by n.
+double spearman_rho(const std::vector<double>& x, const std::vector<double>& y)
+{
+    const std::size_t n = x.size();
+    if (n != y.size() || n < 3)
+        return 0.0;
+    const auto ranks = [n](const std::vector<double>& v) {
+        std::vector<std::size_t> idx(n);
+        for (std::size_t i = 0; i < n; ++i)
+            idx[i] = i;
+        std::stable_sort(idx.begin(), idx.end(),
+                         [&v](std::size_t a, std::size_t b) { return v[a] < v[b]; });
+        std::vector<double> r(n, 0.0);
+        std::size_t i = 0;
+        while (i < n)
+        {
+            std::size_t j = i;
+            while (j + 1 < n && v[idx[j + 1]] == v[idx[i]])
+                ++j;
+            const double avg = 0.5 * (static_cast<double>(i) + static_cast<double>(j)) + 1.0;
+            for (std::size_t k = i; k <= j; ++k)
+                r[idx[k]] = avg;
+            i = j + 1;
+        }
+        return r;
+    };
+    const std::vector<double> rx = ranks(x), ry = ranks(y);
+    double mx = 0.0, my = 0.0;
+    for (std::size_t i = 0; i < n; ++i) { mx += rx[i]; my += ry[i]; }
+    mx /= static_cast<double>(n);
+    my /= static_cast<double>(n);
+    double sxy = 0.0, sxx = 0.0, syy = 0.0;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        const double dx = rx[i] - mx, dy = ry[i] - my;
+        sxy += dx * dy;
+        sxx += dx * dx;
+        syy += dy * dy;
+    }
+    if (sxx <= 0.0 || syy <= 0.0)
+        return 0.0;   // one series is constant: no rank correlation exists
+    return sxy / std::sqrt(sxx * syy);
+}
+
+/// Everything the cost table can ask of a row ONLY because its budget is the
+/// world's own stockpile: the point account, the specialists' opening capital,
+/// the chartered good against the extracted one, and the density reading.
+/// Taken AT LAND, while the row's world is still alive.
+void measure_stockpile_row(const world& w, const stockpile_budget& sb,
+                           const charter_spend_report& rep, cost_row& row)
+{
+    row.stockpile_row      = true;
+    row.stock_points_total = sb.points_total;
+    row.stock_to_centres   = sb.points_to_centres;
+    row.stock_regions      = static_cast<int>(sb.regions.size());
+    row.stock_centres      = static_cast<int>(sb.budget.points().size());
+    row.stock_rejected     = sb.rejected;
+    for (int i = 0; i < stockpile_unspent_reason_count; ++i)
+        row.stock_unspent[static_cast<std::size_t>(i)] = sb.unspent[static_cast<std::size_t>(i)];
+    char indent[80];
+    std::snprintf(indent, sizeof indent, "  %-52s   ", "");
+    row.stockpile_text = stockpile_account_text(w, sb, rep, indent);
+    row.stockpile_fail = stockpile_account_failure(sb, rep);
+
+    // THE OPENING CAPITAL (NR-895): the 400 +/-40% draw with the focus premium,
+    // read off the specialists AS CHARTERED — before the validation run moves it.
+    {
+        std::vector<double> cap;
+        cap.reserve(rep.specialists.size());
+        for (const entity_id sid : rep.specialists)   // ascending id
+        {
+            const auto it = w.corporations.find(sid);
+            if (it == w.corporations.end())
+                continue;
+            cap.push_back(static_cast<double>(it->second.balance));
+            if (!(it->second.balance > 0.0f))
+                ++row.spec_cap_zero;
+        }
+        const tick_summary s = summarise(cap);
+        row.spec_cap_n      = s.n;
+        row.spec_cap_min    = s.min;
+        row.spec_cap_median = s.median;
+        row.spec_cap_max    = s.max;
+        row.spec_cap_mean   = s.mean;
+    }
+
+    // THE CHARTERED GOOD AGAINST THE EXTRACTED ONE (BL-1039 round 2): the spend
+    // tallies a firm to the good it CHARTERED, but place_starting_assets anchors
+    // extraction on the tile's richest deposit, which may be another good. Read
+    // before any breadth claim is taken off firms_by_good.
+    {
+        std::map<std::pair<std::uint16_t, std::uint16_t>, int> pairs;
+        for (const charter_record& c : rep.charters)   // ascending corp id
+        {
+            if (c.specialist || c.good == 0xFFFF)
+                continue;
+            const auto corp = w.corporations.find(c.corp);
+            if (corp == w.corporations.end())
+                continue;
+            for (const entity_id bid : corp->second.assets)
+            {
+                const auto b = w.buildings.find(bid);
+                if (b == w.buildings.end() || b->second.type != building_type::extraction_site)
+                    continue;
+                ++row.extraction_buildings;
+                const auto got = static_cast<std::uint16_t>(b->second.target_resource);
+                if (got == c.good)
+                    ++row.extraction_match;
+                else
+                {
+                    ++row.extraction_differ;
+                    ++pairs[{ c.good, got }];
+                }
+            }
+        }
+        std::vector<std::pair<std::pair<std::uint16_t, std::uint16_t>, int>> top(pairs.begin(),
+                                                                                pairs.end());
+        std::stable_sort(top.begin(), top.end(), [](const auto& a, const auto& b) {
+            return a.second > b.second;   // stable: equal counts keep (chartered, extracted) order
+        });
+        for (std::size_t i = 0; i < top.size() && i < 5; ++i)
+            text_appendf(row.extraction_mismatches, "%s%s->%s %d", i ? ", " : "",
+                         resource_names::name_of(static_cast<resource_type>(top[i].first.first)).c_str(),
+                         resource_names::name_of(static_cast<resource_type>(top[i].first.second)).c_str(),
+                         top[i].second);
+    }
+
+    // DENSITY FOLLOWS CITIES. Meaningful ONLY because the budget is the world's
+    // own stockpile: a budget made of headcount would pass this by construction
+    // (DIGITISATION.md § 1). Firms chartered TO a centre against that centre's
+    // population, over every non-razed centre (a centre with no firm is a zero,
+    // not a missing row) and over the budgeted centres alone.
+    {
+        std::map<entity_id, int> firms_by_centre;
+        for (const charter_record& c : rep.charters)
+            if (!c.specialist)
+                ++firms_by_centre[c.centre];
+        row.centres_with_firms = static_cast<int>(firms_by_centre.size());
+        std::vector<entity_id> ids;
+        ids.reserve(w.population_centres.size());
+        for (const auto& kv : w.population_centres)
+            ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());   // never the map's own order
+        std::vector<double> fa, pa, fb, pb, points_b;
+        for (const entity_id id : ids)
+        {
+            const population_centre_component& pc = w.population_centres.at(id);
+            if (pc.razed || pc.population <= 0)
+                continue;
+            const auto f = firms_by_centre.find(id);
+            const double firms = f == firms_by_centre.end() ? 0.0 : static_cast<double>(f->second);
+            fa.push_back(firms);
+            pa.push_back(static_cast<double>(pc.population));
+            const auto b = sb.budget.points().find(id);
+            if (b != sb.budget.points().end())
+            {
+                fb.push_back(firms);
+                pb.push_back(static_cast<double>(pc.population));
+                points_b.push_back(static_cast<double>(b->second));
+            }
+        }
+        row.rho_all_n    = static_cast<int>(fa.size());
+        row.rho_all      = spearman_rho(fa, pa);
+        row.rho_budget_n = static_cast<int>(fb.size());
+        row.rho_budget   = spearman_rho(fb, pb);
+        row.rho_points   = spearman_rho(points_b, pb);
+    }
+}
 
 /// Run one configuration: its own world built in app order, then measured.
 /// @p at_land runs as the landscape lands; returning false stops the row there
@@ -1992,7 +2269,46 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
     // so even a row that throws below carries the price it was run at.
     charter_spend_report  report;
     harness_charter_input charter;
-    if (row.budget_row)
+    /// BL-1043: a stockpile row's spend, which `charter` points at — it must
+    /// outlive the landscape call below.
+    charter_spend_params  stock_spend{};
+    if (cfg.k == cost_config::kind::stockpile)
+    {
+        // BL-1043 — THE REAL BUDGET. NO budget is handed in, so the shipped path
+        // builds the world's own (`build_stockpile_budget`) and hands it to BOTH
+        // the search and the winner's apply, exactly as app.cpp does. This row
+        // names only the PRICES and the rules it is charged at.
+        stock_spend = stockpile_charter_spend();
+        stock_spend.firm_price_points        = cfg.firm_price_points;
+        stock_spend.specialist_firm_charters = cfg.specialist_firm_charters;
+        stock_spend.resource_cap_rule        = cfg.resource_cap_rule;
+        if (cfg.resource_cap_rule == charter_cap_rule::lifted)
+            stock_spend.per_resource_firm_cap = 0;   // unread there, and refused if set
+        stock_spend.density_ceiling =
+            cfg.resource_cap_rule == charter_cap_rule::sqrt_capital ? cfg.density_ceiling : 0;
+        stock_spend.province_cap  = cfg.province_cap;
+        stock_spend.window_radius = cfg.window_radius;
+        charter.stockpile_spend      = &stock_spend;
+        charter.report               = &report;
+        row.firm_price_points        = stock_spend.firm_price_points;
+        row.specialist_firm_charters = stock_spend.specialist_firm_charters;
+        row.specialist_price_points  = static_cast<long long>(stock_spend.specialist_price_points());
+        row.per_resource_firm_cap    = stock_spend.per_resource_firm_cap;
+        row.max_firms_per_body       = stock_spend.max_firms_per_body;
+        row.density_ceiling          = stock_spend.density_ceiling;
+    }
+    else if (cfg.k == cost_config::kind::none && cfg.span)
+    {
+        // THE SPAN CONTROL (BL-1043): the span world with NO budget. An EMPTY
+        // budget is handed in so the shipped path does not build the stockpile's
+        // — an empty budget takes the legacy branch, which IS "no budget"
+        // (DIGITISATION.md § 1: "no budget and an empty budget are the same
+        // world as today's"). This row is the seat-menu anchor: as many seats as
+        // a world with no budget, on the same world the budget rows are measured on.
+        static const charter_budget k_no_budget{};
+        charter.budget = &k_no_budget;
+    }
+    else if (row.budget_row)
     {
         charter.budget              = budget;
         charter.spend               = synthetic_charter_spend();
@@ -2017,8 +2333,11 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
 
     // A budget row with no points would take the legacy branch and measure
     // TODAY'S world under a budget label. run_charter_cost refuses such a scale
-    // (exit 2) before any budget row runs; this is the backstop.
-    if (row.budget_row && (budget == nullptr || budget->empty()))
+    // (exit 2) before any budget row runs; this is the backstop. A stockpile row
+    // has no budget yet — the world builds its own below, and an empty one there
+    // is the same failure, thrown as soon as it is known.
+    if (row.budget_row && cfg.k != cost_config::kind::stockpile
+        && (budget == nullptr || budget->empty()))
         throw std::runtime_error("budget row '" + row.label + "' has an empty budget: it would "
                                  "measure today's world under a budget label");
 
@@ -2027,6 +2346,9 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
     {
         world_params p{};
         p.seed = seed;
+        // BL-1043: the Digitisation span at EPOCH 0 — never epoch_year 1960, the
+        // superseded arc with Exploration off. Off on every other row.
+        p.digitisation_span_enabled = cfg.span;
         const auto g0 = clk::now();
         build_app_base_world(lua, p, *run);
         row.base_ms = std::chrono::duration<double, std::milli>(clk::now() - g0).count();
@@ -2075,6 +2397,19 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
 
     if (row.budget_row)
     {
+        // BL-1043: a stockpile row's budget is the one the SHIPPED BUILDER made
+        // from this world's own stockpile, and its spend is the one the mirror
+        // charged it at; every other row's is the instrument's.
+        const bool stock_row = cfg.k == cost_config::kind::stockpile;
+        if (stock_row && !run->land.stockpile_path)
+            throw std::runtime_error("stockpile row '" + row.label + "' did not take the shipped "
+                                     "path: no stockpile budget was built");
+        const charter_budget&      bud   = stock_row ? run->land.stockpile.budget : *budget;
+        const charter_spend_params spend = stock_row ? stock_spend : charter.spend;
+        if (stock_row && bud.empty())
+            throw std::runtime_error("stockpile row '" + row.label + "': the Digitisation span is "
+                                     "on but the stockpile budget is EMPTY — the row would measure "
+                                     "today's world under a budget label");
         row.refused         = report.refused;
         row.points_budgeted = report.points_budgeted;
         row.points_spent    = report.points_spent;
@@ -2082,29 +2417,41 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         // BL-1039 fix round: re-derived from the budget and the records, and a
         // FAILING check on every budget row (run_charter_cost), not the forced
         // row's alone.
-        row.balance_fail    = charter_balance_failure(*budget, report);
+        row.balance_fail    = charter_balance_failure(bud, report);
         row.balanced        = row.balance_fail.empty();
         for (const charter_unspent& u : report.unspent)
             row.unspent_by_reason[static_cast<std::size_t>(u.reason)] += u.points;
-        row.budget_centres = static_cast<int>(budget->points().size());
-        for (const auto& kv : budget->points())
+        row.budget_centres = static_cast<int>(bud.points().size());
+        for (const auto& kv : bud.points())
         {
             row.richest_centre_points = std::max(row.richest_centre_points, kv.second);
-            if (kv.second >= charter.spend.specialist_price_points())
+            if (kv.second >= spend.specialist_price_points())
                 ++row.centres_affording_specialist;
         }
-        measure_charter_spill(w, report, charter.spend.window_radius, row.spec_spill,
-                              row.firm_spill);
+        measure_charter_spill(w, report, spend.window_radius, row.spec_spill, row.firm_spill);
 
         // BL-1039: the rules, checked NOW — as the landscape lands (a refused
         // row has no records).
         row.bodies             = report.bodies;
         row.budget_specialists = report.specialists;
         if (!report.refused)
-            row.rule_check = check_charter_rules(w, *budget, report, charter.spend);
+            row.rule_check = check_charter_rules(w, bud, report, spend);
+        // BL-1043's own readings, taken while this world is alive: the point
+        // account, the opening capital, the extracted good, the density reading.
+        if (stock_row)
+        {
+            measure_stockpile_row(w, run->land.stockpile, report, row);
+            if (!row.stockpile_fail.empty())
+            {
+                row.balanced = false;
+                row.balance_fail += row.stockpile_fail;
+            }
+        }
     }
 
-    if (cfg.k == cost_config::kind::none)
+    // The pins are the SPAN-OFF shipped world's, so only the legacy none row is
+    // digested; the span control is a different world by construction (BL-1043).
+    if (cfg.k == cost_config::kind::none && !cfg.span)
     {
         row.digested = true;
         digest_at_land(*run, row.dig);
@@ -2242,6 +2589,23 @@ struct cost_options
     std::string out_path;
     std::string note;
     std::vector<std::string> argv;
+
+    // --- BL-1043: `--budget stockpile`, the REAL budget ---
+    /// The row's budget is the world's own stockpile, built by the shipped
+    /// builder on a Digitisation-span world. Off is BL-1033's synthetic mode,
+    /// unchanged in every particular.
+    bool stockpile = false;
+    /// --firm-prices: POINTS per firm charter, the P_f axis. Stockpile mode only
+    /// (the synthetic spend's firm price is 1 point by construction). Default:
+    /// the provisional shipped constant halved, itself and doubled.
+    std::vector<std::int32_t> firm_prices;
+    /// The span CONTROL row: the span world with no budget, the seat-menu
+    /// anchor. --no-span-control drops it (one full row per seed).
+    bool span_control = true;
+    /// Which axes the command line set, so stockpile mode can refuse the ones
+    /// that have no meaning on a real budget and default the ones that do.
+    bool scales_set = false, ladder_set = false, caps_set = false, ceilings_set = false,
+         prices_set = false, forced_flags_set = false;
 };
 
 struct cost_seed
@@ -2277,18 +2641,27 @@ void write_cost_json(const std::string& path, const cost_options& opt,
         return;
     }
     const auto b = [](bool v) { return v ? "true" : "false"; };
+    // The `tool` string is what charter_cost_merge.js keys a run off: it stays
+    // exactly this in BOTH budget modes, and `budget_mode` says which was run.
     std::fprintf(f, "{\n  \"tool\": \"player_seed_sweep --charter-cost\",\n");
-    std::fprintf(f, "  \"item\": \"BL-1033, BL-1039\",\n");
+    std::fprintf(f, "  \"item\": \"%s\",\n", opt.stockpile ? "BL-1043" : "BL-1033, BL-1039");
+    std::fprintf(f, "  \"budget_mode\": \"%s\",\n", opt.stockpile ? "stockpile" : "synthetic");
     if (aborted_reason != nullptr)
         std::fprintf(f, "  \"aborted\": {\"reason\": \"%s\", \"seed\": %u, \"complete\": false},\n",
                      json_escape(aborted_reason).c_str(), aborted_seed);
     else
         std::fprintf(f, "  \"aborted\": null,\n");
-    std::fprintf(f, "  \"synthetic_test_input\": true,\n");
+    std::fprintf(f, "  \"synthetic_test_input\": %s,\n", b(!opt.stockpile));
     std::fprintf(f, "  \"synthetic_note\": \"%s\",\n",
-                 json_escape("SYNTHETIC TEST INPUT: seeded weights, never population; 1x = the none "
-                             "row's chartered count on the same seed. Never a density-follows-cities "
-                             "reading.").c_str());
+                 json_escape(opt.stockpile
+                     ? "BL-1043: NOT synthetic. Every budget row runs the Digitisation span at epoch "
+                       "0 (never epoch_year 1960) and spends the budget build_stockpile_budget makes "
+                       "from the world's own stockpile, handed to the search and the winner's apply "
+                       "as app::start_new_game_prelude hands it. Budget scales are not an axis. The "
+                       "density_follows_cities reading is therefore meaningful."
+                     : "SYNTHETIC TEST INPUT: seeded weights, never population; 1x = the none "
+                       "row's chartered count on the same seed. Never a density-follows-cities "
+                       "reading.").c_str());
     std::fprintf(f, "  \"build\": \"%s\",\n", build_type_label());
 #ifdef _MSC_FULL_VER
     std::fprintf(f, "  \"msc_full_ver\": %lld,\n", static_cast<long long>(_MSC_FULL_VER));
@@ -2300,6 +2673,16 @@ void write_cost_json(const std::string& path, const cost_options& opt,
     std::fprintf(f, "],\n");
     std::fprintf(f, "  \"validation_ticks\": %d,\n  \"live_ticks\": %d,\n  \"search_thread_count\": 1,\n",
                  k_settle_ticks, opt.live_ticks);
+    if (opt.stockpile)
+    {
+        // BL-1043's P_f axis: points per firm charter, one row set per entry.
+        std::fprintf(f, "  \"firm_price_points\": null,\n  \"firm_prices_points\": [");
+        for (std::size_t i = 0; i < opt.firm_prices.size(); ++i)
+            std::fprintf(f, "%s%d", i ? ", " : "", static_cast<int>(opt.firm_prices[i]));
+        std::fprintf(f, "],\n  \"span_control_row\": %s,\n", b(opt.span_control));
+        std::fprintf(f, "  \"specialist_prices_firm_charters\": [");
+    }
+    else
     std::fprintf(f, "  \"firm_price_points\": %d,\n  \"specialist_prices_firm_charters\": [",
                  static_cast<int>(synthetic_charter_spend().firm_price_points));
     for (std::size_t i = 0; i < opt.specialist_prices.size(); ++i)
@@ -2369,7 +2752,8 @@ void write_cost_json(const std::string& path, const cost_options& opt,
         {
             const cost_row& r = s.rows[ri];
             const char* kind = r.cfg.k == cost_config::kind::none ? "none"
-                             : r.cfg.k == cost_config::kind::synthetic ? "synthetic" : "forced";
+                             : r.cfg.k == cost_config::kind::synthetic ? "synthetic"
+                             : r.cfg.k == cost_config::kind::stockpile ? "stockpile" : "forced";
             const char* sep  = ri + 1 < s.rows.size() ? "," : "";
             std::fprintf(f, "        {\n");
             // `resource_cap` keeps BL-1033's boolean for the two legacy rules and
@@ -2377,6 +2761,9 @@ void write_cost_json(const std::string& path, const cost_options& opt,
             const char* rcap = r.cfg.resource_cap_rule == charter_cap_rule::fixed    ? "true"
                              : r.cfg.resource_cap_rule == charter_cap_rule::lifted   ? "false"
                                                                                      : "null";
+            // BL-1043: `span` is the Digitisation span at epoch 0 for this row's
+            // world; a `none` row with span true is the no-budget control.
+            std::fprintf(f, "          \"span\": %s,\n", b(r.cfg.span));
             std::fprintf(f, "          \"label\": \"%s\", \"kind\": \"%s\", \"scale\": %g, "
                             "\"resource_cap\": %s, \"resource_cap_rule\": \"%s\", "
                             "\"density_ceiling\": %d, "
@@ -2482,6 +2869,44 @@ void write_cost_json(const std::string& path, const cost_options& opt,
                 std::fprintf(f, "%s]", r.bodies.empty() ? "" : "\n          ");
                 std::fprintf(f, ",\n          \"checks_at_land\": { \"pass\": %s, \"fail\": \"%s\" }",
                              b(r.rule_check.pass), json_escape(r.rule_check.fail).c_str());
+                // BL-1043 — the REAL budget's own readings.
+                if (r.stockpile_row)
+                {
+                    std::fprintf(f, ",\n          \"stockpile\": { \"points_total\": %lld, "
+                                    "\"points_to_centres\": %lld, \"regions\": %d, \"centres\": %d, "
+                                    "\"rejected\": %s, \"account_closes\": %s, \"account_fail\": \"%s\", "
+                                    "\"unspent_by_reason\": {",
+                                 r.stock_points_total, r.stock_to_centres, r.stock_regions,
+                                 r.stock_centres, b(r.stock_rejected), b(r.stockpile_fail.empty()),
+                                 json_escape(r.stockpile_fail).c_str());
+                    for (int i = 0; i < stockpile_unspent_reason_count; ++i)
+                        std::fprintf(f, "%s\"%s\": %lld", i ? ", " : " ",
+                                     stockpile_unspent_reason_name(
+                                         static_cast<stockpile_unspent_reason>(i)),
+                                     r.stock_unspent[static_cast<std::size_t>(i)]);
+                    std::fprintf(f, " } }");
+                    std::fprintf(f, ",\n          \"specialist_capital_at_land\": { \"n\": %d, "
+                                    "\"min\": %.1f, \"median\": %.1f, \"max\": %.1f, \"mean\": %.1f, "
+                                    "\"opening_at_zero_or_less\": %d, \"draw\": \"400 +/-40%% with the "
+                                    "focus premium (NR-895)\" }",
+                                 r.spec_cap_n, r.spec_cap_min, r.spec_cap_median, r.spec_cap_max,
+                                 r.spec_cap_mean, r.spec_cap_zero);
+                    std::fprintf(f, ",\n          \"chartered_vs_extracted\": { "
+                                    "\"extraction_buildings\": %d, \"as_chartered\": %d, "
+                                    "\"differ\": %d, \"top_mismatches\": \"%s\" }",
+                                 r.extraction_buildings, r.extraction_match, r.extraction_differ,
+                                 json_escape(r.extraction_mismatches).c_str());
+                    std::fprintf(f, ",\n          \"density_follows_cities\": { \"rho_all_centres\": "
+                                    "%.4f, \"n_all_centres\": %d, \"rho_budgeted_centres\": %.4f, "
+                                    "\"n_budgeted_centres\": %d, \"centres_holding_a_firm\": %d, "
+                                    "\"rho_budget_points_vs_population\": %.4f, "
+                                    "\"measure\": \"Spearman rank correlation, firms chartered to a "
+                                    "centre against its population; ties take the average rank. "
+                                    "rho_budget_points_vs_population is the upstream half: the "
+                                    "centre's stockpile points against its population.\" }",
+                                 r.rho_all, r.rho_all_n, r.rho_budget, r.rho_budget_n,
+                                 r.centres_with_firms, r.rho_points);
+                }
                 if (r.cfg.k == cost_config::kind::forced)
                     std::fprintf(f, ",\n          \"forced_province_cap_pass\": %s, \"forced_pick\": \"%s\", "
                                     "\"forced_centre\": %u",
@@ -2578,6 +3003,46 @@ void write_cost_json(const std::string& path, const cost_options& opt,
 void print_cost_table_header(const cost_options& opt)
 {
     const charter_spend_params spend = synthetic_charter_spend();
+    if (opt.stockpile)
+    {
+        // BL-1043: the same columns, a different budget. Only the first sentence
+        // and the price legend change — everything below is BL-1033's legend.
+        std::string prices;
+        for (std::size_t i = 0; i < opt.firm_prices.size(); ++i)
+            text_appendf(prices, "%s%d", i ? ", " : "", static_cast<int>(opt.firm_prices[i]));
+        std::string ms;
+        for (std::size_t i = 0; i < opt.specialist_prices.size(); ++i)
+            text_appendf(ms, "%s%d", i ? ", " : "", static_cast<int>(opt.specialist_prices[i]));
+        std::printf("  THE REAL BUDGET on every stockpile row: the world's own industry-point "
+                    "stockpile (build_stockpile_budget, BL-1042) on a Digitisation-span world at "
+                    "EPOCH 0 — never epoch_year 1960. Budget SCALES are not an axis here and are "
+                    "refused: there is no scale to apply to a world's own stockpile. MATRIX: firm "
+                    "price P_f in points {%s} x specialist price m in firm charters {%s}. fP firm "
+                    "price in points, sFC specialist price in firm charters, sPts specialist price "
+                    "in points ('-' on a none row: it spends no budget) | unspent points by reason "
+                    "| anyS a specialist exists, natSh largest one-nation share of specialists | "
+                    "holdings inside/outside the window | corps/bg at land | search evaluations, "
+                    "seed-candidate ms, per-proposal mean ms | val and live ms per economy tick "
+                    "over step_economy laps 0-5 ONLY — a LOWER BOUND on the app's tick that widens "
+                    "with density | shortlist, trailing net over it, negative share | evalsDue = "
+                    "strategic evals due per live tick (count), NOT a cost. ceil = unspent as "
+                    "density_ceiling; late = late_shortfall, refsd = refused, share = "
+                    "share_unplaced — the ten reason columns sum to the row's unspent total. Under "
+                    "each stockpile row: the rule line, one line per body (B on firms, G, B_ref, "
+                    "per-good cap, firms PER GOOD, the turn's spread), the at-land checks, the "
+                    "seat, then the stockpile's OWN point account (carve_dropped is the "
+                    "dropped-centre reason), the seat menu against both baselines, the specialists' "
+                    "opening capital, the chartered good against the extracted one, the "
+                    "density-follows-cities reading and the tick ratio with its phase split.\n",
+                    prices.c_str(), ms.c_str());
+        std::printf("  %-52s %5s %3s %8s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
+                    "%11s | %9s | %5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
+                    "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window",
+                    "body", "ceil", "remain", "nonat", "late", "refsd", "share", "anyS", "natSh",
+                    "hold in/out", "corps/bg", "evals", "seed_ms", "prop_ms", "val med/mean",
+                    "live med/mean", "short", "trail8 min/med/max", "neg%", "evalsDue");
+        return;
+    }
     std::string ladder;
     for (std::size_t i = 0; i < opt.specialist_prices.size(); ++i)
     {
@@ -2640,7 +3105,9 @@ void print_cost_row_rules(const cost_row& r)
                 r.rule_check.pass ? "PASS" : "FAIL:", r.rule_check.pass ? "" : r.rule_check.fail.c_str());
 }
 
-void print_cost_row(const cost_row& r)
+/// @p wide widens the three price columns for BL-1043's stockpile prices (a firm
+/// costs thousands of points there, not one); the table is otherwise identical.
+void print_cost_row(const cost_row& r, bool wide = false)
 {
     if (r.threw)
     {
@@ -2654,10 +3121,11 @@ void print_cost_row(const cost_row& r)
         std::snprintf(sfc, sizeof sfc, "%d", static_cast<int>(r.specialist_firm_charters));
         std::snprintf(spts, sizeof spts, "%lld", r.specialist_price_points);
     }
+    const char* price_fmt = wide ? "  %-52s %5s %3s %8s |" : "  %-52s %3s %3s %4s |";
     if (r.stopped_at_land)
     {
-        std::printf("  %-52s %3s %3s %4s | stopped as the landscape landed: nothing measured\n",
-                    r.label.c_str(), fp, sfc, spts);
+        std::printf(price_fmt, r.label.c_str(), fp, sfc, spts);
+        std::printf(" stopped as the landscape landed: nothing measured\n");
         return;
     }
     const auto u = [&](charter_unspent_reason why) {
@@ -2675,9 +3143,10 @@ void print_cost_row(const cost_row& r)
     // EVERY reason has a column, so the row sums to its unspent total; a reason
     // appended to the enum must add its column here.
     static_assert(charter_unspent_reason_count == 10, "a charter_unspent_reason has no cost-table column");
-    std::printf("  %-52s %3s %3s %4s | %4zu %5zu | %6lld %6lld %6lld %6lld %6lld %6lld %6lld %6lld %6lld "
+    std::printf(price_fmt, r.label.c_str(), fp, sfc, spts);
+    std::printf(" %4zu %5zu | %6lld %6lld %6lld %6lld %6lld %6lld %6lld %6lld %6lld "
                 "%6lld | %4s %5.2f | %11s | %9s | %5d %7.0f %7.0f",
-                r.label.c_str(), fp, sfc, spts, r.specialists, r.firms,
+                r.specialists, r.firms,
                 u(charter_unspent_reason::no_gap), u(charter_unspent_reason::province_cap),
                 u(charter_unspent_reason::window_exhausted), u(charter_unspent_reason::body_cap),
                 u(charter_unspent_reason::density_ceiling),
@@ -2747,6 +3216,100 @@ void print_cost_row(const cost_row& r)
                     " — %s\n", "", r.dig.search, r.dig.land, r.dig.settle, r.dig.seat,
                     verdict.c_str());
     }
+}
+
+// --- BL-1043: what a stockpile row is read against, and the lines only it prints -
+
+/// The two baselines a stockpile row is compared with: the LEGACY none row (span
+/// off — the pinned shipped world, and the roster the seat-menu anchor names) and
+/// the SPAN CONTROL (the same span world with no budget at all).
+struct cost_baseline
+{
+    bool         set = false;
+    std::size_t  specialists = 0, firms = 0;
+    int          shortlist = 0;
+    tick_summary val, live;
+    std::array<double, k_app_tick_phase_count> live_phase{};
+};
+
+cost_baseline baseline_of(const cost_row& r)
+{
+    cost_baseline b;
+    b.set         = !r.threw && !r.stopped_at_land && !r.build_only;
+    b.specialists = r.specialists;
+    b.firms       = r.firms;
+    b.shortlist   = r.shortlist;
+    b.val         = r.val_sum;
+    b.live        = r.live_sum;
+    for (int i = 0; i < k_app_tick_phase_count; ++i)
+        b.live_phase[static_cast<std::size_t>(i)] = r.live.phase_ms[i];
+    return b;
+}
+
+/// The lines a REAL budget earns: the point account (the stockpile's own
+/// reasons, the dropped-centre one among them), the seat menu against both
+/// baselines, the opening capital at the 400 +/-40% draw, the chartered good
+/// against the extracted one, the density-follows-cities reading, and the tick
+/// ratio with its phase split.
+void print_stockpile_row_extras(const cost_row& r, const cost_baseline& legacy,
+                                const cost_baseline& control)
+{
+    if (!r.stockpile_row || r.threw || r.stopped_at_land)
+        return;
+    const char* pad = "  %-52s   ";
+    std::printf(pad, "");
+    std::printf("REAL BUDGET: the world's own stockpile (build_stockpile_budget), Digitisation "
+                "span ON at epoch 0; only the prices and the rules are this row's\n");
+    std::fputs(r.stockpile_text.c_str(), stdout);
+
+    std::string control_seats = "not run";
+    if (control.set)
+        control_seats = std::to_string(control.specialists) + " / shortlist "
+                      + std::to_string(control.shortlist);
+    std::printf(pad, "");
+    std::printf("seats: %zu specialist(s)%s, shortlist %d | legacy none %zu / shortlist %d | span "
+                "control %s\n",
+                r.specialists, r.specialists == 0 ? " — NO SPECIALIST ON THIS WORLD" : "",
+                r.shortlist,
+                legacy.set ? legacy.specialists : std::size_t{ 0 },
+                legacy.set ? legacy.shortlist : 0, control_seats.c_str());
+    std::printf(pad, "");
+    std::printf("specialist capital AT LAND (the 400 +/-40%% draw, NR-895): n %d, min %.0f, median "
+                "%.0f, max %.0f, mean %.0f; opening at ZERO or less: %d\n",
+                r.spec_cap_n, r.spec_cap_min, r.spec_cap_median, r.spec_cap_max, r.spec_cap_mean,
+                r.spec_cap_zero);
+    std::printf(pad, "");
+    std::printf("chartered good vs EXTRACTED good (BL-1039 r2: extraction anchors on the tile's "
+                "richest deposit): %d extraction buildings, %d as chartered, %d differ%s%s\n",
+                r.extraction_buildings, r.extraction_match, r.extraction_differ,
+                r.extraction_mismatches.empty() ? "" : " — ",
+                r.extraction_mismatches.c_str());
+    std::printf(pad, "");
+    std::printf("density follows cities (Spearman rho, firms chartered to a centre vs its "
+                "population — MEANINGFUL because the budget is the stockpile, not headcount): "
+                "rho %+.3f over %d non-razed centres; rho %+.3f over the %d budgeted centres; "
+                "%d centres hold a firm. Upstream: rho(budget points, population) %+.3f — does "
+                "the CAPITAL follow cities before any spend does\n",
+                r.rho_all, r.rho_all_n, r.rho_budget, r.rho_budget_n, r.centres_with_firms,
+                r.rho_points);
+
+    const auto ratio = [](double a, double b) { return b > 0.0 ? a / b : 0.0; };
+    std::printf(pad, "");
+    std::printf("tick ratio vs legacy none: val x%.2f, live x%.2f",
+                legacy.set ? ratio(r.val_sum.median, legacy.val.median) : 0.0,
+                legacy.set ? ratio(r.live_sum.median, legacy.live.median) : 0.0);
+    if (control.set)
+        std::printf("; vs span control: val x%.2f, live x%.2f",
+                    ratio(r.val_sum.median, control.val.median),
+                    ratio(r.live_sum.median, control.live.median));
+    std::printf(" (medians)\n");
+    std::printf(pad, "");
+    std::printf("live phase ratio vs legacy none:");
+    for (int i = 0; i < k_app_tick_phase_count; ++i)
+        std::printf(" %s x%.2f", k_app_tick_phase_names[i],
+                    legacy.set ? ratio(r.live.phase_ms[i], legacy.live_phase[static_cast<std::size_t>(i)])
+                               : 0.0);
+    std::printf("\n");
 }
 
 /// The forced row's centre, and why it was picked.
@@ -2867,14 +3430,174 @@ forced_pick pick_sparse_province_centre(const world& w, int radius)
     return best;
 }
 
+/// The none row against the BL-1031 pins: sets `pinned`, `digest_match` and
+/// `digest_diff`, and returns true when a PINNED row differs (the run fails).
+/// A build-only none row stops at the landscape, so only D_search and D_land
+/// are compared.
+bool check_none_row_pins(cost_row& none, uint32_t seed)
+{
+    for (const world_digest_pin& pin : k_world_digest_pins)
+        if (pin.seed == seed)
+        {
+            none.pinned = true;
+            std::string d;
+            if (pin.search != none.dig.search) d += " D_search";
+            if (pin.land   != none.dig.land)   d += " D_land";
+            if (!none.build_only && pin.settle != none.dig.settle) d += " D_settle";
+            if (!none.build_only && pin.seat   != none.dig.seat)   d += " D_seat";
+            none.digest_match = d.empty();
+            none.digest_diff  = d;
+            return !d.empty();
+        }
+    return false;
+}
+
+/// What a whole run has to answer for, across its seeds.
+struct cost_run_flags
+{
+    bool any_threw = false, digest_failed = false, rules_failed = false, balance_failed = false;
+    int  stockpile_rows = 0, rows_without_specialist = 0;
+    std::vector<uint32_t> seeds_without_specialist;   ///< a seed appears once
+};
+
+/// BL-1043 — ONE SEED of the REAL-budget matrix: the legacy none row (span off,
+/// checked against the pins), the span control (the span world with no budget),
+/// then a stockpile row per (firm price P_f x specialist price m x cap rule x
+/// ceiling x province cap). Every row builds its own world from generation.
+void run_stockpile_seed(lua_state& lua, uint32_t seed, const cost_options& opt, cost_seed& cs,
+                        cost_run_flags& f)
+{
+    // 1. THE LEGACY NONE ROW: span off, the shipped world every pin was taken
+    // on, and the roster the seat-menu anchor is read against (the legacy 6, 6
+    // and 8 specialists on seeds 0, 28 and 46).
+    cost_row none;
+    cost_config none_cfg;
+    run_cost_config(lua, seed, none_cfg, nullptr, opt.live_ticks, none,
+                    [&](const app_start_world& landed) {
+                        cs.legacy_specialists = landed.land.specialists.size();
+                        cs.legacy_firms       = landed.land.firms.size();
+                        cs.legacy_1x = static_cast<long long>(cs.legacy_specialists
+                                                              + cs.legacy_firms);
+                        return true;
+                    });
+    if (check_none_row_pins(none, seed))
+        f.digest_failed = true;
+    std::printf("  legacy roster on seed %u: %zu specialists + %zu firms (the no-budget world the "
+                "seat menu is anchored against)\n", seed, cs.legacy_specialists, cs.legacy_firms);
+    print_cost_table_header(opt);
+    print_cost_row(none, /*wide=*/true);
+    std::fflush(stdout);
+    const cost_baseline legacy = baseline_of(none);
+    cs.rows.push_back(std::move(none));
+
+    // 2. THE SPAN CONTROL: the same span world, with no budget at all.
+    cost_baseline control;
+    if (opt.span_control)
+    {
+        cost_row row;
+        cost_config c;
+        c.k    = cost_config::kind::none;
+        c.span = true;
+        try
+        {
+            run_cost_config(lua, seed, c, nullptr, opt.live_ticks, row);
+        }
+        catch (const std::exception& e)
+        {
+            row.cfg = c; row.label = cost_config_label(c); row.threw = true; row.error = e.what();
+            f.any_threw = true;
+        }
+        print_cost_row(row, /*wide=*/true);
+        std::fflush(stdout);
+        control = baseline_of(row);
+        cs.rows.push_back(std::move(row));
+    }
+
+    // 3. THE MATRIX: P_f x m x cap rule x ceiling x province cap.
+    bool printed_budget_line = false;
+    for (const std::int32_t pf : opt.firm_prices)
+        for (const std::int32_t m : opt.specialist_prices)
+            for (const charter_cap_rule rc : opt.resource_caps)
+            {
+                const std::vector<std::int32_t> ceilings =
+                    rc == charter_cap_rule::sqrt_capital ? opt.density_ceilings
+                                                         : std::vector<std::int32_t>{ 0 };
+                for (const std::int32_t ceiling : ceilings)
+                    for (const bool pc : opt.province_caps)
+                    {
+                        cost_config c;
+                        c.k                        = cost_config::kind::stockpile;
+                        c.span                     = true;
+                        c.firm_price_points        = pf;
+                        c.specialist_firm_charters = m;
+                        c.resource_cap_rule        = rc;
+                        c.density_ceiling          = ceiling;
+                        c.province_cap             = pc;
+                        cost_row row;
+                        try
+                        {
+                            run_cost_config(lua, seed, c, nullptr, opt.live_ticks, row);
+                            if (!row.rule_check.pass)
+                                f.rules_failed = true;
+                            if (!row.stopped_at_land && !row.balanced)
+                                f.balance_failed = true;
+                        }
+                        catch (const std::exception& e)
+                        {
+                            row.cfg = c; row.label = cost_config_label(c);
+                            row.threw = true; row.error = e.what();
+                            f.any_threw = true;
+                        }
+                        if (!printed_budget_line && row.stockpile_row)
+                        {
+                            printed_budget_line = true;
+                            std::printf("  stockpile budget on seed %u: %lld points over %d regions "
+                                        "-> %lld points to %d centres (richest %d); at P_f %d that "
+                                        "is %lld firm charters on the world\n",
+                                        seed, row.stock_points_total, row.stock_regions,
+                                        row.stock_to_centres, row.stock_centres,
+                                        row.richest_centre_points, static_cast<int>(pf),
+                                        pf > 0 ? row.stock_to_centres / pf : 0LL);
+                        }
+                        ++f.stockpile_rows;
+                        if (!row.threw && !row.any_specialist)
+                        {
+                            ++f.rows_without_specialist;
+                            if (std::find(f.seeds_without_specialist.begin(),
+                                          f.seeds_without_specialist.end(), seed)
+                                == f.seeds_without_specialist.end())
+                                f.seeds_without_specialist.push_back(seed);
+                        }
+                        print_cost_row(row, /*wide=*/true);
+                        print_stockpile_row_extras(row, legacy, control);
+                        std::fflush(stdout);
+                        cs.rows.push_back(std::move(row));
+                    }
+            }
+}
+
 int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const cost_options& opt)
 {
     using clk = std::chrono::steady_clock;
     const auto run0 = clk::now();
 
+    if (opt.stockpile)
+    {
+        std::printf("player_seed_sweep --charter-cost --budget stockpile — BL-1043: the charter "
+                    "prices and the no-specialist world, measured on REAL stockpiles\n");
+        std::printf("THE REAL BUDGET: every budget row runs the Digitisation span at EPOCH 0 "
+                    "(world_params::digitisation_span_enabled — NEVER epoch_year 1960, the "
+                    "superseded arc with Exploration off) and spends the budget the SHIPPED BUILDER "
+                    "makes from the world's own stockpile (build_stockpile_budget, BL-1042), handed "
+                    "to the search and the winner's apply exactly as app::start_new_game_prelude "
+                    "does. Nothing here is seeded weights, so the density reading MEANS something.\n");
+    }
+    else
+    {
     std::printf("player_seed_sweep --charter-cost — BL-1033: what a denser corporate web costs\n");
     std::printf("SYNTHETIC TEST INPUT: every budget is seeded weights over non-razed centres, never "
                 "population; 1x = the none row's chartered count. NOT a density-follows-cities reading.\n");
+    }
     std::printf("build: %s", build_type_label());
 #ifdef _MSC_FULL_VER
     std::printf(", _MSC_FULL_VER %lld", static_cast<long long>(_MSC_FULL_VER));
@@ -2912,6 +3635,40 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
         return t;
     };
     const std::vector<double>& ladder_scales = opt.ladder_all ? opt.scales : opt.ladder_scales;
+    if (opt.stockpile)
+    {
+        // THE MATRIX AND ITS TRIM, on the face of the table (BL-1043 R1).
+        std::printf("matrix per seed: none (legacy, span OFF — the pinned shipped world and the "
+                    "legacy roster)%s; then firm price P_f",
+                    opt.span_control ? "; none (span ON, an EMPTY budget: the span world with no "
+                                       "budget, the seat-menu anchor)" : "");
+        for (const std::int32_t pf : opt.firm_prices)
+            std::printf(" %d", static_cast<int>(pf));
+        std::printf(" points x specialist price m");
+        for (const std::int32_t m : opt.specialist_prices)
+            std::printf(" %d", static_cast<int>(m));
+        std::printf(" firm charters%s = %zu budget row(s), %zu row(s) per seed in all.\n",
+                    caps_text().c_str(),
+                    opt.firm_prices.size() * opt.specialist_prices.size()
+                        * std::max<std::size_t>(1, opt.resource_caps.size()
+                              * std::max<std::size_t>(1, opt.density_ceilings.size()))
+                        * opt.province_caps.size(),
+                    1 + (opt.span_control ? 1u : 0u)
+                        + opt.firm_prices.size() * opt.specialist_prices.size()
+                              * std::max<std::size_t>(1, opt.resource_caps.size()
+                                    * std::max<std::size_t>(1, opt.density_ceilings.size()))
+                              * opt.province_caps.size());
+        std::printf("TRIM, with the reason: BUDGET SCALES are not an axis — a world's own stockpile "
+                    "has no scale to apply, so --budget-scales, --ladder-scales and BL-1033's extra "
+                    "4x row are REFUSED here rather than silently dropped. The FORCED province-cap "
+                    "row is not run: it concentrates a SYNTHETIC budget onto one centre, which is "
+                    "not a real stockpile%s.\n",
+                    opt.span_control ? "" : ". The SPAN CONTROL row is dropped (--no-span-control): "
+                                            "the seat menu is then read against the legacy row alone");
+        std::fflush(stdout);
+    }
+    else
+    {
     std::printf("prices: firm %d point(s); specialist base %d firm charters (%lld points)",
                 static_cast<int>(base_spend.firm_price_points), static_cast<int>(base_price),
                 static_cast<long long>(base_spend.firm_price_points) * base_price);
@@ -2943,8 +3700,10 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
     std::printf("%s\n", opt.forced_only
                     ? " — FORCED ONLY: the none row is build-only and the matrix is skipped" : "");
     std::fflush(stdout);
+    }
 
     std::vector<cost_seed> results;
+    cost_run_flags flags;
     bool any_threw = false, forced_failed = false, digest_failed = false, rules_failed = false,
          balance_failed = false;
 
@@ -2952,11 +3711,28 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
     {
         cost_seed cs;
         cs.seed = seed;
-        std::printf("\n=== seed %u — SYNTHETIC TEST INPUT on every budget row (%s) ===\n", seed,
-                    build_type_label());
+        if (opt.stockpile)
+            std::printf("\n=== seed %u — the REAL stockpile budget on every budget row (%s) ===\n",
+                        seed, build_type_label());
+        else
+            std::printf("\n=== seed %u — SYNTHETIC TEST INPUT on every budget row (%s) ===\n", seed,
+                        build_type_label());
         std::fflush(stdout);
         try
         {
+            if (opt.stockpile)
+            {
+                run_stockpile_seed(lua, seed, opt, cs, flags);
+                any_threw      = any_threw      || flags.any_threw;
+                digest_failed  = digest_failed  || flags.digest_failed;
+                rules_failed   = rules_failed   || flags.rules_failed;
+                balance_failed = balance_failed || flags.balance_failed;
+                results.push_back(std::move(cs));
+                if (!opt.out_path.empty())
+                    write_cost_json(opt.out_path, opt, results);
+                std::fflush(stdout);
+                continue;
+            }
 
             // THE NONE ROW FIRST: it is the baseline and it measures 1x. The
             // synthetic budgets are built from its world as the landscape lands —
@@ -3014,21 +3790,10 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
                 }
                 return 2;
             }
-            for (const world_digest_pin& pin : k_world_digest_pins)
-                if (pin.seed == seed)
-                {
-                    none.pinned = true;
-                    std::string d;
-                    if (pin.search != none.dig.search) d += " D_search";
-                    if (pin.land   != none.dig.land)   d += " D_land";
-                    // A build-only none row (--forced-only) stops at the landscape.
-                    if (!none.build_only && pin.settle != none.dig.settle) d += " D_settle";
-                    if (!none.build_only && pin.seat   != none.dig.seat)   d += " D_seat";
-                    none.digest_match = d.empty();
-                    none.digest_diff  = d;
-                    if (!d.empty())
-                        digest_failed = true;
-                }
+            // A build-only none row (--forced-only) stops at the landscape, so it
+            // is compared on D_search and D_land alone (check_none_row_pins).
+            if (check_none_row_pins(none, seed))
+                digest_failed = true;
 
             std::printf("  1x = %lld legacy corporations (%zu specialists + %zu firms). SYNTHETIC budgets "
                         "(firm %d point(s); specialist ladder",
@@ -3216,6 +3981,16 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
                                                      : "JSON: " + opt.out_path;
     std::printf("\n%zu seeds in %.0f s (%.0f s per seed). %s\n", seeds.size(), total_s,
                 seeds.empty() ? 0.0 : total_s / static_cast<double>(seeds.size()), written.c_str());
+    if (opt.stockpile)
+    {
+        std::printf("REAL BUDGET run: %d stockpile rows. Rows with NO SPECIALIST: %d%s",
+                    flags.stockpile_rows, flags.rows_without_specialist,
+                    flags.seeds_without_specialist.empty() ? "" : " (seeds");
+        for (const uint32_t s : flags.seeds_without_specialist)
+            std::printf(" %u", s);
+        std::printf("%s. The no-specialist world is decided on this reading, never forced.\n",
+                    flags.seeds_without_specialist.empty() ? "" : ")");
+    }
     std::printf("none-row digests: %s. forced province cap: %s. spend rules (BL-1039, checked at "
                 "land on every budget row): %s. points balance on every budget row: %s. %s\n",
                 digest_failed ? "DIFFER from the pins on some seed (this mode is NOT measuring the shipped start)"
@@ -3546,8 +4321,12 @@ int main(int argc, char** argv)
                     "                         [--province-cap on|off|both] [--specialist-prices 4,8]\n"
                     "                         [--ladder-scales 2|all] [--no-extra] [--no-forced]\n"
                     "                         [--forced-only] [--forced-radius N] [--forced-pick sparse|richest]\n"
-                    "                         [--live-ticks N] [--out file.json] [--note TEXT]   (BL-1033)\n",
-                    argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
+                    "                         [--live-ticks N] [--out file.json] [--note TEXT]   (BL-1033)\n"
+                    "       %s --charter-cost --budget stockpile [--firm-prices 5000,10000,20000]\n"
+                    "                         [--specialist-prices 2,4,8] [--no-span-control]      (BL-1043:\n"
+                    "                         the REAL budget — the Digitisation span at epoch 0 and the world's\n"
+                    "                         own stockpile; budget scales do not apply and are refused)\n",
+                    argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
         return 2;
     }
 
@@ -3701,15 +4480,18 @@ int main(int argc, char** argv)
         for (int a = 2; a < argc; ++a)
         {
             const std::string arg = argv[a];
-            if (arg == "--no-extra")  { opt.extra = false;  continue; }
+            if (arg == "--no-extra")  { opt.extra = false; opt.forced_flags_set = true; continue; }
             if (arg == "--no-forced") { opt.forced = false; continue; }
-            if (arg == "--forced-only") { opt.forced_only = true; opt.forced = true; continue; }
+            if (arg == "--forced-only") { opt.forced_only = true; opt.forced = true;
+                                          opt.forced_flags_set = true; continue; }
+            // BL-1043: drop the span control (one fewer full row per seed).
+            if (arg == "--no-span-control") { opt.span_control = false; continue; }
             if (arg == "--seeds")     { ++a; continue; }   // read by seeds_arg
             if (arg != "--budget-scales" && arg != "--resource-cap" && arg != "--province-cap"
                 && arg != "--live-ticks" && arg != "--out" && arg != "--note"
                 && arg != "--forced-radius" && arg != "--forced-pick"
                 && arg != "--specialist-prices" && arg != "--ladder-scales"
-                && arg != "--density-ceilings")
+                && arg != "--density-ceilings" && arg != "--budget" && arg != "--firm-prices")
             {
                 std::printf("--charter-cost: unknown argument '%s'\n", arg.c_str());
                 return 2;
@@ -3743,13 +4525,59 @@ int main(int argc, char** argv)
                 }
                 return true;
             };
-            if (arg == "--budget-scales")
+            if (arg == "--budget")
             {
+                // BL-1043: which budget the rows spend. `synthetic` is BL-1033's,
+                // unchanged; `stockpile` is the world's own, built by the shipped
+                // builder on a Digitisation-span world.
+                if (val == "stockpile")      opt.stockpile = true;
+                else if (val == "synthetic") opt.stockpile = false;
+                else
+                {
+                    std::printf("--budget: '%s' is not synthetic|stockpile\n", val.c_str());
+                    return 2;
+                }
+            }
+            else if (arg == "--firm-prices")
+            {
+                // BL-1043's P_f axis: POINTS per firm charter, each > 0. Read
+                // only in stockpile mode (the synthetic firm price is 1 point).
+                opt.firm_prices.clear();
+                std::size_t at = 0;
+                while (at <= val.size())
+                {
+                    std::size_t comma = val.find(',', at);
+                    if (comma == std::string::npos)
+                        comma = val.size();
+                    const std::string tok = val.substr(at, comma - at);
+                    if (tok.empty() || tok.size() > 9
+                        || tok.find_first_not_of("0123456789") != std::string::npos
+                        || std::atol(tok.c_str()) <= 0)
+                    {
+                        std::printf("--firm-prices: '%s' is not a whole number of points > 0\n",
+                                    tok.c_str());
+                        return 2;
+                    }
+                    const std::int32_t p = static_cast<std::int32_t>(std::atol(tok.c_str()));
+                    if (std::find(opt.firm_prices.begin(), opt.firm_prices.end(), p)
+                        != opt.firm_prices.end())
+                    {
+                        std::printf("--firm-prices: %d is listed twice\n", static_cast<int>(p));
+                        return 2;
+                    }
+                    opt.firm_prices.push_back(p);
+                    at = comma + 1;
+                }
+            }
+            else if (arg == "--budget-scales")
+            {
+                opt.scales_set = true;
                 if (!parse_scales(opt.scales))
                     return 2;
             }
             else if (arg == "--ladder-scales")
             {
+                opt.ladder_set = true;
                 if (val == "all")
                     opt.ladder_all = true;
                 else
@@ -3761,6 +4589,7 @@ int main(int argc, char** argv)
             }
             else if (arg == "--specialist-prices")
             {
+                opt.prices_set = true;
                 // Firm charters per specialist, each a whole number > 0; the first
                 // is the base price, the rest ladder rungs. No duplicates.
                 opt.specialist_prices.clear();
@@ -3802,6 +4631,7 @@ int main(int argc, char** argv)
             {
                 // BL-1039: on (fixed) | off (lifted) | both | sqrt, or a comma list
                 // of on/off/sqrt. `sqrt` needs --density-ceilings (no default).
+                opt.caps_set = true;
                 opt.resource_caps.clear();
                 std::size_t at = 0;
                 while (at <= val.size())
@@ -3839,6 +4669,7 @@ int main(int argc, char** argv)
                 // BL-1039: firms per body under the square root, each a whole
                 // number in [1, guard - 1] — the ceiling sits below the guard.
                 const int guard = static_cast<int>(synthetic_charter_spend().max_firms_per_body);
+                opt.ceilings_set = true;
                 opt.density_ceilings.clear();
                 std::size_t at = 0;
                 while (at <= val.size())
@@ -3900,6 +4731,52 @@ int main(int argc, char** argv)
                 opt.out_path = val;
             else
                 opt.note = val;
+        }
+        // BL-1043 — `--budget stockpile`: the axes that have no meaning on a real
+        // stockpile are REFUSED (never silently dropped), and the ruled rule is
+        // the default because that is what the item measures under.
+        if (opt.stockpile)
+        {
+            if (opt.scales_set || opt.ladder_set)
+            {
+                std::printf("--budget-scales/--ladder-scales are refused with --budget stockpile: "
+                            "the budget is the world's OWN stockpile (build_stockpile_budget) and "
+                            "there is no scale to apply to it. Drop the flag; the matrix axes here "
+                            "are --firm-prices and --specialist-prices.\n");
+                return 2;
+            }
+            if (opt.forced_flags_set)
+            {
+                std::printf("--no-extra/--forced-only are refused with --budget stockpile: the "
+                            "extra 4x row is a SCALE row and the forced row concentrates a "
+                            "SYNTHETIC budget onto one centre; neither is a real stockpile.\n");
+                return 2;
+            }
+            opt.extra  = false;   // a 4x scale row: no scale axis here
+            opt.forced = false;   // a concentrated synthetic budget: not a real stockpile
+            if (!opt.prices_set)
+                opt.specialist_prices = { 2, 4, 8 };   // the item's m axis
+            if (opt.firm_prices.empty())
+                opt.firm_prices = { k_stockpile_firm_price_points / 2,
+                                    k_stockpile_firm_price_points,
+                                    k_stockpile_firm_price_points * 2 };
+            if (!opt.caps_set)
+                opt.resource_caps = { charter_cap_rule::sqrt_capital };   // the RULED rule
+            if (!opt.ceilings_set
+                && std::find(opt.resource_caps.begin(), opt.resource_caps.end(),
+                             charter_cap_rule::sqrt_capital) != opt.resource_caps.end())
+                opt.density_ceilings = { k_stockpile_density_ceiling };   // RULED, NR-902
+        }
+        else if (!opt.firm_prices.empty())
+        {
+            std::printf("--firm-prices is read only with --budget stockpile: the synthetic budget's "
+                        "firm price is 1 point by construction (synthetic_charter_spend)\n");
+            return 2;
+        }
+        else if (!opt.span_control)
+        {
+            std::printf("--no-span-control is read only with --budget stockpile\n");
+            return 2;
         }
         // BL-1039: the ceiling has no default, and a ceiling nothing reads is refused.
         const bool has_sqrt = std::find(opt.resource_caps.begin(), opt.resource_caps.end(),
