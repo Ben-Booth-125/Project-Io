@@ -597,6 +597,34 @@ struct world
     mutable std::size_t body_market_index_count  = 0;           ///< markets.size() at build.
     mutable entity_id   body_market_index_max_id = null_entity; ///< Max market id at build.
 
+    /// Per-body population-centre index (BL-1050): body -> its centres in
+    /// ASCENDING ID ORDER. The same derived cache as `body_market_index` above
+    /// and for the same reason, one rung sharper: `body_mean_habitability`
+    /// (budget_system.cpp) is called per building per tick and per build
+    /// candidate, and without this each call walks EVERY centre in the world and
+    /// hashes twice per centre to find the handful on one body. That cost is
+    /// older than the index — budget_system's own `hab_cache` exists to blunt it
+    /// at one call site — and BL-1050's sorted walk sits on top of it.
+    ///
+    /// The ascending order is the point, not a convenience: the mean is a float
+    /// sum, so the summation order must be a property of the ids and never of
+    /// `population_centres`' layout, which a load rebuilds and another standard
+    /// library lays out differently again.
+    ///
+    /// THE STAMP IS O(1), unlike the market index's: the count plus the entity
+    /// allocator's cursor, never a walk for a max id — a per-call walk of 5417
+    /// centres is the cost this index exists to remove. Population centres are
+    /// written once by `generate_population_centres` and never created, erased or
+    /// moved between bodies afterwards (a razed centre keeps its entry and its
+    /// tile), so the count alone would already catch every mutation today; the
+    /// cursor is what closes an erase paired with an insert, since no insert can
+    /// happen without moving it. `population_centre_tile` is written alongside
+    /// `population_centres` and shares that lifetime. Mutable so the const read
+    /// path can refresh it.
+    mutable faithful_unordered_map<entity_id, std::vector<entity_id>> body_centre_index;
+    mutable std::size_t   body_centre_index_count  = 0; ///< population_centres.size() at build.
+    mutable std::uint32_t body_centre_index_cursor = 0; ///< next_entity_id() at build.
+
     /// THE ORDER BOOK (BL-293) — standing sell orders, world-wide, in the order
     /// they were placed. Read by `clear_markets` every economy tick; written only
     /// through the `place_sell_order` / `remove_sell_order` corp verbs, by the

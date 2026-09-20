@@ -323,18 +323,40 @@ void inject_background_demand(world& w, const recipe_registry& reg)
 
     // Per-body population scale: sum of every centre's scale on that body,
     // gathered once so every market on a multi-market body (BL-096) sees the
-    // same pull. std::map keyed by entity_id → deterministic accumulation
-    // order regardless of population_centres' unordered_map layout.
-    std::map<entity_id, float> body_scale;
+    // same pull.
+    //
+    // ASCENDING CENTRE ID (BL-1050), and the reason that stood here was WRONG:
+    // it argued that a std::map keyed by entity_id makes the accumulation
+    // deterministic "regardless of population_centres' layout". An ordered KEY
+    // orders which bucket each addend lands in; it does not order the addends
+    // WITHIN a bucket, and `body_scale[body] +=` is a float accumulation whose
+    // order is `population_centres`' — which a save/load rebuilds (world_save.cpp
+    // re-inserts in id order) and another standard library lays out differently
+    // again. Today every scale is a small integer, so every partial sum is exact
+    // and no shipped world's number moves; the order is fixed anyway, because a
+    // sum that happens to be exact today is not a sum that is order-free.
+    //
+    // The membership test is order-free, so the filter runs unordered and only
+    // the accumulation is sorted.
+    std::vector<entity_id> scale_centre_ids;
+    scale_centre_ids.reserve(w.population_centres.size());
     for (const auto& [cid, pcc] : w.population_centres)
     {
+        (void)pcc;
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
             continue;
-        const auto tit = w.tiles.find(tile_it->second);
-        if (tit == w.tiles.end())
+        if (w.tiles.find(tile_it->second) == w.tiles.end())
             continue;
-        body_scale[tit->second.body] += static_cast<float>(pcc.scale);
+        scale_centre_ids.push_back(cid);
+    }
+    std::sort(scale_centre_ids.begin(), scale_centre_ids.end());
+
+    std::map<entity_id, float> body_scale;
+    for (const entity_id cid : scale_centre_ids)
+    {
+        const entity_id body = w.tiles.at(w.population_centre_tile.at(cid)).body;
+        body_scale[body] += static_cast<float>(w.population_centres.at(cid).scale);
     }
 
     for (auto& [mid, mc] : w.markets)
