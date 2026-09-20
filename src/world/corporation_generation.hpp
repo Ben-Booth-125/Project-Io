@@ -207,22 +207,6 @@ int remove_specialist_roster(world& w);
 /// @param settle  The settlement record (`world::gen_settlement`), or null.
 /// @param report  Optional; overwritten with the spend's report.
 /// @return        Every corporation chartered, ascending id.
-/// BL-1060 — the refusal a spend's params cannot decide alone: under
-/// `sqrt_capital`, a density ceiling smaller than some budgeted body's turn
-/// goods plus its yards' places, so the goods could not each keep a share of
-/// it (NR-905, NR-906). Null when the spend may go ahead (and for an empty
-/// budget, a legacy rule, or params `charter_spend_refusal` already refuses).
-///
-/// READ-ONLY, and read BEFORE ANY MUTATION: `apply_landscape_candidate` and
-/// `search_landscape` ask it on the world as they receive it, beside
-/// `charter_spend_refusal`, so a refusal is today's world there too. That world
-/// still carries world-gen's specialist roster, which the budget apply removes
-/// before it charters; removing buildings only shrinks G and the building stock,
-/// so a spend accepted here keeps every share in the walk (which re-asks it).
-const char* charter_spend_world_refusal(const world& w, const recipe_registry& reg,
-                                        const charter_budget& budget,
-                                        const charter_spend_params& spend);
-
 std::vector<entity_id> charter_web_from_budget(world& w,
                                                const recipe_registry& reg,
                                                const charter_budget& budget,
@@ -230,6 +214,24 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                                uint32_t seed,
                                                const struct settlement_state* settle,
                                                charter_spend_report* report = nullptr);
+
+/// BL-1060 — the refusal a spend's params cannot decide alone: under
+/// `sqrt_capital`, a density ceiling that BINDS on some budgeted body and yet
+/// leaves under one firm per turn good once the yards' places come off it, so
+/// NR-905's reservation could not be cut at all. Null when the spend may go
+/// ahead (and for an empty budget, a legacy rule, or params
+/// `charter_spend_refusal` already refuses).
+///
+/// READ-ONLY, and read BEFORE ANY MUTATION: `apply_landscape_candidate` and
+/// `search_landscape` ask it on the world as they receive it, beside
+/// `charter_spend_refusal`, and `charter_web_from_budget` asks it again at its
+/// top — on the world the walk itself will spend, after the budget apply has
+/// removed world-gen's roster. That second ask is the authority (BL-1060 round
+/// 4): the walk never runs a body whose shares could not be cut, whatever the
+/// earlier ask saw.
+const char* charter_spend_world_refusal(const world& w, const recipe_registry& reg,
+                                        const charter_budget& budget,
+                                        const charter_spend_params& spend);
 
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631)

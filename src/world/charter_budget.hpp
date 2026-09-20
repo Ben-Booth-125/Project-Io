@@ -450,7 +450,9 @@ struct charter_body_record
 /// (centre, reason) — so a report prints and compares the same on every run.
 struct charter_spend_report
 {
-    /// Set when `charter_spend_refusal` refused the params; `refusal` says why.
+    /// Set when `charter_spend_refusal` refused the params, or when
+    /// `charter_spend_world_refusal` refused the world (a ceiling that binds on
+    /// a body and cannot be cut into shares); `refusal` says which and why.
     /// On `apply_landscape_candidate`'s budget overload a refused world is
     /// TODAY'S world — the legacy calls ran, and nothing here was chartered.
     bool        refused = false;

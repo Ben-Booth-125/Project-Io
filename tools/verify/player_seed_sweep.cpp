@@ -1095,6 +1095,20 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
             const long long room   = ceil_n - b.yard_places;
             if (b.yard_places < 0 || b.yard_places > ceil_n)
                 failed("the yards' places are outside 0..ceiling");
+            // BL-1060 round 4 (the cold review's finding 4): the one reading of
+            // the yards' places that does NOT come from the code under test —
+            // the walk must not provision more yards than the places the shares
+            // were cut from, or the ceiling is over-subscribed and a reserved
+            // place was eaten. The report already carries both numbers.
+            const long long yards_built = b.firms_by_good[cap_good];
+            if (yards_built > b.yard_places)
+            {
+                std::snprintf(buf, sizeof buf,
+                              "body %u: %lld construction yards chartered but only %d places were "
+                              "reserved for them, so a good's share was eaten", b.body, yards_built,
+                              static_cast<int>(b.yard_places));
+                failed(buf);
+            }
             const bool binds = n_turn > 0 && room >= n_turn && fp > 0 && b.firm_points / fp > ceil_n
                             && n_turn * k > ceil_n;
             const long long want_share = binds ? room / n_turn : 0;

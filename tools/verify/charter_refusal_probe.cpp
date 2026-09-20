@@ -843,6 +843,33 @@ int main()
     }
 
     {
+        // BL-1060 round 4 (the cold review's findings 1 and 4). THE THREE YARD
+        // TESTS DISAGREE HERE, so only the right one can pass: at a seed rate
+        // of 1.0 per building and a yard making 1.0 capacity a batch, the WANT
+        // at the walk's most-built extreme is ~480 yards, the per-good CAP is
+        // 15, and the COVER is larger still. The places the shares are cut from
+        // are the smallest of the three, 15 — and the refusal must read THAT,
+        // not the want: refusing on the want turned this ordinary world down
+        // (120 < 10 + 480) and the search fell back to the legacy world in
+        // silence. A yard bound that read any one of the other two tests, or a
+        // refusal that read the want, fails here.
+        turn::config cfg = turn::ten_goods(150, 15);
+        cfg.yard_seed   = 1.0f;
+        cfg.yard_output = 1.0f;
+        const turn::reading r = turn::run(cfg);
+        turn::print("yard tests disagree: want ~480, cap 15, cover larger", r);
+        const charter_body_record* b = r.rep.bodies.empty() ? nullptr : &r.rep.bodies.front();
+        expect_true("yard bound: the world is NOT refused (the want is not the refusal's reading)",
+                    r.world_refusal == nullptr && !r.rep.refused);
+        expect_true("yard bound: the places are the per-good cap, the smallest of the three tests",
+                    b != nullptr && b->yard_places == 15);
+        expect_true("yard bound: the shares are cut from 120 - 15 = 105, so 10 each (+1 on 5)",
+                    b != nullptr && b->even_share == 10 && b->even_share_extra == 5);
+        expect_true("yard bound: the walk never provisions more yards than the places reserved",
+                    b != nullptr && r.firms[turn::k_yard] <= b->yard_places && r.balanced);
+    }
+
+    {
         // BL-1060 (4): every works the walk charters draws power, which no base
         // installation did, so power is short but NOT in G, and the turn never
         // serves it. Once G fills, the rest is that shortfall — late_shortfall.

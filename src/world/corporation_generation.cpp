@@ -2865,9 +2865,19 @@ struct charter_body_state
     /// yards the walk can provision on this body, taken off the ceiling before
     /// the shares are cut. See `charter_yard_places`.
     int32_t                           yard_places = 0;
-    /// The refusal's reading of the yards (`charter_yard_places`' want bound):
-    /// at least `yard_places`, and it only shrinks as buildings are removed.
+    /// `want_yards` at the walk's most-built extreme, uncapped — report only.
+    /// NOT what the refusal reads (BL-1060 round 4, found by the cold review):
+    /// it is the want BEFORE the per-good cap and the cover bound, so it runs
+    /// orders of magnitude past the yards the walk can stand up, and a refusal
+    /// on it turned ordinary worlds down.
     int64_t                           yard_want_bound = 0;
+    /// THE SHARES COULD NOT BE CUT: the ceiling can bind on this body (its
+    /// charters outrun the ceiling and the turn's caps sum past it) and yet the
+    /// ceiling less the yards' places leaves under one firm per turn good. The
+    /// spend is REFUSED whole — the walk and `charter_spend_world_refusal` both
+    /// read this flag, so neither can proceed where NR-905's reservation cannot
+    /// hold.
+    bool                              share_uncuttable = false;
     /// THE EVEN SHARE (NR-905, NR-906; `charter_body_record::even_share`): 0
     /// where the ceiling does not bind. `share[r]` is turn good r's RESERVATION
     /// of the ceiling — (ceiling - yard_places) / |turn|, the remainder one more
@@ -2906,14 +2916,16 @@ constexpr int64_t k_charter_max_holdings = 4;
 /// capacity, the seed rate is 0, or no demand can outrun today's output.
 ///
 /// @p want_bound_out receives the SECOND test alone (`want_yards` at the
-/// most-built extreme, uncapped): the refusal's reading. It only shrinks when
-/// buildings are removed — the budget apply removes world-gen's roster before
-/// it charters — whereas the other two tests can grow (a removed yard's output
-/// no longer covers demand; a smaller G raises the per-good cap), so the
-/// refusal asked before the removal and re-asked after it cannot disagree.
+/// most-built extreme, uncapped), for the report. IT IS NOT WHAT ANY REFUSAL
+/// READS (BL-1060 round 4, found by the cold review): uncapped it runs orders
+/// of magnitude past the places the walk can fill — at a seed rate of 0.30, the
+/// rate `scripts/economy.lua` records as measured, it turned an ordinary world
+/// down and the search fell back to the legacy no-budget world in silence. The
+/// refusal reads `charter_body_state::share_uncuttable`, cut from the places
+/// this function returns, on the world the walk itself is about to spend on.
 int32_t charter_yard_places(const world& w, const recipe_registry& reg, entity_id body_id,
-                            float other_demand_now, int32_t per_good_cap, int64_t corps_max,
-                            int64_t& want_bound_out)
+                            float consumer_now, float upkeep_now, int32_t per_good_cap,
+                            int64_t corps_max, int64_t& want_bound_out)
 {
     want_bound_out = 0;
     const std::size_t cap_i = static_cast<std::size_t>(resource_type::construction_capacity);
@@ -2935,8 +2947,23 @@ int32_t charter_yard_places(const world& w, const recipe_registry& reg, entity_i
         if (t != w.tiles.end() && t->second.body == body_id)
             ++standing;
     }
-    const float demand_max = other_demand_now
-        + per * static_cast<float>(standing + k_charter_max_holdings * corps_max);
+    // THE UPKEEP HALF IS EXTRAPOLATED TOO (BL-1060 round 4, found by the cold
+    // review). `upkeep_now` is the construction capacity the buildings STANDING
+    // NOW draw in upkeep; the walk re-measures it per firm, so it grows with
+    // every building the walk stands up. Reading it flat made the bound an
+    // upper bound only while `building_upkeep_goods` draws no capacity
+    // (scripts/economy.lua, both bands) — a data tune would have let the walk
+    // provision more yards than the places reserved, over-subscribing the
+    // ceiling. So it is carried per standing building to the same extreme.
+    const int64_t built_max     = standing + k_charter_max_holdings * corps_max;
+    const float   upkeep_per    = standing > 0
+                                    ? upkeep_now / static_cast<float>(standing)
+                                    : 0.0f;
+    const float   upkeep_at_max = standing > 0
+                                    ? upkeep_per * static_cast<float>(built_max)
+                                    : upkeep_now;
+    const float demand_max = consumer_now + upkeep_at_max
+        + per * static_cast<float>(built_max);
 
     const double want = std::ceil(static_cast<double>(demand_max) / static_cast<double>(per_yard));
     want_bound_out = static_cast<int64_t>(std::min<double>(want, 1e9));
@@ -3023,13 +3050,18 @@ void charter_fix_body_rules(const world& w, const recipe_registry& reg,
         const int64_t ceiling  = bs.density_ceiling;
         const std::size_t cap_i = static_cast<std::size_t>(cap_good);
         bs.yard_places = charter_yard_places(w, reg, body_id,
-                                             bs.consumer_demand[cap_i] + upkeep[cap_i],
+                                             bs.consumer_demand[cap_i], upkeep[cap_i],
                                              bs.per_good_cap,
                                              specialists + std::min(charters, ceiling),
                                              bs.yard_want_bound);
         const int64_t room = ceiling - bs.yard_places;
-        if (n_turn > 0 && room >= n_turn && charters > ceiling
-            && n_turn * static_cast<int64_t>(bs.per_good_cap) > ceiling)
+        const bool    binds = n_turn > 0 && charters > ceiling
+                              && n_turn * static_cast<int64_t>(bs.per_good_cap) > ceiling;
+        // BL-1060 round 4: where the ceiling binds and the room left will not
+        // give every turn good a firm, the reservation NR-905 rules cannot be
+        // cut at all — the spend is refused whole rather than run without it.
+        bs.share_uncuttable = binds && room < n_turn;
+        if (binds && room >= n_turn)
         {
             bs.even_share       = static_cast<int32_t>(room / n_turn);
             bs.even_share_extra = static_cast<int32_t>(room % n_turn);
@@ -3080,8 +3112,7 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
     for (auto& [body_id, bs] : bodies)
     {
         charter_fix_body_rules(w, reg, spend, body_id, specialists[body_id], bs);
-        if (static_cast<int64_t>(bs.density_ceiling)
-            < static_cast<int64_t>(bs.turn.size()) + bs.yard_want_bound)
+        if (bs.share_uncuttable)
             return "density_ceiling is smaller than a body's turn goods plus its yards' places, so "
                    "the goods could not each keep a share of it (NR-905)";
     }

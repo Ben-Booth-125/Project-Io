@@ -236,12 +236,17 @@ passes that good over for this centre and moves on, and the centre stops only wh
 turn can place. A city with no free quarry still charters the mills and works it has room for.
 **When the ceiling binds, each good keeps an even share of it (Ben, 2026-09-19, NR-905):** the
 ceiling's room, less a place for each construction yard the body will provision, is reserved in
-equal parts to the goods in the turn — 12 of 120 across ten goods — so a centre that skips the
+equal parts to the goods in the turn — with one yard standing, 11 of the remaining 119 to each of
+ten goods and one more to the first nine — so a centre that skips the
 quarries cannot spend their share on mills before a centre that has quarries is reached. A share is a
 reservation, not a cap (NR-906): a good may take a firm beyond its share whenever the room left
 still covers every other short good's unfilled share, so a good that stops being short releases
 what it did not use and the ceiling still fills. A share no centre on the body placed by the end of
-the walk is counted unspent under its own reason, so the gap shows.
+the walk is counted unspent under its own reason, so the gap shows. **A ceiling that cannot be cut into
+shares refuses the spend whole:** where the ceiling binds on a body and the room left after the
+yards would not give every good of the turn one firm, the world charters nothing rather than run
+without the reservation, and the search falls back to the world it would have built with no budget.
+The refusal is read on the world the walk itself will spend, before anything is chartered.
 
 **SETTLED (Ben, 2026-09-18, elicitation): a specialist's price is anchored to the SEAT MENU.** The
 price, in firm charters, is the one at which the median library world offers about as many seats as
