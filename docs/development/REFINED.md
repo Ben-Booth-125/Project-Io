@@ -51,5 +51,5 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
 
 **Wave 3 — ship**
 
-- [ ] **BL-1050 (order-dependent reads)** — built on a branch, merged only with BL-1044's switch flips (it moves the pins). Five readers walk sorted ids; `world_copy_determinism --copy-by snapshot` passes (NR-894).
+- [ ] **BL-1050 (order-dependent reads)** — BUILT on branch worktree-agent-ab112b1821025f551 (2026-09-20), cold review running; merged only with BL-1044 (it moves the pins). Six readers walk sorted ids; --copy-by snapshot PASSES on seed 28 (was FAIL) and on 46/11/31; world_determinism digests unmoved; seed 28 D_search/D_land unmoved, D_settle and D_seat move. Owed: 12 of 16 seeds on snapshot, the re-pin at BL-1044. Found BL-1061 (flood-field warm order) and owes BL-1062 (the lint).
 - [ ] **BL-1044 (Beat 1 ships)** — waits on BL-1037, BL-1043, BL-1050 and Ben's rulings. The one re-bless, the 1960 readings, the cold review.
