@@ -732,6 +732,55 @@
    ],
    "design": "DELIVERED 2026-09-20 (sprint 45). Four rounds: 2cc5071e (merged 9087e5ea), 2886d20f (71af0b5c), 68329494 rescued from the lane's stalled worktree (35f84614), and round 4 9a39152a in the main session. RULINGS BUILT: NR-902 (ceiling 120), NR-903 (the turn skips an unplaceable good), NR-905 and NR-906 (each turn good keeps an even share of a binding ceiling, as a reservation, the yards' places off the ceiling first). MAIN-SESSION EVIDENCE, chain 12 on 9a39152a (main session, 2026-09-20): world_determinism digests unchanged; --digest-check 16/16 PASS; empty/zero/refused 3/3; charter_refusal_probe and stockpile_budget_check ALL PASS; the three stockpile seeds land 120 firms a body with every account closing and no_gap / late_shortfall / share_unplaced all 0; the 4x cost row shows 10 goods with firms, 11..12 each. THE ROUND 3 REVIEW CAUGHT A LIVE TRAP: the refusal read the uncapped yard want, so at the 0.30 seed rate economy.lua records as measured the whole charter web would have switched off in silence.\n\n--- THE ORIGINAL ITEM ---\n\nRULED (Ben, 2026-09-19, NR-902): the density ceiling is 120 firms per body; k_stockpile_density_ceiling (stockpile_budget.hpp ~189, provisional 150 from BL-1042) becomes 120, with its PROVISIONAL note replaced by the ruling.\n\nRULED (Ben, 2026-09-19, NR-903, option A): under the goods-in-turn fill a good that cannot be placed in a centre's window is SKIPPED for that centre, not fatal; the centre stops only when no good in the turn can place (corporation_generation.cpp:3287-3289, 3343-3351, 3396-3397 today break the centre on the first failed placement). Design: DIGITISATION.md, the NR-903 sentence. DONE WHEN adds: a synthetic case where the first good in the turn has no deposit tile and the later processing goods still charter; the 4x rows book less window_exhausted than 15-17 points.\n\nFOUND 2026-09-19 by BL-1039 round 2's cold review (low; nothing blocking). Rides before BL-1044 turns the span on, because BL-1042's stockpile_charter_spend() selects sqrt_capital and so puts the turn on the play path.\n\n(1) reference_points = c x |G| x fp (corporation_generation.cpp:3025-3028; the sweep ~988) can overflow int64 (UB) and cap(B_ref) saturates once c^2 x |G| x fp > INT64_MAX, so check_charter_rules would fail a correct body: refuse c and fp above a bound that keeps both in range (unreachable at c = 8). (2) The turn serves G, fixed before the walk: a good that first falls short because of the walk's own firms (industrial upkeep draws power, timber, stone — economy.lua:565, 569) never gets a firm and its leftover is booked no_gap, whose definition (charter_budget.hpp:283) is then false — today the home body's base installations keep those goods in G, but a budgeted centre on another body hits it (the BL-708 drift). Either re-derive G as the walk adds demand or book it under its own reason. (3) charter_refusal_probe: add firm_price_points < 0 and specialist_firm_charters <= 0 with a positive firm price (the code refuses both, charter_budget.hpp:412-415, untested); the cap(B_ref - 1) == c half cannot fail while the max(c, ...) floor exists — say so or test below the floor. (4) Nits: the turn's inner k shadows the firm loop's k (C4456, :3295 vs :3191); two different 'firm_points' (per-centre int32 unrounded, per-body int64 rounded) — rename one. DONE WHEN: the probe covers every refusal and fails on a removed one; no digest moves; player_seed_sweep --digest-check 16/16.",
    "resolved": "2026-09-20"
+  },
+  {
+   "glyph": "✓",
+   "written": "2026-09-20",
+   "blocked_on": null,
+   "parked": false,
+   "status": "designed",
+   "sprint": null,
+   "author": "Claude (found by the BL-1050 lane, 2026-09-20)",
+   "requires": [
+    "BL-1050"
+   ],
+   "id": "BL-1061",
+   "short_name": "FLOOD_FIELD_WARM_ORDER",
+   "category": "Economy",
+   "priority": "C",
+   "difficulty": 2,
+   "title": "A cached leg cost depends on which endpoint's flood field was warmed first, so a cold cache can price a route a ULP differently",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/logistics.cpp",
+    "src/world/corp_ai.cpp",
+    "tools/verify/world_copy_determinism.cpp"
+   ],
+   "design": "CONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass after Digitisation, not built mid-sprint.\n\nFOUND 2026-09-20 by the BL-1050 lane, OUTSIDE its five readers and not biting today (4 of 16 seeds pass --copy-by snapshot). intra_body_path (logistics.cpp ~l.237) answers from whichever endpoint's flood field already exists in w.logistics_flood_fields, and floods from the destination when neither does. Two fields price the same pair over the same symmetric graph but relax in different orders, so a cached cost can differ by a ULP depending on which was warmed first. BL-1050 reordered the haul scan (corp_ai.cpp ~l.2034), which reorders price_convoy_leg's warming — the choice does not move, but the warm order does, and a LOADED world's cold cache is exactly where a difference would show. THE WORK: make the answer independent of which field was warmed (flood from a fixed endpoint — the lower entity id or the lower tile index — or reconcile the two fields), or state in LOGISTICS.md that the cached cost is warm-order dependent and make world_copy_determinism assert the pair prices equally from a cold cache either way. DONE WHEN: pricing the same pair from each endpoint's warmed field gives the same cost, checked in a harness; --copy-by snapshot passes on all 16 library seeds."
+  },
+  {
+   "glyph": "✓",
+   "written": "2026-09-20",
+   "blocked_on": null,
+   "parked": false,
+   "status": "designed",
+   "sprint": null,
+   "author": "Claude (BL-1050's own prose, unbuilt; 2026-09-20)",
+   "requires": [
+    "BL-1050"
+   ],
+   "id": "BL-1062",
+   "short_name": "ORDER_DEPENDENCE_LINT",
+   "category": "Development",
+   "priority": "C",
+   "difficulty": 2,
+   "title": "A lint holds the byte-identical-replay rule: every unordered store on world is faithful, and no reader walks one into arithmetic",
+   "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+   "files": [
+    "tools/verify/world_copy_determinism.cpp",
+    "tools/session/"
+   ],
+   "design": "CONTINUITY PASS. BL-1050's prose asks for it and its R1-R7 do not require it, so it was not built with the item (lane report, 2026-09-20). The rule (TECH_FOUNDATIONS.md ~104-111: a loaded world replays byte for byte, and so does a copy) is today held by six hand-fixed readers and one tripwire type; nothing stops the seventh being written. THE WORK: a check that fails when a store on `world` that should be faithful_unordered_map is a plain unordered_map, and when a reader walks an unordered store into a float sum, a strict-inequality tie-break or a write order — a source scan is acceptable if it names what it cannot see. Run it in the verify suite. DONE WHEN: it fails on a deliberately reverted reader (BL-1050's own five make the fixtures) and passes on main."
   }
  ]
 }
