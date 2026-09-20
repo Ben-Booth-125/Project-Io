@@ -6597,95 +6597,95 @@
    "difficulty": 1,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1060 - sprint 45 (2026-09-19)",
    "batch": "sprint-45",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-09-20",
+   "resolution": "The turn skips what it cannot place, each good keeps an even share of a binding ceiling as a reservation, the ceiling is 120, and the spend refuses what it cannot share; the pins held.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the constant"
      ],
      "requirement": "The stockpile path's density ceiling is 120 (NR-902), a named constant with the ruling cited.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "k_stockpile_density_ceiling = 120 with NR-902 cited (stockpile_budget.hpp). chain 12 on 9a39152a (main session, 2026-09-20): every body in the three stockpile seeds reads density ceiling 120 and lands 120 firms."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the turn",
       "headless: charter_refusal_probe or a synthetic sweep row"
      ],
      "requirement": "Under the goods-in-turn fill a good that cannot be placed in a centre's window is skipped for that centre; the centre stops only when no good in the turn can place (NR-903); a synthetic case where the first good has no deposit tile still charters the later processing goods.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Code (the turn skips a good it cannot place, failures remembered per focus) and charter_refusal_probe ALL PASS (chain 12 on 9a39152a (main session, 2026-09-20)): the synthetic case gives the skipped extraction good 0 firms while steel and planks charter 2 each; making a failed placement fatal again fails both NR-903 checks (lane mutation, round 2)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the refusal",
       "headless: charter_refusal_probe"
      ],
      "requirement": "charter_spend_params refuses c and firm price above a bound that keeps c x |G| x fp and cap(B_ref) in range.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "charter_spend_params refuses c x |G| x fp and cap(B_ref) out of int64 range, each bound tight (accepted at the bound, refused one past it); charter_refusal_probe ALL PASS; disabling the three range checks fails all three one-past cases (lane mutation)."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: G and the reasons"
      ],
      "requirement": "A good that falls short only because of the walk's own firms is either served or booked under its own reason, never no_gap.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "A good short only because of the walk's own firms is booked late_shortfall, never no_gap (charter_budget.hpp:8); the probe's late case fails when the check is removed (its 2 points book as no_gap). chain 12 on 9a39152a (main session, 2026-09-20): no_gap 0 and late_shortfall 0 on all three stockpile seeds."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: charter_refusal_probe"
      ],
      "requirement": "charter_refusal_probe covers a negative firm price and a non-positive specialist price with a positive firm price, and fails if either refusal is removed.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "charter_refusal_probe ALL PASS with a negative firm price, a zero and a negative specialist price at a positive firm price; removing either refusal fails its cases (lane mutation). The cap(B_ref - 1) half cannot fail while the max(c, ...) floor stands — said on the face of the probe, which now also tests charter_isqrt directly around 600,000 perfect squares."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "headless: player_seed_sweep --digest-check (main session)"
      ],
      "requirement": "The shipped path does not move: world_determinism digests unchanged; player_seed_sweep --digest-check 16/16 (main session).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "chain 12 on 9a39152a (main session, 2026-09-20): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; player_seed_sweep --digest-check 16/16 PASS (3071 s), and empty 3/3, zero 3/3, refused 3/3 on seeds 0/28/46."
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds nothing blocking.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "code-reviewer (cold) on round 1 (nothing blocking; NR-905 raised), round 2 (the even share built as a cap holds room back -> NR-906) and round 3 (BLOCKING: the refusal read the uncapped yard want, so a data tune would refuse every world and the search would fall back to the legacy world in silence; plus the upkeep half of the yard bound read flat, the header doc block detached, the refusal absent from the authority doc). Round 4 (9a39152a) fixed all of them; the probe's new 'three yard tests disagree' case fails on all four assertions when the refusal is reverted (mutated, rebuilt, run, restored — main session)."
     },
     {
      "id": "R8",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: charter_refusal_probe",
       "headless: player_seed_sweep --digest --charter-budget stockpile"
      ],
      "requirement": "NR-905/NR-906: when the ceiling binds each turn good keeps an even share of the ceiling less the yards' places, as a reservation: a first centre with no quarry cannot starve the extraction goods, a good that stops being short releases its unused share so the ceiling still fills, and an unfilled share is booked under its own reason. A ceiling smaller than the turn is refused.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "chain 12 on 9a39152a (main session, 2026-09-20): the 4x cost row (seed 28, ceiling 120) reads 'the turn: 10 goods, 0 without a firm; firms per good 11..12; even share 11 each, 9 goods +1, reserved of the ceiling less 1 yard place', checks at land PASS; the three stockpile seeds each land 120 firms a body (nine goods 12, cloth 11, one yard) with no_gap 0, late_shortfall 0, share_unplaced 0 and every account closing. A ceiling under the turn is refused (probe), and the sweep now fails if more yards are chartered than places reserved."
     }
    ]
   }

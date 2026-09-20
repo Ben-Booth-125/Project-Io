@@ -43,7 +43,7 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
 - [x] **BL-1056 (points size-neutral)** — DELIVERED 2026-09-19: merged acc81398, fix round 2867cdaa, --digest-check 16/16 (chain 9). The resulting Fuel Doctrine split (coke 142 / charcoal 373) is NR-899, Ben's call before BL-1043 measures. files: history_sim.*, settlement.hpp, digitisation_sim_harness.cpp, exploration_sim_harness.cpp.
 - [x] **BL-1059 (top-third bar)** — DELIVERED 2026-09-19: three rounds (NR-900, NR-904 in the build), --digest-check 16/16 on be5b3d72 (chain 11). files: history_sim.*, settlement.*, digitisation_sim_harness.cpp, exploration_sim_harness.cpp.
 - [x] **BL-1042 (stockpile to budget)** — DELIVERED 2026-09-19: merged c9431b0b, fix round 587b5657 (NR-901), --digest-check 16/16, stockpile accounts close on 0/28/46 (chain 11).
-- [ ] **BL-1060 (charter spend hardening)** — MERGED 9087e5ea, round 2 71af0b5c (NR-903 skip, NR-905 even share, ceiling 120), cold-checked; round 3 (NR-906: the share is a reservation) in its lane. Owed: merge round 3, chain 12 (--digest-check 16/16, empty/zero/refused, stockpile rows, one --charter-cost row), R7.
+- [x] **BL-1060 (charter spend hardening)** — DELIVERED 2026-09-20: four rounds (NR-902, NR-903, NR-905, NR-906), --digest-check 16/16 and the budget modes 3/3 on 9a39152a (chain 12). Round 3's review caught a refusal that would have switched the charter web off on a data tune.
 
 **Wave 2 — measure, then Ben's calls**
 
