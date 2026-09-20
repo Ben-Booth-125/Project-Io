@@ -6789,65 +6789,65 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the five readers"
      ],
      "requirement": "Each of the five readers walks a sorted order or writes per key, named in the commit: body_mean_habitability's float sum over population centres; inject_population_demand's accumulation into a market; corp_ai's haul destination (a strict > over markets with no id tie-break); total_income's float sum over the cash-flow map; the corporation-generation reader.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Seven readers, not five (the lane found the sixth, body_demand's total_scale; the cold review the seventh, inject_background_demand, whose comment carried the same false reason). Each walks ascending entity ids; the haul destination gained an explicit (src_body, r, mid) tie-break the review confirmed is a no-op by construction. Commits 3fc5b3ef-class on branch worktree-agent-ab112b1821025f551 (round 1) and 3c9c5792 (fix round)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_copy_determinism"
      ],
      "requirement": "world_copy_determinism --copy-by snapshot passes on seed 28 and on the 16 library seeds: a saved-and-loaded world settles to the same digest as its original.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "world_copy_determinism --seeds all --copy-by snapshot on the branch (main session, 2026-09-20, 4166 s): 16 of 16 seeds PASS, 0 fail; every loaded world settles byte-identical to its original (e.g. seed 28 4D338B0202264D5C both sides, seed 0 AF3BDD5524ED9FF3), 11-12 stores still iterate differently after a load and 0 authoritative stores differ in size. Before the change seed 28 FAILED at tick 0 lap 5 (265C48A23E313B1A vs 4663417C6733EBDE)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the tripwire",
       "doc: TECH_FOUNDATIONS.md"
      ],
      "requirement": "faithful_unordered_map stays as the tripwire, and TECH_FOUNDATIONS.md states the rule (a loaded world replays byte for byte).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "faithful_unordered_map stays the tripwire and is still COUNTED for --copy-by construct/assign (seed 28: 19 stores, 0 differ); docs/tech/TECH_FOUNDATIONS.md already states the rule verbatim at ~104-111, so no doc edit was owed (lane and review agree)."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the five readers",
       "headless: world_determinism"
      ],
      "requirement": "Nothing changes but the order: each reader produces the same value as today when the underlying order already matched, shown per reader.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Per reader: body_mean_habitability and inject_population_demand MOVE (float sums over population centres — the named two-ULP mover and the many-centres-to-one-market accumulation); the haul tie-break moves no choice; total_income cannot reach state (const world, UI cache); accumulate_body_production, body_upkeep_demand, body_demand and inject_background_demand are value-unmoved (integer-exact partials or a zero rate), evidenced by D_search and D_land holding their pins on ALL 16 seeds (main session, 16-seed --digest-check on the branch, 2026-09-20)."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "record: the branch and the merge plan"
      ],
      "requirement": "It lands on a branch and is NEVER merged to main alone: it moves the pins every other item's checks stand on, and rides BL-1044's integration (NR-894).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "It lands only on branch worktree-agent-ab112b1821025f551 and rides BL-1044's integration (NR-894). Main-session 16-seed --digest-check on the branch: 0/16 rows PASS, 16 FAIL, every row failing on D_settle and D_seat ONLY — never D_search or D_land. So the re-bless is tick-only, exactly the shape NR-894 authorised."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds no reader left in hash order where the order reaches arithmetic or a tie-break, and no behaviour change beyond the order.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "code-reviewer (cold) on the branch, 2026-09-20: the six readers correct and the tie-break a genuine no-op, but the verdict change stopped counting SIZE mismatches (a load that loses a store would have passed), a seventh reader of the same class stood 60 lines from the fix, and body_mean_habitability sorted and allocated per call at six sites. The fix round (3c9c5792) fixed all three: a named derived-cache exemption with size counted (proven by a scratch build whose emptied store now FAILS on size alone while every digest matched), the seventh reader ordered, and a world::body_centre_index memoisation with all four seed-28 digests byte-identical."
     },
     {
      "id": "R7",
