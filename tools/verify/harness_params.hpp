@@ -108,15 +108,24 @@ struct harness_charter_input
 {
     const charter_budget* budget = nullptr;
     /// Read only with a non-null `budget`; the shipped path charges the
-    /// stockpile at `stockpile_charter_spend()`.
+    /// stockpile at `stockpile_charter_spend(stockpile)`.
     charter_spend_params  spend{};
     /// BL-1043 — THE SHIPPED BUDGET AT THE INSTRUMENT'S PRICES. Read ONLY when
     /// `budget` is null, i.e. on the shipped path, where the budget is still the
     /// one `build_stockpile_budget` built from the world's own stockpile: this
-    /// replaces `stockpile_charter_spend()` and NOTHING ELSE, so a row that sets
-    /// it is measuring the real budget at a price off the matrix, never a
-    /// synthetic budget. Null is the shipped spend.
+    /// replaces `stockpile_charter_spend(stockpile)` and NOTHING ELSE, so a row
+    /// that sets it is measuring the real budget at a price off the matrix, never
+    /// a synthetic budget. Null is the shipped spend. With a non-zero
+    /// `stockpile_price_divisor` its firm price is REPLACED by the one the
+    /// budget derived (a divisor row); at 0 it is taken whole (a FIXED-price row,
+    /// BL-1043 stage 1's).
     const charter_spend_params* stockpile_spend = nullptr;
+    /// BL-1064 — THE DIVISOR the shipped path's budget derives its firm price by
+    /// (`build_stockpile_budget`'s argument). 0 is the shipped constant,
+    /// `k_stockpile_price_divisor`. Read ONLY when `budget` is null. A value < 0
+    /// is passed through, and the builder rejects it (the budget is then empty:
+    /// today's world, and the rejection is on `shipped_landscape::stockpile`).
+    std::int64_t stockpile_price_divisor = 0;
     /// Receives the WINNER'S spend report (the search's own evaluations report
     /// nothing) — the instrument's budget's, or on the shipped path the
     /// stockpile's. Untouched when the budget in force is empty.
@@ -138,6 +147,11 @@ struct shipped_landscape
     /// budget of its own (`stockpile_path`); default (empty) otherwise.
     stockpile_budget        stockpile;
     bool                    stockpile_path = false;
+    /// BL-1064: the spend the stockpile was ACTUALLY charged at — its derived
+    /// firm price, or the instrument's (`harness_charter_input`). What a row
+    /// reports it charged is read from here, never restated. Default (empty)
+    /// off the stockpile path.
+    charter_spend_params    stockpile_spend{};
 };
 
 /// The search params app.cpp passes, keyed from the world seed exactly as it
@@ -197,13 +211,20 @@ inline shipped_landscape apply_shipped_landscape(
     charter_spend_params  spend  = charter.spend;
     if (budget == nullptr)
     {
-        out.stockpile      = build_stockpile_budget(w);
+        // BL-1064: the price is derived as the budget is built, by the shipped
+        // divisor unless the instrument named another for this row.
+        out.stockpile      = build_stockpile_budget(w, charter.stockpile_price_divisor != 0
+                                                           ? charter.stockpile_price_divisor
+                                                           : k_stockpile_price_divisor);
         out.stockpile_path = true;
         budget             = &out.stockpile.budget;
         // BL-1043: the shipped spend unless the instrument named its own prices
         // for this row. The BUDGET is the shipped builder's either way.
         spend              = charter.stockpile_spend != nullptr ? *charter.stockpile_spend
-                                                                : stockpile_charter_spend();
+                                                                : stockpile_charter_spend(out.stockpile);
+        if (charter.stockpile_spend != nullptr && charter.stockpile_price_divisor != 0)
+            spend.firm_price_points = out.stockpile.firm_price_points;   // a divisor row
+        out.stockpile_spend = spend;
     }
     sp.budget = budget;
     sp.spend  = spend;

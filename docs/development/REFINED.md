@@ -48,7 +48,13 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
 **Wave 2 — measure, then Ben's calls**
 
 - [ ] **BL-1043 (real-stockpile charter sweep)** — STAGE 1 IN (2026-09-21): 16 seeds x 3 firm prices in three parallel shards, folded as runs.real_stockpile_bl1043_a/_b/_c; R1, R2 and R4 complete. It found that no fixed price holds the seat menu (NR-907, ruled: the price is a share of the world's stockpile), so stage 2 sweeps BL-1064's divisor instead. Owed: stage 2, the serial timing pass (R3), the province-cap reading, the remaining calls (R5), R6 and R7.
-- [ ] **BL-1064 (derived charter price)** — Ben 2026-09-21 (NR-907): a charter's price is the world's own stockpile divided by a constant, fixed at build; the specialist keeps its price in firm charters. Built before BL-1043 stage 2, which reads the divisor. files: stockpile_budget.*, charter_budget.hpp, player_seed_sweep.cpp, stockpile_budget_check.cpp.
+- [x] **BL-1064 (derived charter price)** — DELIVERED 2026-09-21: main session, two cold-review rounds, --digest-check 16/16 (2620 s), world_determinism digests unchanged, stockpile_budget_check --r8 ALL PASS. Ben 2026-09-21 (NR-907): a charter's price is the world's own stockpile divided by a constant, fixed at build; the specialist keeps its price in firm charters. Built before BL-1043 stage 2, which reads the divisor. Requirement group `derived-charter-price`. Built in the main session (2026-09-21), cold review after. files: stockpile_budget.*, harness_params.hpp, app.cpp, player_seed_sweep.cpp, stockpile_budget_check.cpp, world_determinism.cpp (the fold carries the price; span-on only).
+  - [x] T1 derive the price in the builder; the divisor constant; the spend reads it (R1, R2).
+  - [x] T2 the mirror and the app pass the derived spend; the harness records the spend it charged (R1).
+  - [x] T3 the sweep's --price-divisors axis, the charged price per row, the seat-menu close (R3).
+  - [x] T4 stockpile_budget_check's derivation and 5x cases, part 2's price (R4).
+  - [x] T5 build, run the checks, world_determinism, digest-check 16/16, cold review (R5, R6).
+  - STAGE 2, RE-AIMED (Ben, 2026-09-21, NR-908): the divisor answers live-play cost, the specialist price m answers the seat menu, which turns on d/m alone (the handoff's "150" was d/m, direction inverted). Five rows per seed as --price-pairs: 450:4, 650:4, 900:4 (seat menu at d/m 112/162/225) and 325:2, 1300:8 (density at 162).
 
 **Wave 3 — ship**
 

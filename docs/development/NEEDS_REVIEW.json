@@ -285,6 +285,27 @@
     "docs/generation/CORPORATION_GENERATION.md"
    ],
    "resolution": "RULED (Ben, 2026-09-21): option A — a charter's price is a SHARE of the world's own industry stockpile, fixed once when the budget is built, so the seat menu is about the same size on every world. Written into DIGITISATION.md; built by BL-1064 (derived charter price), whose sweep reads the constant. Ben also picked 80k/160k/320k for stage 2, but that answer was the FIXED-price fallback; under option A stage 2 sweeps the divisor instead."
+  },
+  {
+   "id": "NR-908",
+   "title": "CALL: under a derived price, which knob answers the seat menu — the divisor or the specialist price in firm charters?",
+   "raised": "2026-09-21",
+   "kind": "question",
+   "status": "resolved",
+   "source": "BL-1064 (derived charter price), reading the generation docs before stage 2 (main session, 2026-09-21). Stage 1's table (runs.real_stockpile_bl1043_a/_b/_c).",
+   "what": "NR-907 made a firm charter's price the world's stock over a divisor d, with a specialist still costing m firm charters. A centre then affords a specialist when its points cover m/d of the world's stock, so the seat menu turns on d/m ALONE: stage 1 gives seats ~ 0.056 x d / m on the median world (the median of seats x firm price / stock over 48 rows is 0.01395 at m = 4), so the anchor's 9 seats is d/m ~ 160. Firm density — how many charters a world's stock buys — turns on d alone. BL-1064 as filed pinned d to the seat menu with m frozen at 4, which leaves density with no knob; DIGITISATION.md § 1 and its hard-list item 7 set the FIRM price against live-play cost and the 2026-09-18 ruling anchors the SPECIALIST price (in firm charters) to the seat menu. The handoff's 'divisor near 150' was d/m, and its seat direction was inverted (a larger d/m is a cheaper seat and MORE seats).",
+   "why_it_matters": "It decides what stage 2 of BL-1043 measures and what BL-1044 pins: one knob or two.",
+   "options": [
+    "A: the divisor answers live-play cost and m answers the seat menu (the doc's split); stage 2 holds d/m near 160 while d moves.",
+    "B: the divisor answers the seat menu with m frozen at 4 (BL-1064 as filed); density is whatever that divisor gives."
+   ],
+   "recommendation": "A: it is what the doc already rules, and it gives each knob one job.",
+   "files": [
+    "docs/generation/DIGITISATION.md",
+    "src/world/stockpile_budget.hpp",
+    "tools/verify/player_seed_sweep.cpp"
+   ],
+   "resolution": "RULED (Ben, 2026-09-21, elicitation): A — the divisor answers live-play cost, m answers the seat menu. Written into DIGITISATION.md § 1. Stage 2 is FIVE rows per seed (plus the legacy row): (divisor, m) = (450, 4), (650, 4), (900, 4) for the seat menu along d/m = 112 / 162 / 225, and (325, 2), (1300, 8) for density at the ratio 162. The sweep takes them as --price-pairs."
   }
  ]
 }

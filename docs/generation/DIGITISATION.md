@@ -202,8 +202,9 @@ specialist; what remains buys background firms around it; what cannot be spent s
 counted. So the number of specialists is the number of centres rich enough to afford one, and it
 rises with capital rather than being set by a count. **Pass 1's balancing across nations does not
 apply on this path:** a nation whose cities accumulated capital holds the seats that capital
-bought. The price of a firm charter is measured against live-play cost before it is fixed; a
-specialist's price and its starting capital follow the rulings below.
+bought. The price of a firm charter is a share of the world's own stockpile, and the divisor that
+sets the share is measured against live-play cost before it is fixed; a specialist's price and its
+starting capital follow the rulings below.
 
 **SETTLED (Ben, 2026-09-18, NR-889): on a budget world the per-resource firm cap SCALES WITH THE
 BODY'S CHARTER CAPITAL.** Pass 6 caps a body at 8 firms per demanded good, which froze firm count
@@ -263,6 +264,16 @@ does not track it at all — seed 31 holds 95.3M points and offers 6 legacy seat
 and offers 16. At 40000 points a firm the poorest world offered 1 seat and the richest 91, against
 an anchor median of 9; no single number sits inside both tails. The constant itself is read off the
 sweep and pinned at the re-bless.
+
+**SETTLED (Ben, 2026-09-21, NR-908): the divisor answers LIVE-PLAY COST, and the specialist's
+price answers the SEAT MENU.** Once the price is a share of the stock, a centre affords a
+specialist when its points cover the specialist's firm charters over the divisor, as a share of
+the world's stock. So the seat menu turns on that ratio alone, and the price in firm charters is
+the knob the seat-menu anchor sets; on stage 1's reading the anchor's nine seats sit near a ratio
+of 160 (divisor over charters). The divisor alone sets
+how many firm charters a world's stock buys, which is its density and so its tick, and it is set
+against live-play cost. Each knob has one job; a divisor tuned to the seat menu would leave density
+with no knob at all.
 
 **SETTLED (Ben, 2026-09-18, wave 1 form, reversing the same morning's ruling): a budget
 specialist opens on TODAY'S STARTING CAPITAL**, the seeded 400 ±40% draw with the focus premium
@@ -784,10 +795,10 @@ Measured rather than argued:
 - **What binds a far pair, and how fast** (§ Far pairs meet and bind, and this phase makes them).
 - **Whether a colony can hold a colony** (carried from `EXPLORATION.md`).
 - **The depletion formula itself** — writing it down is the work.
-- **How a charter budget converts to firms** — the price of a firm charter and of a specialist in
-  budget points, and the square root's constants and the density ceiling, each set against
-  live-play cost before it is fixed (the split, the rule's form and the price's anchor are settled
-  in § 1).
+- **How a charter budget converts to firms** — the divisor that prices a firm charter as a share of
+  the stock, and the square root's constants, each set against live-play cost before it is fixed;
+  and the specialist's price in firm charters, set against the seat menu (the split, the rule's
+  form, the price's derivation, both anchors and the density ceiling are settled in § 1).
 - **Whether a seat on a budget world is solvent at today's starting capital** — read on real
   stockpiles, with the trailing net over a window long enough to judge it.
 - **What a world gets when no centre can afford a specialist** — decided when Beat 1's real

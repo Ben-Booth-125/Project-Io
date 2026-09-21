@@ -30,6 +30,10 @@
 // EVERY POINT IS ACCOUNTED FOR: points_total == budget.total() + the unspent
 // reasons, always — including on a rejection, where every point is `rejected`.
 //
+// THE PRICE IS THE STOCK'S OWN (BL-1064, NR-907): one firm charter costs the
+// whole stockpile over `k_stockpile_price_divisor`, derived here once and carried
+// on the budget, so the spend charges every world the same SHARE of itself.
+//
 // WITH THE DIGITISATION SPAN OFF (the shipped default) no region holds a point,
 // the budget is EMPTY, and an empty budget is today's world byte for byte
 // (`apply_landscape_candidate`'s legacy branch runs first). That is the whole
@@ -118,6 +122,20 @@ struct stockpile_budget
 
     std::int64_t points_total      = 0; ///< every region's `industry_points`, summed
     std::int64_t points_to_centres = 0; ///< == budget.total()
+
+    /// BL-1064 — THE FIRM PRICE, DERIVED (Ben, 2026-09-21, NR-907;
+    /// DIGITISATION.md § 1): the world's WHOLE stockpile (`points_total`, every
+    /// region's points, the ones no centre took included) divided by
+    /// `price_divisor`, in whole points, and never below 1 — fixed here, once,
+    /// when the budget is built. So the seat menu is about the same size on every
+    /// world: a centre's points and the price both scale with the stock. 0 on
+    /// every EMPTY budget — the span off, a stock whose every point went unspent
+    /// (all razed or dropped), and a rejection — because an empty budget is
+    /// today's world and prices nothing.
+    std::int32_t firm_price_points = 0;
+    /// The divisor the price was derived by (the build's argument); 0 wherever
+    /// the price is.
+    std::int64_t price_divisor     = 0;
     std::array<std::int64_t, stockpile_unspent_reason_count> unspent{};
 
     /// Every region with points > 0, ascending region index.
@@ -147,39 +165,72 @@ inline constexpr std::int64_t stockpile_slot_key_max = 1LL << 31;
 /// apportionment's remainder product stays under 2^63.
 inline constexpr std::int64_t stockpile_region_keys_max = 1LL << 32;
 
-/// Build the charter budget from @p w's stockpile. Pure: reads the settlement
-/// record and the carve index, writes nothing. A world with no settlement
-/// record (a loaded world, a fixture) or no points returns an EMPTY budget with
-/// nothing to account.
+// --- THE PRICE (BL-1064) -------------------------------------------------------
+
+/// The divisor a world's whole stockpile is split by into the price of ONE firm
+/// charter (Ben, 2026-09-21, NR-907: "a charter's price is the world's whole
+/// industry stockpile divided by a constant"; DIGITISATION.md § 1). PROVISIONAL:
+/// BL-1044 pins it off BL-1043 stage 2.
+///
+/// TWO KNOBS, TWO JOBS (Ben, 2026-09-21, NR-908; DIGITISATION.md § 1).
+/// A centre affords a specialist when its points cover
+/// `k_stockpile_specialist_firm_charters` / this of the world's stock, so the
+/// SEAT MENU turns on the ratio of the two alone, and the specialist's price in
+/// firm charters is the knob set against it. THIS divisor sets how many firm
+/// charters a world's stock buys — its density, and so its tick — and is the
+/// knob set against LIVE-PLAY COST.
+///
+/// WHERE 650 COMES FROM (stage 1, runs.real_stockpile_bl1043_a/_b/_c, 16 seeds x
+/// firm price 10000/20000/40000 x 4 firm charters a specialist): a world's seats
+/// run close to 0.056 x its stock / the specialist's price (the median of
+/// seats x firm price / stock over the 48 rows is 0.01395, at 4 charters), so
+/// under a derived price the seats are about 0.056 x this / the charters, and
+/// the anchor's 9 seats is a ratio near 160 — 650 at 4 charters. A LARGER ratio
+/// is a CHEAPER seat and MORE seats. Stage 2 reads the density at that ratio
+/// along the divisor.
+inline constexpr std::int64_t k_stockpile_price_divisor = 650;
+static_assert(k_stockpile_price_divisor > 0, "the price divisor must be > 0");
+
+/// Build the charter budget from @p w's stockpile, its firm price derived by
+/// @p price_divisor (the shipped constant unless an instrument names another).
+/// Pure: reads the settlement record and the carve index, writes nothing. A
+/// world with no settlement record (a loaded world, a fixture) or no points
+/// returns an EMPTY budget with nothing to account and no price.
 ///
 /// A world whose stock holds points while its carve index is EMPTY (both lists)
 /// is INCONSISTENT — the index was lost (a copy or a load that kept the
 /// settlement record but not the index) — and is REJECTED whole, so a lost
-/// index can never pass as regions that carved no centre.
-stockpile_budget build_stockpile_budget(const world& w);
+/// index can never pass as regions that carved no centre. So is a stock with
+/// points priced by a divisor <= 0, or whose derived price is past int32 (the
+/// spend's price type): rejected, never clamped.
+stockpile_budget build_stockpile_budget(const world& w,
+                                        std::int64_t price_divisor = k_stockpile_price_divisor);
 
 /// The same builder over its three inputs, for a caller holding them apart from
 /// a world (tools/verify/stockpile_budget_check's hand-built slots). @p regions
 /// may be null (no settlement record: an empty budget).
 stockpile_budget build_stockpile_budget(const std::vector<region>*            regions,
                                         const std::map<entity_id, carve_slot>& founded,
-                                        const std::vector<carve_dropped_slot>& dropped);
+                                        const std::vector<carve_dropped_slot>& dropped,
+                                        std::int64_t price_divisor = k_stockpile_price_divisor);
 
 // --- THE SPEND ---------------------------------------------------------------
 //
 // PROVISIONAL NAMED CONSTANTS, SET HERE AND NOT IN charter_budget.hpp (whose
 // prices have no shipped default by design). BL-1044 sets them against live-play
-// cost and the seat menu (DIGITISATION.md § 1: the firm price "measured against
-// live-play cost before it is fixed"; the specialist's price "anchored to the
-// seat menu"; the square root's constants and the density ceiling "read off the
-// cost table"). The density ceiling is the one already ruled (NR-902, below).
-// They are read only when the budget is non-empty, which needs the Digitisation
-// span on; with it off (the shipped default) no price is read.
+// cost and the seat menu (DIGITISATION.md § 1: the specialist's price "anchored
+// to the seat menu"; the square root's constants and the density ceiling "read
+// off the cost table"). The density ceiling is the one already ruled (NR-902,
+// below). The FIRM price is not a constant at all: it is derived from the
+// world's own stockpile by `k_stockpile_price_divisor` (above, NR-907). They
+// are read only when the budget is non-empty, which needs the Digitisation span
+// on; with it off (the shipped default) no price is read.
 
-/// Points one background firm charter costs. PROVISIONAL (BL-1044).
-inline constexpr std::int32_t k_stockpile_firm_price_points = 10000;
 /// Firm charters one specialist costs. PROVISIONAL (BL-1044); the synthetic
-/// budget's 4, the only reading the seat has been measured at.
+/// budget's 4, the only reading the seat has been measured at. A specialist's
+/// price is this many DERIVED firm prices (BL-1039's structure, NR-907), and
+/// this is the knob anchored to the SEAT MENU (Ben, 2026-09-18 and 2026-09-21):
+/// with the divisor above, it sets the share of the stock a seat costs.
 inline constexpr std::int32_t k_stockpile_specialist_firm_charters = 4;
 /// The per-good cap's floor and base c (Pass 6's 8, the legacy anchor).
 inline constexpr std::int32_t k_stockpile_per_resource_firm_cap = 8;
@@ -193,7 +244,9 @@ inline constexpr std::int32_t k_stockpile_max_firms_per_body = 200;
 /// economy tick for it. A ceiling that never binds is not a brake.
 inline constexpr std::int32_t k_stockpile_density_ceiling = 120;
 
-/// The spend a stockpile budget is charged at: the ruled `sqrt_capital` cap rule
-/// under the constants above, window 4, the province cap on (§ 1: "the
-/// per-province cap stays at 2 on a budget world").
-charter_spend_params stockpile_charter_spend();
+/// The spend @p sb is charged at: its own DERIVED firm price (BL-1064), the
+/// ruled `sqrt_capital` cap rule under the constants above, window 4, the
+/// province cap on (§ 1: "the per-province cap stays at 2 on a budget world").
+/// On an empty or rejected budget the price is 0 — never read, since an empty
+/// budget takes the legacy branch before any spend param is.
+charter_spend_params stockpile_charter_spend(const stockpile_budget& sb);

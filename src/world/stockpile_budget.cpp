@@ -44,16 +44,17 @@ stockpile_budget rejected_budget(std::int64_t points_total, std::vector<stockpil
 
 } // namespace
 
-stockpile_budget build_stockpile_budget(const world& w)
+stockpile_budget build_stockpile_budget(const world& w, std::int64_t price_divisor)
 {
     const settlement_state* ss = w.gen_settlement.get();
     return build_stockpile_budget(ss != nullptr ? &ss->regions : nullptr,
-                                  w.gen_carve_centres, w.gen_carve_dropped);
+                                  w.gen_carve_centres, w.gen_carve_dropped, price_divisor);
 }
 
 stockpile_budget build_stockpile_budget(const std::vector<region>*             regions,
                                         const std::map<entity_id, carve_slot>& founded,
-                                        const std::vector<carve_dropped_slot>& dropped)
+                                        const std::vector<carve_dropped_slot>& dropped,
+                                        std::int64_t                           price_divisor)
 {
     stockpile_budget out;
     if (regions == nullptr)
@@ -95,6 +96,24 @@ stockpile_budget build_stockpile_budget(const std::vector<region>*             r
         return rejected_budget(total, std::move(rows),
                                "inconsistent: the stockpile holds points but the carve index is empty "
                                "(lost in a copy or a load?)");
+
+    // --- the price (BL-1064, NR-907): the whole stock over the divisor -------
+    // Fixed HERE, once, before any point is split, from `total` — every region's
+    // points, the ones no centre will take included ("the world's whole
+    // industry stockpile"). Integer division floors; a stock smaller than the
+    // divisor still prices a charter at 1 point, never at 0. A divisor that is
+    // not a divisor, or a price the spend cannot hold, is refused, not clamped.
+    if (price_divisor <= 0)
+        return rejected_budget(total, std::move(rows),
+                               "the price divisor must be > 0 (a charter's price is the stockpile "
+                               "over it)");
+    const std::int64_t price = std::max<std::int64_t>(1, total / price_divisor);
+    if (price > std::numeric_limits<std::int32_t>::max())
+        return rejected_budget(total, std::move(rows),
+                               "the derived firm price (the stockpile over the divisor) is past int32 "
+                               "(the spend's price type)");
+    out.firm_price_points = static_cast<std::int32_t>(price);
+    out.price_divisor     = price_divisor;
 
     // --- the carve's slots, per region ----------------------------------------
     // Founded slots in ascending centre id (a std::map), then dropped slots in
@@ -220,6 +239,13 @@ stockpile_budget build_stockpile_budget(const std::vector<region>*             r
     }
 
     out.budget = charter_budget(points);   // a zero share drops, as any budget's does
+    // BL-1064: a budget no centre holds a point of (every point razed or
+    // dropped) prices nothing — it is today's world, and no price is read on it.
+    if (out.budget.empty())
+    {
+        out.firm_price_points = 0;
+        out.price_divisor     = 0;
+    }
     for (const stockpile_region_row& row : rows)
     {
         out.points_to_centres += row.to_centres;
@@ -230,10 +256,10 @@ stockpile_budget build_stockpile_budget(const std::vector<region>*             r
     return out;
 }
 
-charter_spend_params stockpile_charter_spend()
+charter_spend_params stockpile_charter_spend(const stockpile_budget& sb)
 {
     charter_spend_params s;
-    s.firm_price_points        = k_stockpile_firm_price_points;
+    s.firm_price_points        = sb.firm_price_points;   // derived at build (BL-1064)
     s.specialist_firm_charters = k_stockpile_specialist_firm_charters;
     s.window_radius            = 4;
     s.province_cap             = true;

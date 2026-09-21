@@ -1064,8 +1064,9 @@ void app::start_new_game_prelude()
         // BL-1042 — THE CHARTER BUDGET: the world's own industry-point
         // stockpile (Beat 1, DIGITISATION.md Part III), split over the carved
         // centres by `build_stockpile_budget` and charged at
-        // `stockpile_charter_spend` (its provisional prices are named in
-        // stockpile_budget.hpp; BL-1044 sets them). ONE budget and ONE spend
+        // `stockpile_charter_spend` — its firm price DERIVED from the world's
+        // whole stockpile (BL-1064, NR-907), its other provisional constants
+        // named in stockpile_budget.hpp; BL-1044 pins them. ONE budget and ONE spend
         // reach BOTH `sp` AND the winner's apply below — or the search would
         // score one world and the app lay another — and the budget is a local
         // of this block, so it outlives the search and the apply both.
@@ -1081,7 +1082,7 @@ void app::start_new_game_prelude()
         // measurement now that the roster axis regenerates specialists per
         // candidate; BL-977's report carries the before/after.
         const stockpile_budget stockpile = build_stockpile_budget(m_world);
-        const charter_spend_params spend = stockpile_charter_spend();
+        const charter_spend_params spend = stockpile_charter_spend(stockpile);
         sp.budget = &stockpile.budget;
         sp.spend  = spend;
         const landscape_search_result r = search_landscape(m_world, m_registry, sp);
@@ -1093,9 +1094,16 @@ void app::start_new_game_prelude()
             const auto why = [&](stockpile_unspent_reason k) {
                 return static_cast<long long>(stockpile.unspent[static_cast<std::size_t>(k)]);
             };
+            // BL-1064: an empty budget (rejected, or every point unspent) prices nothing.
+            char price[96] = "no price (an empty budget)";
+            if (!stockpile.budget.empty())
+                std::snprintf(price, sizeof price, "firm price %d (the stock / %lld), specialist %lld",
+                              static_cast<int>(stockpile.firm_price_points),
+                              static_cast<long long>(stockpile.price_divisor),
+                              static_cast<long long>(spend.specialist_price_points()));
             std::printf("[stockpile_budget] %lld points: %lld to %zu centres, %lld unspent "
                         "(carve_dropped %lld, carve_no_tile %lld, razed %lld, "
-                        "no_carved_centre %lld, rejected %lld)%s%s; spent %lld of %lld%s\n",
+                        "no_carved_centre %lld, rejected %lld)%s%s; %s; spent %lld of %lld%s\n",
                         static_cast<long long>(stockpile.points_total),
                         static_cast<long long>(stockpile.points_to_centres),
                         stockpile.budget.points().size(),
@@ -1107,6 +1115,7 @@ void app::start_new_game_prelude()
                         why(stockpile_unspent_reason::rejected),
                         stockpile.rejected ? " REJECTED: " : "",
                         stockpile.rejected ? stockpile.rejection.c_str() : "",
+                        price,
                         static_cast<long long>(charter_report.points_spent),
                         static_cast<long long>(charter_report.points_budgeted),
                         charter_report.refused ? " (spend REFUSED)" : "");

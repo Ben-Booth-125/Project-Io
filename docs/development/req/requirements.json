@@ -6861,6 +6861,84 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "derived-charter-price",
+   "title": "BL-1064 - A charter's price is the world's own stockpile divided by a constant",
+   "difficulty": 2,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1064 - sprint 45 (2026-09-21, NR-907)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-21",
+   "resolution": "BL-1064 delivered 2026-09-21: the firm price is derived from the world's whole stockpile (NR-907), the divisor answers live-play cost and m the seat menu (NR-908), the sweep takes --price-divisors and --price-pairs, and nothing span-off moved (16/16).",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "code: build_stockpile_budget",
+      "headless: stockpile_budget_check"
+     ],
+     "requirement": "The stockpile budget derives the FIRM price once, at build: firm_price = points_total / divisor (integer, floor), at least 1, carried on the budget. A divisor <= 0, or a derived price past int32, REJECTS the budget whole (every point unspent as rejected), never clamps. An empty or rejected budget carries no price (0), and no price is read on it. The spend the shipped path charges reads the derived price; a specialist still costs its whole number of firm charters (m x the derived price), so BL-1039's structure is untouched.",
+     "notes": "",
+     "result_metric": "build_stockpile_budget derives firm_price_points = max(1, points_total / divisor) once, before the split; a divisor <= 0 and a price past int32 reject the whole budget; every EMPTY budget (span off, all points unspent, rejected) carries price 0 (the last case added after the cold review). stockpile_charter_spend(sb) reads it; app.cpp and harness_params.hpp charge the same spend. stockpile_budget_check part 1b: 1772/100 -> 17 (the whole stock, not the 853 to centres), floor 1, both rejections, the all-razed empty budget priced 0, m x 17; part 2 (--r8, seed 28): 24,657,817 points -> 37,935, identical on two builds. ALL PASS."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: stockpile_budget.hpp"
+     ],
+     "requirement": "The divisor is a named PROVISIONAL constant beside the other charter constants, citing NR-907, until BL-1044 pins it. Beside it, the two knobs' jobs (Ben, 2026-09-21, NR-908): the divisor answers live-play cost, the specialist price in firm charters answers the seat menu, which turns on their ratio alone. Its provisional value is read off BL-1043 stage 1 at 4 charters (the anchor's 9 seats near a ratio of 160), with the arithmetic stated. The fixed firm-price constant it replaces is retired, not left unread.",
+     "notes": "",
+     "result_metric": "k_stockpile_price_divisor = 650, PROVISIONAL, beside the charter constants, citing NR-907 and NR-908 (the divisor answers live-play cost; m answers the seat menu, which turns on d/m alone). The arithmetic is stated: the median of seats x firm price / stock over stage 1's 48 rows is 0.01395 at m = 4, so the anchor's 9 seats sits near d/m 160 (650 at m 4). k_stockpile_firm_price_points is retired; no reader remains in src/ or tools/."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: the cost mode",
+      "headless: player_seed_sweep --charter-cost --budget stockpile (one seed, main session)"
+     ],
+     "requirement": "player_seed_sweep's stockpile cost mode gains a --price-divisors axis and a --price-pairs D:M axis (each pair its own m, NR-908). Every row prints and writes the price it ACTUALLY charged (derived per seed) and the divisor it derived it by, read from the spend the shipped path used, never restated, and fails on a mismatch. --firm-prices stays (stage 1's fixed-price rows reproduce); one price axis per run, pairs refuse --specialist-prices, and all three are refused outside stockpile mode. The run closes with the seat-menu reading per row: median and min/max specialists across seeds, against the legacy anchor.",
+     "notes": "",
+     "result_metric": "--price-divisors and --price-pairs D:M (each pair its own m) in the stockpile cost mode; one price axis per run, pairs refuse --specialist-prices, all three refused outside stockpile mode (seven refusals smoke-tested). Each row reads its price back from shipped_landscape::stockpile_spend and stockpile_price_failure recomputes it (a mismatch fails the run); the account line says CHARGED and DERIVED or FIXED; JSON carries price_divisor per row and price_divisors / price_pairs_divisor_m in the header (the m list null in a pairs run). Smoke, seed 28, --price-pairs 650:4 (403 s): charged 37,935 = the stock / 650, specialist 151,740, 1 seat against the legacy 6, account closes, the SEAT MENU close prints, legacy digests match the pins. Refused rows are excluded from the close (cold review)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: stockpile_budget_check",
+      "headless: stockpile_budget_check --r8"
+     ],
+     "requirement": "stockpile_budget_check gains the derivation cases: the exact price on a hand-built stock, the floor of 1, the two rejections, no price on an empty budget; two worlds whose stockpiles differ 5x open seat menus within a stated tolerance of each other at the derived price, where a fixed price does not; and (part 2) the derived price is identical across two builds of the same seed.",
+     "notes": "",
+     "result_metric": "stockpile_budget_check part 1b: the derived price exact on the hand stock, the floor of 1, both rejections, the empty budget priced 0; the 5x case — 36,000 and 180,000 points priced 360 and 1,800 at divisor 100 open 7 and 7 seats (tolerance one seat), where A's fixed price opens 14 on B; part 2 (2.5): the derived price is the stock over the shipped divisor and identical across two builds of seed 28. 35 checks, ALL PASS."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "Switch off, nothing moves: with the span off the stockpile is empty and no price is read, so world_determinism digests are unchanged and player_seed_sweep --digest-check passes 16/16.",
+     "notes": "",
+     "result_metric": "With the span off the stock is 0, so the builder returns before the divisor is read, and an empty budget reads no price (search and apply check emptiness first). world_determinism ALL PASS twice, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; player_seed_sweep --digest-check 16/16 PASS (2620 s, main session, 2026-09-21)."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds the price derived as ruled (the whole stockpile, fixed once, floor 1, reject never clamp), every row charged what it says, and no pinned path moved.",
+     "notes": "",
+     "result_metric": "code-reviewer (cold), two rounds. Round 1: the core held (span-off identity, rejection order and accounting, the app/harness mirror, the parser, the merge tool, every hand-worked number); five low findings fixed — a fixed-price row printed a derived price it never charged, an all-razed empty budget carried a price, a pairs run's JSON header named the unread m list, refused rows counted as seats in the SEAT MENU close, two stale DIGITISATION.md lines. Round 2: all five fixes hold; one label nit (DERIVED/FIXED inferred from price equality) fixed. Its advisory stands for Ben: stage 1's rows near stock/price 650 opened 1, 8, 3 and 8 seats, so concentration keeps a spread the derived price does not remove."
+    }
+   ]
   }
  ]
 }

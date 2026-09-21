@@ -21,6 +21,14 @@
 // checked too: an int32 overflow, and a stock with points but no carve index
 // (a lost index must never pass as "no carved centre").
 //
+// PART 1b — BL-1064, THE DERIVED PRICE (instant). The firm price is the whole
+// stock over the divisor (Ben, 2026-09-21, NR-907): floored, never below 1, the
+// unspent points included; a divisor <= 0 or a price past int32 rejects the
+// budget whole; an empty budget carries none. And the property the ruling is
+// for: two hand-built worlds whose stockpiles differ 5x open seat menus within
+// one seat of each other, where one fixed price opens twice the menu on the
+// richer. Every expected number is worked by hand beside its check.
+//
 // PART 2 — R8, A NON-EMPTY BUDGET BUILT TWICE (one seed, the Digitisation span
 // ON). world_determinism's stockpile fold only runs when a region holds a
 // point, and none of its worlds runs the span, so it never sees a non-empty
@@ -28,8 +36,9 @@
 // the search (harness_params.hpp `build_app_base_world`: config, works,
 // generation, setup, load_economy — no search, which needs none of this), builds
 // the stockpile budget off each, and compares every field: the region stock,
-// the carve index, every centre's budget, every unspent reason. It FAILS if the
-// budget is empty (the check would be vacuous) or any field differs.
+// the carve index, every centre's budget, every unspent reason, and the derived
+// price (BL-1064). It FAILS if the budget is empty (the check would be vacuous)
+// or any field differs.
 //
 // Exit 0 only when every check passes.
 // ---------------------------------------------------------------------------
@@ -40,6 +49,7 @@
 #include "world/stockpile_budget.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -214,6 +224,158 @@ void part_one()
         check(!a.rejected && a.budget.empty() && a.points_total == 0
                   && !b.rejected && b.budget.empty() && b.points_total == 0,
               "1.14 no settlement record, or a stock of zero (the span off): an empty budget, no rejection");
+        check(a.firm_price_points == 0 && b.firm_price_points == 0
+                  && stockpile_charter_spend(b).firm_price_points == 0,
+              "1.15 an empty budget carries NO price (0), and nothing prices it (BL-1064)");
+    }
+}
+
+/// Seats a budget opens at @p specialist_price: its centres whose points cover
+/// one specialist. The count `charter_web_from_budget` charters — one specialist
+/// per centre that can afford one (DIGITISATION.md § 1) — before any ground is
+/// read; a centre whose window holds no free site can only lower it.
+int seats_at(const stockpile_budget& sb, std::int64_t specialist_price)
+{
+    int n = 0;
+    for (const auto& [centre, p] : sb.budget.points())
+        if (p >= specialist_price)
+            ++n;
+    return n;
+}
+
+void part_one_price()
+{
+    std::printf("\n--- PART 1b (BL-1064): the firm price is the stock's own ---\n");
+
+    // The hand world of part 1: 1772 points in all (853 to centres, 919
+    // unspent). The price is the WHOLE stock over the divisor — the unspent
+    // points included (NR-907: "the world's whole industry stockpile").
+    std::vector<region> regions = {
+        points_region(1001), points_region(5), points_region(700, 2), points_region(50),
+        points_region(7),    points_region(9), points_region(0),
+    };
+    std::map<entity_id, carve_slot> founded = {
+        { 10, { 0, 1, 300 } }, { 11, { 0, 2, 150 } }, { 13, { 0, 4, 75 } },
+        { 31, { 1, 1, 10 } },  { 30, { 1, 2, 10 } },
+        { 50, { 4, 1, 0 } },   { 51, { 4, 2, 0 } },
+        { 60, { 6, 1, 500 } },
+    };
+    std::vector<carve_dropped_slot> dropped = {
+        { 0, 3, 100, carve_drop_reason::body_built_out },
+        { 5, 1, 40,  carve_drop_reason::no_tile },
+    };
+    const auto w = hand_world(regions, founded, dropped);
+
+    // 1772 / 100 = 17.72 -> 17 (floors); 1772 / 10000 = 0 -> the floor of 1.
+    const stockpile_budget d100   = build_stockpile_budget(*w, 100);
+    const stockpile_budget d10000 = build_stockpile_budget(*w, 10000);
+    std::printf("     divisor 100: price %d (divisor %lld); divisor 10000: price %d; shipped "
+                "divisor %lld: price %d\n",
+                d100.firm_price_points, (long long)d100.price_divisor, d10000.firm_price_points,
+                (long long)k_stockpile_price_divisor, build_stockpile_budget(*w).firm_price_points);
+    check(!d100.rejected && d100.firm_price_points == 17 && d100.price_divisor == 100,
+          "1b.1 the firm price is the WHOLE stock over the divisor, floored: 1772 / 100 -> 17 "
+          "(not the 853 to centres: that would be 8)");
+    check(!d10000.rejected && d10000.firm_price_points == 1,
+          "1b.2 a stock smaller than the divisor prices a charter at 1 point, never 0");
+    check(d100.budget.points() == d10000.budget.points() && d100.unspent == d10000.unspent,
+          "1b.3 the divisor moves the PRICE only: the split and every reason are the same");
+    {
+        const charter_spend_params s = stockpile_charter_spend(d100);
+        check(s.firm_price_points == 17
+                  && s.specialist_price_points()
+                         == 17LL * static_cast<long long>(k_stockpile_specialist_firm_charters),
+              "1b.4 the spend charges the derived price, and a specialist costs its firm charters "
+              "at it (m x 17)");
+    }
+
+    // The rejections: a divisor that is not one, and a price past int32.
+    {
+        const stockpile_budget z = build_stockpile_budget(*w, 0);
+        const stockpile_budget n = build_stockpile_budget(*w, -5);
+        std::printf("     divisor 0: rejected=%d (%s)\n", z.rejected ? 1 : 0, z.rejection.c_str());
+        check(z.rejected && z.budget.empty() && z.firm_price_points == 0
+                  && unspent(z, stockpile_unspent_reason::rejected) == 1772 && z.balanced()
+                  && n.rejected && n.budget.empty(),
+              "1b.5 a divisor <= 0 REJECTS the whole budget (every point rejected), never clamps");
+    }
+    {
+        // 3e9 razed points: no centre's share passes int32 (the centre takes
+        // 10), but the whole stock over a divisor of 1 does.
+        std::vector<region> big = { points_region(3000000000LL, 1), points_region(10) };
+        std::map<entity_id, carve_slot> f = { { 71, { 1, 1, 100 } } };
+        const auto wb = hand_world(big, f, {});
+        const stockpile_budget r1 = build_stockpile_budget(*wb, 1);
+        const stockpile_budget r2 = build_stockpile_budget(*wb, 2);
+        std::printf("     int32 price: divisor 1 rejected=%d (%s); divisor 2 price %d\n",
+                    r1.rejected ? 1 : 0, r1.rejection.c_str(), r2.firm_price_points);
+        check(r1.rejected && r1.budget.empty() && r1.firm_price_points == 0
+                  && unspent(r1, stockpile_unspent_reason::rejected) == 3000000010LL && r1.balanced(),
+              "1b.6 a derived price past int32 REJECTS the whole budget, never clamps");
+        check(!r2.rejected && r2.firm_price_points == 1500000005,
+              "1b.7 the same stock over 2 prices at 1500000005, inside int32: accepted");
+    }
+
+    // A stock with points that no centre takes — region 0's 700 razed, the one
+    // founded slot on a pointless region — builds an EMPTY budget, and an empty
+    // budget prices nothing (the cold review's case, 2026-09-21).
+    {
+        std::vector<region> razed = { points_region(700, 1), points_region(0) };
+        std::map<entity_id, carve_slot> f = { { 80, { 1, 1, 100 } } };
+        const auto wr = hand_world(razed, f, {});
+        const stockpile_budget r = build_stockpile_budget(*wr, 100);
+        std::printf("     all razed: rejected=%d, budget entries %zu, price %d, divisor %lld\n",
+                    r.rejected ? 1 : 0, r.budget.points().size(), r.firm_price_points,
+                    (long long)r.price_divisor);
+        check(!r.rejected && r.budget.empty() && r.points_total == 700 && r.firm_price_points == 0
+                  && r.price_divisor == 0 && stockpile_charter_spend(r).firm_price_points == 0
+                  && r.balanced(),
+              "1b.8 a stock whose every point went unspent builds an EMPTY budget with NO price");
+    }
+
+    // THE PROPERTY THE RULING IS FOR: two worlds whose stockpiles differ 5x
+    // open seat menus of the same size. World A: fourteen centres, one region
+    // and one slot each, so a centre's budget IS its region's points (a Zipf-like
+    // 12000 ... 300, 36000 in all). World B: every region x5 (180000).
+    //   divisor 100, m = 4 (a literal here, so a pinned constant cannot move it):
+    //   A: price 360, specialist 1440 -> 12000..1700 afford, 1300 does not: 7.
+    //   B: price 1800, specialist 7200 -> 60000..8500 afford, 6500 does not: 7.
+    //   At A's FIXED price (specialist 1440) B affords all 14 (its smallest is 1500).
+    // TOLERANCE: one seat. Two scaled stocks price within the floor's rounding
+    // of each other, so a centre sitting exactly on the line may fall either
+    // side; none does here. The fixed price must miss by MORE than the tolerance.
+    {
+        const std::vector<std::int64_t> a_pts = { 12000, 6000, 4000, 3000, 2400, 2000, 1700,
+                                                  1300,  1000, 800,  600,  500,  400,  300 };
+        std::vector<region> ra, rb;
+        std::map<entity_id, carve_slot> fa;
+        for (std::size_t i = 0; i < a_pts.size(); ++i)
+        {
+            ra.push_back(points_region(a_pts[i]));
+            rb.push_back(points_region(a_pts[i] * 5));
+            fa[static_cast<entity_id>(100 + i)] = { static_cast<int>(i), 1, 100 };
+        }
+        const auto wa = hand_world(ra, fa, {});
+        const auto wb = hand_world(rb, fa, {});
+        const stockpile_budget a = build_stockpile_budget(*wa, 100);
+        const stockpile_budget b = build_stockpile_budget(*wb, 100);
+        constexpr std::int64_t m = 4;
+        const int seats_a       = seats_at(a, m * a.firm_price_points);
+        const int seats_b       = seats_at(b, m * b.firm_price_points);
+        const int seats_b_fixed = seats_at(b, m * a.firm_price_points);
+        std::printf("     5x: A %lld points, price %d, %d seats | B %lld points, price %d, %d seats "
+                    "| B at A's fixed price: %d seats\n",
+                    (long long)a.points_total, a.firm_price_points, seats_a,
+                    (long long)b.points_total, b.firm_price_points, seats_b, seats_b_fixed);
+        check(a.points_total == 36000 && b.points_total == 180000 && a.firm_price_points == 360
+                  && b.firm_price_points == 1800,
+              "1b.9 the two worlds: 36000 and 180000 points, priced 360 and 1800 at divisor 100");
+        check(seats_a == 7 && seats_b == 7 && std::abs(seats_a - seats_b) <= 1,
+              "1b.10 stockpiles 5x apart open seat menus within ONE seat of each other at the "
+              "derived price (7 and 7)");
+        check(seats_b_fixed == 14 && seats_b_fixed - seats_a > 1,
+              "1b.11 at one FIXED price the richer world opens twice the menu (14 against 7): "
+              "the spread the ruling removes");
     }
 }
 
@@ -224,6 +386,8 @@ std::string diff_budgets(const stockpile_budget& a, const stockpile_budget& b)
     if (a.rejected != b.rejected) d += " rejected;";
     if (a.points_total != b.points_total) d += " points_total;";
     if (a.points_to_centres != b.points_to_centres) d += " points_to_centres;";
+    if (a.firm_price_points != b.firm_price_points || a.price_divisor != b.price_divisor)
+        d += " the derived price;";
     if (a.unspent != b.unspent) d += " unspent;";
     if (a.budget.points() != b.budget.points()) d += " the per-centre budget;";
     if (a.regions.size() != b.regions.size()) d += " region rows;";
@@ -249,6 +413,7 @@ std::uint64_t fnv(const stockpile_budget& sb)
         for (int i = 0; i < 8; ++i) { h ^= (v >> (8 * i)) & 0xFF; h *= 1099511628211ull; }
     };
     mix(static_cast<std::uint64_t>(sb.points_total));
+    mix(static_cast<std::uint64_t>(sb.firm_price_points));   // BL-1064
     for (const std::int64_t u : sb.unspent) mix(static_cast<std::uint64_t>(u));
     for (const auto& [c, p] : sb.budget.points()) { mix(c); mix(static_cast<std::uint64_t>(p)); }
     return h;
@@ -310,6 +475,14 @@ void part_two(std::uint32_t seed)
     check(carve_first == carve_second && dropped_first == dropped_second,
           "2.3 the carve index is identical across the two builds");
     check(first.balanced() && second.balanced(), "2.4 both accounts close");
+    std::printf("     derived price: %d then %d (the stock over %lld)\n", first.firm_price_points,
+                second.firm_price_points, (long long)first.price_divisor);
+    check(first.firm_price_points > 0 && first.firm_price_points == second.firm_price_points
+              && first.price_divisor == k_stockpile_price_divisor
+              && first.firm_price_points
+                     == std::max<std::int64_t>(1, first.points_total / k_stockpile_price_divisor),
+          "2.5 BL-1064: the derived price is the whole stock over the shipped divisor, and the "
+          "same seed derives the same price twice");
 }
 
 } // namespace
@@ -344,6 +517,7 @@ int main(int argc, char** argv)
     }
 
     part_one();
+    part_one_price();
     if (r8)
         part_two(seed);
     else

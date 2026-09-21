@@ -337,6 +337,7 @@ uint64_t deep_digest(const world& w, const era_minus_one_fixture& fx)
             const stockpile_budget sb = build_stockpile_budget(w);
             fold_i32(h, sb.rejected ? 1 : 0);
             fold_i64(h, sb.points_total);
+            fold_i32(h, sb.firm_price_points);   // BL-1064: the price the stock derives
             for (const std::int64_t u : sb.unspent)
                 fold_i64(h, u);
             fold_u32(h, static_cast<uint32_t>(sb.budget.points().size()));

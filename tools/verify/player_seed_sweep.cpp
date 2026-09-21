@@ -55,11 +55,16 @@
 //                                    [--live-ticks 8]
 //                                    [--out file.json] [--note TEXT]        (BL-1033)
 //      .\build\player_seed_sweep.exe --charter-cost --budget stockpile      (BL-1043)
-//                                    [--seeds 28] [--firm-prices 5000,10000,20000]
+//                                    [--seeds 28] [--price-divisors 450,650,900]  (BL-1064)
+//                                    | [--price-pairs 325:2,1300:8]  (divisor:m, own m)
+//                                    | [--firm-prices 5000,10000,20000]           (stage 1)
 //                                    [--specialist-prices 2,4,8] [--no-span-control]
 //                                    — the REAL budget: the Digitisation span at epoch 0 and
 //                                      the budget build_stockpile_budget makes from the
-//                                      world's own stockpile. No budget scales apply.
+//                                      world's own stockpile. No budget scales apply. The
+//                                      price is DERIVED from each world's stock by the
+//                                      divisor (the shipped rule, NR-907) unless
+//                                      --firm-prices fixes it; never both.
 //
 // BL-630 (2026-08-26) ADDED THE MODE THIS FILE NOW LEADS WITH. The two default
 // conditions above ("worth playing" == a processor, and solvent) were written
@@ -1380,8 +1385,13 @@ void text_appendf(std::string& out, const char* fmt, ...)
 
 /// One block per row: the stock, where it went, and the whole account, as text.
 /// @p indent leads every line (the nested region rows take two more spaces).
+/// @p charged_firm_price is the price the spend actually CHARGED (BL-1064), and
+/// @p derived says whether the row priced off the stock (a divisor row, or the
+/// shipped path) or FIXED its own price — read from the row, never inferred by
+/// comparing the two prices, which can coincide or (on a fault) differ.
 std::string stockpile_account_text(const world& w, const stockpile_budget& sb,
-                                   const charter_spend_report& rep, const char* indent)
+                                   const charter_spend_report& rep, const char* indent,
+                                   std::int32_t charged_firm_price, bool derived)
 {
     std::string out;
     text_appendf(out, "%sstockpile (BL-1042): %lld points on %zu regions -> %lld to %zu centres",
@@ -1393,6 +1403,20 @@ std::string stockpile_account_text(const world& w, const stockpile_budget& sb,
                      static_cast<long long>(sb.unspent[static_cast<std::size_t>(r)]));
     if (sb.rejected)
         text_appendf(out, "; REJECTED: %s", sb.rejection.c_str());
+    else if (!sb.budget.empty())   // BL-1064: the price CHARGED, and where it came from
+    {
+        if (derived)
+            text_appendf(out, "; charged firm price %d, DERIVED (the stock / %lld = %d)",
+                         static_cast<int>(charged_firm_price),
+                         static_cast<long long>(sb.price_divisor),
+                         static_cast<int>(sb.firm_price_points));
+        else
+            text_appendf(out, "; charged firm price %d, FIXED by the row (the stock / %lld "
+                         "would derive %d)",
+                         static_cast<int>(charged_firm_price),
+                         static_cast<long long>(sb.price_divisor),
+                         static_cast<int>(sb.firm_price_points));
+    }
     out += "\n";
     if (sb.points_total == 0)
         return out;
@@ -1455,9 +1479,11 @@ std::string stockpile_account_text(const world& w, const stockpile_budget& sb,
 
 /// The digest modes' block, unchanged: the same text at its six-space indent.
 void print_stockpile_account(const world& w, const stockpile_budget& sb,
-                             const charter_spend_report& rep)
+                             const charter_spend_report& rep, std::int32_t charged_firm_price)
 {
-    std::fputs(stockpile_account_text(w, sb, rep, "      ").c_str(), stdout);
+    // The digest modes run the shipped path, which always derives its price.
+    std::fputs(stockpile_account_text(w, sb, rep, "      ", charged_firm_price, /*derived=*/true)
+                   .c_str(), stdout);
 }
 
 int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
@@ -1649,10 +1675,11 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
             std::printf("%s%s\n", unbalanced.empty() ? "" : "  UNBALANCED:", unbalanced.c_str());
         }
         if (start->land.stockpile_path)
-            print_stockpile_account(start->w, start->land.stockpile, report);
+            print_stockpile_account(start->w, start->land.stockpile, report,
+                                    start->land.stockpile_spend.firm_price_points);
         if (mode != charter_mode::none)
             print_charter_report(start->w, mode, budget,
-                                 start->land.stockpile_path ? stockpile_charter_spend() : charter.spend,
+                                 start->land.stockpile_path ? start->land.stockpile_spend : charter.spend,
                                  report, start->land.search,
                                  legacy_specialists, legacy_firms, charter_scale);
         std::fflush(stdout);
@@ -1790,6 +1817,14 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
 //     search and the winner's apply, exactly as app::start_new_game_prelude does.
 //     The row names only the PRICES and the rules it is charged at
 //     (`harness_charter_input::stockpile_spend`), never a second budget.
+//   * BL-1064 — THE PRICE IS DERIVED BY DEFAULT: the budget prices a firm charter
+//     at the world's whole stock over a DIVISOR (--price-divisors; the shipped
+//     rule, NR-907), so each row's fP differs per seed and is read back from the
+//     spend the shipped path actually charged (`shipped_landscape::
+//     stockpile_spend`). --firm-prices keeps stage 1's FIXED-price rows; the two
+//     axes are never mixed in one run. The run closes with the SEAT MENU per row:
+//     the median and the min/max specialists across the seeds, against the
+//     legacy anchor's.
 //   * THE AXES are the item's: the firm price P_f in points (--firm-prices) and
 //     the specialist's price m in firm charters (--specialist-prices), under the
 //     RULED `sqrt` rule at the RULED ceiling 120 by default. BUDGET SCALES ARE
@@ -1841,8 +1876,13 @@ struct cost_config
     /// with no budget at all.
     bool   span          = false;
     /// BL-1043: the firm price this row's spend runs at (a --firm-prices entry;
-    /// `stockpile` rows only). 0 elsewhere: the synthetic spend's own price.
+    /// `stockpile` rows only). 0 elsewhere: the synthetic spend's own price, or
+    /// a divisor row's, which is not known until its world's stock is.
     std::int32_t firm_price_points = 0;
+    /// BL-1064: a --price-divisors entry — the row's firm price is DERIVED from
+    /// its world's own stockpile at this divisor (the shipped rule). 0: not a
+    /// divisor row. A `stockpile` row carries exactly one of the two.
+    std::int64_t price_divisor = 0;
     double scale         = 1.0;
     /// The per-good cap rule (BL-1039): `fixed` is BL-1033's "rcap on", `lifted`
     /// its "rcap off", `sqrt_capital` the ruled square root under `density_ceiling`.
@@ -1885,10 +1925,16 @@ std::string cost_config_label(const cost_config& c)
     case cost_config::kind::none:
         return c.span ? "none (span ON, NO budget)" : "none (legacy)";
     case cost_config::kind::stockpile:
-        std::snprintf(buf, sizeof buf, "stockpile Pf%d sp%d rcap %s pcap %s",
-                      static_cast<int>(c.firm_price_points),
-                      static_cast<int>(c.specialist_firm_charters), cost_cap_label(c).c_str(),
-                      c.province_cap ? "on" : "off");
+        if (c.price_divisor != 0)   // BL-1064: the price is the stock's, over this
+            std::snprintf(buf, sizeof buf, "stockpile /%lld sp%d rcap %s pcap %s",
+                          static_cast<long long>(c.price_divisor),
+                          static_cast<int>(c.specialist_firm_charters), cost_cap_label(c).c_str(),
+                          c.province_cap ? "on" : "off");
+        else
+            std::snprintf(buf, sizeof buf, "stockpile Pf%d sp%d rcap %s pcap %s",
+                          static_cast<int>(c.firm_price_points),
+                          static_cast<int>(c.specialist_firm_charters), cost_cap_label(c).c_str(),
+                          c.province_cap ? "on" : "off");
         return buf;
     case cost_config::kind::synthetic:
         std::snprintf(buf, sizeof buf, "synthetic %gx rcap %s pcap %s sp%d", c.scale,
@@ -1988,9 +2034,13 @@ struct cost_row
     // --- the budget and its spend (budget rows only) ---
     bool        budget_row = false;
     /// The prices the row's spend ran on, read back from the spend params it
-    /// handed the seam (budget rows only; the none row spends nothing).
+    /// handed the seam (budget rows only; the none row spends nothing). On a
+    /// stockpile row, from the spend the shipped path CHARGED (BL-1064), so a
+    /// divisor row reports its world's derived price.
     std::int32_t firm_price_points = 0, specialist_firm_charters = 0;
     long long    specialist_price_points = 0;
+    /// BL-1064: the divisor the price was derived by (a divisor row); 0 otherwise.
+    long long    price_divisor = 0;
     long long   points_budgeted = 0, points_spent = 0, points_unspent = 0;
     bool        balanced = true;
     std::string balance_fail;   ///< every broken clause (charter_balance_failure); empty = balanced
@@ -2126,6 +2176,43 @@ double spearman_rho(const std::vector<double>& x, const std::vector<double>& y)
     return sxy / std::sqrt(sxx * syy);
 }
 
+/// BL-1064 — the row charged what it says. A divisor row: the budget was priced
+/// by the row's divisor at the whole stock over it (floored, at least 1) —
+/// RECOMPUTED here, not trusted — and the shipped path charged that price. A
+/// fixed-price row: it charged its own price. Empty when all hold.
+std::string stockpile_price_failure(const stockpile_budget& sb, const charter_spend_params& charged,
+                                    const cost_config& cfg)
+{
+    char buf[240];
+    if (cfg.price_divisor != 0)
+    {
+        const long long want = cfg.price_divisor > 0
+            ? std::max<long long>(1, static_cast<long long>(sb.points_total) / cfg.price_divisor)
+            : 0;
+        if (sb.price_divisor != cfg.price_divisor || sb.firm_price_points != want
+            || charged.firm_price_points != sb.firm_price_points)
+        {
+            std::snprintf(buf, sizeof buf, " price: divisor %lld (the budget's %lld), derived %d, "
+                          "stock %lld / divisor = %lld, charged %d;",
+                          static_cast<long long>(cfg.price_divisor),
+                          static_cast<long long>(sb.price_divisor),
+                          static_cast<int>(sb.firm_price_points),
+                          static_cast<long long>(sb.points_total), want,
+                          static_cast<int>(charged.firm_price_points));
+            return buf;
+        }
+        return {};
+    }
+    if (charged.firm_price_points != cfg.firm_price_points)
+    {
+        std::snprintf(buf, sizeof buf, " price: the row's fixed price %d, charged %d;",
+                      static_cast<int>(cfg.firm_price_points),
+                      static_cast<int>(charged.firm_price_points));
+        return buf;
+    }
+    return {};
+}
+
 /// Everything the cost table can ask of a row ONLY because its budget is the
 /// world's own stockpile: the point account, the specialists' opening capital,
 /// the chartered good against the extracted one, and the density reading.
@@ -2143,7 +2230,8 @@ void measure_stockpile_row(const world& w, const stockpile_budget& sb,
         row.stock_unspent[static_cast<std::size_t>(i)] = sb.unspent[static_cast<std::size_t>(i)];
     char indent[80];
     std::snprintf(indent, sizeof indent, "  %-52s   ", "");
-    row.stockpile_text = stockpile_account_text(w, sb, rep, indent);
+    row.stockpile_text = stockpile_account_text(w, sb, rep, indent, row.firm_price_points,
+                                                /*derived=*/row.price_divisor != 0);
     row.stockpile_fail = stockpile_account_failure(sb, rep);
 
     // THE OPENING CAPITAL (NR-895): the 400 +/-40% draw with the focus premium,
@@ -2277,9 +2365,13 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         // BL-1043 — THE REAL BUDGET. NO budget is handed in, so the shipped path
         // builds the world's own (`build_stockpile_budget`) and hands it to BOTH
         // the search and the winner's apply, exactly as app.cpp does. This row
-        // names only the PRICES and the rules it is charged at.
-        stock_spend = stockpile_charter_spend();
-        stock_spend.firm_price_points        = cfg.firm_price_points;
+        // names only the PRICES and the rules it is charged at. BL-1064: a
+        // divisor row names no firm price at all — the shipped path derives it
+        // from this world's stock and charges that, which the row reads back
+        // from `shipped_landscape::stockpile_spend` once the world has landed.
+        stock_spend = stockpile_charter_spend(stockpile_budget{});   // the rules; the price is set below
+        stock_spend.firm_price_points        = cfg.firm_price_points;   // 0 on a divisor row
+        charter.stockpile_price_divisor      = cfg.price_divisor;
         stock_spend.specialist_firm_charters = cfg.specialist_firm_charters;
         stock_spend.resource_cap_rule        = cfg.resource_cap_rule;
         if (cfg.resource_cap_rule == charter_cap_rule::lifted)
@@ -2296,6 +2388,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         row.per_resource_firm_cap    = stock_spend.per_resource_firm_cap;
         row.max_firms_per_body       = stock_spend.max_firms_per_body;
         row.density_ceiling          = stock_spend.density_ceiling;
+        row.price_divisor            = static_cast<long long>(cfg.price_divisor);
     }
     else if (cfg.k == cost_config::kind::none && cfg.span)
     {
@@ -2405,11 +2498,18 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
             throw std::runtime_error("stockpile row '" + row.label + "' did not take the shipped "
                                      "path: no stockpile budget was built");
         const charter_budget&      bud   = stock_row ? run->land.stockpile.budget : *budget;
-        const charter_spend_params spend = stock_row ? stock_spend : charter.spend;
+        // BL-1064: a stockpile row's spend is the one the shipped path CHARGED,
+        // read back — a divisor row's price exists only once its stock does.
+        const charter_spend_params spend = stock_row ? run->land.stockpile_spend : charter.spend;
         if (stock_row && bud.empty())
             throw std::runtime_error("stockpile row '" + row.label + "': the Digitisation span is "
                                      "on but the stockpile budget is EMPTY — the row would measure "
                                      "today's world under a budget label");
+        if (stock_row)
+        {
+            row.firm_price_points       = spend.firm_price_points;
+            row.specialist_price_points = static_cast<long long>(spend.specialist_price_points());
+        }
         row.refused         = report.refused;
         row.points_budgeted = report.points_budgeted;
         row.points_spent    = report.points_spent;
@@ -2441,6 +2541,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         if (stock_row)
         {
             measure_stockpile_row(w, run->land.stockpile, report, row);
+            row.stockpile_fail += stockpile_price_failure(run->land.stockpile, spend, cfg);
             if (!row.stockpile_fail.empty())
             {
                 row.balanced = false;
@@ -2595,10 +2696,21 @@ struct cost_options
     /// builder on a Digitisation-span world. Off is BL-1033's synthetic mode,
     /// unchanged in every particular.
     bool stockpile = false;
-    /// --firm-prices: POINTS per firm charter, the P_f axis. Stockpile mode only
-    /// (the synthetic spend's firm price is 1 point by construction). Default:
-    /// the provisional shipped constant halved, itself and doubled.
+    /// --firm-prices: POINTS per firm charter, a FIXED P_f axis (BL-1043 stage 1).
+    /// Stockpile mode only (the synthetic spend's firm price is 1 point by
+    /// construction). No default: the shipped rule derives the price instead.
     std::vector<std::int32_t> firm_prices;
+    /// --price-divisors: BL-1064's axis — each row prices a firm charter at its
+    /// world's whole stock over the divisor, the shipped rule. Stockpile mode
+    /// only; never with --firm-prices. Default (neither given): the provisional
+    /// shipped divisor halved, itself and doubled.
+    std::vector<std::int64_t> price_divisors;
+    /// --price-pairs D:M,...: BL-1064's PAIRED axis — each entry a divisor AND
+    /// its own specialist price m, so a matrix can hold the seat ratio D/M while
+    /// the divisor moves (Ben, 2026-09-21: the divisor answers live-play cost, m
+    /// the seat menu). Never with --firm-prices, --price-divisors or
+    /// --specialist-prices.
+    std::vector<std::pair<std::int64_t, std::int32_t>> price_pairs;
     /// The span CONTROL row: the span world with no budget, the seat-menu
     /// anchor. --no-span-control drops it (one full row per seed).
     bool span_control = true;
@@ -2607,6 +2719,41 @@ struct cost_options
     bool scales_set = false, ladder_set = false, caps_set = false, ceilings_set = false,
          prices_set = false, forced_flags_set = false;
 };
+
+/// BL-1064 — one entry on the stockpile mode's price axis: a FIXED firm price
+/// (stage 1's rows) or a DIVISOR the world's stock is priced by, and the
+/// specialist prices it runs at — the --specialist-prices list, or a pair's own
+/// single m.
+struct stockpile_price_entry
+{
+    std::int32_t              firm_price_points = 0;
+    std::int64_t              price_divisor     = 0;
+    std::vector<std::int32_t> specialist_prices;
+};
+
+/// The axis the options name: exactly one of --firm-prices, --price-divisors
+/// (each crossed with --specialist-prices) or --price-pairs (each its own m).
+std::vector<stockpile_price_entry> stockpile_price_axis(const cost_options& opt)
+{
+    std::vector<stockpile_price_entry> axis;
+    for (const std::int32_t pf : opt.firm_prices)
+        axis.push_back({ pf, 0, opt.specialist_prices });
+    for (const std::int64_t d : opt.price_divisors)
+        axis.push_back({ 0, d, opt.specialist_prices });
+    for (const auto& [d, m] : opt.price_pairs)
+        axis.push_back({ 0, d, { m } });
+    return axis;
+}
+
+/// Budget rows per seed on the axis above, before the cap-rule, ceiling and
+/// province-cap axes multiply them.
+std::size_t stockpile_price_rows(const cost_options& opt)
+{
+    std::size_t n = 0;
+    for (const stockpile_price_entry& pe : stockpile_price_axis(opt))
+        n += pe.specialist_prices.size();
+    return n;
+}
 
 struct cost_seed
 {
@@ -2675,19 +2822,38 @@ void write_cost_json(const std::string& path, const cost_options& opt,
                  k_settle_ticks, opt.live_ticks);
     if (opt.stockpile)
     {
-        // BL-1043's P_f axis: points per firm charter, one row set per entry.
+        // BL-1043's P_f axis: points per firm charter, one row set per entry —
+        // or BL-1064's divisor axis, which prices each world off its own stock.
+        // A run carries one of the two; the other is an empty list.
         std::fprintf(f, "  \"firm_price_points\": null,\n  \"firm_prices_points\": [");
         for (std::size_t i = 0; i < opt.firm_prices.size(); ++i)
             std::fprintf(f, "%s%d", i ? ", " : "", static_cast<int>(opt.firm_prices[i]));
+        std::fprintf(f, "],\n  \"price_divisors\": [");
+        for (std::size_t i = 0; i < opt.price_divisors.size(); ++i)
+            std::fprintf(f, "%s%lld", i ? ", " : "", static_cast<long long>(opt.price_divisors[i]));
+        std::fprintf(f, "],\n  \"price_pairs_divisor_m\": [");
+        for (std::size_t i = 0; i < opt.price_pairs.size(); ++i)
+            std::fprintf(f, "%s[%lld, %d]", i ? ", " : "",
+                         static_cast<long long>(opt.price_pairs[i].first),
+                         static_cast<int>(opt.price_pairs[i].second));
         std::fprintf(f, "],\n  \"span_control_row\": %s,\n", b(opt.span_control));
-        std::fprintf(f, "  \"specialist_prices_firm_charters\": [");
+        std::fprintf(f, "  \"specialist_prices_firm_charters\": ");
     }
     else
-    std::fprintf(f, "  \"firm_price_points\": %d,\n  \"specialist_prices_firm_charters\": [",
+    std::fprintf(f, "  \"firm_price_points\": %d,\n  \"specialist_prices_firm_charters\": ",
                  static_cast<int>(synthetic_charter_spend().firm_price_points));
-    for (std::size_t i = 0; i < opt.specialist_prices.size(); ++i)
-        std::fprintf(f, "%s%d", i ? ", " : "", static_cast<int>(opt.specialist_prices[i]));
-    std::fprintf(f, "],\n  \"ladder_scales\": ");
+    // BL-1064: a pairs run reads no specialist list — each pair carries its own m
+    // (price_pairs_divisor_m) — so the header says so rather than name the default.
+    if (opt.stockpile && !opt.price_pairs.empty())
+        std::fprintf(f, "null");
+    else
+    {
+        std::fprintf(f, "[");
+        for (std::size_t i = 0; i < opt.specialist_prices.size(); ++i)
+            std::fprintf(f, "%s%d", i ? ", " : "", static_cast<int>(opt.specialist_prices[i]));
+        std::fprintf(f, "]");
+    }
+    std::fprintf(f, ",\n  \"ladder_scales\": ");
     if (opt.ladder_all)
         std::fprintf(f, "\"all\"");
     else
@@ -2700,8 +2866,14 @@ void write_cost_json(const std::string& path, const cost_options& opt,
     std::fprintf(f, ",\n  \"price_note\": \"%s\",\n",
                  json_escape("Every row carries firm_price_points, specialist_firm_charters and "
                              "specialist_price_points (= firm x charters); null on the none row, "
-                             "which spends no budget. specialist_prices_firm_charters[0] is the base "
-                             "price; later entries are ladder rungs run at ladder_scales.").c_str());
+                             "which spends no budget. In a SYNTHETIC run specialist_prices_firm_charters[0] "
+                             "is the base price and later entries are ladder rungs run at ladder_scales; "
+                             "in a STOCKPILE run it is the m axis crossed with the price axis, and null "
+                             "in a --price-pairs run, where each pair in price_pairs_divisor_m carries "
+                             "its own m. BL-1064: a row with a price_divisor was priced off its own "
+                             "world's stockpile (stockpile.points_total / price_divisor, floored, at "
+                             "least 1), so its firm_price_points is the price it CHARGED and differs "
+                             "per seed.").c_str());
     std::fprintf(f, "  \"timing_note\": \"%s\",\n",
                  json_escape("tick_ms times app::step_economy laps 0-5 only (phase 5 = standings + "
                              "convoy credit + firm exits, compute_corp_standings mirrored). Laps 6-8 "
@@ -2774,13 +2946,20 @@ void write_cost_json(const std::string& path, const cost_options& opt,
                                               ? r.cfg.density_ceiling : 0),
                          b(r.cfg.province_cap), r.cfg.window_radius);
             if (r.budget_row)
+            {
                 std::fprintf(f, "          \"firm_price_points\": %d, \"specialist_firm_charters\": %d, "
-                                "\"specialist_price_points\": %lld,\n",
+                                "\"specialist_price_points\": %lld,",
                              static_cast<int>(r.firm_price_points),
                              static_cast<int>(r.specialist_firm_charters), r.specialist_price_points);
+                // BL-1064: a divisor row's price is its world's stock over this.
+                if (r.price_divisor != 0)
+                    std::fprintf(f, " \"price_divisor\": %lld,\n", r.price_divisor);
+                else
+                    std::fprintf(f, " \"price_divisor\": null,\n");
+            }
             else
                 std::fprintf(f, "          \"firm_price_points\": null, \"specialist_firm_charters\": null, "
-                                "\"specialist_price_points\": null,\n");
+                                "\"specialist_price_points\": null, \"price_divisor\": null,\n");
             std::fprintf(f, "          \"threw\": %s, \"error\": \"%s\", \"wall_ms\": %.1f, "
                             "\"generation_ms\": %.1f, \"build_only\": %s, \"stopped_at_land\": %s",
                          b(r.threw), json_escape(r.error).c_str(), r.wall_ms, r.base_ms,
@@ -3008,16 +3187,42 @@ void print_cost_table_header(const cost_options& opt)
         // BL-1043: the same columns, a different budget. Only the first sentence
         // and the price legend change — everything below is BL-1033's legend.
         std::string prices;
-        for (std::size_t i = 0; i < opt.firm_prices.size(); ++i)
-            text_appendf(prices, "%s%d", i ? ", " : "", static_cast<int>(opt.firm_prices[i]));
+        if (!opt.price_pairs.empty())   // BL-1064: (divisor, m) pairs, m their own
+        {
+            prices = "DERIVED per world as the whole stock over a divisor, in (divisor, m) PAIRS {";
+            for (std::size_t i = 0; i < opt.price_pairs.size(); ++i)
+                text_appendf(prices, "%s(%lld, m%d)", i ? ", " : "",
+                             static_cast<long long>(opt.price_pairs[i].first),
+                             static_cast<int>(opt.price_pairs[i].second));
+            prices += "} — each pair runs at its OWN m, not the specialist list below (the "
+                      "shipped rule, NR-907; fP is what the row CHARGED)";
+        }
+        else if (!opt.price_divisors.empty())   // BL-1064: the stock over each divisor
+        {
+            prices = "DERIVED per world as the whole stock over a divisor in {";
+            for (std::size_t i = 0; i < opt.price_divisors.size(); ++i)
+                text_appendf(prices, "%s%lld", i ? ", " : "",
+                             static_cast<long long>(opt.price_divisors[i]));
+            prices += "} (the shipped rule, NR-907; fP is what the row CHARGED)";
+        }
+        else
+        {
+            prices = "FIXED in points {";
+            for (std::size_t i = 0; i < opt.firm_prices.size(); ++i)
+                text_appendf(prices, "%s%d", i ? ", " : "", static_cast<int>(opt.firm_prices[i]));
+            prices += "}";
+        }
         std::string ms;
-        for (std::size_t i = 0; i < opt.specialist_prices.size(); ++i)
-            text_appendf(ms, "%s%d", i ? ", " : "", static_cast<int>(opt.specialist_prices[i]));
+        if (!opt.price_pairs.empty())
+            ms = "each pair's own";
+        else
+            for (std::size_t i = 0; i < opt.specialist_prices.size(); ++i)
+                text_appendf(ms, "%s%d", i ? ", " : "", static_cast<int>(opt.specialist_prices[i]));
         std::printf("  THE REAL BUDGET on every stockpile row: the world's own industry-point "
                     "stockpile (build_stockpile_budget, BL-1042) on a Digitisation-span world at "
                     "EPOCH 0 — never epoch_year 1960. Budget SCALES are not an axis here and are "
                     "refused: there is no scale to apply to a world's own stockpile. MATRIX: firm "
-                    "price P_f in points {%s} x specialist price m in firm charters {%s}. fP firm "
+                    "price P_f %s x specialist price m in firm charters {%s}. fP firm "
                     "price in points, sFC specialist price in firm charters, sPts specialist price "
                     "in points ('-' on a none row: it spends no budget) | unspent points by reason "
                     "| anyS a specialist exists, natSh largest one-nation share of specialists | "
@@ -3035,7 +3240,7 @@ void print_cost_table_header(const cost_options& opt)
                     "opening capital, the chartered good against the extracted one, the "
                     "density-follows-cities reading and the tick ratio with its phase split.\n",
                     prices.c_str(), ms.c_str());
-        std::printf("  %-52s %5s %3s %8s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
+        std::printf("  %-52s %7s %3s %8s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
                     "%11s | %9s | %5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
                     "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window",
                     "body", "ceil", "remain", "nonat", "late", "refsd", "share", "anyS", "natSh",
@@ -3121,7 +3326,7 @@ void print_cost_row(const cost_row& r, bool wide = false)
         std::snprintf(sfc, sizeof sfc, "%d", static_cast<int>(r.specialist_firm_charters));
         std::snprintf(spts, sizeof spts, "%lld", r.specialist_price_points);
     }
-    const char* price_fmt = wide ? "  %-52s %5s %3s %8s |" : "  %-52s %3s %3s %4s |";
+    const char* price_fmt = wide ? "  %-52s %7s %3s %8s |" : "  %-52s %3s %3s %4s |";
     if (r.stopped_at_land)
     {
         std::printf(price_fmt, r.label.c_str(), fp, sfc, spts);
@@ -3513,10 +3718,12 @@ void run_stockpile_seed(lua_state& lua, uint32_t seed, const cost_options& opt, 
         cs.rows.push_back(std::move(row));
     }
 
-    // 3. THE MATRIX: P_f x m x cap rule x ceiling x province cap.
+    // 3. THE MATRIX: price x m x cap rule x ceiling x province cap. BL-1064: the
+    // price axis is fixed prices, divisors, or (divisor, m) PAIRS — a pair
+    // carries its own m and is not crossed with --specialist-prices.
     bool printed_budget_line = false;
-    for (const std::int32_t pf : opt.firm_prices)
-        for (const std::int32_t m : opt.specialist_prices)
+    for (const stockpile_price_entry& pe : stockpile_price_axis(opt))
+        for (const std::int32_t m : pe.specialist_prices)
             for (const charter_cap_rule rc : opt.resource_caps)
             {
                 const std::vector<std::int32_t> ceilings =
@@ -3528,7 +3735,8 @@ void run_stockpile_seed(lua_state& lua, uint32_t seed, const cost_options& opt, 
                         cost_config c;
                         c.k                        = cost_config::kind::stockpile;
                         c.span                     = true;
-                        c.firm_price_points        = pf;
+                        c.firm_price_points        = pe.firm_price_points;
+                        c.price_divisor            = pe.price_divisor;
                         c.specialist_firm_charters = m;
                         c.resource_cap_rule        = rc;
                         c.density_ceiling          = ceiling;
@@ -3551,12 +3759,15 @@ void run_stockpile_seed(lua_state& lua, uint32_t seed, const cost_options& opt, 
                         if (!printed_budget_line && row.stockpile_row)
                         {
                             printed_budget_line = true;
+                            // The first row's CHARGED price (BL-1064: on a divisor
+                            // row, the one this world's stock derived).
+                            const long long pf = row.firm_price_points;
                             std::printf("  stockpile budget on seed %u: %lld points over %d regions "
-                                        "-> %lld points to %d centres (richest %d); at P_f %d that "
-                                        "is %lld firm charters on the world\n",
+                                        "-> %lld points to %d centres (richest %d); at the first "
+                                        "row's P_f %lld that is %lld firm charters on the world\n",
                                         seed, row.stock_points_total, row.stock_regions,
                                         row.stock_to_centres, row.stock_centres,
-                                        row.richest_centre_points, static_cast<int>(pf),
+                                        row.richest_centre_points, pf,
                                         pf > 0 ? row.stock_to_centres / pf : 0LL);
                         }
                         ++f.stockpile_rows;
@@ -3639,25 +3850,46 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
     {
         // THE MATRIX AND ITS TRIM, on the face of the table (BL-1043 R1).
         std::printf("matrix per seed: none (legacy, span OFF — the pinned shipped world and the "
-                    "legacy roster)%s; then firm price P_f",
+                    "legacy roster)%s; then ",
                     opt.span_control ? "; none (span ON, an EMPTY budget: the span world with no "
                                        "budget, the seat-menu anchor)" : "");
-        for (const std::int32_t pf : opt.firm_prices)
-            std::printf(" %d", static_cast<int>(pf));
-        std::printf(" points x specialist price m");
-        for (const std::int32_t m : opt.specialist_prices)
-            std::printf(" %d", static_cast<int>(m));
-        std::printf(" firm charters%s = %zu budget row(s), %zu row(s) per seed in all.\n",
-                    caps_text().c_str(),
-                    opt.firm_prices.size() * opt.specialist_prices.size()
-                        * std::max<std::size_t>(1, opt.resource_caps.size()
-                              * std::max<std::size_t>(1, opt.density_ceilings.size()))
-                        * opt.province_caps.size(),
-                    1 + (opt.span_control ? 1u : 0u)
-                        + opt.firm_prices.size() * opt.specialist_prices.size()
-                              * std::max<std::size_t>(1, opt.resource_caps.size()
-                                    * std::max<std::size_t>(1, opt.density_ceilings.size()))
-                              * opt.province_caps.size());
+        // BL-1064: the price axis says which of its three forms it is.
+        if (!opt.price_pairs.empty())
+        {
+            std::printf("(price divisor, specialist price m) pairs");
+            for (const auto& [d, m] : opt.price_pairs)
+                std::printf(" (%lld, %d)", static_cast<long long>(d), static_cast<int>(m));
+            std::printf(" — the firm price DERIVED per world as its whole stock over the divisor");
+        }
+        else
+        {
+            if (!opt.price_divisors.empty())
+            {
+                std::printf("price divisor");
+                for (const std::int64_t d : opt.price_divisors)
+                    std::printf(" %lld", static_cast<long long>(d));
+                std::printf(" (the firm price DERIVED per world as its whole stock over it)");
+            }
+            else
+            {
+                std::printf("FIXED firm price P_f");
+                for (const std::int32_t pf : opt.firm_prices)
+                    std::printf(" %d", static_cast<int>(pf));
+                std::printf(" points");
+            }
+            std::printf(" x specialist price m");
+            for (const std::int32_t m : opt.specialist_prices)
+                std::printf(" %d", static_cast<int>(m));
+            std::printf(" firm charters");
+        }
+        const std::size_t budget_rows =
+            stockpile_price_rows(opt)
+            * std::max<std::size_t>(1, opt.resource_caps.size()
+                  * std::max<std::size_t>(1, opt.density_ceilings.size()))
+            * opt.province_caps.size();
+        std::printf("%s = %zu budget row(s), %zu row(s) per seed in all.\n",
+                    caps_text().c_str(), budget_rows,
+                    1 + (opt.span_control ? 1u : 0u) + budget_rows);
         std::printf("TRIM, with the reason: BUDGET SCALES are not an axis — a world's own stockpile "
                     "has no scale to apply, so --budget-scales, --ladder-scales and BL-1033's extra "
                     "4x row are REFUSED here rather than silently dropped. The FORCED province-cap "
@@ -3990,6 +4222,68 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
             std::printf(" %u", s);
         std::printf("%s. The no-specialist world is decided on this reading, never forced.\n",
                     flags.seeds_without_specialist.empty() ? "" : ")");
+
+        // BL-1064 — THE SEAT MENU per row, across the seeds: the median and the
+        // spread of specialists each price opened, against the legacy roster's
+        // (the anchor, Ben 2026-09-18: about as many seats as a world with no
+        // budget). A derived price exists to narrow the spread a fixed one left
+        // (stage 1: 1 to 91 at 40000 a firm). Rows in the order they ran.
+        const auto med = [](std::vector<double> v) {
+            std::sort(v.begin(), v.end());
+            const std::size_t n = v.size();
+            return n == 0 ? 0.0 : (n % 2 ? v[n / 2] : (v[n / 2 - 1] + v[n / 2]) / 2.0);
+        };
+        std::vector<double> legacy;
+        for (const cost_seed& cs : results)
+            if (!cs.threw)
+                legacy.push_back(static_cast<double>(cs.legacy_specialists));
+        std::vector<std::string> order;
+        std::map<std::string, std::vector<double>> seats, price;
+        std::map<std::string, int> refused;
+        for (const cost_seed& cs : results)
+            for (const cost_row& r : cs.rows)
+            {
+                if (!r.stockpile_row || r.threw || r.stopped_at_land)
+                    continue;
+                // A REFUSED spend laid the legacy web, so its specialists are the
+                // legacy roster, not seats this price opened: counted, never read.
+                if (r.refused)
+                {
+                    if (seats.find(r.label) == seats.end() && refused.find(r.label) == refused.end())
+                        order.push_back(r.label);
+                    ++refused[r.label];
+                    continue;
+                }
+                if (seats.find(r.label) == seats.end() && refused.find(r.label) == refused.end())
+                    order.push_back(r.label);
+                seats[r.label].push_back(static_cast<double>(r.specialists));
+                price[r.label].push_back(static_cast<double>(r.firm_price_points));
+            }
+        if (!legacy.empty())
+            std::printf("SEAT MENU across %zu seed(s) — legacy anchor (span OFF, no budget): median "
+                        "%.1f, min %.0f, max %.0f\n", legacy.size(), med(legacy),
+                        *std::min_element(legacy.begin(), legacy.end()),
+                        *std::max_element(legacy.begin(), legacy.end()));
+        for (const std::string& label : order)
+        {
+            const int n_refused = refused.count(label) ? refused[label] : 0;
+            char tail[96] = "";
+            if (n_refused > 0)
+                std::snprintf(tail, sizeof tail, "; %d REFUSED row(s) excluded (legacy web laid)",
+                              n_refused);
+            if (seats.find(label) == seats.end())
+            {
+                std::printf("  %-52s no seat reading%s\n", label.c_str(), tail);
+                continue;
+            }
+            const std::vector<double>& s = seats[label];
+            const std::vector<double>& p = price[label];
+            std::printf("  %-52s seats median %.1f, min %.0f, max %.0f over %zu seed(s); charged "
+                        "fP %.0f to %.0f%s\n", label.c_str(), med(s),
+                        *std::min_element(s.begin(), s.end()), *std::max_element(s.begin(), s.end()),
+                        s.size(), *std::min_element(p.begin(), p.end()),
+                        *std::max_element(p.begin(), p.end()), tail);
+        }
     }
     std::printf("none-row digests: %s. forced province cap: %s. spend rules (BL-1039, checked at "
                 "land on every budget row): %s. points balance on every budget row: %s. %s\n",
@@ -4322,10 +4616,13 @@ int main(int argc, char** argv)
                     "                         [--ladder-scales 2|all] [--no-extra] [--no-forced]\n"
                     "                         [--forced-only] [--forced-radius N] [--forced-pick sparse|richest]\n"
                     "                         [--live-ticks N] [--out file.json] [--note TEXT]   (BL-1033)\n"
-                    "       %s --charter-cost --budget stockpile [--firm-prices 5000,10000,20000]\n"
+                    "       %s --charter-cost --budget stockpile [--price-divisors 325,650,1300\n"
+                    "                         | --price-pairs 650:4,1300:8 | --firm-prices 5000,10000,20000]\n"
                     "                         [--specialist-prices 2,4,8] [--no-span-control]      (BL-1043:\n"
                     "                         the REAL budget — the Digitisation span at epoch 0 and the world's\n"
-                    "                         own stockpile; budget scales do not apply and are refused)\n",
+                    "                         own stockpile; budget scales do not apply and are refused.\n"
+                    "                         BL-1064: the firm price is the stock over a divisor unless\n"
+                    "                         --firm-prices fixes it; a pair D:M carries its own m)\n",
                     argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
         return 2;
     }
@@ -4491,7 +4788,8 @@ int main(int argc, char** argv)
                 && arg != "--live-ticks" && arg != "--out" && arg != "--note"
                 && arg != "--forced-radius" && arg != "--forced-pick"
                 && arg != "--specialist-prices" && arg != "--ladder-scales"
-                && arg != "--density-ceilings" && arg != "--budget" && arg != "--firm-prices")
+                && arg != "--density-ceilings" && arg != "--budget" && arg != "--firm-prices"
+                && arg != "--price-divisors" && arg != "--price-pairs")
             {
                 std::printf("--charter-cost: unknown argument '%s'\n", arg.c_str());
                 return 2;
@@ -4566,6 +4864,57 @@ int main(int argc, char** argv)
                         return 2;
                     }
                     opt.firm_prices.push_back(p);
+                    at = comma + 1;
+                }
+            }
+            else if (arg == "--price-divisors" || arg == "--price-pairs")
+            {
+                // BL-1064's axes. A DIVISOR is a whole number > 0 (at most 9
+                // digits: the stock over it must still be a price); a PAIR is
+                // D:M, M a whole number of firm charters > 0. Stockpile mode only.
+                const bool pairs = arg == "--price-pairs";
+                if (pairs) opt.price_pairs.clear(); else opt.price_divisors.clear();
+                const auto whole = [](const std::string& t, std::size_t max_digits) -> long {
+                    if (t.empty() || t.size() > max_digits
+                        || t.find_first_not_of("0123456789") != std::string::npos)
+                        return 0;
+                    return std::atol(t.c_str());
+                };
+                std::size_t at = 0;
+                while (at <= val.size())
+                {
+                    std::size_t comma = val.find(',', at);
+                    if (comma == std::string::npos)
+                        comma = val.size();
+                    const std::string tok = val.substr(at, comma - at);
+                    const std::size_t colon = tok.find(':');
+                    if (pairs != (colon != std::string::npos))
+                    {
+                        std::printf("%s: '%s' is not %s\n", arg.c_str(), tok.c_str(),
+                                    pairs ? "a D:M pair" : "a divisor (pairs go in --price-pairs)");
+                        return 2;
+                    }
+                    const long d = whole(pairs ? tok.substr(0, colon) : tok, 9);
+                    const long m = pairs ? whole(tok.substr(colon + 1), 4) : 1;
+                    if (d <= 0 || m <= 0)
+                    {
+                        std::printf("%s: '%s' is not %s\n", arg.c_str(), tok.c_str(),
+                                    pairs ? "a whole divisor > 0 and a whole m > 0 (D:M)"
+                                          : "a whole divisor > 0");
+                        return 2;
+                    }
+                    const std::pair<std::int64_t, std::int32_t> e{ d, static_cast<std::int32_t>(m) };
+                    const bool twice = pairs
+                        ? std::find(opt.price_pairs.begin(), opt.price_pairs.end(), e)
+                              != opt.price_pairs.end()
+                        : std::find(opt.price_divisors.begin(), opt.price_divisors.end(), e.first)
+                              != opt.price_divisors.end();
+                    if (twice)
+                    {
+                        std::printf("%s: '%s' is listed twice\n", arg.c_str(), tok.c_str());
+                        return 2;
+                    }
+                    if (pairs) opt.price_pairs.push_back(e); else opt.price_divisors.push_back(e.first);
                     at = comma + 1;
                 }
             }
@@ -4742,7 +5091,26 @@ int main(int argc, char** argv)
                 std::printf("--budget-scales/--ladder-scales are refused with --budget stockpile: "
                             "the budget is the world's OWN stockpile (build_stockpile_budget) and "
                             "there is no scale to apply to it. Drop the flag; the matrix axes here "
-                            "are --firm-prices and --specialist-prices.\n");
+                            "are the price (--price-divisors, --price-pairs or --firm-prices) and "
+                            "--specialist-prices.\n");
+                return 2;
+            }
+            // BL-1064: ONE price axis per run, so every row of a table is priced
+            // the same way; and a pair carries its own m.
+            const int price_axes = (opt.firm_prices.empty() ? 0 : 1)
+                                 + (opt.price_divisors.empty() ? 0 : 1)
+                                 + (opt.price_pairs.empty() ? 0 : 1);
+            if (price_axes > 1)
+            {
+                std::printf("--firm-prices, --price-divisors and --price-pairs are one axis each; "
+                            "name one per run (a fixed price and a derived one are different "
+                            "tables).\n");
+                return 2;
+            }
+            if (!opt.price_pairs.empty() && opt.prices_set)
+            {
+                std::printf("--specialist-prices is refused with --price-pairs: each pair D:M "
+                            "carries its own m.\n");
                 return 2;
             }
             if (opt.forced_flags_set)
@@ -4755,11 +5123,10 @@ int main(int argc, char** argv)
             opt.extra  = false;   // a 4x scale row: no scale axis here
             opt.forced = false;   // a concentrated synthetic budget: not a real stockpile
             if (!opt.prices_set)
-                opt.specialist_prices = { 2, 4, 8 };   // the item's m axis
-            if (opt.firm_prices.empty())
-                opt.firm_prices = { k_stockpile_firm_price_points / 2,
-                                    k_stockpile_firm_price_points,
-                                    k_stockpile_firm_price_points * 2 };
+                opt.specialist_prices = { 2, 4, 8 };   // the item's m axis (unread by pairs)
+            if (price_axes == 0)   // BL-1064: the shipped rule, around its divisor
+                opt.price_divisors = { k_stockpile_price_divisor / 2, k_stockpile_price_divisor,
+                                       k_stockpile_price_divisor * 2 };
             if (!opt.caps_set)
                 opt.resource_caps = { charter_cap_rule::sqrt_capital };   // the RULED rule
             if (!opt.ceilings_set
@@ -4767,10 +5134,11 @@ int main(int argc, char** argv)
                              charter_cap_rule::sqrt_capital) != opt.resource_caps.end())
                 opt.density_ceilings = { k_stockpile_density_ceiling };   // RULED, NR-902
         }
-        else if (!opt.firm_prices.empty())
+        else if (!opt.firm_prices.empty() || !opt.price_divisors.empty() || !opt.price_pairs.empty())
         {
-            std::printf("--firm-prices is read only with --budget stockpile: the synthetic budget's "
-                        "firm price is 1 point by construction (synthetic_charter_spend)\n");
+            std::printf("--firm-prices, --price-divisors and --price-pairs are read only with "
+                        "--budget stockpile: the synthetic budget's firm price is 1 point by "
+                        "construction (synthetic_charter_spend)\n");
             return 2;
         }
         else if (!opt.span_control)
