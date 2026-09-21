@@ -47,7 +47,8 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
 
 **Wave 2 — measure, then Ben's calls**
 
-- [ ] **BL-1043 (real-stockpile charter sweep)** — waits on BL-1042, BL-1053 and BL-1034. Quiet machine, keep-awake. Ends in NEEDS_REVIEW calls.
+- [ ] **BL-1043 (real-stockpile charter sweep)** — STAGE 1 IN (2026-09-21): 16 seeds x 3 firm prices in three parallel shards, folded as runs.real_stockpile_bl1043_a/_b/_c; R1, R2 and R4 complete. It found that no fixed price holds the seat menu (NR-907, ruled: the price is a share of the world's stockpile), so stage 2 sweeps BL-1064's divisor instead. Owed: stage 2, the serial timing pass (R3), the province-cap reading, the remaining calls (R5), R6 and R7.
+- [ ] **BL-1064 (derived charter price)** — Ben 2026-09-21 (NR-907): a charter's price is the world's own stockpile divided by a constant, fixed at build; the specialist keeps its price in firm charters. Built before BL-1043 stage 2, which reads the divisor. files: stockpile_budget.*, charter_budget.hpp, player_seed_sweep.cpp, stockpile_budget_check.cpp.
 
 **Wave 3 — ship**
 

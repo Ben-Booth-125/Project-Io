@@ -803,6 +803,34 @@
     "src/world/landscape_search.cpp"
    ],
    "design": "CONTINUITY PASS. FOUND by BL-1034 (world copies diverge) cold review, carried unbuilt through BL-1050 and named again by its review (2026-09-20). faithful_unordered_map throws a logic_error when a copy cannot keep its source order — the tripwire the byte-identical-replay rule stands on. Thrown inside a landscape-search worker thread it reaches std::terminate, and the handler (main.cpp ~l.383) drops the message, so the one diagnostic the tripwire exists to print is exactly what is lost. THE WORK: catch in the worker and carry the message to the joining thread (or set a failure slot the search reports), so a tripwire throw names the store and the site. DONE WHEN: a deliberately unfaithful copy inside a worker prints its message and fails the run, rather than terminating silently."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "45",
+   "written": "2026-09-21",
+   "author": "Ben (2026-09-21, NR-907); Claude (item text from BL-1043 stage 1)",
+   "requires": [
+    "BL-1042",
+    "BL-1043"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1064",
+   "short_name": "DERIVED_CHARTER_PRICE",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 2,
+   "title": "A charter's price is the world's own stockpile divided by a constant, so the seat menu is the same size on every world",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/stockpile_budget.hpp",
+    "src/world/stockpile_budget.cpp",
+    "src/world/charter_budget.hpp",
+    "tools/verify/player_seed_sweep.cpp",
+    "tools/verify/stockpile_budget_check.cpp"
+   ],
+   "design": "RULED (Ben, 2026-09-21, NR-907): the price is a SHARE of the world's own stockpile, not a fixed number of points. Design: DIGITISATION.md, the seat-menu paragraphs.\n\nWHY (BL-1043 stage 1, 16 seeds, runs.real_stockpile_bl1043_a/_b/_c): stockpiles run 24.7M to 133.6M points and a fixed price's seats track them almost proportionally, while the legacy roster does not track them at all (seed 31: 95.3M points, 6 legacy seats; seed 9: 27.5M, 16). At 40000 a firm, the poorest world opened 1 seat and the richest 91 against an anchor median of 9 — no single number sits inside both tails.\n\nTHE WORK. (1) In the stockpile budget's construction, derive the FIRM price from the world's whole stockpile: firm_price = total / k_stockpile_price_divisor, fixed once, integer, with a floor of 1 and the existing refusals unchanged (a non-positive price is still refused). The specialist keeps its price in whole firm charters (m), so a specialist costs m x firm_price and the structure BL-1039 ruled is untouched. Nothing else in the spend changes: the sqrt cap, the ceiling 120, the goods-in-turn fill and its reservation all read the derived price exactly as they read the constant today. (2) The divisor is a named constant beside the other charter constants, with the ruling cited, PROVISIONAL until BL-1044 pins it from the sweep. (3) player_seed_sweep's cost mode gains a --price-divisors axis in place of (or beside) --firm-prices for the stockpile budget, printing the derived price per seed so a row says what it actually charged. (4) stockpile_budget_check gains a case: two worlds whose stockpiles differ by 5x open menus within a stated tolerance of each other, and the derived price is identical across two builds of the same seed.\n\nDONE WHEN. Switch off (span off, empty stockpile) nothing moves: world_determinism digests unchanged and player_seed_sweep --digest-check 16/16. With the span on: BL-1043 stage 2 sweeps the divisor over the 16 library seeds and the seat spread narrows — report the median seats and the min/max against stage 1's 1-to-91 at a fixed price. The divisor Ben pins at BL-1044 is the one whose median menu matches the legacy anchor (median 9 seats)."
   }
  ]
 }

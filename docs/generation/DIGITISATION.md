@@ -252,6 +252,18 @@ The refusal is read on the world the walk itself will spend, before anything is 
 price, in firm charters, is the one at which the median library world offers about as many seats as
 a world with no budget does. The number is read on real stockpiles.
 
+**SETTLED (Ben, 2026-09-21, NR-907): the price is a SHARE OF THE WORLD'S OWN STOCKPILE, not a fixed
+number of points.** A charter's price is the world's whole industry stockpile divided by a constant,
+fixed once when the budget is built; a specialist still costs its whole number of firm charters. So
+the menu is about the same size on every world, which is what the seat-menu anchor asks for, and it
+is a derived number rather than a clamp on the outcome. **Why a fixed price could not hold it**
+(BL-1043 stage 1, 16 library seeds): the library's stockpiles run 24.7M to 133.6M points, and the
+seats a fixed price opens track that stockpile almost proportionally, while the no-budget roster
+does not track it at all — seed 31 holds 95.3M points and offers 6 legacy seats, seed 9 holds 27.5M
+and offers 16. At 40000 points a firm the poorest world offered 1 seat and the richest 91, against
+an anchor median of 9; no single number sits inside both tails. The constant itself is read off the
+sweep and pinned at the re-bless.
+
 **SETTLED (Ben, 2026-09-18, wave 1 form, reversing the same morning's ruling): a budget
 specialist opens on TODAY'S STARTING CAPITAL**, the seeded 400 ±40% draw with the focus premium
 (`CORPORATION_GENERATION.md` § Pass 4). Capital drawn from a centre's unspent points was built and
