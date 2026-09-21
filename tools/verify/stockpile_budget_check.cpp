@@ -4,6 +4,7 @@
 //
 //   bash tools/verify/build_lua_harness.sh stockpile_budget_check
 //   ./build_gen/verify/stockpile_budget_check.exe [--r8] [--seed N]
+//        [--seat-curve [--seeds a,b,c] [--pairs d:m,...]]   (part 3, ~45 s a seed)
 //
 // The DEFAULT run is part 1 alone (instant, script-free), so the ctest glob that
 // registers every tools/verify/*.cpp can run it under its 60 s default from the
@@ -485,18 +486,135 @@ void part_two(std::uint32_t seed)
           "same seed derives the same price twice");
 }
 
+/// Parse "a,b,c" of whole numbers (or "d:m" pairs when @p pairs). Empty on a bad token.
+std::vector<std::pair<std::int64_t, std::int64_t>> parse_list(const std::string& val, bool pairs)
+{
+    std::vector<std::pair<std::int64_t, std::int64_t>> out;
+    std::size_t at = 0;
+    while (at <= val.size())
+    {
+        std::size_t comma = val.find(',', at);
+        if (comma == std::string::npos) comma = val.size();
+        const std::string tok = val.substr(at, comma - at);
+        const std::size_t colon = tok.find(':');
+        if (pairs != (colon != std::string::npos)) return {};
+        const std::string a = pairs ? tok.substr(0, colon) : tok;
+        const std::string b = pairs ? tok.substr(colon + 1) : "1";
+        if (a.empty() || b.empty() || a.size() > 10 || b.size() > 6
+            || a.find_first_not_of("0123456789") != std::string::npos
+            || b.find_first_not_of("0123456789") != std::string::npos)
+            return {};
+        out.emplace_back(std::strtoll(a.c_str(), nullptr, 10), std::strtoll(b.c_str(), nullptr, 10));
+        at = comma + 1;
+    }
+    return out;
+}
+
+/// PART 3 — THE SEAT CURVE (BL-1043 stage 2's owed reading, 2026-09-21). Seats
+/// on a budget world are the centres that can AFFORD a specialist (one per
+/// centre, richest first; stage 2 found the affording count equal to the seats
+/// on 74 of 80 rows, never below them), and affording reads the budget alone —
+/// so this builds each seed's span world as far as the budget (no search, no
+/// settle) and counts, for each (divisor d, charters m), the centres whose
+/// points cover m x the price d derives. An UPPER BOUND on seats, exact wherever
+/// every affording centre finds ground. Reports; asserts only that each world's
+/// budget is non-empty and its account closes.
+void part_three_seat_curve(const std::vector<std::uint32_t>& seeds,
+                           const std::vector<std::pair<std::int64_t, std::int64_t>>& pairs)
+{
+    std::printf("\n--- PART 3: the seat curve — centres affording a specialist, from the budget alone ---\n");
+    std::printf("     %-5s %12s %7s", "seed", "stock", "centres");
+    for (const auto& [d, m] : pairs)
+        std::printf(" %7s", (std::to_string(d) + ":" + std::to_string(m)).c_str());
+    std::printf("   (d:m; d/m =");
+    for (const auto& [d, m] : pairs)
+        std::printf(" %lld", static_cast<long long>(d / m));
+    std::printf(")\n");
+    std::fflush(stdout);
+
+    std::vector<std::vector<int>> col(pairs.size());
+    for (const std::uint32_t seed : seeds)
+    {
+        world_params p{};
+        p.seed = seed;
+        p.digitisation_span_enabled = true;
+        lua_state lua;
+        auto out = std::make_unique<app_start_world>();
+        build_app_base_world(lua, p, *out);
+        const stockpile_budget base = build_stockpile_budget(out->w);
+        check(!base.budget.empty() && !base.rejected && base.balanced(),
+              "3.1 seed " + std::to_string(seed) + ": the span-on budget is non-empty and closes");
+        std::printf("     %-5u %12lld %7zu", seed, static_cast<long long>(base.points_total),
+                    base.budget.points().size());
+        for (std::size_t i = 0; i < pairs.size(); ++i)
+        {
+            const stockpile_budget sb = build_stockpile_budget(out->w, pairs[i].first);
+            const int n = seats_at(sb, pairs[i].second * static_cast<std::int64_t>(sb.firm_price_points));
+            col[i].push_back(n);
+            std::printf(" %7d", n);
+        }
+        std::printf("\n");
+        std::fflush(stdout);
+    }
+    const auto med = [](std::vector<int> v) {
+        std::sort(v.begin(), v.end());
+        const std::size_t n = v.size();
+        return n == 0 ? 0.0 : (n % 2 ? v[n / 2] : (v[n / 2 - 1] + v[n / 2]) / 2.0);
+    };
+    std::printf("     %-5s %12s %7s", "MED", "", "");
+    for (const auto& c : col) std::printf(" %7.1f", med(c));
+    std::printf("\n     %-5s %12s %7s", "MIN", "", "");
+    for (const auto& c : col) std::printf(" %7d", c.empty() ? 0 : *std::min_element(c.begin(), c.end()));
+    std::printf("\n     %-5s %12s %7s", "MAX", "", "");
+    for (const auto& c : col) std::printf(" %7d", c.empty() ? 0 : *std::max_element(c.begin(), c.end()));
+    std::printf("\n     %-5s %12s %7s", "ZERO", "", "");
+    for (const auto& c : col) std::printf(" %7d", static_cast<int>(std::count(c.begin(), c.end(), 0)));
+    std::printf("   (worlds with no centre affording a specialist)\n");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
 {
     bool          r8   = false;
     std::uint32_t seed = 28;
+    bool          curve = false;
+    std::vector<std::uint32_t> curve_seeds = { 46, 28, 11, 31, 40, 12, 37, 13,
+                                               41, 43, 32, 10, 25, 38, 9, 0 };   // the library
+    std::vector<std::pair<std::int64_t, std::int64_t>> curve_pairs = {
+        { 650, 4 }, { 900, 4 }, { 650, 2 }, { 900, 2 }, { 650, 1 }, { 900, 1 }, { 1300, 1 } };
     for (int a = 1; a < argc; ++a)
     {
         const std::string arg = argv[a];
         if (arg == "--r8")
         {
             r8 = true;
+            continue;
+        }
+        if (arg == "--seat-curve")
+        {
+            curve = true;
+            continue;
+        }
+        if ((arg == "--seeds" || arg == "--pairs") && a + 1 < argc)
+        {
+            const auto v = parse_list(argv[++a], arg == "--pairs");
+            bool ok = !v.empty();
+            for (const auto& [x, y] : v)
+                ok = ok && (arg == "--pairs" ? (x > 0 && y > 0) : x <= 0xFFFFFFFFll);
+            if (!ok)
+            {
+                std::printf("%s: '%s' is not a list of %s\n", arg.c_str(), argv[a],
+                            arg == "--pairs" ? "d:m pairs, both > 0" : "seeds");
+                return 2;
+            }
+            if (arg == "--pairs")
+                curve_pairs = v;
+            else
+            {
+                curve_seeds.clear();
+                for (const auto& e : v) curve_seeds.push_back(static_cast<std::uint32_t>(e.first));
+            }
             continue;
         }
         if (arg == "--seed" && a + 1 < argc)
@@ -512,7 +630,8 @@ int main(int argc, char** argv)
             std::printf("--seed: '%s' is not a seed number\n", val);
             return 2;
         }
-        std::printf("usage: stockpile_budget_check [--r8] [--seed N]\n");
+        std::printf("usage: stockpile_budget_check [--r8] [--seed N] "
+                    "[--seat-curve [--seeds a,b] [--pairs d:m,...]]\n");
         return 2;
     }
 
@@ -522,6 +641,8 @@ int main(int argc, char** argv)
         part_two(seed);
     else
         std::printf("\n(part 2, R8's non-empty budget built twice, not run: pass --r8)\n");
+    if (curve)
+        part_three_seat_curve(curve_seeds, curve_pairs);
 
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "ALL PASS" : "FAILURES", failures,
                 failures == 1 ? "" : "s");
