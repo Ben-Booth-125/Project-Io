@@ -24,26 +24,13 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*13 entries — 1 open, 12 resolved.*
+*14 entries — 0 open, 14 resolved.*
 
 ---
 
 ## Open
 
-### NR-909 — CALL: once the span is on by default, what do --verify, --serve and the headless run build?
-*question · raised 2026-09-21 · from Planning BL-1044 (Beat 1 ships), main session, 2026-09-21, reading the three search-less start paths.*
-
-Three start paths never search: app::run_verify (verify_api.cpp:529), run_serve (main.cpp:148) and the headless run (main.cpp:258). Each calls generate_background_firms directly and only WARNS when the stockpile budget is non-empty; today that never fires, because they build from default world_params with the Digitisation span off. BL-1044 flips the span on by default, so from then every --verify capture, every MCP/--serve session and every headless run builds a span world and lays the legacy web over it, ignoring its budget — a world the app never builds. None of these paths searches today either (they lay the legacy web with a fixed seed, not the search winner), so none of them was ever the exact shipped world.
-
-**Why it matters.** --verify is how a UI change is checked and --serve is the AI seam; both would silently show a hybrid world, and their guards would print on every run.
-
-- A: spend the budget on the SEED CANDIDATE (the harness's unsearched apply, apply_shipped_landscape with search = false): a non-empty budget charters as the app does, minus the search; an empty budget keeps today's call byte for byte.
-- B: pin the span OFF on the three paths: they keep today's world exactly, and check a world the player no longer gets.
-- C: run the full search there too: the exact shipped world, at 20-60 s more per verify run.
-
-> **Recommendation:** A. It shows the budget world at no search cost, matches how these paths already skip the search, and leaves a span-off world untouched. B keeps verify on a world nobody plays; C taxes every UI check for the search's choice of roster, which verify has never checked.
-
-*Files: `src/core/verify_api.cpp`, `src/main.cpp`, `tools/verify/harness_params.hpp`*
+*Nothing open.*
 
 ---
 
@@ -248,4 +235,39 @@ NR-907 made a firm charter's price the world's stock over a divisor d, with a sp
 > **RESOLVED.** RULED (Ben, 2026-09-21, elicitation): A — the divisor answers live-play cost, m answers the seat menu. Written into DIGITISATION.md § 1. Stage 2 is FIVE rows per seed (plus the legacy row): (divisor, m) = (450, 4), (650, 4), (900, 4) for the seat menu along d/m = 112 / 162 / 225, and (325, 2), (1300, 8) for density at the ratio 162. The sweep takes them as --price-pairs.
 
 *Files: `docs/generation/DIGITISATION.md`, `src/world/stockpile_budget.hpp`, `tools/verify/player_seed_sweep.cpp`*
+
+### NR-909 — CALL: once the span is on by default, what do --verify, --serve and the headless run build?
+*question · raised 2026-09-21 · from Planning BL-1044 (Beat 1 ships), main session, 2026-09-21, reading the three search-less start paths.*
+
+Three start paths never search: app::run_verify (verify_api.cpp:529), run_serve (main.cpp:148) and the headless run (main.cpp:258). Each calls generate_background_firms directly and only WARNS when the stockpile budget is non-empty; today that never fires, because they build from default world_params with the Digitisation span off. BL-1044 flips the span on by default, so from then every --verify capture, every MCP/--serve session and every headless run builds a span world and lays the legacy web over it, ignoring its budget — a world the app never builds. None of these paths searches today either (they lay the legacy web with a fixed seed, not the search winner), so none of them was ever the exact shipped world.
+
+**Why it matters.** --verify is how a UI change is checked and --serve is the AI seam; both would silently show a hybrid world, and their guards would print on every run.
+
+- A: spend the budget on the SEED CANDIDATE (the harness's unsearched apply, apply_shipped_landscape with search = false): a non-empty budget charters as the app does, minus the search; an empty budget keeps today's call byte for byte.
+- B: pin the span OFF on the three paths: they keep today's world exactly, and check a world the player no longer gets.
+- C: run the full search there too: the exact shipped world, at 20-60 s more per verify run.
+
+> **Recommendation:** A. It shows the budget world at no search cost, matches how these paths already skip the search, and leaves a span-off world untouched. B keeps verify on a world nobody plays; C taxes every UI check for the search's choice of roster, which verify has never checked.
+
+> **RESOLVED.** RULED (Ben, 2026-09-21, the charter pin form): A — where the world carries a charter budget, --verify, --serve and the headless run spend it on the search's seed candidate (the harness's unsearched apply); an empty budget lays exactly today's web. Written into DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds; built by BL-1044 (T5).
+
+*Files: `src/core/verify_api.cpp`, `src/main.cpp`, `tools/verify/harness_params.hpp`*
+
+### NR-910 — CALLS: the charter pins for BL-1044 — the price pair, the seat spread, the no-specialist world, the province cap, the sqrt base
+*question · raised 2026-09-21 · from BL-1043 stage 2 (runs.real_stockpile_bl1043_stage2, 16 seeds x NR-908's five pairs, serial) and the seat curve (stockpile_budget_check --seat-curve, 16 seeds, d/m 162-1300), main session, 2026-09-21.*
+
+Seats turn on d/m alone and follow the curve median 3 / 4 / 13.5 / 28 / 54 at d/m 162 / 225 / 325 / 450 / 650, so the anchor's 9 sits near d/m 290. Live tick against the legacy world: x0.43 / x0.91 / x1.70 at 325:2 / 650:4 / 1300:8, so the divisor near 650 runs the legacy cost. Whole charters are too coarse: at d = 650, m = 3 opens ~4 and m = 2 ~13.5. The spread at the anchor is wide (3-98 at d/m 325) because worlds with many near-equal cities cross the price together — the derived price removes the stock's size, not the world's shape. No-specialist worlds occur below d/m ~325 (seeds 46, 37, 25) and none above. The province cap binds on 7 of 16 worlds at 650:4, up to 24.6% of one budget.
+
+**Why it matters.** BL-1044 pins these and re-blesses the shipped world on them.
+
+- Price pair: A m 2 with the divisor tuned near 580 so the median lands at 9 / B 650:2 (median 13.5) / C m 3 near 870.
+- Seat spread: accept (the anchor is a median) / cap the menu at N.
+- No-specialist world: fall back to the no-budget world / unseatable, re-roll / seat on a background firm.
+- Province cap: keep 2 / raise to 3 / lift. Sqrt base: pin 8 / measure another.
+
+> **Recommendation:** A; accept; fall back; keep 2; pin 8.
+
+> **RESOLVED.** RULED (Ben, 2026-09-21, the charter pin form), all as recommended: a specialist costs TWO firm charters and the divisor is the one at which the median library world opens nine seats at two (near 580, read off the seat curve); the seat spread is accepted — the anchor is a median; a world whose budget opens no specialist falls back to the no-budget world, as a refused spend does; the per-province cap stays at 2; the sqrt base is 8. Written into DIGITISATION.md § 1 and CORPORATION_GENERATION.md § Pass 1; BL-1044 pins them. PINNED (seat curve at m = 2, 16 seeds, 2026-09-21): divisor 580 — median 6.5 / 7 / 8 / 9.5 / 12.5 seats at d = 520 / 540 / 560 / 580 / 600, and 580 is the smallest divisor measured at which no library world falls back (seed 37: 0 at 560, 2 at 580); spread 2 to 73 at 580:2.
+
+*Files: `docs/generation/DIGITISATION.md`, `docs/generation/CORPORATION_GENERATION.md`, `src/world/stockpile_budget.hpp`*
 

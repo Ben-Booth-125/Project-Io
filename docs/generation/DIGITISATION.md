@@ -256,8 +256,10 @@ a world with no budget does. The number is read on real stockpiles.
 **SETTLED (Ben, 2026-09-21, NR-907): the price is a SHARE OF THE WORLD'S OWN STOCKPILE, not a fixed
 number of points.** A charter's price is the world's whole industry stockpile divided by a constant,
 fixed once when the budget is built; a specialist still costs its whole number of firm charters. So
-the menu is about the same size on every world, which is what the seat-menu anchor asks for, and it
-is a derived number rather than a clamp on the outcome. **Why a fixed price could not hold it**
+the size of a world's stockpile no longer decides the size of its menu, and the price is a derived
+number rather than a clamp on the outcome. It does not make the menu the same size everywhere: how
+many near-equal cities a world holds still decides how many cross the price together, and NR-910
+accepts that spread (below). **Why a fixed price could not hold it**
 (BL-1043 stage 1, 16 library seeds): the library's stockpiles run 24.7M to 133.6M points, and the
 seats a fixed price opens track that stockpile almost proportionally, while the no-budget roster
 does not track it at all — seed 31 holds 95.3M points and offers 6 legacy seats, seed 9 holds 27.5M
@@ -269,11 +271,26 @@ sweep and pinned at the re-bless.
 price answers the SEAT MENU.** Once the price is a share of the stock, a centre affords a
 specialist when its points cover the specialist's firm charters over the divisor, as a share of
 the world's stock. So the seat menu turns on that ratio alone, and the price in firm charters is
-the knob the seat-menu anchor sets; on stage 1's reading the anchor's nine seats sit near a ratio
-of 160 (divisor over charters). The divisor alone sets
+the knob the seat-menu anchor sets; measured on the library (BL-1043 stage 2 and the seat curve),
+the anchor's nine seats sit near a ratio of 290 (divisor over charters). The divisor alone sets
 how many firm charters a world's stock buys, which is its density and so its tick, and it is set
 against live-play cost. Each knob has one job; a divisor tuned to the seat menu would leave density
 with no knob at all.
+
+**SETTLED (Ben, 2026-09-21, NR-910): the pins.** A specialist costs **two** firm charters. The
+charter count moves in whole charters, which is too coarse to land the anchor on its own — at the
+divisor that runs the legacy world's tick, three charters open a median of about four seats and two
+open about thirteen — so the divisor takes the last step, inside the band live-play cost allows: it
+is the divisor at which the median library world, at two charters, opens the anchor's nine seats:
+580 on the library, where the median world opens nine or ten and none falls back, at about 0.8 of
+the legacy world's tick. **The seat spread is accepted:** the anchor is a
+median, and a world with many cities near the line offers more seats than one whose capital
+towers over the rest — at the pinned price the library runs from two seats to seventy-three.
+That is the world talking, not a menu to be capped. **A world whose budget opens no specialist falls
+back to the world it would have built with no budget**, exactly as a refused spend does, decided
+from the budget before anything is chartered; above a ratio of about 325 no library world opens
+none. **The per-province cap stays at 2** on a budget world, and **the square root's base is 8**,
+the legacy per-good cap, so a body at the legacy spend keeps the legacy cap.
 
 **SETTLED (Ben, 2026-09-18, wave 1 form, reversing the same morning's ruling): a budget
 specialist opens on TODAY'S STARTING CAPITAL**, the seeded 400 ±40% draw with the focus premium
@@ -289,7 +306,7 @@ ground there is counted unspent rather than scattered across the nation, because
 is capital that left the city that built it. **No budget and an empty budget are the same world as
 today's**: the population-blind placement stands until a budget with something in it arrives.
 
-PROPOSED (listed to Ben 2026-09-18, not overturned): **the per-province cap stays at 2** on a
+PROPOSED (listed to Ben 2026-09-18, not overturned; the cap SETTLED at 2 by NR-910): **the per-province cap stays at 2** on a
 budget world until real budgets show whether they concentrate; and **a budget world does not read
 the Works charter terms** (`trees/INDUSTRY_TREE.md` § What the tree hands the 1960 campaign), because
 a specialist stands wherever its centre can afford one.

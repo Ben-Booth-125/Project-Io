@@ -6744,13 +6744,13 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "record: NEEDS_REVIEW entries"
      ],
      "requirement": "NEEDS_REVIEW carries the calls with their figures: the firm price, the specialist price in firm charters, the no-specialist world, and whether the per-province cap stays.",
      "notes": "",
-     "result_metric": "NR-907 ruled (the price is a share of the stock) and NR-908 ruled (the divisor answers live-play cost, m the seat menu). OPEN, for one form: the divisor (stage 2: 650:4 runs the live tick at x0.91 the legacy world), m (stage 2: the anchor's 9 seats sits above d/m 225, so the seat curve at d/m 325-650 is read first — at d = 650 that is m = 2 or 1), the no-specialist world (now real: seeds 46 and 37 open no seat at d/m 163), and the province cap (binding on 7 of 16 rows at 650:4, up to 24.6% of one world's budget)."
+     "result_metric": "Every call ruled on 2026-09-21: NR-907 (the price is a share of the stock), NR-908 (the divisor answers live-play cost, m the seat menu), NR-910 (m = 2 with the divisor tuned so the median library world opens 9 seats, near 580; the seat spread accepted, 3-98 at d/m 325; the no-specialist world falls back to the no-budget world; the province cap stays 2; the sqrt base is 8) and NR-909 (the search-less paths spend the budget on the seed candidate). Readings behind them: stage 2 and the seat curve (stockpile_budget_check --seat-curve, 16 seeds, d/m 162-1300: medians 3 / 4 / 13.5 / 28 / 54 / 71 / 140.5)."
     },
     {
      "id": "R6",

@@ -33,6 +33,12 @@ call. Where a harness deliberately omits a pass — a generation probe that want
 state, say — the omission is stated at the site with its reason, so a reader can tell a choice from
 an oversight. The default is the application's world.
 
+**The application's own search-less starts obey it too (Ben, 2026-09-21, NR-909).** `--verify`,
+`--serve` and the headless run skip the landscape search, and say so; they do not skip the charter
+budget. Where the world carries one, they spend it on the search's seed candidate, as the harness's
+unsearched apply does, and where it is empty they lay exactly the web they always did — so they
+differ from the played world by the search alone, never by a budget left on the floor.
+
 **The general form, and the reason this sits above the tuning rules below:** every one of those
 rules assumes the thing being measured is the thing that ships. Where it is not, careful measurement
 produces confident wrong answers faster.

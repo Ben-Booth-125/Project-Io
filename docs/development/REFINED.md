@@ -47,7 +47,7 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
 
 **Wave 2 — measure, then Ben's calls**
 
-- [ ] **BL-1043 (real-stockpile charter sweep)** — STAGE 2 IN (2026-09-21, serial, runs.real_stockpile_bl1043_stage2): seats median 1/3/4 at d/m 113/163/225 against the anchor's 9; no-specialist worlds at every d/m; 650:4 runs the live tick at x0.91 legacy. R3 and R6 complete; owed: the seat curve above d/m 225, the calls form (R5), R7 (the sprint-wide cold review). STAGE 1 IN (2026-09-21): 16 seeds x 3 firm prices in three parallel shards, folded as runs.real_stockpile_bl1043_a/_b/_c; R1, R2 and R4 complete. It found that no fixed price holds the seat menu (NR-907, ruled: the price is a share of the world's stockpile), so stage 2 sweeps BL-1064's divisor instead. Owed: stage 2, the serial timing pass (R3), the province-cap reading, the remaining calls (R5), R6 and R7.
+- [ ] **BL-1043 (real-stockpile charter sweep)** — STAGE 2 IN (2026-09-21, serial, runs.real_stockpile_bl1043_stage2): seats median 1/3/4 at d/m 113/163/225 against the anchor's 9; no-specialist worlds at every d/m; 650:4 runs the live tick at x0.91 legacy. R3 and R6 complete; the seat curve read (d/m 162-1300) and every call ruled (NR-910), R5 complete; owed: R7 (the sprint-wide cold review, at BL-1044). STAGE 1 IN (2026-09-21): 16 seeds x 3 firm prices in three parallel shards, folded as runs.real_stockpile_bl1043_a/_b/_c; R1, R2 and R4 complete. It found that no fixed price holds the seat menu (NR-907, ruled: the price is a share of the world's stockpile), so stage 2 sweeps BL-1064's divisor instead. Owed: stage 2, the serial timing pass (R3), the province-cap reading, the remaining calls (R5), R6 and R7.
 - [x] **BL-1064 (derived charter price)** — DELIVERED 2026-09-21: main session, two cold-review rounds, --digest-check 16/16 (2620 s), world_determinism digests unchanged, stockpile_budget_check --r8 ALL PASS. Ben 2026-09-21 (NR-907): a charter's price is the world's own stockpile divided by a constant, fixed at build; the specialist keeps its price in firm charters. Built before BL-1043 stage 2, which reads the divisor. Requirement group `derived-charter-price`. Built in the main session (2026-09-21), cold review after. files: stockpile_budget.*, harness_params.hpp, app.cpp, player_seed_sweep.cpp, stockpile_budget_check.cpp, world_determinism.cpp (the fold carries the price; span-on only).
   - [x] T1 derive the price in the builder; the divisor constant; the spend reads it (R1, R2).
   - [x] T2 the mirror and the app pass the derived spend; the harness records the spend it charged (R1).
@@ -65,7 +65,10 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
   Three gates, in order: Ben's calls, then the build and the measurement, then Ben authorises the
   re-bless against the shape. Main session throughout; the machine quiet for Step 2.
 
-  *Gate 0 — the calls, on ONE form once stage 2 is folded.*
+  *Gate 0 — RULED 2026-09-21 (NR-908, NR-909, NR-910): m = 2 with the divisor tuned so the median
+  library world opens 9 seats (near 580, from the seat curve); the seat spread accepted; the
+  no-specialist world falls back to the no-budget world; province cap 2; sqrt base 8; the search-less
+  paths spend the budget on the seed candidate. The list below is the call record.*
   - C1 the DIVISOR, against live-play cost (NR-908): stage 2's density pairs 325:2 / 650:4 / 1300:8
     at d/m 162 and their tick ratio against the legacy row.
   - C2 m, the specialist price in firm charters, against the seat menu. EARLY STAGE 2 (6 seeds): at
