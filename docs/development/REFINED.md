@@ -60,3 +60,62 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
 
 - [ ] **BL-1050 (order-dependent reads)** — BUILT and VERIFIED on branch worktree-agent-ab112b1821025f551 (2026-09-20): seven readers ordered, fix round 3c9c5792 after a cold review; --copy-by snapshot 16/16 PASS (4166 s); the 16-seed --digest-check on the branch fails on D_settle and D_seat ONLY, never D_search or D_land, so the re-bless is tick-only (NR-894). R1-R6 complete; R7 (the re-pin) is BL-1044's. MERGED ONLY WITH BL-1044.
 - [ ] **BL-1044 (Beat 1 ships)** — waits on BL-1037, BL-1043, BL-1050 and Ben's rulings. The one re-bless, the 1960 readings, the cold review.
+
+  **INTEGRATION PLAN (drafted 2026-09-21 while BL-1043 stage 2 ran; read the item's design text first).**
+  Three gates, in order: Ben's calls, then the build and the measurement, then Ben authorises the
+  re-bless against the shape. Main session throughout; the machine quiet for Step 2.
+
+  *Gate 0 — the calls, on ONE form once stage 2 is folded.*
+  - C1 the DIVISOR, against live-play cost (NR-908): stage 2's density pairs 325:2 / 650:4 / 1300:8
+    at d/m 162 and their tick ratio against the legacy row.
+  - C2 m, the specialist price in firm charters, against the seat menu. EARLY STAGE 2 (6 seeds): at
+    d/m 162 the median is ~2.5 seats against a legacy 8, and 225 gives ~3.5 — the anchor's 9 sits
+    ABOVE the bracket. Seats do turn on d/m alone (the three d/m-162 pairs agree on 5 of 6 seeds), so
+    a supplementary SEAT-CURVE reading is owed before C2: seats at d/m 300 / 450 / 650. Cheap if
+    built as a budget-only instrument (centres affording a specialist, from `build_stockpile_budget`
+    alone — no search, no settle), else a stage 2b row set (seats are deterministic, so shards may
+    run in parallel).
+  - C3 THE NO-SPECIALIST WORLD — now real: seed 46 opens no seat at four of five pairs, seed 37 none
+    at 450:4. Today the budget path leaves the player NULL (corporation_generation.cpp:3907-3926) and
+    spawn_seat returns early (spawn_seat.cpp:118), against world.hpp:300's "exactly one is_player".
+  - C4 the per-province cap (PROPOSED held at 2): read `prov` unspent off stage 2.
+  - C5 the sqrt base c = 8 (`k_stockpile_per_resource_firm_cap`, still in the PROVISIONAL block).
+  - C6 NR-909: the search-less paths on a span world (below).
+
+  *Step 1 — integrate (on main, committed in increments; `git merge-tree` shows the merge CLEAN).*
+  - T1 merge BL-1050 (3c9c5792). Its eight files are untouched on main since the merge-base
+    1dc8332b, so no conflict. It moves the legacy world's D_settle and D_seat only (NR-894).
+  - T2 flip `digitisation_span_enabled` (hard_coded_world.hpp:181) and `resume_seeds_corridor_tier`
+    (history_sim.hpp:1962; the struct default, which also covers Exploration's resume) on by default;
+    rewrite both "OFF BY DEFAULT" comments and era_minus_one.cpp:470.
+  - T3 pin C1, C2, C4, C5 in stockpile_budget.hpp and drop PROVISIONAL.
+  - T4 C3's ruling, and the invariant stated where it binds: print it on the seat line
+    (app.cpp:970) and count it per seed in player_seed_sweep.
+  - T5 C6: verify_api.cpp:529, main.cpp:148 and main.cpp:258 call `generate_background_firms`
+    directly and only warn when the stockpile is non-empty — once T2 lands, EVERY `--verify`,
+    `--serve` and headless world is a span world whose budget they ignore.
+  - T6 harness re-points: exploration_sim_harness.cpp:812 (R6.6 reads the 1660 grudges; setup reads
+    the 1960 close with the span on, BL-1053); haulage_measure run with `--epoch 0` (its default is
+    1960, :178); player_seed_sweep's pins gain an ARC field — legacy rows keep BL-1031's D_search
+    and D_land and take BL-1050's D_settle/D_seat under NR-894, recorded old -> new; the shipped
+    rows are new; `--digest-check` checks the arc it builds, and a legacy mode keeps the span-off
+    pins a live check.
+  - T7 the rulings into DIGITISATION.md § 1 and CORPORATION_GENERATION.md; nothing else in a doc.
+
+  *Step 2 — measure (Release, serial, keep-awake; roughly 5-6 h of machine time).*
+  world_determinism old -> new (A/A records); stockpile_budget_check --r8; charter_refusal_probe;
+  world_copy_determinism --copy-by snapshot 16/16 (BL-1050's owed re-run, ~70 min);
+  player_seed_sweep --digest then --digest-check on the shipped arc, and the legacy arc's check;
+  exploration_sweep --out then seed_library.js --check --from (fingerprints may move ONLY through
+  BL-1037's tier) then --bless; history_sim_harness (its 2-failure baseline), exploration_sim_harness,
+  digitisation_sim_harness; haulage_measure --epoch 0 against the 1055/802 baseline; story_check
+  (2 pre-existing US-016 failures); the 1960 readings per library seed (density follows cities:
+  rho(firms, urban) against rho(firms, goods), BL-1029's 0.431 vs 0.460; industrialisation);
+  setup cost per seed in Release AND the Debug app; the nation treasury credit rate against its two
+  stated scales (BL-1053 (1)); the ctest suite — world-building rows may breach the 60 s default
+  now that setup takes 21 -> 51 s on seed 28; the visual verify suite if C6 routes verify through
+  the budget.
+
+  *Gate 2 — Ben authorises the re-bless against that shape; the pins land; the cold review of the
+  sprint's integrated diff (a fix round budgeted); BL-1050 and BL-1044 close; then sprint 45's retro
+  and the sprint 46 cut.*

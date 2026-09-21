@@ -24,13 +24,26 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*12 entries — 0 open, 12 resolved.*
+*13 entries — 1 open, 12 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-909 — CALL: once the span is on by default, what do --verify, --serve and the headless run build?
+*question · raised 2026-09-21 · from Planning BL-1044 (Beat 1 ships), main session, 2026-09-21, reading the three search-less start paths.*
+
+Three start paths never search: app::run_verify (verify_api.cpp:529), run_serve (main.cpp:148) and the headless run (main.cpp:258). Each calls generate_background_firms directly and only WARNS when the stockpile budget is non-empty; today that never fires, because they build from default world_params with the Digitisation span off. BL-1044 flips the span on by default, so from then every --verify capture, every MCP/--serve session and every headless run builds a span world and lays the legacy web over it, ignoring its budget — a world the app never builds. None of these paths searches today either (they lay the legacy web with a fixed seed, not the search winner), so none of them was ever the exact shipped world.
+
+**Why it matters.** --verify is how a UI change is checked and --serve is the AI seam; both would silently show a hybrid world, and their guards would print on every run.
+
+- A: spend the budget on the SEED CANDIDATE (the harness's unsearched apply, apply_shipped_landscape with search = false): a non-empty budget charters as the app does, minus the search; an empty budget keeps today's call byte for byte.
+- B: pin the span OFF on the three paths: they keep today's world exactly, and check a world the player no longer gets.
+- C: run the full search there too: the exact shipped world, at 20-60 s more per verify run.
+
+> **Recommendation:** A. It shows the budget world at no search cost, matches how these paths already skip the search, and leaves a span-off world untouched. B keeps verify on a world nobody plays; C taxes every UI check for the search's choice of roster, which verify has never checked.
+
+*Files: `src/core/verify_api.cpp`, `src/main.cpp`, `tools/verify/harness_params.hpp`*
 
 ---
 
