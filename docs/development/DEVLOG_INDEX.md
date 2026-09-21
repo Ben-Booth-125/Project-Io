@@ -10,7 +10,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
-| 2026-09-20 | [Sprint 45's last builds: the charter spend hardened, a load that replays, and a refusal that would have gone quiet](DEVLOG.md) | BL-1043 BL-1044 BL-1050 BL-1060 BL-1061 BL-1062 BL-1063 | DEVLOG.md |
+| 2026-09-20 | [Sprint 45's last builds: the charter spend hardened, a load that replays, and a refusal that would have gone quiet](DEVLOG.md) | BL-1043 BL-1044 BL-1050 BL-1060 BL-1061 BL-1062 BL-1063 BL-1064 | DEVLOG.md |
 | 2026-09-19 | [Sprint 45 wave 1 lands: seven items delivered, the Fuel Doctrine and the charter spend ruled nine times](DEVLOG.md) | BL-1039 BL-1040 BL-1041 BL-1042 BL-1043 BL-1044 BL-1047 BL-1050 BL-1051 BL-1053 BL-1056 BL-1057 BL-1058 BL-1059 BL-1060 | DEVLOG.md |
 | 2026-09-18 | [Sprint 45 cut and mostly built: the span, Beat 1's points and the charter rules, behind switches; sprint 46 shaped](DEVLOG.md) | BL-1034 BL-1036 BL-1038 BL-1039 BL-1040 BL-1041 BL-1042 BL-1044 BL-1049 BL-1050 BL-1051 BL-1053 | DEVLOG.md |
 | 2026-09-17 | [Digitisation picked up: the 1960 baseline measured, then the corporate web's plumbing](DEVLOG.md) | BL-1026 BL-1027 BL-1028 BL-1029 BL-1030 BL-1031 BL-1032 BL-1033 BL-1034 BL-1035 | DEVLOG.md |

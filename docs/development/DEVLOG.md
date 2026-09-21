@@ -12,7 +12,7 @@ sessions can be scoped and paced with less waste.
 
 ## 2026-09-20 — Sprint 45's last builds: the charter spend hardened, a load that replays, and a refusal that would have gone quiet
 
-**Runtime:** ~13 h (07:50 to 20:45). Delivery — Full (three lanes with four fix rounds, four cold
+**Runtime:** ~17 h (07:50 to 01:00, the sweep unattended at the end). Delivery — Full (three lanes with four fix rounds, four cold
 reviews, chain 12 plus three long verification runs) with four design calls on elicitation forms.
 
 ### What landed
@@ -51,9 +51,22 @@ BL-1063. Two self-inflicted costs are recorded as hazards: chain 8 was re-run fo
 a memory saying it had finished was not read at session start, and a chain-12 digest check 10 hours in
 was killed as a supposed orphan.
 
+### Stage 1 came in overnight, and moved a ruling
+Three parallel shards (Ben freed memory for a third) finished 16 seeds by 00:40 — seeds 9 and 0 ran
+in two shards at once and agree to the digit, a free cross-process determinism check. The reading
+overturned the premise the seat-menu anchor rested on: the library's stockpiles run 24.7M to 133.6M
+points and a fixed price's seats track them almost proportionally, while the no-budget roster does
+not track them at all (seed 31 holds 95.3M and offers 6 legacy seats; seed 9 holds 27.5M and offers
+16). At 40000 a firm, the poorest world opened 1 seat and the richest 91 against an anchor median of
+9 — no single number sits inside both tails. **Ben ruled (NR-907) that a charter's price is a SHARE
+of the world's own stockpile**, fixed once at build, so the menu is the same size everywhere and the
+specialist keeps its price in firm charters. **BL-1064** builds it; stage 2 then sweeps the divisor
+rather than a fixed band.
+
 ### Left open
-BL-1043 stage 1 (running overnight), then its calls, then BL-1044 — the one re-bless, with BL-1050
-merging in the same integration. See `NEXT_SESSION.md`.
+BL-1064 (the derived price), then BL-1043 stage 2 over the divisor, its serial timing pass and its
+remaining calls, then BL-1044 — the one re-bless, with BL-1050 merging in the same integration. See
+`NEXT_SESSION.md`.
 
 ## 2026-09-19 — Sprint 45 wave 1 lands: seven items delivered, the Fuel Doctrine and the charter spend ruled nine times
 
