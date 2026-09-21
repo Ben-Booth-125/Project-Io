@@ -10,6 +10,47 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-21 — The charter price becomes the world's own, and the seat menu is read off the budget
+
+**Runtime:** ~10 h (14:00 to ~00:00, stage 2 unattended through the evening). Delivery — Full
+(BL-1064 built in the main session, two cold-review rounds) and Design (two elicitation forms:
+NR-908, then NR-909 and NR-910).
+
+### What landed
+- **BL-1064 (derived charter price)**, b89d0c2b. A firm charter costs the world's whole stockpile
+  over a divisor, fixed once at build, never below a point; a bad divisor or an int32-breaking price
+  rejects the budget, and an empty budget prices nothing. player_seed_sweep's stockpile mode gained
+  `--price-divisors` and `--price-pairs D:M`, reads each row's charged price back from the shipped
+  path, and closes with the seat menu. Span off, nothing moved: --digest-check 16/16, the four
+  world_determinism digests unchanged.
+- **BL-1043 stage 2**, e28fc758: 16 seeds x five price pairs, serial with keep-awake, 6.4 h.
+- **The seat curve**, ab655703: `stockpile_budget_check --seat-curve` counts the centres affording a
+  specialist straight off the budget — equal to the charted seats on 74 of 80 stage 2 rows, at ~80 s
+  a seed instead of ~25 minutes.
+
+### Reading the docs changed the plan
+Ben asked for the surrounding generation docs to be read before the sweep was re-aimed. They already
+gave the firm price to live-play cost and the specialist price to the seat menu — which BL-1064 as
+filed had collapsed into one knob. The handoff's "divisor near 150" turned out to be the divisor over
+the specialist's charters, with the seat direction inverted. Ben ruled the split (NR-908), and stage
+2 was re-cut into pairs that hold the seat ratio while the divisor moves.
+
+### What the measurements said
+Seats turn on the ratio alone — the three pairs at d/m 162 opened the same seats while their firm
+counts ran 4 to 120 — and the divisor alone sets the tick: x0.43 / x0.91 / x1.70 the legacy world at
+325:2 / 650:4 / 1300:8. But the anchor's 9 seats sit near d/m 290, above the whole stage 2 bracket,
+and whole charters are too coarse to land it (three open ~4, two ~13.5). Nor does the derived price
+make the menu one size: a world with many near-equal cities crosses the price together (seed 32 goes
+from 4 to 98 seats between d/m 225 and 325), so the library runs 2 to 73 seats at the pinned 580:2. What the
+derived price does remove is the empty world above d/m ~325. Ben ruled NR-910: two charters, the
+divisor tuned to the median (580: a median of 9.5 and no world falling back), the spread accepted, the no-specialist world falling back
+to the no-budget world, province cap 2, sqrt base 8. NR-909: the search-less starts spend the budget
+on the seed candidate.
+
+### Also
+BL-1044's integration plan is in REFINED.md (BL-1050 merges clean). The keep-awake that failed on
+shell quoting is now `tools/session/keepawake.ps1`.
+
 ## 2026-09-20 — Sprint 45's last builds: the charter spend hardened, a load that replays, and a refusal that would have gone quiet
 
 **Runtime:** ~17 h (07:50 to 01:00, the sweep unattended at the end). Delivery — Full (three lanes with four fix rounds, four cold

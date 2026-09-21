@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 222 entries across 2 volume(s).
+One line per session, newest first — 223 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-09-21 | [The charter price becomes the world's own, and the seat menu is read off the budget](DEVLOG.md) | BL-1043 BL-1044 BL-1050 BL-1064 | DEVLOG.md |
 | 2026-09-20 | [Sprint 45's last builds: the charter spend hardened, a load that replays, and a refusal that would have gone quiet](DEVLOG.md) | BL-1043 BL-1044 BL-1050 BL-1060 BL-1061 BL-1062 BL-1063 BL-1064 | DEVLOG.md |
 | 2026-09-19 | [Sprint 45 wave 1 lands: seven items delivered, the Fuel Doctrine and the charter spend ruled nine times](DEVLOG.md) | BL-1039 BL-1040 BL-1041 BL-1042 BL-1043 BL-1044 BL-1047 BL-1050 BL-1051 BL-1053 BL-1056 BL-1057 BL-1058 BL-1059 BL-1060 | DEVLOG.md |
 | 2026-09-18 | [Sprint 45 cut and mostly built: the span, Beat 1's points and the charter rules, behind switches; sprint 46 shaped](DEVLOG.md) | BL-1034 BL-1036 BL-1038 BL-1039 BL-1040 BL-1041 BL-1042 BL-1044 BL-1049 BL-1050 BL-1051 BL-1053 | DEVLOG.md |
