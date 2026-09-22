@@ -6981,7 +6981,7 @@
       "code: stockpile_budget.hpp",
       "headless: stockpile_budget_check --r8"
      ],
-     "requirement": "The ruled pins land where the budget is built, PROVISIONAL dropped from each: k_stockpile_specialist_firm_charters 2, k_stockpile_price_divisor 580, the per-province cap 2, the square root's base c = 8. Each cites NR-910 and the arithmetic it was read off (the seat curve at m = 2: median 9.5 seats at 580, none falling back; spread 2 to 73 accepted).",
+     "requirement": "The ruled pins land where the budget is built, PROVISIONAL dropped from each: k_stockpile_specialist_firm_charters 2, k_stockpile_price_divisor 650 (NR-914: the nine-seat rule read on the shipped world; 580 was its tier-off reading), the per-province cap 2, the square root's base c = 8. Each cites NR-910 and the arithmetic it was read off (the seat curve at m = 2: the shipped curve: median 9 at 650, none falling back; spread 4 to 98 accepted).",
      "notes": "",
      "result_metric": ""
     },
@@ -7065,7 +7065,7 @@
      "verification": [
       "headless: the 1960 readings per library seed"
      ],
-     "requirement": "THE DONE-WHEN READINGS at 1960 on the shipped world, per library seed: density follows cities (rho(firms, urban) against rho(firms, goods), the BL-1029 baseline 0.431 vs 0.460 on its upper-median convention) and industrialisation (points unevenly held, the fuel reading visible).",
+     "requirement": "THE READINGS at 1960 on the shipped world, per library seed, TAKEN AND REPORTED (restated, Ben 2026-09-22, NR-913 — not gated; the density knob is the sprint 46 item DENSITY_FOLLOWS_CITIES): density follows cities (rho(firms, urban) against rho(firms, goods), the BL-1029 baseline 0.431 vs 0.460) and industrialisation (points unevenly held, the fuel reading visible).",
      "notes": "",
      "result_metric": ""
     },

@@ -432,6 +432,24 @@
     "docs/ui/question_log.json",
     "docs/ai/ACTIONS.json"
    ]
+  },
+  {
+   "group": "carry",
+   "short_name": "DENSITY_FOLLOWS_CITIES",
+   "title": "Density follows cities: the charter web at the ruled prices is too sparse to track cities across the markets — a design pass on the density knobs",
+   "priority": "A",
+   "difficulty": 3,
+   "world_mover": true,
+   "requires": [],
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "design": "RULED (Ben, 2026-09-22, NR-913, the pooling form): BL-1044 ships the unpooled web and its done-when is restated; 'density follows cities' becomes this item, a design pass of its own.\n\nWHY. Beat 1's claim (DIGITISATION.md § 1) is that the charter budget is the stockpile, not headcount, so a web that follows cities proves something. Measured at the pins (650:2, 16 library seeds, digitisation_sim_harness --through 1960 reading 1): rho(firms per market, catchment urban population) median 0.139 against rho(firms, good count) 0.167; urban beats goods on 5 of 16 worlds; the legacy web read 0.431 against 0.460 (BL-1029). The web holds a median 65 firms over 148 to 538 markets, so most markets hold none. A firm costs 1/650 of the whole stock and the stock is split over 5,000 to 15,000 carved centres, so most centres hold less than one firm's price and ~85% of every stock goes unspent. Pooling the stranded remainder (NR-913's measurement, charter_spend_params::pool, kept as an off-by-default switch) lifts the reading only to 0.186-0.211, because the density ceiling (120 a body, NR-902) then binds, and it moves the seat menu (pooled firms take ground before poorer centres' specialists).\n\nTHE QUESTION. Which knob makes density follow cities without breaking NR-908's live-play band: the density ceiling, the firm price (a centre-relative price rather than a share of the whole stock), where firms may anchor (a centre's market catchment rather than its own window), or the reading itself (per centre or per region rather than per market). Each has a tick cost, measured against BL-1044's 650:2 row.\n\nDONE WHEN. A ruled knob and a reading: rho(firms, urban) above rho(firms, goods) on the median library world, the tick inside NR-908's band, the seat menu held at the anchor.",
+   "files": [
+    "src/world/stockpile_budget.hpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/charter_budget.hpp",
+    "tools/verify/digitisation_sim_harness.cpp",
+    "tools/verify/player_seed_sweep.cpp"
+   ]
   }
  ]
 }

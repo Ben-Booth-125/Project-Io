@@ -24,29 +24,13 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*18 entries — 1 open, 17 resolved.*
+*18 entries — 0 open, 18 resolved.*
 
 ---
 
 ## Open
 
-### NR-913 — CALL: density does not follow cities on the shipped world — at 580:2 most centres cannot buy one firm, and ~79% of every stock goes unspent
-*question · raised 2026-09-22 · from BL-1044 Step 2 (digitisation_sim_harness --through 1960, reading 1, 16 library seeds; player_seed_sweep --digest on the shipped arc, the charter accounts), main session, 2026-09-22 — BL-1044's done-when reading.*
-
-BL-1044's done-when reading is 'density follows cities': firm count per market against the catchment's urban population, above its good count (BL-1029's baseline on the legacy web: rho 0.431 against 0.460). On the shipped world at the pins it does not: rho(firms, urban) median 0.138 (p25 0.095, p75 0.177), rho(firms, goods) median 0.167; urban beats goods on 5 of 16 worlds. The cause is in the charter accounts. A firm costs 1/580 of the WHOLE stock, but the stock is split over 5,579 to 15,240 carved centres, so most centres hold less than one firm's price: the median world spends 16.6% of its stock and leaves 78.8% unspent as `remainder` (seed 46: 97.4%, seed 25: 94.7%, seed 32: 56.4%). The web is bought by the few dozen richest centres — 7 to 92 firms a world, median 65, against the legacy web's 81 on every seed — so it cannot track cities across 148 to 538 markets. The cost mode's per-centre reading says the same (seed 46: rho -0.005 over 15,240 centres).
-
-**Why it matters.** It is the phase's own claim (DIGITISATION.md § 1: the budget is the stockpile, not headcount, so density following cities is MEANINGFUL) and BL-1044's done-when. The re-bless would pin a world whose charter web sits in its great cities and nowhere else. Tick cost and the seat menu are separate knobs (NR-908); this is where the points go.
-
-- A: accept — capital concentrates, and firms stand where it did; restate the done-when as 'density follows the richest cities' and re-bless.
-- B: pool what a centre cannot spend: a centre's remainder rolls up (to its region, or its nation's capital) and buys firms there, so the stock is spent rather than stranded; the seat menu is untouched (it reads a centre's own points).
-- C: price a firm off the centres, not the whole stock (e.g. the median centre's budget over a divisor), so a typical city can buy one; the specialist stays m x the whole-stock price. Density rises, and so does the tick — measured against NR-908's live-play band.
-- D: hold the re-bless and re-measure the done-when on a small sweep of B or C first.
-
-> **Recommendation:** D, measuring B first: it spends the stranded points without touching the price rulings (NR-907, NR-908, NR-910) or the seat menu, and its cost is one reading. A is legitimate if Ben reads 'cities' as 'the capitals', but it is a different phase claim than § 1 makes.
-
-> **RESOLVED.** INTERIM RULING (Ben, 2026-09-22, the Gate 2 form): D — hold the re-bless and measure pooling (option B) first. The adoption call follows the reading. MEASURED (2026-09-22, digitisation_sim_harness --through 1960 at 650:2, 16 library seeds, pooling off by default): rho(firms, urban) / rho(firms, goods) medians, and worlds where urban beats goods — none 0.139 / 0.167, 5 of 16 (65.5 firms a world, 15.2% of the stock spent); region 0.186 / 0.195, 10 of 16 (109 firms, 19.8%); market 0.211 / 0.204, 7 of 16 (120 firms on every seed, 21.1%); nation 0.156 / 0.213, 3 of 16 (120 firms, 21.1%). The density ceiling (120 a body) binds under every pool, so ~79% of each stock stays unspent — now under the ceiling, not the price. None approaches BL-1029's legacy web (0.431 / 0.460): at most 120 firms over 148-538 markets leaves most markets empty. AND the seat menu is NOT untouched: affording is, but pooled firms at a group's richest centre take ground before poorer centres place their specialists (seed 41: 65 seated unpooled, 44 region, 29 market). The adoption call is Ben's.
-
-*Files: `docs/generation/DIGITISATION.md`, `src/world/corporation_generation.cpp`, `src/world/stockpile_budget.hpp`, `tools/verify/digitisation_sim_harness.cpp`*
+*Nothing open.*
 
 ---
 
@@ -320,6 +304,24 @@ With the span on, a nation's opening treasury is its folded polities' chest at t
 > **RESOLVED.** RULED (Ben, 2026-09-22, the Gate 2 form): A — keep 0.01 per mille and restate Pass 7's scales from the shipped world. Written into NATION_GENERATION.md § Pass 7 (median nation 0.41 credits, 22 of 38 under one, 14 at 100+, sum 31,691, richest 5,420 on the reference seed).
 
 *Files: `docs/generation/NATION_GENERATION.md`, `src/world/nation_generation.hpp`, `tools/verify/era_world_harness.cpp`*
+
+### NR-913 — CALL: density does not follow cities on the shipped world — at 580:2 most centres cannot buy one firm, and ~79% of every stock goes unspent
+*question · raised 2026-09-22 · from BL-1044 Step 2 (digitisation_sim_harness --through 1960, reading 1, 16 library seeds; player_seed_sweep --digest on the shipped arc, the charter accounts), main session, 2026-09-22 — BL-1044's done-when reading.*
+
+BL-1044's done-when reading is 'density follows cities': firm count per market against the catchment's urban population, above its good count (BL-1029's baseline on the legacy web: rho 0.431 against 0.460). On the shipped world at the pins it does not: rho(firms, urban) median 0.138 (p25 0.095, p75 0.177), rho(firms, goods) median 0.167; urban beats goods on 5 of 16 worlds. The cause is in the charter accounts. A firm costs 1/580 of the WHOLE stock, but the stock is split over 5,579 to 15,240 carved centres, so most centres hold less than one firm's price: the median world spends 16.6% of its stock and leaves 78.8% unspent as `remainder` (seed 46: 97.4%, seed 25: 94.7%, seed 32: 56.4%). The web is bought by the few dozen richest centres — 7 to 92 firms a world, median 65, against the legacy web's 81 on every seed — so it cannot track cities across 148 to 538 markets. The cost mode's per-centre reading says the same (seed 46: rho -0.005 over 15,240 centres).
+
+**Why it matters.** It is the phase's own claim (DIGITISATION.md § 1: the budget is the stockpile, not headcount, so density following cities is MEANINGFUL) and BL-1044's done-when. The re-bless would pin a world whose charter web sits in its great cities and nowhere else. Tick cost and the seat menu are separate knobs (NR-908); this is where the points go.
+
+- A: accept — capital concentrates, and firms stand where it did; restate the done-when as 'density follows the richest cities' and re-bless.
+- B: pool what a centre cannot spend: a centre's remainder rolls up (to its region, or its nation's capital) and buys firms there, so the stock is spent rather than stranded; the seat menu is untouched (it reads a centre's own points).
+- C: price a firm off the centres, not the whole stock (e.g. the median centre's budget over a divisor), so a typical city can buy one; the specialist stays m x the whole-stock price. Density rises, and so does the tick — measured against NR-908's live-play band.
+- D: hold the re-bless and re-measure the done-when on a small sweep of B or C first.
+
+> **Recommendation:** D, measuring B first: it spends the stranded points without touching the price rulings (NR-907, NR-908, NR-910) or the seat menu, and its cost is one reading. A is legitimate if Ben reads 'cities' as 'the capitals', but it is a different phase claim than § 1 makes.
+
+> **RESOLVED.** INTERIM RULING (Ben, 2026-09-22, the Gate 2 form): D — hold the re-bless and measure pooling (option B) first. The adoption call follows the reading. MEASURED (2026-09-22, digitisation_sim_harness --through 1960 at 650:2, 16 library seeds, pooling off by default): rho(firms, urban) / rho(firms, goods) medians, and worlds where urban beats goods — none 0.139 / 0.167, 5 of 16 (65.5 firms a world, 15.2% of the stock spent); region 0.186 / 0.195, 10 of 16 (109 firms, 19.8%); market 0.211 / 0.204, 7 of 16 (120 firms on every seed, 21.1%); nation 0.156 / 0.213, 3 of 16 (120 firms, 21.1%). The density ceiling (120 a body) binds under every pool, so ~79% of each stock stays unspent — now under the ceiling, not the price. None approaches BL-1029's legacy web (0.431 / 0.460): at most 120 firms over 148-538 markets leaves most markets empty. AND the seat menu is NOT untouched: affording is, but pooled firms at a group's richest centre take ground before poorer centres place their specialists (seed 41: 65 seated unpooled, 44 region, 29 market). The adoption call is Ben's. RULED (Ben, 2026-09-22, the pooling form): A — ship unpooled, restate BL-1044's done-when (the reading taken and reported, not gated), file density as its own sprint 46 design item (drafts/sprint-46-items.json DENSITY_FOLLOWS_CITIES), re-bless now; the pool switch stays, off by default, as a measurement.
+
+*Files: `docs/generation/DIGITISATION.md`, `src/world/corporation_generation.cpp`, `src/world/stockpile_budget.hpp`, `tools/verify/digitisation_sim_harness.cpp`*
 
 ### NR-914 — CALL: the pinned divisor opens a median 6.5 seats on the shipped world, not the anchor's 9 — the seat curve moved when the tier turned on
 *question · raised 2026-09-22 · from BL-1044 Step 2 (player_seed_sweep --digest on the shipped arc; stockpile_budget_check --seat-curve on the shipped world, 16 library seeds), main session, 2026-09-22.*
