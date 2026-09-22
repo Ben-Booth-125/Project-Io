@@ -773,6 +773,13 @@ void clear_derived_state(world& w)
     w.body_market_index_count  = 0;
     w.body_market_index_max_id = null_entity;
 
+    // BL-1050's per-body centre index, on the same terms: a pure function of
+    // `population_centres` + `population_centre_tile`, both of which the
+    // snapshot DOES carry, so it is rebuilt rather than written.
+    w.body_centre_index.clear();
+    w.body_centre_index_count  = 0;
+    w.body_centre_index_cursor = 0; // not an id: the allocator cursor at build
+
     // Observability, not state: the chat feed and the harness read this ring.
     // A loaded campaign starts with an empty decision log rather than a
     // resurrected one, which is honest -- those decisions were taken in a

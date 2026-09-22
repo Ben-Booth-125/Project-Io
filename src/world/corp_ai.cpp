@@ -23,6 +23,7 @@
 #include <map>
 #include <ostream>
 #include <string>
+#include <tuple> // BL-1050: the haul destination's written-out id tie-break
 #include <utility>
 
 namespace {
@@ -2009,6 +2010,23 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // a single file-local function.
             const logistics_nodes nodes = collect_logistics_nodes(w);
 
+            // ASCENDING MARKET ID (BL-1050). The destination scan below is a
+            // strict `score > best_score` over every market, and `w.markets` is
+            // an unordered store — so two candidates with an EXACTLY equal score
+            // were separated by nothing but that store's bucket layout, which a
+            // save/load rebuilds (world_save.cpp re-inserts in id order) and
+            // another standard library lays out differently again. The walk is
+            // sorted here and the tie-break is written out below, so the winner
+            // is named by the ids either way.
+            std::vector<entity_id> market_ids;
+            market_ids.reserve(w.markets.size());
+            for (const auto& [mid, mc] : w.markets)
+            {
+                (void)mc;
+                market_ids.push_back(mid);
+            }
+            std::sort(market_ids.begin(), market_ids.end());
+
             entity_id   best_market   = null_entity;
             entity_id   best_src_body = null_entity;
             std::size_t best_ri       = 0;
@@ -2031,8 +2049,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (surplus <= 0.0f)
                         continue;
 
-                    for (const auto& [mid, mc] : w.markets)
+                    for (const entity_id mid : market_ids)
                     {
+                        const market_component& mc = w.markets.at(mid);
                         // Same-body IS a real haul (BL-096 multi-market bodies):
                         // `price_convoy_leg` routes it over `intra_body_path`
                         // exactly like the auto-dispatcher's own scan does, so
@@ -2071,7 +2090,22 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         if (score <= 0.0f)
                             continue; // never haul at a loss
 
-                        if (score > best_score)
+                        // THE TIE-BREAK IS WRITTEN OUT (BL-1050), not left to
+                        // the walk: on an exactly equal score the lane with the
+                        // lowest (source body, resource, market id) wins. That
+                        // is what the sorted walk above already yields — the
+                        // pools are a std::map, the resource index ascends, the
+                        // market ids are sorted — so this changes no choice the
+                        // scan makes today. It states the rule instead of
+                        // inheriting it from three loop orders, so a future
+                        // reordering of any of them cannot silently move a
+                        // convoy's destination.
+                        const bool better =
+                            (score > best_score) ||
+                            (score == best_score && best_market != null_entity &&
+                             std::make_tuple(src_body, r, mid) <
+                                 std::make_tuple(best_src_body, best_ri, best_market));
+                        if (better)
                         {
                             best_score    = score;
                             best_market   = mid;

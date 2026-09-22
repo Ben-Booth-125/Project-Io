@@ -10,29 +10,91 @@
 #include <tuple>
 #include <vector>
 
+namespace {
+
+/// body -> its population centres in ASCENDING ID ORDER, built once and kept on
+/// the world (`world::body_centre_index`, declared there with the staleness
+/// rule). The same shape and the same stamp `markets_by_body` (market_clearing.cpp)
+/// uses for markets.
+///
+/// WHY IT IS AN INDEX AND NOT A LOOP (BL-1050 cold review). `body_mean_habitability`
+/// below is called per building per tick (economy_system.cpp), per building AND
+/// per build candidate (building_profit.cpp), by the corp AI and by two UI panels
+/// — and every one of those calls used to walk EVERY centre in the world and hash
+/// twice per centre to keep the few on one body. budget_system's own `hab_cache`
+/// exists to blunt exactly that at the one call site that could. The index pays
+/// the walk once per world instead of once per call, and it hands back the sorted
+/// order the sum needs, so the sort is paid once too.
+const faithful_unordered_map<entity_id, std::vector<entity_id>>& centres_by_body(const world& w)
+{
+    // THE STAMP IS O(1), and it has to be: `markets_by_body` re-derives its max
+    // id by walking all 136 markets per call, which is affordable there and is
+    // the whole cost being removed here (5417 centres on seed 28). So the stamp
+    // is the centre count plus the ENTITY-ALLOCATOR CURSOR — monotonic, and it
+    // moves whenever any entity anywhere is created. Count alone would already
+    // be sound today (centres are written once by generate_population_centres
+    // and nothing erases one — a razed centre keeps its entry), but an erase
+    // paired with an insert would slip past it, and the cursor closes that
+    // without a walk: an insert cannot happen without the cursor moving.
+    const std::size_t   n      = w.population_centres.size();
+    const std::uint32_t cursor = w.next_entity_id();
+
+    if (w.body_centre_index_count != n || w.body_centre_index_cursor != cursor)
+    {
+        auto& map = w.body_centre_index;
+        map.clear();
+        for (const auto& [cid, pcc] : w.population_centres)
+        {
+            (void)pcc;
+            const auto tile_it = w.population_centre_tile.find(cid);
+            if (tile_it == w.population_centre_tile.end())
+                continue;
+            const auto tc_it = w.tiles.find(tile_it->second);
+            if (tc_it == w.tiles.end())
+                continue;
+            map[tc_it->second.body].push_back(cid);
+        }
+        // The one line the determinism rests on: whatever order the walk above
+        // reached them in, each body's list comes out ascending.
+        for (auto& [b, ids] : map)
+        {
+            (void)b;
+            std::sort(ids.begin(), ids.end());
+        }
+        w.body_centre_index_count  = n;
+        w.body_centre_index_cursor = cursor;
+    }
+    return w.body_centre_index;
+}
+
+} // namespace
+
 float body_mean_habitability(const world& w, entity_id body)
 {
     // Mirrors the accumulation apply_budget's batch used, filtered to one body, so
     // the estimate and the live budget loop read an identical mean (bit-for-bit).
-    // ORDER-DEPENDENT: a float sum in `population_centres` iteration order. That
-    // order is why a world copy must keep it (BL-1034, faithful_unordered_map.hpp):
-    // a reordered copy moved this mean two ULP on seed 28 and every wage with it.
+    //
+    // ASCENDING CENTRE ID (BL-1050). This is a float sum and float addition does
+    // not associate, so the summation order must be a property of the ids and
+    // never of `population_centres`' bucket layout: a save/load re-inserts that
+    // store in id order (world_save.cpp) and lays it out differently, and another
+    // standard library lays it out differently again — so the unordered walk that
+    // was here made a LOADED world tick differently from the one it was saved
+    // from. BL-1034's faithful_unordered_map keeps a COPY in its source's order
+    // and stays as the tripwire; it never was the fix for a load or a port.
+    // A reordered read moved one body's mean two ULP on seed 28 and every wage
+    // built on it with it, which is exactly how much this is worth.
+    //
+    // The order arrives from the index above; the arithmetic here is unchanged.
+    const auto& by_body = centres_by_body(w);
+    const auto  it      = by_body.find(body);
+    if (it == by_body.end() || it->second.empty())
+        return 1.0f;
+
     float sum = 0.0f;
-    int   count = 0;
-    for (const auto& [cid, pcc] : w.population_centres)
-    {
-        const auto tile_it = w.population_centre_tile.find(cid);
-        if (tile_it == w.population_centre_tile.end())
-            continue;
-        const auto tc_it = w.tiles.find(tile_it->second);
-        if (tc_it == w.tiles.end())
-            continue;
-        if (tc_it->second.body != body)
-            continue;
-        sum += pcc.habitability;
-        ++count;
-    }
-    return (count > 0) ? sum / static_cast<float>(count) : 1.0f;
+    for (const entity_id cid : it->second)
+        sum += w.population_centres.at(cid).habitability;
+    return sum / static_cast<float>(it->second.size());
 }
 
 building_opex compute_building_opex(const building_component& b,

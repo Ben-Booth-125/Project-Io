@@ -256,8 +256,25 @@ void inject_population_demand(world& w, const recipe_registry& reg)
     const population_demand_params& pd = reg.population_demand();
     const std::array<float, resource_count>& basket = reg.population_demand_basket();
 
-    for (const auto& [centre_id, pcc] : w.population_centres)
+    // ASCENDING CENTRE ID (BL-1050). Many centres inject into ONE market's
+    // `mc.demand[r] +=`, so this is a cross-centre float accumulation and float
+    // addition does not associate: walked in `population_centres`' bucket order
+    // the demand a market prices against would depend on that store's layout,
+    // which a save/load rebuilds (world_save.cpp re-inserts in id order) and
+    // another standard library lays out differently again. The order is now a
+    // property of the ids alone.
+    std::vector<entity_id> centre_ids;
+    centre_ids.reserve(w.population_centres.size());
+    for (const auto& [cid, pcc] : w.population_centres)
     {
+        (void)pcc;
+        centre_ids.push_back(cid);
+    }
+    std::sort(centre_ids.begin(), centre_ids.end());
+
+    for (const entity_id centre_id : centre_ids)
+    {
+        const population_centre_component& pcc = w.population_centres.at(centre_id);
         if (pcc.razed)
             continue; // BL-624 (razed settlement tier): a razed centre has no
                       // heads to feed — it injects no demand until re-settled.
@@ -306,18 +323,40 @@ void inject_background_demand(world& w, const recipe_registry& reg)
 
     // Per-body population scale: sum of every centre's scale on that body,
     // gathered once so every market on a multi-market body (BL-096) sees the
-    // same pull. std::map keyed by entity_id → deterministic accumulation
-    // order regardless of population_centres' unordered_map layout.
-    std::map<entity_id, float> body_scale;
+    // same pull.
+    //
+    // ASCENDING CENTRE ID (BL-1050), and the reason that stood here was WRONG:
+    // it argued that a std::map keyed by entity_id makes the accumulation
+    // deterministic "regardless of population_centres' layout". An ordered KEY
+    // orders which bucket each addend lands in; it does not order the addends
+    // WITHIN a bucket, and `body_scale[body] +=` is a float accumulation whose
+    // order is `population_centres`' — which a save/load rebuilds (world_save.cpp
+    // re-inserts in id order) and another standard library lays out differently
+    // again. Today every scale is a small integer, so every partial sum is exact
+    // and no shipped world's number moves; the order is fixed anyway, because a
+    // sum that happens to be exact today is not a sum that is order-free.
+    //
+    // The membership test is order-free, so the filter runs unordered and only
+    // the accumulation is sorted.
+    std::vector<entity_id> scale_centre_ids;
+    scale_centre_ids.reserve(w.population_centres.size());
     for (const auto& [cid, pcc] : w.population_centres)
     {
+        (void)pcc;
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
             continue;
-        const auto tit = w.tiles.find(tile_it->second);
-        if (tit == w.tiles.end())
+        if (w.tiles.find(tile_it->second) == w.tiles.end())
             continue;
-        body_scale[tit->second.body] += static_cast<float>(pcc.scale);
+        scale_centre_ids.push_back(cid);
+    }
+    std::sort(scale_centre_ids.begin(), scale_centre_ids.end());
+
+    std::map<entity_id, float> body_scale;
+    for (const entity_id cid : scale_centre_ids)
+    {
+        const entity_id body = w.tiles.at(w.population_centre_tile.at(cid)).body;
+        body_scale[body] += static_cast<float>(w.population_centres.at(cid).scale);
     }
 
     for (auto& [mid, mc] : w.markets)

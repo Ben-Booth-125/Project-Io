@@ -1022,6 +1022,17 @@ void accumulate_body_production(const world& w, const recipe_registry& reg,
                                 entity_id body_id,
                                 std::array<float, resource_count>& production)
 {
+    // ASCENDING BUILDING ID (BL-1050). `production[r] +=` is a cross-building
+    // float sum and float addition does not associate, so walked in
+    // `w.buildings`' bucket order this vector — and the gap loop that chooses
+    // the next firm from it — would depend on that store's layout, which a
+    // save/load rebuilds (world_save.cpp re-inserts in id order) and another
+    // standard library lays out differently again.
+    //
+    // The eligibility test is order-free, so it runs first and the sort is over
+    // this body's buildings rather than the world's.
+    std::vector<entity_id> bids;
+    bids.reserve(w.buildings.size());
     for (const auto& [bid, b] : w.buildings)
     {
         const auto tit = w.tiles.find(b.tile);
@@ -1029,6 +1040,13 @@ void accumulate_body_production(const world& w, const recipe_registry& reg,
             continue;
         if (b.decommissioned)
             continue;
+        bids.push_back(bid);
+    }
+    std::sort(bids.begin(), bids.end());
+
+    for (const entity_id bid : bids)
+    {
+        const building_component& b = w.buildings.at(bid);
         if (b.type == building_type::extraction_site)
         {
             const float nominal = extraction_nominal(w, reg, b, 1.0f);
@@ -1080,18 +1098,24 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
     const building_upkeep_params& up = reg.building_upkeep();
 
     // One resolved basket per type, not per building — the basket is per (type,
-    // band) and nothing here can change either. `w.buildings` is an unordered
-    // map, but this walk only ACCUMULATES a per-resource sum over a set that
-    // does not depend on order, so the finished vector is the same whatever
-    // order it was filled in (the same argument run_building_upkeep's own
-    // ownership map carries).
+    // band) and nothing here can change either.
     std::array<std::array<float, resource_count>, building_type_count> basket{};
     for (std::size_t t = 0; t < building_type_count; ++t)
         basket[t] = building_upkeep_goods(up, static_cast<building_type>(t), reg.era());
 
+    // ASCENDING BUILDING ID (BL-1050), and the comment that stood here was
+    // WRONG: it argued that because the SET of addends does not depend on the
+    // walk order, neither does the sum. Float addition does not associate, so
+    // the same set added in two orders is two different numbers — which is
+    // exactly the defect, because `w.buildings`' layout is rebuilt by a
+    // save/load (world_save.cpp re-inserts in id order) and laid out
+    // differently again by another standard library. The set really is
+    // order-free, so the eligibility filter runs unordered and only the sum is
+    // sorted.
+    std::vector<entity_id> bids;
+    bids.reserve(w.buildings.size());
     for (const auto& [bid, b] : w.buildings)
     {
-        (void)bid;
         // The live pass's own eligibility: a building under construction draws
         // through the CONSTRUCTION channel instead, and a decommissioned one is
         // not operating. Sizing against either would provision for demand that
@@ -1101,9 +1125,15 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
         const auto tit = w.tiles.find(b.tile);
         if (tit == w.tiles.end() || tit->second.body != body_id)
             continue;
-        const std::size_t ti = static_cast<std::size_t>(b.type);
-        if (ti >= building_type_count)
+        if (static_cast<std::size_t>(b.type) >= building_type_count)
             continue;
+        bids.push_back(bid);
+    }
+    std::sort(bids.begin(), bids.end());
+
+    for (const entity_id bid : bids)
+    {
+        const std::size_t ti = static_cast<std::size_t>(w.buildings.at(bid).type);
         for (std::size_t r = 0; r < resource_count; ++r)
             demand[r] += basket[ti][r];
     }
@@ -1187,18 +1217,32 @@ std::array<float, resource_count> body_construction_demand(const world& w,
 std::array<float, resource_count> body_demand(const world& w, const recipe_registry& reg,
                                               entity_id body_id)
 {
+    // ASCENDING CENTRE ID (BL-1050). `total_scale` is a float sum — today over
+    // integer scales small enough that every partial stays exact, so no shipped
+    // world's number moves — but it is arithmetic in `population_centres`'
+    // bucket order all the same, and that order is not part of the state (a
+    // save/load re-inserts in id order; another standard library lays it out
+    // differently again). Not one of BL-1050's five named readers: found
+    // alongside them, same file, same gap loop, fixed the same way.
     std::array<float, resource_count> demand = {};
-    float total_scale = 0.0f;
+    std::vector<entity_id> centre_ids;
+    centre_ids.reserve(w.population_centres.size());
     for (const auto& [cid, pcc] : w.population_centres)
     {
+        (void)pcc;
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
             continue;
         const auto tit = w.tiles.find(tile_it->second);
         if (tit == w.tiles.end() || tit->second.body != body_id)
             continue;
-        total_scale += static_cast<float>(pcc.scale);
+        centre_ids.push_back(cid);
     }
+    std::sort(centre_ids.begin(), centre_ids.end());
+
+    float total_scale = 0.0f;
+    for (const entity_id cid : centre_ids)
+        total_scale += static_cast<float>(w.population_centres.at(cid).scale);
     if (total_scale <= 0.0f)
         return demand;
 

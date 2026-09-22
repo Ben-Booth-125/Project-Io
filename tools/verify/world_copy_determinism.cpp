@@ -24,7 +24,14 @@
 //      every lap with `--laps` — with the BL-1031 D_settle recipe
 //      (world_digest.hpp: snapshot bytes + state_hash), and names the FIRST
 //      tick and lap at which the two part.
-// A seed PASSES when the order audit is clean and every digest agrees. The ONLY
+// A seed PASSES when every digest agrees, and — for a COPY (`construct` /
+// `assign`) — the order audit is clean too. Under `--copy-by snapshot` the ORDER
+// is exempt, because a load re-inserts every store in ascending id and therefore
+// MUST lay them out differently; what a load has to prove is the digests.
+// (BL-1050 settled this: the header always said the audit was not counted for a
+// load and `pass()` counted it anyway. It could only be made to agree once a
+// loaded world actually ticked byte for byte.) THE SIZE IS NEVER EXEMPT — see
+// `derived_cache`, the three named stores a load may legitimately lose. The ONLY
 // thing copied is the world: both sides settle against the one registry.
 //
 // WHAT IT FOUND (2026-09-18, seed 28, before the fix). 13 of world's 18
@@ -36,10 +43,19 @@
 // (apply_budget, through the wages built on it) was the first lap whose digest
 // parted. The fix is the store type, src/world/faithful_unordered_map.hpp.
 //
-// `--copy-by snapshot` IS A DIAGNOSTIC, NOT A CONTRACT. A save round trip drops
-// what the save deliberately does not carry (derived caches, generation-time
-// indexes), so a divergence there is a finding about loading, reported but not
-// counted against the copy.
+// `--copy-by snapshot` IS THE LOAD CONTRACT (BL-1050), and its ORDER audit is
+// the diagnostic. A save round trip drops what the save deliberately does not
+// carry (derived caches, generation-time indexes) and re-inserts every store in
+// ascending id, so the stores MUST lie differently and `body_tile_index` must
+// come back a different size — none of that is counted. The digests are: a
+// loaded world ticks exactly as the world it was saved from.
+//
+// WHAT THAT FOUND (2026-09-20, BL-1050, before the fix). Seed 28's loaded world
+// settled to 4663417C6733EBDE against its original's 265C48A23E313B1A. BL-1034's
+// faithful_unordered_map was never the fix for this half — it makes a COPY keep
+// its source's order, and a load has no source order to keep. The fix is five
+// readers that walked an unordered store where the order reached arithmetic or a
+// tie-break; they now walk ascending ids.
 //
 // USAGE (repo root):
 //   ./build_gen/verify/world_copy_determinism.exe --seed 28
@@ -145,6 +161,7 @@ struct order_row
 {
     const char* name = "";
     std::size_t size = 0;
+    std::size_t size_copy = 0;
     std::size_t buckets_orig = 0, buckets_copy = 0;
     std::size_t shared_buckets = 0;   ///< buckets in the original holding 2+ keys
     bool        same_size  = true;
@@ -152,12 +169,31 @@ struct order_row
     std::size_t first_mismatch = 0;   ///< position of the first key that differs
 };
 
+/// THE THREE STORES A LOAD IS ALLOWED TO COME BACK A DIFFERENT SIZE IN, and the
+/// list is NAMED rather than a blanket for a reason (BL-1050 cold review). These
+/// are the derived caches `clear_derived_state` rebuilds: the save deliberately
+/// does not carry them, so they return empty and refill lazily, and counting
+/// that would fail every load. EVERY OTHER STORE IS AUTHORITATIVE, and a size
+/// mismatch in one is a store the save round trip LOST — added to `world` and
+/// wired to a reader but never serialised. That is a real defect, and it is
+/// invisible to the digests whenever the 12-tick settle happens not to read the
+/// store, so the size check is the only thing that catches it. If a new derived
+/// cache is added to the audit, add it here deliberately.
+bool derived_cache(const char* name)
+{
+    return std::strcmp(name, "body_tile_index") == 0
+        || std::strcmp(name, "body_reach_cost") == 0
+        || std::strcmp(name, "body_market_index") == 0
+        || std::strcmp(name, "body_centre_index") == 0;
+}
+
 template <class M>
 order_row audit_order(const char* name, const M& a, const M& b)
 {
     order_row r;
     r.name         = name;
     r.size         = a.size();
+    r.size_copy    = b.size();
     r.buckets_orig = a.bucket_count();
     r.buckets_copy = b.bucket_count();
     for (std::size_t i = 0; i < a.bucket_count(); ++i)
@@ -201,6 +237,7 @@ std::vector<order_row> audit_world_orders(const world& a, const world& b)
     rows.push_back(audit_order("body_tile_index", a.body_tile_index, b.body_tile_index));
     rows.push_back(audit_order("body_reach_cost", a.body_reach_cost, b.body_reach_cost));
     rows.push_back(audit_order("body_market_index", a.body_market_index, b.body_market_index));
+    rows.push_back(audit_order("body_centre_index", a.body_centre_index, b.body_centre_index));
     rows.push_back(audit_order("corp_embargo_conditions", a.corp_embargo_conditions, b.corp_embargo_conditions));
     rows.push_back(audit_order("provinces.tile_province", a.provinces.tile_province, b.provinces.tile_province));
     return rows;
@@ -224,8 +261,10 @@ void digest_after_lap(const world& w, int lap, void* ctx)
 struct seed_result
 {
     std::uint32_t seed = 0;
+    copy_by       by = copy_by::construct;
     bool          orders_clean = true;
     int           orders_differing = 0;
+    int           sizes_differing = 0;   ///< AUTHORITATIVE stores only (see derived_cache)
     bool          land_match = true;
     bool          search_match = true;   ///< copy-at base only: the copy's walk
     int           ticks_compared = 0;
@@ -233,7 +272,30 @@ struct seed_result
     int           first_lap  = -1;       ///< its lap (with --laps), else the tick's end
     std::uint64_t settle_orig = 0, settle_copy = 0;
     double        seconds = 0.0;
-    bool pass() const { return orders_clean && land_match && search_match && first_tick < 0; }
+    /// ORDER IS EXEMPT FOR A LOAD; SIZE NEVER IS (BL-1050, and its cold review).
+    /// Under `--copy-by snapshot` the stores are re-inserted in ascending id and
+    /// MUST come out laid out differently, so counting the ORDER against the
+    /// seed would fail every load by construction. What a load has to prove is
+    /// the digests — that a saved-and-loaded world ticks as the one it was saved
+    /// from whatever order its stores now lie in.
+    ///
+    /// THE EXEMPTION IS THE ORDER ALONE, and the distinction is load-bearing
+    /// because `audit_order` reports a size mismatch THROUGH `same_order`: a
+    /// blanket exemption would drop the size check with it, and a store the save
+    /// round trip LOST would come back empty and print PASS whenever the 12-tick
+    /// settle happened not to read it. So `sizes_differing` counts every
+    /// AUTHORITATIVE store separately, and only the three named derived caches
+    /// are allowed to differ (see `derived_cache`).
+    ///
+    /// Under `construct`/`assign` the whole audit stays a hard requirement: it
+    /// is the faithful_unordered_map tripwire, and a copy that reorders is a
+    /// copy that can silently diverge.
+    bool pass() const
+    {
+        const bool audit_ok = (by == copy_by::snapshot) ? (sizes_differing == 0)
+                                                        : orders_clean;
+        return audit_ok && land_match && search_match && first_tick < 0;
+    }
 };
 
 std::uint64_t search_digest(const landscape_search_result& r)
@@ -256,6 +318,7 @@ seed_result run_seed(lua_state& lua, std::uint32_t seed, copy_at at, copy_by by,
 {
     seed_result res;
     res.seed = seed;
+    res.by   = by;
     const clk::time_point t_start = clk::now();
 
     world_params p{};          // the shipped start: full prehistory, as the pins
@@ -296,18 +359,33 @@ seed_result run_seed(lua_state& lua, std::uint32_t seed, copy_at at, copy_by by,
     // --- the order audit ---
     const std::vector<order_row> rows = audit_world_orders(orig.w, copy_w);
     for (const order_row& r : rows)
-        if (!r.same_order)
+    {
+        if (r.same_order)
+            continue;
+        ++res.orders_differing;
+        if (r.same_size)
         {
-            ++res.orders_differing;
-            std::printf("  ORDER  %-24s n=%-7zu buckets %zu/%zu, %zu shared; %s\n", r.name, r.size,
-                        r.buckets_orig, r.buckets_copy, r.shared_buckets,
-                        r.same_size ? "" : "SIZE DIFFERS");
-            if (r.same_size)
-                std::printf("         first key out of place at position %zu\n", r.first_mismatch);
+            std::printf("  ORDER  %-24s n=%-7zu buckets %zu/%zu, %zu shared;\n", r.name, r.size,
+                        r.buckets_orig, r.buckets_copy, r.shared_buckets);
+            std::printf("         first key out of place at position %zu\n", r.first_mismatch);
+            continue;
         }
+        // A SIZE mismatch, which is a different finding entirely — the copy does
+        // not hold what the original holds. Counted unless the store is one of
+        // the three derived caches a load rebuilds.
+        const bool exempt = derived_cache(r.name);
+        if (!exempt)
+            ++res.sizes_differing;
+        std::printf("  SIZE   %-24s orig %zu, copy %zu  -- %s\n", r.name, r.size, r.size_copy,
+                    exempt ? "derived cache, rebuilt on load: NOT counted"
+                           : "AUTHORITATIVE STORE: the copy does not hold it");
+    }
     res.orders_clean = res.orders_differing == 0;
-    std::printf("  order audit: %zu unordered stores, %d iterate differently in the copy\n",
-                rows.size(), res.orders_differing);
+    std::printf("  order audit: %zu unordered stores, %d iterate differently in the copy%s\n",
+                rows.size(), res.orders_differing,
+                by == copy_by::snapshot ? "  (order exempt for a load -- see pass())" : "");
+    std::printf("  size audit:  %d authoritative store(s) differ in size%s\n", res.sizes_differing,
+                res.sizes_differing == 0 ? "" : "  <- COUNTED under every --copy-by");
     if (at == copy_at::base)
         std::printf("  landscape search on the copy: %s the original's\n",
                     res.search_match ? "MATCHES" : "DIFFERS FROM");
@@ -438,7 +516,9 @@ int main(int argc, char** argv)
     for (const std::uint32_t s : seeds)
         results.push_back(run_seed(lua, s, at, by, ticks, laps));
 
-    std::printf("\n seed  verdict  ticks  orders-differing  first-divergence       D_settle orig     "
+    // `sizes` is the column a load can fail on: every authoritative store the
+    // copy does not hold, derived caches excepted (BL-1050's cold review).
+    std::printf("\n seed  verdict  ticks  orders  sizes  first-divergence       D_settle orig     "
                 "D_settle copy     seconds\n");
     int failed = 0;
     for (const seed_result& r : results)
@@ -446,9 +526,9 @@ int main(int argc, char** argv)
         char first[64] = "-";
         if (r.first_tick >= 0)
             std::snprintf(first, sizeof first, "tick %d lap %d", r.first_tick, r.first_lap);
-        std::printf(" %4u  %-7s  %5d  %16d  %-21s  %016" PRIX64 "  %016" PRIX64 "  %7.1f\n", r.seed,
-                    r.pass() ? "PASS" : "FAIL", r.ticks_compared, r.orders_differing, first,
-                    r.settle_orig, r.settle_copy, r.seconds);
+        std::printf(" %4u  %-7s  %5d  %6d  %5d  %-21s  %016" PRIX64 "  %016" PRIX64 "  %7.1f\n",
+                    r.seed, r.pass() ? "PASS" : "FAIL", r.ticks_compared, r.orders_differing,
+                    r.sizes_differing, first, r.settle_orig, r.settle_copy, r.seconds);
         if (!r.pass())
             ++failed;
     }
