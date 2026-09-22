@@ -1001,6 +1001,64 @@ int main()
         }
     }
 
+    // --- 5. THE POOLED REMAINDER (NR-913, a measurement; off by default) ------
+    std::printf("\ncharter_refusal_probe — pooled remainders (NR-913)\n");
+    {
+        // Two centres, 8 and 5 points; a firm costs 3 and no centre affords a
+        // specialist (1000 charters). Unpooled: 2 + 1 firms, remainders 2 + 2.
+        // Pooled by nation (the fixture has one): the 5-point centre sends its 2
+        // to the 8-point centre, which then spends 8 - 2 + 4 = 10 — three firms
+        // and a remainder of 1 — so 4 firms stand and 1 point is unspent.
+        turn::config cfg;
+        cfg.centres = { turn::centre_spec{ turn::k_cx, turn::k_cy, 8 },
+                        turn::centre_spec{ turn::k_cx + 3, turn::k_cy, 5 } };
+        const auto run_pool = [&](charter_pool pool, charter_spend_report& rep, std::vector<entity_id>& centres) {
+            recipe_registry reg;
+            std::map<entity_id, std::int32_t> points;
+            auto w = turn::build(cfg, reg, points, centres);
+            charter_spend_params s;
+            s.firm_price_points        = 3;
+            s.specialist_firm_charters = 1000;
+            s.window_radius            = cfg.radius;
+            s.province_cap             = true;
+            s.resource_cap_rule        = charter_cap_rule::sqrt_capital;
+            s.per_resource_firm_cap    = cfg.c;
+            s.max_firms_per_body       = 200;
+            s.density_ceiling          = cfg.ceiling;
+            s.pool                     = pool;
+            const charter_budget budget(points);
+            charter_web_from_budget(*w, reg, budget, s, /*seed=*/913u, /*settle=*/nullptr, &rep);
+            return world_state_digest(*w);
+        };
+        charter_spend_report plain, pooled, by_region;
+        std::vector<entity_id> c_plain, c_pooled, c_region;
+        run_pool(charter_pool::none, plain, c_plain);
+        run_pool(charter_pool::nation, pooled, c_pooled);
+        run_pool(charter_pool::region, by_region, c_region);
+        const auto unspent_at = [](const charter_spend_report& r, entity_id c) {
+            long long n = 0;
+            for (const charter_unspent& u : r.unspent)
+                if (u.centre == c) n += u.points;
+            return n;
+        };
+        std::printf("    unpooled: %zu firms, %lld spent | nation pool: %zu firms, %lld spent, %zu transfer(s)\n",
+                    plain.firms.size(), static_cast<long long>(plain.points_spent),
+                    pooled.firms.size(), static_cast<long long>(pooled.points_spent),
+                    pooled.pool_transfers.size());
+        expect_true("pool none: no transfer, 3 firms, remainders 2 + 2 stranded",
+                    plain.pool_transfers.empty() && plain.firms.size() == 3 && plain.points_spent == 9
+                    && unspent_at(plain, c_plain[0]) == 2 && unspent_at(plain, c_plain[1]) == 2);
+        expect_true("pool nation: one transfer, the 5-point centre's 2 to the 8-point centre",
+                    pooled.pool_transfers.size() == 1 && pooled.pool_transfers[0].from == c_pooled[1]
+                    && pooled.pool_transfers[0].to == c_pooled[0] && pooled.pool_transfers[0].points == 2);
+        expect_true("pool nation: 4 firms, 12 spent, 1 unspent at the richest centre, 0 at the sender",
+                    pooled.firms.size() == 4 && pooled.points_spent == 12 && pooled.points_unspent == 1
+                    && unspent_at(pooled, c_pooled[0]) == 1 && unspent_at(pooled, c_pooled[1]) == 0);
+        expect_true("pool region with no carve index: nothing resolves a group, so it is the unpooled walk",
+                    by_region.pool_transfers.empty() && by_region.firms.size() == plain.firms.size()
+                    && by_region.points_spent == plain.points_spent);
+    }
+
     std::printf("\n%s (%d failing)\n", g_fail == 0 ? "ALL PASS" : "FAILED", g_fail);
     return g_fail == 0 ? 0 : 1;
 }

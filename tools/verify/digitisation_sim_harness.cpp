@@ -2261,6 +2261,7 @@ int main(int argc, char** argv)
     bool resume_tier_mode = false; // BL-1037
     bool continued_mode   = false; // BL-1040: --continued, the 1200-network run
     int  integral_stride  = 1;     // BL-1041: --integral-stride, rounds per head-years sample (0 = off)
+    charter_pool pool_mode = charter_pool::none; // NR-913: --pool region|market|nation (a measurement)
     for (int a = 1; a < argc; ++a)
     {
         if (std::strcmp(argv[a], "--limit") == 0 && a + 1 < argc)
@@ -2287,6 +2288,18 @@ int main(int argc, char** argv)
         else if (std::strcmp(argv[a], "--resume-tier") == 0)
         {
             resume_tier_mode = true;
+        }
+        else if (std::strcmp(argv[a], "--pool") == 0 && a + 1 < argc)
+        {
+            const std::string v = argv[++a];
+            if      (v == "region") pool_mode = charter_pool::region;
+            else if (v == "market") pool_mode = charter_pool::market;
+            else if (v == "nation") pool_mode = charter_pool::nation;
+            else
+            {
+                std::printf("--pool needs region|market|nation\n");
+                return 2;
+            }
         }
         else if (std::strcmp(argv[a], "--through") == 0 && a + 1 < argc)
         {
@@ -2454,6 +2467,16 @@ int main(int argc, char** argv)
         charter_spend_report charter_rep;
         harness_charter_input charter_in;
         charter_in.report = &charter_rep;
+        // NR-913 — A MEASUREMENT: the shipped spend with ONLY the pool changed;
+        // the firm price is still derived from this world's stock by the
+        // shipped divisor (the constants are `stockpile_charter_spend`'s).
+        charter_spend_params pooled_spend = stockpile_charter_spend(stockpile_budget{});
+        pooled_spend.pool = pool_mode;
+        if (pool_mode != charter_pool::none)
+        {
+            charter_in.stockpile_spend         = &pooled_spend;
+            charter_in.stockpile_price_divisor = k_stockpile_price_divisor;
+        }
         const shipped_landscape land = apply_shipped_landscape(
             w, reg, wp.seed, /*search=*/true, world_gen_config{}.corporation_count, charter_in);
         std::printf("seed %u ", seed);
@@ -2475,7 +2498,11 @@ int main(int argc, char** argv)
                 std::printf(" %s %lld", stockpile_unspent_reason_name(static_cast<stockpile_unspent_reason>(k)),
                             (long long)sp.unspent[static_cast<std::size_t>(k)]);
             if (sp.rejected) std::printf(" (REJECTED: %s)", sp.rejection.c_str());
-            std::printf(" | charter: budgeted %lld, spent %lld, unspent %lld, %zu specialists, %zu firms%s%s\n",
+            long long pooled = 0;
+            for (const charter_pool_transfer& pt : charter_rep.pool_transfers) pooled += pt.points;
+            std::printf(" | charter (pool %s, %lld points moved): budgeted %lld, spent %lld, unspent %lld, "
+                        "%zu specialists, %zu firms%s%s\n",
+                        charter_pool_name(pool_mode), pooled,
                         (long long)charter_rep.points_budgeted, (long long)charter_rep.points_spent,
                         ch_unspent, charter_rep.specialists.size(), charter_rep.firms.size(),
                         charter_rep.refused ? " REFUSED: " : "",

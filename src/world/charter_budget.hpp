@@ -136,6 +136,52 @@ inline const char* charter_cap_rule_name(charter_cap_rule r)
     return "?";
 }
 
+/// NR-913 — WHERE A CENTRE'S REMAINDER GOES. A centre's STRUCTURAL REMAINDER is
+/// what is left of its points, net of the specialist price it affords, below
+/// one firm price: (points - specialist) mod the firm price, known before the
+/// walk (the walk books exactly this as `remainder`). At the shipped prices most
+/// centres hold less than one firm's price, so almost every point is remainder
+/// (BL-1044 Step 2: a median 79% of every stock).
+///
+/// `none` (THE DEFAULT, and the shipped rule: DIGITISATION.md § 1, "what cannot
+/// be spent stays unspent") books it `remainder` at its own centre. The others
+/// are a MEASUREMENT for Ben's call on NR-913 (2026-09-22: "measure pooling
+/// first"): every nation-resolved centre's remainder moves to the RICHEST centre
+/// of its group (its own points, ties to the lower centre id), which spends the
+/// pooled points on background firms in its own windows, through the unchanged
+/// walk. The SPECIALIST test reads each centre's own points, so the seat menu is
+/// untouched. The group is:
+enum class charter_pool : std::uint8_t
+{
+    none   = 0, ///< no pooling: the shipped rule
+    region = 1, ///< the region the centre was carved from (`world::gen_carve_centres`)
+    market = 2, ///< the market the centre's tile clears at (`market_for_tile`)
+    nation = 3, ///< the centre's nation
+};
+
+inline const char* charter_pool_name(charter_pool p)
+{
+    switch (p)
+    {
+    case charter_pool::none:   return "none";
+    case charter_pool::region: return "region";
+    case charter_pool::market: return "market";
+    case charter_pool::nation: return "nation";
+    }
+    return "?";
+}
+
+/// One pooled remainder: @c points moved from centre @c from to the group's
+/// richest centre @c to (NR-913). A centre's books then read: its budget, less
+/// what it sent, plus what it received, equals its charters' prices plus its
+/// unspent rows.
+struct charter_pool_transfer
+{
+    entity_id    from   = null_entity;
+    entity_id    to     = null_entity;
+    std::int64_t points = 0;
+};
+
 /// How a budget is spent. THE PRICES HAVE NO SHIPPED DEFAULT (DIGITISATION.md
 /// § 1: "the price of a specialist and of a firm are measured against live-play
 /// cost before either is fixed"). They default to 0, and a NON-EMPTY budget with
@@ -178,6 +224,9 @@ struct charter_spend_params
     int window_radius = 4;
     /// The budget path's per-province firm cap applies to budget firms when true.
     bool province_cap = true;
+    /// NR-913: where a centre's structural remainder goes (`charter_pool`).
+    /// `none` is the shipped rule; the others are a measurement.
+    charter_pool pool = charter_pool::none;
 
     /// THE PER-GOOD CAP RULE. `fixed` and `lifted` are BL-1033's cap kept and
     /// cap lifted (Ben, NR-889: measure both before ruling), read only by
@@ -472,6 +521,9 @@ struct charter_spend_report
     bool        fell_back = false;
 
     std::vector<entity_id>       specialists;  ///< ascending id
+    /// NR-913: every pooled remainder, ascending (from); empty unless the spend
+    /// pools (`charter_spend_params::pool`).
+    std::vector<charter_pool_transfer> pool_transfers;
     std::vector<entity_id>       firms;        ///< ascending id
     std::vector<charter_record>  charters;     ///< ascending corp id
     std::vector<charter_unspent> unspent;      ///< ascending (centre, reason); zero rows omitted
@@ -508,6 +560,8 @@ inline const char* charter_spend_refusal(const charter_budget& b, const charter_
         return "specialist_firm_charters must be > 0 on a non-empty charter budget (no shipped default)";
     if (s.window_radius < 0)
         return "window_radius must be >= 0";
+    if (static_cast<int>(s.pool) > static_cast<int>(charter_pool::nation))
+        return "pool is not a known charter_pool";
     // BL-1039 — the caps: the budget path's own numbers, no shipped default,
     // refused where read and <= 0, refused where set and unread.
     if (s.max_firms_per_body <= 0)

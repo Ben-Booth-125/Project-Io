@@ -889,6 +889,16 @@ std::string charter_balance_failure(const charter_budget& budget, const charter_
     std::map<entity_id, long long> left;
     for (const auto& [centre, pts] : budget.points())
         left[centre] = pts;
+    // NR-913: a pooled remainder leaves its centre's books and enters the
+    // receiving centre's; the pool moves points, it never makes or loses one.
+    for (const charter_pool_transfer& t : rep.pool_transfers)
+    {
+        left[t.from] -= t.points;
+        left[t.to]   += t.points;
+        if (t.from == t.to || t.points <= 0 || budget.points().count(t.from) == 0
+            || budget.points().count(t.to) == 0)
+            add("a pool transfer is not between two budgeted centres, or moves nothing");
+    }
     for (const charter_record& r : rep.charters)
     {
         by_records += r.price;

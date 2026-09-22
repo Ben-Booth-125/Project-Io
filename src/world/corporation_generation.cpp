@@ -6,6 +6,7 @@
 
 #include "world/economy_system.hpp"
 #include "world/logistics.hpp"      // invalidate_logistics_caches — remove_specialist_roster
+#include "world/market_clearing.hpp" // market_for_tile — NR-913's market pool
 #include "world/placement_rules.hpp"
 #include "world/planetology.hpp"    // checkpoint_rng — charter_web_from_budget's keyed streams
 #include "world/settlement.hpp"
@@ -2684,6 +2685,14 @@ struct charter_centre
     /// charters), which is summed into the body's `firm_points`.
     int32_t      points_after_specialist = 0;
 
+    /// NR-913 (`charter_spend_params::pool`; 0 unless the spend pools): the
+    /// structural remainder this centre SENDS to its group's richest centre,
+    /// and the group's pooled remainders it RECEIVES as that richest centre
+    /// (its own included). Its firm budget is `points_after_specialist -
+    /// pool_out + pool_in`; the specialist test never reads either.
+    int64_t      pool_out = 0;
+    int64_t      pool_in  = 0;
+
     std::array<int32_t, charter_unspent_reason_count> unspent{};
 
     /// NR-905: the points this centre's FIRMS left when the turn stopped because
@@ -3119,6 +3128,118 @@ void charter_fix_body_rules(const world& w, const recipe_registry& reg,
     }
 }
 
+/// NR-913 — THE POOLED REMAINDERS (`charter_spend_params::pool`), planned
+/// before anything is chartered, on the walk's own resolution of each centre.
+/// Every budgeted centre on a nation's tile whose group resolves sends its
+/// STRUCTURAL remainder — its points net of the specialist price it affords,
+/// mod the firm price, exactly what the walk would book `remainder` — to the
+/// group's richest centre (its own points, ties to the lower id), which spends
+/// the pool on background firms. Empty under `charter_pool::none`.
+/// Deterministic: groups in key order, members in centre-id order.
+struct charter_pool_plan
+{
+    std::map<entity_id, int64_t> in;   ///< each group's richest centre: the pool it receives
+    std::map<entity_id, int64_t> out;  ///< each pooling centre: its own remainder, sent
+    std::vector<charter_pool_transfer> transfers;   ///< from != to, ascending from
+};
+
+charter_pool_plan plan_charter_pool(const world& w, const charter_budget& budget,
+                                    const charter_spend_params& spend)
+{
+    charter_pool_plan plan;
+    if (spend.pool == charter_pool::none || budget.empty() || spend.firm_price_points <= 0)
+        return plan;
+    const int64_t fp = spend.firm_price_points;
+    const int64_t sp = spend.specialist_price_points();
+
+    std::map<int64_t, std::vector<std::pair<entity_id, int32_t>>> groups;
+    for (const auto& [centre_id, pts] : budget.points())
+    {
+        const auto tile_it = w.population_centre_tile.find(centre_id);
+        if (tile_it == w.population_centre_tile.end() || w.tiles.count(tile_it->second) == 0)
+            continue;
+        const auto own = w.tile_to_nation.find(tile_it->second);
+        if (own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
+            continue;   // no nation: its whole budget is `no_nation`, nothing to pool
+        int64_t key = -1;
+        switch (spend.pool)
+        {
+        case charter_pool::region:
+        {
+            const auto slot = w.gen_carve_centres.find(centre_id);
+            if (slot != w.gen_carve_centres.end() && slot->second.region >= 0)
+                key = slot->second.region;
+            break;
+        }
+        case charter_pool::market:
+        {
+            const entity_id m = market_for_tile(w, tile_it->second);
+            if (m != null_entity)
+                key = static_cast<int64_t>(m);
+            break;
+        }
+        case charter_pool::nation:
+            key = static_cast<int64_t>(own->second);
+            break;
+        case charter_pool::none:
+            break;
+        }
+        if (key >= 0)
+            groups[key].push_back({ centre_id, pts });
+    }
+
+    for (const auto& [key, members] : groups)
+    {
+        (void)key;
+        entity_id richest     = null_entity;
+        int32_t   richest_pts = -1;
+        int64_t   pooled      = 0;
+        for (const auto& [c, pts] : members)   // ascending id: a tie keeps the lower id
+        {
+            if (pts > richest_pts)
+            {
+                richest     = c;
+                richest_pts = pts;
+            }
+            int64_t left = pts;
+            if (sp > 0 && left >= sp)
+                left -= sp;
+            const int64_t r = left % fp;
+            if (r > 0)
+            {
+                plan.out[c] = r;
+                pooled += r;
+            }
+        }
+        if (pooled <= 0)
+            continue;
+        plan.in[richest] = pooled;
+        for (const auto& [c, pts] : members)
+        {
+            (void)pts;
+            const auto o = plan.out.find(c);
+            if (o != plan.out.end() && c != richest)
+                plan.transfers.push_back({ c, richest, o->second });
+        }
+    }
+    std::sort(plan.transfers.begin(), plan.transfers.end(),
+              [](const charter_pool_transfer& a, const charter_pool_transfer& b) { return a.from < b.from; });
+    return plan;
+}
+
+/// A centre's pooled points in WHOLE firm charters — what B counts of them.
+/// The richest centre's own firm budget net of its remainder is already whole,
+/// so its B term is `charter_centre_firm_points` plus this.
+int64_t charter_pool_whole(const charter_pool_plan& plan, entity_id centre,
+                           const charter_spend_params& spend)
+{
+    const auto it = plan.in.find(centre);
+    if (it == plan.in.end() || spend.firm_price_points <= 0)
+        return 0;
+    const int64_t fp = spend.firm_price_points;
+    return (it->second / fp) * fp;
+}
+
 } // namespace
 
 const char* charter_spend_world_refusal(const world& w, const recipe_registry& reg,
@@ -3129,6 +3250,7 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
         || charter_spend_refusal(budget, spend) != nullptr)
         return nullptr;   // not a sqrt budget world, or already refused on its params
     const int64_t specialist_price = spend.specialist_price_points();
+    const charter_pool_plan pool = plan_charter_pool(w, budget, spend);   // NR-913
     std::map<entity_id, charter_body_state> bodies;   // std::map: ascending body id
     std::map<entity_id, int64_t> specialists;
     for (const auto& [centre_id, pts] : budget.points())
@@ -3144,7 +3266,8 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
         const auto own = w.tile_to_nation.find(tile_it->second);
         if (own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
             continue;
-        bodies[t->second.body].firm_points += charter_centre_firm_points(pts, spend);
+        bodies[t->second.body].firm_points += charter_centre_firm_points(pts, spend)
+                                              + charter_pool_whole(pool, centre_id, spend);
         if (static_cast<int64_t>(pts) >= specialist_price)
             ++specialists[t->second.body];
     }
@@ -3371,10 +3494,23 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     // The consumer half is also what Pass 6 captures once per body; it reads
     // only the population centres, which no charter moves, so taking it here
     // rather than at the body's first firm reads the same numbers.
+    // NR-913: the pooled remainders, planned now, before anything is chartered
+    // (no pooling under the shipped `charter_pool::none`: every term below is 0).
+    const charter_pool_plan pool = plan_charter_pool(w, budget, spend);
+    for (charter_centre& cc : centres)
+    {
+        if (const auto o = pool.out.find(cc.centre); o != pool.out.end())
+            cc.pool_out = o->second;
+        if (const auto i = pool.in.find(cc.centre); i != pool.in.end())
+            cc.pool_in = i->second;
+    }
+    rep.pool_transfers = pool.transfers;
+
     std::map<entity_id, charter_body_state> bodies;
     for (const charter_centre& cc : centres)
         if (cc.nation != null_entity)
-            bodies[cc.body].firm_points += charter_centre_firm_points(cc.points, spend);
+            bodies[cc.body].firm_points += charter_centre_firm_points(cc.points, spend)
+                                         + charter_pool_whole(pool, cc.centre, spend);
     // Specialists each body's centres can afford: the yards' places read them.
     std::map<entity_id, int64_t> specialists_on_body;
     for (const charter_centre& cc : centres)
@@ -3500,11 +3636,15 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         }
 
         // --- then what remains buys this centre's background firms -------------
-        if (cc.points_after_specialist <= 0)
+        // NR-913: a pooling centre has sent its remainder to its group's richest
+        // centre, which spends the group's here; both terms are 0 without pooling.
+        const int64_t firm_budget =
+            static_cast<int64_t>(cc.points_after_specialist) - cc.pool_out + cc.pool_in;
+        if (firm_budget <= 0)
             continue;
 
-        const int32_t n_firms  = cc.points_after_specialist / spend.firm_price_points;
-        const int32_t leftover = cc.points_after_specialist % spend.firm_price_points;
+        const int32_t n_firms  = static_cast<int32_t>(firm_budget / spend.firm_price_points);
+        const int32_t leftover = static_cast<int32_t>(firm_budget % spend.firm_price_points);
         if (leftover > 0)
             cc.unspent[static_cast<std::size_t>(charter_unspent_reason::remainder)] += leftover;
         if (n_firms <= 0)
