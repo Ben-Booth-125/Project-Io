@@ -10,6 +10,70 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-22 — Beat 1 ships: the span and the charter budget on by default, one re-bless
+
+**Runtime:** ~11 h (08:30 to ~19:30, the measurement unattended through the day). Delivery — Full
+(BL-1044, main session throughout; two cold-review rounds), with two Gate 2 design forms (NR-911 to
+NR-914, then NR-913's pooling call).
+
+### What landed
+- **BL-1050 (order-independent reads)** merged (6fddf614), as planned, only with BL-1044.
+- **BL-1044 (Beat 1 ships).** The Digitisation span and BL-1037's corridor tier run on by default;
+  a `world_params` tier switch keeps the pre-flip world buildable as the LEGACY arc. The pins: a
+  specialist two firm charters, the divisor **650** (NR-914 — the nine-seat rule read on the shipped
+  world; 580 was its tier-off reading), province cap 2, sqrt base 8. The no-specialist world falls
+  back to the no-budget world before anything is chartered (NR-910), with its own unspent reason;
+  the one-player invariant is printed on the seat line and counted per seed (guard S7); the residual
+  is reported, not patched (NR-911). `--verify`, `--serve` and the headless run spend a non-empty
+  budget on the seed candidate (NR-909). `player_seed_sweep --arc shipped|legacy`.
+- **The re-bless** (authorised at Gate 2): the shipped arc's 16 pins taken at 650:2; the legacy
+  rows' D_settle/D_seat moved (below); the seed library blessed — 6 of 16 moved, and
+  `exploration_sweep --arc legacy` reproduced all 16 old fingerprints, so the tier is the only mover.
+
+### What the measurement said
+Every determinism check held (world_determinism A/A, world_copy_determinism --copy-by snapshot
+16/16, --fidelity 16/16, --resume-tier 16/16). Haulage 2035 dispatches / 1627 market to market.
+Four findings went to Ben: the seat menu at 580 came out 6.5, not 9, because the tier moved every
+stockpile (NR-914, re-pinned 650); the median nation opens on 0.41 credits (NR-912, the rate kept,
+§ Pass 7 restated); the no-player residual (NR-911, reported); and **density does not follow
+cities** (NR-913): a firm costs 1/650 of the whole stock, most of 5,000-15,000 centres hold less,
+~85% of every stock goes unspent, and rho(firms, urban) 0.139 sits below rho(firms, goods) 0.167.
+Pooling the stranded remainder was built and measured (region 0.186 / 0.195, market 0.211 / 0.204,
+nation 0.156 / 0.213) — the 120 ceiling binds and seats move — so Ben shipped it unpooled and made
+density its own sprint 46 design item; the pool stays an off-by-default switch.
+
+### The cold review
+Six findings in round 1, all fixed: a fell-back cost row failed its rule check; exploration R3b took
+the tier from the struct default; the search-less paths were silent on a rejected budget; pooling
+could overflow int32; **the launch view framed world-gen's player, whom the search replaces**
+(latent since BL-977, on every world under BL-1044 — now `app::frame_launch_view`, re-run after the
+seat); two stale comments. Round 2 held all six and caught that a re-frame must reset first.
+
+### The legacy arc's re-pinned digests (NR-894: BL-1050 moves the ticks only)
+
+| seed | D_settle old → new | D_seat old → new |
+|---|---|---|
+| 46 | `05B4865F46884E7C` → `01B28F9955D0EC29` | `496E75B156DC9208` → `51AF24CE2939B4D0` |
+| 28 | `265C48A23E313B1A` → `4D338B0202264D5C` | `AA35460CE5894594` → `2C463C3DD4724685` |
+| 11 | `2E8907B0BBE768E7` → `4C97C1C842D23C3B` | `82A858E16FE9CA69` → `66427046BACBC06C` |
+| 31 | `4AEB84A2E62A4536` → `2D4BD68AE2B9E70B` | `B58F31B1D2761E4D` → `15694B8A93C3CD06` |
+| 40 | `4987C80D094C8DAE` → `F336C089F6EEBFEB` | `2B509E9C965DD8BF` → `D7275BB13B29AB2D` |
+| 12 | `FC9F8D4246024A2F` → `111F81D5AFEEA576` | `81E9BB11AB34278B` → `602E807556398990` |
+| 37 | `F175EAB9B7F2BF41` → `928B123846974CAA` | `94B3B7C1A92369E5` → `CEA516E07DFF3356` |
+| 13 | `72797C2C57E94EB1` → `BC9A8253728E77CC` | `0D38309D62D10FE3` → `13D563007848185C` |
+| 41 | `C0EDD8B3B38193C6` → `9D7DBA35957885A1` | `9CB3AC1F2EC21D7F` → `2676C5DC78EEAF10` |
+| 43 | `557E96CF9F2BA372` → `E4D38BA322A56963` | `03D4B5D542CB228B` → `0D441274814EE0CD` |
+| 32 | `AE3347D83E077849` → `953F9A92426452FF` | `FD384DA6A173808F` → `4FC2A8BD099DD3AB` |
+| 10 | `8EA4043497A22AB7` → `2F69415005705C94` | `59D340FE15B12642` → `50DF22739DFC7D73` |
+| 25 | `FEFD82C8BCDD4D22` → `22C20B2D79B86944` | `2F145BF320CFB58B` → `A2046D98550FBDAC` |
+| 38 | `73239E8FE1A24AA3` → `87EE17644608DB65` | `90D2AC55FC74A8D3` → `9FD043C8BB29D902` |
+| 9 | `23DBD6FA7E7D5955` → `9D8F22AD82E026E7` | `A2B82933E77D219A` → `FBDBDC152D43D4AE` |
+| 0 | `A392EFF987F374E2` → `AF3BDD5524ED9FF3` | `8BBEAB8453901456` → `08F13299905A405A` |
+
+D_search and D_land hold their 2026-09-17 values on every row.
+
+---
+
 ## 2026-09-21 — The charter price becomes the world's own, and the seat menu is read off the budget
 
 **Runtime:** ~10 h (14:00 to ~00:00, stage 2 unattended through the evening). Delivery — Full

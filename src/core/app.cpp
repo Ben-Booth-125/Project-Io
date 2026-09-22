@@ -940,6 +940,17 @@ void app::draw_building_carve()
 /// opened on ground a removed corporation had held (BL-1044 cold review, finding 5).
 void app::frame_launch_view()
 {
+    // START FROM THE PLAIN SURFACE VIEW, every call (cold review round 2): a
+    // re-frame must not leave an earlier call's frame and selection standing
+    // when the player it now reads holds nothing here — the no-player residual
+    // (NR-911), or a player with no building on the launch body — or the game
+    // would open framed on a removed corporation's ground. focus_on_surface is
+    // what setup_world opens with, so the first call changes nothing.
+    if (m_launch_body != null_entity)
+        ui::focus_on_surface(m_world, m_ui, m_launch_body);
+    m_ui.planetary_center_pending = false;
+    m_ui.selected_entity          = null_entity;
+
     // Frame the opening view on the player's holdings so "where am I" is answered
     // the moment the surface appears, rather than dropping the player onto the whole
     // surface with their few tiles lost in it. Centre on the centroid of the player
