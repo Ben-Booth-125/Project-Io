@@ -745,6 +745,16 @@ target_compile_options(chain_depth PRIVATE ${IO_WARNING_FLAGS})
 add_executable(player_seed_sweep
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/player_seed_sweep.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    # world_gen_config.cpp and works_registry.cpp since BL-1030: the sweep builds
+    # the world IN APP ORDER through harness_params.hpp's build_app_base_world,
+    # which parses scripts/world_gen.lua and scripts/works.lua. Both are Lua TUs,
+    # so the Lua-free superset excludes them and this target must name them —
+    # without them the CTest build fails at link (LNK2019 on load_from_lua),
+    # which is how the player_seed_sweep_guard row went dark (found 2026-09-22,
+    # BL-1044; the Release build_lua_harness.sh path compiles every world TU and
+    # never saw it).
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
 )
 target_include_directories(player_seed_sweep PRIVATE
