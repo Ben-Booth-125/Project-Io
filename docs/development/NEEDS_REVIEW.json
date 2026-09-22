@@ -419,7 +419,7 @@
     "src/world/stockpile_budget.hpp",
     "tools/verify/digitisation_sim_harness.cpp"
    ],
-   "resolution": "INTERIM RULING (Ben, 2026-09-22, the Gate 2 form): D — hold the re-bless and measure pooling (option B) first. The adoption call follows the reading."
+   "resolution": "INTERIM RULING (Ben, 2026-09-22, the Gate 2 form): D — hold the re-bless and measure pooling (option B) first. The adoption call follows the reading. MEASURED (2026-09-22, digitisation_sim_harness --through 1960 at 650:2, 16 library seeds, pooling off by default): rho(firms, urban) / rho(firms, goods) medians, and worlds where urban beats goods — none 0.139 / 0.167, 5 of 16 (65.5 firms a world, 15.2% of the stock spent); region 0.186 / 0.195, 10 of 16 (109 firms, 19.8%); market 0.211 / 0.204, 7 of 16 (120 firms on every seed, 21.1%); nation 0.156 / 0.213, 3 of 16 (120 firms, 21.1%). The density ceiling (120 a body) binds under every pool, so ~79% of each stock stays unspent — now under the ceiling, not the price. None approaches BL-1029's legacy web (0.431 / 0.460): at most 120 firms over 148-538 markets leaves most markets empty. AND the seat menu is NOT untouched: affording is, but pooled firms at a group's richest centre take ground before poorer centres place their specialists (seed 41: 65 seated unpooled, 44 region, 29 market). The adoption call is Ben's."
   },
   {
    "id": "NR-914",
