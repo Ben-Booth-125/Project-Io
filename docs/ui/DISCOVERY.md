@@ -1,5 +1,14 @@
 # Discovery & Intelligence
 
+> **Settles:** what the player is allowed to know and what must be earned · which
+> fogs are layered, what each governs, and at what grain · how a survey is paid for
+> and what it reveals · what is readable about a rival and what is only inferable
+> from the market · what a trade route contributes to what is known · how any of it
+> survives a save.
+> **Not here:** how the fog is drawn (SOLAR, PLANETARY, LENSES) · what a click on
+> a revealed thing offers (SELECTION) · the market model (economy/MARKETS).
+> **Confused with:** LENSES.md, PLANETARY.md, SELECTION.md.
+
 The authority for how the player *learns about the world* — the two layered "fogs" that gate what
 is known, and the competitor-information rules that make that knowledge a strategic resource. The
 owning items are BL-067 (survey), BL-068 (competitor visibility), BL-088 (persistent trade
@@ -107,7 +116,7 @@ menu, default off) lifts:
 - **This rule's internals redaction**: the rival building hover/Selection cards open their
   Production/Stockpile rows (same rows, real values), the rival building card gains the
   read-only Profitability page, and a selected corp's facts column carries the full readout
-  (cash, reserve floor, Should-Have buffer, per-body pools, running production).
+  (cash, reserve floor, Should-Have buffer, per-market pools, running production).
 - **The geographic fog at draw time**: the Planetary canvas renders unsurveyed regions
   through a heavy lock-colour wash — the *tell* — rather than as ordinary ground, so where
   the corps' own blindness sits stays legible while the watcher sees through it. The

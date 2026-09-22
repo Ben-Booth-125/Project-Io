@@ -3,6 +3,9 @@
 #include "components.hpp"
 #include "nation_ai.hpp"   // BL-542: nation_ai_params — the nation scorer's tunables (light: entity.hpp + nation_budget.hpp only)
 #include "sentiment.hpp"   // BL-545/BL-546: sentiment_params — the authored factor table
+#include "corp_command.hpp"    // BL-743: firm_exit_params — the insolvency wind-up trigger
+#include "network_upkeep.hpp"  // BL-643: network_upkeep_params — the logistics_maintenance line's material rates
+#include "space_programme.hpp" // BL-644: space_programme_params — the tenth budget line's purchase lumps
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
 #include <array>
@@ -16,44 +19,10 @@
 // Only recipe_registry.cpp pulls in the Lua state to populate the tables.
 class lua_state;
 
-/// BL-433: which product's roster an authored entry belongs to.
-///
-/// Two bands plus a wildcard, and deliberately NOT ERAS.md's Era 0 / Era 1
-/// numbering — that axis is about space access *within* the industrial arc and
-/// is gated on launchpad presence, a different question from "which product is
-/// this". One field, one meaning.
-///
-/// `any` is the default and it is load-bearing: a registry whose band is never
-/// set permits everything, so every headless harness — none of which knows about
-/// eras — loads exactly the roster it loaded before this existed.
-enum class era_band : uint8_t
-{
-    any        = 0, ///< Shared by both arcs. The default for an untagged entry.
-    ancient    = 1, ///< The 0 CE product (world_params::epoch_year < 1700).
-    industrial = 2, ///< The 1960 arc, including everything space-facing.
-};
-
-/// One past the last band — the size of any per-band table. Derived from the
-/// enum's tail, the same way `resource_count` and `building_type_count` derive
-/// from theirs: appending a band means moving this with it.
-inline constexpr std::size_t era_band_count =
-    static_cast<std::size_t>(era_band::industrial) + 1;
-
-/// The band a campaign's epoch year belongs to. Uses the SAME 1700 threshold the
-/// antiquity branch already documents on world_params::epoch_year, so the split
-/// between the two arcs is one number in the codebase rather than two.
-inline era_band era_band_for_epoch(int64_t epoch_year)
-{
-    return (epoch_year < 1700) ? era_band::ancient : era_band::industrial;
-}
-
-/// Does an entry authored for band @p entry appear in a campaign running @p campaign?
-/// An `any` entry appears in every band; an `any` campaign (the unset default)
-/// admits every entry.
-inline bool era_permits(era_band campaign, era_band entry)
-{
-    return campaign == era_band::any || entry == era_band::any || entry == campaign;
-}
+// BL-433's era band — `era_band`, `era_band_count`, `era_band_for_epoch`,
+// `era_permits` — lives in era_band.hpp (BL-744) so world_gen_config.hpp can
+// read it without this header's include set. Nothing here changed meaning.
+#include "era_band.hpp"
 
 /// BL-640: one era-banded tranche of a demand basket.
 ///
@@ -282,6 +251,14 @@ struct building_upkeep_params
     /// Regained per tick while the draw is met (or while there is nothing to
     /// draw). Ceilinged at 1000 (fully supplied).
     int supply_recovery_permille = 0;
+    /// BL-746 (Ben, 2026-09-02, ruling NR-782 (a)): the FLOOR an unmet draw can
+    /// decay the factor to. "The lights go dim, not out" — PRODUCTION.md § A
+    /// shortfall scales output — was a rule the decay did not honour: at floor 0
+    /// a building whose draw is never met is dark exactly 1000/decay ticks in,
+    /// and in the industrial band that was every building the power grid could
+    /// not reach, at tick 20, in one tick. 0 keeps the old behaviour (every
+    /// hand-built harness registry); the authored value is economy.lua's.
+    int supply_floor_permille = 0;
 };
 
 /// Resolve @p bt's upkeep basket for a campaign running in band @p campaign,
@@ -388,6 +365,111 @@ struct price_band_params
 {
     float floor_mult = 0.25f; ///< Lowest a price may fall: 0.25x base_price.
     float ceil_mult  = 4.0f;  ///< Highest a price may rise: 4x base_price.
+
+    /// BL-654 — the BUYER'S RESERVATION CEILING, x base_price. "Go without
+    /// rather than buy above this."
+    ///
+    /// It lives in THIS family and not in upkeep (Ben, 2026-08-26) because it
+    /// is a statement about what a good is worth PAYING, not about who is
+    /// buying: one number per world, read by every goods draw, exactly as
+    /// `floor_mult`/`ceil_mult` are read by every price resolution.
+    ///
+    /// It is the exact mirror of `sell_order::floor_price`, the seller's
+    /// reservation (BL-386): both sides may decline a trade, neither may
+    /// dictate one. A short pool bids its shortfall onto the market while the
+    /// good prices at or below `reservation_mult x base_price`, and declines to
+    /// bid at all above it — the shortfall then stands and the existing
+    /// shortfall rule weakens the building or unit, which is an outcome the
+    /// design already knows how to express.
+    ///
+    /// ZERO MEANS THE DRAW NEVER BUYS, which is the pre-BL-654 pool-only
+    /// behaviour exactly — and it is the DEFAULT, so a harness that hand-builds
+    /// a registry and never authors this table is byte-identical. A resource
+    /// with `base_price <= 0` is unbuyable for the same arithmetic reason (its
+    /// ceiling is 0 and no price clears it), which is `run_construction`'s own
+    /// "unpriced == unbuyable" reading rather than a second rule.
+    ///
+    /// Bounded above by `ceil_mult` in practice, and meaningfully BELOW it: a
+    /// resource pegged at `ceil_mult` is a generation-calibration signal
+    /// (MARKETS.md § Price resolution), not a legitimate purchase, so a
+    /// reservation equal to the ceiling would decline nothing and the rule
+    /// would be inert. See docs/economy/MARKETS.md § Settled: a short pool BUYS.
+    float reservation_mult = 0.0f;
+};
+
+/// BL-708 — what makes a good a GRID GOOD, as authored data.
+///
+/// `power` is the roster's first good whose MOVEMENT and MARKET are separate
+/// questions (docs/economy/PRODUCTION.md § Power; docs/economy/LOGISTICS.md
+/// § 3a). It has a price and it clears like any other good — that half needs no
+/// new machinery at all, which is the design's whole claim. What is new is two
+/// properties, and they are carried HERE, per resource, rather than as a branch
+/// on `resource_type::power` in the four places that read them. A branch would
+/// make "is this power?" a question logic asks; a table makes it a fact the data
+/// states, which is the difference between a rule and a special case.
+///
+/// EVERY FIELD DEFAULTS TO THE INERT VALUE — `is_grid` all false, every ceiling
+/// zero — so a harness that hand-builds a registry and never authors
+/// `economy.grid_goods` behaves exactly as it did before this struct existed,
+/// the same tolerance `price_band_params::reservation_mult = 0` carries.
+struct grid_goods_params
+{
+    /// True for a good transmitted on the ROAD NETWORK rather than carried by a
+    /// convoy. Two consequences, and they are the two the design names:
+    ///
+    ///   * NEVER CARGO. `price_convoy_leg` refuses a leg for a grid good, so
+    ///     neither auto-dispatch nor the player's/rival's `dispatch_convoy` verb
+    ///     can ship it — one refusal at the one shared seam, not three.
+    ///   * CONNECTION-GATED. It only moves to or from a tile the network
+    ///     reaches, and connectivity is `tile_reach_cost` read as a BOOLEAN:
+    ///     finite means connected, infinity means not. That is the multi-source
+    ///     Dijkstra § 3 already computes — no second graph and no second field,
+    ///     which is LOGISTICS.md § 3a's own reduction of the problem.
+    ///
+    /// Latency is deliberately absent from this struct: it is a flat one tick
+    /// regardless of distance, which is the tick the draw already runs on, so
+    /// there is nothing to author.
+    std::array<bool, resource_count> is_grid = {};
+
+    /// Per-resource stockpile CEILING — the store may not hold more than this.
+    /// ZERO MEANS UNCAPPED, which is every other good in the roster and the
+    /// reason this lands inert.
+    ///
+    /// Power's one genuinely novel property against the rest of the roster
+    /// (PRODUCTION.md § Power): "a generator running into a full store is
+    /// producing nothing anyone will ever buy — a real decision rather than an
+    /// accounting detail." Applied where output ACCRUES, so the overflow is
+    /// never produced rather than produced and then deleted; a corp that has
+    /// filled its store has to find a buyer, sell down, or throttle.
+    ///
+    /// Deliberately per (corp, body) — the grain the pool itself is held at —
+    /// rather than per building, so it is a statement about a corp's storage on
+    /// a body, not about any one generator's tank.
+    std::array<float, resource_count> stockpile_ceiling = {};
+
+    /// Is @p r transmitted on the network rather than carried? Bounds-checked so
+    /// every reader can pass a raw index without repeating the guard.
+    bool grid(std::size_t r) const
+    {
+        return (r < resource_count) && is_grid[r];
+    }
+
+    /// @p r's stockpile ceiling, or 0 for "uncapped". Bounds-checked, as above.
+    float ceiling(std::size_t r) const
+    {
+        return (r < resource_count) ? stockpile_ceiling[r] : 0.0f;
+    }
+
+    /// Does ANY resource carry a grid rule? The zero-cost early out every
+    /// per-tick reader takes first, so a world that authors no grid good pays
+    /// one bool for the whole feature rather than a per-resource test per draw.
+    bool any() const
+    {
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (is_grid[r] || stockpile_ceiling[r] > 0.0f)
+                return true;
+        return false;
+    }
 };
 
 /// BL-263 spontaneous-market-emergence tunables, authored in scripts/economy.lua
@@ -481,6 +563,47 @@ struct background_demand_params
     float demand_scale      = 1.00f; ///< global scale → demand scale.
 };
 
+/// BL-647 endemic-luxury-demand tunables, authored in scripts/economy.lua under
+/// `economy.endemic_demand`. The Endemic trade channel (MARKETS.md § Demand
+/// channels): a household pull for the endemic luxury goods (tobacco, spices,
+/// coffee, furs) that scales with a nation's WEALTH rather than its headcount,
+/// flavoured per (nation, good) by a seeded, campaign-fixed preference weight —
+/// so different nations crave different luxuries and the trade route is
+/// directional by construction. Applied at tick time by inject_endemic_demand
+/// (market_clearing.cpp), called from clear_markets alongside the population and
+/// background injectors. Same price-elastic shape as both siblings — deliberately
+/// not a second elasticity model.
+struct endemic_demand_params
+{
+    /// The SHARED (`any`) tranche: per-credit-of-national-wealth demand weight
+    /// per resource (see wealth_scale for the units), indexed by
+    /// static_cast<std::size_t>(resource_type). Unlisted resources get 0.
+    /// Luxuries are DEPOSITS — band-independent by construction, like
+    /// agricultural_produce and water in the population basket's shared tranche
+    /// — so the authored basket lives here; the era rows below exist for
+    /// symmetry with the two sibling params and for any future banded luxury.
+    /// Read the era-resolved sum through
+    /// recipe_registry::endemic_demand_basket().
+    std::array<float, resource_count> demand_basket = {};
+    /// Era-banded tranches, same fold, same mask as
+    /// population_demand_params::baskets (BL-640's mechanism, reused).
+    std::vector<era_basket> baskets;
+    float demand_elasticity = 0.80f; ///< exponent on (base_price / price).
+    float elasticity_min    = 0.30f; ///< clamp lo on the elasticity factor.
+    float elasticity_max    = 2.50f; ///< clamp hi on the elasticity factor.
+    /// Credits of national wealth → demand units, multiplied by the basket
+    /// weight: demand[r] = wealth_share × wealth_scale × basket[r] × pref ×
+    /// elastic. DEFAULTS OFF (0.0) so a hand-built harness registry — and every
+    /// pre-BL-647 golden — injects nothing; scripts/economy.lua authors the
+    /// real value (the building_upkeep zero-default precedent).
+    float wealth_scale = 0.0f;
+    /// Half-width of the per-(nation, good) preference band around 1.0:
+    /// pref ∈ [1 − spread, 1 + spread), mean 1 regardless of spread, so tuning
+    /// asymmetry never moves the channel's total. 0 = every nation craves
+    /// identically; 1 = a nation may ignore a luxury entirely or want double.
+    float preference_spread = 0.0f;
+};
+
 /// BL-095 construction-gate tunables, authored in scripts/economy.lua under
 /// `economy.construction`. Read by run_economy_step's construction step, which
 /// paces each build against the local market's recent supply of its materials.
@@ -523,6 +646,46 @@ struct construction_params
     /// Floor on the stack discount, so an old, heavily-stacked site never
     /// reaches implausibly-instant (or zero/negative) build time.
     float site_time_stack_min = 0.5f;
+
+    /// BL-709 — units of `construction_capacity` a site under construction draws
+    /// per FULL-RATE tick, on top of its material basket
+    /// (docs/economy/PRODUCTION.md § Construction as a rate: "Building projects
+    /// consume that capacity").
+    ///
+    /// It is added to the SAME per-tick need row `run_construction` already
+    /// builds from `resource_build_cost_for`, so it joins the same `rate`
+    /// minimum, the same stretch/pause thresholds and the same want register as
+    /// every material — one rule rather than a second one. A build stalled for
+    /// want of capacity therefore registers that want, which prices capacity and
+    /// induces the yard that answers it (MARKETS.md property 3).
+    ///
+    /// DEFAULTS TO ZERO = the pre-BL-709 behaviour exactly, which is what a
+    /// hand-built harness registry gets and why every construction harness that
+    /// authors no value is arithmetically untouched. scripts/economy.lua authors
+    /// the shipped value.
+    float capacity_per_build_tick = 0.0f;
+
+    /// BL-709 — how much `construction_capacity` demand the PRE-GAME SEEDER
+    /// provisions per standing building on a body, so that construction yards
+    /// exist at tick 0 (docs/economy/PRODUCTION.md § Construction as a rate:
+    /// "because generation can SEED CONSTRUCTION CAPACITY, the demand for its
+    /// inputs is non-zero from tick 0, in every market that has any").
+    ///
+    /// IT IS A GENERATION-TIME ESTIMATE, NOT A LIVE DRAW, and the distinction is
+    /// the whole reason it is a separate field from `capacity_per_build_tick`
+    /// above. Nothing in the tick reads it. The live consumer is the build
+    /// project, which is episodic by nature; the seeder cannot size against an
+    /// episodic figure that happens to read zero at generation time, so it sizes
+    /// against the STANDING BUILDING STOCK instead — the steady-state rate at
+    /// which a world of that many buildings replaces and extends itself. That is
+    /// MARKETS.md property 1's own "more buildings" scaling, read as a
+    /// provisioning target.
+    ///
+    /// Generation provisions the sector; the market decides everything
+    /// downstream of it — the same division BL-708 drew for power. ZERO means
+    /// the seeder provisions no capacity, which is the pre-BL-709 behaviour and
+    /// what a hand-built harness registry gets.
+    float seed_capacity_per_building = 0.0f;
 };
 
 /// BL-430 player-facing recipe-switch tunables, authored in scripts/economy.lua under
@@ -894,10 +1057,26 @@ public:
         return m_background_basket;
     }
 
+    /// BL-647 endemic-luxury-demand tunables (economy.endemic_demand in Lua).
+    const endemic_demand_params& endemic_demand() const { return m_endemic_demand; }
+
+    /// BL-647: the endemic luxury basket as masked by the current era.
+    /// Same fold, same caveat as population_demand_basket() above.
+    const std::array<float, resource_count>& endemic_demand_basket() const
+    {
+        return m_endemic_basket;
+    }
+
     /// BL-442 price band (economy.price_band in Lua) — the ONE authority for the
     /// [floor x, ceil x] clamp around base_price, read by both resolve_price
     /// (market_clearing.cpp) and wf_target_price (economy_system.cpp).
     const price_band_params& price_band() const { return m_price_band; }
+
+    /// BL-708 grid-good rules (economy.grid_goods in Lua): which goods ride the
+    /// road network instead of a convoy, and what their stockpile ceiling is.
+    /// Defaults to all-inert, so a hand-built registry authors nothing and
+    /// behaves exactly as it did before the table existed.
+    const grid_goods_params& grid_goods() const { return m_grid_goods; }
 
     /// BL-263 spontaneous-market-emergence tunables (economy.market_emergence in Lua).
     const market_emergence_params& market_emergence() const { return m_market_emergence; }
@@ -930,6 +1109,18 @@ public:
     /// scorer nobody can replay. Sprint N3 T1: no caller yet; the registry is
     /// the home so that wiring the scorer (T6) reads one authored object.
     const nation_ai_params& nation_ai() const { return m_nation_ai; }
+
+    /// BL-644 space-programme purchase lumps (economy.space_programme in Lua).
+    /// Both default ZERO — an unauthored registry derives no state purchase —
+    /// and every authored value is range-checked at load and rejected by key
+    /// rather than clamped, the nation_ai discipline.
+    const space_programme_params& space_programme() const { return m_space_programme; }
+
+    /// BL-643 network-upkeep material rates (economy.network_upkeep in Lua).
+    /// All default ZERO — an unauthored registry derives no upkeep draw — and
+    /// every authored value is range-checked at load and rejected by key
+    /// rather than clamped, the space_programme discipline.
+    const network_upkeep_params& network_upkeep() const { return m_network_upkeep; }
 
     /// BL-628 whole-firm acquisition tunables (economy.acquisition in Lua).
     /// One number, `multiple`, range-checked at load and rejected rather than
@@ -1107,6 +1298,9 @@ public:
 
     // --- direct construction for tests (headless harness builds these by hand) ---
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
+    /// BL-739: the idle-maintenance floor (economy.thresholds.idle_maintenance_floor).
+    float idle_maintenance_floor() const { return m_idle_maintenance_floor; }
+    void  set_idle_maintenance_floor(float f) { m_idle_maintenance_floor = f; }
     void set_growth(const growth_params& s) { m_growth = s; }
     void set_migration(const migration_params& m) { m_migration = m; }
     void set_population_demand(const population_demand_params& p)
@@ -1119,7 +1313,13 @@ public:
         m_background_demand = b;
         rebuild_baskets();
     }
+    void set_endemic_demand(const endemic_demand_params& e)
+    {
+        m_endemic_demand = e;
+        rebuild_baskets(); // BL-647: same era-resolved fold as the two siblings.
+    }
     void set_price_band(const price_band_params& p) { m_price_band = p; }
+    void set_grid_goods(const grid_goods_params& g) { m_grid_goods = g; }
     void set_market_emergence(const market_emergence_params& m) { m_market_emergence = m; }
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
@@ -1138,6 +1338,11 @@ public:
     /// `contract_*` Trust weights and would otherwise overwrite these.
     void set_sentiment(const sentiment_params& p) { m_sentiment = p; }
     void set_nation_ai(const nation_ai_params& p) { m_nation_ai = p; }
+    void set_space_programme(const space_programme_params& p) { m_space_programme = p; }
+    /// BL-743: the firm-exit trigger (economy.firm_exit in Lua; inert defaults).
+    const firm_exit_params& firm_exit() const { return m_firm_exit; }
+    void set_firm_exit(const firm_exit_params& p) { m_firm_exit = p; }
+    void set_network_upkeep(const network_upkeep_params& p) { m_network_upkeep = p; }
     void set_recipe_switch(const recipe_switch_params& p) { m_recipe_switch = p; }
     void set_acquisition(const acquisition_params& p) { m_acquisition = p; }
     void set_economics(building_type type, const building_economics& e)
@@ -1212,6 +1417,7 @@ private:
         };
         fold(m_population_demand.demand_basket, m_population_demand.baskets, m_population_basket);
         fold(m_background_demand.demand_basket, m_background_demand.baskets, m_background_basket);
+        fold(m_endemic_demand.demand_basket,    m_endemic_demand.baskets,    m_endemic_basket); // BL-647
     }
 
     /// BL-428: recompute chain depth over the era-allowed recipes.
@@ -1344,19 +1550,28 @@ private:
     float m_t_full = 1.0f;
     float m_t_idle = 0.2f;
 
+    /// BL-739: fraction of `maintenance` charged even at workforce 0 or
+    /// decommissioned. The C++ default is the pre-BL-739 constant so an
+    /// unloaded registry (hand-built harness mirrors) runs the old arithmetic;
+    /// the shipped Lua authors 0.15 (Ben, 2026-09-01).
+    float m_idle_maintenance_floor = 0.3f;
+
     /// BL-078 elastic-substrate model tunables (economy.substrate). Defaults match
     /// economy.lua so a hand-built harness registry behaves sensibly without Lua.
     growth_params m_growth = {};
     migration_params m_migration = {};
     population_demand_params m_population_demand = {};
     background_demand_params m_background_demand = {};
-    /// BL-640: the era-resolved folds of the two above, rebuilt by
+    endemic_demand_params    m_endemic_demand    = {}; // BL-647
+    /// BL-640: the era-resolved folds of the three above, rebuilt by
     /// rebuild_baskets() on every band change and every setter. Cached rather
     /// than recomputed per read: inject_population_demand walks it once per
     /// centre per tick.
     std::array<float, resource_count> m_population_basket = {};
     std::array<float, resource_count> m_background_basket = {};
+    std::array<float, resource_count> m_endemic_basket    = {}; // BL-647
     price_band_params m_price_band = {};
+    grid_goods_params m_grid_goods = {};
     market_emergence_params m_market_emergence = {};
 
     /// BL-095 construction-gate tunables (economy.construction). Defaults match
@@ -1391,6 +1606,20 @@ private:
     /// so a hand-built harness registry scores exactly as the scorer's own
     /// defaults do -- the registry adds a home, not a second set of numbers.
     nation_ai_params m_nation_ai = {};
+
+    /// BL-644 space-programme purchase lumps (economy.space_programme).
+    /// Default-constructed — both lumps zero, so a hand-built harness registry
+    /// derives no state purchase unless it sets them.
+    space_programme_params m_space_programme = {};
+
+    /// BL-743 firm-exit trigger (economy.firm_exit). Inert defaults: an
+    /// unloaded registry never winds a firm up.
+    firm_exit_params m_firm_exit = {};
+
+    /// BL-643 network-upkeep material rates (economy.network_upkeep).
+    /// Default-constructed — every rate zero, so a hand-built harness registry
+    /// derives no upkeep draw unless it sets them.
+    network_upkeep_params m_network_upkeep = {};
 
     /// BL-430 recipe-switch cost/cooldown. Defaults to free/instant so a
     /// hand-built harness registry that never sets this behaves as it always did.

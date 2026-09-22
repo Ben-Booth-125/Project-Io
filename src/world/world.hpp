@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "campaign_battle.hpp" // active_battle (BL-467 battle state, below)
 #include "corp_command.hpp" // corp_decision_ring (BL-202 strategic decision log)
+#include "faithful_unordered_map.hpp" // every unordered store below (BL-1034: copies tick as their source)
 #include "law.hpp"          // law (BL-343 enacted-law list, below)
 #include "modifier_set.hpp" // scalar_modifier (BL-479 per-corp tech effects, below)
 #include "nation_budget.hpp" // nation_budget (Sprint N3 T2: the persistent weight map, below)
@@ -11,12 +12,15 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+struct settlement_state; // settlement.hpp — held by pointer below, never by value
 
 /// The system's single asteroid belt — a band between two orbital radii. The
 /// belt is not a body (it owns no entity); it is rendered as a thick, translucent
@@ -127,6 +131,35 @@ struct world_history_entry
     std::string   consequence;              ///< Right column — what it left behind (may be empty).
 };
 
+/// BL-1042 (stockpile to budget) — one CARVED centre's slot: which region grew
+/// it, its rank inside that region, and the key the carve sorted it on
+/// (`urban_population / rank`). Written by `generate_population_centres`'
+/// demography path; see `world::gen_carve_centres`.
+struct carve_slot
+{
+    int     region = -1; ///< Index into `settlement_state::regions` (world::gen_settlement).
+    int     rank   = 0;  ///< 1-based rank inside the region.
+    int64_t key    = 0;  ///< The carve's sort key; the charter budget's split weight.
+
+    bool operator==(const carve_slot&) const = default;
+};
+
+/// Why a carved centre was never founded (BL-1042).
+enum class carve_drop_reason : uint8_t
+{
+    body_built_out = 0, ///< no candidate ground left on the body (or the carve outran the candidates)
+    no_tile        = 1, ///< the chosen raster index resolved to no tile (defensive; unreached)
+};
+
+/// A carved centre that was never founded, with the reason.
+struct carve_dropped_slot
+{
+    int               region = -1;
+    int               rank   = 0;
+    int64_t           key    = 0;
+    carve_drop_reason reason = carve_drop_reason::body_built_out;
+};
+
 /// ECS registry. Entities are plain integer IDs; components are stored in
 /// per-type maps. The registry owns all component data for the lifetime of
 /// the simulation.
@@ -181,38 +214,43 @@ struct world
     asteroid_belt belt;
 
     // --- component stores ---
-    std::unordered_map<entity_id, body_component>      bodies;
-    std::unordered_map<entity_id, tile_component>      tiles;
-    std::unordered_map<entity_id, building_component>  buildings;
-    std::unordered_map<entity_id, stockpile_component> stockpiles;
-    std::unordered_map<entity_id, market_component>    markets;
-    std::unordered_map<entity_id, unit_component>             units;
+    // Every unordered store on `world` is a `faithful_unordered_map`: exactly
+    // std::unordered_map, except that a COPY keeps the source's iteration order.
+    // A tick reads some of these stores in that order (a float sum over
+    // `population_centres` among them), so a world copy that reordered them
+    // would tick differently from its original (BL-1034). Add new ones as this type.
+    faithful_unordered_map<entity_id, body_component>      bodies;
+    faithful_unordered_map<entity_id, tile_component>      tiles;
+    faithful_unordered_map<entity_id, building_component>  buildings;
+    faithful_unordered_map<entity_id, stockpile_component> stockpiles;
+    faithful_unordered_map<entity_id, market_component>    markets;
+    faithful_unordered_map<entity_id, unit_component>             units;
 
     /// Population centre entities keyed by their entity ID. Populated by
     /// generate_population_centres() after tile generation; empty until that
     /// call is made for a body. No AI behaviour in the prototype.
-    std::unordered_map<entity_id, population_centre_component> population_centres;
+    faithful_unordered_map<entity_id, population_centre_component> population_centres;
 
     /// Maps a population centre entity ID to the tile entity it occupies.
     /// Written alongside population_centres by generate_population_centres().
-    std::unordered_map<entity_id, entity_id>                   population_centre_tile;
+    faithful_unordered_map<entity_id, entity_id>                   population_centre_tile;
 
     /// Procedural city name per population centre — the human-readable identity used
     /// by the market ledger's market/city selector and the CSV export. Assigned by
     /// generate_population_centres() from an INDEPENDENT seeded stream (so it does not
     /// perturb world generation). A market's city name resolves via its centre_tile.
-    std::unordered_map<entity_id, std::string>                 population_centre_name;
+    faithful_unordered_map<entity_id, std::string>                 population_centre_name;
 
     /// Land-use state per TILE entity, held sparsely: an absent entry is
     /// `undeveloped` (docs/economy/POPULATION.md § Land use). Seeded by
     /// stamp_urban_land_use (BL-612, urban ground stamped) with the urban
     /// footprints under population centres; joins the flat-binary save as its
     /// own store (world_save format v11).
-    std::unordered_map<entity_id, land_use_component>          land_use;
+    faithful_unordered_map<entity_id, land_use_component>          land_use;
 
     /// Nation entities keyed by their entity ID. Populated by generate_nations()
     /// after tile generation; empty until that call is made for a body.
-    std::unordered_map<entity_id, nation_component>    nations;
+    faithful_unordered_map<entity_id, nation_component>    nations;
 
     /// What each nation CARES ABOUT -- the persistent weight vector the national
     /// budget pass (BL-537, `run_national_budget`) spends by. Keyed by nation
@@ -239,13 +277,68 @@ struct world
     /// Maps a tile entity ID to the nation entity ID that owns it.
     /// Absent entries are unclaimed (ocean tiles and bodies without nation generation).
     /// Written by generate_nations() alongside the nation_component.tiles list.
-    std::unordered_map<entity_id, entity_id>           tile_to_nation;
+    faithful_unordered_map<entity_id, entity_id>           tile_to_nation;
+
+    /// Land tiles the colonisation span's diffusion actually reached AND could
+    /// farm (BL-849, colonisation seeds the partition). Mirrors `tile_to_nation`'s
+    /// shape and rule: absent means "not settled" — an unreached tile, a body
+    /// the migration never ran on, or water (colonisation covers land only).
+    ///
+    /// WRITTEN BEFORE `build_province_partition` RUNS, from
+    /// `settlement_state::settled_cells` (`run_settlement`'s colonisation field,
+    /// `colonisation_field::farmable` — see `hard_coded_world.cpp`). Nothing
+    /// downstream of the partition writes it, and it is NOT SERIALISED: like the
+    /// reverse index `tile_to_nation` is, it is a generation-time index with no
+    /// committed record to rebuild it from — the colonisation field itself is
+    /// discarded once the partition has read it.
+    ///
+    /// A `std::set` so a deterministic walk over it needs no sort of its own.
+    std::set<entity_id>                                 tile_settled;
 
     /// Corporation entities keyed by their entity ID. Populated by
     /// generate_corporations() after nation generation; empty until that call
     /// is made. Exactly one entry will have corporation_component::is_player == true,
     /// and world::player_entity will equal that entry's key.
-    std::unordered_map<entity_id, corporation_component> corporations;
+    faithful_unordered_map<entity_id, corporation_component> corporations;
+
+    /// The Era -1 settlement record the SPECIALIST roster pass reads (BL-977):
+    /// `generate_corporations` derives each corp's focus, ownership class and
+    /// home province from `settlement_state::regions` / `charter` /
+    /// `median_industrial_year`. World-gen holds the record in a local and
+    /// passes a pointer; the landscape search regenerates the roster per
+    /// candidate AFTER world-gen has returned, so it needs the same record —
+    /// or every searched roster would fall to the national-character fallback
+    /// and lose the specialists premise (BL-219, BL-631).
+    ///
+    /// A GENERATION-TIME INDEX, like `tile_settled` above: written once at the
+    /// end of `make_hard_coded_world`, shared (read-only) by every per-candidate
+    /// copy of the world, and NOT SERIALISED — the search runs only at new-game,
+    /// and a loaded world never regenerates its roster. Null after a load.
+    std::shared_ptr<const settlement_state> gen_settlement;
+
+    /// BL-1042 (stockpile to budget; DIGITISATION.md Part III) — THE CARVE
+    /// INDEX: every population centre the demography carve founded, keyed by
+    /// centre id, bound to the (region, rank, key) SLOT it materialises. A
+    /// region's industry points reach its campaign centres through this index
+    /// (`build_stockpile_budget`, stockpile_budget.hpp). Centres founded any
+    /// other way — the land-area fallback, the coverage foundings, the province
+    /// anchors — are absent, and hold no share. A spilled centre is bound to the
+    /// region that GREW it, not the one it stands in (`nearest_region` would
+    /// mis-bind it).
+    ///
+    /// A GENERATION-TIME INDEX on exactly `gen_settlement`'s footing: written
+    /// once by `generate_population_centres`, read by the new-game budget, and
+    /// NOT SERIALISED (no save field, no `state_hash` or snapshot fold) — the
+    /// budget is spent at new-game and a loaded world never rebuilds it. Empty
+    /// after a load. A `std::map` so any walk over it is ascending id.
+    std::map<entity_id, carve_slot> gen_carve_centres;
+
+    /// BL-1042 — the carved centres that were NEVER founded, in carve order,
+    /// with why. Their slots' share of a region's points is counted unspent
+    /// under its own reason rather than spread over the region's founded
+    /// centres. Same footing as `gen_carve_centres`: generation-time, NOT
+    /// SERIALISED, empty after a load.
+    std::vector<carve_dropped_slot> gen_carve_dropped;
 
     /// Shared stockpile pool keyed by (corporation, body). This is the Layer 3
     /// economy's working store — extraction and processing credit/draw it, the
@@ -387,7 +480,7 @@ struct world
     /// null_entity for an absent cell), for O(1) neighbour lookup in intra-body pathfinding
     /// (BL-077). A derived cache, not authored state: built on first use by body_tile_grid(),
     /// a pure function of the body's tiles (independent of tiles-map iteration order).
-    std::unordered_map<entity_id, std::vector<entity_id>> body_tile_index;
+    faithful_unordered_map<entity_id, std::vector<entity_id>> body_tile_index;
 
     /// Route-cost cache for intra-body A* (BL-077), keyed by (body, lo_tile, hi_tile) with the
     /// tile pair canonicalised (the weighted path is symmetric). A derived cache; invalidated
@@ -413,7 +506,7 @@ struct world
     /// One multi-source Dijkstra per body rather than an A* per candidate tile: placement
     /// asks this question for every tile under the cursor, and the armed-build tint asks it
     /// for the whole visible grid at once, so a per-query search would be the wrong shape.
-    std::unordered_map<entity_id, std::vector<float>> body_reach_cost;
+    faithful_unordered_map<entity_id, std::vector<float>> body_reach_cost;
 
     /// Techs each corporation has EARNED, by tech id (BL-344). Per-corp, never
     /// global: two corporations research independently, and a gate that read a
@@ -500,7 +593,7 @@ struct world
     /// call. Rebuilt when the stamp below stops matching the market set — markets
     /// are created at runtime but never destroyed, so count + max id catches every
     /// mutation. Mutable so the const read path (market_for_tile) can refresh it.
-    mutable std::unordered_map<entity_id, std::vector<entity_id>> body_market_index;
+    mutable faithful_unordered_map<entity_id, std::vector<entity_id>> body_market_index;
     mutable std::size_t body_market_index_count  = 0;           ///< markets.size() at build.
     mutable entity_id   body_market_index_max_id = null_entity; ///< Max market id at build.
 
@@ -563,7 +656,7 @@ struct world
     /// authors a non-empty entry yet — the read path is the mechanism BL-350
     /// exists to prove condition_set reaches procurement "for free"; content
     /// (an enacted law that populates this) is a BL-343/BL-350 follow-on.
-    std::unordered_map<entity_id, condition_set> corp_embargo_conditions;
+    faithful_unordered_map<entity_id, condition_set> corp_embargo_conditions;
 
     /// THE RELATIONAL SUBSTRATE (BL-545): one directed, continuous, DERIVED
     /// value from an observer to a subject, on two dimensions (Access, Trust),

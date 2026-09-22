@@ -37,14 +37,14 @@
 //       instrument produced a non-vacuous reading (every corp filed, and the
 //       flows sum to the filed net), because a diagnosis cannot be a pass/fail.
 //
-//   R2  THE GATE. The seated corporation's net at the end of the warm start is
+//   R2  THE GATE. The seated corporation's net at the end of the settle is
 //       non-negative on a MAJORITY of swept seeds, and its balance is above zero.
 //       CURRENTLY RED at 1/8 — deliberately left red rather than relaxed; the
 //       residual it is failing on is named in the block above.
 //
 //   R3  No clamp. The balance is never floored, and no subsidy is handed to the
 //       seated corp: asserted here as the two properties a clamp would break —
-//       a corp CAN still end the warm start underwater on some seed (an honest
+//       a corp CAN still end the settle underwater on some seed (an honest
 //       constraint still bites), and the seated corp does not out-earn the field
 //       per holding.
 //
@@ -95,7 +95,8 @@
 //   seated corp still runs at -27.9 cr/qtr, and 60.2% of what remains is
 //   MAINTENANCE on buildings that do not produce. The per-building rows below
 //   name it exactly: an extraction site targeting the ancient ambient tier
-//   (stone #11, timber #12, fibre #43) is idle 80/80 ticks on every seed, with a
+//   (stone #11, timber #12, fibre #43) is idle 80/80 ticks on every seed (the
+//   pre-game settle ran 80 ticks when this was measured), with a
 //   real unexhausted deposit under it, while iron_ore #0 and agricultural_
 //   produce #6 sites run 80/80. The arithmetic behind that is not a bug in any
 //   one file: an ambient raw with no downstream demand clears at the price band
@@ -174,14 +175,22 @@ void check_on_real_spawn(bool ok, const char* row, const char* what)
     check(ok, row, what);
 }
 
-constexpr int k_warm_ticks = 80;  ///< app::pre_game_ticks.
+/// The settle: phase 6's single validation run, whose closing position IS the
+/// gate this harness reads (ERAS.md § The opening position). Mirrors
+/// `app::validation_ticks`, restated because app.hpp brings SDL; if the app's
+/// number moves, this one moves with it. NOT a longer history by choice: the
+/// subject is the position the player is handed, and the one trailing window
+/// read (k_window, 8 quarters) fits inside the settle whole. Re-read under
+/// BL-1008, 2026-09-16 — see THE SETTLE RE-READ below for what moved.
+constexpr int k_settle_ticks = 12;
 constexpr int k_window     = 8;   ///< Trailing quarters averaged (FINANCE.md's own figure).
 
 // ---------------------------------------------------------------------------
 // THE PRE-FIX BASELINE — measured, dated, and kept
 // ---------------------------------------------------------------------------
 // Taken on this harness at commit 8548cea3 (the wave-2 promotion commit), 8
-// seeds from 0, prehistory ON, 80 warm ticks, trailing 8-quarter window. They
+// seeds from 0, prehistory ON, 80 settle ticks (the pre-game settle's length
+// then; it is 12 now — see THE SETTLE RE-READ), trailing 8-quarter window. They
 // are the numbers BL-635's diagnosis was made on, and they are constants here
 // rather than prose so a later regression is measured against the same rows
 // this fix was measured against.
@@ -199,12 +208,43 @@ constexpr int k_window     = 8;   ///< Trailing quarters averaged (FINANCE.md's 
 // -627/qtr". -627 is the OPERATING net, and this sweep reproduces it: the
 // per-seed range was -613.9 to -702.9, mean -646.4. The balance figure did not
 // reproduce (-1 against -120,335) and is not explained here; a live session
-// reads its balance at a different moment in the tick than a warm start's last
+// reads its balance at a different moment in the tick than a settle's last
 // filed return, and the item's diagnosis never rested on it.
 constexpr double k_baseline_seated_operating_net   = -646.4;
 constexpr double k_baseline_seated_upkeep          =  600.0;
 constexpr double k_baseline_rival_solvent_pct      =   26.9;
 constexpr double k_baseline_rival_units_per_seed   =   16.9; // mean of 15..20
+
+// ---------------------------------------------------------------------------
+// THE SETTLE RE-READ (BL-1008, 2026-09-16) — what moved when 80 became 12
+// ---------------------------------------------------------------------------
+// Same binary logic, same 3 seeds from 0, prehistory ON; the ONLY change is the
+// settle length (80 -> 12). A reading, not a re-pin: no band was touched.
+//
+//   row / figure                         80 ticks          12 ticks
+//   seated balance > 0                   1/3               3/3
+//   seated net >= 0 (trailing 8)         1/3               1/3
+//   R2 gate (both)                       1/3  FAIL         1/3  FAIL
+//   seated mean closing balance          15,153.9 cr       2,733.0 cr
+//   seated mean operating net            +214.3 cr/qtr     +123.8 cr/qtr
+//   seated dipped below zero             2/3 seeds         0/3 seeds
+//   rivals solvent at close              29.2%             36.7%   (bar 26.9)
+//   field holdings growth                +10.6%            +7.3%
+//   rival standing force                 11 units          0 units  R4 FAIL
+//
+// CAUSES. (1) The seated balance: the two seeds whose corp never produces
+// (seeds 1 and 2 — every building idle every tick) bleed maintenance and then
+// interest from the 400 cr starting capital; 80 quarters took them below zero,
+// 12 do not. The gate did not move, because its net half reads the same idle
+// buildings at either length. (2) Operating net: seed 0's income is still
+// rising at tick 12 (a processor active 7 of 12 ticks against 70 of 80), so its
+// trailing mean is lower. (3) Rival solvency rose for (1)'s reason. (4) THE
+// STANDING-FORCE ROW WENT RED, and not because rivals cannot afford to hire:
+// generation seeds no starting force (seed_starting_force = false,
+// corporation_generation.hpp), so any unit is a hire_unit the scorer makes, and
+// in 12 ticks none has. The row reads a behaviour that needs more quarters
+// than the game's settle has; whether it should read a longer run, be
+// re-expressed, or stand red is a call this re-read does not make.
 
 /// BL-573: run_nation_step's template registry. Empty is correct here — nothing
 /// in this sweep opens a mercenary contract, so the walk is vacuous.
@@ -386,6 +426,7 @@ struct seed_result
     double rival_net_mean = 0.0;
     double rival_balance_median = 0.0;
     flow_row rival_mean;          ///< per-corp mean of the trailing flows
+    double rival_max_per_holding = 0.0; ///< the best rival's income per holding (R3's range, BL-744)
     int    field_holdings_open = 0;
     int    field_holdings_close = 0;
     int    rival_units = 0, rival_heads = 0;
@@ -439,7 +480,7 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
     output_probe probe;
     probe.corp = w.player_entity;
     g_probe = &probe;
-    for (int t = 0; t < k_warm_ticks; ++t)
+    for (int t = 0; t < k_settle_ticks; ++t)
         tick(w, reg, t);
     g_probe = nullptr;
     out.probe = probe;
@@ -534,6 +575,9 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
             rival_acc.net         += row.net;
             rival_acc.holdings    += row.holdings;
             ++rival_acc.quarters;
+            if (row.holdings > 0.0)
+                out.rival_max_per_holding =
+                    std::max(out.rival_max_per_holding, row.income / row.holdings);
         }
     }
 
@@ -612,9 +656,9 @@ int main(int argc, char** argv)
     }
 
     std::printf("spawn_solvency — BL-635, requirement group `spawn-solvency` R1-R4\n");
-    std::printf("  %d seeds from %u, %d warm ticks, trailing window %d quarters, "
+    std::printf("  %d seeds from %u, %d settle ticks (app::validation_ticks), trailing window %d quarters, "
                 "prehistory %s\n",
-                seed_count, seed0, k_warm_ticks, k_window,
+                seed_count, seed0, k_settle_ticks, k_window,
                 prehistory ? "ON (the shipped spawn)" : "OFF (--fast, NOT the spawn)");
 
     std::vector<seed_result> rows;
@@ -711,7 +755,7 @@ int main(int argc, char** argv)
 
     // The DENOMINATOR. Costs alone cannot say whether the corp is expensive or
     // simply idle, and those want different fixes.
-    std::printf("\n=== R1  THE PRODUCING SIDE — the seated corp over the whole warm start ===\n");
+    std::printf("\n=== R1  THE PRODUCING SIDE — the seated corp over the whole settle ===\n");
     std::printf("  seed | bldg-ticks  active   idle | mean eff.workforce | output/tick "
                 "| extraction out/tick\n");
     for (const seed_result& r : rows)
@@ -830,7 +874,7 @@ int main(int argc, char** argv)
     std::printf("    closing balance %10.1f -> %10.1f cr\n",
                 -120334.6, seated_mean.balance);
     check_on_real_spawn(both * 2 > n_rows, "R2",
-          "a MAJORITY of swept seeds end the warm start with balance > 0 and net >= 0");
+          "a MAJORITY of swept seeds end the settle with balance > 0 and net >= 0");
 
     // ---------------------------------------------------------------------
     // R3 — no clamp, no subsidy. Asserted as the two properties a clamp breaks.
@@ -851,23 +895,31 @@ int main(int argc, char** argv)
 
         // A subsidy would show as the seated corp out-earning the field per
         // holding on income it did not produce. The honest form is the seated
-        // corp's income per holding sitting within the field's own range.
+        // corp's income per holding sitting within the field's own RANGE - at
+        // or below the best rival's - rather than within 3x the field's MEAN.
+        // RE-EXPRESSED 2026-09-02 (Ben, ruling on NR-781): the 3x-mean form
+        // tripped at 3.1x after BL-744 doubled extraction income per building,
+        // with no subsidy path touched; a spawn that earns what the best rival
+        // earns is not subsidised, whatever the mean of a field full of idle
+        // processors says. The mean is still printed for the record.
         const double seated_per_holding =
             seated_mean.holdings > 0.0 ? seated_mean.income / seated_mean.holdings : 0.0;
-        double field_income = 0.0, field_holdings = 0.0;
+        double field_income = 0.0, field_holdings = 0.0, field_max = 0.0;
         for (const seed_result& r : rows)
         {
             field_income   += r.rival_mean.income;
             field_holdings += r.rival_mean.holdings;
+            field_max       = std::max(field_max, r.rival_max_per_holding);
         }
         const double field_per_holding =
             field_holdings > 0.0 ? field_income / field_holdings : 0.0;
-        std::printf("  income per holding: seated %.1f cr/qtr, field %.1f cr/qtr\n",
-                    seated_per_holding, field_per_holding);
+        std::printf("  income per holding: seated %.1f cr/qtr, field mean %.1f cr/qtr, "
+                    "field best %.1f cr/qtr\n",
+                    seated_per_holding, field_per_holding, field_max);
         check_on_real_spawn(
-              field_per_holding <= 0.0 || seated_per_holding <= 3.0 * field_per_holding,
-              "R3", "the seated corp is not out-earning the field per holding "
-                    "(no handed subsidy)");
+              field_max <= 0.0 || seated_per_holding <= field_max,
+              "R3", "the seated corp earns no more per holding than the best rival "
+                    "(within the field's range - no handed subsidy)");
     }
 
     // ---------------------------------------------------------------------
@@ -890,7 +942,7 @@ int main(int argc, char** argv)
     std::printf("  rivals solvent at close: %d/%d (%.1f%%)   "
                 "[pre-BL-635 baseline: %.1f%%]\n",
                 total_solvent, total_rivals, solvent_pct, k_baseline_rival_solvent_pct);
-    std::printf("  field holdings: %d at generation -> %d after the warm start (%+.1f%%)\n",
+    std::printf("  field holdings: %d at generation -> %d after the settle (%+.1f%%)\n",
                 holdings_open, holdings_close,
                 holdings_open > 0
                     ? 100.0 * (holdings_close - holdings_open) / holdings_open : 0.0);
@@ -904,7 +956,7 @@ int main(int argc, char** argv)
     // asserted; the absolute percentage is REPORTED beside its pre-fix baseline
     // so a regression cannot hide inside a relative test.
     check(holdings_close > holdings_open, "R4",
-          "the field is still ACTING — its holding count grew over the warm start");
+          "the field is still ACTING — its holding count grew over the settle");
     check_on_real_spawn(
           total_rivals > 0 && solvent_pct >= k_baseline_rival_solvent_pct - 1.0, "R4",
           "the fix did not starve the field — rival solvency is at or above its "

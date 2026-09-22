@@ -1,5 +1,13 @@
 # Global Style Sheet
 
+> **Proposes:** which visual language and UX direction Io should narrow to · which
+> iterations were rendered and what each was judged against · which colour and global
+> rules the exploration puts forward · which questions remain open for its owner · what
+> a proposal must clear before it may be promoted into an authority doc.
+> **Not here:** any settled surface rule (LAYOUT, MENU, ICONS) · the settled ground
+> art direction (RENDERING) · the glyph vocabulary in force (ICONS).
+> **Confused with:** RENDERING.md, ICONS.md, LAYOUT.md.
+
 Status: **draft — first surface (tech tree panel) in active exploration, nothing SETTLED yet.**
 Owner: Joe. Sprint: none currently — the doc's original "ST1" pointer was to a sprint that
 was never opened and was deleted outright in the 2026-08-24 unstarted-plans purge
@@ -29,8 +37,8 @@ so later sessions don't have to reconstruct the sequence from filenames alone.
 
 First real exploration pass, scoped to one surface (the F9 tech tree panel — see
 `docs/ui/question_log.json`'s `tech_tree_panel` entry) rather than the whole game. Direction:
-industrial-schematic crossed with a supplier's parts catalog, reflecting that the player is a
-mercenary company that *procures* tech rather than researching it (`CONCEPT.md` § Modular tech
+industrial-schematic crossed with a supplier's parts catalog, reflecting that the player reaches
+tech by *procuring* its output (`CONCEPT.md` § Modular tech
 trees) — nodes as catalogued components, not a mystical RPG skill tree.
 
 | Render | What changed | Verdict |
@@ -164,6 +172,28 @@ forest), and drifted several shapes off spec.
   three dev-tail marks). Then the track moves to the **minimap** (`renders/minimap/`, empty;
   `MINIMAP.md` has role/chrome but no spec for the visual-interest / traffic Joe wants).
 
+### Planetary map sub-track (2026-09-01, `renders/map/`)
+
+Rounds 1–2 (`renders/map/PROMPTS.txt`, outputs `it1`–`it3`): 5-way art-direction sheet,
+then the 2×2 base/grade matrix. Joe's provisional front-runner C-F was put to Ben the
+same day (the sprint-29 design forms) and **RATIFIED — SETTLED 2026-09-01**:
+
+- **Base family C (painterly relief) + grade F (near-future) — SETTLED.** The grade is
+  a separable runtime pass over any biome, never baked into terrain content.
+- **No hex grid on screen — SETTLED.** Grid appears only as selection/hover feedback;
+  selected tile carries the single amber `#E8A33D` hex (confirmed against all it2 panels).
+- **Installations are rendered geometry, not glyphs — SETTLED** (aligns with glyph
+  round 4's framing). Canvas building/settlement glyphs retire; the glyph vocabulary
+  survives in chrome and panels.
+- **Camera: staged.** The C-F ground ships as a 2D painterly bake under the current
+  top-down camera; the tilting oblique camera is a future renderer milestone (2.5D vs
+  3D undecided — trade-offs in `docs/research/CANVAS_RENDERING.md` § The end-state
+  choice).
+
+Engine authority for the mechanism these verdicts feed: `docs/ui/RENDERING.md`
+(baked terrain chunks). Round 2 panel set 2 (`it4`) and round 3 (survey-overlay toggle,
+multi-select treatment, icon→geometry resolve) remain open per the prompts file.
+
 ## Colour guide
 
 | Role | Colour | Hex (approx) | Notes |
@@ -184,12 +214,12 @@ forest), and drifted several shapes off spec.
 - Button treatment (filled / outline / minimal-transparent) — unsettled.
 - Type scale and base text size — unsettled; tech tree confirmed always-on short titles are readable and can drop further in size if needed.
 - Iconography weight/line-style — tech tree: flat vector, no gradients, one accent colour pair, category glyphs reserved for large/capstone nodes only (small nodes too small for legible detail).
-- Tile/terrain rendering style — unsettled, untouched by this pass.
+- Tile/terrain rendering style — **SETTLED 2026-09-01**: C-F painterly relief + near-future grade, no on-ground grid (Planetary map sub-track above; `docs/ui/RENDERING.md`).
 - Depth/shadow treatment — tech tree: flat hard-edged offset shadows only (no blur, no gradient); ring/tier structures may use a stepped flat bevel (highlight + shadow edge-lines per step) rather than a gradient. Still being tuned (wide8-11) — not SETTLED.
 
 ## Open questions
 
-- [ ] What should the map itself look like at a glance — abstract/schematic or textured/representational?
+- [x] What should the map itself look like at a glance — **textured/representational** (C-F, SETTLED 2026-09-01; Planetary map sub-track above).
 - [ ] Icon style: does it match the UI chrome style, or is it allowed to differ (e.g. more detailed on-canvas glyphs vs flat panel icons)?
 - [ ] Does the style vary by canvas (Solar / Circumplanetary / Planetary) or stay uniform?
 - [ ] Tech tree: always-on node titles vs. hover-only — designed against the CURRENT real behaviour deliberately; the interaction-model question itself is unraised with Ben as of 2026-08-25 (Joe to raise directly).

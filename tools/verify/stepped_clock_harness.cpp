@@ -42,7 +42,7 @@ settlement_state make_world(int regions)
         region p;
         p.col                = (i * 41) % 300;
         p.row                = (i * 23) % 140;
-        p.culture            = i % 4;
+        p.culture            = culture_shares::pure(i % 4);
         p.nation             = -1;
         p.settle_score_q     = 400 + (i * 37) % 400;
         // Carrying capacity is DERIVED from farm_q (region_carrying_capacity),

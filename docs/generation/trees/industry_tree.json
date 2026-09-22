@@ -1,0 +1,1445 @@
+{
+  "_schema": "tree/io-v1",
+  "_note": [
+    "The Industry tree — the economy pass, 1660 → 1960 (TREES.md § The store). Invested: the Invest verb takes one node a round, chosen by the scorer.",
+    "INDUSTRY_TREE.md is the authority; this file transcribes its tables. tree_lint.js cross-checks the two both ways and enforces the five rules.",
+    "Ids carry branch and ring (IN-<BR>-<ring><seq>; seq m is the ring's milestone). Links are undirected and stored once, on the node farther from the root; the root IN-SP-1a lists none, and that empty list is how the generated table derives is_root (tree_lint holds exactly one).",
+    "Magnitudes (per_mille) are authored by judgement and are placeholders; the sweep re-prices them. Names are generic mechanism nouns — real history is a mechanism reference, never a name source; earth_ref is calibration prose only."
+  ],
+  "tree": "industry",
+  "cap": 64,
+  "branches": [
+    {
+      "key": "SP",
+      "name": "Energy (the spire)",
+      "concern": "fire — mining to steam to the grid; the phase's clock"
+    },
+    {
+      "key": "MT",
+      "name": "Metal",
+      "concern": "what a nation smelts with, and whether metal is counted by the piece or weighed by the ton"
+    },
+    {
+      "key": "MV",
+      "name": "Movement",
+      "concern": "sea legs, colonial reach across water, the collapse of interior distance, the wire"
+    },
+    {
+      "key": "LD",
+      "name": "Land",
+      "concern": "the food ceiling, and what a nation does to its own countryside to fill the works"
+    },
+    {
+      "key": "CH",
+      "name": "Charter",
+      "concern": "who may own, promise, invent and read — the terms a corporation is chartered on"
+    },
+    {
+      "key": "HL",
+      "name": "Health",
+      "concern": "the demographic transition; mortality falling ahead of wealth"
+    }
+  ],
+  "scorer_terms": [
+    "reach_bound",
+    "manpower_bound",
+    "food_bound",
+    "stores_low",
+    "cohesion_low",
+    "threatened",
+    "plague_struck",
+    "ground_ore",
+    "ground_farm",
+    "ground_fuel",
+    "ground_port",
+    "ground_grass",
+    "many_peoples",
+    "coastal_holdings",
+    "spire",
+    "known",
+    "surplus",
+    "furnace_lit",
+    "colonial_reach",
+    "tariff_pressure",
+    "fuel_bound",
+    "labour_bound",
+    "ground_forest",
+    "credit_bound"
+  ],
+  "nodes": [
+    {
+      "id": "IN-SP-1a",
+      "name": "Atmospheric & Rotative Steam",
+      "kind": "major",
+      "ring": 1,
+      "branch": "SP",
+      "links": [],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 150
+        },
+        {
+          "kind": "upgrade",
+          "target": "Water Mill"
+        }
+      ],
+      "pursued_when": {
+        "term": "spire",
+        "situation": "ring 1 has just opened and the fuel trade is running; the engine is the one node every ring-1 branch is adjacent to"
+      },
+      "earth_ref": "1712 → 1780s; the master node"
+    },
+    {
+      "id": "IN-SP-1m",
+      "name": "The Cheap Ton",
+      "kind": "milestone",
+      "ring": 1,
+      "branch": "SP",
+      "links": [
+        "IN-SP-1a"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [
+        "IN-MV-1a"
+      ],
+      "effects": [
+        {
+          "kind": "open",
+          "target": "ring 2"
+        }
+      ],
+      "pursued_when": {
+        "term": "spire",
+        "situation": "the smelting doctrine is taken and a rail head is built; the ton moves, and ring 3 is the only place relief remains"
+      },
+      "earth_ref": "metal stops being counted by the piece and starts being weighed by the ton",
+      "requires_fork": [
+        "IN-MT-1a",
+        "IN-MT-1b"
+      ]
+    },
+    {
+      "id": "IN-SP-2a",
+      "name": "High-Pressure & Compound Engines",
+      "kind": "major",
+      "ring": 2,
+      "branch": "SP",
+      "links": [
+        "IN-SP-1m"
+      ],
+      "gate": "fuel",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 120
+        },
+        {
+          "kind": "modifier",
+          "target": "reach",
+          "per_mille": 60
+        }
+      ],
+      "pursued_when": {
+        "term": "reach_bound",
+        "situation": "holdings sit past free_holdings along a rail and a coast; the engine that moves is what administers the same breadth cheaper"
+      },
+      "earth_ref": "power leaves the engine house; rail and ships become possible"
+    },
+    {
+      "id": "IN-SP-2m",
+      "name": "The Scheduled World",
+      "kind": "milestone",
+      "ring": 2,
+      "branch": "SP",
+      "links": [
+        "IN-SP-2a"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [
+        "IN-MV-2a",
+        "IN-MV-2b"
+      ],
+      "effects": [
+        {
+          "kind": "open",
+          "target": "ring 3"
+        }
+      ],
+      "pursued_when": {
+        "term": "spire",
+        "situation": "steamship and wire are held and the heavy plant has an owner; arrival is a printed promise"
+      },
+      "earth_ref": "arrival stops being a matter of season and wind and becomes a printed promise",
+      "requires_fork": [
+        "IN-CH-2d",
+        "IN-CH-2e"
+      ]
+    },
+    {
+      "id": "IN-SP-3a",
+      "name": "Electrification",
+      "kind": "major",
+      "ring": 3,
+      "branch": "SP",
+      "links": [
+        "IN-SP-2m",
+        "IN-MV-3a"
+      ],
+      "gate": "fuel",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 200
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 80
+        }
+      ],
+      "pursued_when": {
+        "term": "furnace_lit",
+        "situation": "the furnace is lit and stores are not the constraint; grid power is the buy that compounds"
+      },
+      "earth_ref": "grid power; the second prime-mover shift"
+    },
+    {
+      "id": "IN-SP-3m",
+      "name": "The Renewed Line",
+      "kind": "milestone",
+      "ring": 3,
+      "branch": "SP",
+      "links": [
+        "IN-SP-3a"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [
+        "IN-MT-3a",
+        "IN-MV-3a",
+        "IN-HL-3a"
+      ],
+      "effects": [
+        {
+          "kind": "open",
+          "target": "campaign tree"
+        }
+      ],
+      "pursued_when": {
+        "term": "spire",
+        "situation": "what the polity fields it can also replace — the shell, the engine and the soldier; the rim is the last relief left"
+      },
+      "earth_ref": "a nation that can replace what it fields, from its own works, not by purchase abroad"
+    },
+    {
+      "id": "IN-MT-1e",
+      "name": "Furnace Practice",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "MT",
+      "links": [
+        "IN-SP-1a",
+        "IN-MT-1a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 30
+        }
+      ],
+      "pursued_when": {
+        "term": "ground_ore",
+        "situation": "ore is held and the blast furnace is worked; the fuel question is next"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-MT-1a",
+      "name": "Coke Smelting",
+      "kind": "major",
+      "ring": 1,
+      "branch": "MT",
+      "links": [
+        "IN-MV-1b"
+      ],
+      "gate": "fuel",
+      "diffusion": "capacity",
+      "excludes": "IN-MT-1b",
+      "requires": [],
+      "effects": [
+        {
+          "kind": "unlock",
+          "target": "Blast Works"
+        },
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 120
+        },
+        {
+          "kind": "retire",
+          "target": "the charcoal route"
+        }
+      ],
+      "pursued_when": {
+        "term": "ground_fuel",
+        "situation": "coal seams under held ground and the forest thin; scale is the endowment's answer"
+      },
+      "earth_ref": "breaks the charcoal ceiling — scale, wants coalfields"
+    },
+    {
+      "id": "IN-MT-1b",
+      "name": "Charcoal Iron",
+      "kind": "major",
+      "ring": 1,
+      "branch": "MT",
+      "links": [
+        "IN-MT-1e"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": "IN-MT-1a",
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 60
+        },
+        {
+          "kind": "upgrade",
+          "target": "Ore Pits"
+        },
+        {
+          "kind": "modifier",
+          "target": "defence",
+          "per_mille": 40
+        }
+      ],
+      "pursued_when": {
+        "term": "ground_forest",
+        "situation": "forest on held ground and no seam worth a pit; quality is the endowment's answer and the ceiling is accepted"
+      },
+      "earth_ref": "quality, wants forest — the charcoal niche held for a century after coke took the scale"
+    },
+    {
+      "id": "IN-MT-1c",
+      "name": "Machine Tools",
+      "kind": "major",
+      "ring": 1,
+      "branch": "MT",
+      "links": [
+        "IN-SP-1a"
+      ],
+      "gate": "ore_q",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 100
+        },
+        {
+          "kind": "modifier",
+          "target": "research",
+          "per_mille": 40
+        }
+      ],
+      "pursued_when": {
+        "term": "tariff_pressure",
+        "situation": "a neighbour's machine-made goods land cheaper than the polity's own at its market; the toolroom closes the gap a tariff only covers"
+      },
+      "earth_ref": "interchangeable parts; capacity that builds capacity"
+    },
+    {
+      "id": "IN-MT-1d",
+      "name": "Interchangeable Parts",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "MT",
+      "links": [
+        "IN-MT-1c"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "muster_cost",
+          "per_mille": -40
+        }
+      ],
+      "pursued_when": {
+        "term": "threatened",
+        "situation": "a levy is being raised and every musket is fitted by hand"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-MT-2a",
+      "name": "Converter Steel",
+      "kind": "major",
+      "ring": 2,
+      "branch": "MT",
+      "links": [
+        "IN-MT-1d",
+        "IN-SP-2a",
+        "IN-MT-1a"
+      ],
+      "gate": "ore_q",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 150
+        },
+        {
+          "kind": "unlock",
+          "target": "Arsenal"
+        },
+        {
+          "kind": "unlock",
+          "target": "unit roster: industrial"
+        }
+      ],
+      "pursued_when": {
+        "term": "ground_ore",
+        "situation": "ore and coke are both held and the rail head wants rails that do not wear; steel by the ton"
+      },
+      "earth_ref": "1856; cheap steel"
+    },
+    {
+      "id": "IN-MT-2b",
+      "name": "Framed Construction & Cement",
+      "kind": "major",
+      "ring": 2,
+      "branch": "MT",
+      "links": [
+        "IN-MT-2a"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 80
+        },
+        {
+          "kind": "access",
+          "target": "steeper landforms"
+        }
+      ],
+      "pursued_when": {
+        "term": "food_bound",
+        "situation": "the industrial city is at its walls; the frame lets it climb rather than sprawl"
+      },
+      "earth_ref": "iron-framed mills to the steel frame; the industrial city"
+    },
+    {
+      "id": "IN-MT-3a",
+      "name": "Synthetic Chemistry",
+      "kind": "major",
+      "ring": 3,
+      "branch": "MT",
+      "links": [
+        "IN-MT-2a"
+      ],
+      "gate": "fuel",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 100
+        },
+        {
+          "kind": "modifier",
+          "target": "research",
+          "per_mille": 60
+        }
+      ],
+      "pursued_when": {
+        "term": "furnace_lit",
+        "situation": "the furnace is lit, coal-tar is a waste stream, and the polity imports every dye, drug and explosive it uses"
+      },
+      "earth_ref": "dyes → polymers → explosives"
+    },
+    {
+      "id": "IN-MT-3b",
+      "name": "Fixed-Nitrogen Synthesis",
+      "kind": "major",
+      "ring": 3,
+      "branch": "MT",
+      "links": [
+        "IN-MT-3a",
+        "IN-LD-3b"
+      ],
+      "gate": "fuel",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 150
+        },
+        {
+          "kind": "resource",
+          "target": "fixed nitrogen as a bulk good"
+        }
+      ],
+      "pursued_when": {
+        "term": "food_bound",
+        "situation": "the fertiliser cargo arrives by sea and the sea is not safe; the food ceiling is lifted from the air"
+      },
+      "earth_ref": "1913; the food ceiling lifts"
+    },
+    {
+      "id": "IN-MT-3c",
+      "name": "Coal-Tar Distillates",
+      "kind": "minor",
+      "ring": 3,
+      "branch": "MT",
+      "links": [
+        "IN-MT-3a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "plague",
+          "per_mille": 30
+        }
+      ],
+      "pursued_when": {
+        "term": "plague_struck",
+        "situation": "a drawdown is running and the chemistry is held; the first drugs are a by-product"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-MV-1a",
+      "name": "Railway",
+      "kind": "major",
+      "ring": 1,
+      "branch": "MV",
+      "links": [
+        "IN-SP-1a"
+      ],
+      "gate": "fuel",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "unlock",
+          "target": "Rail Head"
+        },
+        {
+          "kind": "reach",
+          "target": "interior haul cost"
+        },
+        {
+          "kind": "modifier",
+          "target": "reach",
+          "per_mille": 120
+        }
+      ],
+      "pursued_when": {
+        "term": "reach_bound",
+        "situation": "inland holdings past free_holdings and a seat that cannot supply them by road"
+      },
+      "earth_ref": "interior distance collapses"
+    },
+    {
+      "id": "IN-MV-1b",
+      "name": "Iron Rails",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "MV",
+      "links": [
+        "IN-MV-1a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "reach",
+          "per_mille": 30
+        }
+      ],
+      "pursued_when": {
+        "term": "ground_ore",
+        "situation": "coke iron is cheap and the wagonways are still wooden"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-MV-1c",
+      "name": "Packet Service",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "MV",
+      "links": [
+        "IN-MV-2a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "reach",
+          "per_mille": 30
+        }
+      ],
+      "pursued_when": {
+        "term": "coastal_holdings",
+        "situation": "regular sailings between held ports; the schedule precedes the engine"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-MV-2a",
+      "name": "Steamship",
+      "kind": "major",
+      "ring": 2,
+      "branch": "MV",
+      "links": [
+        "IN-SP-2a"
+      ],
+      "gate": "coastal",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "unlock",
+          "target": "Coaling Station"
+        },
+        {
+          "kind": "access",
+          "target": "scheduled ocean leg"
+        },
+        {
+          "kind": "modifier",
+          "target": "reach",
+          "per_mille": 100
+        }
+      ],
+      "pursued_when": {
+        "term": "colonial_reach",
+        "situation": "holdings across water where the season, not the enemy, decides when they are supplied"
+      },
+      "earth_ref": "schedule replaces season"
+    },
+    {
+      "id": "IN-MV-2b",
+      "name": "Telegraph",
+      "kind": "major",
+      "ring": 2,
+      "branch": "MV",
+      "links": [
+        "IN-MV-1a"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "unlock",
+          "target": "Signal Line"
+        },
+        {
+          "kind": "intel",
+          "target": "activity-fog freshness"
+        },
+        {
+          "kind": "modifier",
+          "target": "cohesion",
+          "per_mille": 60
+        }
+      ],
+      "pursued_when": {
+        "term": "cohesion_low",
+        "situation": "a realm whose far provinces hear of a decision a season late; the wire is cohesion at range"
+      },
+      "earth_ref": "information detaches from transport; rail signalling drives the net"
+    },
+    {
+      "id": "IN-MV-3a",
+      "name": "Internal Combustion & Oil",
+      "kind": "major",
+      "ring": 3,
+      "branch": "MV",
+      "links": [
+        "IN-MV-2a"
+      ],
+      "gate": "fuel",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 100
+        },
+        {
+          "kind": "resource",
+          "target": "oil as a bulk fuel"
+        }
+      ],
+      "pursued_when": {
+        "term": "fuel_bound",
+        "situation": "coal landed at the seat runs short of what its engines burn; oil seeps on held ground are the second fuel"
+      },
+      "earth_ref": "oil displaces coal at the margin"
+    },
+    {
+      "id": "IN-MV-3b",
+      "name": "Automotive Transport",
+      "kind": "major",
+      "ring": 3,
+      "branch": "MV",
+      "links": [
+        "IN-MV-3a"
+      ],
+      "gate": null,
+      "diffusion": "artifact",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "reach",
+          "per_mille": 80
+        },
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 40
+        }
+      ],
+      "pursued_when": {
+        "term": "reach_bound",
+        "situation": "holdings off the rail and a road net that only carts use"
+      },
+      "earth_ref": "road freight; the artifact form diffuses at once"
+    },
+    {
+      "id": "IN-MV-3c",
+      "name": "Flight",
+      "kind": "major",
+      "ring": 3,
+      "branch": "MV",
+      "links": [
+        "IN-MV-3a"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "intel",
+          "target": "aerial reconnaissance"
+        },
+        {
+          "kind": "modifier",
+          "target": "defence",
+          "per_mille": 60
+        },
+        {
+          "kind": "unlock",
+          "target": "unit roster: machine age"
+        }
+      ],
+      "pursued_when": {
+        "term": "threatened",
+        "situation": "a neighbour with a grudge holds the engine and the polity cannot see past its own border"
+      },
+      "earth_ref": "from the first powered hop to jets by the epoch"
+    },
+    {
+      "id": "IN-LD-1a",
+      "name": "Field Survey",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "LD",
+      "links": [
+        "IN-LD-1d"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 20
+        }
+      ],
+      "pursued_when": {
+        "term": "food_bound",
+        "situation": "the fields are mapped and the tenure question is asked"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-LD-1b",
+      "name": "Cleared Holdings",
+      "kind": "major",
+      "ring": 1,
+      "branch": "LD",
+      "links": [
+        "IN-LD-1a"
+      ],
+      "gate": "arable",
+      "diffusion": "practice",
+      "excludes": "IN-LD-1c",
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "manpower",
+          "per_mille": 120
+        },
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 80
+        },
+        {
+          "kind": "modifier",
+          "target": "cohesion",
+          "per_mille": -60
+        }
+      ],
+      "pursued_when": {
+        "term": "labour_bound",
+        "situation": "the works want hands and the fields hold them; the land is consolidated and the labour released in a generation"
+      },
+      "earth_ref": "consolidation; an urban workforce in a generation, at the cost of unrest and a hollowed countryside"
+    },
+    {
+      "id": "IN-LD-1c",
+      "name": "Smallholder Tenure",
+      "kind": "major",
+      "ring": 1,
+      "branch": "LD",
+      "links": [
+        "IN-LD-1a"
+      ],
+      "gate": "arable",
+      "diffusion": "practice",
+      "excludes": "IN-LD-1b",
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "cohesion",
+          "per_mille": 60
+        },
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 80
+        },
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": -40
+        }
+      ],
+      "pursued_when": {
+        "term": "cohesion_low",
+        "situation": "the seat's cohesion is low and the fields are the one thing the people hold; the land stays divided"
+      },
+      "earth_ref": "the land stays divided; a late start, a deeper domestic market, rural demography survives"
+    },
+    {
+      "id": "IN-LD-1d",
+      "name": "Farm Mechanisation",
+      "kind": "major",
+      "ring": 1,
+      "branch": "LD",
+      "links": [
+        "IN-LD-1e"
+      ],
+      "gate": "arable",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "manpower",
+          "per_mille": 100
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 60
+        }
+      ],
+      "pursued_when": {
+        "term": "manpower_bound",
+        "situation": "the manpower ceiling is hit and most of the population is still in the fields"
+      },
+      "earth_ref": "the reaper line; releases workforce to industry"
+    },
+    {
+      "id": "IN-LD-1e",
+      "name": "Iron Implements",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "LD",
+      "links": [
+        "IN-MT-1c"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 30
+        }
+      ],
+      "pursued_when": {
+        "term": "ground_farm",
+        "situation": "a toolroom and farm ground in the same polity"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-LD-2a",
+      "name": "Soil Chemistry & Fertiliser Trade",
+      "kind": "major",
+      "ring": 2,
+      "branch": "LD",
+      "links": [
+        "IN-LD-1d"
+      ],
+      "gate": null,
+      "diffusion": "artifact",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "resource",
+          "target": "fertiliser as a traded good"
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 100
+        }
+      ],
+      "pursued_when": {
+        "term": "food_bound",
+        "situation": "yield bounded by the local nitrogen cycle and a port that can land cargo"
+      },
+      "earth_ref": "1840s; yield stops being bounded by the local nitrogen cycle"
+    },
+    {
+      "id": "IN-LD-2b",
+      "name": "Fertiliser Cargo",
+      "kind": "minor",
+      "ring": 2,
+      "branch": "LD",
+      "links": [
+        "IN-MV-2a",
+        "IN-LD-2a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 30
+        }
+      ],
+      "pursued_when": {
+        "term": "ground_port",
+        "situation": "a steamship route with a fertiliser source at the far end"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-LD-3a",
+      "name": "Tractor & Fertiliser Package",
+      "kind": "major",
+      "ring": 3,
+      "branch": "LD",
+      "links": [
+        "IN-LD-2a"
+      ],
+      "gate": "arable",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "manpower",
+          "per_mille": 150
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 100
+        }
+      ],
+      "pursued_when": {
+        "term": "manpower_bound",
+        "situation": "the ceiling is hit again with a tenth of the people still on the land"
+      },
+      "earth_ref": "a single-digit share of the workforce on the farm"
+    },
+    {
+      "id": "IN-LD-3b",
+      "name": "Fuel & Fertiliser Depot",
+      "kind": "minor",
+      "ring": 3,
+      "branch": "LD",
+      "links": [
+        "IN-MV-3a",
+        "IN-LD-3a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 30
+        }
+      ],
+      "pursued_when": {
+        "term": "ground_farm",
+        "situation": "oil, fixed nitrogen and farm ground on the same road"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-CH-1a",
+      "name": "Empirical Method",
+      "kind": "major",
+      "ring": 1,
+      "branch": "CH",
+      "links": [
+        "IN-CH-2b"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "research",
+          "per_mille": 100
+        }
+      ],
+      "pursued_when": {
+        "term": "surplus",
+        "situation": "nothing binds; the research rate is what compounds"
+      },
+      "earth_ref": "knowledge compounds openly"
+    },
+    {
+      "id": "IN-CH-1b",
+      "name": "Patent Grants",
+      "kind": "major",
+      "ring": 1,
+      "branch": "CH",
+      "links": [
+        "IN-CH-1a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "research",
+          "per_mille": 60
+        },
+        {
+          "kind": "institution",
+          "target": "property in invention"
+        }
+      ],
+      "pursued_when": {
+        "term": "known",
+        "situation": "a neighbour invents and the polity copies; the grant is what makes its own toolrooms invent"
+      },
+      "earth_ref": "invention becomes property"
+    },
+    {
+      "id": "IN-CH-1c",
+      "name": "Bond Market",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "CH",
+      "links": [
+        "IN-MV-1a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 30
+        }
+      ],
+      "pursued_when": {
+        "term": "credit_bound",
+        "situation": "a rail head or a fleet priced beyond a round's surplus"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-CH-2a",
+      "name": "General Incorporation",
+      "kind": "major",
+      "ring": 2,
+      "branch": "CH",
+      "links": [
+        "IN-CH-1c"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "institution",
+          "target": "chartered corporate form by registration, not by grant"
+        }
+      ],
+      "pursued_when": {
+        "term": "surplus",
+        "situation": "stores comfortable, public credit held, and more ventures asking for a charter than the sovereign grants in a year"
+      },
+      "earth_ref": "chartering by registration, not by grant — the campaign's premise"
+    },
+    {
+      "id": "IN-CH-2b",
+      "name": "Mass Schooling",
+      "kind": "major",
+      "ring": 2,
+      "branch": "CH",
+      "links": [
+        "IN-CH-3a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "research",
+          "per_mille": 80
+        },
+        {
+          "kind": "modifier",
+          "target": "assimilation",
+          "per_mille": 80
+        },
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 40
+        }
+      ],
+      "pursued_when": {
+        "term": "many_peoples",
+        "situation": "held ground whose shares still charge the holder; the school is the assimilation machine"
+      },
+      "earth_ref": "a literate workforce — the floor of the machine age"
+    },
+    {
+      "id": "IN-CH-2c",
+      "name": "Plant Registry",
+      "kind": "minor",
+      "ring": 2,
+      "branch": "CH",
+      "links": [
+        "IN-CH-2a",
+        "IN-MT-2a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 20
+        }
+      ],
+      "pursued_when": {
+        "term": "furnace_lit",
+        "situation": "the furnace is lit and the question of who owns it is asked"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-CH-2d",
+      "name": "State Arsenal",
+      "kind": "major",
+      "ring": 2,
+      "branch": "CH",
+      "links": [
+        "IN-CH-2c"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": "IN-CH-2e",
+      "requires": [],
+      "effects": [
+        {
+          "kind": "institution",
+          "target": "heavy plant nation-owned; corporations lease"
+        },
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 120
+        },
+        {
+          "kind": "modifier",
+          "target": "muster_cost",
+          "per_mille": -40
+        }
+      ],
+      "pursued_when": {
+        "term": "threatened",
+        "situation": "a neighbour with a grudge lit its furnace first; the plant must arrive fast and answer to the seat"
+      },
+      "earth_ref": "the heavy plant is the sovereign's; capacity arrives fast and stays under command"
+    },
+    {
+      "id": "IN-CH-2e",
+      "name": "Private Works",
+      "kind": "major",
+      "ring": 2,
+      "branch": "CH",
+      "links": [
+        "IN-CH-2c"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": "IN-CH-2d",
+      "requires": [],
+      "effects": [
+        {
+          "kind": "institution",
+          "target": "corporations own processing capacity"
+        },
+        {
+          "kind": "modifier",
+          "target": "industrial",
+          "per_mille": 60
+        },
+        {
+          "kind": "modifier",
+          "target": "research",
+          "per_mille": 60
+        },
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 40
+        }
+      ],
+      "pursued_when": {
+        "term": "surplus",
+        "situation": "no grudge at the border and the counting houses hold the credit; the plant is chartered and compounds"
+      },
+      "earth_ref": "the heavy plant is chartered and owned; a slower start, compounding reinvestment"
+    },
+    {
+      "id": "IN-CH-3a",
+      "name": "Broadcast",
+      "kind": "major",
+      "ring": 3,
+      "branch": "CH",
+      "links": [
+        "IN-SP-3a"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "cohesion",
+          "per_mille": 100
+        },
+        {
+          "kind": "modifier",
+          "target": "assimilation",
+          "per_mille": 60
+        }
+      ],
+      "pursued_when": {
+        "term": "cohesion_low",
+        "situation": "a realm spanning water whose provinces hear the seat only by wire"
+      },
+      "earth_ref": "radio: the artifact diffuses, the capacity does not"
+    },
+    {
+      "id": "IN-HL-1a",
+      "name": "Microscopy",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "HL",
+      "links": [
+        "IN-CH-1a",
+        "IN-HL-2a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "plague",
+          "per_mille": 20
+        }
+      ],
+      "pursued_when": {
+        "term": "plague_struck",
+        "situation": "the method is held and the lens shows the cause"
+      },
+      "earth_ref": null
+    },
+    {
+      "id": "IN-HL-2a",
+      "name": "Germ Theory & Sanitation",
+      "kind": "major",
+      "ring": 2,
+      "branch": "HL",
+      "links": [
+        "IN-HL-3a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "plague",
+          "per_mille": 150
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 60
+        }
+      ],
+      "pursued_when": {
+        "term": "plague_struck",
+        "situation": "the industrial city outgrows its wells; mortality falls ahead of wealth"
+      },
+      "earth_ref": "mortality falls ahead of wealth"
+    },
+    {
+      "id": "IN-HL-3a",
+      "name": "Antibiotics & Mass Vaccination",
+      "kind": "major",
+      "ring": 3,
+      "branch": "HL",
+      "links": [
+        "IN-MT-3c"
+      ],
+      "gate": null,
+      "diffusion": "artifact",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "plague",
+          "per_mille": 200
+        },
+        {
+          "kind": "modifier",
+          "target": "manpower",
+          "per_mille": 60
+        }
+      ],
+      "pursued_when": {
+        "term": "plague_struck",
+        "situation": "the chemistry is held and the wards are full; the transition completes"
+      },
+      "earth_ref": "the demographic transition completes"
+    }
+  ]
+}

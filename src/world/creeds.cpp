@@ -1,5 +1,7 @@
 #include "creeds.hpp"
 
+#include "colonisation.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
@@ -43,7 +45,6 @@ struct rng
 // FRESH stage tags — none collides with the ladder's (0x5A11 / 0xC4A7 /
 // 0xF2A6), the continents' (0xC017) or the planetology chain's.
 constexpr uint32_t tag_pantheon = 0xD317u; // Pantheon + tongue generation.
-constexpr uint32_t tag_conflict = 0x1B47u; // The tribal-conflict stage.
 
 int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
@@ -149,7 +150,10 @@ creed_state run_creeds(const planetology_state& pl,
         const cradle_land land = survey_land(w, tile_ids, c, gw, gh);
 
         culture cu;
-        cu.cradle = static_cast<int>(ci);
+        cu.cradle      = static_cast<int>(ci);
+        // The cradle's year is the migration span's start (BL-873) — a real,
+        // meaningful date, never the never-coined sentinel.
+        cu.coined_year = colonisation_start_year;
 
         const tongue p = roll_tongue(r);
         cu.speech = p; // Retained: the nations and cities on this culture's
@@ -201,6 +205,28 @@ creed_state run_creeds(const planetology_state& pl,
         const culture_god& war_g = cu.pantheon[1];
         cu.aggression_q = clampi(war_g.zeal * 70 + chief.zeal * 20 + war_g.dominion * 10, 0, 1000);
 
+        // SEA LEGS (BL-899; docs/lore/CREEDS.md § Sea legs) — derived HERE, off
+        // the finished pantheon, for the same reason `aggression_q` is: it is a
+        // consequence of what happened to these people, never a roll. Two facts
+        // (the third did not survive the migration handoff — see creeds.hpp):
+        // the cradle stood on the water, and the pantheon seats a god of it.
+        // The strongest sea/storm seat is taken rather than the first, so a
+        // people with both a sea chief and a storm god reads off whichever they
+        // actually feared most; the scan is over a fixed-order vector, so it is
+        // deterministic. Zeal weighs twice dominion, as above.
+        int sea_zeal = 0, sea_dom = 0;
+        for (const culture_god& g : cu.pantheon)
+        {
+            if (g.domain != std::string("the sea") && g.domain != std::string("the storm"))
+                continue;
+            if (g.zeal * 10 + g.dominion > sea_zeal * 10 + sea_dom)
+            {
+                sea_zeal = g.zeal;
+                sea_dom  = g.dominion;
+            }
+        }
+        cu.sea_legs_q = clampi((c.coastal ? 400 : 0) + sea_zeal * 40 + sea_dom * 20, 0, 1000);
+
         // The shrine line. Dated AFTER the granary line by construction: the
         // granary year is -(3000 + 6*arable + jitter), this is
         // -(2500 + 5*arable + jitter<=400), and 500 + arable always clears it.
@@ -221,70 +247,31 @@ creed_state run_creeds(const planetology_state& pl,
 }
 
 // ---------------------------------------------------------------------------
-// The tribal-conflict stage — the creeds reach the political map.
+// Fragmentation from contact (BL-852, retiring the tribal marches NR-808
+// resolved) — the creeds reach the political map without a war.
 // ---------------------------------------------------------------------------
 
-void record_tribal_conflict(creed_state& cs,
-                            history_ladder_state& hl,
-                            uint32_t seed)
+void record_cultural_contact(history_ladder_state& hl,
+                             const std::vector<int>& region_mix_q)
 {
-    if (cs.cultures.size() < 2 || hl.cradles.size() < 2)
+    if (region_mix_q.empty())
         return;
 
-    rng r(seed, tag_conflict);
-    const int floor_q = hl.fragmentation_q / 2; // Welding can never halve-and-more.
-    int welds = 0;
+    // THE NON-HEGEMONY FLOOR (BL-224), re-derived over the STRUCTURAL reading
+    // Stage 3 computed from terrain and cradle count alone, before any
+    // culture existed to meet another — the same base value and the same
+    // half-floor the retired welding enforced, so creeds alone still cannot
+    // manufacture a hegemon by themselves.
+    const int floor_q = hl.fragmentation_q / 2;
 
-    for (std::size_t i = 0; i < cs.cultures.size(); ++i)
-    {
-        const culture& a = cs.cultures[i];
-        if (a.aggression_q <= 550) continue; // Peaceable creeds farm instead.
+    // Average interpenetration across every settled region: how far a second
+    // people has mixed into ground a plurality culture still holds. No roll,
+    // no pairwise comparison, no war — a pure read of the settled shares.
+    int64_t total = 0;
+    for (const int m : region_mix_q) total += clampi(m, 0, 1000);
+    const int avg_mix_q = static_cast<int>(total / static_cast<int64_t>(region_mix_q.size()));
 
-        // Nearest other cradle by grid distance, columns wrapping; ties break
-        // on the LOWEST index, same rule as every other selection in the layer.
-        const agrarian_cradle& ac = hl.cradles[static_cast<std::size_t>(a.cradle)];
-        int best = -1, best_d = 1 << 30;
-        for (std::size_t j = 0; j < cs.cultures.size(); ++j)
-        {
-            if (j == i) continue;
-            const agrarian_cradle& bc = hl.cradles[static_cast<std::size_t>(cs.cultures[j].cradle)];
-            const int dc = std::abs(ac.col - bc.col);
-            const int dr = std::abs(ac.row - bc.row);
-            const int d  = std::min(dc, 180 - dc) + dr; // gw wrap priced coarsely.
-            if (d < best_d) { best_d = d; best = static_cast<int>(j); }
-        }
-        if (best < 0) continue;
-        const culture& b = cs.cultures[static_cast<std::size_t>(best)];
-
-        // Attack must clear the defence AND the ground: the ladder's conquest
-        // cost prices the march, exactly as Stage 2 priced it for armies.
-        const int attack  = a.pantheon[1].dominion * 60 + a.aggression_q / 2 + r.pick(120);
-        const int defence = b.pantheon[1].dominion * 60 + b.aggression_q / 4
-                          + hl.conquest_cost_q / 2 + r.pick(120);
-
-        const int jitter = r.pick(300);
-        const int64_t year = -(1500 - static_cast<int64_t>(i) * 60 + jitter);
-
-        if (attack > defence)
-        {
-            ++welds;
-            cs.history.push_back(history_event{
-                years_from_calendar_year(year), chain_stage::legacy,
-                "The " + a.name + " war-bands march under " + a.pantheon[1].name +
-                    "; the " + b.name + " cradle falls.",
-                "-> two peoples weld into one; fragmentation falls" });
-        }
-        else
-        {
-            cs.history.push_back(history_event{
-                years_from_calendar_year(year), chain_stage::legacy,
-                "The " + a.name + " war-bands break against the " + b.name + " ground.",
-                "-> conquest priced too high; the frontier holds" });
-        }
-    }
-
-    if (welds > 0)
-        hl.fragmentation_q = std::max(floor_q, hl.fragmentation_q - welds * 120);
+    hl.fragmentation_q = std::max(floor_q, hl.fragmentation_q - avg_mix_q);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,4 +306,110 @@ void record_globalisation(creed_state& cs, const world& w, entity_id body_id)
         "The common tongue spreads through every port and press.",
         "-> " + std::to_string(std::max(realms, 1)) +
             " realms, one trade language; the old tongues survive in the names of gods" });
+}
+
+// ---------------------------------------------------------------------------
+// Culture relations (BL-870; CIVILISATION.md § Culture relations)
+// ---------------------------------------------------------------------------
+
+int64_t culture_kinship_years(const std::vector<culture>& cultures, int a, int b)
+{
+    const int n = static_cast<int>(cultures.size());
+    if (a < 0 || b < 0 || a >= n || b >= n) return -1;
+    if (a == b) return 0;
+
+    // Collect a's chain to the root, itself included. Bounded by the culture
+    // count so a corrupt tree fails this read rather than hanging it — the
+    // same guard `case_family_tree` checks the walk actually needs.
+    std::vector<int> chain_a;
+    chain_a.reserve(16);
+    for (int at = a, guard = 0; at >= 0 && guard <= n; ++guard)
+    {
+        chain_a.push_back(at);
+        at = cultures[static_cast<std::size_t>(at)].parent;
+    }
+
+    // Walk b's chain until it lands on one of a's ancestors — the first hit
+    // IS the most recent common ancestor, because both walks strictly
+    // decrease toward the root and neither can loop (BL-865).
+    for (int at = b, guard = 0; at >= 0 && guard <= n; ++guard)
+    {
+        if (std::find(chain_a.begin(), chain_a.end(), at) != chain_a.end())
+        {
+            const culture& anc = cultures[static_cast<std::size_t>(at)];
+            const culture& ca  = cultures[static_cast<std::size_t>(a)];
+            const culture& cb  = cultures[static_cast<std::size_t>(b)];
+            // THE SENTINEL IS INT64_MIN, NOT "NEGATIVE" (BL-918). Every
+            // culture in the migration is coined BCE — the cradles at
+            // `colonisation_start_year` (-2400), the daughters between it and
+            // the epoch — so a `< 0` test here read every dated tree as
+            // undated and this returned -1 for every pair on every world:
+            // kinship was unmeasurable, and `culture_opposition_q` weighed
+            // every neighbour as a stranger. Caught by the split census's
+            // "adjacent pairs 0" line, which is what a face is for.
+            if (anc.coined_year == INT64_MIN || ca.coined_year == INT64_MIN
+                || cb.coined_year == INT64_MIN)
+                return -1; // Ancestry known, dates are not — unmeasurable.
+            return std::max(ca.coined_year, cb.coined_year) - anc.coined_year;
+        }
+        at = cultures[static_cast<std::size_t>(at)].parent;
+    }
+    return -1; // No shared ancestor found within a rooted tree — treat as unrelated.
+}
+
+namespace {
+/// Years apart at which kinship stops discounting opposition at all. A
+/// PLACEHOLDER awaiting `history_sweep`, like every magnitude in this layer:
+/// the migration's own deepest descent runs 9-10 generations over roughly the
+/// whole 4000-year span (BL-865's census), so this puts "fully foreign" a
+/// little short of the oldest splits rather than at the horizon itself.
+constexpr int64_t kinship_full_weight_years = 3000;
+}
+
+int culture_opposition_q(const std::vector<culture>& cultures, int a, int b)
+{
+    const int n = static_cast<int>(cultures.size());
+    if (a < 0 || b < 0 || a >= n || b >= n || a == b) return 0;
+
+    const culture& ca = cultures[static_cast<std::size_t>(a)];
+    const culture& cb = cultures[static_cast<std::size_t>(b)];
+
+    // AXIS ONE — TEMPERAMENT. The war god specifically (`pantheon[1]`, the god
+    // every creed raises — creeds.cpp's `add_god("war", ...)`), not the whole
+    // pantheon: a daughter inherits its parent's pantheon UNCHANGED
+    // (`derive_daughter_culture` copies it whole), so comparing the full list
+    // would mostly re-measure kinship a second time. The war god's zeal and
+    // dominion each run 0-10, so the raw difference runs 0-20.
+    int temper_q = 0;
+    if (ca.pantheon.size() > 1 && cb.pantheon.size() > 1)
+    {
+        const culture_god& wa = ca.pantheon[1];
+        const culture_god& wb = cb.pantheon[1];
+        const int diff = std::abs(wa.zeal - wb.zeal) + std::abs(wa.dominion - wb.dominion);
+        temper_q = clampi((diff * 1000) / 20, 0, 1000);
+    }
+
+    // AXIS TWO — COUNTRY. A binary disagreement about how to live
+    // (CIVILISATION.md: "a people of the floodplain and a people of the
+    // highlands... a material disagreement rather than a stated one") rather
+    // than a graded one — there is no natural ordering over farm classes to
+    // grade a difference by.
+    const int farm_q = (ca.origin_farm_class >= 0 && cb.origin_farm_class >= 0
+                      && ca.origin_farm_class != cb.origin_farm_class) ? 1000 : 0;
+
+    const int raw_q = (temper_q + farm_q) / 2;
+
+    // KINSHIP DISCOUNTS THE RESULT. A people that split off a few centuries
+    // ago still largely shares its parent's pantheon (temperament differences
+    // are then near zero already) but may already have settled different
+    // ground (BL-864) — the discount is what stops a fresh, amicable split
+    // from reading as a settled cross-cultural rivalry on farm class alone.
+    // UNKNOWN ancestry (-1) gets NO discount, the safe default: opposition
+    // should never read as lower for a pair the tree cannot actually relate.
+    const int64_t years = culture_kinship_years(cultures, a, b);
+    const int kin_q = years < 0
+        ? 1000
+        : clampi(static_cast<int>((years * 1000) / kinship_full_weight_years), 0, 1000);
+
+    return (raw_q * kin_q) / 1000;
 }

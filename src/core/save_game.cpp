@@ -26,6 +26,7 @@ constexpr auto max_chain_stage = chain_stage::count;
 constexpr auto max_life_stage  = life_stage::civilised;
 constexpr auto max_rung        = ladder_rung::borders;
 constexpr auto max_region_cls  = region_class::port;
+constexpr auto max_region_dom  = region_domain::open_ocean;
 constexpr auto max_temp        = temperature_class::frozen;
 constexpr auto max_atmos       = atmosphere_class::thick;
 constexpr auto max_hydro       = hydrological_state::liquid;
@@ -63,6 +64,7 @@ void w_prefs(std::ostream& o, const world_preferences& p)
     w_enum(o, p.oxygen_story);
     w_enum(o, p.coal_basins);
     w_enum(o, p.drawdown);
+    w_enum(o, p.history_turbulence); // save_game_version 12 (BL-839) -- keep r_prefs in step.
     for (const uint32_t r : p.roll)
         w_u32(o, r);
 }
@@ -72,7 +74,8 @@ bool r_prefs(std::istream& i, world_preferences& p)
     if (!(r_enum(i, p.star, max_lean) && r_enum(i, p.world_size, max_lean)
           && r_enum(i, p.interior, max_lean) && r_enum(i, p.metal, max_lean)
           && r_enum(i, p.ocean, max_lean) && r_enum(i, p.oxygen_story, max_lean)
-          && r_enum(i, p.coal_basins, max_lean) && r_enum(i, p.drawdown, max_lean)))
+          && r_enum(i, p.coal_basins, max_lean) && r_enum(i, p.drawdown, max_lean)
+          && r_enum(i, p.history_turbulence, max_lean))) // save_game_version 12 (BL-839)
         return false;
     for (uint32_t& r : p.roll)
         if (!r_u32(i, r))
@@ -86,6 +89,7 @@ void w_world_params(std::ostream& o, const world_params& p)
     w_enum(o, p.abundance);
     w_i64(o, p.epoch_year);
     w_int(o, p.prehistory_years);
+    w_int(o, p.industrial_years); // save_game_version 4 (BL-747) -- keep r_world_params in step.
     w_int(o, p.body_count);
     w_prefs(o, p.preferences);
 }
@@ -93,7 +97,8 @@ void w_world_params(std::ostream& o, const world_params& p)
 bool r_world_params(std::istream& i, world_params& p)
 {
     return r_u32(i, p.seed) && r_enum(i, p.abundance, max_abundance) && r_i64(i, p.epoch_year)
-        && r_int(i, p.prehistory_years) && r_int(i, p.body_count) && r_prefs(i, p.preferences);
+        && r_int(i, p.prehistory_years) && r_int(i, p.industrial_years) // save_game_version 4
+        && r_int(i, p.body_count) && r_prefs(i, p.preferences);
 }
 
 void w_planetology_params(std::ostream& o, const planetology_params& p)
@@ -207,6 +212,7 @@ void w_planetology_state(std::ostream& o, const planetology_state& s)
     w_f32(o, s.cold_traps);
     w_bool(o, s.mobile_lid);
     w_bool(o, s.core_exposed);
+    w_floats(o, s.thermal_series); // save_game_version 16 (BL-961) -- keep r_planetology_state in step.
     w_body_profile(o, s.profile);
     w_f32_array(o, s.endowment);
     w_vec(o, s.endemics, w_endemic);
@@ -224,7 +230,9 @@ bool r_planetology_state(std::istream& i, planetology_state& s)
         && r_f32(i, s.eclipse_ratio_perigee) && r_f32(i, s.ferruginous_gyr)
         && r_f32(i, s.marine_anoxia_gyr) && r_f32(i, s.land_burial_gyr)
         && r_f32(i, s.arable_share) && r_f32(i, s.drawdown) && r_f32(i, s.cold_traps)
-        && r_bool(i, s.mobile_lid) && r_bool(i, s.core_exposed) && r_body_profile(i, s.profile)
+        && r_bool(i, s.mobile_lid) && r_bool(i, s.core_exposed)
+        && r_floats(i, s.thermal_series) // save_game_version 16 (BL-961)
+        && r_body_profile(i, s.profile)
         && r_f32_array(i, s.endowment) && r_vec(i, s.endemics, r_endemic)
         && r_vec(i, s.history, r_history_event) && r_vec(i, s.checkpoints, r_checkpoint);
 }
@@ -278,7 +286,17 @@ void w_region(std::ostream& o, const region& r)
     w_int(o, r.anchor);
     w_int(o, r.col);
     w_int(o, r.row);
-    w_int(o, r.culture);
+    // save_game_version 10 (BL-835, the army pool) -- keep r_region in step.
+    //
+    // FIXED WIDTH IS WHAT KEEPS THIS SIMPLE. `region::culture` became a
+    // distribution, and a length-prefixed list would have made the seam a
+    // variable field count in the middle of the record. Three ids, three
+    // weights and the tail are seven fixed fields written IN PLACE OF the one
+    // int that used to sit here — the layout moved, so the version moved with
+    // it and the strict-equality check refuses a v8 stream.
+    for (int k = 0; k < culture_share_slots; ++k) w_int(o, static_cast<int>(r.culture.id[k]));
+    for (int k = 0; k < culture_share_slots; ++k) w_int(o, static_cast<int>(r.culture.weight_q[k]));
+    w_int(o, static_cast<int>(r.culture.other_q));
     w_int(o, r.founding_culture);
     w_bool(o, r.creed_conquered);
     w_str(o, r.name);
@@ -291,31 +309,76 @@ void w_region(std::ostream& o, const region& r)
     w_i64(o, r.founded_year);
     w_i64(o, r.industrial_year);
     w_bool(o, r.industrialised);
+    w_int(o, r.industrial_lag_years); // save_game_version 6 (BL-748) -- keep r_region in step.
     w_int(o, r.nation);
     w_int(o, r.contest_q);
     w_i64(o, r.population);
     w_i64(o, r.last_demography_year);
     w_i64(o, r.manpower_stock);
+    // save_game_version 10 (BL-835, the army pool) -- keep r_region in step.
+    // APPENDED IN PLACE, next to the pool it is raised from, because that is
+    // where a reader looking for "how many soldiers" will look. Nothing before
+    // it moved; the strict-equality version check is what refuses a v9 stream,
+    // and there is deliberately no v9 read path -- an army_stock defaulted to
+    // zero on load would be a world whose every region is undefended, which is
+    // the exact pathology this field exists to remove.
+    w_i64(o, r.army_stock);
     w_u32(o, r.works_built);
     w_int(o, r.work_capacity_mod);
     w_int(o, r.work_manpower_mod);
     w_int(o, r.work_reach_mod);
     w_int(o, r.work_defence_mod);
     w_int(o, r.work_industrial_mod);
+    // save_game_version 5 (BL-766, the urban record) -- keep r_region in step.
+    w_int(o, r.centres);
+    w_int(o, r.centres_razed);
+    w_i64(o, r.urban_population);
+    // save_game_version 7 (BL-777, the region domain) -- keep r_region in step.
+    // ONE BYTE, APPENDED. See save_game.hpp's layout-7 note: nothing before it
+    // moved, and the strict-equality version check is still what refuses a v6
+    // stream rather than any attempt to read one.
+    w_enum(o, r.domain);
 }
 
 bool r_region(std::istream& i, region& r)
 {
-    return r_int(i, r.anchor) && r_int(i, r.col) && r_int(i, r.row) && r_int(i, r.culture)
-        && r_int(i, r.founding_culture) && r_bool(i, r.creed_conquered) && r_str(i, r.name)
+    // save_game_version 9 (BL-826) -- keep w_region in step. Read into ints and
+    // narrow deliberately: the on-disk field is an int and the in-memory one an
+    // int16_t, and an unchecked narrowing read is the failure the version guard
+    // exists to make impossible rather than merely unlikely.
+    if (!(r_int(i, r.anchor) && r_int(i, r.col) && r_int(i, r.row))) return false;
+    {
+        int v[culture_share_slots * 2 + 1];
+        for (int k = 0; k < culture_share_slots * 2 + 1; ++k)
+            if (!r_int(i, v[k])) return false;
+        for (int k = 0; k < culture_share_slots; ++k)
+        {
+            if (v[k] < -1 || v[k] > 0x7FFF) return false;
+            if (v[culture_share_slots + k] < 0 || v[culture_share_slots + k] > 1000) return false;
+            r.culture.id[k]       = static_cast<int16_t>(v[k]);
+            r.culture.weight_q[k] = static_cast<int16_t>(v[culture_share_slots + k]);
+        }
+        const int tail = v[culture_share_slots * 2];
+        if (tail < 0 || tail > 1000) return false;
+        r.culture.other_q = static_cast<int16_t>(tail);
+        if (r.culture.total_q() != 1000) return false; // The invariant, enforced at the seam.
+    }
+    return r_int(i, r.founding_culture) && r_bool(i, r.creed_conquered) && r_str(i, r.name)
         && r_int(i, r.settle_score_q) && r_int(i, r.farm_q) && r_int(i, r.ore_q)
         && r_int(i, r.energy_q) && r_int(i, r.port_q) && r_enum(i, r.dominant, max_region_cls)
         && r_i64(i, r.founded_year) && r_i64(i, r.industrial_year) && r_bool(i, r.industrialised)
+        && r_int(i, r.industrial_lag_years) // save_game_version 6
         && r_int(i, r.nation) && r_int(i, r.contest_q) && r_i64(i, r.population)
         && r_i64(i, r.last_demography_year) && r_i64(i, r.manpower_stock)
+        && r_i64(i, r.army_stock) // save_game_version 10 (BL-835)
         && r_u32(i, r.works_built) && r_int(i, r.work_capacity_mod)
         && r_int(i, r.work_manpower_mod) && r_int(i, r.work_reach_mod)
-        && r_int(i, r.work_defence_mod) && r_int(i, r.work_industrial_mod);
+        && r_int(i, r.work_defence_mod) && r_int(i, r.work_industrial_mod)
+        // save_game_version 5 (BL-766) -- keep w_region in step.
+        && r_int(i, r.centres) && r_int(i, r.centres_razed)
+        && r_i64(i, r.urban_population)
+        // save_game_version 7 (BL-777) -- keep w_region in step.
+        && r_enum(i, r.domain, max_region_dom);
 }
 
 void w_settlement(std::ostream& o, const settlement_state& s)
@@ -325,13 +388,15 @@ void w_settlement(std::ostream& o, const settlement_state& s)
     w_vec(o, s.checkpoints, w_checkpoint);
     w_int(o, s.lacunae);
     w_i64(o, s.median_industrial_year);
+    w_bool(o, s.urban_map_drawn); // save_game_version 5 (BL-766)
 }
 
 bool r_settlement(std::istream& i, settlement_state& s)
 {
     return r_vec(i, s.regions, r_region) && r_vec(i, s.history, r_history_event)
         && r_vec(i, s.checkpoints, r_checkpoint) && r_int(i, s.lacunae)
-        && r_i64(i, s.median_industrial_year);
+        && r_i64(i, s.median_industrial_year)
+        && r_bool(i, s.urban_map_drawn); // save_game_version 5 (BL-766)
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +422,41 @@ void w_timelapse(std::ostream& o, const era_timelapse& t)
         w_u16(s, c.region);
         w_u16(s, c.owner);
     });
+    // save_game_version 11 (BL-817, the playback record) -- keep r_timelapse in
+    // step. Three flat arrays: the steps, the per-polity samples they index,
+    // and the delta-encoded culture mix. `int16_t` fields go out as i32 rather
+    // than as a reinterpreted u16, so the wire form needs no signedness
+    // assumption and the reader can range-check before it narrows.
+    w_vec(o, t.steps, [](std::ostream& s, const timelapse_step& v) {
+        w_i32(s, v.year);
+        w_i32(s, v.first_sample);
+        w_i32(s, v.sample_count);
+    });
+    w_vec(o, t.samples, [](std::ostream& s, const polity_sample& v) {
+        w_i64(s, v.population);
+        w_u16(s, v.polity);
+        w_u16(s, v.regions);
+        w_u8(s, v.cap_military);
+        w_u8(s, v.cap_materials);
+    });
+    w_vec(o, t.culture_changes, [](std::ostream& s, const culture_change& v) {
+        w_i32(s, v.year);
+        w_u16(s, v.region);
+        for (int k = 0; k < timelapse_culture_slots; ++k) w_i32(s, v.id[k]);
+        for (int k = 0; k < timelapse_culture_slots; ++k) w_i32(s, v.weight_q[k]);
+        w_i32(s, v.other_q);
+    });
+    // save_game_version 13 (BL-916, the event layer) -- keep r_timelapse in
+    // step. One flat array appended after the culture list; the kind goes out
+    // as its wire byte and is range-checked against `lapse_event_kind::count`
+    // on the way back in.
+    w_vec(o, t.events, [](std::ostream& s, const lapse_event& v) {
+        w_i32(s, v.year);
+        w_u8(s, v.kind);
+        w_u16(s, v.region);
+        w_u16(s, v.polity);
+        w_u16(s, v.other);
+    });
 }
 
 bool r_timelapse(std::istream& i, era_timelapse& t)
@@ -373,6 +473,76 @@ bool r_timelapse(std::istream& i, era_timelapse& t)
         return false;
     for (const owner_change& c : t.changes)
         if (c.region >= static_cast<uint16_t>(t.region_stride) && t.region_stride > 0)
+            return false;
+
+    // save_game_version 11 (BL-817) -- keep w_timelapse in step.
+    if (!r_vec(i, t.steps, [](std::istream& s, timelapse_step& v) {
+            return r_i32(s, v.year) && r_i32(s, v.first_sample) && r_i32(s, v.sample_count);
+        }))
+        return false;
+    if (!r_vec(i, t.samples, [](std::istream& s, polity_sample& v) {
+            uint8_t cm = 0, cx = 0;
+            if (!(r_i64(s, v.population) && r_u16(s, v.polity) && r_u16(s, v.regions)
+                  && r_u8(s, cm) && r_u8(s, cx)))
+                return false;
+            v.cap_military  = cm;
+            v.cap_materials = cx;
+            return true;
+        }))
+        return false;
+    if (!r_vec(i, t.culture_changes, [](std::istream& s, culture_change& v) {
+            if (!(r_i32(s, v.year) && r_u16(s, v.region))) return false;
+            // WIDE ON THE WIRE, NARROW IN THE STRUCT -- so the range check runs
+            // on the value that was written rather than on a value already
+            // wrapped by the cast. A culture index is int16_t and a per-mille
+            // weight is 0..1000; anything else is corrupt, not merely odd.
+            int32_t tmp = 0;
+            for (int k = 0; k < timelapse_culture_slots; ++k)
+            {
+                if (!r_i32(s, tmp) || tmp < -1 || tmp > 32767) return false;
+                v.id[k] = static_cast<int16_t>(tmp);
+            }
+            for (int k = 0; k < timelapse_culture_slots; ++k)
+            {
+                if (!r_i32(s, tmp) || tmp < 0 || tmp > 1000) return false;
+                v.weight_q[k] = static_cast<int16_t>(tmp);
+            }
+            if (!r_i32(s, tmp) || tmp < 0 || tmp > 1000) return false;
+            v.other_q = static_cast<int16_t>(tmp);
+            return true;
+        }))
+        return false;
+
+    // The step index is the one field a corrupt stream could use to walk off
+    // the sample array, so it is checked against what was actually read rather
+    // than trusted -- the same argument `region_stride` gets above.
+    for (const timelapse_step& st : t.steps)
+    {
+        if (st.first_sample < 0 || st.sample_count < 0) return false;
+        if (static_cast<int64_t>(st.first_sample) + st.sample_count
+            > static_cast<int64_t>(t.samples.size()))
+            return false;
+    }
+    for (const culture_change& c : t.culture_changes)
+        if (c.region >= static_cast<uint16_t>(t.region_stride) && t.region_stride > 0)
+            return false;
+
+    // save_game_version 13 (BL-916) -- keep w_timelapse in step. A kind past
+    // the enum is corrupt, not a future kind: the enum is append-only, so a
+    // newer writer would have bumped the version and been refused whole.
+    if (!r_vec(i, t.events, [](std::istream& s, lapse_event& v) {
+            uint8_t kind = 0;
+            if (!(r_i32(s, v.year) && r_u8(s, kind) && r_u16(s, v.region)
+                  && r_u16(s, v.polity) && r_u16(s, v.other)))
+                return false;
+            if (kind >= static_cast<uint8_t>(lapse_event_kind::count)) return false;
+            v.kind = kind;
+            return true;
+        }))
+        return false;
+    for (const lapse_event& e : t.events)
+        if (e.region != lapse_event_none && t.region_stride > 0
+         && e.region >= static_cast<uint16_t>(t.region_stride))
             return false;
     return true;
 }
@@ -393,6 +563,7 @@ void w_body_entry(std::ostream& o, const generation_report::body_entry& b)
     w_int(o, b.tiles.gh);
     w_bool(o, b.tiles.used_convergent);
     w_timelapse(o, b.prehistory_timelapse); // save_game_version 3 (NR-733)
+    w_timelapse(o, b.exploration_timelapse); // save_game_version 14 (BL-946)
 }
 
 bool r_body_entry(std::istream& i, generation_report::body_entry& b)
@@ -403,7 +574,8 @@ bool r_body_entry(std::istream& i, generation_report::body_entry& b)
         && r_bool(i, b.tiles.valid) && r_u32(i, b.tiles.seed)
         && r_f32(i, b.tiles.deposit_scalar) && r_int(i, b.tiles.gw) && r_int(i, b.tiles.gh)
         && r_bool(i, b.tiles.used_convergent)
-        && r_timelapse(i, b.prehistory_timelapse); // save_game_version 3 (NR-733)
+        && r_timelapse(i, b.prehistory_timelapse) // save_game_version 3 (NR-733)
+        && r_timelapse(i, b.exploration_timelapse); // save_game_version 14 (BL-946)
 }
 
 void w_report(std::ostream& o, const generation_report& g)
@@ -418,6 +590,18 @@ void w_report(std::ostream& o, const generation_report& g)
     w_i64(o, g.prehistory_battles);
     w_i64(o, g.prehistory_conquests);
     w_i64(o, g.prehistory_foundings);
+    // save_game_version 8 (BL-768, the ancient road record) -- keep r_report in step.
+    w_i64(o, g.prehistory_corridors);
+    w_i64(o, g.prehistory_junctions);
+    w_i64(o, g.markets_from_trade);
+    // save_game_version 14 (BL-946, the Exploration span's own counters) -- keep r_report in step.
+    w_i64(o, g.exploration_years);
+    w_i64(o, g.exploration_battles);
+    w_i64(o, g.exploration_conquests);
+    w_i64(o, g.exploration_foundings);
+    // save_game_version 15 (BL-969, the handoff validators' verdict) -- keep r_report in step.
+    w_bool(o, g.handoff_invalid);
+    w_str(o, g.handoff_violation);
 }
 
 bool r_report(std::istream& i, generation_report& g)
@@ -427,7 +611,15 @@ bool r_report(std::istream& i, generation_report& g)
         && r_vec(i, g.bodies, r_body_entry)
         && r_vec(i, g.stage_lines, [](std::istream& s, std::string& v) { return r_str(s, v); })
         && r_i64(i, g.prehistory_years) && r_i64(i, g.prehistory_battles)
-        && r_i64(i, g.prehistory_conquests) && r_i64(i, g.prehistory_foundings);
+        && r_i64(i, g.prehistory_conquests) && r_i64(i, g.prehistory_foundings)
+        // save_game_version 8 (BL-768) -- keep w_report in step.
+        && r_i64(i, g.prehistory_corridors) && r_i64(i, g.prehistory_junctions)
+        && r_i64(i, g.markets_from_trade)
+        // save_game_version 14 (BL-946) -- keep w_report in step.
+        && r_i64(i, g.exploration_years) && r_i64(i, g.exploration_battles)
+        && r_i64(i, g.exploration_conquests) && r_i64(i, g.exploration_foundings)
+        // save_game_version 15 (BL-969) -- keep w_report in step.
+        && r_bool(i, g.handoff_invalid) && r_str(i, g.handoff_violation);
 }
 
 // ---------------------------------------------------------------------------

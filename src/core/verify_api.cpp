@@ -35,6 +35,7 @@
 #include "ui/presentation.hpp"
 #include "ui/selection.hpp"
 #include "ui/text_fit.hpp"
+#include "world/era_timelapse.hpp" // BL-829: round 4's replay, for the history_* readouts
 #include "ui/view_nav.hpp"
 #include "world/construction.hpp"
 #include "world/corporation_generation.hpp"
@@ -42,6 +43,7 @@
 #include "world/placement_rules.hpp"
 #include "world/stance.hpp"
 #include "world/survey_system.hpp"
+#include "world/stockpile_budget.hpp" // BL-1042: the budget this search-less path states
 
 #include <algorithm>
 #include <cctype>
@@ -184,6 +186,8 @@ constexpr const char* k_resource_slugs[] = {
     "leather",                 // 44
     "cloth",                   // 45
     "rigging",                 // 46
+    "power",                   // 47
+    "construction_capacity",   // 48
 };
 static_assert(std::size(k_resource_slugs) == static_cast<std::size_t>(resource_type::count),
               "resource_type grew - append its slug to k_resource_slugs (and keep the order)");
@@ -271,8 +275,8 @@ int app::run_autostart()
     // Headless coverage for the path --verify has never reached.
     //
     // run_verify (below) calls setup_world + load_economy and stops. It never
-    // calls start_new_game, so generate_background_firms and the pre-game warm
-    // start have NO automated coverage — which is how a crash in "placing
+    // calls start_new_game, so the landscape search and the winner's validation
+    // run have NO automated coverage — which is how a crash in "placing
     // companies" reached a player build. This runs the real interactive tail,
     // headlessly, and reports which step it died on.
     // run() loads init.lua before anything else; start_new_game reads `config`
@@ -281,7 +285,7 @@ int app::run_autostart()
 
     std::printf("[autostart] step 1: generating world (this is the ~25s one)\n");
     std::fflush(stdout);
-    m_pending_world_params = world_params{};
+    m_pending_world_params = fresh_world_params();
 
     // Mirror the INTERACTIVE path, not a convenient synchronous stand-in.
     // The wizard leaves its own surface build in flight when the player presses
@@ -304,7 +308,7 @@ int app::run_autostart()
     while (m_screen != app_screen::in_game && std::chrono::steady_clock::now() < deadline)
     {
         // BL-630: no fork to take. poll_worldgen drives generation, then the
-        // warm start, then the seat, and lands on in_game by itself.
+        // winner's validation run, then the seat, and lands on in_game by itself.
         poll_worldgen();
         std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 Hz, as the app polls
     }
@@ -481,6 +485,10 @@ void app::inject_pointer(float x, float y, int button, int clicks)
 
 int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
 {
+    // BL-732: a capture must never race the ground cache's per-frame bake
+    // budget — every chunk bakes synchronously for the whole batch.
+    m_ground_bake_all = true;
+
     // Deterministic, non-interactive setup: fixed window (resized to verify_w/
     // verify_h below), seeded world, sim left paused so orbits and ticks never
     // advance between captures. The script drives view/overlay state directly.
@@ -494,7 +502,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // ~38 s on the Debug build, which is the entire reason batch mode exists. The
     // pristine snapshot taken after setup is what makes once safe: it is restored
     // before every script, so script order cannot leak state.
-    setup_world();
+    setup_world(fresh_world_params());
     load_economy();
 
     // BL-365's background firms belong in the verified world too (added 2026-08-13).
@@ -508,6 +516,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // condition reads real recipe outputs. The seed fold matches the interactive
     // path so the verified world is the world the player would get. NOT warmed up —
     // run_verify stays deterministically cold, as its own comment below says.
+    // BL-1042 — THE CHARTER BUDGET, STATED. This path does not search, so it has
+    // no seam to spend one at. Its world is built with the Digitisation span
+    // OFF (fresh_world_params() leaves it at its default), so the stockpile
+    // budget app::start_new_game_prelude would pass is EMPTY — and an empty
+    // budget IS the legacy call below, byte for byte. The guard says so out
+    // loud if that ever stops being true.
+    if (const stockpile_budget sb = build_stockpile_budget(m_world); !sb.budget.empty() || sb.rejected)
+        std::fprintf(stderr, "[stockpile_budget] run_verify: a search-less path lays the legacy web and "
+                             "ignores a %lld-point stockpile budget\n",
+                     static_cast<long long>(sb.points_total));
     generate_background_firms(m_world, m_registry, /*seed=*/0x8A21F00Du);
 
     m_sim_loop.set_speed(0);
@@ -585,6 +603,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     v.set_function("set_overlay", [this](const std::string& name) {
         m_ui.overlay = overlay_from_name(name);
+    });
+    // BL-732: bare-ground judgement captures — hide the national border band
+    // (verify-only; the band's weight over painterly ground is BL-734's call).
+    v.set_function("set_border_band", [this](bool on) {
+        m_ui.dbg_hide_border_band = !on;
     });
     // Drive the Resource/Market/Scarcity lens-local selector headlessly so a golden
     // can pick the displayed good.
@@ -677,6 +700,18 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     // Resize the live window mid-script, so a perf run can measure at the real
     // interactive resolution instead of the fixed verify capture size.
+    //
+    // COORDINATE SPACE (BL-904). `click(x, y)` feeds x/y straight into
+    // io.AddMousePosEvent, which ImGui reads against io.DisplaySize -- and
+    // DisplaySize tracks the SDL window's LOGICAL size every frame
+    // (ImGui_ImplSDL3_NewFrame calls SDL_GetWindowSize, not the pixel size), the
+    // same logical size `capture_frame` reads pixels back at. So a click
+    // coordinate and a coordinate read off a capture ARE the same space, once
+    // this call has actually taken effect -- SDL_SyncWindow above blocks until
+    // it has. The one place they can appear to differ is the STARTUP log line
+    // ("Display: window WxH...", app.cpp), which fires once at app construction
+    // BEFORE any verify script's window() call runs; it is not a second
+    // coordinate space, only an earlier size.
     v.set_function("window", [this](int w, int h) {
         SDL_SetWindowSize(m_window, w, h);
         SDL_SyncWindow(m_window);
@@ -1022,7 +1057,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_wiz_dirty = true;
     });
 
-    // Park the wizard on a specific ROUND (0-2) so a visual check can capture each
+    // Park the wizard on a specific ROUND (0-5, BL-946: System, Life, Culture,
+    // Empires, Exploration, Digitisation) so a visual check can capture each
     // one. Clamped by draw_generation_screen, so an out-of-range index is harmless —
     // the name is kept for the scripts that already call it. Every round is a stable
     // capture: the wizard is driven by the preferences and the seed, not by
@@ -1031,6 +1067,132 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_screen    = app_screen::generating;
         m_wiz_round = round;
         m_wiz_dirty = true;
+    });
+
+    // Which round the wizard is actually ON, 0-based, and how many there are.
+    //
+    // WHY A READBACK EXISTS AT ALL (BL-860). "Back from round 6 lands on round 5"
+    // is a navigation claim, and until this binding the only way a script could
+    // check it was to read a capture with human eyes — so a Back press that went
+    // nowhere would have passed. Every other wizard hook SETS state; this is the
+    // one that reads it, which is what turns a walk into an assertion.
+    v.set_function("wizard_round", [this]() {
+        return std::make_tuple(m_wiz_round, wizard_round_count);
+    });
+
+    // A LAPSE ROUND'S pass, run from the same call site arriving on the round
+    // uses (BL-829, generalised to two lapse rounds by BL-860, to three by
+    // BL-946). Under --verify the run is SYNCHRONOUS — it adopts the record
+    // the harness's own world already carries, or resolves a deferred run in
+    // place — so the call returns with the record in hand and a capture can
+    // never race it.
+    //
+    // @param which  0 = round 3 (Culture, the migration), 1 = round 4
+    //               (Empires, the history to 1200 CE), 2 = round 5
+    //               (Exploration, the span to 1660 CE, BL-946). Omitted means
+    //               0, which is what every existing script asked for when
+    //               there was only one lapse round.
+    v.set_function("history_run", [this](sol::optional<int> which) {
+        const int i = std::clamp(which.value_or(0), 0, wizard_lapse_round_count - 1);
+        m_screen    = app_screen::generating;
+        m_wiz_round = wizard_planetology_round_count + i;
+        // ORDER MATTERS. The preview is refreshed FIRST because the map's land
+        // mask is the wizard's own packed surface, and because the wizard's draw
+        // re-runs the chain whenever the preview is empty — which invalidates
+        // every pass round below it, and would drop the record this call just
+        // took. Refreshing here leaves nothing for the draw to redo.
+        refresh_wizard_preview();
+        m_wiz_dirty = false;
+        launch_wizard_history_run(i);
+    });
+
+    // Park the CURRENT lapse round's playback at a calendar year, so a check can
+    // capture three points across one span. Which round that is follows the
+    // wizard rather than taking an argument: a script parks on a round and then
+    // drives it, so a second way to name the round is a second way to get it
+    // wrong. Playback does not advance under --verify (all animation is frozen
+    // there), so this is the ONLY thing that moves it; the wizard clamps the year
+    // to the record's own span.
+    v.set_function("history_year", [this](int year) {
+        const int i = wizard_lapse_index();
+        m_wiz_history_year[i]    = year;
+        m_wiz_history_playing[i] = false;
+    });
+
+    // How many polities hold ground on the CURRENT lapse round right now, and 0
+    // when no record has been taken. It is what lets an ACCEPTANCE script assert
+    // that a real press actually landed — without a readout the only provable
+    // thing is that a Lua binding works, which is not the question BL-829's live
+    // half asks. Ownership-only, and per-year: it says nothing a slice of the
+    // record does not already say on screen.
+    v.set_function("history_powers", [this]() -> int {
+        const int i = wizard_lapse_index();
+        if (m_wiz_history[i].empty()) return 0;
+        const std::vector<uint16_t> slice =
+            owner_slice_at(m_wiz_history[i].lapse, m_wiz_history_year[i]);
+        std::vector<uint16_t> seen;
+        for (uint16_t o : slice)
+            if (o != owner_none
+                && std::find(seen.begin(), seen.end(), o) == seen.end())
+                seen.push_back(o);
+        return static_cast<int>(seen.size());
+    });
+
+    // BL-916: how many recorded events sit at or before the playhead on the
+    // CURRENT lapse round, and how many of them are realms ending — the two
+    // numbers the ticker and the arc readout draw from. What it lets a script
+    // claim is that the ticker it captured had lines to show and that the
+    // "destroyed" count came off the record rather than off an absence. Counts
+    // only; the prose is the surface's and a capture is how it is judged.
+    v.set_function("history_events", [this]() {
+        const int i = wizard_lapse_index();
+        int total = 0, ended = 0, broke = 0;
+        if (!m_wiz_history[i].empty())
+            for (const lapse_event& e : m_wiz_history[i].lapse.events)
+            {
+                if (e.year > m_wiz_history_year[i]) break;
+                ++total;
+                if (e.kind == static_cast<uint8_t>(lapse_event_kind::realm_ended)) ++ended;
+                if (e.kind == static_cast<uint8_t>(lapse_event_kind::broke_away))  ++broke;
+            }
+        return std::make_tuple(total, ended, broke);
+    });
+
+    // BL-916: the year of the LAST recorded event of one kind (the wire byte
+    // of `lapse_event_kind`) on the current lapse round, or a year before the
+    // span when there is none. It lets a script PARK on the moment a realm
+    // broke away and capture the ticker line with its marker lit, rather than
+    // hoping the closing year happens to sit inside that event's window.
+    v.set_function("history_event_year", [this](int kind) -> int {
+        const int i = wizard_lapse_index();
+        int year = m_wiz_history[i].lapse.start_year - 1;
+        if (!m_wiz_history[i].empty())
+            for (const lapse_event& e : m_wiz_history[i].lapse.events)
+                if (e.kind == static_cast<uint8_t>(kind)) year = e.year;
+        return year;
+    });
+
+    // The current lapse round's own span, so a script walks the years the run
+    // actually produced rather than the years a doc says it should have.
+    v.set_function("history_span", [this]() {
+        const int i = wizard_lapse_index();
+        return std::make_tuple(m_wiz_history[i].lapse.start_year,
+                               m_wiz_history[i].lapse.start_year
+                                   + m_wiz_history[i].lapse.years);
+    });
+
+    // BL-1000: the arc readout's share figures on the CURRENT lapse round, in
+    // per-mille — (peak share of PEOPLE, closing share of people, peak share of
+    // regions). The first is the number the readout prints as "the largest
+    // empire held N% of the world's people", computed by `summarise_lapse_arc`
+    // exactly as history_sweep computes `peak_share_pop_q`; a script reads it
+    // here so the panel and the sweep can be held to one figure for one seed
+    // without a human reading a capture. Zeros with no record.
+    v.set_function("history_arc", [this]() {
+        const int i = wizard_lapse_index();
+        if (m_wiz_history[i].empty()) return std::make_tuple(0, 0, 0);
+        const ui::lapse_arc a = ui::summarise_lapse_arc(m_wiz_history[i]);
+        return std::make_tuple(a.peak_share_pop_q, a.end_share_pop_q, a.peak_share_q);
     });
 
     v.set_function("show_panel", [this](const std::string& name, bool open) {
@@ -1306,6 +1468,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // by a third route.
         else if (name == "market_trades")        target = "##trades_scroll";
         else if (name == "convoys")              target = "Convoys";
+        // BL-904: the pre-game wizard's left column has NO named ledger window
+        // to aim at -- it is a plain `BeginChild("##wiz_left", ...)` -- so a
+        // script had no way to test whether a human could reach a control the
+        // column had scrolled below the fold. `foldout_scroll_child` matches on
+        // the id string alone, so naming the child here is enough.
+        else if (name == "wizard")               target = "##wiz_left";
+        // BL-1000: the pass rounds' chart child inside that column — the lapse
+        // board, ticker and arc readout scroll HERE, not in the outer column.
+        else if (name == "wizard_charts")        target = "##wiz_charts";
         else if (name.empty())                   target = ""; // the documented "clear" call
 
         if (target == nullptr)
@@ -1314,7 +1485,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             SDL_Log("verify.scroll_panel FAIL: unknown panel '%s' - the request "
                     "reached no scroller. Known: tile, history, market, balance, "
                     "corporation, construction, acquisitions, "
-                    "generation_ledger, convoys.", name.c_str());
+                    "generation_ledger, convoys, wizard.", name.c_str());
             ui::foldout_request_scroll("", 0.0f);
             return;
         }
@@ -1836,9 +2007,48 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         std::error_code ec;
         std::filesystem::create_directories("screenshots", ec);
         ui::write_overflow_report("screenshots/text_overflow.txt");
-        SDL_Log("verify.expect_no_clipping %s: %zu failure(s), %zu record(s) total",
-                fails == 0 ? "PASS" : "FAIL", fails, ui::overflows().size());
+
+        // BL-714 — A CHECK MUST PROVE IT LOOKED.
+        //
+        // This reported "0 failure(s), 0 record(s)" across a whole 31-capture shell
+        // pass while the Corporation dashboard visibly truncated a label mid-word
+        // and a clipped button sat on screen (NR-614 / NR-663). Nothing was wrong
+        // with the arithmetic: zero records is the correct output when nothing
+        // routed through the text_fit helpers, and that label is drawn with plain
+        // ImGui text this ledger's scope never reaches.
+        //
+        // So zero failures out of zero observations is not a pass, it is an
+        // instrument reporting on a subject it never saw — and it is strictly worse
+        // than a red row, because it is trusted. `overflow_observations()` counts the
+        // looks rather than the findings, and a check with no looks is now FAIL.
+        //
+        // This does NOT fix the coverage gap; a surface drawn outside text_fit is
+        // still invisible here. It makes the gap announce itself instead of reading
+        // as a clean bill of health, which is what lets the coverage work be scoped.
+        const std::size_t looks = ui::overflow_observations();
+        if (looks == 0)
+        {
+            ++m_verify_failures;
+            SDL_Log("verify.expect_no_clipping FAIL [%s]: VACUOUS — the overflow ledger "
+                    "measured 0 text draws, so 0 failures means it never looked, not that "
+                    "nothing clipped. Either the captured surface draws no text through "
+                    "ui::fit_text/wrap_text/add_fit_text (a coverage gap, not a pass), or "
+                    "recording was off. See BL-714.",
+                    label ? label->c_str() : "");
+            return -1;
+        }
+
+        SDL_Log("verify.expect_no_clipping %s: %zu failure(s), %zu record(s), "
+                "%zu text draw(s) measured",
+                fails == 0 ? "PASS" : "FAIL", fails, ui::overflows().size(), looks);
         return static_cast<int>(fails);
+    });
+
+    // BL-714 companion: the raw look count, so a script can assert its OWN floor
+    // ("this ledger should see at least N draws on this surface") rather than only
+    // the zero case expect_no_clipping now guards.
+    v.set_function("observations", [this]() -> int {
+        return static_cast<int>(ui::overflow_observations());
     });
 
     // === BL-113 interactive-flow acceptance primitives ======================
@@ -3254,6 +3464,64 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_golden_dir = (std::filesystem::path{script_path}.parent_path() / "golden").string();
 
         const int failures_before = m_verify_failures;
+
+        // BL-714 / NR-695 — A STALL MUST BE ONE RED ROW, NOT A DEAD SUITE.
+        //
+        // `overflow_tile_v2` swept the History ledger's TILES view, which draws a
+        // row per tile on the body. It burned CPU, collapsed memory, and STARVED
+        // NINE SCRIPTS BEHIND IT — so a single runaway check cost the whole pass,
+        // and the pass reported nothing about the nine it never reached. BL-423
+        // already decided a batch does not abort on one broken script; a script
+        // that never returns was simply outside that promise.
+        //
+        // A count hook fires between Lua instructions, so it interrupts a runaway
+        // LOOP — which is the shape this defect took. It cannot interrupt a single
+        // long C++ call (one enormous verify.capture()), and that limit is stated
+        // rather than papered over: the watchdog shortens a stall from unbounded to
+        // one capture, not to zero.
+        //
+        // WALL CLOCK IN A DETERMINISTIC HARNESS, deliberately. The budget is a
+        // BACKSTOP, not a performance assertion: it sits far above any legitimate
+        // script (the widest committed check, text_overflow_floor, runs ~60 captures
+        // well inside it), so tripping it means a genuine runaway rather than a slow
+        // machine. Nothing the scripts assert reads this clock, so a pass/fail
+        // verdict stays reproducible.
+        struct script_watchdog
+        {
+            std::chrono::steady_clock::time_point start;
+            double budget_s;
+        };
+        static script_watchdog s_watchdog;
+        s_watchdog.start    = std::chrono::steady_clock::now();
+        s_watchdog.budget_s = m_verify_script_budget_s;
+
+        lua_State* const LS = m_lua.state().lua_state();
+        lua_sethook(LS, [](lua_State* ls, lua_Debug*) {
+            const double elapsed = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - s_watchdog.start).count();
+            if (elapsed > s_watchdog.budget_s)
+            {
+                lua_sethook(ls, nullptr, 0, 0); // do not re-trip while unwinding
+                // Pre-formatted, then passed as "%s": Lua's own lua_pushfstring
+                // accepts only a small format set and rejects a precision like
+                // "%.0f" outright — which turned the watchdog's first real trip into
+                // "invalid option '%.' to 'lua_pushfstring'" instead of the reason.
+                char msg[400];
+                std::snprintf(msg, sizeof msg,
+                              "verify watchdog: script exceeded its %.0f s wall-clock budget "
+                              "(BL-714/NR-695). A check that never returns starves every script "
+                              "behind it, so this is a red row rather than a hung suite. Narrow "
+                              "the sweep, or raise the budget with --verify-budget <seconds>.",
+                              s_watchdog.budget_s);
+                luaL_error(ls, "%s", msg);
+            }
+        }, LUA_MASKCOUNT, 100000);
+        struct hook_guard
+        {
+            lua_State* ls;
+            ~hook_guard() { lua_sethook(ls, nullptr, 0, 0); }
+        } guard{LS};
+
         try
         {
             // Auto-load the helper library (scripts/verify/lib.lua) from the

@@ -74,7 +74,89 @@ inline constexpr uint32_t save_game_magic =
 /// `read_save_game` compares this constant for equality and rejects on any
 /// mismatch. There is no upgrade path to write, and adding one for a single
 /// raster would be inventing a scheme this file does not have.
-inline constexpr uint32_t save_game_version = 3; // NR-733: the report carries the Era -1 time-lapse
+/// Bumped to 4 when `world_params` gained `industrial_years` (BL-747, the
+/// two-span prehistory): `w_world_params` gains one int between
+/// `prehistory_years` and `body_count`. A MID-RECORD gap again, so a v3
+/// stream's world-params record misreads `body_count` and the preferences
+/// after it — refused whole on the same strict-equality contract, for the same
+/// reason as the v2 bump above.
+/// Bumped to 6 by TWO INDEPENDENT REGION GROWTHS THAT LANDED IN ONE WAVE, and
+/// the number is 6 rather than 5 precisely because of that. Both wave-1 items
+/// bumped 4 -> 5 in isolation, each correctly, in separate worktrees:
+///
+///   BL-766 (population map drawn early) appended the URBAN RECORD - two ints
+///     and an int64 at the END of the region record - and added
+///     `urban_map_drawn` to `w_settlement` after `median_industrial_year`.
+///   BL-748 (the furnace moves inside the run) inserted `industrial_lag_years`
+///     as one int BETWEEN `industrialised` and `nation`.
+///
+/// Merged, the stream carries BOTH, so it is neither item's v5 and calling it 5
+/// would have been the worst possible outcome: two different on-disk layouts
+/// sharing one version number, each readable only by the build that wrote it,
+/// with the strict-equality check waving both through. A version is a claim
+/// about a LAYOUT, not a count of how many times someone edited the file.
+///
+/// The write and read orders were reconciled and then PROVED by round-trip
+/// rather than by inspection - `industrial_lag_years` mid-record, then the three
+/// urban fields at the tail, in `w_region` and `r_region` alike.
+///
+/// A v4 or v5 stream misreads `nation` and everything after it, in a record that
+/// repeats hundreds of times per body, so both are refused whole on the same
+/// strict-equality contract as the v2 and v4 bumps above.
+///
+/// LAYOUT 7 = LAYOUT 6 PLUS ONE BYTE AT THE TAIL OF EVERY REGION RECORD.
+///
+/// BL-777 (the region domain) gives `region` a `region_domain` — the three-way
+/// land / coastal_water / open_ocean split the province layer already uses,
+/// brought down to the grain the Era -1 sim acts on. It is written by
+/// `w_region` as a single enum byte AFTER `urban_population`, which is the last
+/// field layout 6 wrote, and read back by `r_region` in the same place with a
+/// range check against `region_domain::open_ocean`.
+///
+/// So layout 7 is layout 6 with exactly one appended byte per region, and
+/// nothing moved. That still refuses every v6 stream whole, and correctly: a
+/// v6 reader handed a v7 stream would run one byte behind for the whole rest of
+/// the file, and a v7 reader handed a v6 stream would consume the NEXT region's
+/// `anchor` low byte as this one's domain. Appending is not compatibility; the
+/// strict-equality check is the compatibility story, as it has been since v2.
+///
+/// THIS IS THE ONLY BUMP IN ITS WAVE, deliberately, and the v6 note above says
+/// why that matters: two items each bumping "the next number" in separate
+/// worktrees produce two on-disk layouts sharing one version, each readable
+/// only by the build that wrote it.
+///
+/// LAYOUT 13 = LAYOUT 12 PLUS ONE VECTOR AT THE TAIL OF EVERY TIME-LAPSE
+/// (BL-916, the event layer): `era_timelapse::events`, written after the
+/// culture-change list by `w_timelapse` and read back in the same place by
+/// `r_timelapse` with a range check on the kind byte. A v12 stream has no
+/// length prefix where v13 expects one, so it is refused whole on the same
+/// strict-equality contract; there is no "older saves read an empty list" path
+/// because there is no partial read at all — an unversioned tail would be read
+/// as the NEXT body entry's name length.
+/// LAYOUT 14 = LAYOUT 13 PLUS ONE `era_timelapse` PER BODY ENTRY, PLUS FOUR
+/// REPORT-LEVEL COUNTERS (BL-946): the Exploration span's own record,
+/// `generation_report::body_entry::exploration_timelapse`, written by
+/// `w_body_entry` right after `prehistory_timelapse` and read back the same
+/// way by `r_body_entry`; and `exploration_years/battles/conquests/foundings`
+/// on `generation_report` itself, written by `w_report` right after the
+/// prehistory counters. Same strict-equality refusal as every prior bump — a
+/// v13 stream has no bytes there at all, so partial-reading it would misparse
+/// the next field.
+///
+/// 15 (BL-969): `handoff_invalid` / `handoff_violation` on `generation_report`,
+/// written by `w_report` after the Exploration counters -- the two handoff
+/// validators' verdict on the shipped path. Same strict-equality refusal: a
+/// v14 stream has no bytes there.
+/// Bumped to 16 by BL-961 (the thermal series): `planetology_state` gains
+/// `thermal_series` — a float vector, `continent_drift_epochs + 1` long, written
+/// by `w_planetology_state` between `core_exposed` and the body profile, in
+/// declaration order. A MID-RECORD gap in every body's planetology record (and
+/// its `undrawn` twin), so a v15 stream misreads the profile and everything
+/// after it — refused whole on the same strict-equality contract as every prior
+/// bump. Serialised at all because the Generation Ledger replays a body's tiles
+/// from the saved record, and the Life phase's palaeo pre-pass now reads the
+/// series; a replay without it would place coal and petroleum from the present.
+inline constexpr uint32_t save_game_version = 16; // BL-961, the thermal series
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

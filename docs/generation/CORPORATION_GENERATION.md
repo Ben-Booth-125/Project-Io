@@ -1,5 +1,15 @@
 # Project Io — Corporation Generation
 
+> **Settles:** how a corporation is assigned a nation, an industrial focus and an ownership
+> class · how a charter reaches the ground · where starting assets, HQ and border range are
+> placed · what finances and stockpile a corp opens with · how a corp is named, and how
+> background firms are produced · how the player's corp and its seat are chosen · what
+> generation deliberately declines to seed.
+> **Not here:** how a rival *decides* anything (../ai/AI_OPPONENT) · how the nation it
+> registers in was made (NATION_GENERATION) · what its money does thereafter
+> (../economy/FINANCE).
+> **Confused with:** ../ai/AI_OPPONENT.md, NATION_GENERATION.md, ../economy/FINANCE.md.
+
 Corporations are the primary actors in the simulation. They extract resources, build
 infrastructure, trade goods, and eventually project power off-world. At campaign start,
 all corporations — including the player's — are generated procedurally and are present
@@ -56,6 +66,15 @@ all corporations.
 Corporation count per campaign is a tunable parameter: `corporation_params::corporation_count`,
 **8** specialists on the homeworld (including the player's). Background firms (Pass 6) are not
 counted by it.
+
+**AMENDED FORWARD (Ben, 2026-09-17): on a Digitisation world the specialists are chartered too.**
+Where the span has run, each population centre's charter budget pays for specialists as well as
+background firms, so the specialist roster is spent from the budgets rather than set by a count
+(`DIGITISATION.md` § 1). The shortlist the seat is chosen from follows where capital accumulated.
+On that path a specialist's home nation is its centre's nation, one specialist per centre rich enough
+to afford one, and **the balancing factor above does not apply** (Ben, 2026-09-17): a nation whose
+cities built capital holds the seats it bought. A specialist's price is anchored to the seat menu
+(Ben, 2026-09-18): the median library world offers about as many seats as a world with no budget.
 
 ### Pass 2 — Industrial focus assignment
 
@@ -280,13 +299,18 @@ Each corporation receives starting capital drawn from a seeded range. A tunable
 focus receive slightly higher starting capital to offset their lack of direct resource
 access.
 
+**A charter-budget world keeps this draw (Ben, 2026-09-18).** A specialist chartered from a
+centre's budget opens on the same seeded capital as any other; capital drawn from its centre's
+unspent points was measured and reversed the same day (`DIGITISATION.md` § 1).
+
 **Pre-game operating history.** Corporations do not open cold. At campaign start the economy
-is run forward a fixed number of **pre-game ticks** (`app::pre_game_ticks` = 80, sliced across
-loading-screen frames after generation completes and the corp is chosen) so every corporation
-enters turn one with a **multi-tick operating history** — warm stockpile pools and a balance
-already moved by production, wages, and trade, rather than the seeded capital alone. The
-headless `--verify` path stays deterministically cold (no pre-game ticks) so generation audits
-remain reproducible.
+is run forward a fixed number of **pre-game ticks** — phase 6's single validation run of the
+winning landscape (`app::validation_ticks`; the length and its measurement are
+`../economy/ERAS.md` § The opening position; BL-978, warm start retired, owns the work) — so
+every corporation enters turn one with a **multi-tick operating history**: warm stockpile pools
+and a balance already moved by production, wages, and trade, rather than the seeded capital
+alone. The headless `--verify` path stays deterministically cold (no pre-game ticks) so
+generation audits remain reproducible.
 
 ### Pass 4b — Starting stockpile
 
@@ -326,25 +350,54 @@ specialists, Pass 6 fills in the rest of the home economy with **background corp
 `corporation_component.is_background = true` — using the same nation-assignment, focus, and
 asset-placement machinery as Passes 1–3, just run repeatedly rather than a fixed number of times.
 
-**Trigger and stop condition — calibrated, not authored.** Pass 6 keeps generating background
-firms and holdings, body by body, until the body's real production reaches a **target fraction of
-its real demand** for the tradeable resource set — **0.90** — or until a **per-resource firm cap**
-is reached, whichever comes first. Retuning recipes, deposits, or population moves how many firms
-Pass 6 places; the design does not author a count.
+**Density is the per-resource firm cap, and the cap is the design (Ben, 2026-09-06).** Pass 6
+generates background firms and holdings, body by body, up to a **per-resource firm cap**. The firm
+count is therefore exactly `specialists + cap × (number of goods with demand)`, and the property
+that follows is the one to carry: **density is set by the BREADTH of the demand baskets, not by
+how much is consumed.**
 
-> **Which of the two actually binds — measured, 2026-08-26 (BL-655), correcting this paragraph.**
-> On the worlds we generate today, **the 0.90 ratio never binds**. The cap does, on every demanded
-> resource, so the firm count is *exactly* `specialists + cap × (number of goods with demand)` —
-> which reproduced every observed number: 12 demanded goods gave 104 corps, 7 gave 64, 6 gave 56.
-> The consequence is the one worth carrying: **density is set by the BREADTH of the demand baskets,
-> not by how much is consumed.** Doubling `demand_scale` moved the corp count by zero. Adding one
-> good to the household basket moves it by the cap.
->
-> This paragraph previously said the ratio was "an emergent measurement rather than an injected
-> clearing constant" and "a stop condition, not a firm-count budget". Measurement says the opposite
-> of both, and the cap's own code comment still reads *"provisional — measure, then pin"* while
-> having quietly become the load-bearing shaping constraint. Whether that is the design anyone
-> wants is open (BL-656); what is settled is that the doc now describes what the code does.
+**There is no 0.90 production-to-demand ratio.** This section described one for months, as a
+"target fraction of real demand" reached before the cap, and called it *calibrated, not authored*.
+Measurement (2026-08-26) found the ratio **never binds on any world we generate** — the cap binds
+on every demanded resource, reproducing every observed count exactly: 12 demanded goods gave 104
+corps, 7 gave 64, 6 gave 56. Doubling `demand_scale` moved the count by zero; adding one good to
+the household basket moved it by the cap. Ben's ruling retires the ratio outright rather than
+raising the cap until it binds, so the shaping constraint is the one that was actually shaping,
+stated plainly and pinned deliberately.
+
+**What that commits to, said out loud.** Background density is a function of **how many different
+goods are wanted**, not of how much of them. A basket that grows in breadth grows the corp count;
+a world that consumes twice as much of the same goods gets the same firms. That is a legible rule
+and it is now the intended one — but it means the demand basket's breadth is a **density knob**,
+and anything editing that basket is editing the size of the background economy.
+
+**AMENDED FORWARD (Ben, 2026-09-18, NR-889): on a Digitisation world the cap scales with capital.**
+Where a charter budget places the web, the per-resource cap above is no longer fixed at 8: it
+scales with the body's charter capital, so a richer body stands more firms per good
+(`DIGITISATION.md` § 1). It scales by a square root, under a named density ceiling below the
+200-per-body guard, which fills goods in turn so it trims every good evenly (Ben, 2026-09-18).
+The budget path's caps are its own, not restatements of this pass's constants. Worlds without a
+budget keep the cap exactly as ruled on 2026-09-06.
+
+**AMENDED FORWARD (Ben, 2026-09-15): density follows the city on a Digitisation world.** The opening
+map wants *many companies around population centres*, which breadth cannot place. Where the
+Digitisation span has run, each population centre arrives with a **charter budget** — its unspent
+industry points — and the landscape search spends it on firms around that centre, specialists and
+background firms alike (Ben, 2026-09-17)
+(`DIGITISATION.md` § This phase sets budgets; the search spends them). Breadth still decides which
+goods a firm can serve; the budget decides how many firms stand where. How a budget converts to a
+firm count is owed and is measured against tick cost before it is tuned.
+
+**Pass 6 is a one-shot, and the economic settle it used to recur through no longer exists.** This
+section said Pass 6 was re-run at a fixed cadence through a settle, with firm exit as the cull.
+`GENERATION_STRATEGY.md` § The eight phases retires the warm start and the settle together and
+replaces them with **phase 6's directed static search** — a settle asks *what survives whatever
+generation happened to place*, a search asks *which placement is worth handing over*, and keeping
+both would pay twice for the weaker answer.
+
+So the background economy's source is the landscape phase 6 **selects**, and this pass is what
+produces the candidate rosters that search ranks. The cap above is what sizes a candidate; the
+search is what chooses among them.
 
 **Background firms are full participants, not a cheaper model.** Once placed, a background firm is
 otherwise ordinary: it runs the **full corp_ai scored-utility layer** — build, demolish, survey,
@@ -370,13 +423,19 @@ world has been run forward, not during the passes above.
 
 ### The spawn shortlist, and the seat
 
+**Reversed in intent (Ben, 2026-09-09): the player is to PICK the seat on a corporation selection
+canvas at Begin**, over the landscape the search selected (`docs/ui/STARTUP.md` § The seat). The shortlist and the weighted draw below remain the mechanism
+until that canvas exists, and afterwards they are what the canvas *offers* — the floor still filters,
+the static score ranks what passes, and the player chooses rather than being drawn for.
+
 Ben's call, 2026-08-26: **which corporation the player runs is drawn at random from a shortlist
 of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:
 
 1. **Generate** — Passes 1–6, exactly as above. No corporation is the player's yet.
-2. **Warm-start in spectate** — the pre-game ticks run with **no seated corp**, under
-   `corp_ai_params::spectating`.
-3. **Shortlist** — every specialist whose quarterly returns clear the viability floor.
+2. **Search and settle in spectate** — phase 6 scores and applies the landscape, then its single
+   validation run ticks with **no seated corp**, under `corp_ai_params::spectating`.
+3. **Shortlist** — every specialist whose ground clears the viability floor on the static landscape
+   score, ranked by that score.
 4. **Seat** — one is drawn from the shortlist against the world seed, and `is_player` /
    `world::player_entity` are re-pointed onto it.
 
@@ -392,10 +451,28 @@ start. **Every seed's opening position therefore changes**, and the goldens re-b
 deliberately, in a single wave with dated provenance, never as a dribble. Ben took that cost
 knowingly on 2026-08-26.
 
-**The viability floor is measured, not authored.** Its metric is the spawn-viability pass's to
-settle, and the shape it must have is: a specialist qualifies if it is solvent at the end of the
-warm start and its trailing net over the last 8 filed quarters is non-negative. Determinism is
-unaffected — the draw consumes the world seed, so a seed reproduces its seat exactly.
+**The viability floor reads the ground, not a trading record** (Ben, 2026-09-16, NR-881; BL-1020,
+the seat floor reads the static score). The settle is phase 6's single short validation run over a
+field that is still ramping, so no trailing net exists to judge at any window — a floor on solvency
+plus eight quarters of trailing net passes nobody, and the shortlist comes back empty. An empty
+shortlist is a broken opening, not a tuning nit: the player picks from it. What *is* knowable before the first
+convoy runs is what phase 6 already scored (`GENERATION_STRATEGY.md` § The eight phases, phase 6).
+That score is a landscape record with per-market readings, so the seat's reading is taken from
+those terms and nothing new: for each holding, the **viability** of the market it clears against —
+`actual × balance`, the per-market form of the composite's own `mean_actual × mean_balance` — and
+the seat's score is the mean over its holdings. The composite's unevenness multiplier belongs to
+the whole landscape and is the same for every seat, so it is not applied.
+
+- **The gate:** a specialist qualifies if its score is above zero — at least one holding stands in
+  a market where the roster closes a chain *and* some resource sits inside the pin band. It is the
+  same necessary condition phase 6 applies to a whole landscape.
+- **The order:** the shortlist is ranked by that score, highest first, entity id breaking a tie.
+- **The trailing figures stay, as information.** The settle's closing balance and the trailing net
+  over the last 8 filed quarters are read for every candidate and shown on the seat card. They
+  never gate and never rank.
+
+Determinism is unaffected — the score is static and the draw consumes the world seed, so a seed
+reproduces its shortlist and its seat exactly.
 
 **The draw over the shortlist is WEIGHTED, not uniform.** Ben, 2026-08-26: *"mostly random for now,
 targeted towards population centres and processing, rather than extraction."* The floor is a filter;
@@ -424,8 +501,9 @@ asserting it against a target. A bias is not a guarantee, and the honest measure
 what share of seeds actually seat a processor-bearing corp near population once the weights are
 live.
 
-**An unmet floor stands.** If no specialist clears, the highest trailing-net specialist is seated
-and the world records that the floor went unmet. That is a viability signal to be read, not a
+**An unmet floor stands.** If no specialist clears, the first-ranked specialist is seated — every
+score is zero, so that is the lowest entity id, and the trailing net is not consulted — and the
+world records that the floor went unmet. That is a viability signal to be read, not a
 failure to be hidden — the same position § Pass 2's diversity floor takes.
 
 **What this retires.** The starting-corp selection stage (`app_screen::choosing_corp`) and its

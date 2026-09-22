@@ -1,5 +1,6 @@
 #pragma once
 
+#include "charter_budget.hpp"
 #include "recipe_registry.hpp"
 #include "world.hpp"
 
@@ -47,8 +48,9 @@ struct corporation_params
     /// **400 (Ben, 2026-08-26), superseding the 0 of 2026-07-06.** The zero was a
     /// deliberate "model every corp as a new charter — capital is *earned*, not
     /// granted" steer, and the earning half of it still holds: the opening balance
-    /// is still overwhelmingly the pre-game warm start's doing (`app::pre_game_ticks`
-    /// = **80** quarters, ~20 in-game years, against the generation-time asset
+    /// is still overwhelmingly the pre-game ticks' doing (the eighty-quarter warm
+    /// start when this was measured; now the winner's validation run,
+    /// `app::validation_ticks`, BL-978 — against the generation-time asset
     /// placement). What the zero did NOT anticipate is what a zero buffer does when
     /// combined with compounding debt interest.
     ///
@@ -120,6 +122,116 @@ std::vector<entity_id> generate_corporations(
     uint32_t seed,
     const struct settlement_state* settle = nullptr,
     struct generation_progress* progress = nullptr);
+
+/// BL-977 — strip the SPECIALIST roster so a candidate can lay a fresh one.
+///
+/// `generate_corporations` APPENDS, and has already run inside
+/// `make_hard_coded_world` by the time the landscape search sees the world; a
+/// second call would double every specialist. This is the inverse the roster
+/// axis needs: every corporation with `is_background == false` goes, with its
+/// asset buildings and their stockpiles, its body pools, any units it owns and
+/// its per-corp tech/modifier rows; `player_entity` is cleared when it named
+/// one of them (the seat is drawn afterwards, from the roster that survives).
+/// BACKGROUND FIRMS ARE UNTOUCHED — they are laid by the candidate's own
+/// placement pass and belong to it, not to the world-gen roster.
+///
+/// Walks corporations in ascending id, so the erase order — and the entity ids
+/// the regenerated roster then draws — is the same on every standard library.
+/// Invalidates the logistics caches: a removed port or hub was a supply anchor.
+///
+/// What it does NOT undo: the market carving already read where the world-gen
+/// roster clustered (`corps_in_nation`), and markets are settled by the end of
+/// phase 4 — the search moves rosters over fixed markets by design.
+///
+/// @return The number of corporations removed.
+int remove_specialist_roster(world& w);
+
+/// BL-1032 — CHARTER THE WEB FROM A PER-CENTRE BUDGET (DIGITISATION.md § 1;
+/// CORPORATION_GENERATION.md Pass 1 and Pass 6, both AMENDED FORWARD). Lays
+/// specialists AND background firms around the population centres @p budget
+/// names, in place of `generate_corporations` + `generate_background_firms`.
+/// The caller (`apply_landscape_candidate`'s budget overload) has already run
+/// `remove_specialist_roster`; this function appends.
+///
+/// NEW CODE BESIDE THE LEGACY PASSES, NEVER A REFACTOR OF THEM: it reuses this
+/// file's helpers (placement, capital, stockpile, naming, HQ, the gap
+/// selection's measurements) and edits neither legacy body, so a world with no
+/// budget keeps its bytes.
+///
+/// THE SPEND, in order:
+///  * Refused params (`charter_spend_refusal`) charter NOTHING and touch
+///    nothing; the report is `charter_refused_report`. (The landscape overload
+///    decides a refusal before any mutation and never calls this with one.)
+///  * Centres spend by budget DESCENDING, ties to the lower centre id, in ONE
+///    walk (DIGITISATION.md § 1: a centre "charters exactly one specialist; what
+///    remains buys background firms around it"): each centre's specialist, then
+///    that centre's firms, then the next centre.
+///  * Home nation = `tile_to_nation` of the centre tile; none -> the whole
+///    budget unspent (`no_nation`).
+///  * TWO REGIONS. CHARACTER (a specialist's focus and ownership) is
+///    `nearest_region` reconciled to that nation — a mismatch takes the nation's
+///    own nearest region to the centre; with none, or no settlement, the
+///    national-character fallback. ANCHORING (rung 2) is `nearest_region` only
+///    when that region is the centre nation's own, and otherwise nothing.
+///  * A centre whose budget >= the specialist price (`firm_price_points x
+///    specialist_firm_charters`) charters EXACTLY ONE specialist: focus and
+///    ownership from the character region (Passes 2 and 2b), today's capital
+///    (400 +/- 40%, the focus premium included), stockpile, name and HQ. NO
+///    nation balancing, no diversity reroll. The remainder buys background
+///    firms at the firm price by Pass 6's gap selection — construction first,
+///    then the biggest gap under the body's per-good cap (`per_resource_firm_cap`
+///    under `fixed`, none under `lifted`), or under `sqrt_capital` the goods IN
+///    TURN, a firm per good each pass up to the square-root cap (BL-1039) — under
+///    the budget path's per-province cap 2 when `spend.province_cap`, the
+///    `density_ceiling` under `sqrt_capital`, and the `max_firms_per_body`
+///    runaway guard. Each body's firm points B, its goods with demand G, B_ref
+///    and the per-good cap are FIXED BEFORE THE WALK (`charter_sqrt_per_good_cap`).
+///  * Anchor rungs: the centre nation's tiles within `spend.window_radius` of
+///    the centre tile (column-wrapped), then the anchor region's window (empty
+///    when the nearest region is a neighbour's), then UNSPENT — never nation-wide.
+///    The rungs bound the ANCHOR only; secondary holdings walk outward from it
+///    (`place_starting_assets`, unchanged), and each record lists every holding
+///    tile so a reader can measure the spill.
+///  * What is not spent is counted by reason: `window_exhausted`,
+///    `province_cap` (the windows had anchorable ground and the cap took all of
+///    it), `no_gap`, `body_cap`, `density_ceiling`, `remainder` — never
+///    scattered. The report carries each body's rule and its firms per good.
+///  * The player is a seeded pick among the budget's specialists; with none,
+///    nobody is picked and the report says `no_specialists`.
+///
+/// RNG: a fresh std::mt19937 per centre per role, seeded through a keyed
+/// `checkpoint_rng` draw on salts no other generation stream uses, so one
+/// centre's draws never depend on another's success.
+///
+/// @param seed    The candidate's placement seed (as the legacy passes take it).
+/// @param settle  The settlement record (`world::gen_settlement`), or null.
+/// @param report  Optional; overwritten with the spend's report.
+/// @return        Every corporation chartered, ascending id.
+std::vector<entity_id> charter_web_from_budget(world& w,
+                                               const recipe_registry& reg,
+                                               const charter_budget& budget,
+                                               const charter_spend_params& spend,
+                                               uint32_t seed,
+                                               const struct settlement_state* settle,
+                                               charter_spend_report* report = nullptr);
+
+/// BL-1060 — the refusal a spend's params cannot decide alone: under
+/// `sqrt_capital`, a density ceiling that BINDS on some budgeted body and yet
+/// leaves under one firm per turn good once the yards' places come off it, so
+/// NR-905's reservation could not be cut at all. Null when the spend may go
+/// ahead (and for an empty budget, a legacy rule, or params
+/// `charter_spend_refusal` already refuses).
+///
+/// READ-ONLY, and read BEFORE ANY MUTATION: `apply_landscape_candidate` and
+/// `search_landscape` ask it on the world as they receive it, beside
+/// `charter_spend_refusal`, and `charter_web_from_budget` asks it again at its
+/// top — on the world the walk itself will spend, after the budget apply has
+/// removed world-gen's roster. That second ask is the authority (BL-1060 round
+/// 4): the walk never runs a body whose shares could not be cut, whatever the
+/// earlier ask saw.
+const char* charter_spend_world_refusal(const world& w, const recipe_registry& reg,
+                                        const charter_budget& budget,
+                                        const charter_spend_params& spend);
 
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631)
@@ -252,11 +364,11 @@ std::vector<entity_id> generate_background_firms(
 /// author a processor (`generate_corporations`, `generate_background_firms`).
 void assign_default_recipes(world& w, const recipe_registry& reg);
 
-/// Measurement seam (2026-08-20) — the SHIPPED background-firm stop condition,
-/// readable from outside. `generate_background_firms` stops when the basket-
-/// weighted production/demand ratio reaches its target (0.90) OR when it hits
-/// `max_firms_per_body`; which one fires decides whether a body's markets open
-/// stocked or thin, and nothing outside that file could previously ask.
+/// Measurement seam (2026-08-20) — the SHIPPED coverage arithmetic, readable
+/// from outside. `generate_background_firms` stops on its caps (per resource,
+/// per province, `max_firms_per_body`), never on a coverage target; the basket-
+/// weighted production/demand ratio is what says whether a body's markets open
+/// stocked or thin, and nothing outside that file could previously ask it.
 ///
 /// Exported rather than re-derived on purpose: a harness that re-implements a
 /// generation rule drifts from it, which has now cost this project four wrong

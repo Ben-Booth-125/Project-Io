@@ -30,10 +30,11 @@ struct sim_terrain_arrays
     std::vector<terrain_cover>     cover;
     std::vector<std::uint8_t>      density;
     std::vector<terrain_landform>  landform;
+    std::vector<std::uint8_t>      river; ///< Non-zero where a river edge touches the tile (BL-853).
 
     sim_terrain_view view() const
     {
-        return sim_terrain_view{ &substrate, &cover, &density, &landform };
+        return sim_terrain_view{ &substrate, &cover, &density, &landform, &river };
     }
 };
 
@@ -47,6 +48,7 @@ inline sim_terrain_arrays build_sim_terrain(const world& w, entity_id body, int 
     out.cover.assign(n, terrain_cover::grass);
     out.density.assign(n, 150u);
     out.landform.assign(n, terrain_landform::plains);
+    out.river.assign(n, 0u);
 
     for (const auto& [id, t] : w.tiles)
     {
@@ -58,6 +60,7 @@ inline sim_terrain_arrays build_sim_terrain(const world& w, entity_id body, int 
         out.cover[idx]     = t.cover;
         out.density[idx]   = t.cover_density;
         out.landform[idx]  = t.landform;
+        out.river[idx]     = t.river_edges != 0 ? 1u : 0u;
     }
     return out;
 }

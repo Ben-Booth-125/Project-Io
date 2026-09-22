@@ -84,7 +84,12 @@ recipes = {
         era     = "industrial", -- BL-433
         group   = "Food Processing", -- BL-434: agriculture-adjacent, same feed-the-population kind
         inputs  = { water = 1.5, steel = 0.5 },
-        outputs = { agricultural_produce = 1.0 },
+        -- BL-744 (2026-09-02): one batch grows 5 units, not 1. At 1 unit the
+        -- bay sold 3.0 of produce for 9.0 of water and steel - the only recipe
+        -- in the roster that lost money BEFORE wages - and no price could fix
+        -- it, since produce is a raw priced by the Farm. Intensive growing is
+        -- the point of the bay; the yield is what makes it a method.
+        outputs = { agricultural_produce = 5.0 },
     },
 
     -- id 4 — Smelter, second recipe (BL-323 S1, PRODUCTION.md): metallic-asteroid
@@ -293,7 +298,10 @@ recipes = {
         display_name = "Charcoal Burner", -- BL-429 slice 2
         era          = "ancient",
         group        = "Fuel Production", -- BL-434: fuel/energy, not metal itself; the Bloomery/Smithy's supplier
-        inputs       = { timber = 3.0 },
+        -- BL-744 (2026-09-02): 3.0 -> 1.5 timber per charcoal. The Peat Kiln
+        -- is the cheapest charcoal route and sets the price; at 3.0 timber the
+        -- Burner could not cover its fixed cost at the floor (M2).
+        inputs       = { timber = 1.5 },
         outputs      = { charcoal = 1.0 },
     },
 
@@ -317,7 +325,15 @@ recipes = {
         display_name = "Smithy", -- BL-429 slice 2
         era          = "ancient",
         group        = "Metal Foundry", -- BL-434
-        inputs       = { iron_blooms = 2.0, charcoal = 1.0 },
+        -- BL-744 (Ben, 2026-09-02, overturning NR-778): the ancient chain to
+        -- steel is DEPTH ONE - the Bloomery at the end of this file smelts ore
+        -- and timber straight to steel and is the band's anchor route. The
+        -- Smithy stays as the deeper ALTERNATE (blooms + charcoal), held to
+        -- "profitable at base" plus the floor half; at 2 blooms + 1 charcoal it
+        -- consumed 55 of inputs for a 16 steel and could not be. A bloom is a
+        -- consolidated lump, not a unit of steel, so the ratio is authored by
+        -- what the route must clear rather than by a mass balance.
+        inputs       = { iron_blooms = 0.4, charcoal = 0.2 },
         outputs      = { steel = 1.0 },
     },
 
@@ -453,7 +469,10 @@ recipes = {
         display_name = "In-Situ Smelter",
         era          = "industrial",
         group        = "Metal Foundry", -- same group as ids 0, 4 and 19
-        inputs       = { regolith = 12.0 },
+        -- BL-744 (2026-09-02): 12 -> 8.5 regolith per unit. Regolith rose
+        -- 0.6 -> 1.0 so an off-world site pays its lights at the floor
+        -- (NR-779), and at 12 units this alternate no longer did (M2).
+        inputs       = { regolith = 8.5 },
         outputs      = { steel = 1.0 },
     },
 
@@ -544,7 +563,10 @@ recipes = {
         display_name = "Coking Kiln",
         era          = "ancient",
         group        = "Fuel Production", -- BL-434, with the Charcoal Burner and Peat Kiln
-        inputs       = { timber = 1.5, iron_blooms = 0.1 },
+        -- BL-744 (2026-09-02): timber 1.5 -> 0.8, blooms 0.1 -> 0.05. The kiln
+        -- is the deeper charcoal method; at the old quantities its inputs
+        -- exceeded the Peat Kiln's price and it failed the floor half (M2).
+        inputs       = { timber = 0.8, iron_blooms = 0.05 },
         outputs      = { charcoal = 1.0 },
     },
 
@@ -560,7 +582,10 @@ recipes = {
         display_name = "Bessemer Converter",
         era          = "industrial",
         group        = "Metal Foundry", -- BL-434, with the Smelter and its siblings
-        inputs       = { iron_ore = 1.5, coal = 0.5, machinery = 0.15 },
+        -- BL-744 (2026-09-02): machinery 0.15 -> 0.05 per unit. The converter
+        -- saves coal for capital; at 0.15 the capital share alone (8.3 at
+        -- machinery's anchored price) exceeded the whole steel price.
+        inputs       = { iron_ore = 1.5, coal = 0.5, machinery = 0.05 },
         outputs      = { steel = 1.0 },
         centre_proximity_radius = 6, -- BL-615: heavy processor class — see the steel recipe's note.
         qualified_workforce = 0.15, -- BL-613: the latest steel method wants some specialists; the plain Smelter wants none
@@ -694,6 +719,232 @@ recipes = {
         group        = "Advanced Fabrication", -- BL-434 — new to the ancient roster (already used by the industrial machinery/alloys/spacecraft_components chain)
         inputs       = { planks = 1.5, cloth = 1.0 },
         outputs      = { rigging = 1.0 },
+    },
+
+    -- ======================================================================
+    -- BL-708 (2026-08-31) — GENERATION. docs/economy/PRODUCTION.md § Power.
+    -- ======================================================================
+    --
+    -- Two routes, one product, INDUSTRIAL BAND ONLY (Ben, 2026-08-31: "the
+    -- ancient band gets no power analogue" — charcoal already carries real
+    -- household demand there and is not an orphan).
+    --
+    -- WHY THESE TWO FUELS. `coal` and `petroleum` are the census's named
+    -- orphans: on the 0 CE band both have NO structural sink at all, and on the
+    -- 1960 band petroleum produced 6169.9 against observed demand 0.000. A
+    -- generator gives them an endpoint that is ALWAYS on, and — because the
+    -- plant buys its fuel as an ordinary processing input while every building
+    -- buys the power as an upkeep bid — BOTH links of `fuel -> power ->
+    -- consumed` price on the market. Neither is a pool draw, so neither severs
+    -- the chain (MARKETS.md property 3, satisfied twice over).
+    --
+    -- "Generation is a business, not a cost centre" (PRODUCTION.md § Power), so
+    -- both routes carry the roster's own ~1.433x markup over their input basket
+    -- — the SAME derivation the BL-585/BL-586 ancient prices used, not a picked
+    -- number. Against `power`'s base price of 1.45 (world_gen.lua):
+    --
+    --   oil-fired  : 1.0 petroleum @ 3.5 = 3.50 in;  3.5 power @ 1.45 = 5.075 out  (1.450x)
+    --   coal-fired : 1.5 coal      @ 2.0 = 3.00 in;  3.0 power @ 1.45 = 4.350 out  (1.450x)
+    --
+    -- IDENTICAL MARGIN, DIFFERENT SIZE, and that pairing is deliberate. Equal
+    -- markup is what stops either route being quietly the better business, so
+    -- which fuel a region burns is decided by what its ground carries and what
+    -- its market charges. The oil plant is simply the LARGER unit — 3.5 power a
+    -- batch against 3.0 — and that is what the pre-game seeder's gap scorer
+    -- (`best_recipe_for_gaps`, corporation_generation.cpp) reads when it picks a
+    -- recipe to fill a shortfall: it ranks on output quantity, so it provisions
+    -- a new region with oil plants first. That ordering matters because it is
+    -- the only one the shipped world can actually run — `petroleum` is produced
+    -- in real quantity on the industrial band while `coal` is produced 0.0, so a
+    -- seeder that reached for the coal route first would build plants with no
+    -- fuel to burn. The coal route is the one a player or a rival switches to
+    -- where the ground favours it.
+    --
+    -- Note what this does NOT do: it does not make oil cheaper. Both routes
+    -- clear the same 1.450x, so the choice stays a question about geology.
+    --
+    -- Re-derive both if a base price in world_gen.lua moves.
+    --
+    -- DEPTH. depth(coal) = depth(petroleum) = 0 (both are dug), so
+    -- depth(power) = 1. Power is NOT terminal — it is consumed by the
+    -- building-upkeep draw (economy.building_upkeep.goods), which is a named
+    -- actor in exactly the sense `ordnance` is, so it needs no orphan exemption.
+    {
+        name         = "oil_power_plant",
+        display_name = "Oil-Fired Power Plant",
+        era          = "industrial",
+        group        = "Power Generation", -- BL-434: a sub-facility kind of its own, so the Build door reads it as a distinct plant
+        inputs       = { petroleum = 1.0 },
+        outputs      = { power = 3.5 },
+    },
+
+    {
+        name         = "coal_power_plant",
+        display_name = "Coal-Fired Power Plant",
+        era          = "industrial",
+        group        = "Power Generation", -- BL-434, with the oil route above
+        inputs       = { coal = 1.5 },
+        outputs      = { power = 3.0 },
+    },
+
+    -- ======================================================================
+    -- BL-709 (2026-08-31) - THE CONSTRUCTION SECTOR'S FIVE PRODUCTION METHODS.
+    -- docs/economy/PRODUCTION.md § Construction as a rate.
+    -- ======================================================================
+    --
+    -- Ben, 2026-08-31: "we should parameterize construction. We can use
+    -- construction as a rate, and pay upkeep on construction buildings which
+    -- costs (depending on production method)."
+    --
+    -- A CONSTRUCTION YARD IS AN ORDINARY PROCESSING FACILITY. That is the whole
+    -- structural claim, and it is why this item adds five rows here rather than
+    -- a building_type, a second tick pass and a parallel draw: "runs a
+    -- PRODUCTION METHOD" is what a recipe already is (§ Alternate production
+    -- methods -- the same `set_recipe` verb and the same construction panel
+    -- method dropdown), so the yard inherits the workforce scalar, the two-
+    -- threshold run model, `building_supply_scalar`, the corp AI's build and
+    -- dial scorers, the seeder's gap filler and the Build door for free.
+    --
+    -- WHAT THE ITEM ACTUALLY FIXES. Construction demand on the industrial band
+    -- measures 0.000 because `run_construction` fires only where something is
+    -- actively building: it is EPISODIC, so when nothing is under construction
+    -- the channel is silent. A sector is CONTINUOUS -- the yard bids for its
+    -- method's goods every tick whether or not a single site is under way -- and
+    -- ECONOMY-SCALED, because what buys its output is the standing building
+    -- stock (economy.building_upkeep.goods) plus every live project. That is
+    -- MARKETS.md property 1 satisfied by construction rather than asserted of it.
+    --
+    -- ERA-BANDED EXACTLY AS RECIPES ARE (property 2), which is the reason the
+    -- ladder spans both bands: two ancient methods, three industrial. The
+    -- ancient band's construction channel is already non-zero (65.1) but still
+    -- episodic; a yard makes it continuous there too.
+    --
+    -- EVERY INPUT IS REACHABLE IN ITS OWN BAND, and that is a real constraint
+    -- rather than a formality. `planks` and `dressed_stone` are made by ancient
+    -- recipes (Sawmill, Stonemason) and by NOTHING in the industrial band, so
+    -- the two ancient methods are the only ones that may name them; the three
+    -- industrial methods draw `steel` (industrial-produced) and raws
+    -- (`iron_ore`, `stone`, `sand`, `timber`), which are dug in any band. A
+    -- method naming a good its own band cannot make would be an authored
+    -- starvation, which is what property 3 exists to catch.
+    --
+    -- THE SHARED PRICE ANCHOR. All five are sized against
+    -- `construction_capacity` = 3.0 (world_gen.lua) so that every one of them
+    -- clears the roster's own observed 1.415-1.443x markup -- the same
+    -- derivation BL-585/BL-586 and BL-708 used, not a picked number. Equal
+    -- markup across the five is deliberate and is the same argument the two
+    -- power routes make: it stops any method being quietly the better business,
+    -- so which one a region runs is decided by what its ground carries and what
+    -- its market charges. What differs is BASKET and SIZE, not margin.
+    --
+    -- Re-derive all five if `construction_capacity` or any input price moves.
+    --
+    -- DEPTH. Ancient: max(depth(timber)=0, depth(planks)=1) + 1 = 2 for the
+    -- timber frame, and the same 2 for stone and brick through dressed_stone --
+    -- so the sector sits at the design's "every chain should reach depth 2 or
+    -- better" bar in that band. Industrial: the iron frame is depth 1 (both its
+    -- inputs are dug), and since chain depth is a MIN across recipes that is the
+    -- industrial figure. Capacity is TERMINAL -- consumed by builds and by the
+    -- building-upkeep draw, producing nothing that must itself be sold -- so it
+    -- is a genuine endpoint in MARKETS.md property 4's sense, not a pass-through.
+
+    {
+        name         = "timber_frame_construction",
+        display_name = "Timber Frame Yard",
+        era          = "ancient",
+        group        = "Construction", -- BL-434: a sub-facility kind of its own, so the Build door reads the five methods as one plant
+        -- timber 2.0*1.5 = 3.00 + planks 1.0*4.3 = 4.30  ->  7.30 in
+        -- 3.5 capacity * 3.0 = 10.50 out  ->  1.438x
+        -- The cheapest ancient start: a corp with a Sawmill already has half the
+        -- basket, which is the point of putting `planks` in it -- the ancient
+        -- band's milled goods gain a sink that is on EVERY tick rather than only
+        -- when someone happens to be building.
+        inputs       = { timber = 2.0, planks = 1.0 },
+        outputs      = { construction_capacity = 3.5 },
+    },
+
+    {
+        name         = "stone_and_brick_construction",
+        display_name = "Stone and Brick Yard",
+        era          = "ancient",
+        group        = "Construction",
+        -- stone 2.0*1.0 = 2.00 + dressed_stone 1.0*2.9 = 2.90 + clay 1.0*1.2 = 1.20  ->  6.10 in
+        -- 2.9 capacity * 3.0 = 8.70 out  ->  1.426x
+        -- The SMALLEST unit of the five and the cheapest basket, so it is the
+        -- method a thin market can actually run. It is also the one that gives
+        -- `dressed_stone` and `clay` a continuous buyer, which the census had
+        -- reading as household-only.
+        inputs       = { stone = 2.0, dressed_stone = 1.0, clay = 1.0 },
+        outputs      = { construction_capacity = 2.9 },
+    },
+
+    {
+        name         = "iron_frame_construction",
+        display_name = "Iron Frame Yard",
+        era          = "industrial",
+        group        = "Construction",
+        -- iron_ore 2.0*2.5 = 5.00 + timber 1.5*1.5 = 2.25  ->  7.25 in
+        -- 3.45 capacity * 3.0 = 10.35 out  ->  1.428x
+        -- ASSUMPTION, FLAGGED: RESOURCES.md has no wrought-iron good, so the
+        -- design table's "iron" is read here as `iron_ore` -- the roster's only
+        -- iron in this band, since `iron_blooms` is smelted by an ANCIENT recipe
+        -- and is unreachable industrially. That is also what makes this the
+        -- cheapest industrial entry: it is the method a region with ore and
+        -- forest runs before it has a steelworks.
+        inputs       = { iron_ore = 2.0, timber = 1.5 },
+        outputs      = { construction_capacity = 3.45 },
+    },
+
+    {
+        name         = "steel_frame_construction",
+        display_name = "Steel Frame Yard",
+        era          = "industrial",
+        group        = "Construction",
+        -- steel 1.0*8.0 = 8.00 in
+        -- 3.8 capacity * 3.0 = 11.40 out  ->  1.425x
+        -- The single-input method: no basket to assemble, so it is the one a
+        -- market with a steelworks can stand up immediately -- and the one that
+        -- finally gives industrial `steel` a terminal buyer that is not another
+        -- processor.
+        inputs       = { steel = 1.0 },
+        outputs      = { construction_capacity = 3.8 },
+    },
+
+    {
+        name         = "reinforced_concrete_construction",
+        display_name = "Reinforced Concrete Yard",
+        era          = "industrial",
+        group        = "Construction",
+        -- steel 0.5*8.0 = 4.00 + stone 2.0*1.0 = 2.00 + sand 2.0*1.0 = 2.00  ->  8.00 in
+        -- 3.8 capacity * 3.0 = 11.40 out  ->  1.425x
+        -- SAME SIZE AND SAME MARGIN as the steel frame, and that pairing is the
+        -- deliberate one: it spreads half the steel cost onto bulk the ground
+        -- gives away, so a region with quarries runs it and a region with a mill
+        -- runs the frame, at identical profit. It is also the only industrial
+        -- sink `sand` has -- the census reads it as extractable-with-no-sink in
+        -- that band.
+        inputs       = { steel = 0.5, stone = 2.0, sand = 2.0 },
+        outputs      = { construction_capacity = 3.8 },
+    },
+
+    -- BL-744 (Ben, 2026-09-02, overturning NR-778): THE ANCIENT CHAIN TO STEEL
+    -- IS DEPTH ONE. Under the recipe margin anchor every processing stage at
+    -- least doubles the value it takes in, so a three-stage route (timber ->
+    -- charcoal -> blooms -> steel) priced ancient steel at 113 against the
+    -- industrial band's 14, and the two bands could not share a price table.
+    -- Ben's call was ONE table and a shorter chain rather than banded prices:
+    -- the Bloomery smelts ore and timber straight to steel (the timber is the
+    -- charcoal, burned in place), so steel's cheapest ancient route is one step
+    -- above raws and its price is set here. The Smithy (steel_from_blooms) is
+    -- now the deeper alternate. Appended, never inserted - ids are indices.
+    {
+        name         = "steel_bloomery",
+        display_name = "Bloomery Furnace",
+        era          = "ancient",
+        group        = "Metal Foundry",
+        inputs       = { iron_ore = 2.0, timber = 1.5 },
+        outputs      = { steel = 1.0 },
+        centre_proximity_radius = 6, -- the heavy processor class, as the steel recipe
     },
 }
 

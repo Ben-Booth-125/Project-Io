@@ -1,5 +1,13 @@
 # Tech Effects — what a tech *does*
 
+> **Proposes:** what an effect is if it is a (kind, target) pair · which kinds close the set and
+> which targets they may name · what retirement does to that model · how the taxonomy maps onto
+> real buildings and units · which categories the docs imply but the taxonomy omits.
+> **Not here:** the predicate/effect substrate every rule is actually composed from (META_LAYER, the
+> authority) · research points and technology unlocks (economy/RESEARCH) · the era ladder
+> (economy/ERAS) · the pre-campaign ladder (ANCIENT_TECH_LADDER, also research).
+> **Confused with:** META_LAYER.md, economy/RESEARCH.md, research/ERA1_TECH_LANDSCAPE.md.
+
 > **Research scaffolding — the design conversation's home, not authority.** From Ben's ask:
 > *map this to real buildings and units — these trees should unlock, upgrade, retire, improve
 > reconnaissance, open law/tax/automation capacity, begin space, and unlock war and communication

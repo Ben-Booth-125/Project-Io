@@ -1,5 +1,15 @@
 # Project Io — Planetology
 
+> **Settles:** how a body's atmosphere, chemistry and hydrology come to be derived rather
+> than authored · how the chain from system to civilisation gate is staged, and what each
+> stage gates · how a biosphere history is simulated and how a line is dated · how a
+> homeworld's inputs are constrained without touching the gates · how the derivation is
+> presented as a biography · what keeps the chain deterministic and cheap.
+> **Not here:** how terrain is laid down from the resulting profile (TILE_GENERATION) ·
+> where the land ends up (CONTINENTS) · what happens after the civilisation gate
+> (../lore/HISTORY).
+> **Confused with:** TILE_GENERATION.md, CONTINENTS.md, ../lore/HISTORY.md.
+
 This document is the authority for BL-167 (Planetology — generated atmosphere, chemistry,
 and a simulated evolution history): a chemical model of the full chain from an input solar
 system to a human civilisation, researched across 13 domains with an adversarial fact-check on
@@ -62,6 +72,13 @@ exponent pair (L ∝ M^3.5 with t ∝ M^-2.5). The water ice line sits at ~2.71�
 wet-versus-dry accretion. Radiogenic U/Th is **decoupled** from [Fe/H] — U and Th come from rare
 r-process events, so mantle Th/U plausibly varies an order of magnitude between systems at the same
 metallicity. That decoupling is free variety: an iron-rich system can be a geologically dead one.
+
+**The mined metals share the metallicity axis by design (Ben, 2026-09-15, NR-872).** Iron, copper,
+silica, rare earths, platinum-group metals and iron-nickel all scale with the one nebular draw, so a
+metal-rich world is rich in all six and about half of accepted homeworlds are poor in no mined
+resource. That is the planetology's honest shape, not a flattening to fix: the within-world
+asymmetry the economy needs comes from terrain, the endemic bands and the deposit passes, and the
+endowment spread across worlds is measured (planetology_sweep) rather than tuned.
 
 Because the star brightens ~30% over its main sequence, the **continuously** habitable corridor is
 much narrower than the instantaneous one — 0.976–1.428 AU for a Sun over 4.5 Gyr, **63%** of the
@@ -244,6 +261,32 @@ measured: acceptance fell 78.5% → 60.2% and 69% of rejects became Mat Worlds. 
 properly needs an epoch-relative threshold, which is a calibration pass, not an edit — BL-301
 (GOE epoch-relative calibration); see NR-046.
 
+#### The thermal series — the same reconstruction, stored for the Life phase
+
+`theta_at` is a lambda inside the chain and is deliberately not exported. What the chain
+**does** export is its answer on the drift clock: `planetology_state::thermal_series`, one
+value per drift epoch ([CONTINENTS.md](CONTINENTS.md) § The drift clock — 5 My per epoch, to a
+depth of 20), so the vector is `continent_drift_epochs + 1` long with the present at index 0
+and the deepest epoch last. Three properties define it, and `planetology_harness` R15 asserts
+each:
+
+- **Index 0 is the present, bit for bit** — assigned from `theta`, never recomputed, because
+  `a + (theta − a)` is not guaranteed to round back to `theta` when the tidal term dominates.
+  Every deeper entry hangs off that identity.
+- **Derived, not rolled.** Each deeper entry is `theta_at(age − k × 5 My)`: the radiogenic term
+  re-evaluated at the epoch, the tidal term carried across unscaled. The series consumes no
+  RNG, so adding it moved no stream.
+- **Heat only falls**, so the series is monotone non-decreasing with depth. Over the record's
+  100 My the radiogenic term moves by about a percent (Kepler: ×1.019 at epoch 20), and the
+  series states that honestly rather than inventing a swing.
+
+A stripped core never runs the Engine and carries a full-length, all-cold series, so every state
+has one shape on the wire; the series is serialised with the rest of the state because the
+Generation Ledger replays a body's tiles from the saved record. Its consumer is the Life phase's
+palaeo pre-pass ([TILE_GENERATION.md](TILE_GENERATION.md) § Pass 6, *Fossils read the PAST*),
+which reads the subsidence the coal and oil epochs actually had instead of today's. BL-961
+(planetology thermal series) owns the design.
+
 The **C1 rejection census** (`tools/verify/planetology_sweep.cpp`) is the instrument for this:
 it measures *which floor clause* rejects each homeworld, so a preference that is expensive for
 a modelling reason ("cold and old" judged on heat the world only lost *after* the gate) shows up
@@ -375,7 +418,7 @@ not. Terrestrial peak conventional oil and the exhaustion of near-surface high-g
 real analogue.
 
 This is the cheapest possible generated, in-fiction answer to *"why would a corporation go to
-space"* — and it makes Era 0 → Era 1 a **pressure** rather than a menu choice, which is exactly what
+space"* — and it makes Era 1 → Era 2 a **pressure** rather than a menu choice, which is exactly what
 `GENERATION_STRATEGY.md`'s economic premise asserts but does not currently generate.
 
 ---

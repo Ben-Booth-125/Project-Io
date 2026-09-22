@@ -31,7 +31,7 @@ struct world;
 //   unique key, so no accumulation and no ordering can reach the result.
 //
 //   A SCORED-UTILITY LAYER, NEVER A PLANNER. Three terms are evaluated over
-//   facts the world already holds, mapped onto the nine authored lines, and
+//   facts the world already holds, mapped onto the ten authored lines, and
 //   returned. Nothing here looks ahead, holds a goal across ticks, remembers a
 //   previous decision, or carries state of its own.
 //
@@ -167,7 +167,7 @@ struct nation_ai_params
     float grudge_posture_weight = 0.5f;
 
     // --- The line mapping ---------------------------------------------------
-    // Which term pushes which of the nine `budget_priority` lines, and why, is
+    // Which term pushes which of the ten `budget_priority` lines, and why, is
     // the table in nation_ai.cpp § The mapping. These are its coefficients.
     /// Floor every line carries before any term is applied. Keeps the vector
     /// non-degenerate (a nation always has SOME opinion) and sets how strongly
@@ -183,6 +183,8 @@ struct nation_ai_params
     float calm_schooling   = 0.80f; ///< The long-horizon civil line, deferred under threat.
     float calm_academic    = 0.40f;
     float calm_works       = 0.30f;
+    float calm_space       = 0.30f; ///< The state's stake in the gate into space (BL-644) —
+                                    ///< prestige spending a threatened nation defers first.
     float threat_contracted = 1.20f; ///< Buy force it does not raise (CONTRACTS.md).
     float threat_reserve    = 0.70f; ///< Hold goods against disruption.
     float threat_milres     = 0.60f; ///< Lower the cost of the war you cannot avoid.

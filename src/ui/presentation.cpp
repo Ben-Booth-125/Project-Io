@@ -116,6 +116,13 @@ constexpr resource_presentation resource_table[resource_count] = {
     { "Leather",            "Lthr",IM_COL32(120,  78,  52, 255) }, // tanned, darker and warmer than raw Hides
     { "Cloth",              "Cth", IM_COL32(210, 200, 160, 255) }, // woven undyed fibre, paler than raw Fibre
     { "Rigging",            "Rig", IM_COL32(176, 140,  72, 255) }, // tarred cordage gold-brown, the roster's deepest good
+    // The two goods that are SERVICES rather than substances, and the only rows
+    // here whose colour is not a material's. Power is BL-708's; it was left
+    // unauthored and so rendered as "(unnamed resource)" through the fallback
+    // below — authored here with BL-709's own row rather than left for a good
+    // the player now buys every tick to keep reading as a gap.
+    { "Power",              "Pwr", IM_COL32(240, 208,  80, 255) }, // live-wire yellow, no material shares it
+    { "Construction Capacity", "Cap", IM_COL32(232, 148,  40, 255) }, // hazard orange — crews and plant, the sector's throughput
 };
 
 // Reserved corporation identity colours. Slot 0 is the player's corporation; the
@@ -386,6 +393,58 @@ ImU32 nation_colour(entity_id id)
     // on well-separated palette slots rather than adjacent hues.
     const uint32_t h = static_cast<uint32_t>(id) * 2654435761u;
     return nation_table[h % nation_slot_count];
+}
+
+ImU32 lineage_colour(float hue, int depth)
+{
+    // Saturation fixed, value stepping down by generation. Both ends were chosen
+    // against the round's backdrop: the root rung must read as a colour rather
+    // than a pastel over `col_wild` grey, and the capped rung must still stand
+    // off the near-black sea the map is drawn on.
+    hue -= static_cast<float>(static_cast<int>(hue));
+    if (hue < 0.0f) hue += 1.0f;
+    const int   d = depth < 0 ? 0 : (depth > lineage_depth_cap ? lineage_depth_cap : depth);
+    const float s = 0.62f;
+    const float v = 0.90f - 0.10f * static_cast<float>(d);
+    float r = 0.0f, g = 0.0f, b = 0.0f;
+    ImGui::ColorConvertHSVtoRGB(hue, s, v, r, g, b);
+    return IM_COL32(static_cast<int>(r * 255.0f + 0.5f),
+                    static_cast<int>(g * 255.0f + 0.5f),
+                    static_cast<int>(b * 255.0f + 0.5f), 255);
+}
+
+ImU32 lapse_polity_colour(int slot)
+{
+    // Twenty hues, ordered so that consecutive slots are far apart on the wheel
+    // and alternate light/dark: the greedy colouring hands out the LOWEST free
+    // slot, so the first few slots carry most of the map and must be the most
+    // distinct from each other. Mid luminance throughout, because the map lays
+    // these over a relief base as a translucent tint (BL-915) and a very dark
+    // hue would vanish into the shading.
+    static constexpr ImU32 table[lapse_polity_slot_count] = {
+        IM_COL32(213,  94,   0, 255), // vermillion
+        IM_COL32(  0, 114, 178, 255), // blue
+        IM_COL32(240, 228,  66, 255), // yellow
+        IM_COL32(  0, 158, 115, 255), // bluish green
+        IM_COL32(204, 121, 167, 255), // reddish purple
+        IM_COL32(230, 159,   0, 255), // orange
+        IM_COL32( 86, 180, 233, 255), // sky blue
+        IM_COL32(170, 200,  60, 255), // lime
+        IM_COL32(150,  80, 110, 255), // reddish purple, shaded
+        IM_COL32(200, 200, 200, 255), // pale grey
+        IM_COL32(140,  60,   0, 255), // vermillion, shaded
+        IM_COL32(150, 180, 220, 255), // blue, tinted
+        IM_COL32(120, 110,  40, 255), // olive
+        IM_COL32( 40, 120, 130, 255), // teal, shaded
+        IM_COL32(230, 130, 130, 255), // salmon
+        IM_COL32( 90,  90, 170, 255), // indigo
+        IM_COL32(150, 210, 180, 255), // bluish green, tinted
+        IM_COL32(190, 140,  90, 255), // tan
+        IM_COL32(110, 160,  60, 255), // green, shaded
+        IM_COL32(220, 180, 220, 255), // lilac
+    };
+    if (slot < 0) slot = -slot;
+    return table[slot % lapse_polity_slot_count];
 }
 
 ImU32 building_kind_colour(building_type type)

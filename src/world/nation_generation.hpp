@@ -77,6 +77,70 @@ struct nation_params
     /// a consequence of the generation chain rather than by coincidence. Short,
     /// empty, or unusable entries fall back to a tongue rolled in Pass 5.
     std::vector<tongue> seed_tongues;
+
+    /// Parallel to `seed_tiles`: the id of the POLITY that held each anchored
+    /// region at the epoch, or -1 for ground no polity ended up holding
+    /// (`settlement_seed_polities`). BL-769.
+    ///
+    /// THIS IS THE PHASE 4 / PHASE 5 BOUNDARY MOVING. Without it Pass 1 grew an
+    /// independent realm out of every region anchor and the history's own
+    /// political map — which `run_history_sim` spent the whole run drawing — was
+    /// discarded and re-invented from the anchors alone. With it, Pass 2d folds
+    /// the seeds of one polity into ONE nation, so the campaign inherits the
+    /// empires the history actually produced.
+    ///
+    /// The carve is UNTOUCHED, deliberately, and for the same reason BL-218
+    /// left it alone: where exactly the boundary between two of a polity's own
+    /// regions falls is a geometric question the history never answered. What
+    /// changes is which cells end up under one flag.
+    ///
+    /// Empty (the default) keeps the pre-BL-769 behaviour bit-for-bit: no fold,
+    /// one candidate nation per seed, as for any body with no settlement pass.
+    std::vector<int> seed_polities;
+
+    /// BL-769 — CITY STATES SURVIVE THE SIZE FLOOR.
+    ///
+    /// A polity that reached the epoch holding a single region and standing a
+    /// population centre on it is a city state, and Pass 2c would otherwise
+    /// absorb it into whichever neighbour grew fattest — losing exactly the
+    /// detail Ben's point 5 asks the History phase to keep ("it is fine to
+    /// consider city states as population centres"). Such a nation is exempt
+    /// from being absorbed; it is not exempt from the floor in any other sense,
+    /// and it never absorbs anybody.
+    ///
+    /// False disables the exemption and every undersized realm merges as before.
+    bool keep_city_states = true;
+
+    /// BL-975 — THE LAST CLOSE'S TREASURIES CROSS THE FOLD.
+    ///
+    /// Indexed by POLITY ID (the same ids `seed_polities` carries): the
+    /// treasury each polity held at the last simulated span's close — the
+    /// Exploration span's 1660 one, or the Digitisation span's 1960 one when
+    /// that span ran (BL-1053) — in the sim's material currency, summed over
+    /// every region flying its flag (`region::treasury` sits on the ground,
+    /// and the flag over the ground at that close owns the chest —
+    /// settlement.hpp's own transfer-by-ownership rule).
+    /// Pass 2d credits each polity's whole sum ONCE, to the seed it folds to,
+    /// and the credit follows that seed through the size-floor merge, so a
+    /// realm absorbed for being small hands its chest to the realm that
+    /// absorbed it. Converted by `treasury_credit_per_mille` below.
+    ///
+    /// Empty (the default) credits nothing: every nation starts on
+    /// `treasury_floor`, exactly as before this item, and a body with no
+    /// settlement pass is unchanged bit-for-bit.
+    std::vector<int64_t> polity_treasuries;
+
+    /// BL-975 — THE ONE STATED CONVERSION, sim material currency -> campaign
+    /// credits, expressed per mille: credits = material x per_mille / 1000.
+    /// Named in docs/generation/NATION_GENERATION.md § Pass 7 and nowhere
+    /// else; the doc owns the figure and the reasoning, this field only
+    /// carries it.
+    float treasury_credit_per_mille = 0.01f;
+
+    /// BL-975 — where a nation with NO folded polity starts (a Voronoi cell
+    /// the history never held, or a body with no settlement pass): the same
+    /// zero NATIONS.md names for a treasury nothing has credited.
+    float treasury_floor = 0.0f;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.
@@ -140,10 +204,9 @@ std::vector<entity_id> generate_nations(
 struct nation_garrison_params
 {
     /// Floor a garrison never falls below, however poor the nation — "a poor
-    /// one a token one" (MILITARY.md), never nothing. Also the count every
-    /// nation currently gets, because `nation_component::treasury` is 0.0 at
-    /// generation for every nation (NATIONS.md: "zero at generation,
-    /// deliberately") — see the flag above.
+    /// one a token one" (MILITARY.md), never nothing. The count a nation on
+    /// `nation_params::treasury_floor` gets (BL-975: a Voronoi cell the
+    /// history never held; every nation before that item).
     int min_count = 20;
 
     /// Additional garrison head per credit of `nation_component::treasury`.

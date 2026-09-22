@@ -1,12 +1,19 @@
 # Project Io — Systems Overview
 
+> **Settles:** which systems exist and how they relate · which are load-bearing and which are
+> flavour · what test a system must pass to earn its place · which doc owns each system's
+> detail.
+> **Not here:** who the player is and how it should feel (CONCEPT) · the rules of any one system
+> (its own doc) · what a term means (GLOSSARY).
+> **Confused with:** CONCEPT.md, MANUAL.md, META_LAYER.md.
+
 ## Structure
 
 Two pillars define the game's end goals: **Trade** and **Conflict**. Every other system creates the conditions, constraints, or capabilities that flow into one or both.
 
-The player is a **mercenary company** (Ben, 2026-08-12, NR-177; CONCEPT.md § Player identity) — an owner of assets and operations, whose motive is narrower than a governing body's (it does not legislate) and whose agency reaches force directly: what it can field, procured from independent suppliers. The operating **corporations** the player deals with are arm's-length counterparties, not a linked treasury or a shared economic arm; a corporation becomes the player's own only by **buyout**, which takes the firm whole (`docs/economy/FINANCE.md` § Whole-firm acquisition). Profit is the motive for every corporation, and that shapes the economic layer throughout.
+The player is a **corporation that holds a seat** (Ben, 2026-09-17, NR-885; CONCEPT.md § Player identity) — an operating firm like its rivals, whose role is to find the ground worth industrialising and build the machinery that gets to space. It does not legislate, and it procures its force from independent suppliers. The other **corporations** are its rivals and arm's-length counterparties, not a linked treasury or a shared economic arm; one becomes the player's own only by **buyout**, which takes the firm whole (`docs/economy/FINANCE.md` § Whole-firm acquisition). Profit is the motive for every corporation, and that shapes the economic layer throughout.
 
-Each system below therefore answers one test: **does it change what the company can field, or what it must answer to?** A system that can only ever move a cost or a price, touching neither, is built for the corporate player the identity moved away from.
+Each system below answers one test: **does it change what the company can field, or what it must answer to?** The company is the player's corporation (CONCEPT.md § Player identity).
 
 Systems are grouped into three supporting tiers below the pillars.
 
@@ -27,7 +34,7 @@ A corporation sells goods from any location to any market. Markets are pooled ex
 ### Conflict
 The player claims, defends, and invades territory through military force. Combat runs concurrently with the economy: supply routes are live targets, and active conflict on a body inhibits its trade connections. Territorial control is both a strategic objective and a source of ongoing economic pressure on opponents.
 
-The **mercenary company** is the actor that commands force — a corporation's levers stop at the economic, which is why force is a different kind of actor's business. BL-315 (conflict spine) owns the loop that makes this pillar load-bearing.
+A **corporation** commands force by procuring it, and the design test is what keeps that force from being flavour on an economy. BL-315 (conflict spine) owns the loop that makes this pillar load-bearing.
 
 There are **two battle resolvers**, and the split is deliberate (Ben, 2026-08-13). `resolve_battle` (`src/world/combat.cpp`) is nation-scale — class-matchup matrix × formation doctrine × terrain × supply × season, integer per-mille arithmetic, deterministic tie-break — and answers "region beats region, this year" for the Era −1 history sim. `resolve_campaign_battle` (`src/world/campaign_battle.cpp`) is campaign-scale — seeded rounds and priced withdrawal — and is opened by `run_battles` in the economy tick whenever hostile units share a province. Authority: `docs/military/MILITARY.md`.
 
@@ -51,7 +58,7 @@ Layer 5 of the economy is the **convoy layer** — the mechanism that couples bo
 
 **Logistical cost.** Each convoy incurs a `base_logistics_cost × distance × qty` budget term, drawn from the Lua economy-constants registry. For space convoys, distance is Euclidean body-centre to body-centre. The cost is the term that makes distant arbitrage marginal and grounds the rule that *logistics affects margin*.
 
-**Dispatch trigger.** The **auto path is the default**: the system fills a destination shortfall from the cheapest reachable source without player intervention. Player-direction of individual convoys is reserved for sell-order / buy-match counterparties on another body. **Exception:** space launches — leaving the gravity well — are **always player-directed** and never auto-dispatched, in Era 0 and Era 1 alike. Terrestrial (land / sea / air) convoys auto-dispatch.
+**Dispatch trigger.** The **auto path is the default**: the system fills a destination shortfall from the cheapest reachable source without player intervention. Player-direction of individual convoys is reserved for sell-order / buy-match counterparties on another body. **Exception:** space launches — leaving the gravity well — are **always player-directed** and never auto-dispatched, in Era 1 and Era 2 alike. Terrestrial (land / sea / air) convoys auto-dispatch.
 
 **Infrastructure gates per mode.**
 - **Land** — ungated; always available across contiguous land on a body. Roads are a per-tile cost-reducer: the three-tier Track/Road/Highway ladder (BL-146–149, road network + hubs; generated lattice in `src/world/road_generation.cpp` plus player placement; `tile_component.road_level` discounts A* traversal).
@@ -83,6 +90,14 @@ Exploration reveals bodies, their resource profiles, and their suitability for s
 
 ### Environment
 Each body, and each subdivision of land within it, has a procedurally generated profile of resources, terrain, hazard, and habitability. Environment sets the local cost of construction, the difficulty of military operations, and extraction yields.
+
+**Climate** is the living half of that profile: a per-body commons, altered by the strain of what
+corporations extract and process on it, running on **planetology's own scalars — instellation,
+surface temperature, arable share, biosphere stage — unfrozen**. It is the **next Era's
+catastrophe** (`docs/economy/ERAS.md` § The point of an Era) and is designed ahead in
+`docs/CLIMATE.md`; it is **outside prototype scope** and nothing in the prototype builds against it.
+Note it does not run on the tile hazard figure, which is the local operating-difficulty number and
+whose design job is the off-world settlement calculus.
 
 ### Generation (Planetology & the chain)
 The world is generated, not authored — a deterministic, seeded chain: planetology (atmosphere, chemistry, evolution history — `src/world/planetology.cpp`, BL-167 planetology) → continents → tiles → population centres → history ladder → nations → roads → markets → corporations. Each stage is a consequence of the one upstream, entered through the New World wizard. Authority: `docs/generation/GENERATION_STRATEGY.md` and `docs/generation/PLANETOLOGY.md`.

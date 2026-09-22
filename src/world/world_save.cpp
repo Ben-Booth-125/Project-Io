@@ -276,10 +276,11 @@ bool r_nation(std::istream& i, nation_component& n)
         && n.qualification >= 0.0f && n.qualification <= 1.0f;
 }
 
-/// Sprint N3 T2: one nation's budget -- the nine line weights in authored enum
+/// Sprint N3 T2: one nation's budget -- the ten line weights in authored enum
 /// order, then the reserve fraction. Fixed-width (`w_f32_array` writes no
 /// count), so `priority_count` is part of the format: appending a line to
-/// `budget_priority` widens every record and is a version bump.
+/// `budget_priority` widens every record and is a version bump (v23 was
+/// exactly that: BL-644's `space_programme` took the count 9 -> 10).
 void w_nation_budget(std::ostream& o, const nation_budget& b)
 {
     w_f32_array(o, b.weights);

@@ -183,6 +183,84 @@ int main()
               "R3g  twenty steps of grow-then-drain-past-capacity never produces a negative stock");
     }
 
+    // --- R9 the army pool is distinct from the population (BL-835) ---------------
+    //
+    // BEN'S RULING, 2026-09-08: "population as a civilian thing — where armies
+    // are distinct from population". The whole item is that sentence, and this
+    // is the assertion that says it in code: an army can be raised, paid for
+    // and destroyed, over and over, and the civilian headcount does not move.
+    //
+    // It is deliberately a CONSERVATION check rather than a value check. There
+    // is no correct garrison size to assert — that is calibration, and the
+    // harness header's own rule is that calibration gets tuned toward instead of
+    // measured. What is not calibration is that the two quantities are separate.
+    {
+        region p = make_region("Muster Region", 0, 0, 500, 100000);
+        advance_region_demography(p, 1, 0); // Bank a stock to muster out of.
+
+        check(garrison_target(p, 0) == 0,
+              "R9a  a zero garrison fraction asks for no army at all");
+        check(garrison_target(p, 1000) == manpower_ceiling(p.population, p.work_manpower_mod),
+              "R9b  a full garrison fraction is exactly the manpower ceiling");
+        check(garrison_target(p, 400) < garrison_target(p, 1000),
+              "R9c  the garrison is a bounded fraction, so a reserve always remains");
+
+        const int64_t civilians = p.population;
+
+        // Twenty rounds of muster-then-annihilate. The army is raised out of the
+        // manpower pool, spent to nothing, raised again — the exact cycle a
+        // frontier province lives through, run past the point where any leak
+        // between the two quantities would have shown up.
+        bool army_ever_negative = false;
+        bool ever_over_target   = false;
+        for (int round = 0; round < 20; ++round)
+        {
+            muster_garrison(p, /*garrison_fraction_q=*/400,
+                            /*muster_rate_q=*/250, /*disband_rate_q=*/300);
+            if (p.army_stock < 0) army_ever_negative = true;
+            if (p.army_stock > garrison_target(p, 400) + 1) ever_over_target = true;
+            // Annihilated, and then asked to bleed further than it can.
+            spend_army(p, p.army_stock);
+            const int64_t past_empty = spend_army(p, 1'000'000'000LL);
+            if (past_empty != 0 || p.army_stock != 0) army_ever_negative = true;
+            replenish_manpower(p); // A year passes; the pool refills off the people.
+        }
+
+        check(!army_ever_negative,
+              "R9d  twenty raise-and-annihilate rounds never drive the army stock negative");
+        check(!ever_over_target,
+              "R9e  the muster never banks more army than the garrison target");
+        check(p.population == civilians,
+              "R9f  THE CIVILIAN COUNT NEVER MOVED — armies are raised, paid for and destroyed "
+              "without touching the population");
+
+        // And the cost is real: mustering an army is charged to the recruitable
+        // pool, not conjured. A region whose people are already under arms
+        // musters nothing rather than inventing soldiers.
+        region drained = make_region("Drained", 1, 1, 500, 100000);
+        advance_region_demography(drained, 1, 0);
+        raise_manpower(drained, drained.manpower_stock); // Every eligible body already called up.
+        const int64_t before = drained.army_stock;
+        muster_garrison(drained, 400, 250, 300);
+        check(drained.army_stock == before,
+              "R9g  a region with an empty manpower pool musters nothing — the cost is charged, "
+              "never waived");
+
+        // The discharge returns men to the POOL, not to the population.
+        region demob = make_region("Demob", 2, 2, 500, 100000);
+        advance_region_demography(demob, 1, 0);
+        demob.army_stock = garrison_target(demob, 1000); // Over-strength for a 400 target.
+        const int64_t demob_civilians = demob.population;
+        const int64_t demob_pool      = demob.manpower_stock;
+        muster_garrison(demob, 400, 250, 300);
+        check(demob.army_stock < garrison_target(demob, 1000),
+              "R9h  an over-strength garrison discharges toward its target");
+        check(demob.manpower_stock >= demob_pool,
+              "R9i  the discharged men land back in the manpower pool");
+        check(demob.population == demob_civilians,
+              "R9j  and the population is untouched by the discharge as well");
+    }
+
     // --- R4 determinism ----------------------------------------------------------
     {
         auto run = [](std::vector<region>& out, std::vector<checkpoint_record>& cps) {

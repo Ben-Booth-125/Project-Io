@@ -13,7 +13,7 @@
 
 /// Debt interest charged per economy tick on a negative balance (BL-073). An
 /// economy tick is one quarter (k_ticks_per_year = 4), so this is the per-quarter
-/// rate: ~2 %/qtr ≈ 8 %/yr. A negative balance compounds once per tick by this
+/// rate: 1.5 %/qtr ≈ 6.1 %/yr compounded. A negative balance compounds once per tick by this
 /// factor; a non-negative balance is never charged. Single source of truth — both
 /// the live budget loop and the econ_bankruptcy harness read this constant, so they
 /// can never drift. Interest is a pure function of balance × rate (deterministic).
@@ -38,10 +38,16 @@ struct building_opex
 /// its siblings for scarce labour pays the premium it offered, on the labour it
 /// actually got. Decommissioned buildings pay only fixed material maintenance,
 /// no wages.
+/// @p idle_floor is the BL-739 idle-maintenance floor — the fraction of
+/// `e.maintenance` charged even at workforce 0 or decommissioned. Every caller
+/// passes `reg.idle_maintenance_floor()`; the parameter is deliberately
+/// UNDEFAULTED so a new call site cannot silently fall back to a stale copy
+/// (the price-band lesson: one authored value, every site moves together).
 building_opex compute_building_opex(const building_component& b,
                                     const building_economics& e,
                                     float contention_scalar,
-                                    float mean_hab);
+                                    float mean_hab,
+                                    float idle_floor);
 
 /// Mean population-centre habitability on a body (BL-074 helper): the average of every
 /// population centre's habitability whose tile sits on `body`, or 1.0 when the body has

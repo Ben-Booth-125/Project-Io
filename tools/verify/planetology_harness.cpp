@@ -46,6 +46,12 @@
 //       format, total oldest-first ordering, and that a historical line
 //       interleaves into the deep-time list — the foundation the HISTORY.md
 //       ladder (BL-221/BL-222) is built on. R12 is reserved by BL-209.
+//   R15 THE THERMAL SERIES (BL-961). planetology_state carries theta at every
+//       drift epoch on the drift record's own clock. Asserts the series is a
+//       pure function of the seed, is `continent_drift_epochs + 1` long, that
+//       epoch 0 IS the present (bit-identical to `theta`), that heat only falls
+//       (no deeper epoch is colder than a shallower one), and that a stripped
+//       core still carries a full-length, all-cold series.
 //
 // HONEST SCOPE NOTE: this validates the deterministic skeleton and the gate
 // ordering. The model has more free parameters (~40 tuning constants) than it
@@ -55,6 +61,7 @@
 // The process exits non-zero if any assertion FAILs.
 
 #include "world/components.hpp"
+#include "world/continents.hpp" // the drift clock the series is kept on (R15)
 #include "world/hard_coded_world.hpp"
 #include "harness_params.hpp"
 #include "world/planetology.hpp"
@@ -725,8 +732,8 @@ int main()
               "R14 a value needing round-half-up converts to the nearer year");
         check(years_from_gya(-1.0e-6f) == -1000LL,
               "R14 the negative branch of the rounding is symmetric");
-        check(years_from_calendar_year(campaign_epoch_year) == 0,
-              "R14 the campaign epoch is year zero");
+        check(years_from_calendar_year(history_datum_year) == 0,
+              "R14 the history datum is year zero");
         check(years_from_calendar_year(1687) == 273,
               "R14 a historical year converts to years-before-epoch");
         check(years_from_calendar_year(-3200) == 5160,
@@ -859,6 +866,50 @@ int main()
         // exists to catch.
         check(interleaved && mixed[at - 1].years_before_epoch >= 1000000LL,
               "R14 every deep-time line still sorts ahead of the historical one");
+    }
+
+    // --- R15 the thermal series (BL-961) --------------------------------------
+    // One value per drift epoch, present first, derived from the same
+    // reconstruction the chain's own gates use and consuming no RNG. Four
+    // properties or the Life phase cannot trust what it samples: the length is
+    // the drift record's stated depth plus the present; epoch 0 is the present
+    // exactly, not a recomputation that rounds near it; the series is a pure
+    // function of the seed; and heat only falls, so a deeper epoch is never
+    // colder than a shallower one (the tidal term is constant, the radiogenic
+    // term decays).
+    {
+        const std::size_t want = static_cast<std::size_t>(continent_drift_epochs) + 1;
+        const planetology_state a = run_planetology(kepler(), def, 0xE471001u);
+        const planetology_state b = run_planetology(kepler(), def, 0xE471001u);
+        check(a.thermal_series.size() == want,
+              "R15 the series is continent_drift_epochs + 1 long (present plus one per epoch)");
+        check(!a.thermal_series.empty() && a.thermal_series[0] == a.theta,
+              "R15 epoch 0 of the series IS the present thermal budget, bit for bit");
+        check(a.thermal_series == b.thermal_series,
+              "R15 the series is a pure function of the seed");
+        bool falls = a.thermal_series.size() == want;
+        for (std::size_t k = 1; k < a.thermal_series.size(); ++k)
+            if (a.thermal_series[k] < a.thermal_series[k - 1]) falls = false;
+        check(falls, "R15 heat only falls: no deeper epoch is colder than a shallower one");
+        check(a.thermal_series.size() == want && a.thermal_series.back() > a.theta,
+              "R15 the deepest epoch is warmer than the present (the series is not a constant)");
+        std::printf("     Kepler theta now %.6f, %d epochs back %.6f (ratio %.5f)\n",
+                    static_cast<double>(a.theta), continent_drift_epochs,
+                    static_cast<double>(a.thermal_series.back()),
+                    static_cast<double>(a.thermal_series.back() / a.theta));
+
+        // A moon carries a tidal term the radiogenic decay does not touch;
+        // the present must still be exact, and the series must still fall.
+        const planetology_state m = run_planetology(selene(), def, 0xE471003u);
+        check(m.thermal_series.size() == want && m.thermal_series[0] == m.theta,
+              "R15 a tidally heated moon's epoch 0 is still bit-identical to its present theta");
+
+        // A stripped core never ran the Engine stage; its series is full-length
+        // and all-cold rather than absent, so every state has one shape.
+        const planetology_state c = run_planetology(pallas(), def, 0xE471004u);
+        bool all_cold = c.thermal_series.size() == want;
+        for (float v : c.thermal_series) if (v != c.theta) all_cold = false;
+        check(all_cold, "R15 a core fragment carries a full-length series equal to its (cold) present");
     }
 
     std::printf("\n=== %s ===\n", g_fail == 0 ? "ALL PASS" : "FAILURES PRESENT");

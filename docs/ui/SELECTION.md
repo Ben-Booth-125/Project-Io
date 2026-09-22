@@ -1,5 +1,15 @@
 # Project Io — Selection Info Element
 
+> **Settles:** which three pointer states exist and what each one drives · which
+> press changes which of them · what this element offers for each kind of thing
+> selected, and where its deeper reference lives · what repeat-clicking the same
+> ground does · how a stack of things under one pointer resolves to a single one ·
+> how an active lens narrows what a press may resolve to and which ledger it
+> drives · what this surface deliberately refuses to be.
+> **Not here:** the hover card itself (TOOLTIP) · what a lens shows (LENSES) ·
+> where the band sits in the shell (LAYOUT) · the ledgers it points at (MENU).
+> **Confused with:** TOOLTIP.md, LENSES.md, LAYOUT.md.
+
 The **Selection info element** is a pinned **action surface** that answers one
 question about the **current selection** — whatever entity the player last
 single-clicked: **"what's my move here?"** It is the opposite of a ledger: a
@@ -206,6 +216,40 @@ horizontal columns (Ben, 2026-07-28):
    management surface), **History** and **Supply** (both drawn disabled — History has no
    surface; supply routing is the Supply lens's subject, LENSES.md), plus **two reserved
    slots** so the grid's shape never changes when a fifth or sixth action arrives.
+
+### A water tile is selectable, and its selection answers ownership (Ben, 2026-09-06)
+
+**Water tiles are selectable.** Clicking water resolved to nothing at all until 2026-09-06 — the
+Selection panel did not update, which was defensible while water was a wall and indefensible once
+it became territory. A water tile selects exactly as a land tile does, through the same
+`focus_on_entity` path and into the same three-column band.
+
+**The reason it must be selectable is that it is the ONLY surface that can answer the water
+model's central claim.** Coastal water and lakes carry an owner, derived from the shore that
+claims them; open ocean structurally does not (`docs/generation/PROVINCES.md` § Who owns water).
+That is the load-bearing shape of the model, and it was invisible on every surface the game
+had — the hover card reported terrain and habitability and said nothing about title, and no lens
+colours ground by owning nation. A claim nobody can look at is one that can only be trusted, which
+is not the standard this project holds a generated world to.
+
+**What the band presents for water**, against the land layout above:
+
+| Column | Water tile |
+|---|---|
+| Left — hex neighbourhood | Unchanged. The ring reads a shoreline usefully; it is where the coast/ocean boundary is legible at all |
+| Centre — facts | **Owner** and **domain** are the headline pair — the nation holding it, or *unowned* stated **positively** for open ocean rather than left blank. Then the province, and habitability |
+| Right — actions | **Construct** is live only for a **port**, on **owned** coastal water; everything else is disabled, as on ground that refuses the type |
+
+**Unowned must READ as a fact, not as missing data.** An empty owner row and an owner row saying
+"unowned" are the same pixels' worth of effort and opposite in meaning: the first looks like the
+panel failed, the second is the design. Open ocean is unowned *structurally* — it is the assertion,
+not the absence of one.
+
+**What is deliberately not here.** The centre column does not gain a deposit, workforce or
+resource page for water — those read the ground, and there is none. And selecting water does not
+substitute for a territory lens: the panel answers *who holds this tile*, one tile at a time,
+where a lens would answer *who holds this region* at a glance. The lens stays unbuilt and
+unpromised.
 
 ### Multi-building tiles
 
@@ -709,10 +753,24 @@ resolves to the tile, whose element carries its province), and a repeat click wa
 below (§ Tile repeat-click selection cycle). Under a lens the stack does not apply at all — see
 the next section, which supersedes it.
 
+**Two resolvers, and which wins.**
+
+| Resolver | Answers | Used by |
+|---|---|---|
+| **Boundary** (`resolve_structure_hit`) | "am I on this structure's edge?" | The national border band — plain-canvas chrome, not a lens, and suppressed with its hit corridor while any lens is up |
+| **Area** (`lens_structure_of_tile`) | "which structure is this ground part of?" | The active lens |
+
+**With no lens active, a marker outranks both, and a boundary outranks an area.** The order is not
+arbitrary: a marker and a border are things the player *aimed at*, while a catchment is ground they
+happen to be over.
+
 ### A lens collapses selection to ONE TIER (Ben, 2026-08-28)
 
-Owned by BL-664 (one tier under a lens). Three rules, and they hold for every lens without
-exception:
+Owned by BL-664 (one tier under a lens). The pivot it sharpens is Ben's earlier ruling,
+2026-08-24: *"When a lens reveals any large structure, the selection should pivot to the entire
+structure, and no longer provinces. So for the market lens, the entire market gets highlighted on
+mouse over, and clicking opens up our market ledger for that market."* Three rules, and they hold
+for every lens without exception:
 
 1. **The lens's structure is the only thing under the pointer.** Resolution asks the active lens
    what structure this ground belongs to and answers with that, or with nothing. It does not walk
@@ -756,8 +814,7 @@ no destination for.
 ### The lens names the ledger the selection drives
 
 Resolving the entity and choosing its 'go to' ledger are the *same* decision — the lens that
-validates the structure also routes it. [LENSES.md](LENSES.md) § Per-lens selection validity &
-routing owns the per-lens table; this is the shape it takes.
+validates the structure also routes it.
 
 | Active lens | Resolves to | Routes to |
 |---|---|---|
@@ -768,6 +825,7 @@ routing owns the per-lens table; this is the shape it takes.
 | **Market** / **Scarcity** | the **market catchment** under the pointer | Market Ledger |
 | **Continent** | the **plate** | History ledger, at its tectonic record |
 | **Population** / **Industry** / **Throughput** | nothing — inert | — |
+| **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
 
 **A tile group is a structure like any other.** Hovering one tile of a corporation's holdings
 lights **all** of them at once (Ben, 2026-08-28: "hovering one tile displays an outline around all
@@ -775,7 +833,11 @@ company buildings for that corporation/company"), and clicking any of them opens
 ledger. It is the same claim the market catchment's highlight makes — *all of this is one thing* —
 so it takes the same wash the catchment does rather than a walked boundary (Ben's 2026-08-24 ruling
 on that question, recorded in `body_surface_canvas.cpp`: a wash is per-tile and costs one test,
-and an area statement is the truer read anyway).
+and an area statement is the truer read anyway). It lands one frame behind the pointer,
+exactly as the hovered-province outline already does and for the same reason: the tile loop
+must know the answer before it has drawn the tile that produces it.
+
+**Check:** `scripts/verify/lens_structure_pivot.lua`.
 
 ### A deposit and a plate are cards, not just channels
 

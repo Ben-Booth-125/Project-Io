@@ -4023,6 +4023,2844 @@
    "promoted_from": "backlog.json BL-666 (owner ledger destinations) - Sprint 23, UI visibility batch 2",
    "batch": "sprint-23-wave-1",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "live-spectate-route",
+   "title": "BL-695 - spectator mode is reachable from the running game",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-695 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "spectate-god-view-control",
+   "title": "BL-702 - god view has a control under spectate",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-702 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "selectable-1960s-start",
+   "title": "BL-705 - the 1960s start is selectable and the epoch reads world_params",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-705 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "composite-standing-index",
+   "title": "BL-700 - a corporation's standing is a composite",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-700 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "decision-feed-reasons",
+   "title": "BL-696 - the AI decision feed reports the real chosen candidate",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-696 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "skill-harness-margin-metric",
+   "title": "BL-697 - the skill harness bands the spread in composite standing",
+   "status": "deferred",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-697 - Sprint 26, watch the AI play",
+   "batch": "carried out of sprint 26 - blocked on demand (NR-758)",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: ai_skill_harness"
+     ],
+     "requirement": "ai_skill_harness samples the spread in composite standing across the field on the existing SAMPLE_EVERY cadence and asserts it against a band.",
+     "notes": "Consumes BL-700's composite. Exact form (leader-over-median vs leader-over-second) is a design call to make against a real run's numbers, per Rule 0b."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: ai_skill_harness"
+     ],
+     "requirement": "The absolute net-worth bands survive as a SOLVENCY FLOOR beneath the spread band - a narrow spread achieved by everyone being broke is not a pass.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: ai_skill_harness"
+     ],
+     "requirement": "Bands re-derived from a fresh bless with dated provenance in the harness's own provenance-log idiom.",
+     "notes": "NR-305: the 2026-08-16 bands are stale against everything since. Re-derive, do not stretch."
+    }
+   ]
+  },
+  {
+   "brief": "rival-coalitions",
+   "title": "BL-699 - rivals score stance against standing, so coalitions form against the leader",
+   "status": "deferred",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-699 - Sprint 26, watch the AI play",
+   "batch": "carried out of sprint 26 - blocked on demand (NR-758)",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: corp_ai_harness"
+     ],
+     "requirement": "corp_ai scores the four BL-448 stance verbs (declare_hostile, offer_friendship, accept_friendship, return_to_neutral) and issues them through the corp-command seam. A run produces at least one stance change.",
+     "notes": "The verbs exist and the scorer names none of them today. No new verb is needed."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: a harness row over a run where one corp leads"
+     ],
+     "requirement": "Stance scoring reads composite standing, so hostility concentrates on the leading corporation and friendship on the field - and it reads no player seat.",
+     "notes": "Uniform by construction. It must NOT read world::player_entity."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: live click on the AI decisions ledger"
+     ],
+     "requirement": "A stance change is legible: it emits into the decision feed with its reason. A coalition the player cannot see is the hidden handicap the whole design rejects.",
+     "notes": "A requirement of this item, not a follow-up."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: build counts do not fall to zero for a corp under coalition pressure"
+     ],
+     "requirement": "Coalition pressure never vetoes construction or extension - a pressured corp still builds (Ben, 2026-08-31).",
+     "notes": "AI_OPPONENT.md § The constraint on restraint."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: ai_skill_harness R0"
+     ],
+     "requirement": "Deterministic: pure, seeded, replayable; two runs on one seed produce an identical state_hash.",
+     "notes": "The standing rule's condition for the whole grant."
+    }
+   ]
+  },
+  {
+   "brief": "rival-trace-export",
+   "title": "BL-704 - a run exports a per-rival decision trace",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-704 - Sprint 26, watch the AI play",
+   "batch": "carried out of sprint 26 - blocked on demand (NR-758)",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "a-channel-must-bid",
+   "title": "BL-654 - a short pool buys on the market, up to a reservation ceiling",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-654 - Sprint 27, demand",
+   "batch": "sprint-27-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "injectors-must-not-skip-silently",
+   "title": "BL-652 - an injector that cannot price a basket entry must say so",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-652 - Sprint 27, demand",
+   "batch": "sprint-27-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "chain-completeness-read",
+   "title": "BL-706 - measure chain completeness per region and its spread",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-706 - Sprint 27, demand",
+   "batch": "sprint-27-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "ancient-chain-does-not-convert",
+   "title": "BL-707 - diagnose why raw inputs glut while finished goods starve",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-707 - Sprint 27, demand",
+   "batch": "sprint-27-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "power-as-a-grid",
+   "title": "BL-708 - power, a bought upkeep draw transmitted on the road network",
+   "status": "complete",
+   "resolved": "2026-08-31",
+   "promoted_from": "backlog.json BL-708 - Sprint 27, demand",
+   "batch": "sprint-27-wave-2",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "construction-as-a-rate",
+   "title": "BL-709 - construction becomes a sector with a throughput and a method",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-709 - Sprint 27, demand",
+   "batch": "sprint-27-wave-3",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census showing the construction channel non-zero when nothing is actively building"
+     ],
+     "requirement": "A construction building runs a production method, draws that method goods as upkeep every tick, and produces construction capacity that building projects consume.",
+     "notes": "The channel measures 0.000 in the industrial band today because run_construction fires only while something is building.",
+     "evidence": "PENDING, verified 2026-09-01 and NOT met. The mechanism is coded — a Construction-group recipe runs on a processing_facility, draws its method's goods as ordinary recipe inputs each tick, and `capacity_per_build_tick` makes a live project consume the capacity. But the stated verification (the channel non-zero when nothing is actively building) is not demonstrable and two measurements run against it. (a) demand_census, ancient band: `construction_capacity` PRODUCED = 0.0 across an 80-tick warm start despite two timber-frame yards standing, with timber (5359.1) and planks (635.8) both available — the yards exist and make nothing. (b) chain_conversion_probe, industrial band: both seeded yards are GONE by tick 80, by removal rather than by switching. The `construct` column the census reports is still driven by live projects, which is the episodic behaviour this row exists to replace. NR-770 owns the diagnosis; scripts/economy.lua records that the per-tick universal upkeep draw was tried and MEASURED to collapse operating firms 198/328 -> 33/317, so this is a known-hard row and not an oversight."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: demand_census per band"
+     ],
+     "requirement": "Five methods, era-banded as recipes are: timber frame and stone-and-brick (ancient); iron frame, steel frame, reinforced concrete (industrial).",
+     "notes": "Baskets and rates MEASURED against the census, never guessed.",
+     "evidence": "COMPLETE, verified 2026-09-01. Five methods, era-banded, all group \"Construction\": timber_frame_construction + stone_and_brick_construction (ancient), iron_frame_construction + steel_frame_construction + reinforced_concrete_construction (industrial) — scripts/recipes.lua 827/842/857/874/889. demand_census confirms the band split from the other side: the ancient band's roster admits the two ancient methods and the industrial band's the three industrial ones."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: demand_census at tick 0"
+     ],
+     "requirement": "Seeded capacity gives the channel a non-zero reading at TICK 0 in every market that has any.",
+     "notes": "Ben's own reason for the change, and MARKETS.md property 5 delivered by the generator rather than an authored basket.",
+     "evidence": "COMPLETE, verified 2026-09-01. demand_census: `construction_capacity` is in the TERMINAL SET of BOTH bands and is priced in 14 of 14 ancient markets and 9 of 9 industrial — 0 floored, verdict `in band` in both. That is MARKETS.md property 5 (\"every chain terminates in every market\") delivered by the generator rather than by an authored basket, which is exactly the claim."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: corp_ai_harness plus a thrash check"
+     ],
+     "requirement": "The AI scorer prices construction capacity as a contended shared resource - NR-592 is fixed here.",
+     "notes": "Under a lump sum a blind scorer is a missed opportunity; under a contended pool it proposes builds the pool cannot serve, every evaluation, for as long as the pool is short.",
+     "evidence": "COMPLETE, verified 2026-09-01. `build_material_cost` is priced into the capex of BOTH build candidates — corp_ai.cpp:951 (extraction) and :1202 (processing) — so the score AND the solvency spend carry the material basket, keyed by recipe per BL-590. NR-592 marked resolved on this evidence. corp_ai_harness green, including BL-712's new R8; the thrash check is corp_ai_harness R2's action-budget rows, also green."
+    }
+   ]
+  },
+  {
+   "brief": "ground-bake-renderer",
+   "title": "BL-732 - the Planetary ground renders as baked painterly chunks",
+   "status": "complete",
+   "resolved": "2026-09-01",
+   "promoted_from": "backlog.json BL-732 - Sprint 29, rendering",
+   "batch": "sprint-29",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "ground-wave-2",
+   "title": "BL-735 - stepped zoom tiers, threaded bake, muted borders",
+   "status": "complete",
+   "resolved": "2026-09-01",
+   "promoted_from": "backlog.json BL-735 - Sprint 29",
+   "batch": "sprint-29",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "ground-sharpness",
+   "title": "BL-736 - the baked ground gets its edges back",
+   "status": "complete",
+   "resolved": "2026-09-02",
+   "promoted_from": "backlog.json BL-736 - Sprint 30",
+   "batch": "sprint-30",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "stepped-tilt",
+   "title": "BL-737 - the top rungs tilt the land",
+   "status": "complete",
+   "resolved": "2026-09-02",
+   "promoted_from": "backlog.json BL-737 - Sprint 30",
+   "batch": "sprint-30",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "recipe-margin-anchor",
+   "title": "BL-744 - every recipe pays at base price",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-02",
+   "promoted_from": "backlog.json BL-744 - Sprint 31",
+   "batch": "sprint-31",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "upkeep-starvation-cliff",
+   "title": "BL-746 - the lights go dim, not out",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "partial",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-746 - Sprint 31",
+   "batch": "sprint-31",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "An unmet goods-upkeep draw decays a building's supply factor to the authored floor (economy.building_upkeep.supply_floor_permille) and no further; a met draw recovers from the floor by the authored step; a factor below the floor is lifted to it on the next unmet tick; the floor is data, range-checked in [0, 1000].",
+     "verification": [
+      "headless: building_upkeep R8 (floor 500 and 250, recovery, lift)"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. building_upkeep R8: 41 unmet ticks at floor 500 leave 500 (scalar 0.5); a met draw recovers to 600; floor 250 lands at 250; a factor of 120 is lifted to 500 on the next unmet tick. Parse rejects a floor outside [0, 1000]."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "A grid good is drawn only where the road network reaches the building's tile; an unreached building neither draws it nor weakens for want of it, while the ordinary goods in its basket still draw and still bind.",
+     "verification": [
+      "headless: building_upkeep R9 (unreached tile, grid flag on/off, timber still binds)"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. building_upkeep R9: an unreached processor drawing power on the grid stays at 1000 over 5 ticks; the same draw with power off the grid decays to 750; with timber in the basket the unreached building decays to 950 for the timber alone."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Measured on the debt instrument (campaign_lapse --epoch 1960 --warm 0 --ticks 60): no building reaches supply factor 0 at any tick, and the industrial field's active count no longer collapses at tick 1000/decay.",
+     "verification": [
+      "headless: campaign_lapse corps.csv bldg_supply_zero == 0 every tick, buildings_active at tick 60"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. Tags fix-ind-s0 / fix-ind-s1: bldg_supply_zero 0 at every tick (was 182 at tick 20); active 221 / 137 at tick 60 (was 2 / 12); income 13.4k / 6.8k (was 132 / 2.9k); debtors 11 of 86 / 6 of 73 (was 22 of 66 / 13 of 58). Ancient band byte-identical (fix-anc-s0 == debt-anc-s0: 19 entries)."
+    },
+    {
+     "id": "R4",
+     "status": "cancelled",
+     "requirement": "The field's mean supply factor climbs off the floor: power arrives where the network reaches (the generation bootstrap, NR-782 (c) held).",
+     "verification": [
+      "headless: campaign_lapse corps.csv supply_factor_mean trend"
+     ],
+     "notes": "Today ~0.57 - most buildings sit at the floor.",
+     "evidence": "CANCELLED 2026-09-16, unbuilt. Its owner was purged on 2026-09-08. The reading it would have moved stands where stage 1 left it: mean supply factor ~0.57, most buildings sitting AT the floor because power still does not arrive. Whoever takes this up re-measures on campaign_lapse against BL-759's re-based baseline, not the pre-BL-747 figures on the cold row."
+    }
+   ],
+   "resolution": "CLOSED PARTIAL 2026-09-16. Stage 1 landed in full and is measured: R1 (the supply floor), R2 (no wire, no draw) and R3 (no building at factor 0 on the debt instrument) all carry their evidence. R4 is the stage-2 lever - \"no price, no draw\", ruled by Ben on 2026-09-06 - and it was never built: BL-746 was cancelled two days later in the 2026-09-08 backlog purge, which closed every item hanging off the abandoned sprint plans rather than judging the work wrong. The group is closed here so it stops reading as live work; the rule it would have built is in PRODUCTION.md as the third rung, and the whole design (including the done-when PAIR - mean supply factor climbing AND a real moving power price, because the first alone cannot tell the gate working from the gate silencing the draw) is on the cold BL-746 row. Re-author from there."
+  },
+  {
+   "brief": "two-span-prehistory",
+   "title": "BL-747 - the Era -1 sim runs on the 1960 arc, as two spans on one engine",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-747 - Sprint 32",
+   "batch": "sprint-32",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "The polity sim runs at any epoch: era_minus_one_enabled gates on prehistory_years > 0 alone, and an epoch_year of 1960 with prehistory_years > 0 produces a non-empty history_sim_state with battles, conquests or foundings non-zero.",
+     "verification": [
+      "headless: world_determinism (a 1960 world reports a run era pass)",
+      "headless: history_sweep at --epoch 1960"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-03. world_determinism R4.2: at epoch 1960 the era pass runs where it used to be skipped entirely - years=800 battles=1323 conquests=1128 foundings=506. The gate is now prehistory_years > 0 alone."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "THE INVARIANT. The 0 CE arc is byte-identical to the pre-change build: world_determinism's deep digests stay 039EE9880739CDF6 (seed ABCDEF01, prehistory on), B0EBBA249B3DDABB (seed 12345678, prehistory on) and DE55600457797638 (seed ABCDEF01, prehistory off), and the era report stays years=400 battles=270 conquests=207 foundings=833 on seed A.",
+     "verification": [
+      "headless: world_determinism R3.1-R3.5 against the 2026-09-03 baseline digests"
+     ],
+     "notes": "Baseline captured 2026-09-03 before any change; the digests are the acceptance test, not a golden to re-bless.",
+     "evidence": "COMPLETE 2026-09-03, verified in the MAIN session on the merged tree, not on the agent report. world_determinism ALL PASS with the three digests unmoved: 039EE9880739CDF6 (seed A on), B0EBBA249B3DDABB (seed B on), DE55600457797638 (seed A off), and the era report still years=400 battles=270 conquests=207 foundings=833 on seed A. Corroborated independently by history_conquest_gap A1 on 8 seeds. NOTE: this row is about the ANCIENT arc only. The cold review found the 1960 arc gains era-seeded demography as a consequence of the sim now running there (era_world_harness R2 red) - see BL-758."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "ONE INVOCATION, NOT TWO. The two spans are expressed inside a single run_history_sim call via a boundary_year on history_sim_params and per-span tick bands, so era_minus_one_fixture still captures the whole run and the count of run_history_sim callers is unchanged. A second production call site is a failure of this row.",
+     "verification": [
+      "static: one call to run_history_sim in src/, asserted by inspection in the review pass",
+      "headless: history_conquest_gap still reproduces generation's counts from the fixture"
+     ],
+     "notes": "era_minus_one.hpp documents six divergences plus an uncounted seventh caller; two calls would double that seam.",
+     "evidence": "COMPLETE 2026-09-03. One production call to run_history_sim, unchanged: the spans are expressed inside it by history_sim_params::boundary_year plus span1_band_ceiling. era_minus_one_fixture still captures the whole run, and history_conquest_gap A1 (\"the re-run IS generation own Era -1\") passes on every seed."
+    },
+    {
+     "id": "R4",
+     "status": "partial",
+     "requirement": "The band a polity may reach is ceilinged per span - Medieval before the boundary year, unrestricted after - for BOTH the works roster and the unit roster, and the ceiling is derived from the boundary rather than authored twice.",
+     "verification": [
+      "headless: history_sweep reports works raised by band either side of the boundary at --epoch 1960"
+     ],
+     "notes": "DOWNGRADED FROM COMPLETE 2026-09-03 by the cold review. The row declares its verification as \"history_sweep reports works raised by band either side of the boundary\", and that was never implemented - works_raised is a single scalar with no band split anywhere in history_sim_state. The evidence substituted world_determinism printing \"span-1 ceiling band 1\", which proves the PARAMETER WAS SET, not that the clamp changed a decision. Nothing in the project can currently distinguish span1_band_ceiling = medieval from = industrial at epoch 1960: if no polity reaches capacity 4 before the boundary the ceiling is inert and no check would notice. BL-760 owns the observable.",
+     "evidence": "PARTIAL 2026-09-03. Mechanically verified and no more: sim_band_ceiling(params, y) is the single derivation; roster_band_for_capacity has exactly two call sites in the era path and both are min_band-clamped against it (cold review confirmed there is no third). world_determinism prints the ceiling in force per run. The BEHAVIOURAL half - that the clamp changes what a polity fields or builds - is unverified and currently unobservable."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "On an ancient epoch NO second span is configured: boundary_year stays at its INT64_MIN default and span1_band_ceiling at industrial, so the ceiling is inert twice over - no year is before the boundary, AND the clamp is the identity - and the ancient arc executes today values through today code. The second span is absent by DEFAULT, not by a branch that could be taken wrongly.",
+     "verification": [
+      "headless: world_determinism R3 (the 0 CE digests, which R2 pins)"
+     ],
+     "notes": "CORRECTED 2026-09-03 while building. The row first read that the boundary falls PAST stop_year on an ancient epoch, so the ceiling applies throughout. That would cap the 0 CE run at medieval and move every ancient world, which R2 forbids. Whether the ancient arc SHOULD be capped is a real question and is NR-784, to be taken as its own item with a deliberate digest re-bless.",
+     "evidence": "COMPLETE 2026-09-03. On an ancient epoch era_minus_one_sim_params takes the else branch and leaves boundary_year at INT64_MIN and span1_band_ceiling at industrial, so the ceiling is inert twice over. R2 digests are the proof. A defect found reviewing the merge was fixed in the main session: era_minus_one_has_industrial_span tested only the epoch, so industrial_years = 0 on a 1960 arc would have put the boundary AT the epoch and capped the whole run at medieval - the opposite of what that field doc-comment promises. It now tests industrial_years > 0 as well."
+    }
+   ]
+  },
+  {
+   "brief": "generation-budget",
+   "title": "BL-754 - the generating-screen budget, instrumented per pass",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-03",
+   "promoted_from": "backlog.json BL-754 - Sprint 32",
+   "batch": "sprint-32",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "resource-origin-split",
+   "title": "BL-762 - deposits split by origin: metals with the body, biology deferred to Life",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-762 - Sprint 32",
+   "batch": "sprint-32-wave-2",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "A `resource_origin` classification exists as ONE table and is the single source of the geological/biological split. Nothing re-derives it from an inline gate, and every resource in the roster carries a value.",
+     "verification": [
+      "headless: a new or extended harness asserts every resource_type has an origin",
+      "static: review confirms no second classification exists"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-03, and the completeness guarantee is a COMPILE ERROR rather than a harness assertion - which is strictly stronger, since a harness row can be skipped and a build cannot. resource_origin (unset/geological/biological/manufactured) plus resource_origin_of(), a switch with NO default over all 49 resources, feeding a constexpr table and a static_assert that no entry survives as `unset`. RED-PROOFED: removing one case (clay) fails the build with 'every resource_type must declare a resource_origin - see resource_origin_of' across every TU, and restoring it compiles. Adding a resource without classifying it therefore cannot ship. Also: is_biological_resource / is_geological_resource are the predicates the Life pass will select on. FOSSIL AND LIVING ARE ONE CLASS deliberately - coal and timber differ in WHEN their life existed, and planetology already encodes that in which scalar it gates on (peak vs stage); a three-way enum would duplicate that distinction in a second place."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The Body phase places only GEOLOGICAL deposits. Biological resources (coal, petroleum, peat, timber, agricultural_produce, fibre) are not placed there.",
+     "verification": [
+      "headless: earthlike_tile_census reports zero biological deposits after the Body phase"
+     ],
+     "notes": "Re-sequenced 2026-09-03. R2 should be re-homed onto BL-765 rather than left open here, since it cannot be satisfied until that item runs. BL-762's own contribution is the classification, which is complete.",
+     "evidence": "NOT DELIVERED, and it is not independently deliverable - which is a finding about the item's decomposition rather than a shortfall in the work. Removing biological deposits from the Body phase requires the Life phase to place them, and the Life phase (BL-765) needs BL-763 (landed) AND BL-764 (Lagrangian tiles, held back at difficulty 5). Doing R2 now would delete agricultural_produce, which survey_endowment reads as a region's FARM score (settlement.cpp), which drives cradle placement, region class, corporate focus and the entire food chain - and coal+petroleum, which it reads as ENERGY and which gate industrialisation. The world would generate without food. So the split must land WITH BL-765, not before it: the classification is the seam, and the move across it is BL-765's act."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "THE STREAM IS NOT SILENTLY RE-CUT. `tile_rng` is consumed past the deposit block by the endemic amount draw and by derive_environment's hazard/habitability jitter, so the biological draws either stay in place and consuming (writing zero), or the stream is re-cut deliberately and the 0 CE digests are re-blessed as a STATED act with the old and new values recorded.",
+     "verification": [
+      "headless: world_determinism - either the three digests hold, or they move once with both values recorded on the item"
+     ],
+     "notes": "This is the row that decides whether BL-762 is a refactor or a world change. It must not be resolved by adjusting the harness.",
+     "evidence": "COMPLETE 2026-09-03, satisfied by not being touched. No draw was added, removed or reordered: the change is a compile-time classification with no runtime presence in the deposit path, so tile_rng's sequence past generate_deposits - the endemic amount draw and derive_environment's hazard/habitability jitter - is exactly where it was. world_determinism digests unmoved: 039EE9880739CDF6 / B0EBBA249B3DDABB / DE55600457797638. THE HAZARD THIS ROW EXISTS FOR IS STILL LIVE for whoever does R2: the biological draws must keep consuming (writing zero) rather than being deleted, or hazard and habitability move on every tile."
+    },
+    {
+     "id": "R4",
+     "status": "partial",
+     "requirement": "Endowment still gates: a body whose biosphere never reached land has no coal anywhere, and the gate is the origin table plus planetology rather than a scattered `>=` in S8.",
+     "verification": [
+      "headless: planetology_sweep or an extension reports coal endowment zero for a pre-land peak"
+     ],
+     "notes": null,
+     "evidence": "PARTIAL 2026-09-03. The endowment gate still works and is untouched - a body whose biosphere never reached land still has no coal, because planetology S8 still zeroes it. What is NOT done is the second half of the row: the gate is still 'a scattered >= in S8' rather than the origin table plus planetology. Making it the table needs something the table does not yet carry - the SPECIFIC life stage each biological resource requires (coal on peak >= land, petroleum on peak >= oxygenated, timber on stage >= land). resource_origin says a resource is biological; it does not say which stage produced it. Encoding that per resource is the natural follow-on and is exactly what BL-765 needs to derive placement from the paleo record, so it belongs with that item."
+    }
+   ]
+  },
+  {
+   "brief": "continent-time-axis",
+   "title": "BL-763 - continents return a sequence of plate snapshots, not an endpoint",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-03",
+   "promoted_from": "backlog.json BL-763 - Sprint 32",
+   "batch": "sprint-32-wave-2",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "tick-length-parameter",
+   "title": "BL-771 - the economy gets a tick-length parameter, and every rate declares its period",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-03",
+   "promoted_from": "backlog.json BL-771 - Sprint 32",
+   "batch": "sprint-32-wave-2",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "sweep-measures-generation",
+   "title": "BL-757 - the era sweep measures the run that generates a world",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-757 - Sprint 32",
+   "batch": "sprint-32-wave-2",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "`history_sweep --epoch <year>` derives its params through `era_minus_one_sim_params` AND matches generation on the other four divergence axes: the folded seed (`era_minus_one_sim_seed`), a real creed pointer, generation's works registry, and the PRE-sim settlement.",
+     "verification": [
+      "headless: history_sweep --epoch 0 reproduces generation's own counts for a seed - battles 270, conquests 207, foundings 833 on seed ABCDEF01"
+     ],
+     "notes": "Deriving the params alone closes axes 1-2 of six. The 2026-09-03 banner fix already says so honestly; this row makes the claim true instead.",
+     "evidence": "COMPLETE 2026-09-03. The deriving path now runs from era_minus_one_fixture, so all six divergence axes are generation's: span and clock (fx.params), the FOLDED seed (fx.seed), a real creed pointer (&fx.creeds), the works pointer (fx.works) and the PRE-sim settlement (fx.settlement). Asserted per seed by a new row S1b, which is SELF-CHECKING rather than a pinned literal: generation_report carries the counts generation's own era produced, and S1b requires the re-run to reproduce prehistory_battles/conquests/foundings exactly. A hardcoded 270/207/833 would have rotted the moment the world legitimately changed. Two visible confirmations that the fix is real: regions_start fell 1333 -> 149 (the pre-sim settlement replacing the post-sim one) and battles went from flat zero to real values. history_sweep 2 --epoch 0: ALL PASS."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The default (no --epoch) sweep is unchanged and still labelled as the struct-default ladder, so the research instrument survives alongside the generation-measuring one.",
+     "verification": [
+      "headless: history_sweep with no flag reports the same distributions as before"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-03, verified against the pre-change baseline rather than by inspection. The default 16-seed sweep is ALL PASS and its rows are IDENTICAL to the 2026-09-03 baseline capture on (seed, regions_start, regions_end). The fixture is requested only on the deriving path, so the default pays nothing for it; the call-site widening passes exactly make_hard_coded_world's own parameter defaults ({}, nullptr, nullptr), so the default path's inputs are unchanged. Banner still labels it 'STRUCT DEFAULTS - *not* the run that builds a world'. NOTE: S3 fails at 2 seeds on the default path and did so before this change - it is satisfied only when some seed's battle count differs from the first, which two seeds on the coarse ladder need not do. Pre-existing weak assertion, not a regression; worth strengthening separately."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The S2 recheck runs the SAME span and the SAME world as the rows it rechecks.",
+     "verification": [
+      "headless: history_sweep --epoch 1960 - S2 green and comparing a two-span run against a two-span run"
+     ],
+     "notes": "Partly fixed 2026-09-03: the shadowed params and the epoch-less recheck world were corrected. This row closes what remains.",
+     "evidence": "COMPLETE 2026-09-03. S2's recheck now takes the SAME route as the rows it rechecks - the fixture under --epoch - and passes on both paths. It previously would have compared generation's era against the struct-default one and called the disagreement non-determinism, which is the BL-757 defect reappearing inside the check meant to catch it. history_sweep 2 --epoch 0: S2 PASS. Default 16 seeds: S2 PASS."
+    },
+    {
+     "id": "R4",
+     "status": "partial",
+     "requirement": "Works raised is reported PER BAND, so BL-767 can tune against it and BL-768 can see whether build_work ever wins.",
+     "verification": [
+      "headless: history_sweep reports works per roster band, either side of the boundary year"
+     ],
+     "notes": "Downgraded from the row as written. The remaining halves are prerequisites for BL-767 (tuning against works) and BL-768 (whether build_work ever wins), and should be filed on whichever of those is picked up first.",
+     "evidence": "PARTIAL 2026-09-03. Works standing at end of run are now tallied PER ROSTER BAND, derived in the harness from region::works_built against whichever registry was actually in play, and printed as a distribution line. The sim is untouched. TWO HALVES REMAIN, both recorded in the code rather than glossed. (1) On the deriving path the figure is vacuous: generation is called with works = nullptr - which is what world_determinism does, and is why R1's acceptance figures are reachable - so no work is buildable and four zeroes is the honest report. Making it meaningful needs generation handed its REAL works.lua registry, which is divergence axis 5 fully closed and is scope beyond this item. (2) 'Either side of the boundary year' is NOT derivable in the harness at all: the mask is end-state only and nothing timestamps a work, so the split needs the sim to record the year each row was raised. The zero-works finding itself still stands from the DEFAULT path, which does carry a registry and still raised nothing across 16 seeds."
+    }
+   ]
+  },
+  {
+   "brief": "saturation-measure-promoted",
+   "title": "BL-775 - the saturation measure moves out of the harness so generation can call it",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-03",
+   "promoted_from": "backlog.json BL-775 - Sprint 32",
+   "batch": "sprint-32-wave-2",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "lua-harness-builder-bash",
+   "title": "BL-774 - a worktree agent builds the Lua-linked harness class with one command, and the class is derived rather than listed",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-774 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "1960-baselines-rebased",
+   "title": "BL-759 - the sprint 33 baselines are restated against the world HEAD actually builds",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-759 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "band-ceiling-observable",
+   "title": "BL-760 - the two-span band ceiling becomes observable, and world_params round-trips under assertion",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-760 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "landscape-scorer-discriminates",
+   "title": "BL-770 slice 1 - the phase 6 scorer exists, and we know whether it discriminates between candidate landscapes at all",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-770 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "coastal-territory",
+   "title": "BL-776 - the nation carve claims coastal water and lakes; open ocean stays unowned",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-776 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "resource-origin-and-lagrangian",
+   "title": "BL-762 + BL-764 - deposits split by origin, and tiles gain a drift time axis",
+   "difficulty": 9,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-762, BL-764 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "history-sim-ladder-and-empires",
+   "title": "BL-748 + BL-767 - the furnace happens inside the run, and empires reliably form",
+   "difficulty": 8,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-748, BL-767 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "population-map-early",
+   "title": "BL-766 - the population map is drawn before history and evolved by it",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-766 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "scorer-sees-a-roster",
+   "title": "BL-770 slice 2 - the objective gains a roster-aware term, so phase 6 has something to search on",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-770 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "paleo-deposits",
+   "title": "BL-765 - coal where the ancient swamps were, oil where the ancient seas were",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-765 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "retire-the-warm-start",
+   "title": "BL-754 + BL-772 - the generation budget is printed, and the warm start retires into phase 6",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "partial",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-754, BL-772 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "BL-754: the app prints its own per-pass generation budget on the generating screen, as world_determinism already does headlessly.",
+     "verification": [
+      "static: app.cpp emits the per-pass split",
+      "visual: the generating screen shows it"
+     ],
+     "notes": "The measurement half already exists - world_determinism emits [gen budget] total/pre-settlement/settlement/era-1/post-era. Only the APP-side print is owed.",
+     "evidence": " LIVE CHECK DONE 2026-09-06, AND R1 IS NOW COMPLETE. Opened the built app (--autostart-play, main checkout build) and read the generating screen directly: \"world built in 84.75 s\" and \"pre-settlement 1.46  settlement 0.02  era-1 8.09  post-era 75.18\". Both lines render. The agent could not do this - its granted computer-use path resolved to a DIFFERENT worktree exe and its window was masked out of every screenshot; the main session hit the same trap and cleared it by granting the running process basename. TWO MEASUREMENTS THE RUN PRODUCED THAT NOBODY HAD. (1) build/ is DEBUG, so 84.75 s must NOT be quoted against BL-761 72-73 s RELEASE figure - different builds, not a regression. (2) The warm start in Debug is 667,428 ms on one run and 389,740 ms on another: run_economy_step 534,719 ms and convoys 117,300 ms of the first, everything else under 3 s combined. That is BL-761 finding quantified and it names the same two culprits. It also means the DEBUG play loop takes ~11 minutes to reach the map, which is a sharper argument for BL-772 than the Release number. COMPLETE 2026-09-06, BOTH HALVES. Console verified by the agent; the ON-SCREEN half verified by the main session opening the built app and reading it: \"world built in 84.75 s\" / \"pre-settlement 1.46  settlement 0.02  era-1 8.09  post-era 75.18\"."
+    },
+    {
+     "id": "R2",
+     "status": "cancelled",
+     "requirement": "BL-772: no pre_game_ticks loop remains, and Pass 6 background-firm generation stops running as a separate one-shot.",
+     "verification": [
+      "static: the loop is gone from app::start_new_game",
+      "headless: a generated world still carries background firms"
+     ],
+     "notes": null,
+     "evidence": "CANCELLED, NOT FAILED - deliberately blocked and the brief pre-authorised stopping. Phase 6 has NO SEARCH: landscape_score.cpp has no caller outside its own harness, so retiring the warm start would open play on an UNSETTLED position, which is worse than the 72-73 s it saves. No code moved. Re-opens with BL-770 search."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "WHAT MUST NOT BE LOST: play still opens on a SETTLED position with the clock rebased to the epoch (BL-369). That is the one property the warm start existed for.",
+     "verification": [
+      "headless: a handed-over world is settled, and the clock starts at the epoch"
+     ],
+     "notes": "If phase 6 cannot yet hand over a settled world, say so and STOP rather than shipping an unsettled one. That is a legitimate outcome.",
+     "evidence": "HOLDS - because nothing was retired. It would NOT hold under R2 today, and that is the whole reason R2 was cancelled."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "ERAS.md and MARKETS.md are rewritten to describe the new source of the background economy, not merely stripped of the old one.",
+     "verification": [
+      "static: both docs describe phase 6 as the source"
+     ],
+     "notes": "ERAS.md's \"the warm start has no calendar meaning\" paragraph needs rewriting rather than deleting.",
+     "evidence": "COMPLETE. ERAS.md and MARKETS.md REWRITTEN rather than stripped, including why the superseded 90%-of-demand rule was wrong: a target fraction pushes every market toward the same coverage, which is the evenness § Asymmetry exists to prevent."
+    },
+    {
+     "id": "R5",
+     "status": "failed",
+     "requirement": "The startup time drop is MEASURED and reported.",
+     "verification": [
+      "headless: before/after wall clock"
+     ],
+     "notes": "BL-761 measured the warm start at 72-73 s on both arcs against a ~6 s budget. That is the number this should move.",
+     "evidence": "FAILED, and recorded as such rather than dropped: the drop is ZERO SECONDS because the retirement did not land. The 72-73 s Release warm start is untouched. Measured incidentally: in DEBUG it is 667,428 ms, of which run_economy_step is 534,719 - BL-761 finding quantified."
+    }
+   ]
+  },
+  {
+   "brief": "region-domain",
+   "title": "BL-777 - regions carry their domain, and Settle stops founding on open ocean",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-777 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "centre-bound-to-region",
+   "title": "BL-783 - a materialised centre stands where the region that grew it stood",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-783 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "roads-and-markets-from-history",
+   "title": "BL-768 - simple roads stamped FROM the history, and markets emerging at the end of it",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "partial",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-768 - Sprint 32b",
+   "batch": "sprint-32b-wave-2b",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "The sim RECORDS what it built (the works roster already carries the road rows), and a pass immediately AFTER it stamps ancient-tier roads over the settlement set from that record.",
+     "verification": [
+      "headless: a 1960 world opens with roads whose shape follows the history trunk routes"
+     ],
+     "notes": "Roads are NOT laid inside the sim. It has no world&, deliberately; its Dijkstra returns a COST between regions, never a tile list; and generate_roads reads population_centre_tile, which is only filled after. Derive from the record, do not fight the architecture.",
+     "evidence": "COMPLETE 2026-09-06. The sim RECORDS and a later pass STAMPS - the architecture the feasibility pass demanded. Era counters DIGIT-IDENTICAL either side, which is the evidence the record changed no decision."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Markets are carved at the end of the history phase from where trade CONCENTRATED, rather than from population alone.",
+     "verification": [
+      "headless: market placement follows the history, and differs from a population-only carve"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE. Markets open by trade on 4 of 4 seeds (2/1/2/5); era_world_harness R6a-R6d green. Both constants MEASURED off a bimodal distribution rather than chosen."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "An ERA-APPROPRIATE tier rule. edge_tier and the redundancy rationing key off a nation qualification percentile that is a 1960-era field; ancient roads need their own rule rather than borrowing the industrial one.",
+     "verification": [
+      "static: the ancient tier rule is its own, not the industrial one reused"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE. Traffic plus works at BOTH ends, never the 1960 qualification percentile."
+    },
+    {
+     "id": "R4",
+     "status": "partial",
+     "requirement": "Works raised is non-zero, and its roads are visible on the canvas.",
+     "verification": [
+      "headless: works raised > 0 in real generated worlds",
+      "visual: roads render on the canvas"
+     ],
+     "notes": "BL-757 measured ZERO works raised across sixteen seeds because build_work never wins the scored contest, and wave 1 confirmed it still does at 16 seeds. If this item cannot move that, REPORT it - do not tune work_amortise_years further, it is already at its floor of 1.",
+     "evidence": " LIVE CHECK 2026-09-06, PARTIAL AND HONESTLY SO. Roads DO render: the Selection panel reads \"Tile [93, 52] - Road\", and road geometry is visible on the canvas as connected segments with node markers, present on land and absent on water. WHAT THE CANVAS CANNOT SHOW: an ancient history-derived road is indistinguishable by eye from a national-lattice road - they render with the same geometry - so a live look cannot separate them. The headless differential is strictly STRONGER evidence here: era ON vs OFF, 3146 -> 3466 roaded tiles at seed 0 (+320) with Road tier 173 -> 265, plus road_reach_census C7 pinning all five rungs of the tier rule. Recording the live look as done and the ancient-vs-national distinction as unshowable on the canvas, rather than claiming a look proved something it cannot. PARTIAL, AND BOTH HALVES SHORT FOR DIFFERENT REASONS. Works raised is STILL ZERO and the arithmetic says no weight closes it - Invest scores a SUM over held regions, a work scores ONE region plus the mean, so the gap widens with every conquest. That is BL-757 and it needs a SCORING change. The canvas half: roads DO render (Selection panel reads Tile [93,52] - Road) but an ancient road is indistinguishable by eye from a national one, so the headless differential is the stronger evidence. AND THE LIVE LOOK FOUND WHAT THE HARNESS COULD NOT - one nation with a complete road lattice, filed BL-784."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "Digest movement REPORTED with its cause, never re-blessed.",
+     "verification": [
+      "headless: world_determinism run, movement reported"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE. Digests reported; seedA/off unmoved and corroborated independently by two other harnesses."
+    }
+   ]
+  },
+  {
+   "brief": "tariff-posture-and-consequence",
+   "title": "BL-750 + BL-769 - a nation inherits its protection from history, and the map of consequence folds into it",
+   "difficulty": 7,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-750, BL-769 - Sprint 32b",
+   "batch": "sprint-32b-wave-2b",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "sweep-sees-the-arc",
+   "title": "BL-926 - the instrument reports the arc",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-926 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "aggression-lean-once",
+   "title": "BL-927 - the creed-aggression lean applied once",
+   "difficulty": 1,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-927 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "culture-diversity-overtuned",
+   "title": "BL-918 - many kin cultures, ranges break into insular groups",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-918 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "lineage-palette",
+   "title": "BL-919 - kin cultures share a hue family",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-919 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "terrain-underlay-on-lapse",
+   "title": "BL-915 - rivers, mountains, seats and whole frontiers on the lapse",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-915 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "lapse-event-layer",
+   "title": "BL-916 - typed events on the record, shown as they happen",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-916 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "reach-has-a-gradient",
+   "title": "BL-922 - supply priced from the capital over held ground at a cost that bites",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-922 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "live-lapse-render",
+   "title": "BL-914 - the pass rounds render while they compute",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-914 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "roads-and-bridges-on-lapse",
+   "title": "BL-917 - roads grow on the map and cross rivers as bridges",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-917 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "city-states-on-culture-ground",
+   "title": "BL-920 - the phase opens on culture ground and city states rise by organising it",
+   "difficulty": 6,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-920 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "force-follows-the-network",
+   "title": "BL-921 - a pooled levy along the supplied network",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-921 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "prize-reads-the-city",
+   "title": "BL-924 - a region is worth attacking for what stands on it",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-924 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "trade-across-kin-borders",
+   "title": "BL-925 - amicable neighbours trade across the border",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-925 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "supply-sites-from-the-stockpile",
+   "title": "BL-929 - a polity upgrades supply sites from its stockpile",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-929 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "breakdown-to-city-states",
+   "title": "BL-923 - over-extended ground breaks into city states",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-11",
+   "promoted_from": "backlog.json BL-923 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "exploration-sweep-builds-each-world-once",
+   "title": "BL-952 - exploration_sweep builds each world once, not three times",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-14",
+   "promoted_from": "backlog.json BL-952 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "strength-metric-reads-strategy-fairly",
+   "title": "BL-951 - Reading 3's \"strongest realms\" metric moves from region count to treasury/throughput rank",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-14",
+   "promoted_from": "backlog.json BL-951 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "exploration-handoff-crosses",
+   "title": "BL-956 - The Exploration span hands a validated struct forward, and world setup reads 1660 grudges and corridors from it",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-14",
+   "promoted_from": "backlog.json BL-956 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "wants-point-outward",
+   "title": "BL-953 - A polity's wants lean where it campaigns and whom it subjects, weighted by cultural preference",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-14",
+   "promoted_from": "backlog.json BL-953 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "trade-flows-between-polities",
+   "title": "BL-954 - Goods flow between polities as a want met by throughput, and the flow is what a market earns",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-14",
+   "promoted_from": "backlog.json BL-954 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "exploration-spend-is-scored",
+   "title": "BL-955 - Ports, hulls and standing armies are scored against the other verbs, not bought whenever affordable",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-14",
+   "promoted_from": "backlog.json BL-955 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "post-road-rung-actually-fires",
+   "title": "BL-949 - Tune the road ladder's third rung so Post Roads actually fires on a sweep",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-14",
+   "promoted_from": "backlog.json BL-949 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "displacement-clears-the-bar",
+   "title": "BL-950 - Push the near/far cost split further so the displacement reading reliably clears its own bar",
+   "difficulty": 5,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-14",
+   "promoted_from": "backlog.json BL-950 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "exploration-sweep-stops-at-the-exploration-close",
+   "title": "BL-958 - exploration_sweep stops generation at the Exploration close instead of building the whole world",
+   "difficulty": 2,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-14",
+   "promoted_from": "backlog.json BL-958 - Sprint 41, before wave 3",
+   "batch": "sprint-41-exploration-trade",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "colonisation-d1-d3-regression",
+   "title": "BL-981 - colonisation_harness D1/D3 is red again: one dangling seat pointer on seed 2",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "promoted_from": "backlog.json BL-981 - Sprint 42, wave 0",
+   "batch": "sprint-42-wave-0",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "generation-corpus-reconcile",
+   "title": "BL-980 - The eleven doc-versus-code contradictions found by the 2026-09-15 generation audit are reconciled",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "promoted_from": "backlog.json BL-980 - Sprint 42, wave 0",
+   "batch": "sprint-42-wave-0",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "tree-roots-and-header-regen",
+   "title": "BL-974 - The colonisation and industry roots are fixed and a lint proves each generated tree header matches its store",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "promoted_from": "backlog.json BL-974 - Sprint 42, wave 0",
+   "batch": "sprint-42-wave-0",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "endowment-spread-and-drift-golden",
+   "title": "BL-962 + BL-964 - planetology_sweep asserts the endowment spread; continent_drift asserts a drift digest",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "promoted_from": "backlog.json BL-962 + BL-964 - Sprint 42, wave 0",
+   "batch": "sprint-42-wave-0",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "terrain-economic-gate",
+   "title": "BL-966 - Deposit concentration is asserted in bands and survey_endowment gets its first harness",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "promoted_from": "backlog.json BL-966 - Sprint 42, wave 0",
+   "batch": "sprint-42-wave-0",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "share-readings-population-weighted",
+   "title": "BL-970 - history_sweep reads empire share, peak and the arc by population held, not region count",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "promoted_from": "backlog.json BL-970 - Sprint 42, wave 0",
+   "batch": "sprint-42-wave-0",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "displacement-volume-weighted",
+   "title": "BL-971 - exploration_sweep weights the displacement reading by conflict volume and checks in its per-seed table",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "promoted_from": "backlog.json BL-971 - Sprint 42, wave 0",
+   "batch": "sprint-42-wave-0",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "instruments-run-the-winner",
+   "title": "BL-979 - Every downstream instrument runs the landscape search winner, and one reading reports the fraction of markets in band",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "promoted_from": "backlog.json BL-979 - Sprint 42, wave 0",
+   "batch": "sprint-42-wave-0",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "pass-one-validator-in-production",
+   "title": "BL-969 - make_hard_coded_world validates pass_one_output and every consumer reads the struct, not the live sim",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "promoted_from": "backlog.json BL-969 - Sprint 42, wave 0",
+   "batch": "sprint-42-wave-0",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "tile-pass-reentry",
+   "title": "BL-965 - generate_body_tiles splits at the Body/Life boundary so the Life phase re-runs over a cached record",
+   "difficulty": 5,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-965 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "planetology-thermal-series",
+   "title": "BL-961 - Planetology stores its thermal history as a per-epoch series the Life phase samples",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-961 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "tiles-ride-plates",
+   "title": "BL-963 - The banding pass reads plate-carried position so palaeo climate is a frame",
+   "difficulty": 7,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-963 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "rivers-priced-in-walk",
+   "title": "BL-967 - The migration walk prices rivers as corridors",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-967 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "ephemeral-cultures-measured",
+   "title": "BL-968 - Cultures that never hold ground are measured (step 1 only; the rule is Ben's call)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-968 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "force-upkeep-in-the-world",
+   "title": "BL-972 - Navies and standing armies cost a per-head upkeep from the treasury, replacing the scorer caps",
+   "difficulty": 5,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-972 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "tree-effects-generated",
+   "title": "BL-973 - Node effects are generated from the tree stores and applied by the sim",
+   "difficulty": 6,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-973 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "tariff-derivation-hands-to-digitisation",
+   "title": "BL-976 - The industrial-timing tariff derivation is retired on the single-span arc",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-976 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "nation-treasury-from-exploration",
+   "title": "BL-975 - Nation treasuries are credited from the Exploration treasury at the fold",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-975 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "search-axes-live-and-reach-term",
+   "title": "BL-977 - The landscape search perturbs a live roster and a scored road tier; the reach-quality term lands",
+   "difficulty": 6,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-977 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "warm-start-retired",
+   "title": "BL-978 - pre_game_ticks is removed; the search's single validation run is the settle",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-978 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "consolidation-folds-every-seat",
+   "title": "BL-998 - At 1200 CE every seat a polity holds folds its stores into the capital treasury",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-998 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "held-seeds-cause-measured",
+   "title": "BL-999 - Each held seed in the displacement reading gets a named cause",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-999 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "wizard-leaderboard-population-share",
+   "title": "BL-1000 - The Empires round leaderboard ranks share of the world by population held",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-1000 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "collapse-doc-folded-and-retired",
+   "title": "BL-1001 - COLLAPSE.md folds what CIVILISATION.md lacks into it and retires to research",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-1001 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "breadcrumb-dropped",
+   "title": "BL-1002 - The per-tile derivation breadcrumb leaves GENERATION_LEDGER.md",
+   "difficulty": 1,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-16",
+   "promoted_from": "backlog.json BL-1002 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "far-trade-reading",
+   "title": "BL-1006 - One reading measures delivered volume sold at its destination and the share that skipped the seller's nearest market, after a year of play",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1006 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "stratum-demand-ladder",
+   "title": "BL-996 - Household demand follows headcount up cumulative stratum rungs, upper rungs scaled by qualification, and an unmet top rung blocks promotion",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "cancelled",
+   "promoted_from": "backlog.json BL-996 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "harnesses-read-the-validation-run",
+   "title": "BL-1008 - Six harnesses simulate an 80-tick warm start the game no longer runs",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1008 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "digest-sees-the-money",
+   "title": "BL-1009 - The determinism digest covers everything generation moves that play reads: seeded sentiment, road tiers, region and nation treasuries, and the Exploration stocks",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1009 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "small-grudges-freeze",
+   "title": "BL-842 - Integer truncation freezes small grudges forever, falsifying both decay and sparsity",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-842 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "assimilation-lost-to-the-tail",
+   "title": "BL-841 - A holder with no free culture slot loses its assimilation into the anonymous tail",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "cancelled",
+   "promoted_from": "backlog.json BL-841 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "alarm-stops-saturating",
+   "title": "BL-1018 - visible_capability_reference is re-scaled so alarm discriminates between near pairs instead of reading 1000 everywhere",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "cancelled",
+   "promoted_from": "backlog.json BL-1018 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "the-first-crossing",
+   "title": "BL-1019 - Why four of six held seeds meet exactly one polity in 460 years, and what opens a frontier",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "cancelled",
+   "promoted_from": "backlog.json BL-1019 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "trade-rebased-on-reach",
+   "title": "BL-1021 - Trade income is paid on the distinct unlike classes a realm can reach, not on roaded pairs",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1021 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "empty-cultures-fold-into-parent",
+   "title": "BL-1017 - An empty culture folds back into its parent at the boundary, keeping the lineage link",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1017 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "digitisation-readings",
+   "title": "BL-982 - The thirteen Digitisation readings are instrumented over a seed spread before any mechanism lands",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-982 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "forest-is-the-fifth-branch",
+   "title": "BL-1023 - A fifth Colonisation branch, Forest, teaches woodland and boreal; arid and stone stay hostile country",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1023 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "creed-classifier-one-scale",
+   "title": "BL-1016 - The sweep's creed classifier compares a product against a mean, so consolidators cannot win",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1016 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "era-world-three-reds",
+   "title": "BL-1010 - era_world_harness has three failing rows on main and no record says why",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1010 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "coastal-ground-cheaper",
+   "title": "BL-1022 - Measure the cost of taking coastal ground against inland ground before any sea-legs magnitude moves",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1022 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "seat-floor-reads-static-score",
+   "title": "BL-1020 - The seat viability floor reads the static landscape score, not eight quarters of trailing net",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1020 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "resolved": "2026-09-16",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "charter-budget-seam",
+   "title": "BL-1032 - A per-centre charter budget reaches the landscape search and charters specialists and background firms around each centre, off by default",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1032 - sprint 44 (2026-09-17)",
+   "batch": "sprint-44",
+   "resolved": "2026-09-17",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "charter-budget-cost",
+   "title": "BL-1033 - What a denser corporate web costs: the charter budget swept at 1x/2x/4x with the per-resource cap kept and lifted",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1033 - sprint 44 (2026-09-17)",
+   "batch": "sprint-44",
+   "resolved": "2026-09-18",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "world-copy-ticks-exact",
+   "title": "BL-1034 - A copied world ticks byte for byte as its original",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1034 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-18",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_copy_determinism --seed 28"
+     ],
+     "requirement": "On library seed 28, a world copied from the app-order base world, before the landscape and after it, settles through the 12-tick validation run byte for byte with its original, compared every tick.",
+     "notes": "The failing case filed with the item: the copy digested D_settle 18F78EB9B2B20F29 against the pinned 265C48A23E313B1A.",
+     "result_metric": "world_copy_determinism --seed 28: PASS copied at base (272.5 s), at land (233.7 s) and by assignment (249.7 s); D_settle 265C48A23E313B1A on both sides, 0 stores out of order (main session, 26c8ec6e)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: world_copy_determinism --seeds all"
+     ],
+     "requirement": "The same holds on all 16 library seeds, or on a stated subset with the reason the rest were not run.",
+     "notes": "",
+     "result_metric": "world_copy_determinism --seeds all: 16/16 PASS, 12 ticks each, 0 stores out of order (lane run on 1c5d60b1, 5551 s contended); the main session re-ran seed 28 three ways (R1)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --digest-check"
+     ],
+     "requirement": "The original path does not move: every library seed's four digests equal the BL-1031 pins with no charter budget. The pins are never re-taken; a fix that moves them is a world-mover and waits on Ben.",
+     "notes": "",
+     "result_metric": "player_seed_sweep --digest-check on the integrated main 26c8ec6e (BL-1034, BL-1036, BL-1037, BL-1038 and its fix round): 16/16 rows PASS against the BL-1031 pins, 0 threw, 4289 s (machine contended) — main session, 2026-09-18."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "headless: landscape_search_harness"
+     ],
+     "requirement": "world_determinism's digests are unchanged, and landscape_search_harness R2 (thread invariance) and R3 (path replay) stay green: the search copies the base world for every evaluation, so a changed copy is read there first.",
+     "notes": "",
+     "result_metric": "world_determinism ALL PASS on 26c8ec6e, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged. landscape_search_harness PASS — R2.2-R2.8 thread invariance at 2/3/4/8 threads, R3.1 path replay (main session)."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "code: the fix site names the member and the mechanism"
+     ],
+     "requirement": "The unfaithful member is named, with why a copy read it differently, in a comment at the fix; the reproduction is a committed harness, not a one-off.",
+     "notes": "",
+     "result_metric": "faithful_unordered_map.hpp names MSVC's per-bucket reversal and the order-dependent sum; budget_system.cpp carries the comment at body_mean_habitability; world_copy_determinism is committed (cold review confirmed)."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review of the diff finds no copy path left unfaithful and no change to the original path.",
+     "notes": "",
+     "result_metric": "Cold review (code-reviewer, 2026-09-18): no correctness bug in the copy; the original path is untouched except the landscape search's evaluation copies (moot once BL-1050 lands); the order dependence and save/load divergence filed as BL-1050, riding sprint 45's re-bless (NR-894)."
+    }
+   ],
+   "resolution": "A copied world ticks byte for byte as its original; the pins held. The order dependence itself is BL-1050."
+  },
+  {
+   "brief": "span-boundary-resume",
+   "title": "BL-1036 - A span resumed from a handoff struct carries its dated objects, keeps its 1200 anchors explicitly, and proves it under a fidelity check",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1036 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-18",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "world_determinism's four digests are unchanged: the Exploration caller passes no dated objects and anchors equal to its own start year.",
+     "notes": "",
+     "result_metric": "world_determinism ALL PASS, digests seedA/on 099530C9B7A211D7, seedB/on 3C348D569EEF30EB, seedA/off 583A788BD8045DA0, 1960/two-span 2EC67DAE697FBA02 — equal to the values recorded at 836d9e52 (main session, 614a02e5)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --digest-check"
+     ],
+     "requirement": "Every library seed's four digests equal the BL-1031 pins with no budget (16 seeds, or a stated subset with the reason).",
+     "notes": "The 16-seed --digest-check runs on the integrated main (chain 3, 2026-09-18).",
+     "result_metric": "player_seed_sweep --digest-check on the integrated main 26c8ec6e (BL-1034, BL-1036, BL-1037, BL-1038 and its fix round): 16/16 rows PASS against the BL-1031 pins, 0 threw, 4289 s (machine contended) — main session, 2026-09-18."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sim_harness",
+      "headless: history_sim_harness"
+     ],
+     "requirement": "exploration_sim_harness is green and history_sim_harness holds its tracked 2-failure baseline (R3a2/R3a3), nothing new.",
+     "notes": "",
+     "result_metric": "exploration_sim_harness ALL PASS; history_sim_harness FAILURES (2): R3a2 and R3a3 only, the tracked baseline (main session, 614a02e5)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness (fidelity mode)"
+     ],
+     "requirement": "On all 16 library seeds a span resumed from exploration_output at 1660 opens with state equal to the struct, field by field, dated objects included.",
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --fidelity over the 16 library seeds: gate 1 (opening == struct) 16 of 16 (main session, 614a02e5; 472 s, worst seed 133 s)."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness (fidelity mode)"
+     ],
+     "requirement": "After one resumed round, treaties, the overlord graph and stocks equal the continued run's 1660 round apart from the named network sources; the 1960 divergence against --through is printed and attributed by source, never gated bit for bit.",
+     "notes": "",
+     "result_metric": "Gate 2 (one neutralised round == the continued run's 1660 round) 16 of 16; divergence to 1960 printed by source: market stamp up to 808 regions, 1660 record up to 615, dead-filter 0 on every seed, seed up to 790; residual 0 on every seed (main session, 614a02e5)."
+    },
+    {
+     "id": "R6",
+     "status": "partial",
+     "verification": [
+      "code: every consolidation and near-home site reads the explicit params",
+      "code: civilisation and universal-creed tables carry"
+     ],
+     "requirement": "No site keys consolidation or the near-home cutoff on params.start_year; the civilisation and universal-creed tables cross a resume without index reuse; only living polities are noted as founded at a resumed open.",
+     "notes": "NOT MET at the 1200 boundary: Exploration's own resume still restarts the civilisation and creed tables at 0 while regions keep their indices, and the 1660 handoff inherits that table (cold review, 2026-09-18). Carrying them at 1200 moves shipped worlds; filed as BL-1049, unscheduled.",
+     "result_metric": "Every consolidation and near-home site reads the explicit params (cold review: all six former start_year reads replaced); only living polities are noted as founded at a resumed open; the tables cross the 1660 resume."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no resumed field dropped and no change to the Exploration path.",
+     "notes": "",
+     "result_metric": "Cold review (code-reviewer, 2026-09-18): nothing blocking; follow-ups committed in 58193812; the 1200 index reuse filed as BL-1049."
+    }
+   ],
+   "resolution": "Delivered with R6 partial: the 1200 index reuse is BL-1049 (continuity pass)."
+  },
+  {
+   "brief": "resume-road-tier",
+   "title": "BL-1037 - A resumed span reopens a bought road rung at the tier it was bought to, behind a switch",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1037 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-18",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "headless: player_seed_sweep --digest-check"
+     ],
+     "requirement": "With the switch off (its default), every digest and pin is unmoved.",
+     "notes": "The 16-seed --digest-check runs on the integrated main (chain 3).",
+     "result_metric": "world_determinism ALL PASS on 26c8ec6e, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged. player_seed_sweep --digest-check on the integrated main 26c8ec6e (BL-1034, BL-1036, BL-1037, BL-1038 and its fix round): 16/16 rows PASS against the BL-1031 pins, 0 threw, 4289 s (machine contended) — main session, 2026-09-18."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness or exploration_sweep (switch on)"
+     ],
+     "requirement": "With the switch on, per library seed: the corridors whose resumed tier changed, by span (1200 and 1660); none reopens below the tier it was bought to; no rung is bought twice.",
+     "notes": "The cold review notes the gate is close to tautological (live counts never fall), so it is a regression guard rather than independent evidence. Lane figures, switch off: refused walks promoted at 1200 on every seed (2-110), bought rungs demoted at 1200 on none, post roads demoted at 1660 on 12 seeds and re-bought on 9.",
+     "result_metric": "digitisation_sim_harness --resume-tier over the 16 library seeds: RESUME-TIER PASS, switch-on invariants (nothing below, above or re-crossed at 1200 and 1660) hold on 16 of 16 (main session, 614a02e5; 240 s)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review confirms both directions of the old error (bought rungs demoted, refused walks promoted) are resolved.",
+     "notes": "",
+     "result_metric": "Cold review (code-reviewer, 2026-09-18): correct in both directions and inert when off."
+    }
+   ],
+   "resolution": "Delivered behind a switch that BL-1044 turns on."
+  },
+  {
+   "brief": "industry-tree-wired",
+   "title": "BL-1038 - The Industry tree is invested in the sim behind a switch: every living polity enters at 1660, fuel reads a held seam, urban mass drives its rate",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1038 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-18",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "headless: player_seed_sweep --digest-check"
+     ],
+     "requirement": "With industry_tree_enabled off (its default), every digest and pin is unmoved.",
+     "notes": "The 16-seed --digest-check runs on the integrated main (chain 3).",
+     "result_metric": "world_determinism ALL PASS on 26c8ec6e, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged. player_seed_sweep --digest-check on the integrated main 26c8ec6e (BL-1034, BL-1036, BL-1037, BL-1038 and its fix round): 16/16 rows PASS against the BL-1031 pins, 0 threw, 4289 s (machine contended) — main session, 2026-09-18."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "tool: tree_lint.js all"
+     ],
+     "requirement": "tree_lint passes on every tree with the new fork-reachability rule, and the rule FAILS on the pre-cut industry store (Charcoal Iron unreachable), so it is not vacuous.",
+     "notes": "",
+     "result_metric": "tree_lint.js all: OK on all four trees; tree_lint.js industry --store <the 45cdb8f3 store>: FAIL \"IN-MT-1b can never be bought while its partner IN-MT-1a is refused\" (main session)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sim_harness (Industry block)"
+     ],
+     "requirement": "Every keyed Industry effect is read, availability and both fork sides are reachable, the rim is detectable, pinned stubs are stated on the face, and industry_mask is 0 at 1660 on a shipped world.",
+     "notes": "",
+     "result_metric": "exploration_sim_harness ALL PASS including the T8 Industry block, T8.9.7-8, T8.13.3 and T8.14 from the fix round (main session, 58193812)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: a 1660->1960 run with the switch on"
+     ],
+     "requirement": "Per library seed: the distribution of Industry nodes held, fork sides taken, rim holders, and the share of polities that never pass the fuel gate.",
+     "notes": "The spread is set by Invest frequency, not the rate: NR-893.",
+     "result_metric": "exploration_sweep --through 1960 --industry-open 1660, 16 library seeds (main session, 58193812): alive 862, invested 553, nodes held 0/0/6/27/42 of 45, rim 121; had an Industry round 572, of which never passed fuel 127 (22%); never had a round 290 (34%); forks Fuel coke 404 / charcoal 118 / neither 340, Labour 229/44/589, Works arsenal 208 / private 152 / neither 502."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "code: empire and exploration scorers untouched"
+     ],
+     "requirement": "The empire and exploration term_value arrays and gate readings are unchanged; the any-held-seam fuel reading and the urban-mass rate apply to the Industry tree only; the rate clamps its sum before the integer transform.",
+     "notes": "",
+     "result_metric": "Cold review: the empire and exploration scorers, gates, term_value arrays and rates are untouched; the any-held-seam reading, urban-mass rate and gate re-check apply to Industry only."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no shared reader moved while the switch is off.",
+     "notes": "",
+     "result_metric": "Cold review (code-reviewer, 2026-09-18): nothing blocking; fix round merged as 191c212b; term readings on NR-891, furnace_lit on NR-892."
+    }
+   ],
+   "resolution": "Delivered behind a switch; the Digitisation span turns it on inside itself."
+  },
+  {
+   "brief": "charter-spend-rules",
+   "title": "BL-1039 - The charter spend takes a square-root cap under a density ceiling that fills goods in turn",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1039 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-19",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --digest-check (none, empty, zero, refused)"
+     ],
+     "requirement": "Every no-budget, empty, all-zero and refused digest equals its pin.",
+     "notes": "",
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged): player_seed_sweep --digest-check 16/16 PASS (none, the shipped path); --digest-check --seeds 0,28,46 --charter-budget empty 3/3 PASS, zero 3/3 PASS, refused 3/3 PASS (each exits 3 by design: a partial seed set)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --charter-budget synthetic (legacy modes)"
+     ],
+     "requirement": "The legacy cap-kept and cap-lifted synthetic modes still produce their recorded digests.",
+     "notes": "",
+     "result_metric": "LANE EVIDENCE ONLY: round 2 (4be0c877) re-ran the legacy synthetic 2x modes (cap kept, cap lifted) on seeds 0, 28, 46 before and after and the digests held. charter_cost_sweep.json records no digests for those rows, so the main session could not re-diff them independently; the cold review (R7) confirms the legacy rules change only report fields."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --charter-cost (new rows)"
+     ],
+     "requirement": "Rows on seeds 0, 28 and 46 at 1x, 2x and 4x under the square-root rule with two ceilings, with firms per good on every row, land in charter_cost_sweep.json with their note.",
+     "notes": "",
+     "result_metric": "player_seed_sweep --charter-cost --seeds 0,28,46 --budget-scales 1,2,4 --resource-cap sqrt --density-ceilings 120,160 --specialist-prices 4 --no-extra --no-forced, quiet machine, main at ab9c38f8, Release /O2 MSVC 14.44.35207, serial, 7126 s (main session, 2026-09-19): 21 rows, firms per good on every row, spend rules and points balance PASS on every row, nothing threw; folded into charter_cost_sweep.json as runs.bl1039_sqrt with its note (4ffc6716)."
+    },
+    {
+     "id": "R4",
+     "status": "cancelled",
+     "verification": [
+      "headless: a synthetic row with the capital rule"
+     ],
+     "requirement": "A budget specialist's starting capital equals its centre's unspent remainder times the rate, asserted; specialists opening with zero are counted.",
+     "notes": "Cancelled 2026-09-18: Ben reverted capital to the 400 +/-40% draw (NR-895); the unspent-points rule is removed in round 2."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "code: the Pass 6 coupling is broken",
+      "code: no shipped default in charter_budget.hpp"
+     ],
+     "requirement": "The budget path no longer reads constants coupled to Pass 6's; Pass 6's own constants are untouched; charter_spend_params keeps no shipped default and refuses a non-positive price.",
+     "notes": "",
+     "result_metric": "code-reviewer (cold, static) on 4be0c877, 2026-09-19: no new default in charter_budget.hpp (window_radius and province_cap predate BL-1039); charter_spend_params refuses a non-positive firm price and specialist price (charter_budget.hpp:412-415); the budget path reads no Pass 6 constant. The rate this row named was removed with the capital rule (NR-895)."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "record: NEEDS_REVIEW entry"
+     ],
+     "requirement": "A call for the reference budget's definition and the density ceiling is filed with the rows.",
+     "notes": "",
+     "result_metric": "Filed with the rows as NR-902 (the density ceiling, 120 or 160) on 2026-09-19; the reference budget's definition was ruled by NR-895 (B_ref = 8 x goods x firm price)."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no pinned path moved.",
+     "notes": "",
+     "result_metric": "code-reviewer (cold, static) on 4be0c877, 2026-09-19: nothing blocks; the draw path is the pre-BL-1039 code verbatim; an empty budget returns to the legacy overload before any new code (landscape_search.cpp:235-239), so no pinned path reads it. One design call (a failed placement forfeits the centre's remainder: NR-903) and low findings (BL-1060)."
+    },
+    {
+     "id": "R8",
+     "status": "complete",
+     "verification": [
+      "headless: charter_refusal_probe",
+      "headless: player_seed_sweep smoke row"
+     ],
+     "requirement": "B counts firm points net of specialist prices and B_ref = 8 x |G| x firm price, so a body at the legacy firm spend gets exactly the legacy cap of 8 (a probe case proves it).",
+     "notes": "",
+     "result_metric": "charter_refusal_probe ALL PASS on 849a358d (chain 8, main session): cap(B_ref) == c over the grid; the cold review confirms it can fail (an isqrt off-by-one or a units change trips it) and notes the missing negative-price cases (BL-1060)."
+    },
+    {
+     "id": "R9",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep smoke row (sqrt, ceiling 120, 4x)"
+     ],
+     "requirement": "Under the density ceiling firms go to the goods in turn, up to each good's cap, so every good with demand holds firms and the ceiling trims them evenly.",
+     "notes": "",
+     "result_metric": "The 4x ceiling-120 rows (seeds 0, 28, 46): 120 firms, every good with demand holds firms, trimmed evenly to within one (seed 0: nine goods at 12, one at 11, one yard); checks at land PASS on every square-root row. Caveat: a failed placement ends the centre's walk, so an unplaceable extraction good can forfeit the remainder (NR-903)."
+    }
+   ],
+   "resolution": "The square-root cap under a density ceiling (120, NR-902), goods filled in turn, B on firm points; the pins held. R4 cancelled with the capital rule (NR-895); R2 rests on the lane's before/after digests."
+  },
+  {
+   "brief": "digitisation-span",
+   "title": "BL-1040 - The Digitisation span runs as its own call from exploration_output, 1660 to 1960, wherever Exploration runs, behind a switch",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1040 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-19",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "tool: seed_library.js --check",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "With digitisation_span_enabled off (its default), every world_determinism digest, every seed-library fingerprint and every BL-1031 pin is unmoved.",
+     "notes": "The 16-seed --digest-check runs after BL-1039 merges, covering both.",
+     "result_metric": "Chain 8 on 849a358d (main session, 2026-09-19; BL-1039 round 2, BL-1040, BL-1041 and its fix round, BL-1051, BL-1053 merged): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; exploration_sweep --out then seed_library.js --check --from: 0 moved, 0 absent, 16 unchanged; player_seed_sweep --digest-check: 16/16 rows PASS against the BL-1031 pins, 0 threw, 3265 s."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness (span mode)"
+     ],
+     "requirement": "With the switch on, the span runs as a third call after the Exploration fold and before population centres are generated: 75 decision rounds, 1660 to 1956, on every library seed, resumed from exploration_output.",
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --through 1960: the span ran 75 rounds, 1660-1960, on 16/16 seeds (lane run); the main session re-ran seeds 28, 40 and 38 and reproduced the lane's counters exactly (121/121/92, 151/76/92, 76/1/213 battles/conquests/foundings; Industry 11/325, 17/401, 21/471)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: the span params start from exploration_sim_params",
+      "code: the run predicate"
+     ],
+     "requirement": "The span's params derive from exploration_sim_params (never the Empires derivation), take their own seed fold, enable the Industry tree from 1660, and keep BL-1037's switch off; the span runs if and only if Exploration ran, never keyed on epoch_year, so the superseded arc runs no Digitisation.",
+     "notes": "",
+     "result_metric": "Cold review (2026-09-18): params from exploration_sim_params, own seed, anchors at 1200, Industry from the span start, BL-1037 off, no Empires-only setting copied; the span sits inside the block that ran Exploration, so it never runs on the superseded arc and stop_after_exploration stops it."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960 (span mode)"
+     ],
+     "requirement": "The thirteen readings are taken on THIS span, per library seed, beside the 1660 control; the continued-Exploration run stays available and is labelled a 1200-network run.",
+     "notes": "",
+     "result_metric": "The thirteen readings on the span per seed beside the 1660 control (16/16 controls matched their fingerprints, lane run); main-session spot of 3 seeds: measured 3, partial 2, structural zero 1, n/a 7. --continued is labelled a 1200-network run in its header, per-seed title, summary and JSON (not on each reading line; the cold review calls R4 met in substance)."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --fidelity"
+     ],
+     "requirement": "BL-1036's fidelity gates still pass on 16 of 16 seeds with the span as the real consumer of the resume.",
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --fidelity, 16 library seeds (main session, 9bc9bb9a): gate 1 16/16, gate 2 16/16, gate 3 (shipped span == the resume) 16/16, 770.9 s, worst seed 214.2 s. FIDELITY PASS."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "code: stop_after_exploration respected",
+      "code: stop_after_digitisation and wizard label 14"
+     ],
+     "requirement": "stop_after_exploration still stops before the span (so exploration_sweep and the fingerprints stay cheap and unmoved); a stop_after_digitisation stop and the wizard's fourteenth label exist.",
+     "notes": "",
+     "result_metric": "Cold review: stop_after_exploration is read at the span's own gate; stop_after_digitisation and the fourteenth label exist. The loading bar's denominator changed with them (12/15), which BL-1053 corrects."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "verification": [
+      "headless: span cost per seed"
+     ],
+     "requirement": "The span's cost per library seed is recorded (median and maximum, Release, serial).",
+     "notes": "",
+     "result_metric": "Span cost per seed, Release harness build, serial: median 2366 ms, max 15069 ms over 16 seeds (lane run; machine not certified quiet); main-session spot on 3 light seeds: median 295 ms, max 339 ms."
+    },
+    {
+     "id": "R8",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no shipped path reaching the span while the switch is off.",
+     "notes": "",
+     "result_metric": "Cold review (code-reviewer, 2026-09-18): nothing blocking with the switch off; the 1660 records world setup still reads, and the harness/validator tightening, are BL-1053."
+    }
+   ],
+   "resolution": "The span runs as its own call; switch off, the digests, fingerprints and pins held (chain 8)."
+  },
+  {
+   "brief": "span-open-survey",
+   "title": "BL-1051 - At the Digitisation span open every region is surveyed for fuel and forest, and the Industry scorer reads forest and a lit furnace from it",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1051 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-19",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "tool: seed_library.js --check",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "With the span switch off, every digest, fingerprint and pin is unmoved.",
+     "notes": "The 16-seed --digest-check and a fingerprint re-check run after BL-1039 round 2 and BL-1041 merge.",
+     "result_metric": "Chain 8 on 849a358d (main session, 2026-09-19; BL-1039 round 2, BL-1040, BL-1041 and its fix round, BL-1051, BL-1053 merged): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; exploration_sweep --out then seed_library.js --check --from: 0 moved, 0 absent, 16 unchanged; player_seed_sweep --digest-check: 16/16 rows PASS against the BL-1031 pins, 0 threw, 3265 s."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: the survey runs once at the span open, over every region, from tiles",
+      "code: energy_q and the gate means untouched"
+     ],
+     "requirement": "The span open fills two new region fields for every region — a surveyed fuel reading and a forest share (land tiles under forest cover, 0-1000, integer) — and nothing else reads them outside the Industry scorer and BL-1041.",
+     "notes": "",
+     "result_metric": "Cold review: the survey runs once at the span open over every region from tiles, after the handoff copy; the -1 sentinel never enters a mean or gate; nothing outside the Industry scorer reads the fields (survey_fuel_q reserved for BL-1041)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sim_harness"
+     ],
+     "requirement": "ground_forest reads the held-mean forest share and furnace_lit reads a Fuel Doctrine side held (T8.7.3 updated); a wooded polity with no seam takes Charcoal Iron on the term, not only because Coke is gated.",
+     "notes": "",
+     "result_metric": "exploration_sim_harness ALL PASS including T8.7.3, T8.7.5 and T8.8.4 (main session, chain 7 on f98c2cea (BL-1039 fix round, BL-1051, BL-1053 merged)). Superseded in part by Ben's wave 1 rulings (furnace_lit = Coke held; forest scored as fuel), which BL-1041 builds and re-tests."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960 (span)"
+     ],
+     "requirement": "Per library seed: the forest-share spread, the Fuel Doctrine split against BL-1038's pooled 404 / 118 / 340, and whether the charcoal polities are the wooded ones.",
+     "notes": "",
+     "result_metric": "Lane --through 1960, 16 seeds: Fuel Doctrine coke/charcoal/neither 391/132/333; the survey moved 14 polities coke->charcoal on 9 seeds, none the other way; mean held forest coke 209 / charcoal 231. --fidelity V5 gates 16/16 (main session, chain 7 on f98c2cea (BL-1039 fix round, BL-1051, BL-1053 merged))."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no reader of the new fields outside the switch.",
+     "notes": "",
+     "result_metric": "Cold review (2026-09-18): nothing blocking; furnace_lit constancy and the unlike fuel/forest scales went to Ben (NR-895) and are ruled."
+    }
+   ],
+   "resolution": "Every region is surveyed at the span open; switch off, the digests, fingerprints and pins held (chain 8)."
+  },
+  {
+   "brief": "setup-reads-span-close",
+   "title": "BL-1053 - When the Digitisation span runs, world setup reads its 1960 close, not Exploration's 1660 one",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1053 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-19",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "tool: seed_library.js --check",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "With the span switch off, every digest, fingerprint and pin is unmoved.",
+     "notes": "The 16-seed --digest-check runs after BL-1039 round 2 and BL-1041 merge.",
+     "result_metric": "Chain 8 on 849a358d (main session, 2026-09-19; BL-1039 round 2, BL-1040, BL-1041 and its fix round, BL-1051, BL-1053 merged): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; exploration_sweep --out then seed_library.js --check --from: 0 moved, 0 absent, 16 unchanged; player_seed_sweep --digest-check: 16/16 rows PASS against the BL-1031 pins, 0 threw, 3265 s."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960 (span, setup diff)"
+     ],
+     "requirement": "With the span on, world setup's treasuries, grudges, stamped roads and junction corridors equal the span's 1960 close, table for table, on every library seed; a harness line prints the diff and it is empty.",
+     "notes": "",
+     "result_metric": "Lane --through 1960: the setup diff is EMPTY on 16/16 seeds (grudges, corridors, chests read from the 1960 close)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: nation treasury credit"
+     ],
+     "requirement": "A polity founded after 1660 is credited its 1960 treasury, and one conquered after 1660 is not credited a chest it no longer holds.",
+     "notes": "",
+     "result_metric": "Code read plus the lane's ad hoc check on seeds 28, 40, 38, 32: a polity with no ground at 1960 is credited nothing."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --fidelity"
+     ],
+     "requirement": "span_params_issues checks every Empires-only setting is off in the span's params; the validator checks contacts and dated objects for continuity and that the span stopped at digitisation_stop_year; fidelity still passes 16 of 16.",
+     "notes": "",
+     "result_metric": "--fidelity on the merged tree: gates 1, 2 and 3 16/16, 765.8 s (main session, chain 7 on f98c2cea (BL-1039 fix round, BL-1051, BL-1053 merged)); lane: four negative tests refused on all 16 seeds."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "code: no pointer into freed Exploration state",
+      "code: stop-year guard"
+     ],
+     "requirement": "The captured span params hold no pointer into state freed before the function returns, and a span whose stop year is not after Exploration's is refused before it runs.",
+     "notes": "",
+     "result_metric": "Lane ad hoc check: a stop year of 1660 is refused before the span runs; captured params hold no resume pointer."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "live: the loading screen"
+     ],
+     "requirement": "The loading bar counts only the stages that will run, so a campaign start without the span reads as it did before BL-1040.",
+     "notes": "",
+     "result_metric": "Live check (Ben, 2026-09-18, the Debug app at 2387af55 on the BenQ): the building screen steps (1/12) to (12/12) and ends full; the wizard's Loading-the-X-round bars shown too. Ben: \"Looks good. We can close that.\""
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no setup read of a 1660 record left on the span path.",
+     "notes": "",
+     "result_metric": "code-reviewer (cold, static, main at 2cfb1c11, 2026-09-19): no setup read of a 1660 record left on the span path. Grudges, surviving corridors and treasuries are reassigned from the 1960 close (hard_coded_world.cpp:1493-1496) and every later reader takes them; kepler_exploration is read only as the span's resume input and the validator's 'from'; no dangling pointer (without_resume_pointers nulls all eight); span-off unchanged but the loading-bar total. Two low findings (a stop-year rule that cannot fail; a hand-kept Empires-only list) filed as BL-1058."
+    }
+   ],
+   "resolution": "With the span on, setup reads the 1960 close; with it off, the pins held (chain 8); the cold review found no 1660 read left."
+  },
+  {
+   "brief": "industry-points",
+   "title": "BL-1041 - Beat 1: regions with centres accrue located industry points from 1660 to 1960, from scale, their own fuel, Industry capacity and treasury paid in",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1041 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-19",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "tool: seed_library.js --check",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "With the span off, every digest, fingerprint and pin is unmoved; points accrue only inside the Digitisation span.",
+     "notes": "",
+     "result_metric": "Chain 8 on 849a358d (main session, 2026-09-19; BL-1039 round 2, BL-1040, BL-1041 and its fix round, BL-1051, BL-1053 merged): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; exploration_sweep --out then seed_library.js --check --from: 0 moved, 0 absent, 16 unchanged; player_seed_sweep --digest-check: 16/16 rows PASS against the BL-1031 pins, 0 threw, 3265 s."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: the accrual"
+     ],
+     "requirement": "Each round every region with centres is credited, on itself (order-independent, int64), scale x its fuel factor (soft, with a floor) x (1000 + the Industry industrial modifier)/1000; the fuel factor reads the span-open survey, and a region founded after the open reads a stated inheritance.",
+     "notes": "",
+     "result_metric": "Main-session code read on 849a358d (history_sim.cpp industry_points_scale_credit ~l.8531, accrue_industry_points, the call ~l.3471): each region with centres is credited on itself off the round's opening state, int64 staged (heads x rate x years / 1e6, x fuel factor floor 250 + 750 x reading / 1000, x (1000 + industrial)/1000), out-of-domain inputs refused (-1), never clamped; the fuel reading is the span-open survey with Default A's x0.7 inheritance (exploration_sim_harness T8.15 pins both defaults). Known drift: every held node's industrial modifier is summed, not capacity nodes only (BL-1057)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: treasury paid in"
+     ],
+     "requirement": "A fixed share of the capital treasury's surplus after the round's army and navy bills converts to points on the capital's own region each round — a consequence, no scored choice, no new verb.",
+     "notes": "",
+     "result_metric": "Met AS BUILT on 849a358d: 250 per mille of the round's surplus after the bills converts, debited, to points on the capital's region; no scored choice, no verb. RE-RULED 2026-09-19 (NR-897): the points spread over the polity's centres by urban scale; BL-1056 carries that, and this row records the build it replaced."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960 (reading 8)"
+     ],
+     "requirement": "Reading 8 per library seed: points spread across regions and polities, the treasury-paid share of points, the fuel factor's spread, and rho(points, urban heads) printed.",
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --through 1960 on 849a358d (main session, 2026-09-19), 16 of 16 worlds, ledger == credited on 16, 0 refused, 0 rejected: points/world med 78.7M; Gini over regions med 0.856; top-region share med 0.280 (max 0.646); treasury-paid share med 0.690; fuel factor median 454, spread 750; rho(points, urban heads) med 0.839; rho(scale points, head-years) med 0.900; rho(scale points per head-year, fuel) med 0.911; original ground 0.570, pre-1660 sim ground 0.454, span-founded 0.003."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960 (reading 9)"
+     ],
+     "requirement": "Reading 9 (Migration) is reported as failing where it fails, never n/a.",
+     "notes": "",
+     "result_metric": "Same run: reading 9 reports FAILING on 11 of 16 worlds (urban share flat or falling: 46 11 31 40 37 13 43 10 25 38 0) and on every world for its stream clause (0 cross-border streams); failing, never n/a."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --fidelity"
+     ],
+     "requirement": "The fidelity gates still pass 16 of 16.",
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --fidelity on 849a358d (main session, chain 8): gates 1, 2 and 3 16 of 16 seeds, negative controls 3 of 3, 740 s, FIDELITY PASS."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no point credited outside the span and no narrowing without a range check.",
+     "notes": "",
+     "result_metric": "code-reviewer (cold) on the BL-1041 merge, 2026-09-18 (NR-896/NR-897 raised from it, fa65047f); its six neutral findings handled in 2c6df95f (merged 849a358d): five made, the capacity-kind filter carried by BL-1057. No point credited outside the span; narrowing range-checked."
+    }
+   ],
+   "resolution": "Beat 1's located points accrue inside the span only; switch off, the pins held (chain 8). The treasury landing was re-ruled (NR-897) and moves in BL-1056."
+  },
+  {
+   "brief": "top-third-bar",
+   "title": "BL-1059 - The Fuel Doctrine pulls count held regions in each resource's own top third",
+   "difficulty": 2,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1059 - sprint 45 (2026-09-19)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-19",
+   "resolution": "Each Fuel Doctrine pull counts held regions in its own resource's top third of the world, on the unclamped share, ties clearing whole; the pins held.",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "tool: seed_library.js --check",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "With the span switch off, every world_determinism digest, seed-library fingerprint and BL-1031 pin is unmoved.",
+     "notes": "",
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; exploration_sweep --out then seed_library --check --from: 0 moved, 0 absent, 16 unchanged; player_seed_sweep --digest-check 16/16 PASS (2959 s)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: the bar",
+      "headless: digitisation_sim_harness (self-check)"
+     ],
+     "requirement": "At the span open a fuel bar and a forest bar are fixed once from every region's unclamped span-open survey share: a region clears when its share is in the top third of the world for that resource, a 0 never clears, a tie at the cut clears whole; the bars are identical across a re-run.",
+     "notes": "",
+     "result_metric": "Code (rounds 1-3: 15713143, 4a7bb291, 6a0d64f1), cold-reviewed twice: the bars are fixed once at the span open from every region carrying both span-open scores, ranking the unclamped survey share (NR-900); a tie at the cut clears whole (NR-904) and a share of 0 never clears; the three bar checks (open, close, re-run) read 'same' on all 16 seeds in chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: the pulls",
+      "headless: exploration_sim_harness"
+     ],
+     "requirement": "ground_forest and ground_fuel read the share of held regions (surveyed for both; span-founded ground excluded) clearing their own bar; the fuel gate, its re-check, the seam flag, the span-ran flag and the -1 fallback are unchanged.",
+     "notes": "",
+     "result_metric": "Code and exploration_sim_harness ALL PASS (chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged); T8.7.5-T8.7.7 read the bar, confirmed by mutation in the lane): both pulls read the share of held regions clearing their own bar; the fuel gate, seam flag, span-ran flag and -1 fallback unchanged (cold review)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960"
+     ],
+     "requirement": "On every library seed each bar is cleared by about a third of the world's ranked regions (more only where a tie at the cut clears whole), printed per seed; no pull rises when a realm gains a region that does not clear its bar.",
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --through 1960 --integral-stride 5 (chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged)): each bar clears about a third of the WORLD on every seed (fuel 33.3-33.4%, forest 33.3-34.3% where ties at the cut clear whole); no bar empty; the empty-bar gate never tripped. Carrier rates run higher by design (fuel 51% of carriers on seed 43)."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960"
+     ],
+     "requirement": "Reading 8 reports the Fuel Doctrine split and mean pulls by side at 1960 over 16 seeds, for Ben's judgement.",
+     "notes": "",
+     "result_metric": "Same run: Fuel Doctrine at 1960 over 16 seeds coke 239 / charcoal 277 / neither 340 (from 142 / 373 / 341 under the mean, NR-899); charcoal polities wooder than coke on 15 of 16 seeds; top region's share of points median 0.030, max 0.195; rho(scale points, head-years) median 0.896."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness --fidelity"
+     ],
+     "requirement": "--fidelity passes 16 of 16.",
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --fidelity: FIDELITY PASS, gates 1-3 16 of 16 (chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged); gate 3 now recomputes each score from its share, and the comparator names all 57 region fields)."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no term that grows with realm size and no bar that moves after the open.",
+     "notes": "",
+     "result_metric": "code-reviewer (cold) on round 1 (the cap cliff and the nonzero-only ranking -> NR-900) and focused cold checks on rounds 2 and 3 (the missing region field, the share/score check, the forest tie -> NR-904); nothing blocks after round 3."
+    }
+   ]
+  },
+  {
+   "brief": "stockpile-to-budget",
+   "title": "BL-1042 - A region's industry points become its campaign centres' charter budgets, built in world/* and passed by the app and its harness mirror alike",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1042 - sprint 45 (2026-09-19)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-19",
+   "resolution": "A region's points reach its carved centres by slot key; townless ground converts nothing and razed ground is lost (NR-901); the pins held.",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "code: the carve index"
+     ],
+     "requirement": "carved_centre carries its slot key and rank; found_centre records a non-serialised centre -> (region, rank) index on world, beside gen_settlement.",
+     "notes": "",
+     "result_metric": "Code (629a4b6b, fix round 6f37aa22): carved_centre carries key and rank; found_centre records a non-serialised centre -> (region, rank) index (gen_carve_centres, gen_carve_dropped) beside gen_settlement; world_copy_determinism restores both (fix round). Cold review: no divergence."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: the builder",
+      "headless: player_seed_sweep --charter-budget stockpile (main session)"
+     ],
+     "requirement": "A world/* builder splits each region's points over its carved centres by slot key with largest-remainder apportionment; anchors and coverage foundings get nothing; a carved centre dropped when its body is built out has its share counted under its own unspent reason. Every point is accounted for by a centre or a reason.",
+     "notes": "",
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19): stockpile_budget_check ALL PASS (the split on hand-built slots: 481/240/120, a dropped slot's 160 unspent, ties to the lower rank, anchors and coverage foundings 0; the lane showed an even split fails 1.1, 1.2, 1.10); player_seed_sweep --digest --charter-budget stockpile --seeds 0,28,46: every account closes (seed 0 31,516,790 = 2,620,000 spent + 28,896,790 charter unspent + 0; seed 28 24,657,817 = 2,820,000 + 21,837,817 + 0; seed 46 57,250,014 = 2,380,000 + 54,645,852 + 224,162 carve_dropped)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: both sides",
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "app::start_new_game_prelude and tools/verify/harness_params.hpp pass the same budget, spend and report to the 7-argument apply, the budget outliving the search; the two diffs are reviewed against each other.",
+     "notes": "",
+     "result_metric": "code-reviewer (cold, static, 2026-09-19): the app path and the harness mirror hand the search the same budget, spend, order and lifetime; the only difference is the report pointer, which is output-only."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "code: entry points"
+     ],
+     "requirement": "The search-less entry points (verify_api.cpp, main.cpp) state or mirror the budget; prices are named constants where the stockpile budget is built, never charter_budget.hpp defaults.",
+     "notes": "",
+     "result_metric": "Cold review: the three search-less entry points (verify_api.cpp, main.cpp x2) state the budget and warn if non-empty; prices are named constants in stockpile_budget.hpp (the ceiling ruled 120 by NR-902, set in BL-1060)."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "code: comments"
+     ],
+     "requirement": "The stale \"nothing shipped passes a budget\" comments are corrected in the same commit (landscape_search.hpp, charter_budget.hpp, harness_params.hpp, app.cpp).",
+     "notes": "",
+     "result_metric": "The stale 'nothing shipped passes a budget' comments corrected in 629a4b6b (landscape_search.hpp, charter_budget.hpp, harness_params.hpp, app.cpp); cold review found none left."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --digest-check (main session)",
+      "headless: world_determinism"
+     ],
+     "requirement": "With the span off the stockpile is empty and the legacy branch runs first: --digest-check with stockpile == none == the BL-1031 pins, 16/16.",
+     "notes": "",
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19): player_seed_sweep --digest-check 16/16 PASS ('none' is now the shipped stockpile path, empty with the span off, and its EMPTY-FLAG check holds); world_determinism digests unchanged. The requirement's 'stockpile == none' holds by construction with the span off (the review's wording note)."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --charter-budget stockpile (main session)"
+     ],
+     "requirement": "With the span on in a harness, a non-empty budget reaches the search on at least three library seeds, every point accounted for by spend or reason.",
+     "notes": "",
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19): with the span on, a non-empty budget reaches the search on seeds 0, 28 and 46 (24.7M-57.3M points to 5,579-15,240 centres), every point accounted for by spend or reason (R2)."
+    },
+    {
+     "id": "R8",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "world_determinism folds the stockpile into its region digest.",
+     "notes": "",
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19): stockpile_budget_check --r8 --seed 28 PASS (a non-empty budget built twice: identical budgets, identical carve index, both accounts close). world_determinism's own fold is conditional and sees no non-empty budget on its span-off worlds; --r8 is the check that can fail."
+    }
+   ]
+  },
+  {
+   "brief": "charter-spend-hardening",
+   "title": "BL-1060 - The charter turn skips a good it cannot place, the ceiling is 120, and the spend refuses and labels honestly",
+   "difficulty": 1,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1060 - sprint 45 (2026-09-19)",
+   "batch": "sprint-45",
+   "resolved": "2026-09-20",
+   "resolution": "The turn skips what it cannot place, each good keeps an even share of a binding ceiling as a reservation, the ceiling is 120, and the spend refuses what it cannot share; the pins held.",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "code: the constant"
+     ],
+     "requirement": "The stockpile path's density ceiling is 120 (NR-902), a named constant with the ruling cited.",
+     "notes": "",
+     "result_metric": "k_stockpile_density_ceiling = 120 with NR-902 cited (stockpile_budget.hpp). chain 12 on 9a39152a (main session, 2026-09-20): every body in the three stockpile seeds reads density ceiling 120 and lands 120 firms."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: the turn",
+      "headless: charter_refusal_probe or a synthetic sweep row"
+     ],
+     "requirement": "Under the goods-in-turn fill a good that cannot be placed in a centre's window is skipped for that centre; the centre stops only when no good in the turn can place (NR-903); a synthetic case where the first good has no deposit tile still charters the later processing goods.",
+     "notes": "",
+     "result_metric": "Code (the turn skips a good it cannot place, failures remembered per focus) and charter_refusal_probe ALL PASS (chain 12 on 9a39152a (main session, 2026-09-20)): the synthetic case gives the skipped extraction good 0 firms while steel and planks charter 2 each; making a failed placement fatal again fails both NR-903 checks (lane mutation, round 2)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: the refusal",
+      "headless: charter_refusal_probe"
+     ],
+     "requirement": "charter_spend_params refuses c and firm price above a bound that keeps c x |G| x fp and cap(B_ref) in range.",
+     "notes": "",
+     "result_metric": "charter_spend_params refuses c x |G| x fp and cap(B_ref) out of int64 range, each bound tight (accepted at the bound, refused one past it); charter_refusal_probe ALL PASS; disabling the three range checks fails all three one-past cases (lane mutation)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "code: G and the reasons"
+     ],
+     "requirement": "A good that falls short only because of the walk's own firms is either served or booked under its own reason, never no_gap.",
+     "notes": "",
+     "result_metric": "A good short only because of the walk's own firms is booked late_shortfall, never no_gap (charter_budget.hpp:8); the probe's late case fails when the check is removed (its 2 points book as no_gap). chain 12 on 9a39152a (main session, 2026-09-20): no_gap 0 and late_shortfall 0 on all three stockpile seeds."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "headless: charter_refusal_probe"
+     ],
+     "requirement": "charter_refusal_probe covers a negative firm price and a non-positive specialist price with a positive firm price, and fails if either refusal is removed.",
+     "notes": "",
+     "result_metric": "charter_refusal_probe ALL PASS with a negative firm price, a zero and a negative specialist price at a positive firm price; removing either refusal fails its cases (lane mutation). The cap(B_ref - 1) half cannot fail while the max(c, ...) floor stands — said on the face of the probe, which now also tests charter_isqrt directly around 600,000 perfect squares."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "The shipped path does not move: world_determinism digests unchanged; player_seed_sweep --digest-check 16/16 (main session).",
+     "notes": "",
+     "result_metric": "chain 12 on 9a39152a (main session, 2026-09-20): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; player_seed_sweep --digest-check 16/16 PASS (3071 s), and empty 3/3, zero 3/3, refused 3/3 on seeds 0/28/46."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds nothing blocking.",
+     "notes": "",
+     "result_metric": "code-reviewer (cold) on round 1 (nothing blocking; NR-905 raised), round 2 (the even share built as a cap holds room back -> NR-906) and round 3 (BLOCKING: the refusal read the uncapped yard want, so a data tune would refuse every world and the search would fall back to the legacy world in silence; plus the upkeep half of the yard bound read flat, the header doc block detached, the refusal absent from the authority doc). Round 4 (9a39152a) fixed all of them; the probe's new 'three yard tests disagree' case fails on all four assertions when the refusal is reverted (mutated, rebuilt, run, restored — main session)."
+    },
+    {
+     "id": "R8",
+     "status": "complete",
+     "verification": [
+      "headless: charter_refusal_probe",
+      "headless: player_seed_sweep --digest --charter-budget stockpile"
+     ],
+     "requirement": "NR-905/NR-906: when the ceiling binds each turn good keeps an even share of the ceiling less the yards' places, as a reservation: a first centre with no quarry cannot starve the extraction goods, a good that stops being short releases its unused share so the ceiling still fills, and an unfilled share is booked under its own reason. A ceiling smaller than the turn is refused.",
+     "notes": "",
+     "result_metric": "chain 12 on 9a39152a (main session, 2026-09-20): the 4x cost row (seed 28, ceiling 120) reads 'the turn: 10 goods, 0 without a firm; firms per good 11..12; even share 11 each, 9 goods +1, reserved of the ceiling less 1 yard place', checks at land PASS; the three stockpile seeds each land 120 firms a body (nine goods 12, cloth 11, one yard) with no_gap 0, late_shortfall 0, share_unplaced 0 and every account closing. A ceiling under the turn is refused (probe), and the sweep now fails if more yards are chartered than places reserved."
+    }
+   ]
+  },
+  {
+   "brief": "real-stockpile-charter-sweep",
+   "title": "BL-1043 - Charter prices and the no-specialist world, measured on real stockpiles",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1043 - sprint 45 (2026-09-20)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "code: the cost mode",
+      "headless: player_seed_sweep --charter-cost (main session)"
+     ],
+     "requirement": "The cost sweep measures REAL stockpile budgets: the Digitisation span on at epoch 0 in the harness (never epoch_year 1960, the superseded arc), the budget built by the shipped builder, not a synthetic one. The matrix and any trim from the full 16 seeds x 11 rows are stated with the reason.",
+     "notes": "",
+     "result_metric": "The cost sweep grew a --budget stockpile mode: the Digitisation span on at epoch 0 (never 1960) and the budget built by the shipped builder, handed to the search and the winner's apply as app::start_new_game_prelude does (merged b4a0de45). MATRIX stage 1, stated on the run's face: 16 library seeds x firm price 10000/20000/40000 x specialist 4 firm charters, sqrt c=8 ceiling 120, province cap on. TRIM refused rather than dropped: budget scales, ladder scales and the forced province-cap row have no meaning for a world's own stockpile. Run as THREE parallel shards (Ben, to halve the wait): a = 46,28,11,31,40,12,37,13; b = 32,10,25,38,9,0; c = 41,43,9,0. Seeds 9 and 0 ran twice, in b and c, and agree to the digit — an unplanned cross-process determinism check."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --charter-cost (main session)"
+     ],
+     "requirement": "Per row and seed: specialists and shortlist size against the legacy roster (6, 6 and 8 on seeds 0, 28, 46); worlds with NO specialist; the specialist capital distribution at the 400 +/-40% draw (NR-895), including any opening at zero; unspent by reason (province_cap, density_ceiling, window_exhausted, share_unplaced, remainder, the dropped-centre reason); firms per good; the density-follows-cities reading; the tick ratio with its phase split; the seat's balance and trailing-net sign.",
+     "notes": "",
+     "result_metric": "Per row and seed, over 16 unique seeds: specialists against BOTH baselines (the legacy no-budget roster and a same-world span-on empty budget), firms and firms per good, the stockpile's own account (closes on every seed), unspent by reason, the specialist capital at the draw, the chartered good against the extracted one, rho(firms, population) with the upstream rho(points, population), and the tick ratio with its phase split. Rows with NO specialist: 0 of 48. Readings: legacy anchor median 9 (6-17); seats median 107.5 / 50.5 / 23.5 at 10k / 20k / 40k; the 120 ceiling binds on 16/16 rows at 10k and 11/16 at 40k."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "record: the run note"
+     ],
+     "requirement": "The run is serial on a quiet machine with keep-awake, and each row's per-tick maximum is scanned for a sleep-length outlier; any row the PC slept through is re-run.",
+     "notes": "",
+     "result_metric": "OWED: stage 1 ran three shards in PARALLEL at Ben's request, so the per-tick milliseconds are contended and are not a timing reading. A short serial pass on 2-3 seeds at the chosen price closes this (~1 h). Keep-awake was held; the PC's 4-hour idle sleep did not fire during the run."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "tool: charter_cost_merge.js"
+     ],
+     "requirement": "The table lands in charter_cost_sweep.json (or a sibling) as its own named run with its note, every key already there unchanged (charter_cost_merge.js).",
+     "notes": "",
+     "result_metric": "Folded into charter_cost_sweep.json by charter_cost_merge.js as runs.real_stockpile_bl1043_a (8 seeds, 40 rows), _b (6, 30) and _c (4, 20), each with its note; every key already in the table verified deep-equal and unchanged."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "record: NEEDS_REVIEW entries"
+     ],
+     "requirement": "NEEDS_REVIEW carries the calls with their figures: the firm price, the specialist price in firm charters, the no-specialist world, and whether the per-province cap stays.",
+     "notes": "",
+     "result_metric": "NR-907 filed with the full table (one price cannot hold the seat menu across a library whose stockpiles vary 5x). The firm price, the specialist price and stage 2's band all wait on it. The no-specialist world is answered by the data so far — no seed produced one at any tested price — but remains Ben's to rule. The province cap has not been read off the charter unspent reasons yet."
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "The shipped path does not move: world_determinism digests unchanged and player_seed_sweep --digest-check 16/16 after the harness change (main session).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds the sweep measures what it claims (the real builder, the stated matrix) and no pinned path moved.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "order-independent-reads",
+   "title": "BL-1050 - Five readers walk unordered stores in hash order, so a saved-and-loaded world ticks differently",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1050 - sprint 45 (2026-09-20)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "code: the five readers"
+     ],
+     "requirement": "Each of the five readers walks a sorted order or writes per key, named in the commit: body_mean_habitability's float sum over population centres; inject_population_demand's accumulation into a market; corp_ai's haul destination (a strict > over markets with no id tie-break); total_income's float sum over the cash-flow map; the corporation-generation reader.",
+     "notes": "",
+     "result_metric": "Seven readers, not five (the lane found the sixth, body_demand's total_scale; the cold review the seventh, inject_background_demand, whose comment carried the same false reason). Each walks ascending entity ids; the haul destination gained an explicit (src_body, r, mid) tie-break the review confirmed is a no-op by construction. Commits 3fc5b3ef-class on branch worktree-agent-ab112b1821025f551 (round 1) and 3c9c5792 (fix round)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: world_copy_determinism"
+     ],
+     "requirement": "world_copy_determinism --copy-by snapshot passes on seed 28 and on the 16 library seeds: a saved-and-loaded world settles to the same digest as its original.",
+     "notes": "",
+     "result_metric": "world_copy_determinism --seeds all --copy-by snapshot on the branch (main session, 2026-09-20, 4166 s): 16 of 16 seeds PASS, 0 fail; every loaded world settles byte-identical to its original (e.g. seed 28 4D338B0202264D5C both sides, seed 0 AF3BDD5524ED9FF3), 11-12 stores still iterate differently after a load and 0 authoritative stores differ in size. Before the change seed 28 FAILED at tick 0 lap 5 (265C48A23E313B1A vs 4663417C6733EBDE)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: the tripwire",
+      "doc: TECH_FOUNDATIONS.md"
+     ],
+     "requirement": "faithful_unordered_map stays as the tripwire, and TECH_FOUNDATIONS.md states the rule (a loaded world replays byte for byte).",
+     "notes": "",
+     "result_metric": "faithful_unordered_map stays the tripwire and is still COUNTED for --copy-by construct/assign (seed 28: 19 stores, 0 differ); docs/tech/TECH_FOUNDATIONS.md already states the rule verbatim at ~104-111, so no doc edit was owed (lane and review agree)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "code: the five readers",
+      "headless: world_determinism"
+     ],
+     "requirement": "Nothing changes but the order: each reader produces the same value as today when the underlying order already matched, shown per reader.",
+     "notes": "",
+     "result_metric": "Per reader: body_mean_habitability and inject_population_demand MOVE (float sums over population centres — the named two-ULP mover and the many-centres-to-one-market accumulation); the haul tie-break moves no choice; total_income cannot reach state (const world, UI cache); accumulate_body_production, body_upkeep_demand, body_demand and inject_background_demand are value-unmoved (integer-exact partials or a zero rate), evidenced by D_search and D_land holding their pins on ALL 16 seeds (main session, 16-seed --digest-check on the branch, 2026-09-20)."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "record: the branch and the merge plan"
+     ],
+     "requirement": "It lands on a branch and is NEVER merged to main alone: it moves the pins every other item's checks stand on, and rides BL-1044's integration (NR-894).",
+     "notes": "",
+     "result_metric": "It lands only on branch worktree-agent-ab112b1821025f551 and rides BL-1044's integration (NR-894). Main-session 16-seed --digest-check on the branch: 0/16 rows PASS, 16 FAIL, every row failing on D_settle and D_seat ONLY — never D_search or D_land. So the re-bless is tick-only, exactly the shape NR-894 authorised."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no reader left in hash order where the order reaches arithmetic or a tie-break, and no behaviour change beyond the order.",
+     "notes": "",
+     "result_metric": "code-reviewer (cold) on the branch, 2026-09-20: the six readers correct and the tie-break a genuine no-op, but the verdict change stopped counting SIZE mismatches (a load that loses a store would have passed), a seventh reader of the same class stood 60 lines from the fix, and body_mean_habitability sorted and allocated per call at six sites. The fix round (3c9c5792) fixed all three: a named derived-cache exemption with size counted (proven by a scratch build whose emptied store now FAILS on size alone while every digest matched), the seventh reader ordered, and a world::body_centre_index memoisation with all four seed-28 digests byte-identical."
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep --digest-check (main session)",
+      "headless: world_determinism"
+     ],
+     "requirement": "After BL-1044's integration: player_seed_sweep --digest-check 16/16 against the NEW pins, and world_determinism's digests recorded old -> new.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

@@ -1,5 +1,15 @@
 # Project Io — Nation Generation
 
+> **Settles:** how a nation comes to exist — where a seed is placed, how territory expands,
+> what the size floor merges away · how a resource profile and a political character are
+> derived from the ground a nation holds · how history's ruptures redraw the carve · how a
+> nation is named · what treasury and substrate density it opens with · how settlements are
+> placed alongside.
+> **Not here:** what a nation *does* once the campaign runs (../politics/NATIONS) · how
+> corporations attach to one (CORPORATION_GENERATION) · which ladder produced the history it
+> inherits (../lore/HISTORY).
+> **Confused with:** ../politics/NATIONS.md, CORPORATION_GENERATION.md, ../lore/HISTORY.md.
+
 Nations are the political and territorial layer overlaid on the tile map. They define the
 geopolitical backdrop at campaign start: who controls what land, what the diplomatic starting
 positions are, and what legal context corporations operate within.
@@ -10,7 +20,7 @@ treasury, law authorship and the nation-behaviour grant (Ben, 2026-08-18). Where
 about a field, generation wins on how it is **set** and NATIONS.md wins on what it **means**.
 
 **Nations are backdrop to the player, not the player.** The player is a **law subject** — a
-mercenary company in the live arc (`docs/development/ROADMAP.md` § The two arcs) — so the
+corporation that holds a seat (`docs/CONCEPT.md` § Player identity) — so the
 mechanics a nation holds stay a nation's and do not become the player's levers.
 
 ---
@@ -68,8 +78,9 @@ The settlement pass is BL-218 (nations rewrite). Between the ladder and the seed
 the ladder's cradles and the creeds' pantheons into **regions** — the unit that actually gets
 settled, industrialised, fought over, and read by corporation generation.
 
-Per region it records: the anchor tile, the **culture it inherits** (its nearest cradle's, so
-the pantheon distribution is a map of who walked where rather than a per-region re-roll), its
+Per region it records: the anchor tile, the **culture it inherits** (the culture of the stream
+that reached it — [COLONISATION.md](COLONISATION.md) § Culture arrives by route — so the pantheon
+distribution is a map of who walked where rather than a per-region re-roll), its
 **ancient endowment** (farm / ore / energy / harbour, surveyed once over the anchor's window), a
 founding year derived from how strongly the ground invited settlement, and — where the ground can
 pay for it — the year its furnaces lit.
@@ -264,6 +275,30 @@ regardless of ideology.
 
 ### Pass 5 — Naming
 
+**The register of naming sites.** A tongue is coined in [CREEDS.md](../lore/CREEDS.md); this
+section owns which passes *consume* one. The register is here rather than beside the tongue
+because consumption is a generation fact, and because a claim that every name is drawn from a
+tongue is **not true of every site** — the exceptions are the reason a register exists at all.
+
+| Site | Source | Draws on a tongue |
+|---|---|---|
+| Star and body names | `body_names.cpp` | Yes — its own `roll_tongue` sky tongue, distinct from any culture's |
+| Nation names | `make_nation_name`, `nation_generation.cpp` | Yes — `tongue_word` over the culture's `speech` |
+| Region names | `settlement.cpp` | Yes, **both halves** — the culture half and the quarter word |
+| City names | `city_names.cpp` | Yes — `coin_lexicon` over the founding culture's tongue |
+| Culture and god names | `creeds.cpp` | Yes — the tongue's own word builder |
+| **Corporation names** | `make_corp_name`, `corporation_generation.cpp` | **Partly.** The identifier half is invented or borrowed from the home nation's leading syllable, so it inherits that tongue; the **type** half is one of twelve English structural words (`k_corp_types`). See [CORPORATION_GENERATION.md](CORPORATION_GENERATION.md) § Pass 5 — Naming. |
+
+**The corporation type word is the one sanctioned English survival in generation**, and it is
+deliberate: a corporation is a modern institution the player reads as one, and "Holdings" does
+the work a coined syllable would not. Nothing else in the register may acquire an exception by
+resembling it.
+
+**A tongue with no phoneme inventory cannot coin**, so `quarter_word` keeps an English fallback
+table for that case alone — a region with no name at all would be worse than one out of
+register. That is a degenerate-input guard, not a second naming system.
+
+
 **There is no name bank** (BL-290, native nation names). A nation is named in the **tongue of the
 culture that settled the region its seed grew from** — the same phoneme inventory the creeds pass
 (BL-235) coined that culture's own name and its gods from. Naming *consumes* the phonology the
@@ -328,24 +363,58 @@ settlement-density description with no consumer. The pass requires population ce
 exist — which is why `generate_population_centres` runs before `generate_nations` in
 `hard_coded_world.cpp` (see § Settlement generation below).
 
-### Pass 7 — Starting treasury (RULED, not yet built — Ben, 2026-08-24, NR-580)
+### Pass 7 — Starting treasury *(Ben, 2026-08-24; the source ruled BL-975, 2026-09-15)*
 
-`nation_component::treasury` is zero at generation by NATIONS.md's existing design — deliberate,
-since a treasury that started full would be a balance change smuggled in as a field. That rule
-still holds for the ONGOING campaign; what it does not settle is generation itself, and Sprint 16
-hit the gap from two directions at once (BL-571's garrison sizing, BL-572's contract-offer
-funding both scale off treasury, so both flatten to their floor in a freshly generated world).
+`nation_component::treasury` opens on **what the history banked, not what the campaign has yet
+earned**. NATIONS.md's rule — a treasury nothing has credited is zero, and a treasury that started
+full would be a balance change smuggled in as a field — still holds for the ONGOING campaign; it
+never settled generation, and two consumers hit the gap at once (garrison sizing and contract-offer
+funding both scale off treasury, so both flattened to their floor in a freshly generated world).
+Ruled 2026-08-24 that generation credits a treasury of its own; ruled 2026-09-15 that the credit is
+the **treasury folded across the last simulated span's handoff** — Exploration's at 1660, or the
+Digitisation span's at 1960 where that span runs — not a levy re-run at world creation. The history
+already wrote the number, and a nation that inherited an empire's chest should open richer than one
+that inherited a city state's.
 
-**Ruled: generation runs a starting levy or tariff of its own**, crediting every nation's
-treasury via the SAME conservation-checked transfer `apply_budget`'s levy already uses
-(NATIONS.md § 2 — a transfer, not a mint; someone's balance debits exactly what the treasury
-credits), before `seed_nation_garrisons` (`hard_coded_world.cpp`) and before any contract-offer
-derivation can run. This
-is a generation-time pass, not a campaign-tick one — it fires once, at world creation, using
-whatever a nation's own resource/territory profile already earns it that first quarter, so a rich
-nation still starts richer without any new authored number. Owner: a future backlog item against
-this pass; not yet implemented (see `docs/development/backlog.json` for the open item this design
-promotes into).
+**The rule.** `EXPLORATION.md` § Where the treasury sits puts one treasury per polity at its
+capital seat, as a fact about the ground (`region::treasury`): the flag over that ground at the
+close owns the chest. Pass 2d folds a polity's anchored regions into ONE nation, and the polity's
+whole treasury at the close — summed over every region flying its flag, so a water-seated capital
+still counts —
+lands on that nation, once. A seed the size floor (Pass 2c) absorbs hands its chest to the realm
+that absorbed it, the same way it hands over its ground. A nation with **no folded polity** — a
+Voronoi cell the history never held, or any body without a settlement pass — opens on the
+**floor: 0 credits**, NATIONS.md's own zero for a treasury nothing has credited.
+
+**The one stated conversion.** The sim's treasury is in its material currency; the campaign's is
+credits. The conversion is a per-mille, and it is named here and nowhere else:
+
+    treasury_credits = Σ region::treasury (at the last span's close, over the folded polities) × 0.01 ‰
+
+that is, **0.01 per mille — one credit per 100,000 units of material**
+(`nation_params::treasury_credit_per_mille`). Chosen against two scales the campaign already has,
+measured on the reference seed:
+
+- **The first quarter's budget.** Every nation's extraction levy (NATIONS.md § 3) is its whole
+  quarterly income at the open; on the reference seed the 38 levies sum to ~284 credits in quarter
+  one, ~7.5 credits per nation. The 1660 median polity chest is ~10 million material, so 0.01 ‰
+  opens the median nation on ~100 credits — about **thirteen quarters (three years) of its own
+  levy**, a reserve, not a hoard. Ten times more (0.1 ‰) would be thirty years of income.
+- **The corporate economy it faces.** Opening corporate cash on the reference seed is ~1,000
+  credits per firm, ~92,000 across the field. At 0.01 ‰ the 38 treasuries sum to ~15,300 credits
+  and the richest realm opens on ~3,800 — four firms' worth, a state that can fund a line or two
+  of its budget (NATIONS.md § 1) without becoming the economy's largest buyer on tick one. At
+  0.1 ‰ the treasuries alone would exceed every firm's cash combined.
+
+Garrison sizing (`seed_nation_garrisons`, MILITARY.md § Nation garrisons) reads the result and
+differentiates on it: the reference seed's poorest realms hold the 20-head floor, its median ~25,
+its richest the 200-head ceiling. The spread is log-heavy because the 1660 chests are — a
+consequence of the span's own endowment and trade income, not a distribution authored here.
+
+**What this pass is not.** It is not a mint inside the campaign: it runs once, at world creation,
+as the fold of a stock the history already held, on the same footing as a corporation's opening
+capital (`CORPORATION_GENERATION.md`). It says nothing about what the treasury is *spent on* —
+NATIONS.md § 1 owns the budget, and Digitisation owns whatever the 1660 → 1960 span adds to it.
 
 ---
 

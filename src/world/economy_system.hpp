@@ -6,6 +6,9 @@
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
 #include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
+#include "space_programme.hpp" // space_purchase (BL-644)
+#include "network_upkeep.hpp"  // network_purchase (BL-643)
+#include "corp_command.hpp"    // firm_exit_record (BL-743)
 #include "logistics.hpp"     // lp_pool_map (BL-596/BL-597, shared active+passive LP pool)
 #include "world.hpp"
 
@@ -100,6 +103,9 @@ struct corp_budget
     /// earmarked, not a top-up), so on that line the inflow here and the
     /// outflow of the dispatch net to zero across the tick; the ledger shows
     /// both rather than neither. The one INFLOW that is not market income.
+    /// A COMPLETED space-programme purchase (BL-644) folds here too: the state
+    /// paid for goods it consumed, the credit stays on the balance, and this
+    /// is the line that explains it.
     float subsidies   = 0.0f;
 
     /// The per-tick balance delta: income less every outflow.
@@ -204,6 +210,23 @@ struct economy_report
     /// nondeterminism, so the accumulation order must stay SORTED.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> wants;
 
+    /// BL-654 ATTRIBUTION MIRROR: the subset of `wants` contributed by the two
+    /// upkeep passes (`run_unit_upkeep`, `run_building_upkeep`). Every figure
+    /// here is ALSO in `wants`, which stays the one register clearing reads —
+    /// this map is never summed into `mc.demand` and is never paid against.
+    ///
+    /// It exists because `wants` deliberately merges its consumers (the market
+    /// does not care who bid), and demand_census recovers the construction half
+    /// from world state and calls the remainder "processing". Before BL-654 that
+    /// remainder was exactly processing; now the upkeep bid is in there too, and
+    /// with no tag the census would report the Industry channel as processing
+    /// demand — a report about a different world, which is the failure that
+    /// census exists to prevent.
+    ///
+    /// Same key type and same std::map as `wants`, for the same
+    /// sorted-accumulation reason.
+    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> upkeep_wants;
+
     /// Per (corporation, body): the pool-level workforce scarcity figure this
     /// tick — `min(1, supply/demand)`, rescaled by habitability efficiency after
     /// production. Since BL-614 (wage competition) this is a REPORTING aggregate
@@ -261,12 +284,14 @@ struct economy_report
     // pass's own report in `national_budget`. Each is empty on a tick that
     // produced nothing; none is persisted.
 
-    /// Claims on a nation's budget raised THIS tick, in emission order. Today
-    /// the only producer is `run_corp_strategic_step`'s cash gate: a rival whose
+    /// Claims on a nation's budget raised THIS tick, in emission order. Two
+    /// producers: `run_corp_strategic_step`'s cash gate — a rival whose
     /// top-scoring survey it could not afford asks its home nation to fund that
-    /// survey in full (`public_exploration`, subject = the body) — at most one
-    /// per corp per evaluation. Emission order is the sorted-corp walk, and the
-    /// budget pass re-sorts into its own order anyway.
+    /// survey in full (`public_exploration`, subject = the body), at most one
+    /// per corp per evaluation — and `derive_space_programme_claims` (BL-644,
+    /// inside `run_nation_step`), the state's own purchase claims. Emission
+    /// order is each producer's sorted walk, and the budget pass re-sorts into
+    /// its own order anyway.
     std::vector<budget_claim> budget_claims;
 
     /// What the national budget pass did this tick: per-nation / per-line
@@ -285,6 +310,29 @@ struct economy_report
     /// — it leaves the corp's balance where it found it — so it is reported here
     /// rather than folded into `budgets[corp].subsidies`. BL-555's line.
     std::vector<earmark_result> earmarks;
+
+    /// What the space programme did this tick (BL-644): every state purchase
+    /// intent, from "the share could buy a lump" through funded (the budget
+    /// paid it) to completed (the goods left the supplier's pool and ceased to
+    /// exist — the satellite launched). The State demand channel's census
+    /// surface: a completed row is realised state demand for its `resource`
+    /// and `quantity`; an unfunded row is demand the treasury could not yet
+    /// cover. In emission order (ascending nation, then the fixed good order).
+    std::vector<space_purchase> space_purchases;
+
+    /// What network upkeep did this tick (BL-643): every Infrastructure-channel
+    /// purchase intent — the material bill each nation's road/hub network asked
+    /// for, what the `logistics_maintenance` share actually funded (pro rata,
+    /// unlike the space programme's lumps), and what left the supplier's pool
+    /// and ceased to exist. The census surface: `quantity` is the bill,
+    /// `drawn` the realised consumption, and the gap is demand the budget
+    /// could not pay. In emission order (ascending nation, stone then timber).
+    std::vector<network_purchase> network_purchases;
+
+    /// Which firms the insolvency wind-up erased this tick (BL-743), with the
+    /// written-off balance and what was liquidated. Report-only — the lapse
+    /// and census read it; nothing feeds it back into the sim.
+    std::vector<firm_exit_record> firm_exits;
 
 };
 
@@ -397,7 +445,12 @@ struct unit_upkeep_tick
 ///  2. THE GOODS DRAW. `resolve_unit_upkeep` resolves the cost vector from the
 ///     roster; each good is drawn from the unit owner's pool ON THE UNIT'S OWN
 ///     BODY. A pool can be empty, so the draw takes what is there and NEVER goes
-///     negative; a short draw marks the unit unmet.
+///     negative. **BL-654: what the pool cannot cover is then BID onto the
+///     unit's local market and paid for** — the same single path
+///     `run_building_upkeep` takes, never a second mechanism — unless the good
+///     prices above the buyer's reservation ceiling
+///     (`price_band_params::reservation_mult`), in which case the unit declines
+///     to buy. Only what is short after BOTH marks the unit unmet.
 ///
 ///  3. THE DECAY RULE — ONE rule, TWO triggers. (a) the unit is beyond the reach
 ///     field (BL-325 S3's out-of-supply decay), or (b) the draw in step 2 went
@@ -410,7 +463,12 @@ struct unit_upkeep_tick
 /// Inert at the shipped rates: every `unit_upkeep_params` rate defaults to zero,
 /// which means no pool is touched (not even created), no draw can go unmet, and
 /// the reach field is never built from here.
-unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg);
+///
+/// @param report BL-654: the shortfall bid lands in `wants` (the price signal),
+///               the fill in `purchases` (what the corp is billed for) and a
+///               copy of the bid in `upkeep_wants` (attribution only). With
+///               `reservation_mult` at its 0 default nothing is ever written.
+unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_report& report);
 
 // ---------------------------------------------------------------------------
 // BL-641 — the building pass
@@ -473,7 +531,18 @@ struct building_upkeep_tick
 /// Inert at the shipped-zero rates: every `building_upkeep_params` rate defaults
 /// to zero, which means no basket resolves non-zero, no pool is touched (not
 /// even created), no draw can go unmet, and no supply factor ever moves.
-building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg);
+///
+/// BL-654: what the pool cannot cover is BID onto the building's local market
+/// and paid for — the same single path `run_unit_upkeep` takes — unless the good
+/// prices above the buyer's reservation ceiling, in which case the building goes
+/// without and step 3's shortfall rule applies unchanged. This is what makes the
+/// Industry channel a PRICE SIGNAL rather than a silent sink: the draw's want
+/// reaches `market_component::demand`, so a rival scoring the building that
+/// supplies it finally has a reason to (MARKETS.md § Demand channels).
+///
+/// @param report Same three registers `run_unit_upkeep` writes.
+building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
+                                         economy_report& report);
 
 // ---------------------------------------------------------------------------
 // BL-470 — the unit march pass

@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**49 surfaces** — 6 settled, 43 awaiting Ben's wording.
+**54 surfaces** — 8 settled, 46 awaiting Ben's wording.
 
 ---
 
@@ -148,21 +148,13 @@ alphabetical order.
 
 *Demanded by BL-468 · `src/core/battle_dispatch_text.cpp`, `src/core/session_history.cpp`, `src/ui/chat_panel.hpp` · id `field_channel`*
 
-### Generation Ledger - Body view (histograms, thresholds, profile echo)
+### Generation Ledger - one flat panel of collapsing sections (profile, thresholds, latitude bands, the three distributions) over a body selector
 
 **Answers:** What shape did this body's generation actually come out, and which input made it that shape?
 
-**Because:** A biome-balance question ('forest and wetland stay sparse on the homeworld') was previously answered by eyeballing the map, which cannot distinguish a bad tuning constant from an unlucky seed. Putting the composition/landform histograms, the ocean threshold against the profile's target, and the profile that drove them on ONE surface is what makes the answer traceable to an input rather than to an impression. It earns its space as a tuning instrument, not shipped chrome - it is the last rail slot for that reason.
+**Because:** A biome-balance question ('forest and wetland stay sparse on the homeworld') was previously answered by eyeballing the map, which cannot distinguish a bad tuning constant from an unlucky seed. Putting the composition/landform histograms, the ocean threshold against the profile's target, and the profile that drove them on ONE surface is what makes the answer traceable to an input rather than to an impression. It earns its space as a tuning instrument, not shipped chrome - it is the last rail slot for that reason. A sibling question - 'why is THIS tile what it is?', asked by a per-tile derivation breadcrumb in a Tile view - was retired with the ledger's tab strip (Ben, 2026-08-30): the six-pass pipeline discards its intermediates and nothing in the code or the design now rebuilds them per tile, so the body-level shape is the only question this surface asks.
 
 *Demanded by BL-303 · `src/ui/generation_ledger.cpp` · id `generation_ledger_body`*
-
-### Generation Ledger - Tile derivation breadcrumb
-
-**Answers:** Why is THIS tile what it is?
-
-**Because:** The six-pass pipeline discards its intermediates, so a surprising tile was previously unanswerable without a debugger: the heightmap, the sea score it was tested against, the moisture and the band all vanish before the tile exists. The breadcrumb names the input value and the rule that fired at each pass, which turns 'that looks wrong' into a specific pass to go and read. It is also the shared content builder the hover card and the Selection element are intended to wrap, so the space it earns is paid for more than once.
-
-*Demanded by BL-303 · `src/ui/generation_ledger.cpp` · id `generation_ledger_tile`*
 
 ### God-view corp/rival readouts (Selection facts column, rival Status rows, rival hover detail) + the survey tell on the Planetary canvas
 
@@ -254,7 +246,7 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 *Demanded by BL-687 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp` · id `market_ledger_trades`*
 
-### National border band (Planetary canvas, always-on chrome)
+### National border band (Planetary canvas, plain-canvas chrome)
 
 **Answers:** Whose ground is this, and where does it stop?
 
@@ -374,6 +366,38 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 *Demanded by BL-575, BL-511 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/ui_state.hpp` · id `unit_marker`*
 
+### Selection band — the water tile variant (owner / domain centre column)
+
+**Answers:** Who owns this water?
+
+**Because:** Coastal water and lakes carry an owner, derived from the shore that claims them; open ocean structurally does not (PROVINCES.md § Who owns water). That asymmetry is the load-bearing shape of the water model, and it was invisible on every surface the game had — the hover card reported terrain and habitability and said nothing about title, no lens colours ground by owning nation, and clicking water did not move the Selection band at all. A claim nobody can look at can only be trusted, which is not the standard this project holds a generated world to. It earns its space by reusing the tile element rather than adding one: same header, same hex ring (which is where a shoreline reads at all), same action grid; only the centre column forks, and it forks because four of the five ground sections — buildings, deposits, resources, population — ask questions about ground there is none of. The single most important word on it is 'Unowned', stated positively: an empty owner row and an owner row reading 'Unowned' cost the same pixels and mean opposite things, the first looking like the panel failed and the second being the model's central assertion.
+
+*Demanded by BL-785 · `src/ui/selection_panel.cpp` · id `water_tile_selection`*
+
+### New World wizard - round 6, Exploration
+
+**Answers:** Who reaches beyond this ground, and what do they bring back?
+
+**Because:** BL-946 (Ben, 2026-09-13, resolving NR-847/NR-857): the Exploration span (1200 -> 1660 CE, EXPLORATION.md) was running opt-in behind `exploration_sim_enabled` and invisible to the player - a real generation pass with no wizard round to show it. The default flips to TRUE and this round replays it on the same shared engine and the same lapse map as Culture and Empires, stopped at its own close (`world_gen_config::stop_after_exploration`) before borders, roads and companies are built. ITS OWN RECORD, NOT A REUSE OF THE EMPIRES ONE: `generation_report::body_entry::exploration_timelapse` is recorded at the one call site that runs the span (as_timelapse(kepler_exploration_hs)) and wired through the SAME `progress->lapse_tap` publish path Culture and Empires already use, so the round shows a real, growing map rather than a silent hang followed by an empty pane - this is also what gives BL-943's fleet/caravan exemplars and BL-932's capital-consolidation burst real Exploration-span events to draw, closing the exact gap NR-857 named. Its own battle/conquest/founding counters (`exploration_*` on `generation_report`) are shown rather than the Empires round's, because the two spans are not the same age.
+
+*Demanded by BL-816, BL-829, BL-860, BL-931, BL-937, BL-943, BL-946 · `src/ui/startup_screens.cpp`, `src/ui/history_lapse.cpp`, `src/world/hard_coded_world.cpp`, `src/world/hard_coded_world.hpp`, `src/core/app.hpp` · id `wizard_round_exploration`*
+
+### New World wizard - round 5, The History
+
+**Answers:** Who claimed this ground, and who lost it, in the age before the epoch?
+
+**Because:** Origin belongs to round 4; this round is the rest of the arc - communication, then conquest or diplomatic union, then a stable dark age - over the 4000 years ending at 1200 CE. It earns a page of its own rather than a section of round 4's because it has its own span, its own rules and its own reroll: a history you cannot reject is a history you were assigned, and rejecting it must not re-draw the migration above it (world_params::era_seed exists for exactly that). Its chart surface is the leaderboard, which moves with the map. THE MOMENTS ARE PART OF THE TIME-LAPSE, not outcomes read off at the end (Ben, 2026-09-11): the record carries typed events - foundings, seats falling, realms ending, secessions, re-seatings, roads, civilisations, creeds - and the round shows them as a ticker of the last few at or before the playhead, phrased with the region's generated name, named in the ticker but NOT marked on the map: BL-916 pulsed a ring at every event's region for about a screen-second, the same ring for a realm dying and a trade route opening, and with fifteen region-carrying kinds the map read as a snowstorm over the borders it exists to show (Ben, 2026-09-16, watching it run). The borders are the story; the ticker carries the moments. The arc readout under the board counts destroyed realms off those events (a dead realm is ABSENT from the next sample, so counting zeros read 0 on every world) and takes peak share against the regions live at the peak's own step, not the final stride. Its map is the same surface as round 4's and draws the same ground under its polity fill - rivers, relief, seats, a frontier on both axes, and neighbours never in one hue (BL-915). A FLEET OR CARAVAN EXEMPLAR MARKS A CORRIDOR'S THROUGHPUT CROSSING A THRESHOLD (BL-943, EXPLORATION.md sec Goods move as throughput: "the visual is a filter on that number, not a second simulation"): a `road_promoted` or `trade_link_opened` event already IS that threshold crossing, so one sail or one caravan draws at the corridor's midpoint and fades over the same marker window the event ring does - never a mark per cargo unit, never a continuous animation. Sea vs. land is read off the corridor's own baked terrain sample; the road ladder's three rungs (Track/Road/Post Road, BL-940) grow and ring the mark so they never draw alike. The one-time treasury consolidation (BL-932, "material becomes capital" at 1200 CE) draws as a separate gold burst at every capital, gated on the record actually reaching past that year - which, until the Exploration span's own tap is wired into the recorded era, it does not, so the beat is correctly silent on every world today.
+
+*Demanded by BL-816, BL-829, BL-860, BL-916, BL-915, BL-943 · `src/ui/startup_screens.cpp`, `src/ui/history_lapse.cpp`, `src/core/app.hpp` · id `wizard_round_history`*
+
+### New World wizard - round 7, Digitisation
+
+**Answers:** What does that ground produce, and who trades it?
+
+**Because:** Rounds 4, 5 and 6 settle who reached this ground, who then held it, and who reached beyond it; what that ground PRODUCES is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Renamed from Industrialisation to Digitisation (BL-946, Ben 2026-09-13) as the honest label for everything after 1660 CE; still the same labelled placeholder BL-914 built, and Digitisation's own content is out of BL-946's scope.
+
+*Demanded by BL-816, BL-819, BL-824, BL-860, BL-946 · `src/ui/startup_screens.cpp` · id `wizard_round_substrate`*
+
 ---
 
 ## Settled
@@ -425,4 +449,20 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 **Because:** Comparison is impossible when every selection replaces the last. The card frame is what makes drill-through (BL-214) a shared idiom rather than a per-panel behaviour. Pairs existed here before BL-247's log was removed.
 
 *Demanded by BL-196, BL-213, BL-214 · `src/ui/selection_card.cpp` · id `selection_card`*
+
+### New World wizard - the lapse rounds' top-sixteen board
+
+**Answers:** Which powers are rising and which are falling as the centuries pass?
+
+**Because:** Ordered and capped is the design, not a display convenience: sixteen rows re-ranking is the surface that shows RISE AND FALL, and an uncapped list of everything would show none of it. It orders by SHARE OF PEOPLE (BL-1000; Ben, 2026-09-15, NR-876): a polity's sampled population over every living polity's at the recorded step at or before the playhead - history_sweep's own arithmetic, so a figure on the board is the figure the sweep prints. Share of LAND was the honest default while the ownership record was all there was (BL-830), but it measures founding as much as conquest - by population the largest realms are two to five points MORE concentrated and most region-count risers were founding empty ground - so land stays as the second, qualifying column and the tie-break, and the region COUNT column went to pay for it. Where a step has no samples (the opening years; the whole Culture round) every row holds no one and the board falls back to land order. Rows are POLITIES, not settlements, because a settlement cannot rise and fall against a rival. Drawn on ALL THREE lapse rounds (4, 5 and 6, BL-946 added the third) from that round's own record, rather than once on a fused round. Pop (the headcount) and Might (the military capacity band, 1-6) are drawn from BL-817's per-polity sample series at the same step, so the board and the map show one instant. The arc readout under the board prints its peak on the same people column, as the sweep's peak_share_pop_q. A RESEARCH column is refused outright, because research points accrue from population under BL-822 and the column would show a correlation it never measured - on the board Ben is judging the research levers with.
+
+*Demanded by BL-830, BL-860, BL-916, BL-946, BL-1000 · `src/ui/history_lapse.cpp` · id `wizard_round_history_board`*
+
+### New World wizard - round 4, The Migration
+
+**Answers:** Who reached this ground first, and by which routes?
+
+**Because:** THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09). One round covering both the peopling of the world and the empires that followed was tried and failed twice: it drew conquest with the migration already finished off-screen, and then - once the migration was moved inside it - migration with no conquest at all and a static final third. The peopling of an empty world and the contest over it have different subjects, different rules and different terminating conditions, so they are two rounds. This one is the diffusion: where people started, the routes they took, and the cultures those routes produced, ending when all land has some culture rather than at a calendar year. It keeps the 2D map, because a globe shows a world and a map shows a FRONTIER (Ben, 2026-09-08, at the live app), and it keeps the inverted model - the pass cannot be previewed per keystroke, so arriving on the round runs it and the wait IS the content. THE MAP'S COLOUR IS THE CULTURE'S, AND KIN SHARE A HUE FAMILY (BL-919): the owner on this round is a culture, and dozens of related cultures under twelve identity colours read as plaid, so the palette is derived once from the culture tree at record time - hue by root cradle with the cradles spread evenly round the wheel, each daughter a fixed step off its parent and bounded to the family's wedge, lightness stepping down by depth and bounded so deep lineages stay readable. A migration route reads as one family shading along its length; another cradle's ground reads as a different family. DRAWS THE GROUND, NOT ONLY THE FILL (Ben, 2026-09-11): rivers and the landform relief are drawn beneath the culture fill and the fill is a translucent tint over them, because a frontier is legible only against the terrain it crosses - a border that stops at a river reads as a river border, and on a flat colour it read as nothing. The frontier is drawn on both axes, each power's seat is a dot, and adjacent powers never share a hue: colours are assigned by a greedy colouring over the polity adjacency graph at record time rather than hashed from the id, over a palette wider than twelve. The terrain base is baked once per record, never re-merged per frame.
+
+*Demanded by BL-816, BL-829, BL-860, BL-919, BL-915 · `src/ui/startup_screens.cpp`, `src/ui/history_lapse.cpp`, `src/ui/presentation.cpp` · id `wizard_round_migration`*
 

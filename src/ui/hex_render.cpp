@@ -1,5 +1,6 @@
 #include "hex_render.hpp"
 
+#include "terrain_palette.hpp" // BL-732: the pure palette both this and ground_bake read
 #include "icons.hpp" // landform glyphs (BL-231)
 #include "world/logistics.hpp" // body_tile_grid — O(1) neighbour lookup (BL-077 raster)
 #include "world/world.hpp"
@@ -31,36 +32,18 @@ ImU32 blend(ImU32 a, ImU32 b, float t)
                     static_cast<int>(aa));
 }
 
-// Signed elevation, plains = 0. Ordered as topography, not as the enum: mountain
-// stands highest, then highland; valley, crater, rift and canyon sink in turn.
-// Magnitudes stay small on purpose — see landform_relief's contract.
-float relief_amount(terrain_landform lf)
-{
-    switch (lf)
-    {
-        case terrain_landform::mountain: return  0.22f;
-        case terrain_landform::highland: return  0.12f;
-        case terrain_landform::plains:   return  0.00f;
-        case terrain_landform::crater:   return -0.08f;
-        case terrain_landform::valley:   return -0.10f;
-        case terrain_landform::rift:     return -0.14f;
-        case terrain_landform::canyon:   return -0.16f;
-    }
-    return 0.0f;
-}
+// BL-732: relief_amount moved to terrain_palette.cpp — the pure palette the
+// ground bake shares. The colour encodings must agree for the delegation below
+// to be a cast; this asserts it once, at compile time.
+static_assert(ui::palette::col32(1, 2, 3, 4) == IM_COL32(1, 2, 3, 4),
+              "terrain_palette's colour32 layout must match IM_COL32");
 } // namespace
 
 ImU32 landform_relief(ImU32 base, terrain_landform lf)
 {
-    const float a = relief_amount(lf);
-    if (a == 0.0f)
-        return base; // plains is the untouched baseline
-
-    // Warm sun above, cool shadow below — the convention that makes a shaded map
-    // read as topography rather than as two arbitrary tints.
-    constexpr ImU32 highlight = IM_COL32(255, 248, 225, 255);
-    constexpr ImU32 shadow    = IM_COL32( 18,  24,  40, 255);
-    return blend(base, a > 0.0f ? highlight : shadow, a > 0.0f ? a : -a);
+    // Delegates to the pure palette (BL-732); maths moved verbatim, goldens
+    // depend on it staying byte-identical.
+    return static_cast<ImU32>(palette::landform_relief(base, lf));
 }
 
 ImU32 contrast_ink(ImU32 bg)
@@ -75,94 +58,17 @@ ImU32 contrast_ink(ImU32 bg)
 
 ImU32 substrate_colour(terrain_substrate sub)
 {
-    switch (sub)
-    {
-        case terrain_substrate::barren:   return IM_COL32(170, 145, 100, 255);
-        case terrain_substrate::rocky:    return IM_COL32(112, 105,  95, 255);
-        case terrain_substrate::volcanic: return IM_COL32(135,  55,  28, 255);
-        case terrain_substrate::icy:      return IM_COL32(200, 224, 236, 255);
-        // BL-516 water kinds. The three read as ONE FAMILY at a glance — the same
-        // blue, lightened toward the shore — so the map still says "water" before
-        // it says which; the depth cue is what tells a strait from open sea.
-        case terrain_substrate::ocean:    return IM_COL32( 40,  80, 160, 255); // open sea (unchanged)
-        case terrain_substrate::coast:    return IM_COL32( 78, 128, 194, 255); // the shallows
-        case terrain_substrate::lake:     return IM_COL32( 62, 122, 172, 255); // inland water
-        case terrain_substrate::regolith: return IM_COL32(138, 130, 120, 255);
-        case terrain_substrate::metallic: return IM_COL32(158, 150, 140, 255);
-        // BARE SOIL — a tan that no pre-split composition had, because the old
-        // model could not draw sedimentary ground without something growing on
-        // it. It is the base every biotic cover below is blended INTO, and the
-        // four canonical blends are calibrated against exactly this value.
-        case terrain_substrate::sedimentary: return IM_COL32(150, 138, 110, 255);
-    }
-    return IM_COL32( 60,  60,  60, 255);
+    // Delegates to the pure palette (BL-732). The values, and the BL-516 water
+    // family and calibrated-sedimentary rationale, live in terrain_palette.cpp.
+    return static_cast<ImU32>(palette::substrate_colour(sub));
 }
-
-namespace {
-
-/// The colour a cover tends toward at FULL density. Deliberately more saturated
-/// than anything that reaches the screen: the drawn colour is the substrate
-/// blended this far by the tile's density, so these are endpoints, not samples.
-///
-/// CALIBRATED (BL-519). The four biotic endpoints are solved so that each old
-/// composition, at the density decompose_biome grades it to, reproduces its
-/// pre-split colour EXACTLY on sedimentary ground:
-///
-///   grassland = sedimentary + grass  @150 -> (96,150,72)   the old grassland
-///   forest    = sedimentary + forest @205 -> (48,102,56)   the old forest
-///   wetland   = sedimentary + marsh  @170 -> (78,120,92)   the old wetland
-///   tundra    = sedimentary + scrub  @ 75 -> (140,140,118) the old tundra
-///
-/// So the map a player already knows is pixel-identical, and what is NEW is that
-/// a forested crag now reads as rock tinted green rather than as flat woodland.
-/// Blend that ROUNDS. `blend` above truncates, and the four calibrated cover
-/// endpoints land a channel short of their pre-split colour under truncation
-/// (grassland came out (95,149,71) instead of (96,150,72)). Rounding here rather
-/// than fixing `blend` keeps every OTHER colour path in this file bit-identical,
-/// which matters because the visual goldens compare pixels.
-ImU32 blend_round(ImU32 a, ImU32 b, float t)
-{
-    t = std::clamp(t, 0.0f, 1.0f);
-    auto ch = [&](int shift)
-    {
-        const float av = static_cast<float>((a >> shift) & 0xFF);
-        const float bv = static_cast<float>((b >> shift) & 0xFF);
-        return static_cast<int>(std::lround(av + (bv - av) * t));
-    };
-    return IM_COL32(ch(IM_COL32_R_SHIFT), ch(IM_COL32_G_SHIFT), ch(IM_COL32_B_SHIFT),
-                    (a >> IM_COL32_A_SHIFT) & 0xFF);
-}
-
-ImU32 cover_endpoint(terrain_cover c)
-{
-    switch (c)
-    {
-        case terrain_cover::grass:  return IM_COL32( 58, 158,  45, 255);
-        case terrain_cover::forest: return IM_COL32( 23,  93,  43, 255);
-        case terrain_cover::marsh:  return IM_COL32( 42, 111,  83, 255);
-        case terrain_cover::scrub:  return IM_COL32(116, 145, 137, 255);
-        case terrain_cover::snow:   return IM_COL32(240, 246, 252, 255);
-        case terrain_cover::dunes:  return IM_COL32(214, 190, 138, 255);
-        case terrain_cover::ash:    return IM_COL32( 78,  72,  70, 255);
-        case terrain_cover::salt:   return IM_COL32(232, 228, 216, 255);
-        case terrain_cover::urban:  return IM_COL32(120, 118, 128, 255); // BL-366: built-over grey.
-        case terrain_cover::none:   break;
-    }
-    return IM_COL32(0, 0, 0, 0);
-}
-
-} // namespace
 
 ImU32 terrain_colour(terrain_substrate sub, terrain_cover cov, std::uint8_t density)
 {
-    const ImU32 base = substrate_colour(sub);
-    if (cov == terrain_cover::none || density == 0)
-        return base;
-    // Urban is opaque, not a tint: a paved tile is not "grey-ish ground", and
-    // letting the geology show through it would misread as a lens artefact.
-    if (cov == terrain_cover::urban)
-        return cover_endpoint(terrain_cover::urban);
-    return blend_round(base, cover_endpoint(cov), cover_fraction(density));
+    // Delegates to the pure palette (BL-732): blend_round, the calibrated
+    // BL-519 cover endpoints and the urban-is-opaque rule all live in
+    // terrain_palette.cpp now, shared with the ground bake.
+    return static_cast<ImU32>(palette::tile_colour(sub, cov, density));
 }
 
 // ---------------------------------------------------------------------------

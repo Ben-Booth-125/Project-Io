@@ -30,12 +30,45 @@ $repo        = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Pa
 $backlogPath = Join-Path $repo 'docs/development/backlog.json'
 $items       = (Get-Content -Raw -Encoding UTF8 $backlogPath | ConvertFrom-Json).items
 
+# Landed items no longer live in backlog.json at all (archive_landed.js, 2026-09-01):
+# the hot file is the live worklist. "DONE lately" is a question about exactly the rows
+# that left, so fold the cold store back in. Whole rows only — a prose-only record from
+# the earlier archive_designs pass carries no `status` and is not an item.
+$archiveDir = Join-Path $repo 'docs/development/archive'
+if (Test-Path $archiveDir) {
+    $landed = foreach ($f in Get-ChildItem -Path $archiveDir -Filter 'backlog-design-*.json') {
+        $records = (Get-Content -Raw -Encoding UTF8 $f.FullName | ConvertFrom-Json).records
+        if ($null -eq $records) { continue }
+        foreach ($p in $records.PSObject.Properties) {
+            if ($null -eq $p.Value.status) { continue }
+            $row = $p.Value
+            if ($null -eq $row.id) { $row | Add-Member -NotePropertyName id -NotePropertyValue $p.Name -Force }
+            $row
+        }
+    }
+    # Hot wins on any id held both places, as archive_store.allItems() does. This union
+    # is deliberately NARROWER than that one: allItems() also folds in the older
+    # complete/cancelled/purged sweeps, and "DONE lately" is a question about the last
+    # few days, which those 2026-08 snapshots cannot answer. Counting them here would
+    # move "N done / N total / N% delivered" off the live worklist it reports on.
+    $hotIds = [System.Collections.Generic.HashSet[string]]::new()
+    $items | ForEach-Object { [void]$hotIds.Add($_.id) }
+    $items = @($items) + @($landed | Where-Object { -not $hotIds.Contains($_.id) })
+}
+
+# DELIVERED vs CLOSED. A cancelled item is off the worklist but was never built, so
+# counting it as done would inflate the one figure that says how much of the design
+# exists (archive_store.js § CLOSED). `$terminal` stays DELIVERED-only and drives the
+# done count and "DONE lately"; `$closed` is what removes something from TO DO.
 $terminal = @('complete', 'shipped', 'delivered')
+$cancelled = @('cancelled', 'purged', 'superseded')
+$closed = $terminal + $cancelled
 $priOrder = @('SSS', 'S', 'A', 'B', 'C', 'F')
 $priRank  = @{}; for ($i = 0; $i -lt $priOrder.Count; $i++) { $priRank[$priOrder[$i]] = $i }
 
-$open        = @($items | Where-Object { $_.status -notin $terminal })
+$open        = @($items | Where-Object { $_.status -notin $closed })
 $doneItems   = @($items | Where-Object { $_.status -in $terminal })
+$cancelledItems = @($items | Where-Object { $_.status -in $cancelled })
 $terminalIds = [System.Collections.Generic.HashSet[string]]::new()
 $doneItems | ForEach-Object { [void]$terminalIds.Add($_.id) }
 
@@ -71,6 +104,13 @@ if (-not $Done) {
     Head 'Project Io - backlog'
     Write-Host ("  {0} open   {1} done   {2} total   ({3}% delivered)" -f `
         $open.Count, $doneItems.Count, $total, $pct)
+    # Cancelled work is reported, never merged into "done". A backlog that shrinks
+    # because items were closed unbuilt looks identical to one that shrank because
+    # they shipped, unless this line exists to tell them apart.
+    if ($cancelledItems.Count) {
+        Write-Host ("  {0} cancelled (closed unbuilt; restore with archive_landed.js --restore)" -f `
+            $cancelledItems.Count) -ForegroundColor DarkGray
+    }
     $byStatus = $open | Group-Object status | Sort-Object Name
     Write-Host ("  open by status:   " + (($byStatus | ForEach-Object { "$($_.Name)=$($_.Count)" }) -join '  ')) -ForegroundColor DarkGray
     $byPri = $open | Group-Object priority | Sort-Object { $priRank[$_.Name] }

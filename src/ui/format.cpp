@@ -1,6 +1,7 @@
 #include "format.hpp"
 
 #include "core/sim_loop.hpp"
+#include "world/hard_coded_world.hpp" // world_params{}.epoch_year — the pre-world default
 
 #include <array>
 #include <cmath>
@@ -20,6 +21,14 @@ constexpr int months_per_quarter = sim_loop::months_per_econ;  // 3
 constexpr int quarters_per_year  = 4;
 constexpr int months_per_year    = months_per_quarter * quarters_per_year; // 12
 constexpr int days_per_year      = days_per_month * months_per_year;       // 360
+
+// The live campaign's epoch year (BL-705). Seeded from `world_params`' own
+// default so a menu-only session — no world generated yet — reads the year a
+// default campaign would, and republished by the app whenever a world is made
+// or loaded. Single-threaded by construction: the app writes it on the main
+// thread at world-swap time, and every reader is an ImGui draw on that thread.
+// Display only; nothing simulated is derived from it.
+int g_campaign_epoch_year = static_cast<int>(world_params{}.epoch_year);
 
 // Magnitude abbreviation thresholds, ascending. Each suffix applies once the
 // magnitude reaches its divisor.
@@ -125,13 +134,23 @@ const char* month_abbrev(int month)
     return month_abbrevs[static_cast<std::size_t>(month - 1)];
 }
 
+int campaign_epoch_year()
+{
+    return g_campaign_epoch_year;
+}
+
+void set_campaign_epoch_year(int year)
+{
+    g_campaign_epoch_year = year;
+}
+
 calendar_date date_from_day(uint64_t day_tick)
 {
     const uint64_t day_of_year = day_tick % static_cast<uint64_t>(days_per_year);
     const int      month_index = static_cast<int>(day_of_year) / days_per_month; // 0-11
 
     calendar_date d;
-    d.year    = static_cast<int>(day_tick / static_cast<uint64_t>(days_per_year)) + campaign_epoch_year;
+    d.year    = static_cast<int>(day_tick / static_cast<uint64_t>(days_per_year)) + g_campaign_epoch_year;
     d.month   = month_index + 1;
     d.day     = static_cast<int>(day_of_year % static_cast<uint64_t>(days_per_month)) + 1;
     d.quarter = month_index / months_per_quarter + 1;

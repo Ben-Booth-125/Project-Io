@@ -154,14 +154,6 @@
    "Keyboard."
   ],
   [
-   "canvas.tech_tree_navigate",
-   "The F9 tech-tree constellation canvas (src/ui/tech_tree_panel.cpp, draw_constellation). A full-canvas takeover bounded to ui::canvas_rect(); it is chrome-less by decision (BL-310 round 4), so it carries no zoom slider or scale bar of its own — this is the only way to move around it."
-  ],
-  [
-   "ledger.tech_tree_style_preview",
-   "The 'Style preview' checkbox at the foot of the Tech Tree fold-out ledger in the shell nav column (src/ui/tech_tree_panel.cpp, draw_tech_tree_menu). The F9 constellation canvas is chrome-less by decision (BL-310 round 4), so every control for that surface lives in this ledger."
-  ],
-  [
    "canvas.zoom_keys",
    "Keyboard."
   ],
@@ -292,10 +284,6 @@
   [
    "ledger.nav_generation",
    "Nav rail, slot 10 (plate/continent glyph)"
-  ],
-  [
-   "ledger.generation_view_tab",
-   "Generation Ledger, view tab strip"
   ],
   [
    "ledger.generation_body_selector",
@@ -602,8 +590,16 @@
    "Command line."
   ],
   [
+   "chrome.spectate_cli",
+   "Command line. The ONLY route into spectator mode for a human — before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do."
+  ],
+  [
+   "chrome.epoch_cli",
+   "Command line. The only route to a start other than the default 0 CE one — the 1960s branch was live in world_params but reachable solely by editing a source default (BL-705)."
+  ],
+  [
    "canvas.border_band_select",
-   "The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
+   "The national border band on the Planetary canvas — plain-canvas chrome, not a lens, and suppressed while any lens is up. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
   ],
   [
    "ledger.company_open",
@@ -624,6 +620,14 @@
   [
    "ledger.selection_open_in_buildings",
    "Selection band, building card's right-hand 2x3 action grid, 'Open in ledger' button (a panel outline with one row picked out)"
+  ],
+  [
+   "canvas.tech_tree_navigate",
+   "The F9 tech-tree constellation canvas (src/ui/tech_tree_panel.cpp, draw_constellation). A full-canvas takeover bounded to ui::canvas_rect(); it is chrome-less by decision (BL-310 round 4), so it carries no zoom slider or scale bar of its own — this is the only way to move around it."
+  ],
+  [
+   "ledger.tech_tree_style_preview",
+   "The 'Style preview' checkbox at the foot of the Tech Tree fold-out ledger in the shell nav column (src/ui/tech_tree_panel.cpp, draw_tech_tree_menu). The F9 constellation canvas is chrome-less by decision (BL-310 round 4), so every control for that surface lives in this ledger."
   ]
  ]
 }

@@ -13,6 +13,11 @@
 namespace {
 
 /// Read a Lua {resource_name = qty} table into a resource-indexed array.
+///
+/// Quantities are validated as the values that land: a NaN weight passes a
+/// `<= 0` guard at every basket injector (NaN compares false), so it would
+/// flow straight into `market_component::demand` and from there into price
+/// resolution. Reject, never clamp — the loader precedent (BL-647 review).
 void read_resource_map(const sol::table& src, std::array<float, resource_count>& dst,
                        const std::string& context)
 {
@@ -23,7 +28,11 @@ void read_resource_map(const sol::table& src, std::array<float, resource_count>&
         const resource_type r = resource_names::resource_from_name(rname, ok);
         if (!ok)
             throw std::runtime_error("Unknown resource '" + rname + "' in " + context);
-        dst[static_cast<std::size_t>(r)] = kv.second.as<float>();
+        const float qty = kv.second.as<float>();
+        if (!std::isfinite(qty) || qty < 0.0f)
+            throw std::runtime_error("Rejected quantity for '" + rname + "' in " + context
+                                     + " (must be finite and >= 0)");
+        dst[static_cast<std::size_t>(r)] = qty;
     }
 }
 
@@ -257,6 +266,13 @@ void recipe_registry::load_from_lua(lua_state& lua)
     {
         m_t_full = thr->get_or("t_full", 1.0f);
         m_t_idle = thr->get_or("t_idle", 0.2f);
+        // BL-739: validated as the value that lands — a floor outside [0, 1]
+        // is rejected, never clamped (the loader precedent).
+        const float floor = thr->get_or("idle_maintenance_floor", m_idle_maintenance_floor);
+        if (!std::isfinite(floor) || floor < 0.0f || floor > 1.0f)
+            throw std::runtime_error("economy.thresholds.idle_maintenance_floor must be "
+                                     "finite and in [0, 1]");
+        m_idle_maintenance_floor = floor;
     }
 
     // BL-365 population-growth gate (economy.population_growth). Scalars fall
@@ -332,6 +348,36 @@ void recipe_registry::load_from_lua(lua_state& lua)
         set_background_demand(bd);
     }
 
+    // BL-647 endemic-luxury-demand model (economy.endemic_demand). The basket
+    // and era rows reuse the two siblings' readers; the scalars are VALIDATED
+    // AS THE VALUES THAT LAND and REJECTED out of range rather than clamped —
+    // a wealth-scaled channel tuned by a NaN or a negative spread is a channel
+    // nobody can replay (the read_checked / read_unit_rate precedent).
+    sol::optional<sol::table> en_demand = (*econ)["endemic_demand"];
+    if (en_demand)
+    {
+        endemic_demand_params ed;
+        sol::optional<sol::table> ed_basket = (*en_demand)["demand_basket"];
+        if (ed_basket)
+            read_resource_map(*ed_basket, ed.demand_basket, "economy.endemic_demand.demand_basket");
+        read_checked(*en_demand, "demand_elasticity", ed.demand_elasticity, 0.0, 10.0,
+                     "economy.endemic_demand");
+        read_checked(*en_demand, "elasticity_min", ed.elasticity_min, 0.0, 100.0,
+                     "economy.endemic_demand");
+        read_checked(*en_demand, "elasticity_max", ed.elasticity_max, 0.0, 100.0,
+                     "economy.endemic_demand");
+        if (ed.elasticity_min > ed.elasticity_max)
+            throw std::runtime_error("economy.endemic_demand: elasticity_min "
+                                     "exceeds elasticity_max");
+        read_checked(*en_demand, "wealth_scale", ed.wealth_scale, 0.0, 1.0,
+                     "economy.endemic_demand");
+        ed.preference_spread = read_unit_rate(*en_demand, "preference_spread",
+                                              ed.preference_spread,
+                                              "economy.endemic_demand");
+        read_era_baskets(*en_demand, ed.baskets, "economy.endemic_demand");
+        set_endemic_demand(ed);
+    }
+
     // BL-442 price band (economy.price_band) — authored once here, read by BOTH
     // resolve_price (market_clearing.cpp) and wf_target_price (economy_system.cpp).
     sol::optional<sol::table> price_band = (*econ)["price_band"];
@@ -340,7 +386,51 @@ void recipe_registry::load_from_lua(lua_state& lua)
         price_band_params pb;
         pb.floor_mult = price_band->get_or("floor_mult", pb.floor_mult);
         pb.ceil_mult  = price_band->get_or("ceil_mult",  pb.ceil_mult);
+        // BL-654: the buyer's reservation ceiling, in the same authored family.
+        // Absent -> 0.0 -> no goods draw ever buys, the pre-BL-654 behaviour.
+        pb.reservation_mult = price_band->get_or("reservation_mult", pb.reservation_mult);
         m_price_band = pb;
+    }
+
+    // BL-708 grid goods (economy.grid_goods) — docs/economy/PRODUCTION.md § Power,
+    // docs/economy/LOGISTICS.md § 3a.
+    //
+    // ABSENT TABLE = no good is a grid good and no store is capped = the
+    // pre-BL-708 behaviour exactly, the same tolerance economy.price_band's
+    // reservation_mult and economy.building_upkeep's rates both carry.
+    //
+    // Keyed by RESOURCE NAME, and an unknown name THROWS rather than being
+    // skipped — read_resource_map's own contract, applied here by hand because
+    // the value is a sub-table rather than a number. A typo'd `powr` would
+    // otherwise author a grid rule nothing ever reads, which is the
+    // silent-nothing this authoring seam must not do.
+    sol::optional<sol::table> grid = (*econ)["grid_goods"];
+    if (grid)
+    {
+        grid_goods_params gg;
+        for (const auto& kv : *grid)
+        {
+            const std::string rkey = kv.first.as<std::string>();
+            bool ok = false;
+            const resource_type rt = resource_names::resource_from_name(rkey, ok);
+            if (!ok)
+                throw std::runtime_error("recipe_registry: economy.grid_goods names an unknown "
+                                         "resource '" + rkey + "'");
+            const std::size_t ri = static_cast<std::size_t>(rt);
+
+            sol::table row = kv.second.as<sol::table>();
+            gg.is_grid[ri] = row.get_or("transmitted", false);
+            const float ceiling = row.get_or("stockpile_ceiling", 0.0f);
+            // Rejected by name rather than clamped — the untrusted-input rule at
+            // the authoring boundary. A negative ceiling would make every store
+            // permanently over-full and silently stop every generator in the
+            // world; a non-finite one would poison the min() that applies it.
+            if (!std::isfinite(ceiling) || ceiling < 0.0f)
+                throw std::runtime_error("recipe_registry: economy.grid_goods." + rkey
+                                         + ".stockpile_ceiling must be finite and >= 0");
+            gg.stockpile_ceiling[ri] = ceiling;
+        }
+        m_grid_goods = gg;
     }
 
     // BL-263 spontaneous-market-emergence tunables (economy.market_emergence).
@@ -364,6 +454,25 @@ void recipe_registry::load_from_lua(lua_state& lua)
         cp.site_time_reach_scale = construction->get_or("site_time_reach_scale", cp.site_time_reach_scale);
         cp.site_time_stack_discount = construction->get_or("site_time_stack_discount", cp.site_time_stack_discount);
         cp.site_time_stack_min = construction->get_or("site_time_stack_min", cp.site_time_stack_min);
+        // BL-709 — what a live project draws from the construction sector each
+        // full-rate tick. Rejected by name rather than clamped, the same
+        // untrusted-input-at-the-authoring-boundary rule economy.grid_goods'
+        // ceiling takes below: a negative rate would credit a build with
+        // capacity it never consumed and could drive `rate` above 1, and a
+        // non-finite one poisons the min() that applies it.
+        cp.capacity_per_build_tick =
+            construction->get_or("capacity_per_build_tick", cp.capacity_per_build_tick);
+        if (!std::isfinite(cp.capacity_per_build_tick) || cp.capacity_per_build_tick < 0.0f)
+            throw std::runtime_error("recipe_registry: economy.construction.capacity_per_build_tick "
+                                     "must be finite and >= 0");
+        // BL-709 — the seeder's provisioning rate. Same rejection rule: a
+        // negative or non-finite target would make the gap vector meaningless
+        // and could send `biggest_gap_resource` chasing a phantom forever.
+        cp.seed_capacity_per_building =
+            construction->get_or("seed_capacity_per_building", cp.seed_capacity_per_building);
+        if (!std::isfinite(cp.seed_capacity_per_building) || cp.seed_capacity_per_building < 0.0f)
+            throw std::runtime_error("recipe_registry: economy.construction.seed_capacity_per_building "
+                                     "must be finite and >= 0");
         m_construction = cp;
     }
 
@@ -572,6 +681,11 @@ void recipe_registry::load_from_lua(lua_state& lua)
             bupk->get_or("supply_decay_permille",    bp.supply_decay_permille);
         bp.supply_recovery_permille =
             bupk->get_or("supply_recovery_permille", bp.supply_recovery_permille);
+        bp.supply_floor_permille =
+            bupk->get_or("supply_floor_permille", bp.supply_floor_permille);
+        if (bp.supply_floor_permille < 0 || bp.supply_floor_permille > 1000)
+            throw std::runtime_error("recipe_registry: building_upkeep.supply_floor_permille "
+                                     "must be in [0, 1000] (BL-746)");
         // Both are per-mille of a 0..1000 factor, so the honest domain is
         // [0, 1000]. Rejected by name rather than clamped, the untrusted-input
         // rule applied at the authoring boundary (economy.acquisition's
@@ -745,6 +859,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
         read_checked(t, "calm_schooling",    np.calm_schooling,    0.0, inf, ctx);
         read_checked(t, "calm_academic",     np.calm_academic,     0.0, inf, ctx);
         read_checked(t, "calm_works",        np.calm_works,        0.0, inf, ctx);
+        read_checked(t, "calm_space",        np.calm_space,        0.0, inf, ctx);
         read_checked(t, "threat_contracted", np.threat_contracted, 0.0, inf, ctx);
         read_checked(t, "threat_reserve",    np.threat_reserve,    0.0, inf, ctx);
         read_checked(t, "threat_milres",     np.threat_milres,     0.0, inf, ctx);
@@ -753,6 +868,69 @@ void recipe_registry::load_from_lua(lua_state& lua)
         read_checked(t, "calm_reserve_bonus", np.calm_reserve_bonus, 0.0, 1.0, ctx);
 
         m_nation_ai = np;
+    }
+
+    // BL-644 space-programme purchase lumps (economy.space_programme). The same
+    // strict read as nation_ai above, and for the same reason: the lump sizes
+    // feed a deterministic per-tick derivation, so a NaN here would be a spend
+    // nobody can replay. Absent table (or key) keeps the zero defaults — an
+    // unauthored world derives no state purchase.
+    sol::optional<sol::table> space_tbl = (*econ)["space_programme"];
+    if (space_tbl)
+    {
+        const std::string      ctx = "economy.space_programme";
+        const double           inf = std::numeric_limits<double>::infinity();
+        space_programme_params sp  = m_space_programme;
+        const sol::table&      t   = *space_tbl;
+
+        read_checked(t, "components_lump", sp.components_lump, 0.0, inf, ctx);
+        read_checked(t, "propellant_lump", sp.propellant_lump, 0.0, inf, ctx);
+
+        m_space_programme = sp;
+    }
+
+    // BL-743 firm-exit trigger (economy.firm_exit). Strict read: the trigger
+    // erases actors, so a NaN threshold would be a wind-up nobody can replay.
+    // Absent table keeps the inert defaults — an unauthored world never exits
+    // a firm.
+    sol::optional<sol::table> exit_tbl = (*econ)["firm_exit"];
+    if (exit_tbl)
+    {
+        const std::string ctx = "economy.firm_exit";
+        firm_exit_params  fe  = m_firm_exit;
+        const sol::table& t   = *exit_tbl;
+
+        read_checked(t, "balance_floor", fe.balance_floor,
+                     -std::numeric_limits<double>::infinity(), 0.0, ctx);
+        read_checked(t, "consecutive_quarters", fe.consecutive_quarters,
+                     0, 40, ctx); // 40 = the return-retention cap
+
+        m_firm_exit = fe;
+    }
+
+    // BL-643 network-upkeep material rates (economy.network_upkeep). The same
+    // strict read as space_programme above, and for the same reason: these
+    // rates feed a deterministic per-tick derivation, so a NaN here would be a
+    // draw nobody can replay. Absent table (or key) keeps the zero defaults —
+    // an unauthored world derives no upkeep draw.
+    sol::optional<sol::table> net_tbl = (*econ)["network_upkeep"];
+    if (net_tbl)
+    {
+        const std::string     ctx = "economy.network_upkeep";
+        const double          inf = std::numeric_limits<double>::infinity();
+        network_upkeep_params np  = m_network_upkeep;
+        const sol::table&     t   = *net_tbl;
+
+        read_checked(t, "stone_track",    np.stone_per_level[0],  0.0, inf, ctx);
+        read_checked(t, "stone_road",     np.stone_per_level[1],  0.0, inf, ctx);
+        read_checked(t, "stone_highway",  np.stone_per_level[2],  0.0, inf, ctx);
+        read_checked(t, "timber_track",   np.timber_per_level[0], 0.0, inf, ctx);
+        read_checked(t, "timber_road",    np.timber_per_level[1], 0.0, inf, ctx);
+        read_checked(t, "timber_highway", np.timber_per_level[2], 0.0, inf, ctx);
+        read_checked(t, "stone_hub",      np.stone_per_hub,       0.0, inf, ctx);
+        read_checked(t, "timber_hub",     np.timber_per_hub,      0.0, inf, ctx);
+
+        m_network_upkeep = np;
     }
 
     // BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch).

@@ -1,5 +1,13 @@
 # Project Io — Markets
 
+> **Settles:** where a market centre is and what it covers · how an order book clears · how a
+> price resolves and what bounds it · where a demand want comes from · who may place an order
+> and on what terms · what a market does when it cannot clear.
+> **Not here:** the money loop the proceeds land in (FINANCE) · what physically moves the goods
+> (SUPPLY) · what the road costs (LOGISTICS) · a priced promise between named parties
+> (CONTRACTS).
+> **Confused with:** FINANCE.md, CONTRACTS.md, SUPPLY.md.
+
 The market model: `src/world/market_clearing.cpp`, the market/order components in
 `src/world/components.hpp`, and the seeding in `src/world/hard_coded_world.cpp`. Production's side
 of the exchange is `docs/economy/PRODUCTION.md` § Stockpile and output flow; which resources trade
@@ -27,9 +35,37 @@ deterministic, with a seeded jitter on the borderline. If no centre qualifies, o
 fallback market is seeded. On seed 0 the home body carries nine carved markets, and *no single one
 of them stands for the body*.
 
+**A market also emerges where trade CONCENTRATED, not from population alone** (Ben, 2026-09-03,
+the eight-phase reorder point 4: *"markets should begin to emerge towards the end of this
+phase"*). The carve above is a **nation-grain** judgement — this nation's geology, and how many
+corporations already compete in it — and it says nothing about *where inside that territory*
+exchange actually happened. The Era −1 history does: it records every corridor it supplied an
+army or a founding party along (`LOGISTICS.md` § The ancient network), and a region several of
+them **meet** at is a junction. A centre standing at a junction is gated as a rich nation's
+centres are, whatever its own nation's concentration says.
+
+Three properties keep that from becoming a second, competing carve:
+
+1. **It only ever LOWERS the gate**, so it adds markets and removes none. Raising the gate at a
+   quiet region would delete a market the economy is already built on, and this is an emergence
+   rather than a cull.
+2. **The floor is the existing fracture gate.** A village never carries a market however many
+   roads meet on it — the ladder's own bottom rung does not move.
+3. **A junction is a graph property**, not a percentile: the count of distinct corridors
+   incident on a region. So it is a plain integer over a sorted record rather than a threshold
+   argued from a distribution.
+
+What it produces is the **entrepôt on poor ground** — a barren nation that would otherwise fold
+into its neighbour keeps a market where the routes cross. BL-768 (roads and markets from
+history) owns the design.
+
 **Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
-(`market_for_tile`); a corp's body-aggregate clearing routes via its lowest-id building's tile
-(`market_for_corp_on_body`).
+(`market_for_tile`). **A corporation clears in every market it holds a pool in** (Ben, 2026-09-15):
+goods pools are per `(corp, market)` (`PRODUCTION.md` § Stockpile and output flow), so a building
+sells into and buys from its own tile's catchment, and goods a convoy delivers sell at the market
+they were delivered to. The earlier body-aggregate rule — every sale routed through the corp's
+lowest-id building — is retired with the per-body pool; it is what made a same-body haul sell back
+at home.
 
 ## Spontaneous market emergence
 
@@ -115,24 +151,29 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
 3. **Demand injection** — two pure demand-side pulls, both after the reset so they are not
    erased the tick they land:
    - `inject_population_demand` — each population centre pulls a price-elastic, multi-resource
-     DEMAND from its catchment market (food rations, agricultural produce, water, clean water,
-     consumer goods, medical supplies): `pcc.scale × demand_scale × basket[r] ×
-     elasticity(price)`. Population is a pure **consumer** — no supply term. Tunables in
-     `scripts/economy.lua` § `population_demand`.
-   - `inject_background_demand` — the offstage economy's own pull on the mid-chain processing
-     goods (silicon, refined copper, REE alloy, machinery, alloys, electronics — **not**
+     DEMAND from its catchment market, over the cumulative rungs its stratum reaches:
+     `heads / heads_per_demand_unit × basket[r] × elasticity(price)`, with rungs 4–5 scaled by the
+     nation's qualification and every rung weighted by the catchment's culture
+     (`POPULATION.md` § The stratum ladder). Population is a pure **consumer** — no supply term.
+     Tunables in `scripts/economy.lua` § `population_demand`.
+   - `inject_background_demand` — **a labelled STOPGAP**: the offstage economy's own pull on the
+     mid-chain processing goods (silicon, refined copper, REE alloy, machinery, alloys — **not**
      `spacecraft_components`, which stays procurement-only so the militia's contracts remain its
-     only buyer), world-scale rather than per-centre, because real background firms alone would
-     under-consume these before enough of them exist. Per-body population scale is gathered in a
-     `std::map` so accumulation order is deterministic. Tunables in `scripts/economy.lua` §
-     `background_demand`.
-4. **Auto-surplus** — each `(corp, body)` pool lists everything above its **processor
+     only buyer), because real background firms alone would under-consume these before enough of
+     them exist. **It retires good by good as a real channel claims each one (Ben, 2026-09-15):**
+     electronics left it when the metropolis rung of the household ladder took it
+     (`POPULATION.md` § The stratum ladder); the intermediates stay until the Industry channel's
+     building upkeep buys them. **A body's pull is SPLIT across its markets in proportion to their
+     catchment population**, never granted whole to each — a body carved into nine markets does not
+     want nine times as much. Per-body population is gathered in a `std::map` so accumulation order
+     is deterministic. Tunables in `scripts/economy.lua` § `background_demand`.
+4. **Auto-surplus** — each `(corp, market)` pool lists everything above its **processor
    reservation** (the inputs its own processors need for a full run next tick) for sale. A
    resource under a standing sell order is exempted — the manual order governs.
 5. **Standing sell orders** — read from `world::sell_orders` (the book is world state, placed by
    the player and by rival corps through the same `place_sell_order` verb), quantity capped by the
    pool, entered into both market supply and the explicit sell book with their `floor_price`.
-   Multiple orders against one `(corp, body, resource)` share a **running remainder**: total
+   Multiple orders against one `(corp, market, resource)` share a **running remainder**: total
    listed quantity never exceeds the pool, each order's matched/auto-cleared quantity is tracked
    per order, and pool debits clamp at zero.
 6. **Auto-demand** — two registers, read separately (§ Want and fill below). `report.wants` —
@@ -225,6 +266,101 @@ bid; `run_unit_upkeep` does not, and it has the same latent defect. **A sink tha
 its own supply is a slow way to shut the economy down**, and the cost of learning that is one
 harness run rather than a shipped world nobody can play.
 
+**4. Every resource must have a path to a TERMINAL sink** (Ben, 2026-08-31). A terminal sink
+consumes a good and produces nothing that must itself be sold: a household basket, an upkeep draw,
+a construction cost. **Processing is not one** — it is a pass-through, and a chain that ends in a
+processor ends nowhere.
+
+Measured 2026-08-31 with `demand_census`, and **the two bands fail differently** — which is worth
+keeping straight, because the fix is not the same:
+
+*Ancient band.* The endpoints largely work. BL-640's era-banded basket does what property 2 asked:
+ceramics, dressed stone, planks, leather, cloth and charcoal all carry real household demand. What
+is broken is the **middle**. `fibre` is produced 27613.5 against demand 89.7 and sits near its price
+floor, while `leather` — which fibre's sibling chain should feed — is produced **6.8** against demand
+87.1 and prices at **9.97× base, ceiled in 13 of 14 markets**. The chain is not converting: raw
+inputs glut, finished goods starve. Fifteen resources still have no market sink at all, and the
+census separates them usefully — four *produced in-band with no sink* (ordnance, rigging, tools,
+trade_goods_misc) and eleven *extractable with no sink* (coal, coffee, copper ore, iron-nickel ore,
+petroleum, platinum-group metals, rare-earth ore, regolith, silica, spices, tobacco).
+
+*Industrial band.* The endpoints barely exist. Household reaches 6 resources, construction reaches
+**0**, building upkeep **0**, and the largest single source of demand is the background-industrial
+**stopgap** at 3660.8 of 5268 total — 69%. Strip it and roughly **1.8% of what the world produces
+has a genuine buyer**. `iron_ore` is produced 42991.6 against demand **0.000**.
+
+So the ancient band needs its chain to convert; the industrial band needs endpoints to exist at all.
+
+The rule is not "every resource needs its own channel". It is that **intermediates earn DERIVED
+demand through the chain** — a market with people wants cloth, and should never need to want fibre
+directly; fibre's demand is the cloth-maker bidding for it. That is why property 3 above is
+load-bearing rather than fastidious: derived demand only propagates backwards through links that
+**bid**. Sever the chain at one pool draw and everything upstream of it becomes an orphan, however
+carefully its recipe was authored.
+
+This gives the admission rule its shape. A resource is legitimate in a band when a path exists from
+it to a terminal sink **in that band**, and the census can assert it per band rather than per
+opinion.
+
+**5. Terminal demand is UNIVERSAL; supply is not — and the asymmetry is generation's to PRODUCE,
+not to guarantee** (Ben, 2026-08-31).
+
+Terminal demand follows **population**, and population is everywhere. So every chain should
+*terminate* in every market: wherever there are people, there is a buyer for the consumer end of
+every chain the band supports. That half is a rule, and it is what stops a good being an orphan in
+one market and a staple in the next for no reason a player could read.
+
+Supply is regional, because deposits are. Trade therefore arises from **supply asymmetry**, not
+from demand asymmetry — which is the right way round, and the reason universal demand does not
+flatten the map.
+
+**But local self-sufficiency is NOT forbidden.** An earlier draft of this section proposed the
+stronger rule that no chain should be completable within any single market. Ben overturned it the
+day it was written: *"there is no reason that every start needs to be equally good and fair… we
+should be making rules that encourage a level of asymmetry."* A region that can close a chain by
+itself is a strong start, and a strong start is a legitimate outcome — the same way a poor one is.
+
+So the second half is **suppositional**: self-sufficiency is expected to be possible, uncommon, and
+unevenly distributed. What generation owes is the **spread**, not the floor. See
+`docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the deliverable.
+
+**AMENDED (Ben, 2026-09-15): demand keeps universal PRESENCE and takes a cultural WEIGHT.** The
+first half above stands — every market keeps a buyer for every terminal good its band supports.
+What changes is the volume: household demand for a good is weighted by the population-weighted
+preference of the cultures in the market's catchment. Trade therefore arises from **both**
+asymmetries — supply, because deposits are regional, and demand, because peoples are. The
+preference is derived in the history (`docs/generation/EXPLORATION.md` § A good acquires a cultural
+preference) and seeded at the epoch (`docs/generation/DIGITISATION.md` § 1. A dense corporate web,
+and markets that stock what their people want).
+
+**6. Two channels are settled by the power and construction design** (Ben, 2026-08-31), and both
+are worth naming here because they change what the register measures.
+
+**Construction stops being episodic.** It becomes a *sector* with a throughput that draws its
+method's goods as upkeep every tick, rather than a per-project lump that fires only while something
+is building — which is why the channel currently measures 0.000 in the industrial band. Seeded
+capacity gives it a non-zero reading from tick 0. `docs/economy/PRODUCTION.md` § Construction as a
+rate owns it.
+
+**Power is a BOUGHT good, and it is the Industry channel's first viable entry** (Ben, 2026-08-31:
+*"it has to be a bought good when it is taken as upkeep. Therefore corporations can buy power from
+each other, and background companies can produce power with a profit"*).
+
+Every building that needs power bids for it, so **both links of the fuel chain bid**: the generator
+buys fuel as a processing input, and every building buys power as upkeep. Neither is a pool draw, so
+neither severs the chain — property 3 satisfied twice, and property 4's derived demand propagating
+through links that bid, working as designed. `coal` and `petroleum` gain their endpoint and power
+gains its own.
+
+**It is the first entry in the Industry basket the world will actually make.** That basket ships at
+zero because tools and planks are *produced 0.0* in band; power is produced because producing it is
+profitable, which is why turning Industry on for power is a different proposition from turning it on
+for tools, and the order to do it in.
+
+Power is also the first good whose **movement and market are separate questions**: it has a price but
+no convoy, and a buyer can only match a seller its road network reaches, which keeps the price
+regional. `docs/economy/PRODUCTION.md` § Power and `docs/economy/LOGISTICS.md` § 3a own it.
+
 ### Settled: a short pool BUYS, up to a reservation ceiling
 
 Ben's ruling, 2026-08-26 (BL-654): *"Buy on the market, but at a threshold, buying is not allowed.
@@ -262,9 +398,10 @@ gameplay that good produces.
 ### What each channel adds, and what it already has
 
 - **Household** (BL-640, era-banded household basket). The basket gains an era band and the
-  stratum ladder POPULATION.md § Population demand already calls for and leaves unquantified. It is
+  stratum ladder (`POPULATION.md` § The stratum ladder, Ben 2026-09-15): volume by headcount,
+  cumulative rungs up to electronics at a metropolis, upper rungs scaled by qualification. It is
   the sink for terminal artisan goods — the ancient roster's ceramics, cloth, leather, dressed
-  stone — which is what those goods were authored to be.
+  stone — and, in the industrial band, the first genuine buyer for electronics.
 - **Industry** (BL-641, building upkeep in goods). Today a building pays maintenance and wages in
   **credits only**, while a unit pays credits **and a goods vector** (`run_unit_upkeep`). Giving
   buildings the same shape turns every firm in the world into a consumer, and it is the single
@@ -276,7 +413,7 @@ gameplay that good produces.
   constructing them, so the draw never fires during the opening years, and stone and timber have a
   construction sink on paper with no pull in practice. Two halves: make the opening years build,
   and make **centres draw materials as they grow**, which is the half that does not decay after the
-  warm start. An ancient economy's largest material sink is building.
+  pre-game settle. An ancient economy's largest material sink is building.
 - **Infrastructure** (BL-643, network upkeep draws materials). The `logistics_maintenance` budget
   line already exists and names exactly this. A road network that consumes stone and timber to stay
   standing is a permanent sink scaled by geography rather than by population — and it gives the
@@ -300,6 +437,23 @@ gameplay that good produces.
   that scales with **wealth** rather than headcount, flavoured by national character — so different
   nations crave different luxuries and the trade route is asymmetric by construction. This is the
   most *Trade*-shaped channel of the eight: extract where it grows, sell where the money is.
+
+  **`trade_goods_misc` joins this basket as its fifth member (Ben, 2026-09-06).** It is a *produced*
+  endemic-class good — the Potter & Weaver's and the Glassworks' output — where the other four are
+  extracted, and until now it was produced, priced and wanted by nothing, which under this document's
+  admission rule (a consumer is a mechanism, not a noun) makes it a name rather than a resource.
+  Putting it in the wealth-scaled basket gives it the one thing it lacked: a terminal sink in its
+  own band.
+
+  **What it costs, and it is worth stating rather than discovering.** The four extracted luxuries
+  carry *geography* — each grows in one lat/sector and nowhere else, which is what makes the trade
+  route asymmetric and the price a function of distance. `trade_goods_misc` has no endemic geography;
+  it is made wherever clay and a workshop are. So its row **dilutes the directional asymmetry** that
+  is the whole point of the channel — a fifth craving that every nation can satisfy locally. It is
+  admitted anyway because a sink in the right band beats no sink at all, and because the dilution is
+  bounded by the row's own weight. If the channel's asymmetry measurably weakens, the honest next
+  step is to give the good a geography (an endemic *recipe* input, or a named luxury replacing the
+  placeholder) rather than to widen the basket further.
 
 ### Measuring it
 
@@ -331,12 +485,27 @@ injects supply and demand.** Nothing in the engine injects fictional supply; the
 quantities are the two pure demand pulls in step 3. The design is BL-365 (real background
 corporations).
 
-World-gen runs a **second, later corporation-generation pass**
-(`docs/generation/CORPORATION_GENERATION.md` § Pass 6) that places real background firms — real
-buildings, on real tiles, with `corporation_component.is_background = true` — until the body's
-real production meets a ~90% target fraction of real demand. The count is **calibrated**, not
-authored: generation keeps adding firms/holdings until the measured production/demand ratio
-crosses the target, so the figure stays correct as recipes, deposits, or population are retuned.
+**The background economy is the landscape phase 6 selected** — not a separate injection pass bolted
+on after generation. The settle that hands play its opening position is phase 6's single
+validation run of the winner — twelve quarterly econ ticks, `app::validation_ticks`, a length
+measured on the per-tick convoy dispatch count rather than chosen (`../economy/ERAS.md` § The
+opening position; BL-978, warm start retired, owns the work). There is no other pre-game tick
+loop: the prices play opens on are the ones those twelve clearings leave. Generation scores candidate corporate landscapes
+— rosters, placements and road tiers — statically against the finished world, and the winning
+candidate's firms *are* the background economy: real buildings, on real tiles, with
+`corporation_component.is_background = true`. Placement mechanics are
+`docs/generation/CORPORATION_GENERATION.md` § Pass 6; what is placed is decided by the search
+(`docs/generation/GENERATION_STRATEGY.md` § The eight phases; BL-770, Era 0 candidate search).
+
+**So the roster is a consequence of the objective, not of a calibrated stopping rule.** The earlier
+design added firms until measured production crossed a ~90% target fraction of measured demand.
+That is superseded, and for a reason worth stating rather than dropping: a target fraction pushes
+every market toward the same coverage, and an even map is exactly what
+`docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the deliverable exists to prevent. The
+search's objective is **viable-but-uneven** — chain completeness, the supply-to-demand ratio, and
+the *spread* of both across markets, with unevenness scored for rather than tolerated. What the
+calibrated rule got right is kept: nothing is authored as a fixed count, so the roster stays
+correct as recipes, deposits or population are retuned.
 
 Background firms are not a cheaper stand-in for the player's rivals. They run the **full corp_ai
 scored-utility layer** — build, demolish, survey, road, hire, and trade decisions, identical to
@@ -370,7 +539,7 @@ branch for zero supply against real demand takes the price to the top of the ban
 input.
 
 **Two registers, one of them priced.** `economy_report` carries `wants` alongside `purchases`,
-both `std::map` keyed by `(corp, body)`:
+both `std::map` keyed by `(corp, market)`:
 
 - **`wants`** — the full-run input need, computed **before** any coverage decision, so it is the
   same number whether the draw then succeeds, runs short, or fails outright. Registered by
@@ -581,110 +750,26 @@ potential trade sorted by margin is information the player must still weigh agai
 competition and what the price does next — so ordering it does not decide the game. Ordering
 *tiles to build on* by margin does, and is refused.
 
-## Procurement — a layer over the market, not a second market
+## A market's listed value
 
-> **[`CONTRACTS.md`](CONTRACTS.md) is the authority for contracting** — both the buy side
-> (procurement, BL-350) and the sell side (the mercenary contract, BL-377). This section is the
-> **market-facing** account: how procurement sits against the market rather than replacing it. The
-> counterparty model, the terminal states, the reputation axis and the whole sell side live there.
+**A market's cap is its LISTED VALUE (Ben, 2026-09-15): the summed valuation of the firms
+headquartered in its catchment.** It answers *how much capital sits here*, which is the reading a
+player means by a market's size. Each firm is valued by the formula a whole-firm buyout already
+prices (`FINANCE.md` § Whole-firm acquisition), so the sum introduces no second valuation.
 
-A procurement contract is **a build order placed with someone else**: the commit-on-affordability,
-draw-materials-per-tick, pay-across-the-build shape of construction pacing, with the materials
-drawn against the **supplier's** market and the output delivered to the **buyer's** pool. The
-counterparty is a NAMED corp with a price, a lead time, and a possible refusal — not a purchase
-order against an unlimited market, and not an order-book entry (the book is price-time priority
-over anonymous asks; it has no representation for a named counterparty or a lead time). It joins
-the same `corp_command` seam the order book does, for the same reason: the player's press and the
-AI's command are one implementation.
+**It is a sum over firms, not a share price.** The corporation ledger's ruling that a firm has no
+market cap stands; nothing here gives a corporation equity, a share count or a stake. A firm counts
+toward the market whose catchment holds its headquarters, once.
 
-- **Three verbs** (`corp_verb::request_quote` / `accept_quote` / `cancel_contract`, `world.hpp`
-  §11–14, append-only after `set_workforce_auto`). `request_quote` evaluates four decline
-  conditions in order — no capacity (the supplier holds no completed building that produces the
-  good), no input access (the supplier's local market cannot supply its recipe's inputs), embargo
-  (`world::corp_embargo_conditions`, a `condition_set` per supplier — the generic predicate
-  machinery of BL-342 reaching procurement for free), reputation floor
-  (`world::procurement_reputation`, a **view** of the relational substrate — see below) — and
-  returns a distinguishable `corp_command_result` for each.
+**It is derived, never stored**, and it is seeded at the epoch only in the sense that the firms it
+sums are (`docs/generation/DIGITISATION.md` § 5. Wealth inequality, market cap and GDP).
 
-  > **Authoring a `market` condition: it measures the WORLD, not a market (NR-114).**
-  > `condition_subject::market` resolves to the **mean resolved price across every market in the
-  > world**, summed in ascending entity-id order for determinism — not the price in the local
-  > market, and not the corp's own markets. There is no market qualifier on `condition`, because
-  > a law or tech asking "is this good expensive yet?" is asking a world-level question, and a
-  > mean is harder to game than a max. The consequence to author around: **a corp trading in one
-  > expensive market cannot satisfy a market condition on its own.** If a per-market predicate is
-  > ever wanted, add a qualifier to `condition` rather than changing what this subject means.
-  > `evaluate` also takes a **subject corp** (`condition_set::evaluate(set, world, subject_corp)`),
-  > since every consumer — a levy charged to a corp, a tech earned per corp — is per-corporation;
-  > pass `null_entity` for a genuinely world-level predicate and the corp-scoped subjects measure
-  > zero.
-- **Split payment.** A deposit (`economy.procurement.deposit_fraction`, 0.25) debits at
-  `accept_quote`; the remainder is drawn evenly across the quote's `lead_time_ticks`
-  (`economy_system.cpp`'s contract-pacing pass, right after the capability-points pass). The pace
-  is fixed rather than market-gated (stretch/pause on the supplier's live throughput) — a known
-  simplification against construction pacing's own model.
-- **Lead time is derived, not authored**: `base_lead_ticks × ceil(quantity / supplier_throughput)`
-  — a bigger order takes longer, a capable supplier is faster, and the quote is incidentally an
-  intelligence channel (legitimate under BL-068, competitor visibility: the supplier volunteers
-  its own throughput in the price it quotes).
-- **Reputation moves only on completion (+) or cancellation (−)** — narrow by design: it shifts
-  price/tie-breaking, never gates access beyond the decline floor above.
-- **Reputation is NOT procurement's store.** It is a **view** of `world::sentiment` — the
-  relational substrate, `src/world/sentiment.{hpp,cpp}` — on its **Trust** dimension at (buyer,
-  supplier) grain (BL-546, reputation as a sentiment view). The two moves above are one
-  occurrence each of authored conduct (`contract_completed`, `contract_cancelled`) folded into
-  that table at weights seeded from `economy.procurement.reputation_on_*`. Two consequences the
-  market side cares about: the floor is **not permanent** (the row decays toward neutral, so a
-  refusal is a condition of today rather than a verdict), and there is **no second table** the
-  axis can disagree with. [`../politics/RELATIONS.md`](../politics/RELATIONS.md) § 2 is the
-  authority.
-- **Persistence.** `procurement.{hpp,cpp}`, magic `IOPC` + version 3: `world::procurement_quotes`
-  and `procurement_contracts` round-trip in stored order, and no relational value crosses this
-  stream at all. The substrate carries its own leg of the seam (`IOSN`, `write_sentiment` /
-  `read_sentiment`), and the whole-world snapshot (`IOSV`, BL-536) carries the per-pair record.
-  A bad stream is refused rather than reinterpreted, and strict version equality is what keeps an
-  older stream's trailing block from being misread as quote records. Every stream carries the
-  header BL-107 (save-format header) specifies.
-- **The militia's own demand.** `spacecraft_components` carries no background demand — a
-  militia's contracts are its only buyer, which is what makes the coupling between the
-  processing roster and procurement real rather than thematic.
+## Procurement is not the order book
 
-### What a contract is actually worth
-
-The seam is only half the deal; the other half is the terms, and three of them are load-bearing
-(BL-392, contract terms).
-
-1. **Goods land on the BUYER's body.** A contract carries a **`delivery_body`** — the buyer's own
-   body, taken as the body of the lowest-id building they own (lowest id, not first-in-`assets`,
-   because a demolish permutes that list and the quote must be reproducible). It degrades to the
-   supplier's fulfilment body only when the buyer owns nothing anywhere. Delivering to the
-   supplier's body instead would land goods on a body where the buyer holds no processor
-   reservation, and the auto-surplus path would liquidate the whole delivery the tick it arrived.
-2. **A commitment buys a discount.** The quote is spot less a **volume discount**, asymptotic in
-   the order size — `volume_discount_max × q / (q + volume_discount_half_quantity)`, authored in
-   `scripts/economy.lua` under `economy.procurement` — so no order however large drives the price
-   to zero, and the terms improve monotonically with the size of the commitment. A quote at the
-   live spot price would settle at break-even minus friction, strictly worse than buying on the
-   market.
-3. **Lead time reads the SUPPLIER.** The throughput divisor is that supplier's real per-tick
-   output of that good — extraction sites targeting it at their own rate, processing facilities
-   at their recipe's yield of it times theirs, summed in ascending building id (a float sum needs
-   a fixed order). Floored at 1 tick: a contract completing in zero ticks is a spot purchase
-   wearing a contract's name.
-
-**Freight is the price of the distance.** Delivering across bodies costs
-`offbody_freight_fraction` of the order's pre-discount goods value, carried on the contract as
-`freight_cost` and included in the total the deposit and the instalments are computed from. It is
-set **below** `volume_discount_max` on purpose, so a genuine volume order still beats spot after
-carriage; a same-body delivery pays nothing.
-
-**Every credit this seam moves is a TRANSFER.** The supplier is credited exactly what the buyer is
-debited, in the same statement, deposit, instalments and freight alike — the supplier arranges the
-carriage, so paying them for it keeps the flow closed. On completion the goods are **drawn from
-the supplier's pool** at the fulfilment body as far as their stock goes, with any shortfall built
-to order (which is what a build order placed with someone else means).
-
-Verified by `tools/verify/money_conservation.cpp`.
+A procurement contract is a **named counterparty** with a lead time and a refusal. The order
+book is price-time priority over anonymous asks, and it has no representation for either of
+those. The form itself — its verbs, its terms, its pricing and its reputation axis — is
+[`CONTRACTS.md`](CONTRACTS.md).
 
 ## Tariffs — the first flow that pays a nation
 
@@ -693,11 +778,25 @@ Verified by `tools/verify/money_conservation.cpp`.
 > **clearing-tick half**: how the duty is charged when a trade matches.
 
 A market resolves to a jurisdiction: `market_component::centre_tile` through
-`world::tile_to_nation`. A sale whose buyer is domiciled outside that jurisdiction is a
-**cross-border** sale, and that is what a tariff reads.
+`world::tile_to_nation`. Goods that arrive in one jurisdiction from another have crossed a border,
+and that is what a tariff reads.
 
-**The rule, in one line:** a matched trade whose buyer is domiciled outside the market's own
-nation pays that nation's enacted import duty, and the duty is credited to that nation's treasury.
+**The rule, in one line (Ben, 2026-09-15):** a convoy arriving at a market whose nation differs
+from its source market's nation pays the destination nation's enacted import duty on the cargo, at
+the destination's price, charged to the convoy's owner and credited to that nation's treasury.
+
+**Why the border and not the sale.** An import duty taxes goods coming in, and the convoy is the
+only object that carries goods across a line — so it is the only place the duty has a real payer
+without inventing one. The earlier rule charged a *matched order-book trade* whose buyer was
+domiciled abroad; that path is the only clearing path with a counterparty on both sides, and it is
+dormant in play, so no tariff ever fired and a nation's protection shaped nothing. Charging the
+shipper at arrival reaches every import, auto-dispatched or directed, and it is **the one** point
+of charge — the matched-trade charge is retired with it, so no good pays twice.
+
+- **The base is the cargo's value at the destination** — quantity × the destination market's last
+  resolved price at the arrival tick. The goods are priced where they will be sold.
+- **A market with no nation charges nothing.** An off-world market emerges outside any
+  jurisdiction, so a space convoy pays no duty until law reaches the sky.
 
 - **The rate is set by law, and only by law.** `law_effect_kind::import_tariff` is ad-valorem
   (`law::rate` is a fraction of the trade's value, not a per-unit charge) and has a second party.
@@ -708,13 +807,12 @@ nation pays that nation's enacted import duty, and the duty is credited to that 
 - **`nation_component` carries a `treasury`**, zero at generation — a treasury that started full
   would be a balance change smuggled in as a field. Its spend side is the national budget
   (`docs/politics/NATIONS.md`, BL-537).
-- **A same-nation sale is charged nothing.** A tariff that taxed domestic trade would be a sales
+- **A same-nation haul is charged nothing.** A tariff that taxed domestic trade would be a sales
   tax wearing the wrong name.
-- **Only matched explicit trades are charged**, and that is a principled limit rather than an
-  oversight: a matched trade is the only clearing path with a real counterparty on both sides. The
-  auto-surplus and buyer-of-last-resort paths trade against the market itself, and taxing an
-  import from nobody would invent the second party the flow does not have.
-- **It is a transfer.** The buyer's expenditure rises by exactly what the treasury rises by, in
+- **The payer is the shipper, and the shipper is always real.** The objection that retired a
+  charge on auto-surplus — *taxing an import from nobody* — does not reach a convoy: every convoy
+  has an owner who paid to move it.
+- **It is a transfer.** The shipper's expenditure rises by exactly what the treasury rises by, in
   the same statement. `apply_budget` charges expenditure unconditionally (a balance may go
   negative), so the two sides cannot drift apart on a solvency edge.
 - **Off by default, and provably so.** The whole pass is gated on `any_import_tariff_enacted`; with
@@ -743,6 +841,19 @@ Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are
 of it. Untradeable resources (`base_price ≤ 0`) keep their prior price. A resource pegged at the
 ceiling is a generation-calibration signal (background production absent or under-target — see
 `docs/generation/CORPORATION_GENERATION.md` § Pass 6), not a legitimate "lucrative fillable gap".
+
+> **Authoring a `market` condition: it measures the WORLD, not a market (NR-114).**
+> `condition_subject::market` resolves to the **mean resolved price across every market in the
+> world**, summed in ascending entity-id order for determinism — not the price in the local
+> market, and not the corp's own markets. There is no market qualifier on `condition`, because
+> a law or tech asking "is this good expensive yet?" is asking a world-level question, and a
+> mean is harder to game than a max. The consequence to author around: **a corp trading in one
+> expensive market cannot satisfy a market condition on its own.** If a per-market predicate is
+> ever wanted, add a qualifier to `condition` rather than changing what this subject means.
+> `evaluate` also takes a **subject corp** (`condition_set::evaluate(set, world, subject_corp)`),
+> since every consumer — a levy charged to a corp, a tech earned per corp — is per-corporation;
+> pass `null_entity` for a genuinely world-level predicate and the corp-scoped subjects measure
+> zero.
 
 ### Where the band lives
 
@@ -783,40 +894,68 @@ debits (`supply_system.cpp`). Over 5 seeds, 39 markets on 5 multi-market bodies:
 
 | Market → nearest market neighbour | credits per unit |
 |---|---|
-| p10 | 0.12 |
-| median | 0.70 |
-| p90 | 1.67 |
-| max | 4.83 |
+| p10 | 0.08 |
+| median | 0.76 |
+| p90 | 5.65 |
+| max | 7.84 |
 
-The denominator is the **cheapest good carrying a base price: 0.60**. The binding case is
-therefore the worst haul against the cheapest good:
+The denominator is the **cheapest good carrying a base price: 1.00** (regolith, sitting at the
+stone/sand bulk floor — `RESOURCES.md` § What trades). The binding case is therefore the worst
+haul against the cheapest good:
 
 ```
-ceil > 1 + 4.83 / 0.60 = 9.06   ->   10.0
+ceil > 1 + 7.84 / 1.00 = 8.84   ->   10.0
 ```
 
 **Why a smaller ceiling is not enough.** A ceiling of 4.0 clears the *median* neighbour pair
-(which needs 2.16) and only just clears the p90 (3.79); the tail — the worst-connected market pair
-carrying the cheapest good — is permanently unservable at any scarcity. 10.0 covers **every**
-nearest-neighbour pair measured, for **every** priced good.
+(which needs 1.76) but not the p90 (6.65); the tail — the worst-connected market pair carrying
+the cheapest good — is permanently unservable at any scarcity. 10.0 covers **every**
+nearest-neighbour pair measured, for **every** priced good, with headroom below it.
 
-**A second, independent reading agrees.** The requirement's other half is that a scarce cheap
-good must be able to outprice an abundant dear one. Read *within a tier* — which is the only
-coherent reading, since RESOURCES.md promises margin widens *between* tiers — the ordinary raw
-tier spans 0.60 to 6.00 (`rare_earth_ore`), demanding `ceil > 10`. The two derivations land on
-the same number, which is the reason to trust it. Read *across* tiers it would demand 233
-(0.60 against `spacecraft_components` at 140), which would delete the tier model; that reading
-is rejected and recorded (NR-291).
+**A second, independent reading agrees on the shape.** The requirement's other half is that a
+scarce cheap good must be able to outprice an abundant dear one. Read *within a tier* — which is
+the only coherent reading, since RESOURCES.md promises margin widens *between* tiers — the
+ordinary raw tier spans 1.00 to 6.00 (`rare_earth_ore`), demanding `ceil > 6`, inside the
+haulage bound. Read *across* tiers it would demand 280 (1.00 against `spacecraft_components`
+at 280), which would delete the tier model; that reading is rejected and recorded (NR-291).
 
 **The floor is 0.25×.** The requirement derives a ceiling and says nothing about a floor; lowering
 it would widen the arbitrage margin only by cutting what an abundant producer receives (NR-290).
+
+**The nearest-neighbour reading is no longer the whole requirement (Ben, 2026-09-15).** Trade
+now chases price over distance (`SUPPLY.md` § Dispatch trigger), and a sea leg is the cheapest
+per distance (`SUPPLY.md` § Logistical cost), so the haul that matters is not only to the nearest
+neighbour but to wherever a gap is. The ceiling still covers every nearest pair; beside it sits a
+reading of the far pairs a seller actually reaches, taken after play has run, since a gap play
+erases in a year was never a working international market.
+
+**The far trade reading** (BL-1006, far trade reading) is `haulage_measure --far-trade`. It follows
+every convoy from dispatch to its first clear after arrival, on the world the app builds, in two
+windows of four quarterly dispatches — the first year of play, and the year after N years — and
+reads three things:
+
+- **(a)** volume delivered **and sold** at its destination, where that is not the market the source
+  pool clears at. A dispatch count is not this figure.
+- **(b)** the share of (a) whose destination is not the seller's **nearest** market — the market
+  other than home the dispatcher's own leg pricing reaches cheapest, so *nearest* means nearest
+  reachable.
+- **(c)** per good, the destination-minus-home price gap at dispatch and again at arrival, beside
+  the haul paid per unit, so a gap that play closes shows as closing.
+
+A sale is read from the exchange record and attributed **cargo-first** — the cargo is taken to sell
+before the pool's other stock — which is an upper bound, since goods are fungible inside a pool.
+Per-market pools, sea legs and the net-price dispatch rule are each judged against this reading.
 
 **Re-derive rather than trust.** Re-run `haulage_measure` whenever the logistics cost table
 (`logistics.base_cost_per_unit_distance`), the map scale (`body_km_per_tile`), or the
 `base_price` table changes — all three move the number this ceiling is computed from.
 
 **The band does not create inter-market trade; the convoy does.** Measured over five seeds, 1,677
-of 2,146 dispatched convoys are intra-body market-to-market hauls. **Inter-body** trade is gated
+of 2,146 dispatched convoys are intra-body market-to-market hauls. **Under per-body pools those
+hauls moved nothing** (found 2026-09-15): the cargo returned to the pool it left and sold at the
+corp's home market, so the count measured dispatch, never trade. Per-market pools
+(`PRODUCTION.md` § Stockpile and output flow) are what make the figure mean what it says, and it
+must be re-read as delivered volume sold at the destination. **Inter-body** trade is gated
 separately: the space lane is refused by the launchpad and propellant gates in `dispatch_convoys`
 before any price is consulted. `trade_routes` (BL-088, persistent trade routes) is a body-level
 record, so it is structurally blind to intra-body trade (NR-289).

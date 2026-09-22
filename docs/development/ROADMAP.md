@@ -1,5 +1,11 @@
 # Project Io — Roadmap
 
+> **Settles:** which theme comes next · what *finished* means for it · how milestones sequence
+> against each other · what is still owed before a cut. The only place that says *when*.
+> **Not here:** the individual items (the backlog, through its query tools) · how an item is
+> delivered (DELIVERY) · what was built and when (the devlog).
+> **Confused with:** DELIVERY.md, DEVELOPMENT_PRACTICES.md, economy/ERAS.md.
+
 This document owns the **milestone sequence**: which theme comes next, and what *finished* means
 for it. It does **not** list items — the backlog does — and it does **not** record what was built
 or when — [`DEVLOG.md`](DEVLOG.md) and [`SPRINTS.md`](SPRINTS.md) do.
@@ -19,10 +25,13 @@ per-minor findings — is kept verbatim at
 
 ## The two arcs (2026-08-12, NR-177)
 
-**Ancient — live.** A standalone commercial product set at 0 CE, with the player as a **mercenary
-company**, built on the campaign engine as it stands. Four rulings shape it: the space work is
-**stashed, not re-anchored**; the mercenary company is the militia one era earlier (procure force,
-field it, be paid), so the 2026-08-10 identity is being *tested*, not replaced; the grain is **tile
+**Industrial — live (re-spanned 2026-09-16, NR-807).** A standalone commercial product set at the
+**1960 epoch**, with the player as a **corporation that holds a seat**, built on the campaign engine as it
+stands. It was specified at 0 CE until 2026-09-16; the 2026-09-08 calendar moved the epoch and
+CONCEPT.md § Eras now names the industrial arc as live. The ancient span was not dropped — it became
+the first of the generation passes that produce the 1960 world. The identity was ruled
+separately (Ben, 2026-09-17, NR-885), retiring the mercenary company of 2026-08-12. Three rulings
+still shape it: the space work is **stashed, not re-anchored**; the grain is **tile
 and fine tick**, with `history_sim` staying the *generator*; and the release bar is **commercial** —
 Steam or itch, paid, polish and content depth required.
 
@@ -113,7 +122,6 @@ by [`../tech/TECH_FOUNDATIONS.md`](../tech/TECH_FOUNDATIONS.md), not by this doc
 - **The ancient product's own done-definition** — the commercial cut's bar, distinct from
   v1.0.0's, which is the *space* game's and stays parked with it (NR-177).
 - **The product's name.** Io is a moon of Jupiter.
-- **The mercenary sell side** beyond the contract seam: win and lose consequences, and reputation.
 
 ---
 

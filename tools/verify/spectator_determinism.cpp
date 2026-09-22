@@ -91,7 +91,34 @@ void check(bool ok, const char* label)
 constexpr uint32_t k_seed  = 0;
 constexpr int      k_ticks = 300;
 
-// R2's golden. Recorded from `run_rollout(k_seed, k_ticks, /*spectating=*/false)`
+// R2's BYTE-IDENTITY GOLDEN — RETIRED (Ben, 2026-09-01, ruling on NR-752).
+//
+// The row asserted that an unspectated rollout still hashes to a constant
+// recorded from a pre-BL-409 build. It is gone, and the log below is why: it
+// was re-blessed TEN TIMES between 2026-08-14 and 2026-08-31, and NOT ONE of
+// those moves was a spectator-mode fact. Every one was a deliberate world or
+// economy change somewhere else in the project — a grid resize, a resource_count
+// widening, holdings patterns, road cuts, the province partition, a unit-upkeep
+// retune. The row was asserting WORLD-CONTENT STABILITY, which is not what this
+// harness is for and never was.
+//
+// This is the NR-596 argument taken one step further, and NR-596 is the
+// precedent — that entry retired a third check on this same harness for the
+// same reason (see the RETIRED note further down).
+//
+// WHAT STILL GUARDS THE PROPERTY, and it is the part that matters: the two
+// invariants io-standing-rules.md's BL-409 section actually cites are asserted
+// below and unaffected — the flag DEFAULTS FALSE so a played session keeps the
+// prohibition in full, and admitting one more corp SHIFTS NO RIVAL'S CADENCE
+// SLOT. Determinism keeps its own guards too: R2's two-independently-built-
+// worlds reproducibility row, and every row of R3. What is gone is only the
+// frozen constant, which could not tell a determinism leak from a Tuesday.
+//
+// THE LOG IS KEPT DELIBERATELY. It is the evidence for the retirement, and a
+// future reader tempted to re-add a hash constant here should read it first.
+//
+// ---- historical provenance, 2026-08-14 to 2026-08-31 ----
+// Recorded from `run_rollout(k_seed, k_ticks, /*spectating=*/false)`
 // built against the PRE-BL-409 corp_ai.cpp — i.e. the value the unspectated
 // path produced before the guards became conditional. That is what makes R2 a
 // byte-identity claim rather than a self-consistency one: two runs of the same
@@ -274,7 +301,7 @@ constexpr int      k_ticks = 300;
 // wave 3, once and late. Taken here instead, deliberately: wave 3 is now behind
 // Sprint 21, and a known-red golden left standing for that long is how layer (1)
 // above happens a third time. One bless, one provenance entry, measured first.
-constexpr uint64_t k_unspectated_golden = 0xE350DF2A50BF4BAAull;
+// (the constant itself is retired with the row — see the header above)
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the
@@ -681,24 +708,15 @@ int main()
           "R2 the prohibition still binds: the player corp issues ZERO decisions unspectated");
     check(played_a.final_hash == played_b.final_hash,
           "R2 an unspectated run is reproducible (two independently built worlds, same hash)");
-    if constexpr (k_unspectated_golden != 0ull)
-    {
-        check(played_a.final_hash == k_unspectated_golden,
-              "R2 byte-identity: the unspectated hash equals the pre-BL-409 golden");
-        if (played_a.final_hash != k_unspectated_golden)
-            std::printf("     golden=%016llX  observed=%016llX\n",
-                        static_cast<unsigned long long>(k_unspectated_golden),
-                        static_cast<unsigned long long>(played_a.final_hash));
-    }
-    else
-    {
-        // Deliberately loud rather than silent. An unset golden is a check that
-        // is not being made, and a harness that hides that is worse than one
-        // that does not have the row at all.
-        std::printf("  [....] R2 byte-identity golden UNSET — record %016llX into "
-                    "k_unspectated_golden from a PRE-BL-409 build\n",
-                    static_cast<unsigned long long>(played_a.final_hash));
-    }
+    // RETIRED (Ben, 2026-09-01, ruling on NR-752): the byte-identity row
+    // against a frozen pre-BL-409 constant. It asserted world-content
+    // stability, not a spectator-mode property, and was re-blessed ten times
+    // for changes that had nothing to do with this harness. The full argument
+    // and the dated log are at the top of this file. The hash is still PRINTED,
+    // because a value nobody asserts is still worth being able to read when
+    // diagnosing a real divergence.
+    std::printf("     unspectated state_hash = %016llX (reported, not asserted)\n",
+                static_cast<unsigned long long>(played_a.final_hash));
 
     // =====================================================================
     // R3 — a spectated run is itself deterministic.

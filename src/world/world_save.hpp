@@ -225,7 +225,34 @@ inline constexpr uint32_t world_save_magic =
 /// where this one continues and is refused whole on the same strict-equality
 /// contract as every prior bump. Claimed through
 /// `tools/session/next_save_version.js --claim`.
-inline constexpr uint32_t world_save_version = 20;
+/// Bumped to 21 by BL-708 (power): `resource_type` gains `power` at the enum's
+/// tail, so `resource_count` moves 47 -> 48 and EVERY per-resource array in the
+/// stream — tile deposits, pools, market supply/demand/price/base_price, every
+/// authored basket the reader reconstructs — changes length. That is the same
+/// break BL-586's append was (v9 -> v10): a v20 stream's very first tile record
+/// is short by one float and every byte after it misreads. Refused whole on the
+/// strict-equality contract, exactly as every prior bump; there is no migration
+/// and deliberately none, since the pre-bump stream cannot say what a tile's
+/// `power` deposit was. Claimed through
+/// `tools/session/next_save_version.js --claim`.
+/// Bumped to 22 by BL-709 (construction becomes a sector): `resource_type` gains
+/// `construction_capacity` at the enum's tail, so `resource_count` moves 48 -> 49
+/// and every per-resource array in the stream changes length again — the exact
+/// same break the v20 -> v21 append above describes, for the same reason and with
+/// the same answer. Refused whole on the strict-equality contract; no migration,
+/// and deliberately none. Claimed through
+/// `tools/session/next_save_version.js --claim`.
+/// Bumped to 23 by BL-644 (space_programme budget line): `budget_priority` gains
+/// `space_programme` at the enum's tail, so `priority_count` moves 9 -> 10 and
+/// the nation-budget record (`w_nation_budget` / `r_nation_budget`) — whose
+/// weight vector is fixed-width, no count — widens by one float. A v22 stream's
+/// budget records are each short by one float and every byte after the first
+/// misreads; refused whole on the strict-equality contract, exactly as every
+/// prior bump. No migration, and deliberately none: a pre-bump stream cannot
+/// say what a nation's space weight was, and the scorer re-authors weights on
+/// its own cadence anyway. Claimed through
+/// `tools/session/next_save_version.js --claim`.
+inline constexpr uint32_t world_save_version = 23;
 
 /// Write @p w as a complete world snapshot.
 ///

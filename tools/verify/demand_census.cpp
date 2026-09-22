@@ -1,6 +1,6 @@
 // demand_census — BL-649. Per RESOURCE and per ERA BAND: how much demand the
 // world models, and WHICH PASS injects it. Requirement group `demand-census`,
-// rows R1-R4.
+// rows R1-R4, plus R5 (BL-706, chain completeness) and R6 (BL-652, unpriced basket).
 //
 // WHY THIS EXISTS. Sprint 21 runs several viability passes, and "did that change
 // help" has no answer without a before. More sharply: the 2026-08-26 session
@@ -14,7 +14,10 @@
 // that can fail are INTERNAL INCONSISTENCIES — a channel it cannot enumerate, a
 // resource it cannot name, an attribution that does not reconcile — plus R4,
 // which is a regression check on the INSTRUMENT (does it still reproduce the
-// hand-built finding), not on the economy.
+// hand-built finding), not on the economy; plus R6, which fails on a basket
+// naming a good no market prices. R6 is content, not magnitude: it asserts no
+// number and admits no tuning, because that combination has exactly two causes
+// and both are faults (BL-652).
 //
 // WHY IT LOADS LUA. The demand baskets ARE Lua data (economy.population_demand,
 // economy.background_demand, economy.military.unit_upkeep, economy.building_upkeep),
@@ -38,7 +41,7 @@
 //     inject_population_demand      -> HOUSEHOLD
 //     inject_background_demand      -> BACKGROUND-INDUSTRIAL (a stopgap; see the register)
 //     inject_interbody_demand       -> INTER-BODY PULL (redistribution, not a new want)
-//     economy_report::wants         -> CONSTRUCTION + PROCESSING INPUTS
+//     economy_report::wants         -> CONSTRUCTION + PROCESSING INPUTS + UPKEEP BID
 //
 // Those are the same functions, in the same order, reading the same prices
 // `clear_markets` would read on this tick. Nothing is re-derived and nothing is
@@ -53,6 +56,14 @@
 // per-tick expression (`cost[r] / build_duration_ticks`), and the processing half
 // is the remainder. If the remainder goes negative the attribution is wrong, and
 // that is an internal inconsistency — R2's kind of failure, and it is asserted.
+//
+// BL-654 PUT A THIRD CONSUMER IN THAT REGISTER: a short upkeep pool now bids its
+// shortfall. That share is NOT re-derived — it is read off
+// `economy_report::upkeep_wants`, the attribution mirror the same statement
+// writes — and subtracted out, because "the remainder" would otherwise report
+// the Industry channel as processing demand. The `upkeep/bd` column is that
+// share; `upkeep/pl` and `indust/pl` remain the GROSS per-tick need, so the
+// pool-covered part is the difference between them.
 //
 // STRUCTURAL SINK vs OBSERVED DEMAND. The per-resource table carries both, and
 // the distinction matters. OBSERVED demand can be zero merely because nobody has
@@ -78,6 +89,19 @@
 //       run-dependent noise. Run it twice and byte-compare.
 //   R4  Reproduces the hand-built finding at the 0 CE band: the produced-with-
 //       no-sink set. A regression check on the instrument.
+//   R5  BL-706. Per MARKET: the fraction of the band's TERMINAL chains that can
+//       be sourced WITHIN REACH of it, and — the actual deliverable —  the
+//       SPREAD of that fraction across the world. GENERATION_STRATEGY.md
+//       § Asymmetry is the deliverable. REPORTED, with one loose assertion on
+//       the spread and none on any market's value. See the block above
+//       `market_completeness` for the grain and the reach definition.
+//   R6  BL-652: FAILS if a demand basket names a good NO market prices. The one
+//       row here that fails on content rather than on the instrument, and it
+//       does not breach R2 — it is not a magnitude. Both injectors skip such an
+//       entry in silence, and the combination is always a missing script or an
+//       authoring error, never intent. Runtime counterpart:
+//       `unpriced_basket_entries` (src/world/market_clearing.cpp), which the
+//       app reports at campaign start.
 //
 // Usage:  demand_census [--seed N] [--ticks N] [--fast] [--band ancient|industrial|both]
 //   --fast  zero the pre-epoch year-tick sim. Cheaper, and NOT the shipped
@@ -94,11 +118,16 @@
 #include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
 #include "world/nation_step.hpp"
+#include "world/market_saturation.hpp" // BL-775: the promoted saturation measure
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
+#include "world/network_upkeep.hpp"  // BL-643: the Infrastructure channel's derivation, re-run for the census
+#include "world/space_programme.hpp" // BL-644: the State channel's derivation, re-run for the census
 #include "world/supply_system.hpp"
+#include "world/survey_system.hpp" // init_survey_states - the app runs it, this census did not
 #include "world/tech_gate.hpp"
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
@@ -113,6 +142,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -147,6 +177,8 @@ const char* const k_resource_names[] = {
     "clean_water", "consumer_goods", "medical_supplies", "ordnance",
     "ceramics", "dressed_stone", "planks", "tools",
     "hides", "fibre", "leather", "cloth", "rigging",
+    "power", // BL-708 — the grid good
+    "construction_capacity", // BL-709 — the construction sector's product
 };
 constexpr std::size_t k_named = sizeof(k_resource_names) / sizeof(k_resource_names[0]);
 
@@ -210,28 +242,36 @@ const channel_row k_channels[] = {
       "inject_population_demand (market_clearing.cpp) <- economy.population_demand basket" },
     { "Industry",       ch_state::present,
       "run_building_upkeep (economy_system.cpp) <- economy.building_upkeep.goods, per building type "
-      "and ERA-BANDED, scaling with BUILDING COUNT (MARKETS.md property 1). A POOL draw, like the "
-      "standing-force one below, so it consumes goods WITHOUT pricing them -- and the rates ship at "
-      "ZERO because turning them on starves every firm of a good the band does not make; see the "
-      "`indust/pl` column and economy.lua's own measurement note (BL-641)" },
+      "and ERA-BANDED, scaling with BUILDING COUNT (MARKETS.md property 1). BL-654: it BIDS now -- "
+      "the pool is drawn first and the shortfall goes to market at up to price_band.reservation_mult "
+      "x base, so the draw prices what it wants (see the `upkeep/bd` column). BL-738's stage-1 "
+      "repair rates (industrial timber/stone) were landed, MEASURED over a full campaign cell, and "
+      "withdrawn the same day - cost without the income side (broke nations, BL-741/BL-742); the "
+      "record is at the scripts/economy.lua goods table. Only power carries a non-zero rate" },
     { "Construction",   ch_state::present,
       "run_construction -> economy_report::wants (economy_system.cpp) <- economy.buildings.resource_costs "
       "/ material_overrides. Fires only where something is BUILDING (owner BL-642)" },
-    { "Infrastructure", ch_state::absent,
-      "no material draw for roads / ports / hubs anywhere in src/world; the logistics_maintenance "
-      "budget line spends credits (owner BL-643)" },
-    { "State",          ch_state::absent,
-      "nation budget lines (incl. strategic_reserve) carry weights and spend credits; no goods "
-      "purchase exists (owner BL-644)" },
+    { "Infrastructure", ch_state::present,
+      "derive_network_upkeep_claims / settle_network_purchases (network_upkeep.cpp) <- "
+      "economy.network_upkeep, through the logistics_maintenance budget line - pro-rata, a PAID "
+      "POOL PURCHASE like the State channel, never a market bid; realised purchases readable from "
+      "economy_report::network_purchases; the census's infra/pl column re-derives the bill" },
+    { "State",          ch_state::present,
+      "derive_space_programme_claims / settle_space_purchases (space_programme.cpp) <- "
+      "economy.space_programme lumps, through the budget's claim/transfer machinery. A PAID POOL "
+      "PURCHASE, never a market bid ('never on the open market' is the design's own rule) — "
+      "realised purchases readable from economy_report::space_purchases; the census's state/pl "
+      "column re-derives the would-be claims" },
     { "Research",       ch_state::absent,
       "research_institute credits corporation_component::science per tick; nothing draws goods "
       "(owner BL-645)" },
     { "Conflict",       ch_state::absent,
       "battle resolution consumes no goods; the only military draw is the per-head standing-force "
       "upkeep below, which is not a battle (owner BL-646)" },
-    { "Endemic trade",  ch_state::absent,
-      "no wealth-scaled or character-flavoured luxury basket; tobacco/spices/coffee/furs are named "
-      "by no injector (owner BL-647)" },
+    { "Endemic trade",  ch_state::present,
+      "inject_endemic_demand (market_clearing.cpp) <- economy.endemic_demand basket: wealth-scaled "
+      "(nation treasury + positive domiciled balances), nation-flavoured by a pure seeded "
+      "preference hash, price-elastic like its sibling baskets" },
 };
 constexpr std::size_t k_channel_count = sizeof(k_channels) / sizeof(k_channels[0]);
 
@@ -249,8 +289,9 @@ const channel_row k_off_register[] = {
       "inject_interbody_demand -- REDISTRIBUTES the home body's unmet demand onto outposts. Injects no "
       "new want: with no home demand for a good it moves nothing" },
     { "Standing-force upkeep", ch_state::present,
-      "run_unit_upkeep -- a POOL draw (economy.military.unit_upkeep.goods_per_head). It never reaches "
-      "market_component::demand, so it consumes goods WITHOUT pricing them" },
+      "run_unit_upkeep (economy.military.unit_upkeep.goods_per_head). BL-654: pool first, then the "
+      "shortfall is BID on the unit's local market up to price_band.reservation_mult x base -- the "
+      "same single goods-draw path the Industry channel takes, so it prices what it wants" },
 };
 constexpr std::size_t k_off_register_count =
     sizeof(k_off_register) / sizeof(k_off_register[0]);
@@ -294,8 +335,25 @@ const char* state_word(ch_state s)
 //                       ancient household is ceramics, cloth, leather and
 //                       dressed stone, and rigging is none of them.
 //   trade_goods_misc  - endemic luxury demand (BL-647) owns its buyer.
+//
+// RE-BLESSED 2026-08-31 (BL-654, a short pool buys up to a reservation ceiling)
+// - ONE good removed, and again nothing relaxed: the match is still exact, both
+// directions. `ordnance` leaves because the sentence four lines above stopped
+// being true. The per-head standing-force draw is no longer pool-only: a short
+// pool bids its shortfall onto the unit's local market up to
+// price_band.reservation_mult x base_price and pays for what it gets, so
+// ordnance has a real market buyer at 0 CE for the first time. That was the
+// item's whole purpose - a channel that consumes without pricing cannot
+// bootstrap its own supply (MARKETS.md § Demand channels, property 3) - so this
+// removal is the change working, not the bar moving.
+//
+// `tools` and `planks` DID NOT leave with it, and that is the honest reading
+// rather than an oversight: their draw is BL-641 building upkeep, whose rates
+// still ship at zero (scripts/economy.lua). BL-654 gave that draw a bid path;
+// turning the rates on is a separate data change with its own measurement, and
+// until it happens no building names tools as a want.
 const char* const k_r4_expected[] = {
-    "ordnance", "rigging", "tools", "trade_goods_misc",
+    "rigging", "tools", "trade_goods_misc",
 };
 constexpr std::size_t k_r4_expected_count =
     sizeof(k_r4_expected) / sizeof(k_r4_expected[0]);
@@ -305,15 +363,8 @@ constexpr std::size_t k_r4_expected_count =
 
 using res_row = std::array<double, resource_count>;
 
-std::vector<entity_id> sorted_keys_markets(const world& w)
-{
-    std::vector<entity_id> ids;
-    ids.reserve(w.markets.size());
-    for (const auto& kv : w.markets)
-        ids.push_back(kv.first);
-    std::sort(ids.begin(), ids.end());
-    return ids;
-}
+// sorted_market_ids() — PROMOTED to world/market_saturation.hpp (BL-775), so
+// generation and this census share one implementation rather than two that can drift.
 
 /// Summed over markets in ASCENDING ID ORDER — `w.markets` is unordered, and a
 /// float accumulation over its layout is the exact seam BL-422 found a latent
@@ -390,38 +441,13 @@ void finish_tick(world& w, const recipe_registry& reg, int t, economy_report& re
 }
 
 // ---------------------------------------------------------------------------
-// Structural classification
+// Structural resource_classification
 // ---------------------------------------------------------------------------
 
-struct classification
-{
-    // Produced in this band?
-    bool produced_by_recipe = false;  ///< an era-allowed recipe outputs it
-    bool has_deposit        = false;  ///< some tile in the generated world yields it
-    int  depth              = -1;     ///< recipe_registry::depth_of under this band
+// struct resource_classification — PROMOTED to world/market_saturation.hpp (BL-775), so
+// generation and this census share one implementation rather than two that can drift.
 
-    // Structural sinks — does ANY pass in this band name it as a want?
-    bool sink_household   = false;
-    bool sink_background  = false;
-    bool sink_process     = false;    ///< input to an era-allowed recipe
-    bool sink_construct   = false;    ///< line in an era-available building's basket
-    bool sink_unit_upkeep = false;    ///< pool draw, NOT a market bid
-    bool sink_industry    = false;    ///< BL-641 building upkeep — pool draw, NOT a market bid
-
-    /// Does ANY market carry a base price for it? Both basket injectors skip a
-    /// resource whose `base_price` is 0 ("untradeable -- no base price to anchor
-    /// the elasticity curve"), so an unpriced basket entry is a want the engine
-    /// silently discards. That is a channel going quiet without saying so, which
-    /// is the one thing this census exists to make impossible.
-    bool priced = false;
-
-    bool any_market_sink() const
-    {
-        return sink_household || sink_background || sink_process || sink_construct;
-    }
-};
-
-std::string sink_word(const classification& c)
+std::string sink_word(const resource_classification& c)
 {
     std::string s;
     auto add = [&s](const char* t) { if (!s.empty()) s += "+"; s += t; };
@@ -429,14 +455,17 @@ std::string sink_word(const classification& c)
     if (c.sink_background)  add("BG");
     if (c.sink_process)     add("PROC");
     if (c.sink_construct)   add("CONS");
-    if (c.sink_unit_upkeep) add("upk");   // lower case: not a market bid
-    if (c.sink_industry)    add("ind");   // BL-641, likewise a pool draw
+    if (c.sink_unit_upkeep) add("UPK");   // BL-654: a market bid now, hence upper case
+    if (c.sink_industry)    add("IND");   // BL-641 + BL-654, likewise
+    if (c.sink_endemic)     add("END");   // BL-647: a market bid, wealth-scaled
+    if (c.sink_state)       add("st");    // BL-644: pays, consumes, never bids — lower case
+    if (c.sink_infra)       add("in");    // BL-643: likewise, pro-rata
     if (s.empty())
         s = "NONE";
     return s;
 }
 
-const char* prod_word(const classification& c)
+const char* prod_word(const resource_classification& c)
 {
     if (c.produced_by_recipe && c.has_deposit) return "R+D";
     if (c.produced_by_recipe)                  return "REC";
@@ -444,128 +473,141 @@ const char* prod_word(const classification& c)
     return "-- ";
 }
 
-std::array<classification, resource_count>
-classify(const world& w, const recipe_registry& reg)
+// classify_resources() — PROMOTED to world/market_saturation.hpp (BL-775), so
+// generation and this census share one implementation rather than two that can drift.
+
+// ---------------------------------------------------------------------------
+// R5 — CHAIN COMPLETENESS, AND ITS SPREAD (BL-706)
+// ---------------------------------------------------------------------------
+// WHY IT LIVES HERE and not in a harness of its own. The census already walks
+// every market and every resource per band, and already knows which sinks are
+// TERMINAL (MARKETS.md § Three properties, 4: a household basket, an upkeep
+// draw, a construction cost — never a processor, which is a pass-through and a
+// chain that ends in one ends nowhere). Chain completeness is that same
+// resource_classification asked per MARKET rather than per world, so it costs one tile
+// walk and inherits everything above it, before/after discipline included.
+//
+// WHAT IT MEASURES. GENERATION_STRATEGY.md § Asymmetry is the deliverable: "for
+// a market or region, the fraction of the chains terminating there that can be
+// sourced within reach". Generation is answerable for the DISTRIBUTION of that
+// number across the world — wide, with real tails at both ends — and answerable
+// for nothing at all about any individual market's value.
+//
+// THE GRAIN IS THE MARKET, because a market is where a chain's demand actually
+// lands. `market_for_tile` already partitions every tile into exactly one market
+// catchment (a body with several markets routes each tile to the nearest centre,
+// components.hpp § market_component), so a catchment is a real, disjoint,
+// GENERATED region rather than one invented for this measurement. Body grain
+// would fold a body's several markets into one figure and lose the intra-body
+// spread, which is the half a player actually stands in; province grain would
+// measure a partition no chain clears against.
+//
+// "WITHIN REACH" IS THE GAME'S OWN RULE, NOT A SECOND METRIC. A tile counts for
+// a market when (a) it clears against that market and (b) a corporation could
+// legally site a building on it — `place_building_allowed`'s reach clause
+// (placement_rules.cpp), mirrored exactly: a supply anchor always qualifies,
+// otherwise `tile_reach_cost` must be within the AUTHORED budget
+// `economy.construction.max_logistics_reach` (24.0 as shipped; < 0 disables the
+// rule, and then only an unreachable tile is excluded). An infinite cost — an
+// island carrying no city, a landmass cut off from the anchor network — fails
+// it, which is the point: ground nobody can supply is not supply.
+//
+// THE NUMERATOR IS STRUCTURAL, NOT OBSERVED. "Can be sourced" asks what the
+// GROUND plus the band's recipe roster permit, never what happens to stand on
+// this seed. A good is sourceable in a market when a deposit for it sits on a
+// qualifying tile, or when an era-allowed recipe makes it from goods that are —
+// computed as a monotone fixpoint over the era-masked recipe list, so a cyclic
+// roster terminates and the answer cannot depend on recipe order.
+//
+// THE DENOMINATOR IS THE BAND'S WHOLE TERMINAL SET, IDENTICAL FOR EVERY MARKET.
+// That is MARKETS.md property 5 taken at its word: terminal demand follows
+// population, population is everywhere, so every chain terminates in every
+// market. Scoring against each market's OBSERVED terminal demand instead would
+// let an empty market read 1.00 for wanting nothing, which measures settlement
+// rather than endowment. The `heads` column carries the settlement fact
+// separately, beside the score, so the two are never confused.
+//
+// The BACKGROUND-INDUSTRIAL basket is deliberately NOT terminal here. Property 4
+// names three terminal sinks and it is not one of them, and the channel register
+// above labels it a stopgap; counting a world-scale constant basket as a chain
+// endpoint would put identical goods in every market's denominator for a reason
+// that is not a fact about the world.
+//
+// IT REPORTS (R2, unchanged). No row below fails on a market being poor or rich.
+
+/// One market's reading. Sorted by market id; every field is an integer count or
+/// a ratio of two, so nothing here depends on container layout.
+// struct market_completeness — PROMOTED to world/market_saturation.hpp (BL-775), so
+// generation and this census share one implementation rather than two that can drift.
+
+/// The spread — the deliverable. Percentiles by nearest rank over the sorted
+/// sample, so no interpolation constant has to be defended.
+struct spread_stats
 {
-    std::array<classification, resource_count> c{};
+    int    n = 0;
+    double min = 0.0, p25 = 0.0, median = 0.0, p75 = 0.0, max = 0.0;
+    double mean = 0.0, sd = 0.0, range = 0.0;
+    int    distinct = 0;            ///< distinct scores, rounded to 1e-6
+    std::array<int, 10> hist{};     ///< deciles of [0, 1]
+};
 
-    for (std::size_t r = 0; r < resource_count; ++r)
-        c[r].depth = reg.depth_of(static_cast<resource_type>(r));
+// terminal_resources() and its doc comment — PROMOTED to world/market_saturation.hpp (BL-775), so
+// generation and this census share one implementation rather than two that can drift.
 
-    // --- what an era-allowed recipe makes and eats -------------------------
-    // The BROWSE path (recipe_count/recipe_at), which is the era-masked one.
-    const int n_allowed = reg.recipe_count(building_type::processing_facility);
-    const bool processing_available = reg.building_available(building_type::processing_facility);
-    for (int i = 0; i < n_allowed && processing_available; ++i)
+/// `place_building_allowed`'s reach clause, restated for a read-only question.
+/// Requires `body_reach_field` to have been built for the tile's body — the
+/// caller does that once per body before the walk.
+// tile_in_reach() — PROMOTED to world/market_saturation.hpp (BL-775), so
+// generation and this census share one implementation rather than two that can drift.
+
+// measure_market_completeness() — PROMOTED to world/market_saturation.hpp (BL-775), so
+// generation and this census share one implementation rather than two that can drift.
+
+spread_stats summarise_spread(std::vector<double> v)
+{
+    spread_stats st;
+    st.n = static_cast<int>(v.size());
+    if (st.n == 0)
+        return st;
+
+    std::sort(v.begin(), v.end());
+
+    auto rank = [&v](double q) {
+        std::size_t i = static_cast<std::size_t>(q * static_cast<double>(v.size() - 1) + 0.5);
+        if (i >= v.size())
+            i = v.size() - 1;
+        return v[i];
+    };
+
+    st.min    = v.front();
+    st.max    = v.back();
+    st.range  = st.max - st.min;
+    st.p25    = rank(0.25);
+    st.median = rank(0.50);
+    st.p75    = rank(0.75);
+
+    double sum = 0.0;
+    for (const double x : v)
+        sum += x;
+    st.mean = sum / static_cast<double>(v.size());
+    double ss = 0.0;
+    for (const double x : v)
+        ss += (x - st.mean) * (x - st.mean);
+    st.sd = std::sqrt(ss / static_cast<double>(v.size()));
+
+    st.distinct = 1;
+    for (std::size_t i = 1; i < v.size(); ++i)
+        if (std::fabs(v[i] - v[i - 1]) > 1e-6)
+            ++st.distinct;
+
+    for (const double x : v)
     {
-        const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
-        for (std::size_t r = 0; r < resource_count; ++r)
-        {
-            if (rc.outputs[r] > 0.0f)
-                c[r].produced_by_recipe = true;
-            if (rc.inputs[r] > 0.0f)
-                c[r].sink_process = true;
-        }
+        int b = static_cast<int>(x * 10.0);
+        if (b < 0) b = 0;
+        if (b > 9) b = 9;
+        ++st.hist[static_cast<std::size_t>(b)];
     }
-
-    // --- what the ground yields --------------------------------------------
-    // A BOOLEAN only. `w.tiles` is unordered and a float sum over its layout
-    // would be run-dependent; an OR is not.
-    for (const auto& [tid, t] : w.tiles)
-    {
-        (void)tid;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (t.resource_deposit[r] > 0.0f)
-                c[r].has_deposit = true;
-    }
-
-    // --- the two authored baskets, AS MASKED BY THIS BAND -------------------
-    // BL-640: read population_demand_basket() / background_demand_basket(), the
-    // registry's era-resolved folds - the exact vectors inject_population_demand
-    // and inject_background_demand multiply by. `.demand_basket` on the params is
-    // now the SHARED (`any`) tranche alone, and reading it here would have this
-    // census attribute a structural sink to a band whose basket never names the
-    // good - precisely the defect the banding closes. `reg` already carries this
-    // band (set_era, above), so no extra state is threaded in.
-    const std::array<float, resource_count>& pd_basket = reg.population_demand_basket();
-    const std::array<float, resource_count>& bd_basket = reg.background_demand_basket();
-    for (std::size_t r = 0; r < resource_count; ++r)
-    {
-        if (pd_basket[r] > 0.0f)
-            c[r].sink_household = true;
-        if (bd_basket[r] > 0.0f)
-            c[r].sink_background = true;
-    }
-
-    // --- construction baskets, over every era-available building -----------
-    // extraction_site is keyed by target_resource and processing_facility by
-    // recipe id (recipe_registry::resource_build_cost_for); every other type
-    // resolves to its type-level basket. Enumerated through that ONE accessor so
-    // the census cannot disagree with the draw run_construction actually makes.
-    for (std::size_t bt_i = 0; bt_i < building_type_count; ++bt_i)
-    {
-        const building_type bt = static_cast<building_type>(bt_i);
-        if (bt == building_type::none || !reg.building_available(bt))
-            continue;
-
-        auto note = [&c](const std::array<float, resource_count>& row) {
-            for (std::size_t r = 0; r < resource_count; ++r)
-                if (row[r] > 0.0f)
-                    c[r].sink_construct = true;
-        };
-
-        if (bt == building_type::extraction_site)
-        {
-            for (std::size_t r = 0; r < resource_count; ++r)
-                note(reg.resource_build_cost_for(bt, static_cast<resource_type>(r), no_recipe));
-        }
-        else if (bt == building_type::processing_facility)
-        {
-            for (int i = 0; i < n_allowed; ++i)
-            {
-                const recipe& rc = reg.recipe_at(bt, i);
-                note(reg.resource_build_cost_for(bt, resource_type::iron_ore,
-                                                 reg.recipe_id(rc.name)));
-            }
-        }
-        else
-        {
-            note(reg.resource_build_cost_for(bt, resource_type::iron_ore, no_recipe));
-        }
-    }
-
-    // --- is it priced on any market? ---------------------------------------
-    for (const auto& [mid, mc] : w.markets)
-    {
-        (void)mid;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (mc.base_price[r] > 0.0f)
-                c[r].priced = true;
-    }
-
-    // --- the standing-force pool draw --------------------------------------
-    const unit_upkeep_params& up = reg.military().upkeep;
-    for (std::size_t r = 0; r < resource_count; ++r)
-        if (up.goods_per_head[r] > 0.0f)
-            c[r].sink_unit_upkeep = true;
-
-    // --- BL-641: the INDUSTRY pool draw ------------------------------------
-    // Read from the registry the same way the construction baskets above are:
-    // over every building type AVAILABLE IN THIS BAND, through the registry's own
-    // band-composing accessor, so the census cannot disagree with the draw
-    // run_building_upkeep actually makes.
-    for (std::size_t t = 0; t < building_type_count; ++t)
-    {
-        const building_type bt = static_cast<building_type>(t);
-        if (!reg.building_available(bt))
-            continue;
-        const auto basket = building_upkeep_goods(reg.building_upkeep(), bt, reg.era());
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (basket[r] > 0.0f)
-                c[r].sink_industry = true;
-    }
-
-    return c;
+    return st;
 }
 
 // ---------------------------------------------------------------------------
@@ -589,18 +631,26 @@ struct band_result
     int   recipes_allowed = 0, recipes_authored = 0, max_depth = 0;
 
     // the census tick's attribution
-    res_row household{}, background{}, interbody{}, construction{}, processing{};
+    res_row household{}, background{}, endemic{}, interbody{}, construction{}, processing{};
+    res_row state_pl{};   ///< BL-644: the state's would-be purchases this tick (a pool draw, not market demand)
+    res_row infra_pl{};   ///< BL-643: the network's would-be material bill this tick (likewise)
+    /// BL-654: the upkeep channels' share of the want register — the shortfall a
+    /// short pool actually BID on the market, read off `economy_report::
+    /// upkeep_wants` rather than re-derived. Subtracted out of `processing`,
+    /// which is a remainder and would otherwise swallow it whole.
+    res_row upkeep_bid{};
     res_row wants_raw{}, wants_folded{}, upkeep_pool{}, industry_pool{};
     double  wants_dropped_no_market = 0.0;
 
     // observed production over the whole run
     res_row produced{};
 
-    std::array<classification, resource_count> cls{};
+    std::array<resource_classification, resource_count> cls{};
 
     bool attribution_ok = true;   ///< processing residual non-negative
     std::vector<std::string> no_sink_produced;   ///< R4's set, sorted by name
     std::vector<std::string> no_sink_raws;       ///< extractable, unwanted
+    std::vector<std::string> state_only;         ///< BL-644: bought and consumed by the state alone
     std::vector<std::string> basket_unmakeable;  ///< a basket names what the band cannot produce
     std::vector<std::string> basket_unpriced;    ///< a basket names it, no market prices it -> skipped
 
@@ -622,6 +672,22 @@ struct band_result
     std::array<int, resource_count> markets_at_floor{};  ///< of those, how many sit AT the floor
     std::array<int, resource_count> markets_at_ceil{};   ///< of those, how many sit AT the ceiling
     float price_floor_mult = 0.0f, price_ceil_mult = 0.0f;  ///< echoed from registry, for the header
+
+    // BL-706 R5 — chain completeness per market, and the spread of it. See the
+    // block above `market_completeness` for the grain and the reach definition.
+    std::vector<market_completeness> completeness;
+    std::vector<std::string>         terminal_goods;
+    spread_stats                     spread;
+    float                            reach_budget = -1.0f;  ///< echoed from the registry
+
+    // BL-979 — the OTHER half of saturation: per market, the fraction of priced
+    // resources whose static supply:demand ratio sits inside the pin band. The
+    // number landscape_score's term 2 scores on, read off the same
+    // implementation (market_saturation::fraction_in_band). REPORTED, not
+    // gated — the band is Ben's to set.
+    std::vector<market_balance> balance;
+    spread_stats                balance_spread;
+    double                      pin_ratio = 0.0;   ///< the band the fraction was read at
 };
 
 band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
@@ -640,12 +706,33 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     if (!prehistory)
         p = no_prehistory(p);   // preserves seed and epoch_year
 
-    // app::setup_world -> load_economy -> generate_background_firms ->
-    // assign_default_recipes, in that order (app.cpp § start_new_game_prelude).
+    // app::setup_world -> load_economy -> search_landscape -> apply the WINNER
+    // -> assign_default_recipes, in that order (app.cpp § BL-770 PHASE 6). The
+    // background economy is the search winner, not the seed candidate (BL-979;
+    // apply_shipped_landscape in harness_params.hpp mirrors the app's sequence).
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
-    assign_default_recipes(w, reg);
-    generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
-    assign_default_recipes(w, reg);
+    print_shipped_landscape(apply_shipped_landscape(w, reg, seed));
+
+    // 2026-09-01, found by BL-711: the app calls init_survey_states at campaign
+    // start (app.cpp) and this census never did, so EVERY body - home included -
+    // stayed `hidden`. rank_extraction_sites gates on survey visibility, so it
+    // returned an empty list on every tick and THE CORP AI BUILT ZERO EXTRACTION
+    // SITES for the whole warm start. Not fewer: zero. Every extraction count this
+    // census has ever printed was the seeder's placement, frozen.
+    //
+    // That made the instrument blind to exactly the behaviour sprint 27 is
+    // steering by. BL-711 changed the extraction candidate list from a global
+    // top-M to a per-resource top-K, which the probe measures as coal going from
+    // 0 mines in any world to 25 - and this census reported the two builds
+    // BYTE-IDENTICAL, because in its world neither list is ever consulted.
+    //
+    // Same class, same day, same one-line answer as ai_skill_harness.cpp's own
+    // 2026-08-31 note: a pass the app runs that the benchmark did not, so the
+    // benchmark measured a world the game never produces. It is
+    // DEVELOPMENT_PRACTICES.md § A harness must build the world the application
+    // builds, and it moves every reading this file produces - deliberately, once,
+    // dated here rather than dribbled.
+    init_survey_states(w);
 
     out.recipes_authored = static_cast<int>(reg.recipe_count());
     out.recipes_allowed  = reg.recipe_count(building_type::processing_facility);
@@ -712,6 +799,16 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (row[r] > 0.0f)
                     out.construction[r] += static_cast<double>(row[r] / econ.build_duration_ticks);
+            // BL-709: the sector's own draw is part of THIS channel, and it has
+            // to be counted here or the reconciliation below misattributes it.
+            // `processing` is derived by subtraction (wants_folded less this
+            // half less the upkeep half), so a construction want the census does
+            // not recognise does not vanish — it silently reappears as a
+            // processor's input bid, which is a worse lie than a missing row.
+            // Mirrors `run_construction`'s own expression exactly: flat per
+            // tick, NOT divided by build_duration_ticks.
+            out.construction[static_cast<std::size_t>(resource_type::construction_capacity)] +=
+                static_cast<double>(reg.construction().capacity_per_build_tick);
         }
     }
 
@@ -721,7 +818,7 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     // clear_markets' own demand phase, in clear_markets' own order, reading the
     // prices clear_markets would read on this tick.
     const market_supply_snapshot prior_supply = snapshot_market_supply(w);
-    const std::vector<entity_id> mids = sorted_keys_markets(w);
+    const std::vector<entity_id> mids = sorted_market_ids(w);
 
     // --- BL-655 R3: the price consequence ----------------------------------
     // Taken here, BEFORE the demand register is re-injected below: the prices
@@ -766,11 +863,48 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     inject_background_demand(w, reg);
     out.background = sub(sum_demand(w, mids), out.household);
 
+    // BL-647: the endemic pull, in clear_markets' own order — after the two
+    // sibling baskets, before the inter-body redistribution.
+    inject_endemic_demand(w, reg);
+    {
+        res_row after = sum_demand(w, mids);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            out.endemic[r] = after[r] - out.household[r] - out.background[r];
+    }
+
     inject_interbody_demand(w, reg, prior_supply);
     {
         res_row after = sum_demand(w, mids);
         for (std::size_t r = 0; r < resource_count; ++r)
-            out.interbody[r] = after[r] - out.household[r] - out.background[r];
+            out.interbody[r] = after[r] - out.household[r] - out.background[r]
+                             - out.endemic[r];
+    }
+
+    // BL-644: the State channel — re-derive the space programme's claims on
+    // the census tick's world state, exactly as the census re-runs the demand
+    // injections above. A pure read: the derivation mutates nothing, and the
+    // scratch claims are discarded. What it measures is the goods demand the
+    // state WOULD place this tick — a pool purchase, never market demand, so
+    // it is reported beside the pool columns and folded into no total.
+    {
+        std::vector<budget_claim> scratch;
+        const std::vector<space_purchase> intents = derive_space_programme_claims(
+            w, w.nation_budgets, reg.space_programme(), scratch);
+        for (const space_purchase& sp : intents)
+            out.state_pl[static_cast<std::size_t>(sp.resource)] +=
+                static_cast<double>(sp.quantity);
+    }
+
+    // BL-643: the Infrastructure channel, same re-derivation discipline — the
+    // bill the network would present this tick (quantity is stock-capped by
+    // the derivation, so this is the fundable want, not the unbounded need).
+    {
+        std::vector<budget_claim> scratch;
+        const std::vector<network_purchase> intents = derive_network_upkeep_claims(
+            w, w.nation_budgets, reg.network_upkeep(), scratch);
+        for (const network_purchase& np : intents)
+            out.infra_pl[static_cast<std::size_t>(np.resource)] +=
+                static_cast<double>(np.quantity);
     }
 
     // The want register. `clear_markets` drops a want whose (corp, body) has no
@@ -794,11 +928,25 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
         }
     }
 
-    // Processing = the want register less its construction half. A negative
-    // residual means the attribution is wrong — R2's kind of failure.
+    // BL-654: the UPKEEP half of the want register, taken off the report's own
+    // attribution mirror rather than re-derived from the baskets — the mirror is
+    // written by the same statement that writes the bid, so it cannot disagree
+    // with it. Folded on the same rule the wants above are: a want on a body
+    // with no market never reaches a demand register.
+    for (const auto& [key, wanted] : rep.upkeep_wants)  // std::map — sorted keys
+    {
+        if (bodies_with_market.count(key.second) == 0)
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (wanted[r] > 0.0f)
+                out.upkeep_bid[r] += wanted[r];
+    }
+
+    // Processing = the want register less its construction and upkeep halves. A
+    // negative residual means the attribution is wrong — R2's kind of failure.
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        out.processing[r] = out.wants_folded[r] - out.construction[r];
+        out.processing[r] = out.wants_folded[r] - out.construction[r] - out.upkeep_bid[r];
         if (out.processing[r] < -1e-3)
             out.attribution_ok = false;
         if (out.processing[r] < 0.0)
@@ -807,8 +955,11 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     // The construction column is capped at what actually folded, for the same
     // reason: a site on a body with no market registers a want the market never
     // hears, and printing it in a MARKET demand column would overstate the total.
+    // BL-654: less the upkeep bid, which is a measured share of that same folded
+    // total rather than a modelled one.
     for (std::size_t r = 0; r < resource_count; ++r)
-        out.construction[r] = std::min(out.construction[r], out.wants_folded[r]);
+        out.construction[r] = std::min(out.construction[r],
+                                       std::max(0.0, out.wants_folded[r] - out.upkeep_bid[r]));
 
     // The standing-force pool draw — a real sink that never reaches a market.
     {
@@ -860,7 +1011,7 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
         }
     }
 
-    // --- world shape and classification ------------------------------------
+    // --- world shape and resource_classification ------------------------------------
     out.tiles     = static_cast<int>(w.tiles.size());
     out.markets   = static_cast<int>(w.markets.size());
     out.buildings = static_cast<int>(w.buildings.size());
@@ -878,15 +1029,21 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
         out.centre_scale = static_cast<double>(scale_sum);
     }
 
-    out.cls = classify(w, reg);
+    out.cls = classify_resources(w, reg);
 
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        const classification& c = out.cls[r];
-        if (c.produced_by_recipe && !c.any_market_sink())
+        const resource_classification& c = out.cls[r];
+        // BL-644/BL-643: a nation-purchased good has a real paying consumer,
+        // so it is not sinkless — but its want never reaches a price, which
+        // the separate nation-only list below keeps visible.
+        const bool nation_bought = c.sink_state || c.sink_infra;
+        if (c.produced_by_recipe && !c.any_market_sink() && !nation_bought)
             out.no_sink_produced.emplace_back(rname(r));
-        else if (!c.produced_by_recipe && c.has_deposit && !c.any_market_sink())
+        else if (!c.produced_by_recipe && c.has_deposit && !c.any_market_sink() && !nation_bought)
             out.no_sink_raws.emplace_back(rname(r));
+        if (nation_bought && !c.any_market_sink())
+            out.state_only.emplace_back(rname(r));
         if ((c.sink_household || c.sink_background) && !c.produced_by_recipe && !c.has_deposit)
             out.basket_unmakeable.emplace_back(rname(r));
         if ((c.sink_household || c.sink_background) && !c.priced)
@@ -894,8 +1051,40 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     }
     std::sort(out.no_sink_produced.begin(), out.no_sink_produced.end());
     std::sort(out.no_sink_raws.begin(), out.no_sink_raws.end());
+    std::sort(out.state_only.begin(), out.state_only.end());
     std::sort(out.basket_unmakeable.begin(), out.basket_unmakeable.end());
     std::sort(out.basket_unpriced.begin(), out.basket_unpriced.end());
+
+    // BL-706 R5. Last, and deliberately so: it builds the body reach fields (a
+    // cache on `world`) and reads the resource_classification above. Nothing after it
+    // touches the world, so the Dijkstra it triggers perturbs no measurement.
+    out.reach_budget = reg.construction().max_logistics_reach;
+    out.completeness = measure_market_completeness(w, reg, out.cls);
+    // The promoted measure returns the numbers; naming them is presentation and
+    // stays here, which is why it no longer takes an out-param for the names.
+    for (const std::size_t tr : terminal_resources(out.cls))
+        out.terminal_goods.emplace_back(rname(tr));
+    {
+        std::vector<double> v;
+        v.reserve(out.completeness.size());
+        for (const market_completeness& m : out.completeness)
+            v.push_back(m.completeness);
+        out.spread = summarise_spread(std::move(v));
+    }
+
+    // BL-979: the balance half of saturation — what the search scores on as its
+    // term 2 — off the same implementation, printed beside R5. Reported, never
+    // gated. Reads the reach fields R5 just built (memoised), so it perturbs no
+    // measurement either.
+    out.pin_ratio = k_balance_pin_ratio;
+    out.balance   = fraction_in_band(w, reg, out.pin_ratio);
+    {
+        std::vector<double> v;
+        v.reserve(out.balance.size());
+        for (const market_balance& m : out.balance)
+            v.push_back(m.fraction);
+        out.balance_spread = summarise_spread(std::move(v));
+    }
 
     return out;
 }
@@ -935,42 +1124,51 @@ void print_band(const band_result& b)
                 b.industry_eligible, b.buildings, b.industry_drawing);
 
     std::printf("\n  --- per-resource demand census, census tick, summed over every market ---\n");
-    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s | %11s | %10s %10s | %10s | %s\n",
+    std::printf("  BL-654: `upkeep/bd` is the shortfall a short pool BID on the market, so it is\n"
+                "  MARKET demand; `upkeep/pl` and `indust/pl` are the GROSS per-tick need with the\n"
+                "  pool-covered part included, and are not. bd <= pl + ind, always.\n");
+    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s %10s %10s | %11s | %10s %10s %10s %10s | %10s | %s\n",
                 "id", "resource", "prod", "d px",
-                "household", "backgrnd", "interbody", "construct", "process",
-                "MKT TOTAL", "upkeep/pl", "indust/pl", "produced", "structural sinks");
-    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s | %11s | %10s %10s | %10s | %s\n",
+                "household", "backgrnd", "endemic", "interbody", "construct", "process", "upkeep/bd",
+                "MKT TOTAL", "upkeep/pl", "indust/pl", "state/pl", "infra/pl", "produced", "structural sinks");
+    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s %10s %10s | %11s | %10s %10s %10s %10s | %10s | %s\n",
                 "---", "----------------------", "----", "----",
-                "----------", "----------", "----------", "----------", "----------",
-                "-----------", "----------", "----------", "----------", "----------------");
+                "----------", "----------", "----------", "----------", "----------", "----------", "----------",
+                "-----------", "----------", "----------", "----------", "----------", "----------", "----------------");
 
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        const classification& c = b.cls[r];
-        const double total = b.household[r] + b.background[r] + b.interbody[r]
-                           + b.construction[r] + b.processing[r];
-        std::printf("  %-3zu %-22s %-4s %2d %-1s | %10.3f %10.3f %10.3f %10.3f %10.3f | %11.3f | "
-                    "%10.3f %10.3f | %10.1f | %s\n",
+        const resource_classification& c = b.cls[r];
+        const double total = b.household[r] + b.background[r] + b.endemic[r] + b.interbody[r]
+                           + b.construction[r] + b.processing[r] + b.upkeep_bid[r];
+        std::printf("  %-3zu %-22s %-4s %2d %-1s | %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f | "
+                    "%11.3f | %10.3f %10.3f %10.3f %10.3f | %10.1f | %s\n",
                     r, rname(r), prod_word(c), c.depth, c.priced ? "$" : "-",
-                    b.household[r], b.background[r], b.interbody[r],
-                    b.construction[r], b.processing[r], total,
-                    b.upkeep_pool[r], b.industry_pool[r], b.produced[r], sink_word(c).c_str());
+                    b.household[r], b.background[r], b.endemic[r], b.interbody[r],
+                    b.construction[r], b.processing[r], b.upkeep_bid[r], total,
+                    b.upkeep_pool[r], b.industry_pool[r], b.state_pl[r], b.infra_pl[r],
+                    b.produced[r], sink_word(c).c_str());
     }
 
-    std::printf("  %-3s %-22s %-4s %-4s | %10.3f %10.3f %10.3f %10.3f %10.3f | %11.3f | "
-                "%10.3f %10.3f | %10.1f |\n",
+    std::printf("  %-3s %-22s %-4s %-4s | %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f | %11.3f | "
+                "%10.3f %10.3f %10.3f %10.3f | %10.1f |\n",
                 "", "TOTAL", "", "",
-                total_of(b.household), total_of(b.background), total_of(b.interbody),
-                total_of(b.construction), total_of(b.processing),
-                total_of(b.household) + total_of(b.background) + total_of(b.interbody)
-                    + total_of(b.construction) + total_of(b.processing),
-                total_of(b.upkeep_pool), total_of(b.industry_pool), total_of(b.produced));
-    std::printf("  %-3s %-22s %-4s %-4s | %10d %10d %10d %10d %10d | %11s | %10d %10d | %10s |  "
-                "(resources touched)\n",
+                total_of(b.household), total_of(b.background), total_of(b.endemic),
+                total_of(b.interbody),
+                total_of(b.construction), total_of(b.processing), total_of(b.upkeep_bid),
+                total_of(b.household) + total_of(b.background) + total_of(b.endemic)
+                    + total_of(b.interbody)
+                    + total_of(b.construction) + total_of(b.processing) + total_of(b.upkeep_bid),
+                total_of(b.upkeep_pool), total_of(b.industry_pool), total_of(b.state_pl),
+                total_of(b.infra_pl), total_of(b.produced));
+    std::printf("  %-3s %-22s %-4s %-4s | %10d %10d %10d %10d %10d %10d %10d | %11s | %10d %10d %10d %10d | "
+                "%10s |  (resources touched)\n",
                 "", "BREADTH", "", "",
-                touched_by(b.household), touched_by(b.background), touched_by(b.interbody),
-                touched_by(b.construction), touched_by(b.processing), "",
-                touched_by(b.upkeep_pool), touched_by(b.industry_pool), "");
+                touched_by(b.household), touched_by(b.background), touched_by(b.endemic),
+                touched_by(b.interbody),
+                touched_by(b.construction), touched_by(b.processing), touched_by(b.upkeep_bid), "",
+                touched_by(b.upkeep_pool), touched_by(b.industry_pool), touched_by(b.state_pl),
+                touched_by(b.infra_pl), "");
 
     if (b.wants_dropped_no_market > 0.0)
         std::printf("  note: %.3f units of want were registered on bodies carrying no market and "
@@ -994,7 +1192,7 @@ void print_band(const band_result& b)
     {
         if (b.markets_pricing[r] == 0)
             continue;
-        const classification& c = b.cls[r];
+        const resource_classification& c = b.cls[r];
         if (!c.any_market_sink() && b.produced[r] <= 0.0)
             continue;   // neither bought nor made here — no consequence to read
         const double base  = (b.price_ratio[r] > 0.0) ? (b.price_mean[r] / b.price_ratio[r]) : 0.0;
@@ -1014,18 +1212,105 @@ void print_band(const band_result& b)
     std::printf("\n  --- what this band cannot buy ---\n");
     std::printf("  produced in-band, NO market sink : %s\n", join(b.no_sink_produced).c_str());
     std::printf("  extractable, NO market sink      : %s\n", join(b.no_sink_raws).c_str());
+    std::printf("  nation-purchased ONLY (paid pool draws, never a market bid - BL-644/BL-643): %s\n",
+                join(b.state_only).c_str());
     std::printf("  a basket names it, band cannot make it or dig it: %s\n",
                 join(b.basket_unmakeable).c_str());
-    std::printf("  a basket names it, NO market prices it (both injectors SKIP it silently): %s\n",
+    std::printf("  a basket names it, NO market prices it (BL-652, asserted by R6): %s\n",
                 join(b.basket_unpriced).c_str());
 
     int live = 0;
     if (total_of(b.household)    > 0.0) ++live;
     if (total_of(b.background)   > 0.0) ++live;
+    if (total_of(b.endemic)      > 0.0) ++live;   // BL-647
     if (total_of(b.interbody)    > 0.0) ++live;
     if (total_of(b.construction) > 0.0) ++live;
     if (total_of(b.processing)   > 0.0) ++live;
-    std::printf("  live injecting passes this band  : %d of 5 measured\n", live);
+    std::printf("  live injecting passes this band  : %d of 6 measured\n", live);
+
+    // --- BL-706 R5: chain completeness, and the spread ----------------------
+    std::printf("\n  --- R5  CHAIN COMPLETENESS PER MARKET, and its SPREAD (BL-706) ---\n");
+    std::printf("  Fraction of the band's TERMINAL chains a market could source WITHIN REACH.\n"
+                "  Grain: the market catchment (market_for_tile). Reach: place_building_allowed's\n"
+                "  own clause against economy.construction.max_logistics_reach = %.1f.\n",
+                static_cast<double>(b.reach_budget));
+    std::printf("  Structural, not observed: what the ground and the band's recipes PERMIT.\n");
+    std::printf("  The SPREAD is the deliverable. No row here fails on a market being poor.\n");
+    std::printf("  terminal set (%zu goods, the denominator for EVERY market): %s\n",
+                b.terminal_goods.size(), join(b.terminal_goods).c_str());
+
+    // BL-979: the in-band columns sit beside completeness, joined by market id
+    // (both measures walk sorted_market_ids, but a join is cheaper than an
+    // assumption).
+    std::map<entity_id, const market_balance*> by_market;
+    for (const market_balance& m : b.balance)
+        by_market[m.market] = &m;
+
+    std::printf("\n  %-10s %-8s | %9s %9s %9s | %6s | %6s %6s | %-12s | %6s %6s | %s\n",
+                "market", "body", "catchment", "in reach", "heads",
+                "raws", "closed", "of", "completeness", "inband", "rated", "in band");
+    std::printf("  %-10s %-8s | %9s %9s %9s | %6s | %6s %6s | %-12s | %6s %6s | %s\n",
+                "----------", "--------", "---------", "---------", "---------",
+                "------", "------", "------", "------------", "------", "------", "-------");
+    for (const market_completeness& m : b.completeness)
+    {
+        const auto bit = by_market.find(m.market);
+        const market_balance* mb = (bit == by_market.end()) ? nullptr : bit->second;
+        std::printf("  %-10llu %-8llu | %9d %9d %9lld | %6d | %6d %6d | %-12.4f | %6d %6d | %.4f\n",
+                    static_cast<unsigned long long>(m.market),
+                    static_cast<unsigned long long>(m.body),
+                    m.catchment_tiles, m.in_reach_tiles, m.heads,
+                    m.raws_in_reach, m.terminals_closed, m.terminals_total,
+                    m.completeness,
+                    mb ? mb->balanced : 0, mb ? mb->rated : 0,
+                    mb ? mb->fraction : 0.0);
+    }
+
+    // --- BL-979: FRACTION IN BAND, per market and as a spread. REPORTED, not gated.
+    {
+        const spread_stats& bs = b.balance_spread;
+        int any_in_band = 0, rated_sum = 0, balanced_sum = 0;
+        for (const market_balance& m : b.balance)
+        {
+            if (m.balanced > 0)
+                ++any_in_band;
+            rated_sum    += m.rated;
+            balanced_sum += m.balanced;
+        }
+        std::printf("\n  FRACTION IN BAND (BL-979): of a market's PRICED resources with any signal, the share\n"
+                    "  whose static supply:demand ratio sits inside [1/%.1f, %.1f] — landscape_score's\n"
+                    "  term 2, read off market_saturation::fraction_in_band. A REPORT: no row gates on it;\n"
+                    "  where the band belongs is Ben's call.\n",
+                    b.pin_ratio, b.pin_ratio);
+        std::printf("  SPREAD over %d markets: min %.4f  median %.4f  max %.4f   (p25 %.4f  p75 %.4f  mean %.4f  sd %.4f)\n",
+                    bs.n, bs.min, bs.median, bs.max, bs.p25, bs.p75, bs.mean, bs.sd);
+        std::printf("  markets with ANY priced good in band: %d of %d;  pooled: %d of %d rated (%.4f)\n",
+                    any_in_band, bs.n, balanced_sum, rated_sum,
+                    rated_sum > 0 ? static_cast<double>(balanced_sum) / rated_sum : 0.0);
+    }
+
+    const spread_stats& s = b.spread;
+    std::printf("\n  COMPLETENESS SPREAD over %d markets: min %.4f  p25 %.4f  median %.4f  p75 %.4f  max %.4f\n",
+                s.n, s.min, s.p25, s.median, s.p75, s.max);
+    std::printf("           range %.4f   mean %.4f   sd %.4f   distinct scores %d of %d markets\n",
+                s.range, s.mean, s.sd, s.distinct, s.n);
+    std::printf("  histogram (decile of completeness -> markets):\n");
+    for (std::size_t i = 0; i < s.hist.size(); ++i)
+    {
+        std::printf("    [%.1f,%.1f)%s %4d  ", static_cast<double>(i) / 10.0,
+                    static_cast<double>(i + 1) / 10.0, (i == 9) ? "]" : " ", s.hist[i]);
+        for (int k = 0; k < s.hist[i] && k < 60; ++k)
+            std::printf("#");
+        std::printf("\n");
+    }
+    if (s.n >= 2 && s.distinct == 1)
+        std::printf("  FLAT: every market scores identically. Generation produced no supply\n"
+                    "        asymmetry at all in this band — see GENERATION_STRATEGY.md\n"
+                    "        § Asymmetry is the deliverable. Reported, not asserted.\n");
+    if (total_of(b.upkeep_bid)   > 0.0) ++live;   // BL-654: the upkeep bid
+    if (total_of(b.state_pl)     > 0.0) ++live;   // BL-644: the state's pool purchase
+    if (total_of(b.infra_pl)     > 0.0) ++live;   // BL-643: the network's material bill
+    std::printf("  live injecting passes this band  : %d of 9 measured\n", live);
 }
 
 } // namespace
@@ -1036,6 +1321,7 @@ int main(int argc, char** argv)
     int      warm_ticks = 80;
     bool     prehistory = true;
     std::string bands   = "both";
+    float    reach_override = -1.0f;   ///< NR-763 probe; < 0 = use the authored value.
 
     for (int i = 1; i < argc; ++i)
     {
@@ -1047,6 +1333,17 @@ int main(int argc, char** argv)
             warm_ticks = std::max(0, std::atoi(argv[++i]));
         else if (std::strcmp(argv[i], "--band") == 0 && i + 1 < argc)
             bands = argv[++i];
+        // NR-763 PROBE KNOB. `economy.construction.max_logistics_reach` is the
+        // clause R5 measures chain completeness against, and NR-763 asks whether
+        // the shipped 24.0 is why self-sufficiency is the NORM rather than the
+        // exception: market 48706 has a 493-tile catchment and ALL 493 are in
+        // reach. Ben's own recommended first probe is "vary this one constant and
+        // re-read the spread", so it is a FLAG rather than an edit-and-revert of
+        // a shipped value - the probe is repeatable and the authored constant is
+        // never touched. Absent, the registry's authored value stands and every
+        // reading is unchanged.
+        else if (std::strcmp(argv[i], "--reach") == 0 && i + 1 < argc)
+            reach_override = static_cast<float>(std::atof(argv[++i]));
     }
 
     // The real data layer, loaded as app::load_economy loads it. A restated
@@ -1063,6 +1360,18 @@ int main(int argc, char** argv)
     reg.load_from_lua(lua);
     world_gen_config gen_cfg;
     gen_cfg.load_from_lua(lua);
+
+    // NR-763: applied AFTER load_from_lua so the override is the last word, and
+    // echoed in the header below so a saved run always says which budget produced
+    // it. R5 already prints `reach_budget` off the registry, so the per-band
+    // tables carry it too - there is no way to read a probe run and mistake it
+    // for a shipped one.
+    if (reach_override >= 0.0f)
+    {
+        construction_params cp = reg.construction();
+        cp.max_logistics_reach = reach_override;
+        reg.set_construction(cp);
+    }
 
     // Vacuity guard (the standing lesson from interbody_pull_harness): an empty
     // registry would print every resource as equally unwanted and diagnose nothing.
@@ -1089,11 +1398,12 @@ int main(int argc, char** argv)
         }
     }
 
-    std::printf("demand_census — BL-649, requirement group `demand-census` R1-R4\n");
-    std::printf("  seed %u | warm ticks %d | prehistory %s | bands %s\n",
+    std::printf("demand_census — BL-649, requirement group `demand-census` R1-R6\n");
+    std::printf("  seed %u | warm ticks %d | prehistory %s | bands %s | reach %.1f%s\n",
                 seed, warm_ticks,
                 prehistory ? "ON (the shipped spawn)" : "OFF (--fast, NOT the spawn)",
-                bands.c_str());
+                bands.c_str(), reg.construction().max_logistics_reach,
+                reach_override >= 0.0f ? " (--reach OVERRIDE, NR-763 probe)" : " (authored)");
     std::printf("  IT REPORTS. No row below fails on a magnitude; see the file header.\n");
 
     // -----------------------------------------------------------------------
@@ -1172,11 +1482,80 @@ int main(int argc, char** argv)
         // target on the economy.
         const double any_demand = total_of(b.household) + total_of(b.background)
                                 + total_of(b.interbody) + total_of(b.construction)
-                                + total_of(b.processing);
+                                + total_of(b.processing) + total_of(b.upkeep_bid);
         std::snprintf(msg, sizeof msg,
                       "%s: the instrument is non-vacuous — some pass injected some demand",
                       b.band.c_str());
         check(any_demand > 0.0, "R2", msg);
+
+        // --- BL-706 R5 ------------------------------------------------------
+        // Anti-vacuity on the NEW instrument, in exactly the shape of the row
+        // above it: a completeness reading over zero markets, or against an
+        // empty terminal set, is a broken instrument reporting 0.00 everywhere
+        // and diagnosing nothing. This is a check on the census, NOT a target
+        // on the world — the world's own value is reported and never asserted.
+        std::snprintf(msg, sizeof msg,
+                      "%s: the completeness instrument is non-vacuous — %zu markets read "
+                      "against a terminal set of %zu goods",
+                      b.band.c_str(), b.completeness.size(), b.terminal_goods.size());
+        check(!b.completeness.empty() && !b.terminal_goods.empty(), "R5", msg);
+
+        // Internal consistency, R2's kind: a market cannot close more chains
+        // than the band has, and the ratio has to be the two counts it prints.
+        bool ratio_ok = true;
+        for (const market_completeness& m : b.completeness)
+        {
+            if (m.terminals_closed < 0 || m.terminals_closed > m.terminals_total ||
+                m.in_reach_tiles > m.catchment_tiles)
+                ratio_ok = false;
+            const double expect = (m.terminals_total > 0)
+                                ? static_cast<double>(m.terminals_closed)
+                                  / static_cast<double>(m.terminals_total) : 0.0;
+            if (std::fabs(expect - m.completeness) > 1e-9)
+                ratio_ok = false;
+        }
+        std::snprintf(msg, sizeof msg,
+                      "%s: every completeness row reconciles (closed <= total, in-reach <= "
+                      "catchment, ratio = the printed counts)", b.band.c_str());
+        check(ratio_ok, "R5", msg);
+
+        // THE ONE SPREAD ASSERTION, and it is deliberately the loosest one that
+        // still means something. It does NOT say a market must be rich or poor,
+        // and it sets no floor on any market's value — GENERATION_STRATEGY.md
+        // § Asymmetry is the deliverable is explicit that generation owes the
+        // spread and nothing about an individual region. What it says is that a
+        // world in which EVERY market scores the identical number carries no
+        // supply asymmetry at all, and that is a generation defect however fine
+        // each market looks alone. Two distinct values clear it; the shipped
+        // world is far above that, so this catches a flattening regression
+        // rather than grading the current tuning.
+        std::snprintf(msg, sizeof msg,
+                      "%s: the world is not FLAT — markets do not all score identically "
+                      "(%d distinct of %d; range %.4f). A floor on the SPREAD only",
+                      b.band.c_str(), b.spread.distinct, b.spread.n, b.spread.range);
+        check(b.spread.n < 2 || b.spread.distinct >= 2, "R5", msg);
+        // --- R6 (BL-652) — THE ONE MAGNITUDE-FREE ROW THAT FAILS -------------
+        // Both basket injectors SKIP a resource whose market base_price is 0,
+        // and they do it in silence: from every total downstream, an authored
+        // but unpriced basket entry is indistinguishable from a channel nobody
+        // wrote. Two separate bugs hid behind that on one day in August 2026 —
+        // this census read as having no background demand at all, and
+        // spawn_solvency measured a whole spawn diagnosis in a world where
+        // background demand did not exist. NEITHER FAILED. Both quietly
+        // answered a question about a different world.
+        //
+        // It is not a magnitude assertion and does not breach R2's discipline:
+        // the combination is ALWAYS either a missing script (world_gen.lua,
+        // which carries kepler_market.base_price) or an authoring error, and it
+        // is never intended. `src/world/market_clearing.cpp`'s
+        // `unpriced_basket_entries` is the same finding at runtime, where the
+        // app warns rather than fails.
+        std::snprintf(msg, sizeof msg,
+                      "%s: no demand basket names a good NO market prices — %s",
+                      b.band.c_str(),
+                      b.basket_unpriced.empty() ? "none do"
+                                                : join(b.basket_unpriced).c_str());
+        check(b.basket_unpriced.empty(), "R6", msg);
     }
 
     // R4 — the hand-built finding, at the ancient band only.

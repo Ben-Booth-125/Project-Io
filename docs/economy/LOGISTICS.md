@@ -1,5 +1,14 @@
 # Project Io — Logistics
 
+> **Settles:** what it costs to cross a tile and which path is taken · how far a placement may
+> reach · where roads come from and who may extend them · how physical scale becomes travel
+> time and how long a leg takes · what can cut a route · what caps how much may be in motion at
+> once.
+> **Not here:** the convoy itself — its cargo, dispatch, trigger and arrival (SUPPLY) · what the
+> cargo is worth at either end (MARKETS) · what the ground is made of (TILES).
+> *Logistics is the road; Supply is the traffic.*
+> **Confused with:** SUPPLY.md, TILES.md, MARKETS.md.
+
 **The network.** How far anything is from anything else, what it costs to cross, how long it takes,
 and what the network permits. This document owns the **substrate**; `SUPPLY.md` owns the **flow that
 runs on it** (convoys).
@@ -105,6 +114,40 @@ cannot be used twice while the first hub is still building.
 unreachable"** — a distinction a UI holding a `const world&` needs, because it must not trigger the
 Dijkstra itself.
 
+### 3a. Power rides this network (Ben, 2026-08-31)
+
+**Power is transmitted on the road network, and it needs no new graph.** Ben: *"Power travels via
+road infrastructure, although it is different from a convoy, it has a 1 qtr travel time."*
+
+Three properties, and each one reuses something already here:
+
+1. **Connectivity, not distance.** A building can draw from a generator if a path exists at all.
+   That is exactly `tile_reach_cost` read as a boolean — **finite means connected, infinity means
+   not** — so the multi-source Dijkstra of § 3 already answers the question and no second field is
+   needed.
+2. **Flat latency: one tick, regardless of distance.** Power is not priced by traversal cost the way
+   cargo is; a connection either exists or it does not, and if it does the power is available on the
+   next tick. This is what makes it *unlike* a convoy despite sharing the road.
+3. **Interdiction cuts it, for free.** § 7's rule already lets a hostile unit sever the network. A
+   cut that strands a market from its generation is now a cut that turns the lights off there —
+   Conflict reaching Trade through infrastructure rather than through a special case.
+
+**Connection gates the TRADE, not only the draw** (Ben, 2026-08-31). Power is bought and sold
+(`PRODUCTION.md` § Power), so what this network decides is **who may match whom**: a buyer can only
+clear against a generator its roads reach. Power therefore has a price that is **regional by
+construction** — a well-connected region with generation is cheap, a stranded one is expensive or
+dark — without any rule naming a region. It is the first good whose **movement and market are
+separate questions**: a price, and no convoy.
+
+The design consequence worth stating: **roads become dual-purpose.** A road built for convoys also
+carries power, so the network's value is no longer only throughput, and a region's power is a fact
+about its *connectedness* rather than about its ground. That is a supply asymmetry with a cause a
+player can read and change, which is what `docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the
+deliverable asks generation to produce.
+
+`docs/economy/PRODUCTION.md` § Power owns the generation buildings, the upkeep draw and the
+shortfall rule; this section owns only the transmission.
+
 ### 4. Roads — generated, then extended by hand
 
 Generated per nation after population, deterministically from the campaign seed (BL-146 /
@@ -152,6 +195,47 @@ rather than silently left off the lattice.
 
 The player extends the lattice with `place_road`; rivals do too, through the same verb.
 
+### 4a. The ancient network — roads stamped FROM the history
+
+> *"We should also be laying simple roads to supply provinces."*
+> — Ben, 2026-09-03, the eight-phase reorder, point 4
+
+**The national lattice above is not the only road on the map.** Before any nation existed the
+Era −1 sim moved armies and founding parties across the ground, and those lines are the
+world's first roads. They are **derived from the history, never laid inside it**: the sim
+records each corridor it walked — a campaign's staging-holding-to-objective supply line, a
+settle's parent-to-daughter route — and a pass immediately after it stamps those lines onto
+`road_level`. `GENERATION_STRATEGY.md` § The eight phases states why the record is the only
+possible shape: the sim has no write channel to the world, its pathfinder returns a cost
+between regions rather than a list of tiles, and the modern pass's node source does not exist
+until after it runs.
+
+**The ancient tier rule is its own, not the industrial one.** § 4's gates read a nation's
+qualification percentile — a field derived from industrialisation timing, which an antiquity
+world neither has nor has any spread in. What an ancient corridor has instead is:
+
+- **traffic** — how many times the history actually used it. Repeat traffic earns a **Road**;
+  a line walked once is a **Track**;
+- **works** — a corridor whose **two** ends both raised something reach-bearing from the Era −1
+  works roster (`docs/lore/HISTORY.md` § The works roster) promotes one rung. Both ends,
+  because a paved trunk with a station at one end and nothing at the other is a road that
+  stops. This is the **only** route to a **Highway** before the industrial era, which keeps
+  § 4's antiquity shape intact — a world that built nothing carries Roads and no Highways —
+  while giving the works roster a payoff that persists onto the campaign map.
+
+**Purely additive.** The stamp takes the maximum per tile, so no national road is ever
+downgraded and the ancient corridors appear where the modern lattice did not reach or reached
+lower. The land rule is unchanged: water tiles are skipped and a corridor whose route crosses
+open ocean is not stamped at all.
+
+Why it matters beyond decoration: `docs/generation/PROVINCES.md` § Richness is absorbed makes
+roads the term that **gates what a rich province can yield**. Laying them from the history is
+what turns that gate into a fact with a visible cause — a province is well-served because an
+empire supplied through it, not because a generator rolled well.
+
+BL-768 (roads and markets from history) owns this design; `src/world/road_generation.hpp`
+carries the constants and the measurement they were read off.
+
 **Roads do not decay** (Ben, 2026-08-22): *"Roads do not decay, but nations have to pay tax to
 support them. If a nation runs into too much debt supporting infrastructure, it can go bankrupt
 with major penalties. But between these states nothing changes."* The cost is **binary, not
@@ -161,25 +245,76 @@ be a second decay model wearing a budget's clothes, which the first half of the 
 This is the sink the *logistics maintenance* line of the national budget (BL-538, national budget)
 pays into, and it gives a nation its first failure state — BL-550 (national insolvency).
 
+**The tax buys materials — the Infrastructure demand channel** (BL-643, network upkeep draws;
+`src/world/network_upkeep.{hpp,cpp}`). Each economy tick a nation's network bills **stone and
+timber** at authored per-element rates (`economy.network_upkeep`, scripts/economy.lua): every road
+tile in its territory by level, plus every active port and inland hub standing on its ground. The
+bill is **geography, never population** — network size is derived from the world each tick, so the
+channel scales exactly as MARKETS.md § Demand channels property 1 demands. The purchase is the
+state-purchase shape (NATIONS.md § A budget): a named supplier's pool, the supplier market's own
+price, the budget pass's direct transfer, and the goods **consumed** — repairs go into the roadbed.
+Unlike the space programme's lumps the claim is **pro-rata** (rule 3): upkeep is continuous, so
+half the repair budget buys half the materials, and an underfunded quarter is a reported partial
+fill, never a banked lump. Consistent with the binary ruling above, an unfunded draw degrades
+nothing — the network's failure state remains insolvency, not decay.
+
+### 4b. Sea lanes — the colonial ties, stamped FROM the colonial record
+
+**The water analogue of § 4a.** The colonial era
+(`../generation/EXPLORATION.md` § The colonial tie is a sea lane, and the map reads it) records every sea leg it walked — a purchase party's crossing, a
+campaign's sea supply, the standing traffic between a metropole and what it holds — and a pass
+after it stamps those legs onto the water as a **sea lane** tier that discounts the sea-leg
+traversal cost in § 1. Traffic earns the tier, as it earns a Road on land; a crossing made once is
+no lane. **Purely additive and purely water**: land tiles are untouched, and the § 4a rule that a
+corridor crossing open ocean is not stamped as road is unchanged — the crossing becomes a lane
+instead.
+
+**A tie is therefore a force on the map, never a preference inside an actor.** Because § 1 is one
+weight function, a lane is read by everything that reads traversal cost: a convoy between a
+colony's market and its metropole's lands cheaper than one to a stranger's, so a colony's chains
+close through its metropole *first* without any preferred seller being named — and **placement
+reach widens across the lane** (§ 3), so a firm on one shore may legally hold a site on the other.
+That second effect is wider than a market preference and it is intended: a tie only prices could
+see would be invisible to the corporate search, which reads reach cost (BL-812, phase 6 sees roads).
+
+**A lane outlives the polity that made it**, as a road outlives the empire that paved it. Whether
+a lane *decays* when its traffic stops is open in `COLONIAL_ERA.md` § Open questions; roads do not
+(§ 4a), but the sea is not a roadbed.
+
 ### 5. Physical scale and travel time (Ben, 2026-08-12)
 
-**Scale is derived, not authored.** Planetology generates `home_mass`; a rocky planet's radius
-follows roughly `R ∝ M^0.27`, so tile width falls out of a scalar the generation chain has already
-settled. At Earth mass on the 312-column grid that is **~128 km per tile** — which puts a day's
-march at about a fifth of a tile and makes a tile **a region-sized unit rather than a field.**
+**A tile has a physical size, and it is derived rather than authored.** Planetology generates
+`home_mass`; a rocky planet's radius follows its mass as roughly `R ∝ M^0.27`, so radius →
+circumference → `circumference / grid_width` gives kilometres per tile — tile width falls out of a
+scalar the generation chain has already settled. At Earth mass on the 312-column grid that is
+**~128 km per tile** (`body_km_per_tile`, `src/world/logistics.hpp`), which puts a day's march at
+about a fifth of a tile and makes a tile **a region-sized unit rather than a field.**
 
-Without a tile scale, convoy speed would be an *interplanetary* calibration (`1 / distance_in_AU`)
-and every intra-body convoy would arrive in one econ tick whether it crossed one tile or all 312 —
-distance would cost money and never cost time, and tripling the map could not make distance feel
-bigger.
+Without a tile scale, speed on this network would be `1 / distance_in_AU` — an *interplanetary*
+calibration — and since `body_distance_au` returns 0 for two markets on the same body, **every
+intra-body haul would arrive in exactly one econ tick (90 days)** whether it crossed one tile or all
+312. Distance would cost money and never cost time, and a bigger map would only mean the same 90
+days buys more reach.
 
-**Two speeds, and the gap between them is a design lever:** caravan **25 km/day**, coastal vessel
-**130 km/day**. Roughly five times, *"and that difference is the whole reason coastal trade is worth
-designing"* — BL-188 (coastal ports) owns the sea-trade design that reaches the faster speed.
+**Travel time reuses the terrain weighting the pathfinder already computes.** `logistics_path::cost`
+is weighted by § 1's one weight function (plains ×1.0 … mountain ×2.0), so it is a count of
+*effective* tiles — and terrain cost is already a time multiplier. The A\* weights do double duty
+rather than needing a parallel table:
 
-**Terrain cost doubles as a time multiplier** — the A\* weights do double duty rather than needing a
-parallel table. Travel is quantised to whole econ ticks (minimum 1), because the economy resolves
-quarterly.
+```
+days   = path.cost × km_per_tile ÷ km_per_day
+ticks  = ceil(days ÷ 90)          # the economy clears quarterly; minimum 1
+```
+
+**Two speeds, and the gap between them is a design lever:** **land ~25 km/day** (an ox-and-cart
+caravan) against **sea ~130 km/day** (a coasting vessel). Roughly five times, *"and that difference
+is the whole reason coastal trade is worth designing"* — BL-188 (coastal ports) owns the sea-trade
+design that reaches the faster speed. A short regional haul lands in one quarter; a long one takes
+several.
+
+The **space leg** is the one leg the AU calibration is right for: it keeps its own ~1-tick-per-AU
+rate over the Euclidean body-centre distance of § 8, while the tile scale above governs everything
+that crosses a body's ground.
 
 ### 6. Cache invalidation — narrowed, for a real reason
 

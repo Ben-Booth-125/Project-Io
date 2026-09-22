@@ -13,6 +13,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
 #include "world/survey_system.hpp"
+#include "world/stockpile_budget.hpp" // BL-1042: the budget the search-less paths state
 #include "world/tech_gate.hpp"
 
 #ifdef _WIN32
@@ -23,6 +24,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -132,6 +134,16 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
 
+    // BL-1042 — THE CHARTER BUDGET, STATED. This path does not search, so it has
+    // no seam to spend one at. Its world is built with the Digitisation span
+    // OFF (make_hard_coded_world()'s default params), so the stockpile
+    // budget app::start_new_game_prelude would pass is EMPTY — and an empty
+    // budget IS the legacy call below, byte for byte. The guard says so out
+    // loud if that ever stops being true.
+    if (const stockpile_budget sb = build_stockpile_budget(w); !sb.budget.empty() || sb.rejected)
+        std::fprintf(stderr, "[stockpile_budget] run_serve: a search-less path lays the legacy web and "
+                             "ignores a %lld-point stockpile budget\n",
+                     static_cast<long long>(sb.points_total));
     // BL-365: real background corporations, generated now that reg is loaded.
     generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
 
@@ -232,6 +244,16 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
 
+    // BL-1042 — THE CHARTER BUDGET, STATED. This path does not search, so it has
+    // no seam to spend one at. Its world is built with the Digitisation span
+    // OFF (make_hard_coded_world()'s default params), so the stockpile
+    // budget app::start_new_game_prelude would pass is EMPTY — and an empty
+    // budget IS the legacy call below, byte for byte. The guard says so out
+    // loud if that ever stops being true.
+    if (const stockpile_budget sb = build_stockpile_budget(w); !sb.budget.empty() || sb.rejected)
+        std::fprintf(stderr, "[stockpile_budget] headless run: a search-less path lays the legacy web and "
+                             "ignores a %lld-point stockpile budget\n",
+                     static_cast<long long>(sb.points_total));
     // BL-365: real background corporations, generated now that reg is loaded.
     generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
 
@@ -447,14 +469,35 @@ int main(int argc, char* argv[])
         // per script cost ~40 s x 79 launches). Checked before --verify so the
         // longer flag is not shadowed by a prefix scan; both are exact matches,
         // but the order documents the intent.
+        // --verify-budget <seconds>: the per-script wall-clock backstop (BL-714 /
+        // NR-695). 0 disables it. Parsed before the dispatch below so both --verify
+        // and --verify-all honour it.
+        double verify_budget = -1.0;
+        for (int i = 1; i + 1 < argc; ++i)
+        {
+            if (std::string(argv[i]) == "--verify-budget")
+                verify_budget = std::atof(argv[i + 1]);
+        }
+
+        // "The next argument, unless it is a flag." It used to read "unless it is
+        // --bless", which meant `--verify-all --verify-budget 60` took
+        // "--verify-budget" as the SCRIPT DIRECTORY and swept nothing. Any leading
+        // "--" is a flag; a path never starts with one.
+        const auto positional = [argc, argv](int i, const char* fallback) {
+            if (i + 1 < argc && std::string(argv[i + 1]).rfind("--", 0) != 0)
+                return std::string(argv[i + 1]);
+            return std::string(fallback);
+        };
+
+        // `app` is neither copyable nor movable, so it is built in place and the
+        // budget written onto it before the run starts.
         for (int i = 1; i < argc; ++i)
         {
             if (std::string(argv[i]) == "--verify-all")
             {
-                std::string dir = "scripts/verify";
-                if (i + 1 < argc && std::string(argv[i + 1]) != "--bless")
-                    dir = argv[i + 1];
-                return app{}.run_verify_all(dir, bless);
+                app a;
+                if (verify_budget >= 0.0) a.m_verify_script_budget_s = verify_budget;
+                return a.run_verify_all(positional(i, "scripts/verify"), bless);
             }
         }
 
@@ -462,11 +505,9 @@ int main(int argc, char* argv[])
         {
             if (std::string(argv[i]) == "--verify")
             {
-                // The script is the next non-flag argument, else the default.
-                std::string script = "scripts/verify/corporation_lens.lua";
-                if (i + 1 < argc && std::string(argv[i + 1]) != "--bless")
-                    script = argv[i + 1];
-                return app{}.run_verify(script, bless);
+                app a;
+                if (verify_budget >= 0.0) a.m_verify_script_budget_s = verify_budget;
+                return a.run_verify(positional(i, "scripts/verify/corporation_lens.lua"), bless);
             }
         }
 
@@ -497,6 +538,72 @@ int main(int argc, char* argv[])
             }
         }
 
+        // --spectate (BL-695): open the session with NOBODY SEATED, so the
+        // scored-utility layer evaluates every corporation and the human only
+        // watches (AI_OPPONENT.md § 10i). Until now the mode was reachable
+        // ONLY from `verify.spectate()` behind --verify, which made "watch the
+        // AI play" a headless-script capability and not something a person
+        // could do; this is the route in.
+        //
+        // ENTRY AT START, deliberately. § 10i removes the prohibition's
+        // SUBJECT rather than excepting the rule, which is a fact about the
+        // whole session. Flipping it mid-run would change, halfway through,
+        // which corps the scorer may legally act on — a separate argument
+        // nobody has made — so there is no in-game control that clears it.
+        //
+        // Applied to every RENDERED entry path below, the way --host-agent is
+        // (review 2026-08-19 #9: a path that silently ignores a startup flag
+        // is a bug). Not applied to --verify (scripts drive verify.spectate
+        // themselves) nor to --serve (that seam's session actor IS a seat).
+        bool spectate = false;
+        for (int i = 1; i < argc; ++i)
+            if (std::string(argv[i]) == "--spectate")
+                spectate = true;
+
+        // --epoch <year>  (BL-705): the calendar year every world this process
+        // generates BEGINS at — world_params::epoch_year. Below 1700 takes the
+        // antiquity branch (0 is the default 0 CE start); 1960 selects the
+        // industrial one, which puts the recipe registry on the industrial band
+        // and skips the Era -1 antiquity prehistory. Both starts are supported
+        // (docs/economy/ERAS.md § Where the ladder starts); before this flag the
+        // 1960s branch was live but reachable only by editing a source default.
+        //
+        // Applies to a NEW world. --load carries the save's own epoch. It is
+        // parsed here, below the --verify / --verify-all / --serve dispatch, so
+        // it does NOT reach those: their goldens and pinned bands are all taken
+        // against the default world, and giving them a second epoch would mean
+        // a second golden set. Deliberate, not an oversight.
+        bool         epoch_set  = false;
+        std::int64_t epoch_year = 0;
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::string(argv[i]) != "--epoch")
+                continue;
+            if (i + 1 >= argc)
+            {
+                std::fprintf(stderr, "ProjectIo: --epoch needs a calendar year\n");
+                return 1;
+            }
+            // Validated as the value that LANDS, not as a convenient parse: a
+            // bare atoll would read "--epoch nineteen-sixty" as 0 and silently
+            // generate the wrong world. Negative years are legitimate (BCE,
+            // astronomical numbering), so the band is symmetric.
+            const std::string  arg = argv[i + 1];
+            std::size_t        used = 0;
+            long long          y    = 0;
+            try                       { y = std::stoll(arg, &used); }
+            catch (const std::exception&) { used = 0; }
+            if (used != arg.size() || y < -100000 || y > 100000)
+            {
+                std::fprintf(stderr,
+                             "ProjectIo: --epoch expects a calendar year in "
+                             "-100000..100000 (got \"%s\")\n", arg.c_str());
+                return 1;
+            }
+            epoch_year = y;
+            epoch_set  = true;
+        }
+
         // --autostart: boot straight into a new campaign, headlessly, and exit.
         // Added 2026-08-12 to reproduce a crash that appears ONLY on the
         // interactive path: --verify calls setup_world directly and therefore
@@ -507,6 +614,9 @@ int main(int argc, char* argv[])
             {
                 app a;
                 a.host_agent(agent_port);
+                if (spectate)
+                    a.spectate_session();
+                if (epoch_set) a.set_epoch_year(epoch_year);
                 return a.run(app::autostart_mode::smoke);
             }
 
@@ -521,6 +631,9 @@ int main(int argc, char* argv[])
             {
                 app a;
                 a.host_agent(agent_port);
+                if (spectate)
+                    a.spectate_session();
+                if (epoch_set) a.set_epoch_year(epoch_year);
                 return a.run(app::autostart_mode::play);
             }
 
@@ -531,6 +644,9 @@ int main(int argc, char* argv[])
                 // silently; wire it like every sibling path.
                 app a;
                 a.host_agent(agent_port);
+                if (spectate)
+                    a.spectate_session();
+                if (epoch_set) a.set_epoch_year(epoch_year);
                 return a.run_autostart();
             }
 
@@ -545,6 +661,9 @@ int main(int argc, char* argv[])
 
             app a;
             a.host_agent(agent_port);
+            if (spectate)
+                a.spectate_session();
+            if (epoch_set) a.set_epoch_year(epoch_year);
             if (!load_path.empty())
                 a.open_save(load_path);
             return a.run();

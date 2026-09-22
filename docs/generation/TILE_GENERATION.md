@@ -1,5 +1,15 @@
 # Project Io — Tile Generation
 
+> **Settles:** what each of the six passes does to a tile, and in what order · how a body
+> profile turns solar parameters into terrain without body-specific code · how a biome
+> decomposes into the terrain axes · how deposits are placed, and how the fossil/living
+> split is decided · how a sibling pass extends the pipeline without changing the core ·
+> what a tile records for the ledger.
+> **Not here:** where the height bias comes from (CONTINENTS) · where the body profile comes
+> from (PLANETOLOGY) · how tiles are partitioned into provinces (PROVINCES) · what a
+> resource is and what it is worth (../economy/RESOURCES, ../economy/TILES).
+> **Confused with:** CONTINENTS.md, PROVINCES.md, ../economy/TILES.md.
+
 This document specifies the strategy and rules for procedural tile generation in
 `hard_coded_world.cpp`. Generation is **deterministic**: every body has a fixed
 seed and a solar-parameter profile — **derived by the Planetology chain**
@@ -139,8 +149,8 @@ The same heightmap on an airless body still generates and drives landform
 assignment — a crater-heavy moon still has elevation structure.
 
 The normalised heightmap is **retained** on `tile_component::height` and serialised,
-because the province partition reads it (§ Province partition); every other
-intermediate is disposable (`GENERATION_LEDGER.md` § Data lifetime).
+because the province partition reads it ([`PROVINCES.md`](PROVINCES.md) § The partition);
+every other intermediate is disposable (`GENERATION_LEDGER.md` § Data lifetime).
 
 ---
 
@@ -174,16 +184,29 @@ from `H` remain land and receive valley or canyon landforms in Pass 5.
 
 ### Pass 3 — Latitude band assignment
 
-Divide the grid rows into named temperature bands. Band boundaries are shifted by
-`temperature_class`:
+Divide the grid rows into named temperature bands. The band raster is read from each
+tile's **plate-carried position at epoch 0** through the palaeo frame
+([CONTINENTS.md](CONTINENTS.md) § The Lagrangian frame) — the same frame the Life
+phase reads the fossil epochs from — and at epoch 0 that position is the raster row,
+so the row-percent table below is exactly what every tile receives. Band boundaries
+are shifted by `temperature_class`:
 
 | Band | Temperate row % | Scorching row % | Cold row % |
 |---|---|---|---|
-| Polar | 0–10, 90–100 | — | 0–15, 85–100 |
-| Subpolar | 10–22, 78–90 | — | 15–35, 65–85 |
-| Temperate | 22–42, 58–78 | 0–20, 80–100 | 35–65 |
+| Polar | 0–6, 94–100 | — | 0–15, 85–100 |
+| Subpolar | 6–14, 86–94 | — | 15–35, 65–85 |
+| Temperate | 14–42, 58–86 | 0–20, 80–100 | 35–65 |
 | Subtropical | 42–47, 53–58 | 20–40, 60–80 | — |
 | Tropical | 47–53 | 40–60 | — |
+
+The Temperate column's polar/subpolar boundaries were narrowed 2026-09-10
+(BL-888, redirected from BL-859): polar from the outer 20% of rows to the
+outer 12%, subpolar from the next 24% to the next 16% — the combined cold
+band drops from 44% to 28% of rows. `colonisation_harness`'s per-farm-class
+census found boreal (icy substrate / snow cover) at 24-30% of all land and
+the largest single class of unfarmed ground; this is the ice-cap-extent lever
+Ben's ruling asked for, not a colonisation-side fix. The subtropical/tropical
+boundaries are unchanged.
 
 The cold column's polar band is the outer 30% of rows, not the outer 50%: a
 `polar_frozen` body with half its rows polar reads half-icy (see the comment in
@@ -378,17 +401,38 @@ the approximate profiles in `docs/economy/TILES.md`. Amounts are randomised in a
 per-tile draw seeded from the body seed plus tile index, ensuring the same body
 always produces the same deposits.
 
+**The output is split by ORIGIN, and so is the rule.** Pass 6 has two phases — a
+**Body phase** that seeds the lithosphere with the body, and a **Life phase** that
+carries the biosphere's residue — and each deposit belongs to one of them according
+to the resource's origin (§ Origin in [RESOURCES.md](../economy/RESOURCES.md)),
+never according to which row of a table writes it. Since the origin table is total
+and compile-enforced, each phase's output is free of the other's **by
+construction**: a new resource is classified or the build fails.
+
+**The Body phase's traversal still draws every row, including the biological ones,
+and discards them.** That is deliberate, and it is the one constraint every future
+change here is subject to: `tile_rng` runs on past the deposit block into the
+endemic amount draw and into the derived environment's hazard/habitability jitter,
+so removing, adding or reordering a draw moves hazard and habitability on **every
+tile of every world**. Drawn-then-discarded keeps that stream where it is, which is
+what makes a change in *placement* attributable to placement rather than to stream
+drift — two different findings that must not be allowed to blur into one.
+
+**The Life phase runs on its own per-tile stream** (`life_rng`), for the same reason
+the full raw-set additions run on theirs: it could not be cut into the shared stream
+without moving the environment everywhere.
+
 **Ambient resources** are always generated on eligible compositions at a low fixed
 baseline before the main deposit draw. This guarantees every tile has at least one
 extractable resource.
 
-| Ambient resource | Eligible compositions | Base deposit |
-|---|---|---|
-| Stone | All non-ocean, non-icy | 10–30 |
-| Timber | Forest, Wetland | 15–40 |
-| Sand | Barren (plains/canyon landform) | 10–25 |
-| Clay | Wetland, any valley landform | 8–20 |
-| Peat | Tundra (plains/valley landform) | 5–15 |
+| Ambient resource | Phase | Eligible ground | Base deposit |
+|---|---|---|---|
+| Stone | Body | All non-ocean, non-icy | 10–30 |
+| Timber | Life | Forest or marsh cover | 15–40 |
+| Sand | Body | Barren (plains/canyon landform) | 10–25 |
+| Clay | Body | Marsh cover, any valley landform | 8–20 |
+| Peat | Life | Scrub cover on sedimentary substrate, plains or valley landform — the pair rule, `RESOURCES.md` § Ambient goods | 5–15 |
 
 **Calibrated subset deposit table** — the seven-resource subset, authored on the
 per-tile `tile_rng` stream. These values are hand-calibrated and the economy is
@@ -397,25 +441,19 @@ tuned on them; the full-set pass below leaves them bit-for-bit unchanged.
 | Composition | Resource | Base range | Mountain mod | Rift mod | Valley mod |
 |---|---|---|---|---|---|
 | Barren | Iron ore | 0–150 | ×1.4 | ×1.2 | — |
-| Barren | Petroleum | 0–120 | — | — | ×1.2 |
 | Rocky | Iron ore | 0–200 | ×1.5 | — | — |
 | Volcanic | Iron ore | 0–150 | — | ×1.3 | — |
 | Icy | Water | 0–400 | — | — | — |
-| Grassland | Agricultural produce | 40–180 | — | — | ×1.3 |
-| Grassland | Fibre | 30–140 | — | — | ×1.3 |
-| Forest | Agricultural produce | 10–80 | — | — | ×1.15 |
-| Wetland | Agricultural produce | 40–200 | — | — | — |
-| Wetland | Fibre | 30–150 | — | — | — |
 | Tundra | Iron ore | 0–60 | ×1.3 | — | — |
 | Metallic | Iron ore | 50–250 | — | — | — |
 | Metallic | Regolith | 20–50 | — | — | — |
 | Regolith | Regolith | 20–50 | — | — | — |
 
-**Fibre (BL-586, 2026-08-24)** is the ordinary case, not the endemic one below: it grows by this
-same cover-based ambient/biotic mechanic agricultural produce uses, on the same grassland and
-wetland tiles, **additively** — a tile carries both deposits at once, not one instead of the
-other. It is a common crop, priced and gated the same as any other Tier 1 ambient good, with no
-planetology-endowment or endemic-scarcity gate on top.
+**Fibre (BL-586, fibre as an ordinary crop)** is the ordinary case, not the endemic one
+below: it grows by this same cover-based biotic mechanic agricultural produce uses, on the
+same grass and marsh tiles, **additively** — a tile carries both deposits at once, not one
+instead of the other. It is a common crop, priced and gated the same as any other Tier 1
+ambient good, with no planetology-endowment or endemic-scarcity gate on top.
 
 Modifiers apply multiplicatively to the upper bound of the base range. (The
 metallic row also authors regolith 20–50, same as the regolith composition — a
@@ -430,7 +468,6 @@ goods are sparse *and* small. Base ranges below are pre-scalar.
 
 | Composition | Resource | Base range (pre-scalar) |
 |---|---|---|
-| Barren | Coal | 30–140 |
 | Barren | Silica | 20–90 |
 | Rocky | Silica | 20–100 |
 | Rocky | Copper ore | 30–160 |
@@ -439,6 +476,83 @@ goods are sparse *and* small. Base ranges below are pre-scalar.
 | Volcanic | Rare earth ore | 20–100 |
 | Metallic | Iron-nickel ore | 60–260 |
 | Metallic | Platinum group metals | 20–120 |
+
+### The Life phase — the fossil / living split
+
+The biosphere's residue is placed by its own rules, on `life_rng`, and the line
+through it is the same one Planetology's endowment already draws: **fossils key off
+the peak biosphere, living resources off the current one**, which is why a dead
+world keeps its coal and loses its forests
+([PLANETOLOGY.md](PLANETOLOGY.md) § S8). Here that line falls between the epoch each
+row reads.
+
+**Living resources read the PRESENT.** Timber follows forest and marsh cover, peat
+the scrub-on-sedimentary pair on plains or valley (the rule `RESOURCES.md` § Ambient goods
+authors — a marsh-only reading narrows it and is not the design), agricultural produce and
+fibre the cover on sedimentary ground — because that is where they are, not where they were.
+
+| Cover (on sedimentary) | Resource | Base range | Valley mod |
+|---|---|---|---|
+| Grass | Agricultural produce | 40–180 | ×1.3 |
+| Grass | Fibre | 30–140 | ×1.3 |
+| Forest | Agricultural produce | 10–80 | ×1.15 |
+| Marsh | Agricultural produce | 40–200 | — |
+| Marsh | Fibre | 30–150 | — |
+
+**Fossils read the PAST**, through the palaeo query
+([CONTINENTS.md](CONTINENTS.md) § The Lagrangian frame): a tile is asked where it
+*sat* when its material formed, and the deposit is placed from the climate it sat
+in. Presence is a **consequence, not a roll** — the palaeo predicate replaces the
+rarity gate that used to decide whether a tile carried coal at all, and the per-body
+rarity scalar survives only as a magnitude term, keeping the rare-stays-rare
+ordering.
+
+- **Coal** wants an everwet mire over a subsiding basin. All three halves are
+  stated: everwet is the moisture field's own wet cutoff, sampled at the palaeo
+  position; the belt weighting is the mire's — equatorial 1.00, subtropical 0.85,
+  cool-temperate 0.55, nothing under a subpolar or polar sky; and the basin is the
+  spatial statement of the same subsidence term S7 already spends on the coal
+  window, read as the lower 55% of the land-height range. Base range 30–140,
+  pre-scalar.
+- **Petroleum** wants a productive shallow sea. The ground has to have sat low —
+  the lower 40% of the land-height range, the same reading the ore-field regions
+  use for old shelf and epicontinental basin — and under a productive sky:
+  tropical and subtropical 1.00, temperate 0.80, subpolar 0.45, polar none. Base
+  range 0–120, ×1.2 in a valley.
+
+**The epoch each fossil reads is derived from the biosphere history, not authored
+per resource.** Two facts set it, and both come out of the chain: *which* window —
+coal is laid in the land-burial window and petroleum in the marine-anoxic one, the
+two durations S7/S8 already compute and already spend on the endowment — and *how
+deep in the drift record* it sits, which is the window's share of its own chain
+ceiling mapped across the epochs the record spans. The ordering falls out of the
+chain too and is binding: marine anoxia opens at oxygenation and land burial only
+after land is colonised, so the oil epoch is never shallower than the coal epoch on
+the same body. Depth is **clamped** at the record's stated span rather than
+extrapolated past it (CONTINENTS.md § The drift clock).
+
+**The interior is read at the epoch too.** The basin half of the coal term and the
+shelf half of the oil term are both subsidence, and subsidence is driven by the thermal
+budget — S7 spends that budget on the coal window as a present-day scalar. The pre-pass
+scales each belt term by the epoch's budget relative to today's, read from
+`planetology_state::thermal_series` at the coal and oil epochs
+([PLANETOLOGY.md](PLANETOLOGY.md) § The thermal series). Heat only falls, so the factor
+is ≥ 1 and small — about a percent across the record's depth — and it is a
+**magnitude** term, never a presence one: *where* the seams are is the drift record's
+call, *how much* stacked there is the interior's. A missing series reads the present,
+exactly as a missing drift record does.
+
+**A body with no drift history reads the present, and that is the correct answer**
+rather than a degraded one. A stagnant lid never moved, and a body generated with no
+continents result has no plate set to wind back; in both cases every palaeo answer
+collapses to the present, which is exactly what the frame's epoch-0 identity
+guarantees.
+
+**The ore-field regions for coal and petroleum form where the Life phase put them.**
+Their candidate set is the tiles that actually bear the resource, not a restatement
+of the placement rule against the present map — a restated rule is a rule that
+drifts, and restating this one would centre a coal region on ground the finished
+world gives no coal to.
 
 ### Post-multiplies and endemic additions
 
@@ -518,120 +632,14 @@ monotonic descent / no cycles, discount ordering) and a bitmask-identity check f
 
 ---
 
-## Province partition
+## The province partition runs after this pipeline
 
-> **[`PROVINCES.md`](PROVINCES.md) is the authority for the province as a game object** — what
-> it is, the three size constants and why there are three, the three domains, what reads it, and
-> the rulings behind all of it. This section keeps the **generation-pass** view: where the
-> partition sits in the pipeline and what it consumes. The partition is BL-515 (province
-> partition); the water domains are BL-516 (water provinces).
-
-The last generation pass over a body's land: `build_province_partition`
-(`src/world/province.{hpp,cpp}`), run from `make_hard_coded_world` after nations,
-corporations, population centres, rivers and roads exist — because it reads all of
-them. It is organic rather than a regular block partition by ruling (Ben, 2026-08-21):
-*"packing each province perfectly looks nice, but it is scarcely how borders were
-defined in history."*
-
-**Provinces grow from settlement and are stopped by terrain.** Four rulings
-(Ben, 2026-08-21) define it, and `province.hpp` is the authority for the mechanics:
-
-| Ruling | How the pass realises it |
-|---|---|
-| Seeds are population centres, strength scaling with scale 1–5 | Each centre seeds one region with a growth budget of 7 tiles (village) to 12 (metropolis); all centres grow simultaneously as one multi-source fill |
-| Boundaries are rivers, elevation difference, and sometimes roads — but **a road binds** | Integer edge cost `base 10 + river 40 + round(\|Δheight\| × 683) + jitter 0–4`, the whole sum divided by 4 when both tiles are roaded |
-| Identity is the **lowest-id member tile** | Derived, never allocated — so an id cannot be handed out in the wrong order, and nothing new is serialised |
-| Country no centre reaches becomes **hinterland** | Seeds chosen from the least-accessible tile onward at a minimum spacing of 3, all chosen before any grows |
-| 7–12 soft, 3–12 hard, boundaries win ties; **tiny provinces are kept** | A region takes its first 3 tiles at any cost, then grows to its budget, then annexes only ground no harder to reach than what it already holds. Nothing is ever merged away |
-| **12 is a PREFERENCE; 20 is the hard cap** (Ben, 2026-08-21, NR-438) | Growth clamps at 12, but singleton absorption can carry a full region past it. The bound that is *asserted* is 20 (`k_province_hard_cap_tiles`); the over-12 share is **reported**, never asserted |
-
-**Why the cap is 20 and not 12.** Pass 3 absorbs a one-tile province into its
-**cheapest** neighbour, and that neighbour may already hold 12. The three ways out
-are clamping (dishonest), preferring a roomier neighbour (which contradicts the
-cheapest-edge rule the growth model is *expressed in*), or a higher bound. Ben chose
-the bound — *"we prefer up to 12 tiles, but up to 20 is permitted in rare cases"* — so
-the cheapest-edge rule survives intact, which is what the ruling protects. (The
-prefer-room variant was measured at 241 over the preference, max 14, and rejected;
-the breach was its only justification.)
-
-**Elevation is read from the retained heightmap.** The pass reads
-`tile_component::height` — Pass 1's normalised heightmap, retained for this
-consumer (BL-517, retained height) — not the seven landform classes, whose numeric
-order means nothing (`GENERATION_LEDGER.md` § Data lifetime).
-
-### Provinces over water
-
-Ben: *"We can also draw provinces over the ocean, using 3-12 size coastal tile
-provinces. Ocean provinces should be much larger, but not larger than say 80
-tiles."* The partition runs **the same algorithm three times**, over three
-exclusive tile sets, and a province never spans two of them:
-
-| Domain | Tiles | Growth clamp | Hard cap | Seed spacing | Seeded by |
-|---|---|---|---|---|---|
-| Land | everything not water | 12 (preferred) | 20 | 3 | population centres, then hinterland |
-| Coastal water | `coast` + `lake` | 12 (preferred) | 20 | 3 | hinterland only |
-| Open ocean | `ocean` | **80** | — (see below) | 7 | hinterland only |
-
-**The land-only invariant is narrowed, not deleted** (NR-428). Land provinces are
-hex-connected land that never spans water; the general claim — asserted by the
-harness as P2b — is that **a province holds exactly one domain**, which is strictly
-stronger, since it also forbids a lake joining the sea.
-
-**Open ocean has no separate hard cap, deliberately.** Land needed one because Ben
-ruled a preference (12) and a bound (20) as two different numbers; for the sea he
-named one number. Inventing a second would invent a threshold nobody chose, so
-what carries the 80 instead is the exact identity the harness asserts: *every tile
-above it arrived by singleton absorption, never by growth.*
-
-**The sea spacing is measurement-pinned, and the pin rule is "the cap must stay a
-guard, not a clamp."** Seeds at separation *d* tile a plane in cells of area
-(√3/2)·*d*², so the lattice predicts a mean size; where growth is running into the
-ceiling instead of meeting its neighbours, the measured mean falls away from that
-prediction and provinces pile up on the clamp exactly:
-
-| d | ideal cell | measured mean | max | exactly on the 80 | provinces |
-|---|---|---|---|---|---|
-| 6 | 31.2 | 32.17 | 75 | 0 (0.0%) | 2,901 |
-| **7** | **42.4** | **41.07** | **82** | **26 (1.1%)** | **2,272** |
-| 8 | 55.4 | 49.29 | 83 | 207 (10.9%) | 1,893 |
-| 9 | 70.1 | 55.25 | 83 | 507 (30.0%) | 1,689 |
-
-At *d* = 8 one province in nine sits exactly on 80 — the clamp is drawing the size
-rather than guarding it. At *d* = 7 the measured mean still matches its lattice
-prediction, which is the evidence that terrain and spacing set the size. 41 tiles
-against land's 8.6 is also "much larger" by nearly five times.
-
-**Sea provinces are addressable empty space.** Units are land-bound (`march_unit`
-refuses a water destination outright), buildings refuse water, and a sea province
-sustains zero buildings. They exist without a naval model to justify them.
-
-**Open question for Ben:** a **lake** is partitioned on the coastal band, as its own
-province. Ben named lakes as a tile kind but did not rule what province a lake
-belongs to (its own, the surrounding land province, or a coastal one). Its own was
-chosen because it invents no new size rule and keeps the one-domain invariant.
-
-**The measured distribution, 6 seeds** (`tools/verify/province_partition_harness.cpp`,
-sections C and D — which is also the re-pinning instrument for the two
-measurement-pinned coefficients):
-
-| Partition | provinces | min | max | mean | < 7 | < 3 | > 12 | % in 7–12 |
-|---|---|---|---|---|---|---|---|---|
-| Organic, pre-absorption | 24,498 | 1 | 12 | 7.87 | 6,195 | 3,008 | 0 | 74.71% |
-| Organic, **with absorption** | 22,390 | 1 | **16** | 8.61 | 4,098 | 913 | 1,096 | 76.80% |
-
-The spread is wide **on purpose** and is reported rather than tuned: organic
-borders are irregular, and the sub-floor tail is the pockets a ceiling leaves
-behind — kept by ruling, not repaired.
-
-Read the absorption row against the hard cap, not against 12. **Max 16 against a cap
-of 20**, so the bound holds with four tiles of headroom, and **4.90% sit above the
-preferred 12**. Absorption is what moves every one of those numbers: it converts
-2,098 one-tile provinces into member tiles of their cheapest neighbour, which is
-why the count falls, the mean rises, and the sub-floor tail more than halves. The
-harness asserts the cap and the accounting identity (every tile above 12 arrived
-by absorption, so growth's own clamp is still proven separately) and **reports**
-the 4.90% — whether that counts as "rare" is Ben's judgement against a number, and
-no threshold for it has been chosen.
+`build_province_partition` is not one of the six passes, and not a sibling pass either: it reads a
+body's finished tile map rather than building one. [`PROVINCES.md`](PROVINCES.md) owns what a
+province is and how the partition is grown; [`GENERATION_STRATEGY.md`](GENERATION_STRATEGY.md) owns
+where it sits in the pass order. What this pipeline owes it is Pass 1's normalised
+`tile_component::height`, retained for that consumer rather than discarded with the other
+intermediates (§ Pass 1 — Heightmap).
 
 ---
 
@@ -728,7 +736,22 @@ identity.
 
 `generate_body_tiles()` takes an optional `generation_record*`. When non-null it
 captures the per-pass intermediates (heightmap, ocean score and threshold, moisture,
-latitude bands). The common path passes `nullptr` and pays nothing. Generation is
+latitude bands). The common path passes `nullptr` and receives nothing. Generation is
 deterministic, so this is the seam the **Generation Ledger**
 (`GENERATION_LEDGER.md`) reads to explain *why* a tile turned out as it did; what the
 record does and does not attribute is in GENERATION_LEDGER.md § The data seam.
+
+**The record is also the seam between the generator's two halves** (BL-965, the
+Body/Life split). `generate_body_tiles()` is `generate_body_surface()` — Passes 1–5
+with 4b–4e and the Body phase of Pass 6, which creates the tiles — followed by
+`generate_life_deposits_over()` — the palaeo pre-pass, the ore-field pre-pass and the
+Life phase of Pass 6, which writes the deposit arrays. The whole is bit-identical to
+running them as one function. The record carries what the Life half can neither read
+off a tile nor re-derive from the seed: the Body phase's raw deposit per tile and the
+endemic amounts it drew. The endemic draw sits on the Body side of the cut for the
+reason § Pass 6 gives — it is taken on `tile_rng` between the deposit block and the
+environment jitter, and that stream cannot be re-cut — so the Body half *draws* it and
+the Life half *places* it. The Life half reads its inputs and writes only the two
+deposit arrays and `life_phase_placed`, so it can be re-run over the same tiles and
+record as often as a Life-phase rule changes; the census harness's `--life-only` mode
+is that loop, in-process, with no on-disk form of the seam.

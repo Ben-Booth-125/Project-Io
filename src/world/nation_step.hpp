@@ -27,8 +27,10 @@ class recipe_registry;
 //     proof: no nation scored, nothing spent.
 //  2. GATHER. This tick's claims come off `economy_report::budget_claims`,
 //     emitted earlier in the same tick by corp_ai's cash gate — a rival that
-//     wanted to survey a body and could not afford to asks its home nation.
-//     Nothing here invents a claim.
+//     wanted to survey a body and could not afford to asks its home nation —
+//     PLUS the state's own purchase claims: `derive_space_programme_claims`
+//     (BL-644, space_programme.hpp) appends one earmarked claim per launch
+//     lot a nation's share can buy, payee = the supplier whose pool holds it.
 //  3. SPEND. `run_national_budget` — the pure pass over (weights, claims). Every
 //     credit out is a direct transfer to a named corporation; the treasury is
 //     never overdrawn; an earmarked claim is paid whole or not at all.
@@ -41,7 +43,11 @@ class recipe_registry;
 //     dispatch that cannot proceed (the body was surveyed by someone else this
 //     very tick, say) is RECORDED on the report as a failed earmark and its
 //     credit CLAWED BACK to the treasury — a nation does not pay for a survey
-//     that did not start.
+//     that did not start. The space programme settles the same way one move
+//     later (`settle_space_purchases`): each paid claim's lump leaves the
+//     supplier's pool and ceases to exist, the credit STAYS (it is a sale,
+//     folded onto `subsidies`), and a lump the pool cannot cover is clawed
+//     back on the survey precedent.
 //
 // An UNEARMARKED transfer (none exists yet; BL-538's other lines will make
 // them) is folded onto `report.budgets[corp].subsidies` so the corp's `net()`
@@ -73,9 +79,11 @@ struct earmark_result
 };
 
 /// Run the nation step for one economy tick. Mutates nation treasuries, corp
-/// balances, the survey store (via `dispatch_survey`) and `w.nation_budgets`;
+/// balances, the survey store (via `dispatch_survey`), supplier (corp, body)
+/// pools (the space programme's consumption, BL-644) and `w.nation_budgets`;
 /// nothing else. Appends to `report.national_budget`, `report.nation_scores`,
-/// `report.earmarks` and `report.budgets[corp].subsidies`.
+/// `report.earmarks`, `report.space_purchases`, `report.budget_claims` (the
+/// state's own space-programme claims) and `report.budgets[corp].subsidies`.
 ///
 void run_nation_step(world& w, const recipe_registry& reg, economy_report& report,
                      int econ_tick);

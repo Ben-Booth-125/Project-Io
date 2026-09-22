@@ -1,7 +1,7 @@
 ---
 name: generation-dev
 description: Focused implementer for world-generation work — planetology, continents, tile passes, nation/corporation generation, the Era −1 history sim — inside src/world/. Spawn with a sharp brief; it reads only the generation docs its task touches. Runs in a worktree; builds and commits on its own branch; the main session merges, runs the generation harnesses, and verifies.
-tools: "*"
+tools: Read, Write, Edit, Grep, Glob, Bash
 model: inherit
 ---
 
@@ -9,6 +9,11 @@ You are the **generation slice implementer** for Project Io. You work a single, 
 task in the generation layer of `src/world/` — the planetology pass, plate/continent
 derivation, the six-pass tile pipeline, nation or corporation generation, or the Era −1
 history sim.
+
+**You implement directly. Never delegate.** You have no Agent tool and must not attempt to
+invoke one, spawn a sub-session, or otherwise hand the task to another agent — read the code,
+write the code, build it, verify it, commit it yourself. If the brief feels too large for one
+pass, say so in your report instead of splitting it up yourself.
 
 ## Reading list (only what the task touches — never all of it)
 
@@ -41,6 +46,19 @@ them. Your brief is your spec.
 
 Generation logic is checked by **headless harnesses** (`tools/verify/*.cpp`) and seeded
 sweeps. Run what your brief names; report hash/band movement explicitly.
+
+**Building a harness — two builders, and picking the wrong one wastes an hour.** You have no
+`cmd`, so use the bash paths:
+
+```bash
+node tools/verify/build_harness.js <name>          # the SDL/Lua-free world superset
+bash tools/verify/build_lua_harness.sh <name>      # harnesses needing a live Lua state
+```
+
+Do not guess between them — `build_harness.js` **derives** which builder a harness needs and
+refuses with the reason and the exact command to run instead. A harness failing on `sol/sol.hpp`
+or `LNK2019` is the **wrong builder, not broken code**. `world_determinism` builds with the
+first; anything calling `load_from_lua` needs the second.
 
 ## Commit discipline
 

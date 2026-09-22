@@ -2,6 +2,7 @@
 
 #include "budget_system.hpp"  // compute_building_opex, body_mean_habitability
 #include "building_profit.hpp"
+#include "decision_trace.hpp"  // BL-704: opt-in streaming decision sink
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
 #include "logistics.hpp"       // body_reach_field (BL-379: warm before the reach-checked muster scan)
 #include "market_clearing.hpp" // market_for_tile
@@ -19,6 +20,7 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <map>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -38,6 +40,21 @@ entity_id tile_body(const world& w, entity_id tile)
 {
     const auto it = w.tiles.find(tile);
     return (it != w.tiles.end()) ? it->second.body : null_entity;
+}
+
+/// The LOWEST-ID market on `body`, or `null_entity` if it carries none.
+///
+/// Lowest id rather than map order: `world::markets` is an unordered_map, so
+/// "the first one found" is a hash-layout answer and this file may not have
+/// one. The same stable pick `market_clearing.cpp` and `supply_system.cpp` each
+/// make internally (a body may host several markets — BL-096).
+entity_id market_on_body(const world& w, entity_id body)
+{
+    entity_id best = null_entity;
+    for (const auto& [mid, mc] : w.markets)
+        if (mc.body == body && (best == null_entity || mid < best))
+            best = mid;
+    return best;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,6 +163,56 @@ float local_price(const world& w, entity_id tile, std::size_t r)
     return (m.price[r] > 0.0f) ? m.price[r] : m.base_price[r];
 }
 
+/// BL-709 / NR-592 — the MATERIAL half of a build's capital cost, priced at the
+/// market serving @p tile, plus the CONSTRUCTION CAPACITY the project will draw
+/// from the sector over its whole build.
+///
+/// WHAT THIS CLOSES. The build candidates below scored on `build_cost` alone —
+/// the flat CASH figure — and never priced `resource_build_cost` at all
+/// (NR-592, recorded by BL-590 and left open deliberately). Under a lump-sum
+/// model that was a missed opportunity and no worse: a candidate whose materials
+/// the corp could not reach was refused cleanly by `construct_building`'s own
+/// affordability gate, mutating nothing, so the cost was one wasted seam call.
+///
+/// UNDER A CONTENDED SHARED CAPACITY POOL IT BECOMES A CORRECTNESS PROBLEM, and
+/// that is why Ben scheduled it here rather than leaving it filed. Capacity is
+/// one pool that every project on a body bids into. A scorer that cannot see it
+/// proposes builds the pool cannot serve — every evaluation, for as long as the
+/// pool is short — which is the same thrash shape BL-696 measured in the recipe
+/// margin-chase. Pricing it makes the shortage visible where the decision is
+/// actually taken.
+///
+/// PRICED AT LOCAL PRICES, not base, because that is the whole signal: a
+/// material the local market has ceiled is genuinely dearer to build with there,
+/// and the scorer should prefer the site where it is not. Same `local_price`
+/// every other estimate in this file reads, so a build and a margin cannot
+/// disagree about what a good costs.
+///
+/// CAPACITY IS PRICED OVER THE WHOLE BUILD (`rate * build_duration_ticks`),
+/// because that is what the project will actually consume — `run_construction`
+/// draws `capacity_per_build_tick` on every tick the site is open. Zero when the
+/// dial is unauthored, which is the pre-BL-709 default.
+///
+/// Deterministic: a fixed walk over resource indices and two const reads.
+float build_material_cost(const world& w, const recipe_registry& reg, entity_id tile,
+                          building_type type, resource_type target, std::uint16_t recipe)
+{
+    const auto& row = reg.resource_build_cost_for(type, target, recipe);
+    float total = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (row[r] > 0.0f)
+            total += row[r] * local_price(w, tile, r);
+
+    const float cap_rate = reg.construction().capacity_per_build_tick;
+    if (cap_rate > 0.0f)
+    {
+        const float dur = std::max(0.0f, reg.economics(type).build_duration_ticks);
+        total += cap_rate * dur
+               * local_price(w, tile, static_cast<std::size_t>(resource_type::construction_capacity));
+    }
+    return total;
+}
+
 /// Per-batch margin of `recipe_id` at the prices of the market serving `tile`.
 float recipe_margin(const world& w, const recipe_registry& reg,
                     entity_id tile, uint16_t recipe_id)
@@ -195,16 +262,70 @@ struct candidate
     corp_priority_bucket  bucket = corp_priority_bucket::nice_to_have;
 };
 
+/// The BUDGET CLASS a candidate competes in — and, by construction, the only
+/// grouping in which two candidate scores are COMPARABLE (BL-696).
+///
+/// Each family is scored by ONE formula in ONE unit: a build by `net^2 / capex`
+/// (capital efficiency), a dial by the estimator's modelled `gain` (credits per
+/// tick), a trade by `quantity x floor` (credits), a dispatch by
+/// `revenue - leg cost` (credits), a survey by `area / cost`, a hire by the
+/// roster row's weight. Those numbers live on wildly different scales — a
+/// listing of accumulated stock routinely scores in the hundreds while a
+/// perfectly good workforce dial scores 3 — so a comparison ACROSS families
+/// states nothing. Each family also has its own action budget below, which is
+/// what makes this the grouping a candidate genuinely competed in.
+///
+/// The classification mirrors the per-candidate booleans the selection loop
+/// already used, and is now their single definition so the two cannot drift.
+enum class candidate_family : uint8_t
+{
+    build = 0, ///< `construct_building` — one per evaluation (`max_builds`).
+    dial,      ///< recipe / workforce / idle / resume — `max_dials` per evaluation.
+    survey,    ///< paid discovery — one per evaluation.
+    hire,      ///< `hire_unit` — one per evaluation.
+    trade,     ///< order-book commands — `max_trades` per evaluation.
+    dispatch,  ///< directed convoys — `max_dispatches` per evaluation.
+};
+
+inline constexpr std::size_t candidate_family_count =
+    static_cast<std::size_t>(candidate_family::dispatch) + 1;
+
+/// The family a command competes in. `dial` is the default arm deliberately:
+/// it is the "acts on one of my own buildings" case, which is what every verb
+/// not named below is, and what the one-touch-per-building rule keys off.
+candidate_family family_of(const corp_command& cmd)
+{
+    switch (cmd.verb)
+    {
+        case corp_verb::build:             return candidate_family::build;
+        case corp_verb::survey:            return candidate_family::survey;
+        case corp_verb::hire_unit:         return candidate_family::hire;
+        // A trade's subject is a BODY and a dispatch's is a MARKET, so neither
+        // takes a dial slot nor records a building cooldown — see the selection
+        // loop, where that reasoning is spelt out.
+        case corp_verb::place_sell_order:
+        case corp_verb::remove_sell_order: return candidate_family::trade;
+        case corp_verb::dispatch_convoy:   return candidate_family::dispatch;
+        default:                           return candidate_family::dial;
+    }
+}
+
 /// Deterministic ordering: bucket asc FIRST (a lower bucket may never starve
 /// a higher one — AI_OPPONENT.md §2B), then score desc, then verb, subject,
-/// tile as the existing BL-202 tie-break.
+/// tile as the existing BL-202 tie-break, then target and recipe (BL-712).
 bool candidate_before(const candidate& a, const candidate& b)
 {
     if (a.bucket != b.bucket) return a.bucket < b.bucket;
     if (a.score != b.score) return a.score > b.score;
     if (a.cmd.verb != b.cmd.verb) return a.cmd.verb < b.cmd.verb;
     if (a.cmd.subject != b.cmd.subject) return a.cmd.subject < b.cmd.subject;
-    return a.cmd.tile < b.cmd.tile;
+    if (a.cmd.tile != b.cmd.tile) return a.cmd.tile < b.cmd.tile;
+    // BL-712: one tile can now emit one build candidate PER RECIPE GROUP,
+    // so tile alone no longer separates two rows. Without this, equal-score
+    // siblings fall to std::sort's unspecified order among equivalents —
+    // stable for one binary, not a property the simulation may rest on.
+    if (a.cmd.target != b.cmd.target) return a.cmd.target < b.cmd.target;
+    return a.cmd.recipe < b.cmd.recipe;
 }
 
 /// Strategy weight for a verb family under the corp's industrial focus —
@@ -238,7 +359,8 @@ float idle_maintenance(const world& w, const recipe_registry& reg, const buildin
     probe.decommissioned     = true;
     const entity_id body     = tile_body(w, b.tile);
     const float     hab      = (body != null_entity) ? body_mean_habitability(w, body) : 1.0f;
-    return compute_building_opex(probe, reg.economics(b.type), 1.0f, hab).maintenance;
+    return compute_building_opex(probe, reg.economics(b.type), 1.0f, hab,
+                                 reg.idle_maintenance_floor()).maintenance;
 }
 
 } // namespace
@@ -343,6 +465,138 @@ corp_priority_bucket bucket_for_reason(corp_decision_reason reason)
         default:
             return corp_priority_bucket::nice_to_have; // expansion
     }
+}
+
+// ---------------------------------------------------------------------------
+// Standing — the composite index (BL-700, AI_OPPONENT.md § "Standing")
+// ---------------------------------------------------------------------------
+
+const char* standing_component_name(standing_component c)
+{
+    switch (c)
+    {
+        case standing_component::economic: return "economic";
+        case standing_component::research: return "research";
+        case standing_component::military: return "military";
+    }
+    return "unknown";
+}
+
+namespace {
+
+/// NET WORTH: cash, plus the assessed value of the corp's buildings, plus the
+/// assessed value of the stock it holds. In credits.
+float standing_economic(const world& w, const recipe_registry& reg,
+                        entity_id corp, const corporation_component& cc)
+{
+    // Accumulated in double and narrowed once at the end. The terms differ by
+    // orders of magnitude (a five-figure balance against a fractional pool
+    // quantity), which is exactly where float accumulation loses the small
+    // ones; the walk order is fixed, so this stays a deterministic answer.
+    double worth = cc.balance;
+
+    // BUILDINGS, AT HISTORICAL COST — the registry's flat `build_cost`, summed
+    // over `assets` (a vector: authored order, deterministic). This is
+    // DELIBERATELY the same definition `budget_system.cpp` files as
+    // `quarterly_return::book_value`, and it is one definition rather than a
+    // second: the build press charges `build_cost + material_cost`, where that
+    // second term is priced at the CURRENT MARKET, and folding it in would make
+    // a corp's standing move on commodity prices it does not own.
+    for (const entity_id bid : cc.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        worth += reg.economics(bit->second.type).build_cost;
+    }
+
+    // HELD STOCK, at the resolved price of the market on the pool's OWN body.
+    // `corp_body_pools` is a std::map, so this walk is key-ordered.
+    //
+    // Unlike the building term this one IS marked to market, and the asymmetry
+    // is the right call rather than an oversight. A balance sheet must not move
+    // on prices, because it feeds an acquisition price a buyer has to be able
+    // to reproduce. Standing is a COMPARATIVE index read once per tick, and
+    // every corp in the field is marked at the same prices on the same tick, so
+    // a price move lifts or drops holders together rather than reordering them
+    // spuriously — and stock really is worth less on a market that pays less
+    // for it.
+    //
+    // A good the local market does not price contributes NOTHING, which is the
+    // honest answer rather than a gap: there is nowhere to sell it.
+    for (const auto& [key, pool] : w.corp_body_pools)
+    {
+        if (key.first != corp)
+            continue;
+        const entity_id mid = market_on_body(w, key.second);
+        if (mid == null_entity)
+            continue;
+        const market_component& mc = w.markets.at(mid);
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (mc.base_price[r] <= 0.0f)
+                continue; // this market does not price the good
+            // The RESOLVED price where there is one, falling back to the
+            // rarity base — the same two-step the dispatch candidate makes, so
+            // a market that has not cleared yet still values stock rather than
+            // valuing it at zero.
+            const float price = (mc.price[r] > 0.0f) ? mc.price[r] : mc.base_price[r];
+            worth += static_cast<double>(pool.quantities[r]) * static_cast<double>(price);
+        }
+    }
+
+    return static_cast<float>(worth);
+}
+
+/// MILITARY: summed `unit_strength` over the units this corp fields.
+float standing_military(const world& w, entity_id corp)
+{
+    // BL-459: strength is DERIVED — there is no stored `strength` field, and
+    // `unit_roster.hpp`'s function is the only place the roster's per-type
+    // quality and the unit's supply factor are applied.
+    //
+    // Accumulated as an INTEGER, exactly as condition_set.cpp's
+    // `military_strength` subject does and for the same reason: `w.units` is an
+    // unordered_map, so the walk order follows hash layout, and float addition
+    // is not associative. An int64 accumulator makes the sum order-independent
+    // by construction rather than by luck.
+    int64_t s = 0;
+    for (const auto& [uid, u] : w.units)
+        if (u.owner == corp)
+            s += unit_strength(w, u);
+    return static_cast<float>(s);
+}
+
+} // namespace
+
+standing_index corp_standing_index(const world& w, const recipe_registry& reg,
+                                  entity_id corp, const corp_ai_params& p)
+{
+    standing_index out;
+
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return out; // an unknown corp stands at zero on every component
+    const corporation_component& cc = cit->second;
+
+    // The measurement switch. A FOURTH COMPONENT ADDS ONE LINE HERE and nothing
+    // else in this function — see `standing_component`'s append-only note.
+    out.component[static_cast<std::size_t>(standing_component::economic)] =
+        standing_economic(w, reg, corp, cc);
+    // RESEARCH: the BL-332 accumulator. Stockpiled, market-invisible, never
+    // decaying — reached, not spent, so this is a level and not a balance.
+    out.component[static_cast<std::size_t>(standing_component::research)] = cc.science;
+    out.component[static_cast<std::size_t>(standing_component::military)] =
+        standing_military(w, corp);
+
+    // A LOOP, not three hand-written terms: this is what makes a fourth
+    // component an addition rather than a rewrite.
+    double total = 0.0;
+    for (std::size_t i = 0; i < standing_component_count; ++i)
+        total += static_cast<double>(out.component[i]) *
+                 static_cast<double>(p.standing_weights[i]);
+    out.total = static_cast<float>(total);
+    return out;
 }
 
 float corp_should_have_buffer(const world& w, const recipe_registry& reg,
@@ -474,7 +728,40 @@ std::array<float, resource_count> input_demand_weights(const world& w,
     return weight;
 }
 
-std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m,
+/// Rank the world's buildable extraction sites, keeping the best K OF EACH
+/// RESOURCE (BL-711; AI_OPPONENT.md - Selection must be scale-free).
+///
+/// This used to keep a global top-M over `deposit x affinity x demand_weight`.
+/// Deposit magnitudes span three orders for reasons that have nothing to do
+/// with desirability - ore is physically a larger number than clay - so that
+/// truncation did not rank the field, it deleted most of it. Measured on the
+/// ancient band: all 8 surviving rows were iron_ore, from 12287.6 down to a
+/// 7859.8 cut-off, against a best-in-world of 297.2 for clay, 75.0 for peat and
+/// 507.2 for hides. Those resources were not rarely chosen; they were never
+/// CANDIDATES, anywhere, for any corp, in any world.
+///
+/// The symptom surfaced far downstream and looked like a different bug entirely:
+/// 30 Peat Kilns standing against 0 peat mines, 22 Potter's Kilns against 0 clay
+/// mines. The scorer was not wrong - it correctly declined every candidate it
+/// was shown, and the only resource it was ever shown was the glutted one.
+///
+/// `input_demand_pull` (BL-440) fires here and cannot fix it: bounded at
+/// 1 + pull x wanted/(1 + sites), it reached 9x for clay and could not close a
+/// 60x gap. A bounded multiplier cannot rescue an unbounded ordering.
+///
+/// THIS IS BL-440's OWN TRAP, ONE ALTITUDE UP. That item fixed the TILE-LOCAL
+/// version - a tile used to offer only its richest deposit - and its comment
+/// named the shape exactly: pre-selecting the richest was a TILE-LOCAL
+/// heuristic answering a WORLD-level question. The world-level truncation was
+/// left standing, which is the identical defect written at a different
+/// altitude. Hence the rule now sits in AI_OPPONENT.md rather than in a comment.
+///
+/// Buckets walk in ASCENDING RESOURCE INDEX, not in `k_extractable` order, so
+/// the returned order is a function of the resource enum rather than of a
+/// list's authoring order - registering a new extractable appends, it does not
+/// reshuffle. Within a bucket the comparator is the one the global sort used,
+/// tile-id tie-break included.
+std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per_resource,
                                                    const std::array<float, resource_count>& demand_weight)
 {
     std::vector<extraction_site> sites;
@@ -530,21 +817,39 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m,
             sites.push_back({tid, rich * affinity * demand_weight[ri], rt});
         }
     }
-    // PARTIAL SORT, not a full one (2026-08-12). Only the top M survive the
-    // resize below, so sorting all ~18,000 qualifying sites to discard all but
-    // ~64 of them was work thrown away. `std::partial_sort` orders exactly the
-    // first M under the same comparator and leaves the tail unspecified — which
-    // is precisely what `resize` then discards, so the returned list is
-    // BIT-IDENTICAL to sort-then-resize. No golden moves.
+    // PARTIAL SORT within each bucket, not a full one (the 2026-08-12 reason,
+    // unchanged): only the first K survive, and `std::partial_sort` orders
+    // exactly those under the same comparator while leaving the tail
+    // unspecified - which is precisely what is then discarded.
     const auto cmp = [](const extraction_site& a, const extraction_site& b) {
         if (a.suitability != b.suitability) return a.suitability > b.suitability;
         return a.tile < b.tile;
     };
-    const std::size_t keep = std::min(sites.size(), static_cast<std::size_t>(std::max(0, top_m)));
-    std::partial_sort(sites.begin(), sites.begin() + static_cast<std::ptrdiff_t>(keep),
-                      sites.end(), cmp);
-    sites.resize(keep);
-    return sites;
+    const std::size_t k = static_cast<std::size_t>(std::max(0, top_k_per_resource));
+    if (k == 0)
+        return {}; // enumeration disabled; no site is a candidate anywhere
+
+    // One pass to bucket, then K out of each. Bucketing by the target's own
+    // index rather than by a search per resource keeps this O(sites), which
+    // matters: the ancient band offers ~36,700 (tile, resource) pairs and this
+    // runs once per tick.
+    std::array<std::vector<extraction_site>, resource_count> by_target;
+    for (const extraction_site& s : sites)
+        by_target[static_cast<std::size_t>(s.target)].push_back(s);
+
+    std::vector<extraction_site> out;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        std::vector<extraction_site>& bucket = by_target[r];
+        const std::size_t keep = std::min(bucket.size(), k);
+        if (keep == 0)
+            continue;
+        std::partial_sort(bucket.begin(), bucket.begin() + static_cast<std::ptrdiff_t>(keep),
+                          bucket.end(), cmp);
+        out.insert(out.end(), bucket.begin(),
+                   bucket.begin() + static_cast<std::ptrdiff_t>(keep));
+    }
+    return out;
 }
 } // namespace
 
@@ -602,7 +907,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     // site ranking they feed, not once per due corp — the same BL-253 hoist.
     const std::array<float, resource_count> demand_weight = input_demand_weights(w, reg, p);
     const std::vector<extraction_site> ranked_sites =
-        rank_extraction_sites(w, p.top_m_sites, demand_weight);
+        rank_extraction_sites(w, p.top_k_sites_per_resource, demand_weight);
 
     for (std::size_t index = 0; index < corp_ids.size(); ++index)
     {
@@ -683,7 +988,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const float net           = revenue - ex.maintenance - ex.base_wage * wf;
                 if (net <= 0.0f)
                     continue; // never build into an expected loss
-                const float capex = std::max(1.0f, ex.build_cost);
+                // BL-709 / NR-592: capex is now CASH PLUS MATERIALS PLUS the
+                // capacity the project will draw. It feeds both `c.score` (via
+                // the net^2/capex curve) and `c.spend` (the solvency gate), so
+                // a rival now prefers the site whose materials are cheap and
+                // reserves against what the build will really cost it.
+                //
+                // THIS MOVES NUMBERS, and knowingly: every economy golden
+                // records a world evolved under a materials-blind scorer. Ben
+                // scheduled it with this item precisely because the shared
+                // capacity pool makes the blindness a correctness problem
+                // rather than a missed opportunity.
+                const float capex = std::max(1.0f, ex.build_cost
+                    + build_material_cost(w, reg, s.tile, building_type::extraction_site,
+                                          s.target, no_recipe));
 
                 // Predictive spending (BL-203): forecast this build's added
                 // supply against the local market's PUBLIC demand over its
@@ -704,26 +1022,42 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 c.cmd.tile   = s.tile;
                 c.cmd.type   = building_type::extraction_site;
                 c.cmd.target = s.target;
-                // BL-417 step 1: this used to read `net / payback` with
-                // `payback = capex / net` — which is `net^2 / capex`. It looked
-                // like capital efficiency and behaved like a margin bias:
-                // doubling the margin quadruples the score, doubling the cost
-                // only halves it. Written out here so the code stops lying to
-                // the next reader.
+                // BL-417 STEP 2 (Ben, 2026-09-01, ruling on NR-769): the score is
+                // RETURN ON CAPITAL PER TICK — `net / capex` — and nothing else.
                 //
-                // The bias is RETAINED, deliberately. focus_weight, jitter and
-                // the glut multiplier were all tuned against this curve, and
-                // every blessed golden records a world evolved under it —
-                // replacing it with an explicit linear metric is a re-tune plus
-                // a golden reshuffle, which is BL-417 step 2 and Ben's call.
+                // It was `net^2 / capex`, which reads as capital efficiency and
+                // behaves as a margin bias: doubling the margin quadruples the
+                // score, doubling the cost only halves it. Step 1 (BL-417,
+                // 2026-08-17) made the expression say that out loud and left the
+                // decision open. This is the decision.
                 //
-                // NOT algebraically free in float: `net / (capex / net)` and
-                // `net * net / capex` round differently. Measured against the
-                // MSVC build (ai_skill_harness 5 seeds, spectator_determinism
-                // state_hash) before landing; byte-identical both sides. See
-                // BL-417 `step_1_landed` and requirements group
-                // quadratic-build-score-honest.
-                c.score  = (net * net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                // WHY IT HAD TO GO, and it is measured rather than argued:
+                // AI_OPPONENT.md § Selection must be scale-free says a cheap good
+                // can never win an ABSOLUTE contest however badly the world needs
+                // it — and `net^2 / capex` is an absolute contest. BL-712 put
+                // `Power Generation` and `Construction` in front of the scorer for
+                // the first time (168 and 430 candidates, against zero before) and
+                // the scorer refused them anyway, peaking at 31.9 and 105.3 against
+                // Advanced Fabrication's 1884. BL-711 left the same fingerprint
+                // from the other side: peat reaches the scorer, both its slots are
+                // placeable, and it still never gets a site. Two independent fixes
+                // both ran into the same wall one level down, which is what made
+                // this the curve's problem rather than theirs.
+                //
+                // A RATE, WITH A UNIT. `net / capex` is credits per tick per credit
+                // of capital — dimension 1/tick — so a rival now ranks builds by
+                // how fast capital comes back, not by how fat the margin is. The
+                // multipliers are unchanged and still unitless: focus_weight is the
+                // corp's specialist premise, jitter is its personality, glut is the
+                // forecast veto.
+                //
+                // THE GOLDEN RESHUFFLE IS THE POINT, not a side effect: every
+                // blessed golden recorded a world evolved under the quadratic, and
+                // this item was held for as long as it was precisely because
+                // nobody wanted to pay that. Measured distribution over one
+                // industrial warm start, 15,549 build candidates — quadratic
+                // median 13.54 / max 1884.33, linear median 0.106 / max 2.81.
+                c.score  = (net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
                 c.spend  = capex;
                 c.reason = corp_decision_reason::best_build;
                 c.bucket = bucket_for_reason(c.reason);
@@ -823,8 +1157,22 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // full run. Measured at 30.9% of processing building-ticks
                 // (NR-266), so this remains an over-estimate; the `reachable`
                 // gate below is the coarse guard against the worst of it.
-                uint16_t best_recipe = no_recipe;
-                float    best_net    = 0.0f;
+                //
+                // BL-712: the best is kept PER GROUP, not once. A single argmax
+                // over net margin is a category exclusion rather than a ranking
+                // (AI_OPPONENT.md § Selection must be scale-free): margins span
+                // three orders, so `power` at net 3.98 could never out-rank
+                // price-ceiled `electronics` at net 290 and NO rival ever built a
+                // plant, in any world, at any time. `recipe::group` is the
+                // category the design already authors (BL-434) — "Power
+                // Generation" and "Construction" are each their own — so the
+                // pre-filter now narrows WITHIN a group and hands every group to
+                // the scorer, which is what the scorer is for.
+                //
+                // std::map, so the emission order below is the group's collation
+                // order rather than registry-walk order — a function of the
+                // roster, not of iteration.
+                std::map<std::string, std::pair<uint16_t, float>> group_best;
                 for (int i = 0; i < n_recipes; ++i)
                 {
                     const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
@@ -873,57 +1221,82 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (!bp.has_data)
                         continue;
                     const float n = bp.net();
-                    if (n > best_net || (n == best_net && best_recipe != no_recipe && rid < best_recipe))
+                    auto  slot = group_best.find(abs->group);
+                    if (slot == group_best.end())
                     {
-                        best_net    = n;
-                        best_recipe = rid;
+                        group_best.emplace(abs->group, std::make_pair(rid, n));
+                        continue;
                     }
+                    // Same tie-break as the single argmax had, now applied
+                    // within the group: lowest absolute id wins a draw.
+                    if (n > slot->second.second
+                        || (n == slot->second.second && rid < slot->second.first))
+                        slot->second = std::make_pair(rid, n);
                 }
-                if (best_recipe == no_recipe)
+                if (group_best.empty())
                     continue; // nothing this corp can reach, run and profit from
 
-                const recipe* rc = reg.get_recipe(best_recipe);
-                // The target names the primary output. It is what the glut
-                // forecast is run against, and it is the argument placement_rules
-                // reads for the Hydroponics Bay rule (BL-166).
-                const resource_type target    = primary_output(*rc);
-                const float         primary_q = rc->outputs[static_cast<std::size_t>(target)];
+                // ONE candidate per group. Each is scored on the same curve and
+                // vetoed by the same placement and glut gates as before — and
+                // those gates are the second half of why this matters: they used
+                // to run AFTER the argmax, so a tile whose fattest recipe failed
+                // placement or forecast a glut produced NO candidate at all,
+                // rather than falling through to one that would have placed.
+                for (const auto& [grp, pick] : group_best)
+                {
+                    (void)grp; // the key is the category; the pick is what to build
+                    const uint16_t best_recipe = pick.first;
+                    const float    best_net    = pick.second;
+                    const recipe* rc = reg.get_recipe(best_recipe);
+                    // The target names the primary output. It is what the glut
+                    // forecast is run against, and it is the argument placement_rules
+                    // reads for the Hydroponics Bay rule (BL-166).
+                    const resource_type target    = primary_output(*rc);
+                    const float         primary_q = rc->outputs[static_cast<std::size_t>(target)];
 
-                if (!placement_rules::can_place_in_world(w, tile, building_type::processing_facility, target))
-                    continue;
+                    if (!placement_rules::can_place_in_world(w, tile, building_type::processing_facility, target))
+                        continue;
 
-                const float net = best_net;
-                if (net <= 0.0f)
-                    continue; // never build into an expected loss, same as above
+                    const float net = best_net;
+                    if (net <= 0.0f)
+                        continue; // never build into an expected loss, same as above
 
-                const float capex      = std::max(1.0f, pe.build_cost);
-                const float added_rate = primary_q * batches;
-                const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
-                const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p);
-                if (glut <= 0.0f)
-                    continue; // forecast hard glut — veto, as the extraction half does
+                    // BL-709 / NR-592, the processing half — same reasoning as the
+                    // extraction candidate above. The recipe travels into the
+                    // lookup, because since BL-590 the material basket is keyed by
+                    // it: a Sawmill and a Smithy do not cost the same to build, and
+                    // the scorer should not pretend they do.
+                    const float capex      = std::max(1.0f, pe.build_cost
+                        + build_material_cost(w, reg, tile, building_type::processing_facility,
+                                              target, best_recipe));
+                    const float added_rate = primary_q * batches;
+                    const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
+                    const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p);
+                    if (glut <= 0.0f)
+                        continue; // forecast hard glut — veto, as the extraction half does
 
-                candidate c;
-                c.cmd.tick   = tick;
-                c.cmd.corp   = corp;
-                c.cmd.verb   = corp_verb::build;
-                c.cmd.tile   = tile;
-                c.cmd.type   = building_type::processing_facility;
-                c.cmd.target = target;
-                // The recipe MUST travel with the command. construct_building
-                // substitutes steel for `no_recipe` — right for a caller with no
-                // opinion, wrong for one that chose — and BL-388 closed exactly
-                // that trap by making corp_command assert the built processor
-                // kept the recipe it was given.
-                c.cmd.recipe = best_recipe;
-                // Same curve as the extraction candidate, deliberately: BL-417
-                // step 2 is the decision about whether net^2/capex is the right
-                // shape, and it should be taken ONCE for both, not forked here.
-                c.score  = (net * net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
-                c.spend  = capex;
-                c.reason = corp_decision_reason::best_build;
-                c.bucket = bucket_for_reason(c.reason);
-                cands.push_back(c);
+                    candidate c;
+                    c.cmd.tick   = tick;
+                    c.cmd.corp   = corp;
+                    c.cmd.verb   = corp_verb::build;
+                    c.cmd.tile   = tile;
+                    c.cmd.type   = building_type::processing_facility;
+                    c.cmd.target = target;
+                    // The recipe MUST travel with the command. construct_building
+                    // substitutes steel for `no_recipe` — right for a caller with no
+                    // opinion, wrong for one that chose — and BL-388 closed exactly
+                    // that trap by making corp_command assert the built processor
+                    // kept the recipe it was given.
+                    c.cmd.recipe = best_recipe;
+                    // Same curve as the extraction candidate, deliberately: BL-417
+                    // step 2 was taken ONCE for both rather than forked here. See
+                    // that candidate for the full reasoning.
+                    c.score  = (net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                    c.spend  = capex;
+                    c.reason = corp_decision_reason::best_build;
+                    c.bucket = bucket_for_reason(c.reason);
+                    cands.push_back(c);
+                }
             }
         }
 
@@ -1009,10 +1382,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         c.cmd.tile      = best_tile;
                         c.cmd.road_tier = best_tier;
                         // Modest relative to the site it targets: a road does
-                        // not itself earn revenue, it unlocks a FUTURE
-                        // build's, so it is priced under the BL-417
-                        // net^2/capex curve rather than matching it.
-                        c.score  = 0.3f * best_net * best_net / std::max(1.0f, rex.build_cost) * jitter;
+                        // not itself earn revenue, it unlocks a FUTURE build's,
+                        // so it is priced UNDER the build curve rather than
+                        // matching it. It tracks that curve by construction, so
+                        // BL-417 step 2 moves it in lockstep — leaving the
+                        // quadratic here while the builds went linear would have
+                        // made a road outscore the site it exists to reach by two
+                        // orders of magnitude.
+                        c.score  = 0.3f * best_net / std::max(1.0f, rex.build_cost) * jitter;
                         c.spend  = std::max(1.0f, rex.build_cost);
                         c.reason = corp_decision_reason::best_build;
                         c.bucket = bucket_for_reason(c.reason);
@@ -1222,7 +1599,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // just gets rejected rather than mutating anything; it is not a new
             // planner, just an unpriced one. Stated explicitly (not a silent gap) —
             // see NEEDS_REVIEW.json.
-            if (b.type == building_type::processing_facility && b.recipe != no_recipe)
+            const recipe* cur_rc = (b.type == building_type::processing_facility && b.recipe != no_recipe)
+                                       ? reg.get_recipe(b.recipe) : nullptr;
+            if (cur_rc != nullptr)
             {
                 const float cur_margin = recipe_margin(w, reg, b.tile, b.recipe);
                 const int   n          = reg.recipe_count(building_type::processing_facility);
@@ -1230,8 +1609,47 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 float    best_m  = cur_margin;
                 for (int i = 0; i < n; ++i)
                 {
-                    const uint16_t rid = static_cast<uint16_t>(i);
-                    const float    m   = recipe_margin(w, reg, b.tile, rid);
+                    // BL-712, the two defects this walk carried.
+                    //
+                    // (1) ID SPACE. `i` was used AS an absolute recipe id, but the
+                    // loop bound is the BROWSE count — recipe_registry.hpp keeps the
+                    // two apart, and the build candidate above crosses them through
+                    // recipe_id(name) precisely because NR-254 caught the Build door
+                    // getting this wrong. So the chase was scoring a set that is
+                    // neither this era's roster nor the whole registry: it could
+                    // propose an out-of-band recipe and could never see one whose
+                    // absolute id sits past the browse count.
+                    const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+                    const uint16_t rid = reg.recipe_id(rc.name);
+                    if (reg.get_recipe(rid) == nullptr)
+                        continue; // the name did not round-trip; never propose it
+                    //
+                    // (2) SCALE-BLINDNESS, the same defect as the build candidate
+                    // (AI_OPPONENT.md § Selection must be scale-free) — but here it
+                    // was also proposing something the SEAM HAS REFUSED SINCE
+                    // 2026-08-16. try_switch_recipe returns `cross_group` outright
+                    // for a switch that changes group: Ben's BL-434 retraction, on
+                    // the grounds that "switching methods can mean changing to a
+                    // different building type" and the only route to a different
+                    // type is dismantle-and-rebuild (economy_system.cpp, that
+                    // branch's own comment).
+                    //
+                    // Margins in the shipped roster span three orders, so an
+                    // unrestricted argmax over ABSOLUTE per-batch margin lands on
+                    // an out-of-group recipe nearly every time. The chase then
+                    // spent its one proposal per building on a command that could
+                    // not apply, and — because only the single argmax is ever
+                    // proposed — STARVED the legal within-group switch that would
+                    // have. Asserted by corp_ai_harness R8, whose second row goes
+                    // red without this guard for exactly that reason.
+                    //
+                    // So this is not a new rule, it is the scorer being told what
+                    // the seam already decided: a dial tunes within a group;
+                    // becoming a different facility is a build decision, scored as
+                    // one, above.
+                    if (rc.group != cur_rc->group)
+                        continue;
+                    const float m = recipe_margin(w, reg, b.tile, rid);
                     if (m > best_m) { best_m = m; best_id = rid; }
                 }
                 if (best_id != b.recipe)
@@ -1499,16 +1917,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // numbers behind it are corp_ai_params fields precisely so tuning it
         // never needs this code changed. See AI_OPPONENT.md § 6.
         {
-            // Lowest-id market on a body, or null. Lowest id (not map order) so
-            // the choice is stable across container internals.
-            auto market_on_body = [&w](entity_id body) -> entity_id {
-                entity_id best = null_entity;
-                for (const auto& [mid, mc] : w.markets)
-                    if (mc.body == body && (best == null_entity || mid < best))
-                        best = mid;
-                return best;
-            };
-
             // corp_body_pools is a std::map, so this walk is already ordered by
             // (corp, body) — the deterministic iteration the whole scorer rests on.
             for (const auto& [key, pool] : w.corp_body_pools)
@@ -1516,7 +1924,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 if (key.first != corp)
                     continue;
                 const entity_id body = key.second;
-                const entity_id mid  = market_on_body(body);
+                const entity_id mid  = market_on_body(w, body);
                 if (mid == null_entity)
                     continue;
                 const market_component& mc = w.markets.at(mid);
@@ -1593,18 +2001,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // rather than flooding the candidate list with every (body, resource)
         // pair.
         {
-            // Lowest-id market on a body — the same stable pick
+            // `market_on_body` (top of this file) is the same stable pick
             // `supply_system.cpp`'s own (internal-linkage) `market_for_body`
-            // makes, duplicated rather than shared for the same reason that
-            // one's own comment gives.
-            auto market_on_body = [&w](entity_id body) -> entity_id {
-                entity_id best = null_entity;
-                for (const auto& [mid, mc] : w.markets)
-                    if (mc.body == body && (best == null_entity || mid < best))
-                        best = mid;
-                return best;
-            };
-
+            // makes. It was a lambda here and a second identical one in the
+            // trade block above until BL-700 needed a third for the standing
+            // read; three copies of one rule is one copy too many, so it is now
+            // a single file-local function.
             const logistics_nodes nodes = collect_logistics_nodes(w);
 
             entity_id   best_market   = null_entity;
@@ -1684,7 +2086,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
             if (best_market != null_entity)
             {
-                const entity_id src_market = market_on_body(best_src_body);
+                const entity_id src_market = market_on_body(w, best_src_body);
                 if (src_market != null_entity)
                 {
                     candidate c;
@@ -1741,9 +2143,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         //
         // It now records **the best option this corp did NOT take** — the
         // highest-scoring candidate rejected anywhere in the walk, by an action
-        // budget, the one-touch rule, the solvency gate, or the seam itself.
-        // That is what the field's name always claimed, and it is the
-        // counterfactual a reader actually wants: "what did it pass up?"
+        // budget, the one-touch rule or the solvency gate. That is what the
+        // field's name always claimed, and it is the counterfactual a reader
+        // actually wants: "what did it pass up?"
+        //
+        // "or the seam itself" was in that list until BL-696 and is now
+        // deliberately absent — a command the seam refuses was never an option
+        // to pass up. See the refusal branch below, which is where the whole
+        // argument lives.
         //
         // Consequences, both deliberate:
         //  - It is knowable only once the WHOLE list has been walked (a
@@ -1752,39 +2159,74 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         //    application order. The ring and the history log are still written
         //    one-for-one in that same order, so the feed's positional pairing
         //    between them is unchanged.
-        //  - Every decision from one evaluation therefore carries the SAME
-        //    runner-up. That is honest: the foregone option belongs to the
-        //    evaluation, not to the individual command.
+        //  - Every decision from one evaluation carried the SAME runner-up.
+        //    That much is now qualified by BL-696 below: the value is per
+        //    FAMILY, so two decisions from one evaluation share a runner-up
+        //    only when they competed for the same budget. The foregone option
+        //    still belongs to the evaluation rather than to the individual
+        //    command — it just belongs to one competition within it.
         //
         // Zero still means "nothing was passed up" — every enumerated candidate
-        // was acted on — which the feed renders as "uncontested".
+        // of that family was acted on — which the feed renders as "uncontested".
+        //
+        // BL-696 (the decision feed reads zero) narrows the field ONE further
+        // step, and the narrowing is what makes it mean anything at all. It was
+        // a single scalar broadcast onto every decision from the evaluation —
+        // the best foregone candidate of ANY family — and the feed divides the
+        // pair (`win / (win + run)`, decision_feed.cpp § read_margin) to draw a
+        // conviction bar. That division is only defined if the two numbers share
+        // a scale, and across families they do not: a foregone sell order scores
+        // in the hundreds of credits while a good workforce dial scores 3. So
+        // `runner_up >= winning_score` became the ORDINARY case, every row read
+        // "overridden", every bar pinned to zero, and the one surface onto rival
+        // reasoning stated nothing. Measured on the shipped world (24 quarters,
+        // spectated): every dial row read `3.62 v 307.02` / `8.93 v 328.16`,
+        // the same runner-up on each, because one listing dominated the whole
+        // evaluation.
+        //
+        // The runner-up is therefore now PER FAMILY (`candidate_family` above):
+        // the best candidate this corp passed up IN THE COMPETITION THIS ONE
+        // WON. It is still NR-232's counterfactual — the best option not taken,
+        // rejected by a budget, the one-touch rule, the solvency gate or the
+        // seam — with the qualifier that was missing and load-bearing. NR-226
+        // still holds: a runner-up may legitimately exceed its winner, because
+        // candidates sort by BUCKET before score, so a Must-Have idle can
+        // displace a higher-scoring Should-Have dial in the same family.
+        //
+        // Nothing about SELECTION changes. `best_rejected` is written and read
+        // for the record only; the greedy walk never consults it, so the world
+        // this scorer produces is byte-identical either side of this change and
+        // only the logged margin moves.
         struct pending_decision { corp_decision d; entity_id log_body; };
         std::vector<pending_decision> pending;
-        float best_rejected = 0.0f;
+        std::array<float, candidate_family_count> best_rejected{}; // value-initialised: all 0
         const auto forgo = [&best_rejected](const candidate& cand) {
-            best_rejected = std::max(best_rejected, cand.score);
+            float& slot = best_rejected[static_cast<std::size_t>(family_of(cand.cmd))];
+            slot = std::max(slot, cand.score);
         };
         for (std::size_t i = 0; i < cands.size(); ++i)
         {
             const candidate& c = cands[i];
-            const bool is_build  = (c.cmd.verb == corp_verb::build);
-            const bool is_survey = (c.cmd.verb == corp_verb::survey);
-            const bool is_hire   = (c.cmd.verb == corp_verb::hire_unit);
+            // One classification, used by the budgets, the one-touch rule, the
+            // cooldown and the runner-up alike (BL-696 hoisted it into
+            // `family_of` so a seventh verb family cannot be added to one of
+            // those and forgotten in another).
+            //
             // Trade gets its own budget rather than sharing the dial budget: its
             // subject is a BODY, not a building, so neither the dial cap nor the
             // one-touch-per-building rule below means anything for it, and folding
             // it in would let a listing consume a dial slot a loss-maker needed.
             // Hire is excluded from the dial budget for the same reason (its
             // subject is a tile), and capped at one per evaluation besides.
-            const bool is_trade  = (c.cmd.verb == corp_verb::place_sell_order ||
-                                    c.cmd.verb == corp_verb::remove_sell_order);
-            // Directed dispatch (BL-600) is excluded from the dial budget for
-            // the identical reason trade is: its subject is a MARKET, not a
-            // building, so neither the dial cap nor the one-touch-per-building
-            // rule below means anything for it. Its own cap, same shape as
-            // hire's.
-            const bool is_dispatch = (c.cmd.verb == corp_verb::dispatch_convoy);
-            const bool is_dial   = !is_build && !is_survey && !is_hire && !is_trade && !is_dispatch;
+            // Directed dispatch (BL-600) is excluded for the identical reason:
+            // its subject is a MARKET. Its own cap, same shape as hire's.
+            const candidate_family fam = family_of(c.cmd);
+            const bool is_build    = (fam == candidate_family::build);
+            const bool is_survey   = (fam == candidate_family::survey);
+            const bool is_hire     = (fam == candidate_family::hire);
+            const bool is_trade    = (fam == candidate_family::trade);
+            const bool is_dispatch = (fam == candidate_family::dispatch);
+            const bool is_dial     = (fam == candidate_family::dial);
             // Every `continue` below is a FOREGONE candidate, and each one calls
             // forgo() so it can compete to be the decision log's runner-up.
             // A budget-capped candidate is the purest case of the thing the
@@ -1856,7 +2298,36 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             entity_id built = null_entity;
             if (apply_corp_command(w, reg, c.cmd, &built) != corp_command_result::applied)
             {
-                forgo(c);
+                // A SEAM REFUSAL IS NOT A FOREGONE OPTION, and this line is
+                // BL-696's actual cause (it called forgo(c) until 2026-08-31).
+                //
+                // NR-232's definition folded "rejected by the seam" in with
+                // "rejected by a budget or the solvency gate", and the three are
+                // not the same fact. A budget-capped candidate is an option the
+                // corp HAD and did not take — the counterfactual the feed's
+                // margin column exists to show. A seam-refused one was never
+                // available to take at all: `apply_corp_command` mutates nothing
+                // on refusal, and the corp made no choice about it.
+                //
+                // It matters because refusals are not rare, they are STRUCTURAL,
+                // and they carry the largest scores in the list. The recipe
+                // margin-chase (above) is deliberately enumerated WITHOUT the
+                // switch cost and WITHOUT the cooldown the seam enforces at
+                // apply time — BL-430's stated call — so the same handful of
+                // high-scoring chases are proposed and refused every evaluation.
+                // Measured on the shipped world (24 quarters, spectated):
+                // 160 of 249 rejections scoring over 50 were seam-refused
+                // `set_recipe` candidates, so the top refused chase became the
+                // runner-up on EVERY decision that corp took, every row in the
+                // feed read "overridden", and the conviction bar sat at zero on
+                // all of them. The one surface onto rival reasoning reported the
+                // same thing about every decision, which is the same as
+                // reporting nothing.
+                //
+                // Not counting a refusal is therefore the fix at the cause. The
+                // refusal itself is unchanged and still benign (see the
+                // apply-then-count note below): the candidate consumes no action
+                // slot and the next-best candidate is still tried.
                 continue; // a seam rejection mutates nothing; just skip it
             }
 
@@ -2012,8 +2483,25 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // decision with its agency event must match on fields, not on adjacency.
         for (pending_decision& pd : pending)
         {
-            pd.d.runner_up = best_rejected;
+            // BL-696: the best option foregone IN THIS DECISION'S OWN FAMILY —
+            // the only comparison that is on one scale (see `candidate_family`).
+            pd.d.runner_up =
+                best_rejected[static_cast<std::size_t>(family_of(pd.d.command))];
             w.ai_decisions.push(pd.d);
+
+            // BL-704: stream the decision to the opt-in trace sink, HERE rather
+            // than by reading the ring later, because the ring wraps at 256 --
+            // and once it has, an end-of-run dump reports the tail and silently
+            // drops everything before it. (Measured on decision_trace_harness's
+            // fixture: the first wrap lands near tick 2200, later than a
+            // back-of-envelope estimate suggests but a certainty over a
+            // campaign. Streaming costs the same and removes the failure mode
+            // rather than deferring it.) Off by default; when off this
+            // is one always-false branch (decision_trace.hpp). Write-only: the
+            // sink is an observation the simulation never reads back, and
+            // `decision_trace_harness` T1 pins that by requiring an identical
+            // state_hash with tracing on and off.
+            decision_trace::record(pd.d);
 
             world_history_entry log_entry;
             log_entry.timestamp = tick;

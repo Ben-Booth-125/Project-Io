@@ -1,6 +1,7 @@
 #include "planetology.hpp"
 
 #include "body_names.hpp" // the generated catalogue the preview must quote (BL-257)
+#include "continents.hpp" // the drift clock the thermal series is kept on (BL-961)
 #include "star_map.hpp"
 
 #include <algorithm>
@@ -617,7 +618,7 @@ std::string format_history_date(int64_t years_before_epoch)
 
     // Recorded history: a calendar year, astronomical numbering (negative for
     // BCE), which is what the historical ladder's own lines want to read as.
-    const int64_t year = campaign_epoch_year - y;
+    const int64_t year = history_datum_year - y;
     std::snprintf(buf, sizeof buf, "%lld", static_cast<long long>(year));
     return buf;
 }
@@ -849,6 +850,10 @@ planetology_state run_planetology(const body_inputs& in,
         st.endowment[static_cast<std::size_t>(resource_type::iron_ore)]              = 1.4f * p.metallicity;
         st.endowment[static_cast<std::size_t>(resource_type::regolith)]              = 1.0f;
         st.endowment[static_cast<std::size_t>(resource_type::stone)]                 = 0.6f;
+        // No Engine stage ran, so there is no thermal history to reconstruct;
+        // the series still carries its full length so every state has the same
+        // shape on the wire — a stripped core is cold at every epoch (BL-961).
+        st.thermal_series.assign(static_cast<std::size_t>(continent_drift_epochs) + 1, st.theta);
         return st;
     }
 
@@ -960,6 +965,21 @@ planetology_state run_planetology(const body_inputs& in,
     };
 
     st.mobile_lid = mobile_lid_at(age); // present day — bit-identical to before
+
+    // THE THERMAL SERIES (BL-961): theta at every drift epoch, on the drift
+    // record's own clock, so the Life phase can read the interior AS IT STOOD
+    // when a fossil's window was open rather than proxying from today. Index 0
+    // is the present and is ASSIGNED, not recomputed — `a + (theta - a)` is not
+    // guaranteed to round back to `theta` when the tidal term dominates, and the
+    // epoch-0 identity is the contract every deeper entry hangs off. The rest is
+    // theta_at on the same clamped age the gates use; no RNG is touched here.
+    {
+        constexpr float epoch_gyr = static_cast<float>(continent_epoch_years) * 1.0e-9f;
+        st.thermal_series.assign(static_cast<std::size_t>(continent_drift_epochs) + 1, st.theta);
+        for (int k = 1; k <= continent_drift_epochs; ++k)
+            st.thermal_series[static_cast<std::size_t>(k)] =
+                theta_at(age - static_cast<float>(k) * epoch_gyr);
+    }
 
     if (st.theta < 0.10f)      st.profile.geology = geological_activity::none;
     else if (st.theta < 0.45f) st.profile.geology = geological_activity::low;

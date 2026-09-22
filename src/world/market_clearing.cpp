@@ -1,10 +1,12 @@
 #include "market_clearing.hpp"
 
 #include "law.hpp" // the D4 import tariff: any_import_tariff_enacted / nation_tariff_rate
+#include "logistics.hpp" // BL-708: body_reach_field / tile_reach_cost — the grid good's listing gate
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <map>
 #include <tuple>
 #include <vector>
@@ -272,7 +274,11 @@ void inject_population_demand(world& w, const recipe_registry& reg)
         {
             const float base = mc.base_price[r];
             if (base <= 0.0f)
-                continue; // Untradeable — no base price to anchor the elasticity curve.
+                continue; // Untradeable — no base price to anchor the elasticity
+                          // curve. BL-652: this skip is SILENT by construction and
+                          // must not be the only record of it — `unpriced_basket_entries`
+                          // is the named diagnostic, reported at startup and failed
+                          // on by demand_census.
             const float weighted = scale * basket[r];
             if (weighted <= 0.0f)
                 continue;
@@ -325,7 +331,9 @@ void inject_background_demand(world& w, const recipe_registry& reg)
         {
             const float base = mc.base_price[r];
             if (base <= 0.0f)
-                continue; // untradeable — no base price to anchor the elasticity curve.
+                continue; // untradeable — no base price to anchor the elasticity
+                          // curve. BL-652: named by `unpriced_basket_entries`, for
+                          // the reason on inject_population_demand's copy of this line.
             const float weighted = scale * basket[r];
             if (weighted <= 0.0f)
                 continue; // spacecraft_components (and anything else unlisted, or
@@ -337,6 +345,201 @@ void inject_background_demand(world& w, const recipe_registry& reg)
             mc.demand[r] += weighted * elastic;
         }
     }
+}
+
+namespace {
+
+/// BL-647: the campaign-fixed preference weight of nation @p nation for the
+/// resource at index @p r — the "national character" half of the endemic
+/// channel, making different nations crave different luxuries.
+///
+/// A PURE FUNCTION, not stored state: FNV-1a over the nation's entity id, its
+/// generated name and character axes (all fixed at generation, all already
+/// persisted), and the resource index. Same inputs after a save/load, so the
+/// craving is fixed for the campaign without touching the serialisation seam,
+/// and no RNG stream runs in the tick loop. Folding the name and the three
+/// character axes — not the id alone — is what seeds it from the nation's
+/// GENERATED identity: two worlds whose phonology and settlement record differ
+/// crave differently even where entity ids coincide.
+///
+/// Shape: uniform in [1 − spread, 1 + spread), mean 1.0 for every spread, so
+/// the authored spread tunes ASYMMETRY without moving the channel's total.
+float nation_preference(entity_id nation, const nation_component* nc,
+                        std::size_t r, float spread)
+{
+    std::uint64_t h = 1469598103934665603ull; // FNV-1a 64 offset basis
+    const auto mix_byte = [&h](std::uint8_t b) {
+        h ^= b;
+        h *= 1099511628211ull; // FNV-1a 64 prime
+    };
+    for (int i = 0; i < 8; ++i)
+        mix_byte(static_cast<std::uint8_t>((static_cast<std::uint64_t>(nation) >> (8 * i)) & 0xFF));
+    if (nc != nullptr)
+    {
+        for (const char ch : nc->name)
+            mix_byte(static_cast<std::uint8_t>(ch));
+        mix_byte(static_cast<std::uint8_t>(nc->politics));
+        mix_byte(static_cast<std::uint8_t>(nc->posture));
+        mix_byte(static_cast<std::uint8_t>(nc->focus));
+    }
+    mix_byte(static_cast<std::uint8_t>(r & 0xFF));
+    mix_byte(static_cast<std::uint8_t>((r >> 8) & 0xFF));
+
+    // Avalanche finalizer (MurmurHash3 fmix64). NOT decorative: raw FNV-1a
+    // diffuses a late-mixed byte into the HIGH bits only weakly, and the
+    // resource index is the LAST thing mixed — without this the top-24-bit
+    // read below barely moved across goods, and every nation craved all four
+    // luxuries near-identically (caught red by endemic_demand_harness E2).
+    h ^= h >> 33;
+    h *= 0xff51afd7ed558ccdull;
+    h ^= h >> 33;
+    h *= 0xc4ceb9fe1a85ec53ull;
+    h ^= h >> 33;
+
+    // Top 24 bits → uniform [0, 1). Integer path is bit-identical everywhere.
+    const float u = static_cast<float>((h >> 40) & 0xFFFFFFull) / 16777216.0f;
+    return 1.0f - spread + 2.0f * spread * u;
+}
+
+} // namespace
+
+void inject_endemic_demand(world& w, const recipe_registry& reg)
+{
+    // BL-647: the Endemic trade channel (MARKETS.md § Demand channels — the
+    // register's eighth row). Tobacco, spices, coffee and furs were on the
+    // roster, extractable, priced — and wanted by nothing in any band. This is
+    // their buyer: a household pull that scales with WEALTH rather than
+    // headcount, so it is the first demand whose SIZE is a function of
+    // prosperity and it rewards a player who has made somewhere rich.
+    const endemic_demand_params& ed = reg.endemic_demand();
+    const std::array<float, resource_count>& basket = reg.endemic_demand_basket();
+    if (ed.wealth_scale <= 0.0f)
+        return; // authored off (the default) — hand-built registries and every
+                // pre-BL-647 golden inject nothing.
+
+    // --- Per-nation wealth -------------------------------------------------
+    //
+    // THE WEALTH READ IS A DELEGATED CALL (this agent's, BL-647): the nation's
+    // treasury plus the summed POSITIVE balances of the corporations domiciled
+    // in it (corporation_component::home_nation). Chosen over the alternatives
+    // because it is the quantity that most directly moves with player success —
+    // grow a profitable corp in a nation and that nation's luxury pull grows
+    // the same quarter — while the treasury half carries the state's own
+    // riches (levies, tariffs). Rejected: population-centre scale × a wealth
+    // proxy (headcount-scaled, the exact thing this channel must not be) and
+    // trailing quarterly-return averages (same signal, one quarter staler).
+    // A corp in debt contributes zero rather than draining its neighbours'
+    // riches — insolvency is not negative luxury appetite.
+    //
+    // Accumulated over SORTED corp ids so the float sum cannot vary with
+    // `w.corporations`' unordered layout (the BL-406 class of defect).
+    std::vector<entity_id> corp_ids;
+    corp_ids.reserve(w.corporations.size());
+    for (const auto& [cid, cc] : w.corporations)
+    {
+        (void)cc;
+        corp_ids.push_back(cid);
+    }
+    std::sort(corp_ids.begin(), corp_ids.end());
+
+    std::map<entity_id, float> nation_wealth; // nation id -> credits
+    for (const entity_id cid : corp_ids)
+    {
+        const corporation_component& cc = w.corporations.at(cid);
+        if (cc.home_nation == null_entity)
+            continue;
+        if (cc.balance > 0.0f)
+            nation_wealth[cc.home_nation] += cc.balance;
+    }
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.treasury > 0.0f)
+            nation_wealth[nid] += nc.treasury; // one add per key: order-free.
+
+    // --- How many markets share each nation's pull -------------------------
+    // A nation's craving is split evenly across the markets anchored in its
+    // territory, so its TOTAL pull is independent of how many markets BL-096
+    // carved it into. Integer increments: order-free over the unordered map.
+    std::map<entity_id, int> nation_markets;
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        const auto it = w.tile_to_nation.find(mc.centre_tile);
+        if (it != w.tile_to_nation.end() && it->second != null_entity)
+            nation_markets[it->second] += 1;
+    }
+
+    for (auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        const auto nit = w.tile_to_nation.find(mc.centre_tile);
+        if (nit == w.tile_to_nation.end() || nit->second == null_entity)
+            continue; // no owning nation (an off-world outpost): no craving
+                      // lands here — the home body's luxury shortfall reaches
+                      // outposts through inject_interbody_demand instead.
+        const entity_id nation = nit->second;
+        const auto wit = nation_wealth.find(nation);
+        if (wit == nation_wealth.end() || wit->second <= 0.0f)
+            continue; // no wealth, no luxury pull — the channel's whole point.
+        const float share =
+            wit->second / static_cast<float>(nation_markets.at(nation));
+        const auto nat_it = w.nations.find(nation);
+        const nation_component* nc =
+            (nat_it != w.nations.end()) ? &nat_it->second : nullptr;
+
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float base = mc.base_price[r];
+            if (base <= 0.0f)
+                continue; // Untradeable here. For an endemic good this skip is
+                          // DESIGNED, not a BL-652 authoring fault: a world
+                          // carries only the luxuries its biosphere rolled
+                          // (RESOURCES.md § Mercantile), an absent one is
+                          // priced nowhere, and its basket weight is inert on
+                          // that world — which is why this channel is
+                          // deliberately NOT added to unpriced_basket_entries.
+            const float weighted = share * ed.wealth_scale * basket[r]
+                * nation_preference(nation, nc, r, ed.preference_spread);
+            if (weighted <= 0.0f)
+                continue;
+
+            // The population basket's elasticity shape, reused — not a second
+            // elasticity model.
+            const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : base;
+            const float elastic = std::clamp(std::pow(base / price, ed.demand_elasticity),
+                                             ed.elasticity_min, ed.elasticity_max);
+            mc.demand[r] += weighted * elastic;
+        }
+    }
+}
+
+std::vector<unpriced_basket_entry> unpriced_basket_entries(const world& w,
+                                                           const recipe_registry& reg)
+{
+    // Does ANY market price it? A pure OR over an unordered map, so the map's
+    // layout cannot reach the answer. Taken once rather than per basket entry.
+    std::array<bool, resource_count> priced{};
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (mc.base_price[r] > 0.0f)
+                priced[r] = true;
+    }
+
+    // The registry's ERA-RESOLVED folds — the exact vectors the two injectors
+    // multiply by, not the shared `any` tranche on the params, so a band whose
+    // basket never names the good is never accused of naming it.
+    const std::array<float, resource_count>* baskets[2] = {
+        &reg.population_demand_basket(), &reg.background_demand_basket()
+    };
+    const char* const channels[2] = { "household", "background" };
+
+    std::vector<unpriced_basket_entry> out;
+    for (std::size_t c = 0; c < 2; ++c)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if ((*baskets[c])[r] > 0.0f && !priced[r])
+                out.push_back({ static_cast<resource_type>(r), channels[c] });
+    return out;
 }
 
 namespace {
@@ -616,10 +819,15 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // goods, additive alongside population demand. See inject_background_demand.
     inject_background_demand(w, reg);
 
+    // BL-647: endemic-luxury demand — a wealth-scaled, character-flavoured
+    // pull for the endemic goods, additive alongside the two above. See
+    // inject_endemic_demand.
+    inject_endemic_demand(w, reg);
+
     // BL-263: the home body's own unmet demand pulls a discounted slice onto
     // every outpost market, additive after the resets above — without this an
     // outpost with real supply and no local population collapses to the price
-    // floor the instant it starts producing. Runs AFTER the two demand
+    // floor the instant it starts producing. Runs AFTER the three demand
     // injections above, because BL-406's counterpart selection reads the demand
     // they deposit: the counterpart for a resource is whichever home-body market
     // wants it most, and that is not knowable until this tick's demand is in.
@@ -655,6 +863,39 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     std::unordered_map<entity_id, std::unordered_map<std::size_t, std::vector<ob_sell_entry>>> sell_books;
     std::unordered_map<entity_id, std::unordered_map<std::size_t, std::vector<ob_buy_entry>>>  buy_books;
 
+    // BL-708 — A GRID GOOD ONLY LISTS ONTO A MARKET ITS NETWORK REACHES.
+    //
+    // "Connection gates the TRADE, not only the draw" (LOGISTICS.md § 3a): power
+    // is bought and sold, so what the network decides is WHO MAY MATCH WHOM. The
+    // buyer's half of that lives in `draw_goods_or_bid`; this is the seller's,
+    // and the two together are what make power's price REGIONAL BY CONSTRUCTION
+    // — a well-connected region with generation is cheap, a stranded one is
+    // expensive or dark — without any rule naming a region.
+    //
+    // The market's own `centre_tile` is the shelf's position on the grid, and
+    // connectivity is `tile_reach_cost` read as a BOOLEAN, exactly as the draw
+    // reads it: finite connected, infinity (or an uncomputed -1) not. Memoised
+    // per market for this pass, so a body's Dijkstra is warmed at most once and
+    // each market is tested at most once however many corps list into it.
+    const grid_goods_params& grid_rules = reg.grid_goods();
+    const bool               any_grid   = grid_rules.any();
+    std::map<entity_id, bool> market_on_grid; // std::map: sorted, so no hash-order dependence
+    auto market_connected = [&](entity_id market_id) {
+        const auto memo = market_on_grid.find(market_id);
+        if (memo != market_on_grid.end())
+            return memo->second;
+        bool ok = false;
+        const auto mit = w.markets.find(market_id);
+        if (mit != w.markets.end() && mit->second.centre_tile != null_entity)
+        {
+            body_reach_field(w, mit->second.body); // warm; tile_reach_cost is the const half
+            const float rc = tile_reach_cost(w, mit->second.centre_tile);
+            ok = (rc >= 0.0f) && std::isfinite(rc);
+        }
+        market_on_grid.emplace(market_id, ok);
+        return ok;
+    };
+
     // Auto-surplus: each corp's pool above its processor reservation.
     for (auto& [key, pool] : w.corp_body_pools)
     {
@@ -675,6 +916,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             if (mc.base_price[r] <= 0.0f)
                 continue;
             if (order_controls(corp, body, r))
+                continue;
+
+            // BL-708: a grid good stranded off the network cannot be listed —
+            // there is no wire to sell it down. It stays in the pool, where the
+            // stockpile ceiling then stops the generator making more of it.
+            if (any_grid && grid_rules.grid(r) && !market_connected(mid))
                 continue;
 
             const float surplus = pool.quantities[r] - reserve[r];
@@ -706,6 +953,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         if (mid == null_entity)
             continue;
         const std::size_t r = static_cast<std::size_t>(order.resource);
+        // BL-708: the same listing gate the auto-surplus path takes. A standing
+        // sell order is still a seller, and an off-grid seller of a grid good
+        // has nothing to deliver against it.
+        if (any_grid && grid_rules.grid(r) && !market_connected(mid))
+            continue;
         const auto pkit = w.corp_body_pools.find(std::make_pair(order.corp, order.body));
         if (pkit == w.corp_body_pools.end())
             continue;

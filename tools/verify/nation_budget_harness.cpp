@@ -42,6 +42,21 @@
 //   R5  DETERMINISM: two runs of one fixture are identical, and so is a run
 //       whose claim vector arrives in the opposite order (the pass sorts into
 //       its own walk order rather than trusting the producer's).
+//   R7  THE SPACE PROGRAMME (BL-644). The tenth line's consumer, end to end:
+//       derive -> spend -> settle. A nation with treasury, weight and a stocked
+//       supplier buys a WHOLE lump at the supplier market's price and the goods
+//       are CONSUMED (a terminal sink); a supplier short of a lump is not a
+//       supplier; a share below the lump banks and later fires whole; claimed
+//       stock is reserved against a second nation; the player's corp is never
+//       a supplier; a funded lump the pool can no longer cover is clawed back.
+//   R9  NETWORK UPKEEP (BL-643). The logistics_maintenance line's consumer and
+//       the Infrastructure demand channel: the bill is GEOGRAPHY (road tiles by
+//       level plus active hubs, derived from the world each tick), the claim is
+//       UNEARMARKED so rule 3's pro-rata fill applies (half the repair budget
+//       buys half the materials — the deliberate contrast with R7's lumps), the
+//       goods are drawn from a named supplier's pool and CONSUMED, the player
+//       is never a supplier, and both claw-backs (drained pool; rogue transfer)
+//       are defended. R9h drives run_nation_step end to end, the R8 precedent.
 //   R6  THE TRANSFER RECORD AND THE EARMARK (Sprint N3 T3, 2026-08-23). Every
 //       credit moved is recorded on `national_budget_tick::transfers` — who
 //       paid whom, on which line, for what — sorted (corp, nation, line), and
@@ -61,7 +76,12 @@
 //
 // The process exits non-zero if any assertion FAILs.
 
+#include "world/economy_system.hpp"   // economy_report — R8 drives the real step
 #include "world/nation_budget.hpp"
+#include "world/nation_step.hpp"      // run_nation_step — R8, the wiring itself
+#include "world/recipe_registry.hpp"  // set_space_programme — R8's params route
+#include "world/network_upkeep.hpp"
+#include "world/space_programme.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -711,7 +731,7 @@ int main()
               "R4d a non-positive claim never becomes a credit");
 
         // A LINE OUTSIDE THE ENUM. `budget_priority` has a `uint8_t` underlying
-        // type, so 0..255 are all valid VALUES while only 0..8 index the weight
+        // type, so 0..255 are all valid VALUES while only 0..9 index the weight
         // vector: the gather loop must reject the claim, not index on it.
         // Without the check this is a heap-buffer-overflow, confirmed by
         // AddressSanitizer (Sprint N1 defect 1) - and the standing rule that an
@@ -1070,6 +1090,756 @@ int main()
             check(identical,
                   "R6m the record is the same list, field for field, when the "
                   "claims arrive in the opposite order");
+        }
+    }
+
+    // --- R7: the space programme (BL-644) -----------------------------------
+    // The tenth line's consumer: derive -> spend -> settle. Every number below
+    // is dyadic (prices 2.0 / 0.5, lumps 8 / 16, treasury 1024, reserve 1/4,
+    // weights quarters and halves), so the assertions are bit equality.
+    std::printf("\n-- R7  the space programme buys, consumes, and skips whole --\n");
+    {
+        constexpr std::size_t k_comp = static_cast<std::size_t>(resource_type::spacecraft_components);
+        constexpr std::size_t k_prop = static_cast<std::size_t>(resource_type::propellant);
+        constexpr std::size_t k_space = static_cast<std::size_t>(budget_priority::space_programme);
+
+        // A market with authored prices, so the derivation has its procurement
+        // price basis (resolved price; base_price is the fallback, exercised
+        // by leaving one good's `price` at zero in R7g's twin below).
+        auto add_market = [](world& w, entity_id body) {
+            const entity_id m = w.create_entity();
+            market_component mc{};
+            mc.body = body;
+            w.markets[m] = mc;
+            return m;
+        };
+
+        // The reference space fixture. Treasury 1024, reserve 1/4 -> spendable
+        // 768; weights space 1/4, logistics 1/2, schooling 1/4 -> space share
+        // 192. Supplier pool on body_a: 100 components, 100 propellant; prices
+        // 2.0 and 0.5; lumps 8 and 16 -> claim amounts 16.0 and 8.0.
+        struct space_fixture
+        {
+            fixture   f;      // reuses the base fixture's world/corp helpers
+            entity_id body_a  = null_entity;
+            entity_id market  = null_entity;
+            space_programme_params params;
+        };
+        auto make_space_fixture = [&](float components_stock, float propellant_stock) {
+            space_fixture s;
+            s.f.nation_a = add_nation(s.f.w, "Spacefaria", 1024.0f);
+            s.f.corp_1   = add_corp(s.f.w, "Supplier",  0.0f);
+            s.f.corp_2   = add_corp(s.f.w, "Bystander", 0.0f);
+            s.body_a     = add_body(s.f.w, "Padworld");
+            s.market     = add_market(s.f.w, s.body_a);
+            s.f.w.markets.at(s.market).price[k_comp] = 2.0f;
+            s.f.w.markets.at(s.market).price[k_prop] = 0.5f;
+
+            nation_budget nb{};
+            nb.reserve_fraction     = 0.25f;
+            nb.weights[k_space]     = 0.25f;
+            nb.weights[k_logistics] = 0.5f;
+            nb.weights[k_schooling] = 0.25f;
+            s.f.budgets[s.f.nation_a] = nb;
+
+            auto& pool = s.f.w.corp_body_pools[std::make_pair(s.f.corp_1, s.body_a)];
+            pool.quantities[k_comp] = components_stock;
+            pool.quantities[k_prop] = propellant_stock;
+
+            s.params.components_lump = 8.0f;
+            s.params.propellant_lump = 16.0f;
+            return s;
+        };
+        auto run_space = [](space_fixture& s) {
+            std::vector<space_purchase> intents = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, s.f.claims);
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_space_purchases(s.f.w, intents, t);
+            return std::make_pair(std::move(intents), std::move(t));
+        };
+
+        // R7a: the whole loop. Both lumps derived, funded, consumed.
+        {
+            space_fixture s = make_space_fixture(100.0f, 100.0f);
+            const double credit_before = world_credit_exact(s.f.w);
+            auto [intents, t] = run_space(s);
+            const auto& pool = s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+
+            check(intents.size() == 2 &&
+                  intents[0].resource == resource_type::spacecraft_components &&
+                  same(intents[0].quantity, 8.0f) && same(intents[0].credits, 16.0f) &&
+                  intents[0].supplier == s.f.corp_1 && intents[0].body == s.body_a &&
+                  intents[1].resource == resource_type::propellant &&
+                  same(intents[1].quantity, 16.0f) && same(intents[1].credits, 8.0f) &&
+                  intents[0].funded && intents[0].completed &&
+                  intents[1].funded && intents[1].completed,
+                  "R7a a nation with treasury, weight and a stocked supplier "
+                  "derives both lumps at the supplier market's price and both "
+                  "are funded and completed");
+            check(same(pool.quantities[k_comp], 92.0f) &&
+                  same(pool.quantities[k_prop], 84.0f),
+                  "R7b ...and the goods are CONSUMED: exactly one lump of each "
+                  "leaves the pool and lands nowhere - the satellite launched");
+            check(same(s.f.w.corporations.at(s.f.corp_1).balance, 24.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
+                  same(t.total_transferred, 24.0f) &&
+                  world_credit_exact(s.f.w) == credit_before,
+                  "R7c ...conservation-exact: the supplier is credited the 24.0 "
+                  "the treasury paid (1024 -> 1000), and total world credit is "
+                  "unchanged to the double-summed bit");
+        }
+
+        // R7d: no whole lump in any pool -> no claim at all. The state does
+        // not split a launch across suppliers or buy a partial lot.
+        {
+            space_fixture s = make_space_fixture(7.5f, 0.0f); // both short
+            const auto before = snapshot(s.f.w);
+            auto [intents, t] = run_space(s);
+            check(intents.empty() && s.f.claims.empty() && t.transfers.empty() &&
+                  snapshot(s.f.w) == before &&
+                  same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                           .quantities[k_comp], 7.5f),
+                  "R7d a supplier short of a whole lump is not a supplier: no "
+                  "claim, no transfer, no draw - the tick is bit-identical");
+        }
+
+        // R7e: the LUMP property. A share below the lump's cost buys nothing
+        // and the treasury banks it; grown past the cost, the lump fires
+        // WHOLE. Components only (propellant lump zeroed): share = treasury x
+        // 3/4 x 1/4 = treasury x 3/16; cost 16.0 -> fires at treasury > 85.33.
+        {
+            space_fixture s = make_space_fixture(100.0f, 100.0f);
+            s.params.propellant_lump = 0.0f;
+            s.f.w.nations.at(s.f.nation_a).treasury = 64.0f; // share 12 < 16
+            {
+                auto [intents, t] = run_space(s);
+                check(intents.empty() && t.transfers.empty() &&
+                      same(s.f.w.nations.at(s.f.nation_a).treasury, 64.0f),
+                      "R7e a share below the lump buys NOTHING - no partial "
+                      "purchase, the treasury banks the share (state demand "
+                      "arrives in lumps)");
+            }
+            s.f.claims.clear();
+            s.f.w.nations.at(s.f.nation_a).treasury = 128.0f; // share 24 >= 16
+            {
+                auto [intents, t] = run_space(s);
+                check(intents.size() == 1 && intents[0].funded && intents[0].completed &&
+                      same(intents[0].credits, 16.0f) &&
+                      same(s.f.w.nations.at(s.f.nation_a).treasury, 112.0f) &&
+                      same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                               .quantities[k_comp], 92.0f),
+                      "R7f ...and once the accumulated share covers it the lump "
+                      "fires whole - 16.0 paid, 8 units consumed, nothing "
+                      "in between");
+            }
+        }
+
+        // R7g: two nations, one pool - the reservation. Stock covers ONE
+        // components lump; the lower-id nation claims it and the second
+        // derives nothing, rather than both being paid for the same units.
+        {
+            space_fixture s = make_space_fixture(10.0f, 0.0f);
+            s.params.propellant_lump = 0.0f;
+            const entity_id nation_b = add_nation(s.f.w, "Latecomia", 1024.0f);
+            s.f.budgets[nation_b] = s.f.budgets.at(s.f.nation_a);
+            auto [intents, t] = run_space(s);
+            (void)t;
+            check(intents.size() == 1 && intents[0].nation == s.f.nation_a &&
+                  intents[0].funded && intents[0].completed &&
+                  same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                           .quantities[k_comp], 2.0f) &&
+                  same(s.f.w.nations.at(nation_b).treasury, 1024.0f),
+                  "R7g stock a claim names is RESERVED: with one lump on hand "
+                  "two nations do not both buy it - the ascending-id walk "
+                  "takes it and the second treasury is untouched");
+        }
+
+        // R7h: the player's corp is never a supplier - a state purchase drains
+        // the pool unasked, and on the player's corp that is a forced sale the
+        // standing rules do not sanction. The fatter player pool loses to the
+        // thinner rival pool; with ONLY the player stocked, nothing is bought.
+        {
+            space_fixture s = make_space_fixture(8.0f, 0.0f); // corp_1: exactly one lump
+            s.params.propellant_lump = 0.0f;
+            s.f.w.player_entity = s.f.corp_2;
+            s.f.w.corp_body_pools[std::make_pair(s.f.corp_2, s.body_a)]
+                .quantities[k_comp] = 1000.0f; // fatter, and ineligible
+            auto [intents, t] = run_space(s);
+            (void)t;
+            const bool rival_chosen = intents.size() == 1 && intents[0].supplier == s.f.corp_1;
+
+            space_fixture q = make_space_fixture(0.0f, 0.0f);
+            q.params.propellant_lump = 0.0f;
+            q.f.w.player_entity = q.f.corp_1;
+            q.f.w.corp_body_pools.at(std::make_pair(q.f.corp_1, q.body_a))
+                .quantities[k_comp] = 1000.0f; // only the player holds stock
+            auto [q_intents, qt] = run_space(q);
+            check(rival_chosen && q_intents.empty() && qt.transfers.empty() &&
+                  same(q.f.w.corp_body_pools.at(std::make_pair(q.f.corp_1, q.body_a))
+                           .quantities[k_comp], 1000.0f),
+                  "R7h the player's corp is never a supplier: a fatter player "
+                  "pool loses to a rival's, and a world where only the player "
+                  "holds stock sees no state purchase at all");
+        }
+
+        // R7i: the claw-back defence. Drain the pool BETWEEN derive and spend
+        // (an out-of-band draw the reservation cannot see) - the transfer is
+        // reversed in the same two floats, so the nation did not pay for a
+        // launch that never happened and world credit still balances.
+        {
+            space_fixture s = make_space_fixture(100.0f, 0.0f);
+            s.params.propellant_lump = 0.0f;
+            const double credit_before = world_credit_exact(s.f.w);
+            std::vector<space_purchase> intents = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, s.f.claims);
+            s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                .quantities[k_comp] = 0.0f; // the out-of-band draw
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_space_purchases(s.f.w, intents, t);
+            check(intents.size() == 1 && intents[0].funded && !intents[0].completed &&
+                  same(s.f.w.corporations.at(s.f.corp_1).balance, 0.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f) &&
+                  world_credit_exact(s.f.w) == credit_before,
+                  "R7i a funded lump the pool can no longer cover is CLAWED "
+                  "BACK whole - balance and treasury both restored, funded but "
+                  "not completed, credit conserved");
+        }
+
+        // R7j: determinism - two identical space fixtures, identical floats
+        // and identical intent lists, over the full derive/spend/settle loop.
+        {
+            space_fixture a = make_space_fixture(100.0f, 100.0f);
+            space_fixture b = make_space_fixture(100.0f, 100.0f);
+            auto [ia, ta] = run_space(a);
+            auto [ib, tb] = run_space(b);
+            (void)ta; (void)tb;
+            bool identical = snapshot(a.f.w) == snapshot(b.f.w) && ia.size() == ib.size();
+            for (std::size_t i = 0; identical && i < ia.size(); ++i)
+                identical = ia[i].nation == ib[i].nation && ia[i].supplier == ib[i].supplier &&
+                            ia[i].body == ib[i].body && ia[i].resource == ib[i].resource &&
+                            same(ia[i].quantity, ib[i].quantity) &&
+                            same(ia[i].credits, ib[i].credits) &&
+                            ia[i].funded == ib[i].funded && ia[i].completed == ib[i].completed;
+            check(identical,
+                  "R7j two runs of one space fixture are bit-identical, intents "
+                  "included");
+        }
+
+        // R7k: the pricing twin the add_market comment promised (cold-review
+        // finding 2). Half one: an unresolved price (0) falls back to
+        // base_price — request_quote's own reading. Half two: a body with NO
+        // market refuses the purchase outright — a zero-credit draw would be
+        // confiscation wearing a purchase's name.
+        {
+            space_fixture s = make_space_fixture(100.0f, 0.0f);
+            s.params.propellant_lump = 0.0f;
+            s.f.w.markets.at(s.market).price[k_comp]      = 0.0f;
+            s.f.w.markets.at(s.market).base_price[k_comp] = 2.0f;
+            auto [intents, t] = run_space(s);
+            (void)t;
+            const bool fallback_ok =
+                intents.size() == 1 && intents[0].funded && intents[0].completed &&
+                same(intents[0].credits, 16.0f);
+
+            space_fixture q = make_space_fixture(100.0f, 100.0f);
+            q.f.w.markets.erase(q.market); // no market on the body at all
+            const auto before = snapshot(q.f.w);
+            auto [q_intents, qt] = run_space(q);
+            check(fallback_ok && q_intents.empty() && qt.transfers.empty() &&
+                  snapshot(q.f.w) == before,
+                  "R7k the price basis: an unresolved price falls back to "
+                  "base_price (8 x 2.0 = 16.0 paid), and a body with no market "
+                  "sees no purchase at all");
+        }
+
+        // R7l: a PAID space transfer with no intent behind it. In-process the
+        // derivation is the line's only claimant, but the claim vector is an
+        // AI-facing seam (wire-reachable over --serve), so settle claws back
+        // any space transfer it cannot match — otherwise a rogue claim leaves
+        // credits on a corp with no goods drawn and no ledger row (cold-review
+        // finding 4).
+        {
+            space_fixture s = make_space_fixture(100.0f, 100.0f);
+            const double credit_before = world_credit_exact(s.f.w);
+            std::vector<space_purchase> intents = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, s.f.claims);
+            budget_claim rogue;
+            rogue.nation  = s.f.nation_a;
+            rogue.corp    = s.f.corp_2; // holds no stock, made no intent
+            rogue.line    = budget_priority::space_programme;
+            rogue.amount  = 4.0f;       // within the line's remaining share
+            rogue.subject = s.body_a;
+            s.f.claims.push_back(rogue);
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_space_purchases(s.f.w, intents, t);
+            check(same(s.f.w.corporations.at(s.f.corp_2).balance, 0.0f) &&
+                  same(s.f.w.corporations.at(s.f.corp_1).balance, 24.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
+                  intents.size() == 2 && intents[0].completed && intents[1].completed &&
+                  world_credit_exact(s.f.w) == credit_before,
+                  "R7l a paid space transfer with NO intent behind it is clawed "
+                  "back whole: the rogue claimant keeps nothing, the legitimate "
+                  "purchases stand, world credit conserved");
+        }
+
+        // R8: the REAL wiring (cold-review finding 1). R7a-R7l call the three
+        // functions directly; this row drives run_nation_step itself, so
+        // deleting or reordering the 2b/4b calls in nation_step.cpp goes red
+        // here and nowhere else. econ_tick 1: the single nation (index 0) is
+        // not due for re-scoring on any cadence >= 2, so the authored budget
+        // survives step 1 and the derivation reads it.
+        {
+            space_fixture s = make_space_fixture(100.0f, 100.0f);
+            s.f.w.nation_budgets[s.f.nation_a] = s.f.budgets.at(s.f.nation_a);
+            recipe_registry reg;
+            reg.set_space_programme(s.params);
+            const double credit_before = world_credit_exact(s.f.w);
+            economy_report rep;
+            run_nation_step(s.f.w, reg, rep, /*econ_tick=*/1);
+            const auto& pool =
+                s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+            check(rep.space_purchases.size() == 2 &&
+                  rep.space_purchases[0].completed && rep.space_purchases[1].completed &&
+                  same(pool.quantities[k_comp], 92.0f) &&
+                  same(pool.quantities[k_prop], 84.0f) &&
+                  same(s.f.w.corporations.at(s.f.corp_1).balance, 24.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
+                  same(rep.budgets[s.f.corp_1].subsidies, 24.0f) &&
+                  world_credit_exact(s.f.w) == credit_before,
+                  "R8 run_nation_step end to end: derive -> spend -> settle -> "
+                  "fold - pools drained, supplier credited, subsidies explain "
+                  "the delta, report.space_purchases carries both completed rows");
+        }
+
+        // R7m (BL-742): NO pool holds a lump, but a market shelf holds a whole
+        // one — the fallback buys it whole or not at all (the lump property
+        // survives the fallback): supplier null, no claim, direct whole
+        // treasury debit, inventory decremented. A shelf holding only HALF a
+        // lump buys nothing.
+        {
+            space_fixture s = make_space_fixture(0.0f, 0.0f); // pools EMPTY
+            s.params.propellant_lump = 0.0f;
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_comp] = 1.0f;
+            mc.inventory[k_comp]  = 100.0f; // holds the whole lump of 8
+            std::vector<space_purchase> intents = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, s.f.claims);
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_space_purchases(s.f.w, intents, t);
+            const bool whole_ok =
+                intents.size() == 1 && intents[0].supplier == null_entity &&
+                intents[0].market == s.market && intents[0].completed &&
+                same(mc.inventory[k_comp], 92.0f) &&
+                same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 16.0f) &&
+                s.f.claims.empty();
+
+            space_fixture q = make_space_fixture(0.0f, 0.0f);
+            q.params.propellant_lump = 0.0f;
+            auto& qmc = q.f.w.markets.at(q.market);
+            qmc.base_price[k_comp] = 1.0f;
+            qmc.inventory[k_comp]  = 4.0f; // HALF a lump: no purchase
+            std::vector<space_purchase> q_intents = derive_space_programme_claims(
+                q.f.w, q.f.budgets, q.params, q.f.claims);
+            check(whole_ok && q_intents.empty() &&
+                  same(qmc.inventory[k_comp], 4.0f),
+                  "R7m (BL-742) empty pools, stocked shelf: the lump comes "
+                  "whole off market inventory (treasury debited directly, no "
+                  "claim, no corp paid) - and a half-lump shelf buys nothing");
+        }
+    }
+
+    // --- R9: network upkeep (BL-643) ----------------------------------------
+    // The logistics_maintenance line's consumer: derive -> spend -> settle.
+    // Every number is dyadic (rates 1/2/4 and 0.5/1/2, hub 8/4, prices 2.0 and
+    // 4.0, treasury 1024 or 128, reserve 1/4 or 1/2), so assertions are bit
+    // equality. Network: 4 Track + 1 Highway + 1 active port -> stone bill
+    // 4x1 + 1x4 + 8 = 16, timber bill 4x0.5 + 1x2 + 4 = 8; at prices 2.0/4.0
+    // both claims are 32.0 credits.
+    std::printf("\n-- R9  network upkeep bills geography, fills pro rata, consumes --\n");
+    {
+        constexpr std::size_t k_stone  = static_cast<std::size_t>(resource_type::stone);
+        constexpr std::size_t k_timber = static_cast<std::size_t>(resource_type::timber);
+
+        auto add_market = [](world& w, entity_id body) {
+            const entity_id m = w.create_entity();
+            market_component mc{};
+            mc.body = body;
+            w.markets[m] = mc;
+            return m;
+        };
+        auto add_tile = [](world& w, entity_id body, int x, int y, std::uint8_t road,
+                           entity_id nation /* null_entity = unowned */) {
+            const entity_id t = w.create_entity();
+            tile_component tc{};
+            tc.body       = body;
+            tc.grid_x     = x;
+            tc.grid_y     = y;
+            tc.road_level = road;
+            w.tiles[t] = tc;
+            if (nation != null_entity)
+                w.tile_to_nation[t] = nation;
+            return t;
+        };
+        auto add_hub = [](world& w, entity_id tile, building_type type,
+                          int ticks_remaining, bool decommissioned) {
+            const entity_id b = w.create_entity();
+            building_component bc{};
+            bc.tile            = tile;
+            bc.type            = type;
+            bc.ticks_remaining = ticks_remaining;
+            bc.decommissioned  = decommissioned;
+            w.buildings[b] = bc;
+            return b;
+        };
+
+        struct net_fixture
+        {
+            fixture   f;
+            entity_id body_a = null_entity;
+            entity_id market = null_entity;
+            network_upkeep_params params;
+        };
+        // The reference network fixture. Weights logistics 1/2, schooling 1/4,
+        // exploration 1/4; treasury 1024, reserve 1/4 -> spendable 768,
+        // logistics share 384 >= the 64.0 bill -> paid in full.
+        auto make_net_fixture = [&](float stone_stock, float timber_stock) {
+            net_fixture s;
+            s.f.nation_a = add_nation(s.f.w, "Roadsteadia", 1024.0f);
+            s.f.corp_1   = add_corp(s.f.w, "Quarryco",  0.0f);
+            s.f.corp_2   = add_corp(s.f.w, "Bystander", 0.0f);
+            s.body_a     = add_body(s.f.w, "Gridworld");
+            s.market     = add_market(s.f.w, s.body_a);
+            s.f.w.markets.at(s.market).price[k_stone]  = 2.0f;
+            s.f.w.markets.at(s.market).price[k_timber] = 4.0f;
+
+            // The network: 4 Track + 1 Highway owned by the nation, one ACTIVE
+            // port on owned ground. Three non-members prove the gates: a roaded
+            // tile on UNCLAIMED ground, an under-construction hub, and a
+            // decommissioned hub — none of them may move the bill.
+            for (int x = 0; x < 4; ++x)
+                add_tile(s.f.w, s.body_a, x, 0, /*road=*/1, s.f.nation_a);
+            const entity_id hw = add_tile(s.f.w, s.body_a, 0, 1, /*road=*/3, s.f.nation_a);
+            (void)hw;
+            const entity_id port_tile = add_tile(s.f.w, s.body_a, 1, 1, /*road=*/0, s.f.nation_a);
+            add_hub(s.f.w, port_tile, building_type::port, 0, false);
+            add_tile(s.f.w, s.body_a, 2, 1, /*road=*/2, null_entity); // unowned road
+            const entity_id t_build = add_tile(s.f.w, s.body_a, 3, 1, 0, s.f.nation_a);
+            add_hub(s.f.w, t_build, building_type::inland_logistics_hub, 5, false); // building
+            const entity_id t_dec = add_tile(s.f.w, s.body_a, 0, 2, 0, s.f.nation_a);
+            add_hub(s.f.w, t_dec, building_type::port, 0, true); // decommissioned
+
+            nation_budget nb{};
+            nb.reserve_fraction       = 0.25f;
+            nb.weights[k_logistics]   = 0.5f;
+            nb.weights[k_schooling]   = 0.25f;
+            nb.weights[k_exploration] = 0.25f;
+            s.f.budgets[s.f.nation_a] = nb;
+
+            auto& pool = s.f.w.corp_body_pools[std::make_pair(s.f.corp_1, s.body_a)];
+            pool.quantities[k_stone]  = stone_stock;
+            pool.quantities[k_timber] = timber_stock;
+
+            s.params.stone_per_level  = {1.0f, 2.0f, 4.0f};
+            s.params.timber_per_level = {0.5f, 1.0f, 2.0f};
+            s.params.stone_per_hub    = 8.0f;
+            s.params.timber_per_hub   = 4.0f;
+            return s;
+        };
+        auto run_net = [](net_fixture& s) {
+            std::vector<network_purchase> intents = derive_network_upkeep_claims(
+                s.f.w, s.f.budgets, s.params, s.f.claims);
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_network_purchases(s.f.w, intents, t);
+            return std::make_pair(std::move(intents), std::move(t));
+        };
+
+        // R9a: the whole loop, fully funded. The gates on what counts as
+        // network are asserted through the BILL ITSELF: 16 stone / 8 timber is
+        // only right if the unowned road, the building hub and the
+        // decommissioned hub all counted for nothing.
+        {
+            net_fixture s = make_net_fixture(100.0f, 100.0f);
+            const double credit_before = world_credit_exact(s.f.w);
+            auto [intents, t] = run_net(s);
+            const auto& pool = s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+
+            check(intents.size() == 2 &&
+                  intents[0].resource == resource_type::stone &&
+                  same(intents[0].quantity, 16.0f) && same(intents[0].credits, 32.0f) &&
+                  intents[0].supplier == s.f.corp_1 && intents[0].body == s.body_a &&
+                  intents[1].resource == resource_type::timber &&
+                  same(intents[1].quantity, 8.0f) && same(intents[1].credits, 32.0f) &&
+                  intents[0].funded && intents[0].completed &&
+                  intents[1].funded && intents[1].completed,
+                  "R9a the network bills its geography - road tiles by level "
+                  "plus the one ACTIVE hub (unowned road, building hub and "
+                  "decommissioned hub all count nothing) - and both material "
+                  "claims fund whole");
+            check(same(pool.quantities[k_stone], 84.0f) &&
+                  same(pool.quantities[k_timber], 92.0f) &&
+                  same(intents[0].drawn, 16.0f) && same(intents[1].drawn, 8.0f),
+                  "R9b ...and the goods are CONSUMED: the full bill leaves the "
+                  "pool and lands nowhere - the repairs went into the roadbed");
+            check(same(s.f.w.corporations.at(s.f.corp_1).balance, 64.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 960.0f) &&
+                  same(t.total_transferred, 64.0f) &&
+                  same(intents[0].paid, 32.0f) && same(intents[1].paid, 32.0f) &&
+                  world_credit_exact(s.f.w) == credit_before,
+                  "R9c ...conservation-exact: the supplier is credited the 64.0 "
+                  "the treasury paid (1024 -> 960), world credit unchanged to "
+                  "the double-summed bit");
+        }
+
+        // R9d: the PRO-RATA property - the deliberate contrast with R7e's
+        // lump. Share 32 against a 64.0 bill fills every claim at exactly 1/2:
+        // half the repair budget buys half the materials, nothing banks.
+        {
+            net_fixture s = make_net_fixture(100.0f, 100.0f);
+            s.f.w.nations.at(s.f.nation_a).treasury = 128.0f;
+            auto& nb = s.f.budgets.at(s.f.nation_a);
+            nb.reserve_fraction       = 0.5f;
+            nb.weights[k_logistics]   = 0.5f;
+            nb.weights[k_schooling]   = 0.5f;
+            nb.weights[k_exploration] = 0.0f;
+            auto [intents, t] = run_net(s);
+            const auto& pool = s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+
+            bool fills_ok = true;
+            int  n_log = 0;
+            for (const budget_transfer& tr : t.transfers)
+                if (tr.line == budget_priority::logistics_maintenance)
+                {
+                    ++n_log;
+                    fills_ok = fills_ok && same(tr.fill_fraction, 0.5f) && tr.rationed;
+                }
+            check(intents.size() == 2 && n_log == 2 && fills_ok &&
+                  intents[0].funded && intents[0].completed &&
+                  intents[1].funded && intents[1].completed &&
+                  same(intents[0].paid, 16.0f) && same(intents[0].drawn, 8.0f) &&
+                  same(intents[1].paid, 16.0f) && same(intents[1].drawn, 4.0f) &&
+                  same(pool.quantities[k_stone], 92.0f) &&
+                  same(pool.quantities[k_timber], 96.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 96.0f) &&
+                  same(s.f.w.corporations.at(s.f.corp_1).balance, 32.0f),
+                  "R9d a share of 32 against a 64.0 bill fills PRO RATA at 1/2 "
+                  "- half the credits move, half the materials draw (8 stone, "
+                  "4 timber), no lump banks and no claim is skipped");
+        }
+
+        // R9e: a pool short of the bill CAPS the claim rather than refusing it
+        // - the other half of the continuous shape (R7d's twin, inverted:
+        // where the state splits no launch, it happily buys a partial repair).
+        {
+            net_fixture s = make_net_fixture(6.0f, 0.0f);
+            auto [intents, t] = run_net(s);
+            (void)t;
+            check(intents.size() == 1 &&
+                  intents[0].resource == resource_type::stone &&
+                  same(intents[0].quantity, 6.0f) && same(intents[0].credits, 12.0f) &&
+                  intents[0].funded && intents[0].completed &&
+                  same(intents[0].drawn, 6.0f) &&
+                  same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                           .quantities[k_stone], 0.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1012.0f),
+                  "R9e a supplier short of the bill still supplies: the 16-unit "
+                  "stone bill caps to the 6 on hand (12.0 paid), and an empty "
+                  "timber pool derives no claim at all");
+        }
+
+        // R9f: the player's corp is never a supplier - R7h's own two halves.
+        {
+            net_fixture s = make_net_fixture(4.0f, 0.0f); // corp_1: thin but eligible
+            s.f.w.player_entity = s.f.corp_2;
+            s.f.w.corp_body_pools[std::make_pair(s.f.corp_2, s.body_a)]
+                .quantities[k_stone] = 1000.0f; // fatter, and ineligible
+            auto [intents, t] = run_net(s);
+            (void)t;
+            const bool rival_chosen = intents.size() == 1 && intents[0].supplier == s.f.corp_1;
+
+            net_fixture q = make_net_fixture(0.0f, 0.0f);
+            q.f.w.player_entity = q.f.corp_1;
+            q.f.w.corp_body_pools.at(std::make_pair(q.f.corp_1, q.body_a))
+                .quantities[k_stone] = 1000.0f; // only the player holds stock
+            auto [q_intents, qt] = run_net(q);
+            check(rival_chosen && q_intents.empty() && qt.transfers.empty() &&
+                  same(q.f.w.corp_body_pools.at(std::make_pair(q.f.corp_1, q.body_a))
+                           .quantities[k_stone], 1000.0f),
+                  "R9f the player's corp is never a supplier: a fatter player "
+                  "pool loses to a rival's, and a world where only the player "
+                  "holds stock sees no upkeep purchase at all");
+        }
+
+        // R9g: no price basis -> no purchase; and zero rates -> inert tick.
+        {
+            net_fixture s = make_net_fixture(100.0f, 100.0f);
+            s.f.w.markets.erase(s.market); // no market on the body at all
+            const auto before = snapshot(s.f.w);
+            auto [intents, t] = run_net(s);
+            const bool no_market_ok = intents.empty() && t.transfers.empty() &&
+                                      snapshot(s.f.w) == before;
+
+            net_fixture z = make_net_fixture(100.0f, 100.0f);
+            z.params = network_upkeep_params{}; // unauthored: every rate zero
+            const auto z_before = snapshot(z.f.w);
+            auto [z_intents, zt] = run_net(z);
+            check(no_market_ok && z_intents.empty() && zt.transfers.empty() &&
+                  z.f.claims.empty() && snapshot(z.f.w) == z_before,
+                  "R9g a body with no market sees no purchase, and unauthored "
+                  "(all-zero) rates derive nothing at all - the tick is "
+                  "bit-identical");
+        }
+
+        // R9h: both claw-backs. Half one: the pool is drained BETWEEN derive
+        // and spend - the funded transfer is reversed in the same two floats.
+        // Half two: a rogue logistics claim (no intent behind it) is paid by
+        // the pass and clawed back whole at settle.
+        {
+            net_fixture s = make_net_fixture(100.0f, 0.0f);
+            const double credit_before = world_credit_exact(s.f.w);
+            std::vector<network_purchase> intents = derive_network_upkeep_claims(
+                s.f.w, s.f.budgets, s.params, s.f.claims);
+            s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                .quantities[k_stone] = 0.0f; // the out-of-band draw
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_network_purchases(s.f.w, intents, t);
+            const bool drained_ok =
+                intents.size() == 1 && intents[0].funded && !intents[0].completed &&
+                same(intents[0].drawn, 0.0f) &&
+                same(s.f.w.corporations.at(s.f.corp_1).balance, 0.0f) &&
+                same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f) &&
+                world_credit_exact(s.f.w) == credit_before;
+
+            net_fixture r = make_net_fixture(100.0f, 100.0f);
+            const double r_credit_before = world_credit_exact(r.f.w);
+            std::vector<network_purchase> r_intents = derive_network_upkeep_claims(
+                r.f.w, r.f.budgets, r.params, r.f.claims);
+            budget_claim rogue;
+            rogue.nation = r.f.nation_a;
+            rogue.corp   = r.f.corp_2; // holds no stock, made no intent
+            rogue.line   = budget_priority::logistics_maintenance;
+            rogue.amount = 4.0f;
+            r.f.claims.push_back(rogue);
+            national_budget_tick rt;
+            run_national_budget(r.f.w, r.f.budgets, r.f.claims, &rt);
+            settle_network_purchases(r.f.w, r_intents, rt);
+            check(drained_ok &&
+                  same(r.f.w.corporations.at(r.f.corp_2).balance, 0.0f) &&
+                  same(r.f.w.corporations.at(r.f.corp_1).balance, 64.0f) &&
+                  same(r.f.w.nations.at(r.f.nation_a).treasury, 960.0f) &&
+                  r_intents.size() == 2 && r_intents[0].completed && r_intents[1].completed &&
+                  world_credit_exact(r.f.w) == r_credit_before,
+                  "R9h both claw-backs: a funded draw the pool can no longer "
+                  "cover is reversed whole, and a rogue logistics transfer "
+                  "with no intent behind it leaves its claimant nothing - "
+                  "world credit conserved in both");
+        }
+
+        // R9i: determinism - two identical fixtures, identical floats and
+        // identical intent lists over the full derive/spend/settle loop.
+        {
+            net_fixture a = make_net_fixture(100.0f, 100.0f);
+            net_fixture b = make_net_fixture(100.0f, 100.0f);
+            auto [ia, ta] = run_net(a);
+            auto [ib, tb] = run_net(b);
+            (void)ta; (void)tb;
+            bool identical = snapshot(a.f.w) == snapshot(b.f.w) && ia.size() == ib.size();
+            for (std::size_t i = 0; identical && i < ia.size(); ++i)
+                identical = ia[i].nation == ib[i].nation && ia[i].supplier == ib[i].supplier &&
+                            ia[i].body == ib[i].body && ia[i].resource == ib[i].resource &&
+                            same(ia[i].quantity, ib[i].quantity) &&
+                            same(ia[i].credits, ib[i].credits) &&
+                            same(ia[i].paid, ib[i].paid) && same(ia[i].drawn, ib[i].drawn) &&
+                            ia[i].funded == ib[i].funded && ia[i].completed == ib[i].completed;
+            check(identical,
+                  "R9i two runs of one network fixture are bit-identical, "
+                  "intents included");
+        }
+
+        // R9j: the REAL wiring - run_nation_step itself (the R8 precedent), so
+        // deleting or reordering the 2c/4c calls in nation_step.cpp goes red
+        // here and nowhere else. econ_tick 1: the single nation is not due for
+        // re-scoring, so the authored budget survives step 1.
+        {
+            net_fixture s = make_net_fixture(100.0f, 100.0f);
+            s.f.w.nation_budgets[s.f.nation_a] = s.f.budgets.at(s.f.nation_a);
+            recipe_registry reg;
+            reg.set_network_upkeep(s.params);
+            const double credit_before = world_credit_exact(s.f.w);
+            economy_report rep;
+            run_nation_step(s.f.w, reg, rep, /*econ_tick=*/1);
+            const auto& pool =
+                s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+            check(rep.network_purchases.size() == 2 &&
+                  rep.network_purchases[0].completed && rep.network_purchases[1].completed &&
+                  same(pool.quantities[k_stone], 84.0f) &&
+                  same(pool.quantities[k_timber], 92.0f) &&
+                  same(s.f.w.corporations.at(s.f.corp_1).balance, 64.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 960.0f) &&
+                  same(rep.budgets[s.f.corp_1].subsidies, 64.0f) &&
+                  world_credit_exact(s.f.w) == credit_before,
+                  "R9j run_nation_step end to end: derive -> spend -> settle -> "
+                  "fold - pools drained, supplier credited, subsidies explain "
+                  "the delta, report.network_purchases carries both completed "
+                  "rows");
+        }
+
+        // R9k (BL-742): NO pool holds the goods, but a market's REAL inventory
+        // does — the measured industrial-band case. The purchase falls back to
+        // the shelf: supplier is null (THE MARKET, the exchange-record
+        // convention), no budget claim rides the machinery, the treasury is
+        // debited directly, inventory decrements, and no corp is paid — the
+        // money leaves the world as every market purchase does. Bills 16 stone
+        // + 8 timber at prices 2.0/4.0 = 32 + 32; share 384 covers both.
+        {
+            net_fixture s = make_net_fixture(0.0f, 0.0f); // pools EMPTY
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_stone]  = 1.0f;   // priced, so the shelf is buyable
+            mc.base_price[k_timber] = 1.0f;
+            mc.inventory[k_stone]   = 100.0f; // the swept stock, on the shelf
+            mc.inventory[k_timber]  = 100.0f;
+            auto [intents, t] = run_net(s);
+            (void)t;
+            check(intents.size() == 2 &&
+                  intents[0].supplier == null_entity && intents[0].market == s.market &&
+                  intents[0].completed && intents[1].completed &&
+                  same(intents[0].drawn, 16.0f) && same(intents[1].drawn, 8.0f) &&
+                  same(mc.inventory[k_stone], 84.0f) &&
+                  same(mc.inventory[k_timber], 92.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 64.0f) &&
+                  same(s.f.w.corporations.at(s.f.corp_1).balance, 0.0f) &&
+                  s.f.claims.empty(),
+                  "R9k (BL-742) empty pools, stocked shelf: the purchase falls "
+                  "back to market inventory - treasury debited directly, "
+                  "inventory drawn, no claim appended, no corp paid");
+        }
+
+        // R9l (BL-742): the fallback caps ITSELF at the line share — a poor
+        // nation's shelf purchase is pro-rata against the share, not the
+        // treasury. Treasury 128, reserve 1/4 -> spendable 96, logistics 1/2
+        // -> share 48 against a 64.0 bill: 32 stone-credits fit whole, timber
+        // gets the remaining 16 of its 32 (half its bill -> 4 of 8 units).
+        {
+            net_fixture s = make_net_fixture(0.0f, 0.0f);
+            s.f.w.nations.at(s.f.nation_a).treasury = 128.0f;
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_stone]  = 1.0f;
+            mc.base_price[k_timber] = 1.0f;
+            mc.inventory[k_stone]   = 100.0f;
+            mc.inventory[k_timber]  = 100.0f;
+            auto [intents, t] = run_net(s);
+            (void)t;
+            check(intents.size() == 2 &&
+                  same(intents[0].drawn, 16.0f) &&
+                  same(intents[1].quantity, 4.0f) && same(intents[1].drawn, 4.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 128.0f - 48.0f),
+                  "R9l (BL-742) the shelf purchase caps itself at the line "
+                  "share, pro-rata - 48 of the 64.0 bill, never the treasury");
         }
     }
 

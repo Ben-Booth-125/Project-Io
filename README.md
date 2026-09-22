@@ -4,9 +4,8 @@ Project Io is a near-future, space-based grand strategy game. You begin as a **c
 — not a nation — competing across an Earth-like solar system through resource extraction,
 trade, and military conflict. Unlike a nation-state, a corporation starts with no territory
 and no standing force: every asset must justify itself through economic or strategic return.
-The design arc points beyond that start, and it is deliberately still moving: the player is
-being redefined as a **mercenary company** — hired to make a fact about the world true, paid
-for doing it, and buying its equipment from companies it does not own.
+The player is one of those corporations (NR-885, 2026-09-17): it finds the ground worth
+industrialising, builds toward space, and buys its equipment from companies it does not own.
 
 That last clause is becoming a system of its own. **Ownership is separating from identity**:
 not every firm is publicly held, and owning one is divorced from being one. A **corporation**

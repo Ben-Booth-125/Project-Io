@@ -39,6 +39,27 @@ enum class abundance_level : uint8_t { sparse, lean, standard };
 struct world_params
 {
     uint32_t        seed       = 0;                         ///< Master seed, XOR-folded into each per-body seed. 0 reproduces the legacy world.
+
+    /// A SECOND SEED FOR THE ANCIENT ERA ALONE, so the same ground can be
+    /// played through twice and come out differently (Ben, 2026-09-09:
+    /// "reroll should produce differences regardless").
+    ///
+    /// THE PROBLEM IT SOLVES. `era_minus_one_sim_seed` folds `params.seed`, so
+    /// the era was a pure function of the master seed. The wizard's history
+    /// round could therefore re-RUN the pass on Reroll but could not vary it —
+    /// pressing Reroll reproduced the same history exactly. Folding the round's
+    /// roll into `params.seed` instead was the obvious repair and is the wrong
+    /// one: `seed` drives the planetology rounds ABOVE this one, so it would
+    /// re-draw the star, the world and its surface, and rounds-are-causal says
+    /// a round may only invalidate the rounds BELOW it.
+    ///
+    /// So the era gets a seed of its own. Rerolling the history round moves
+    /// this and nothing else: the same planet, a different four thousand years.
+    ///
+    /// DEFAULT 0 CHANGES NO WORLD. The fold below is an addition, so at 0 the
+    /// derivation is `params.seed ^ 0x415C1E17u` — exactly what it has always
+    /// been. Every existing seed, golden and fixture is untouched.
+    uint32_t        era_seed   = 0;
     abundance_level abundance  = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
 
     /// Calendar year the generated world BEGINS at (BL-271, the Era -1 sandbox).
@@ -71,7 +92,101 @@ struct world_params
     /// Determinism is untouched — the value is part of the params, so the same
     /// params still give the same world.
     int             prehistory_years = 400;
-    int             body_count = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
+
+    /// Years of INDUSTRIAL span the sim plays after the boundary year, on an
+    /// epoch that has one. `prehistory_years` is the ANCIENT span before it,
+    /// so a 1960 arc at the defaults runs 1160 -> 1560 -> 1960. Zero means no
+    /// industrial span and the run is single-span, as an ancient epoch is.
+    int             industrial_years = 400;
+
+    /// THE EMPIRES ROUND'S OWN STOP YEAR (BL-906), for a SINGLE-span run only
+    /// (`era_minus_one_has_industrial_span(params) == false`) — independent of
+    /// `epoch_year`.
+    ///
+    /// THE BUG THIS CLOSES. `era_minus_one_sim_params` used to set
+    /// `hp.stop_year = params.epoch_year` unconditionally, so an ancient-epoch
+    /// world (the campaign's `epoch_year == 0`) ran the Empires round 400 BCE
+    /// -> 0 CE — 400 years — where `docs/generation/CIVILISATION.md` § "The
+    /// closure of the Empire era" specifies 400 BCE -> 1200 CE, 1,600 years.
+    /// The stop year was coupled to a field that means something else
+    /// entirely: the CAMPAIGN's calendar start, not this round's own close.
+    ///
+    /// 1200 is Ben's ruling (2026-09-11) and the doc's own "1200 is unmoved" —
+    /// it is a fixed year the Empires round closes ON, not a span length, so it
+    /// does not move if `prehistory_years` (the START side of the span) is
+    /// ever retuned.
+    ///
+    /// TWO-SPAN EPOCHS (>= 1700) DO NOT READ THIS FIELD. There the industrial
+    /// arc's own stop is `epoch_year` (the 1960 arc, untouched) and the ancient
+    /// half beneath it stops at `boundary_year`, both unaffected by BL-906.
+    ///
+    /// Default 1200 matches the doc for every existing single-span caller —
+    /// nothing opts in, the shipped world simply runs its documented span.
+    int64_t         empires_stop_year = 1200;
+
+    /// BL-931 — RUN THE EXPLORATION SPAN, 1200 -> `exploration_stop_year`,
+    /// on the SAME `history_sim` engine, immediately after the single-span
+    /// Empires round closes (EXPLORATION.md sec The engine is shared).
+    ///
+    /// OFF BY DEFAULT, deliberately, unlike the Empires round itself. Wiring
+    /// this on unconditionally would move `region::nation` (read by
+    /// `derive_national_character` right after the era block) from the 1200
+    /// CE political map to whatever the exploration span leaves at
+    /// `exploration_stop_year` — every generation golden and every harness
+    /// that checks post-generation political state would move with it. That
+    /// is real work this item does not do (verifying the downstream
+    /// consequences and re-baselining what moves), so the capability lands
+    /// real and tested but does not yet change what a caller who asks for
+    /// nothing new gets. A caller that wants the span opts in here.
+    ///
+    /// Only read on a SINGLE-span Empires run (`!era_minus_one_has_industrial
+    /// _span(params)`) — a two-span (>= 1700) epoch's own industrial arc
+    /// already plays past 1660 on a different calendar mapping, and stacking
+    /// this on top of it is a question this item does not answer.
+    /// DEFAULT FLIPPED TO TRUE (Ben, 2026-09-13, BL-946, resolving NR-847):
+    /// the wizard now shows an Exploration round and it must have something
+    /// real to run. This re-baselines `region::nation` to the 1660 CE map for
+    /// every generated world -- authorised, not a silent re-bless; see
+    /// world_determinism's re-recorded digest in the DEVLOG.
+    bool exploration_sim_enabled = true;
+
+    /// The calendar year the Exploration span closes. Default 1660 is
+    /// EXPLORATION.md's own span end; exposed as a field on the same footing
+    /// as `empires_stop_year` rather than a compile-time constant, for a
+    /// harness that wants to bind a shorter span.
+    int64_t         exploration_stop_year = 1660;
+
+    /// BL-1040 — RUN THE DIGITISATION SPAN, `exploration_stop_year` ->
+    /// `digitisation_stop_year`, as its OWN call to the same engine, resumed
+    /// from the Exploration span's `exploration_output` (DIGITISATION.md, the
+    /// span paragraphs).
+    ///
+    /// THE RUN PREDICATE IS "EXPLORATION RAN", NEVER THE EPOCH (Ben,
+    /// 2026-09-18): the span runs wherever Exploration runs, whatever
+    /// `epoch_year` says, and nowhere else. On the superseded arc (epoch >=
+    /// 1700) Exploration is off, so this span is too. The call site nests it
+    /// inside the block that ran Exploration, so the predicate is structural
+    /// rather than a second reading of the same conditions.
+    ///
+    /// OFF BY DEFAULT, and it stays off until BL-1044's re-bless turns it on:
+    /// the span rewrites `region::nation`, population and treasury to the 1960
+    /// map before population centres are placed, so every generation golden
+    /// and every post-generation reading would move with it. With it off, a
+    /// world is byte-identical to one built before this field existed.
+    ///
+    /// NOT ON THE SAVE SEAM, on exactly the footing of `exploration_sim_enabled`
+    /// and `exploration_stop_year` above: `w_world_params` writes neither of
+    /// those, and a scope knob that decides which history generation plays is
+    /// not a property a loaded campaign re-reads.
+    bool digitisation_span_enabled = false;
+
+    /// The calendar year the Digitisation span closes: the campaign epoch the
+    /// span grows the world to (DIGITISATION.md: "1660 -> 1960 CE, 300
+    /// years"). A field on the same footing as `exploration_stop_year`, for a
+    /// harness that wants to bind a shorter span.
+    int64_t         digitisation_stop_year = 1960;
+
+    int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a
     // *consequence* of its habitable land area and the minimum-viable-territory floor
     // (nation_params in world/nation_generation.hpp), not a value the player pre-sets.
@@ -110,6 +225,46 @@ struct generation_progress
     /// writes, renderer reads, relaxed atomics, no mutex.
     std::atomic<int> sub_progress{0};
     std::atomic<int> sub_total{0};
+
+    // --- The live lapse tap (BL-914) ----------------------------------------
+    //
+    // A pass round's own record, published while it computes rather than
+    // handed over whole once the future lands. The pointer is set by the
+    // caller BEFORE `std::async` starts the worker and never reassigned while
+    // the worker runs, so no lock is needed on the pointer itself; the object
+    // it points at (`era_lapse_tap`) carries its own mutex around the growing
+    // vectors, for the reason its own header argues. Null for every generation
+    // call that has no wizard watching — `start_new_game`, every harness — so
+    // the sim pays nothing beyond one pointer compare when nobody is drawing.
+    era_lapse_tap* lapse_tap = nullptr;
+
+    // --- The generation budget, published to the loading screen (BL-754) ----
+    //
+    // WHY HERE AND NOWHERE ELSE. The same numbers already reach a harness on
+    // `era_minus_one_fixture` (see that type for why they may not live on
+    // `generation_report` — the report is serialised, and a wall clock is the
+    // worst possible thing to put through a save). But the fixture is a heavy
+    // capture the app never asks for, and BL-754's remaining half is the APP
+    // printing its own budget on its own generating screen. This sink is
+    // already the app-to-generation seam, already atomic, already a pure tap
+    // with no save presence — so it is the one place the measurement can sit
+    // without becoming world state or costing a capture.
+    //
+    // NOTHING BELOW MAY EVER ENTER A DIGEST, A HASH, OR A BRANCH. These are
+    // milliseconds of wall clock: reading one back into generation would make
+    // the world non-deterministic by construction. They are WRITE-ONLY from
+    // the worker and READ-ONLY from the renderer, exactly like every other
+    // field in this struct, and they are reported to a human, never asserted.
+    //
+    // `budget_ready` is release-stored AFTER the five values, so an
+    // acquire-load of it is the renderer's guarantee that all five are filled.
+    // Zero until generation finishes; zero for any pass that did not run.
+    std::atomic<int64_t> ms_world_total{0};
+    std::atomic<int64_t> ms_before_settlement{0};
+    std::atomic<int64_t> ms_settlement{0};
+    std::atomic<int64_t> ms_era{0};
+    std::atomic<int64_t> ms_after_era{0};
+    std::atomic<bool>    budget_ready{false};
 
     // --- The territory carve, live (BL-305) ---------------------------------
     //
@@ -274,17 +429,33 @@ inline const char* const generation_stage_labels[] = {
     "Laying roads",         // 10
     "Placing companies",    // 11
     "Finishing",            // 12
+    "Running the exploration age", // 13 — 1200 -> 1660, after the ancient era
+    "Running the digitisation span", // 14 — 1660 -> 1960, after the exploration age (BL-1040)
 };
 inline constexpr int generation_stage_label_count =
     static_cast<int>(sizeof(generation_stage_labels) / sizeof(generation_stage_labels[0]));
+
+/// BL-1053: how many stages a `make_hard_coded_world` call on @p cfg will
+/// REPORT -- the number of times it advances `generation_progress::stage`,
+/// which is what `stage_count` must hold for the bar to reach its end. Never
+/// the label count above: some labels caption a stage rather than being one
+/// (the exploration age and the Digitisation span re-caption the history's
+/// single stage), and one is never published. Set by generation itself at its
+/// first line; a caller that publishes `stage_count` before the worker starts
+/// uses this so the two agree.
+int generation_stage_count(const world_gen_config& cfg);
 
 /// What the generation pass recorded about each body, for the staged generation
 /// screen and the planet report.
 ///
 /// This is a PRESENTATION artefact, not simulation state: it is filled during
 /// make_hard_coded_world and handed to the app, which reveals it stage by stage.
-/// It never enters the `world` struct, so it stays off the serialisation seam —
-/// the same reasoning that keeps world_params in the app (BL-114).
+/// It never enters the `world` struct — the same reasoning that keeps world_params
+/// in the app (BL-114). It is NOT off the serialisation seam, though:
+/// `core/save_game.cpp` writes the report whole (`w_report`), because a loaded
+/// campaign has no generation to consult and the Continent lens, the History
+/// ledger and the Generation Ledger's tile replay all read it. Two seams — a
+/// field added anywhere in this struct is a `save_game_version` bump.
 struct generation_report
 {
     struct body_entry
@@ -320,9 +491,15 @@ struct generation_report
         /// `history` is empty here — those lines were moved into `state.history`
         /// at generation, where the biography reads them; what is kept is the
         /// plate set and the per-tile `plate_id`, which nothing else records.
-        /// The Continent lens is the consumer. Presentation data, like the rest
-        /// of this struct: it never enters `world`, so it stays off the
-        /// serialisation seam.
+        /// The Continent lens is the consumer.
+        ///
+        /// IT IS NOT OFF THE SERIALISATION SEAM (corrected 2026-09-03, BL-763).
+        /// This comment used to say "it never enters `world`, so it stays off
+        /// the serialisation seam". The first clause is true and the second does
+        /// not follow: `continent_state` is written and read by
+        /// `src/core/save_game.cpp` as part of the SAVE ENVELOPE, so a field
+        /// added here is a `save_game_version` bump exactly like a field on
+        /// `world_params`. Two seams, and this struct is on the second one.
         continent_state continents;
 
         /// What the settlement/industrialisation pass computed for this body
@@ -333,8 +510,8 @@ struct generation_report
         /// on, when their furnaces lit), the rupture `checkpoints`, and the
         /// `lacunae` count — the holes the wars left in the record. Nothing
         /// else records any of it. Presentation data, like the rest of this
-        /// struct: it never enters `world`, so it stays off the serialisation
-        /// seam.
+        /// struct: it never enters `world`, but it reaches the save with the
+        /// rest of the report (`w_settlement`, `core/save_game.cpp`).
         settlement_state settlement;
 
         /// THE RECORDED ERA -1 TIME-LAPSE (NR-733, Ben's ruling 2026-08-30) — the
@@ -361,6 +538,13 @@ struct generation_report
         /// moved `save_game_version` to 3.
         era_timelapse prehistory_timelapse;
 
+        /// THE EXPLORATION SPAN'S OWN RECORD (BL-946), same shape and same
+        /// discipline as `prehistory_timelapse` above -- recorded, never
+        /// re-simulated. Empty wherever `exploration_sim_enabled(params)` did
+        /// not run (an opted-out world, or any body but the cradle). This is
+        /// what the wizard's new Exploration round replays.
+        era_timelapse exploration_timelapse;
+
         /// Exactly what `generate_body_tiles` was called with for this body — the
         /// arguments that are NOT recoverable from anything else the report or the
         /// world holds (the seed above all: Kepler's is chosen by the BL-276
@@ -369,8 +553,11 @@ struct generation_report
         /// The Generation Ledger (BL-303) regenerates a body's `generation_record`
         /// on demand from these rather than the world storing one per tile — the
         /// derivation is deterministic and cheap, so keeping it is bloat
-        /// (GENERATION_LEDGER.md § Data lifetime). Presentation data like the rest
-        /// of this struct: it never enters `world` and never reaches the save.
+        /// (GENERATION_LEDGER.md § Data lifetime). What DOES reach the save is
+        /// this struct: the six inputs are written with the rest of the report
+        /// (`w_body_entry`, `core/save_game.cpp`) precisely so a loaded campaign
+        /// can replay the same tiles the ledger explains. The intermediates it
+        /// regenerates never do.
         struct tile_inputs
         {
             bool     valid           = false; ///< False on a report built without a tile pass.
@@ -412,6 +599,58 @@ struct generation_report
     int64_t prehistory_conquests = 0; ///< Regions that changed hands.
     int64_t prehistory_foundings = 0; ///< Regions founded by the sim.
 
+    // --- The Exploration span's own counters (BL-946), same discipline as
+    // the four above -- zero wherever `exploration_sim_enabled(params)` did
+    // not run (an opted-out world, or a report stopped before it, e.g. the
+    // wizard's Empires round).
+    int64_t exploration_years     = 0; ///< Years simulated in the Exploration span.
+    int64_t exploration_battles   = 0; ///< Battles fought in that span.
+    int64_t exploration_conquests = 0; ///< Regions that changed hands.
+    int64_t exploration_foundings = 0; ///< Regions founded (trade provinces) in that span.
+
+    // --- What the grudge record seeded (BL-898) -----------------------------
+    //
+    // Reported for exactly the reason the four counters above are, and this
+    // item is the reason that reason is worth restating: the grudge table was
+    // CARRIED across the pass 1 -> pass 2 handoff for a whole sprint with no
+    // consumer at all, and a carried-but-unread field is indistinguishable from
+    // one that was never carried — except that it looks finished. These two
+    // make the seeding countable, so a generation that seeded nothing cannot
+    // pass for one that was never wired.
+    int32_t grudge_sentiment_rows    = 0; ///< Grudges that became a sentiment row.
+    int32_t grudge_sentiment_dropped = 0; ///< Grudges refused: below floor, no successor, self pair.
+
+    // --- The ancient road record and what it carved (BL-768) ----------------
+    //
+    // Reported for the reason the four counters above are: the acceptance test
+    // is behavioural — roads whose shape follows the history's trunk routes, and
+    // markets where trade concentrated — and a pass that recorded nothing looks
+    // exactly like one that was never wired. These three make the difference
+    // countable rather than eyeballed.
+    //
+    // Zero when the era did not run, which is every `no_prehistory()` harness.
+    int64_t prehistory_corridors = 0; ///< Distinct region-to-region corridors recorded.
+    int64_t prehistory_junctions = 0; ///< Regions where three or more of them met.
+    /// Markets that qualified ONLY because their centre stands at a trade
+    /// junction — the ones that would not exist on the nation gate alone. THE
+    /// EXACT COUNT, taken at the carve by evaluating both gates, rather than a
+    /// difference between two worlds: an era-ON and an era-OFF world do not
+    /// share a settlement pattern, so subtracting their market counts would
+    /// measure the whole era rather than this term.
+    int64_t markets_from_trade   = 0;
+
+    // --- The handoff validators' verdict (BL-969) ---------------------------
+    //
+    // `pass_one_output_valid` and `exploration_output_valid` run on the
+    // SHIPPED path, right after each fold, against the live `creed_state`
+    // the fold read from. A violation is recorded here rather than swallowed:
+    // the flag so a harness can assert it never trips, the message so a
+    // human can read which clause of GENERATION_STRATEGY.md § What crosses
+    // each handoff the world just broke. Debug builds also assert; every
+    // build prints one line to stderr. Both handoffs share the pair -- the
+    // message names which validator spoke, and a second failure appends.
+    bool        handoff_invalid = false;
+    std::string handoff_violation;
 };
 
 /// Construct and return a world populated with the prototype's authored bodies.
@@ -489,8 +728,28 @@ static_assert(generation_progress::carve_capacity == home_grid_width * home_grid
 /// planetology chain, same Continents pass, same BL-276 acceptance gate, same
 /// seed formulas — the gate is literally the same function. The New World
 /// wizard's preview pane calls this so the map a player rerolls IS the map
-/// "Begin" hands them. Rivers and the political layer (sibling passes the
-/// preview does not show) are skipped. Returns raster-order tile ids.
+/// "Begin" hands them. The river pass runs too, under the same seed formula, so
+/// the wizard's lapse maps draw the campaign's rivers (BL-915); the political
+/// layer (a sibling pass the preview does not show) is skipped. Returns
+/// raster-order tile ids.
 std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
                                                      const world_params& params,
                                                      const world_gen_config& gen_cfg = {});
+
+/// Fold a settlement into the MIGRATION's ownership record: one change per
+/// region at its `founded_year`, owned by its plurality CULTURE (not a polity),
+/// ascending by year. Pure and read-only. This is the record the wizard's
+/// Culture round replays; `make_hard_coded_world` calls it at the migration's
+/// end, and the wizard calls it under `--verify` to lift the same record off
+/// a finished report rather than run the pass a second time (BL-919).
+era_timelapse build_migration_timelapse(const settlement_state& ss, const creed_state& cs,
+                                        int64_t start_year, int64_t end_year);
+
+/// The same fold without a creeds roster: the culture tree is REBUILT from the
+/// settlement's own record (`cradle_coined_year` first, then `spawned_cultures`
+/// in allocation order -- the exact numbering the roster carries, per
+/// settlement.hpp), so the `culture_split` events are the same ones. This is the
+/// `--verify` adoption path (BL-919), where the report holds a settlement and
+/// no `creed_state`.
+era_timelapse build_migration_timelapse(const settlement_state& ss, int64_t start_year,
+                                        int64_t end_year);

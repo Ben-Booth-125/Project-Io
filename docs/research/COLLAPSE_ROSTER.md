@@ -1,28 +1,43 @@
-# Collapse — polity strategies and culminating events for Era −1
+# Collapse Roster — polity strategies and culminating events (mechanism reference)
 
-This document is the authority for the Era −1 collapse metagame: the strain a major polity
-accumulates, the strategies a polity plays against it, and the culminating events that resolve
-it. It sits on `docs/lore/HISTORY.md` (the institutional ladder this plays out inside) and
-`docs/ai/STRATEGIES.md` (the sibling roster at corp grain — this doc reuses its discipline, not
-its content). Campaign events *express* the collapse metagame rather than driving it (Ben,
-2026-08-22, [`../EVENTS.md`](../EVENTS.md)), so **the strain accumulator lives here** — this
-document holds the mechanic, and the event layer reads it.
+> **Proposes:** six shapes a major polity might play against its own doom · seven ways a doom
+> might resolve, and how strategy and culmination pair · the machinery such a roster would need.
+> **Not here:** how an empire actually falls in the Era −1 sim — network failure, secession as
+> city states, what a successor inherits (../generation/CIVILISATION, the authority) · how a
+> realm breaks along faith (../lore/CREEDS § The schism verb) · how a fall is narrated and why
+> the sim reads that story back (../generation/CIVILISATION § How a fall is told) · what makes a
+> long run affordable (../generation/CIVILISATION § The long run is paid for by the table) · the
+> stage ladder the sim plays inside (../lore/HISTORY) · the sibling roster at corp grain
+> (../ai/STRATEGIES, also research).
+> **Confused with:** generation/CIVILISATION.md, lore/HISTORY.md, ai/STRATEGIES.md.
+
+> **Research scaffolding — a mechanism reference, not authority (Ben, 2026-09-15).** This roster
+> was drawn in a design session on 2026-08-20 as the Era −1 collapse metagame: a strain
+> accumulator, six polity strategies played against it, seven culminating events, and a matrix
+> pairing the two. **The design it described was not the one built.** The collapse the generation
+> layer models is **network failure** — a realm fragments when a specific region's supply falls
+> under a floor, and the cut-off ground secedes as city states — with the **schism verb** as the
+> one other break, along faith rather than distance. Those two are owned by
+> `../generation/CIVILISATION.md` § How an empire actually falls and `../lore/CREEDS.md` § The
+> schism verb, and no code reads a strategy weighting, a strain accumulator or a culmination from
+> this page. What the built model still needed from here — the ideological axis, the affordability
+> rungs, contagion as a property of the network — was folded into `CIVILISATION.md` (the fold is
+> `BL-1001 (COLLAPSE doc folded and retired)`). What remains below is kept as **history's
+> mechanism catalogue**: read it for how a devolution, an absorption or a slow fade works as a
+> mechanism, never as a claim about the game. The backlog items the machinery table names were
+> purged with the roster; their ids are provenance only.
+
+**Naming rule applies in full.** Every historical name below — Rome, Britain, the tetrarchy — is
+a **mechanism reference for the reader**, never content for the game
+(`.claude/rules/io-standing-rules.md` § Terms & docs). Nothing here enters generation as a proper
+noun; polities and successors are named by the seeded phoneme generator.
 
 *Provenance:* written from Ben's ask (2026-08-20) — *consider different high-level strategies /
 metagames for surpassing the Era −1 Collapse*, extended the same session to *different
 culminating events — the British empire gave away its colonies; there are tonnes of examples of
-cultures facing imminent doom.* Consumers: character inheritance into the campaign nations
-(posture, creed, grudges), BL-277 (Era −1 military strategy), BL-300 (myth/theology), BL-299
-(great-power seed).
-
-**Grain note (Ben, 2026-08-20):** each era spans a long period, so there is little need to
-compress — strategies and culminations are defined at full markdown fidelity here, not as a
-card schema. If the sim needs a compact encoding, derive it from this doc.
-
-**Naming rule applies in full.** Every historical name below — Rome, Britain, the Meiji pivot —
-is a **mechanism reference for the reader**, never content for the game
-(`.claude/rules/io-standing-rules.md` § Terms). Nothing here enters generation as a proper noun;
-polities and successors are named by the seeded phoneme generator.
+cultures facing imminent doom.* Grain note from the same session: each era spans a long period,
+so strategies and culminations were defined at full markdown fidelity rather than as a card
+schema.
 
 ---
 
@@ -142,7 +157,7 @@ then absorbs fragments when the neighbour breaks.
 - **Needs:** the eliminated-polity / `owner_none` emission (BL-505) as a scoreable
   signal; the tech-ladder regression rule already supports the economics — collapse burns
   *capacity*, never *awareness*, so successors rebuild faster than inventors
-  (`docs/research/ANCIENT_TECH_LADDER.md` § diffusion rule 4).
+  (`ANCIENT_TECH_LADDER.md` § The diffusion axis).
 - **Culmination:** it *consumes* culminations rather than having one — until it becomes a
   major itself and re-enters the wheel.
 - **Payoff:** the strategy that makes collapse **generative** — the map's next age is
@@ -162,12 +177,12 @@ holdings, so reach-based power carries no strain — and economic reach *is* mil
   the wheel. It does not: reach feeds a *separate, slower* strain inflow on the same
   accumulator (over-commitment abroad), read from the logistics network itself per BL-325
   ruling 3 — so the Metropole is the longest-lived shape and still breaks. BL-510 (reach-fed
-  slow strain); HISTORY.md's Stage 5 is a parameterisation of it, not a second system.
+  slow strain); `../lore/HISTORY.md`'s Stage 5 is a parameterisation of it, not a second system.
 - **Culmination:** Devolution (§ E2) or the Slow Fade (§ E6).
 
 ### 6. The Temple — raise the ceiling
 
-Spend on cohesion infrastructure — the Era −1 works roster (HISTORY.md § works), and
+Spend on cohesion infrastructure — the Era −1 works roster (`../lore/HISTORY.md` § The works roster), and
 myth/theology (BL-300) — to move the strain threshold itself. Collapse timing becomes an
 institutions race rather than a geometry problem.
 
@@ -282,69 +297,11 @@ each break severs the trade and tribute its neighbours' cohesion rested on.
 
 ## Telling the story — the ideological axis
 
-**The dual-focus rule (Ben, 2026-08-20):** when these stories are told, focus dually on the
-**material** necessities and warfare, *and* on **the way real cultures told their own story** —
-the ideologies preserved in real history — and how those map onto our fictional parallel
-worlds. A collapse the player only sees as border changes is half a collapse.
-
-The naming rule already gives the transfer principle: the **mechanism** crosses, the **noun**
-never does. That holds for ideology exactly as for institutions — *how a culture narrates its
-doom* is a mechanism; the specific gods and dynasties are nouns. The seeded template banks
-that name polities should also mint their **self-stories**, from the pattern library below.
-
-### The pattern library — how real cultures narrated the doom
-
-Each pattern names the real narrative move, then its fictional-world seat (what generation
-writes it onto, what the sim reads back from it).
-
-- **The mandate withdrawn.** Legitimacy is a grant from heaven/the cosmos; disaster is
-  evidence the grant has moved. Makes regime change *thinkable without cultural death* —
-  the ideological substrate of Transformation (E4). *Seat:* a creed axis
-  (mandate-holds ↔ mandate-forfeit); high works + this creed biases the break toward E4.
-- **Translation of empire.** The centre is not destroyed, it *moves* — successors claim to
-  BE the continuation, not the replacement. Every E1 fragment claiming the whole. *Seat:*
-  successor creeds after Fragmentation; the restoration grudge ("we are the true heir")
-  aimed at sibling successors, not just predators.
-- **The declinist mirror.** The culture narrates its own fall in advance — moral corruption,
-  lost virtue of the ancestors — often for generations before any material break. *Seat:*
-  a narrated-history line that *precedes* the culmination (BL-489, narration bank): strain past a band
-  emits "their own chroniclers wrote of decay" years before the break. The player should be
-  able to read the doom coming the way the culture's own writers did.
-- **The apocalypse reframed as test.** Imminent doom read as trial or purification — the
-  millenarian response. Fuels last stands and Exodus (E5): a people who expect the end can
-  march *through* it. *Seat:* a creed that raises cohesion under extreme strain (a
-  deathbed rally term) at the price of never choosing Release — the anti-Hydra.
-- **The garden given away.** Devolution (E2) needs its own story or it reads as defeat: the
-  real mechanism is recasting release as *maturity* — empire retold as stewardship completed,
-  ties of kinship replacing ties of rule. *Seat:* the low-grudge asymmetry E2 already
-  writes, now with its narrative cause; the core's creed shifts imperial → mercantile.
-- **The golden age behind us.** Post-collapse cultures curate an idealised memory of the
-  peak — the material regression is real, the *story* of greatness is preserved losslessly.
-  This is the ideological twin of the tech ladder's regression rule: capacity burns,
-  **awareness never** — and neither does the myth. *Seat:* the restoration creed of E1/E5
-  survivors; the Phoenix's legitimising claim when it gathers fragments.
-- **The chosen remnant.** Exodus (E5) survivors narrate displacement as election — smallness
-  as proof of purity. *Seat:* the rump polity's high-cohesion term IS this story; creed
-  locks legitimist + maximal grudge, and the myth outlives any realistic hope of return.
-
-### Why the sim should read the story back
-
-These are not flavour. Two mechanical returns:
-
-1. **Ideology biases the culmination.** The state vector that determines the exit
-   (§ Open questions, Q2) should include the creed: mandate-creeds fall toward E4,
-   remnant/test-creeds toward E5, stewardship-creeds toward E2. Same strain, different
-   story, different ending — which is precisely how the real cases diverged. Deterministic
-   throughout: creed is seeded data, the bias a scored term.
-2. **The story is the inherited character.** Posture, creed and grudge are exactly "the way
-   the culture tells its story" carried to 0 CE. The pattern library gives the phoneme/
-   template banks a second vocabulary to mint from — so a generated nation doesn't just
-   have a name, it has an account of itself, traceable to a culmination the player can
-   find in the history log.
-
-BL-300 (myth/theology) is the natural home for the authored bank; BL-489 (narration bank)
-and the history-tab playback are where the narration surfaces. The discipline stays HISTORY.md's: **driven, not
-narrated** — the story is emitted by what happened, never scripted over it.
+Folded into `../generation/CIVILISATION.md` § How a fall is told — the ideological axis: the
+dual-focus rule, the pattern library reseated on the exits the design actually has (secession,
+schism, conquest), and why the sim reads the story back. The one pattern with no seat there —
+*the garden given away*, which needs a voluntary release — belongs to the Hydra and Devolution
+rows above.
 
 ## The matrix — strategy × culmination
 
@@ -381,48 +338,9 @@ dead weight; a culmination that never fires is scope to cut.
 
 ## The 4000-year problem — making the run affordable
 
-**The budget.** The sim runs inside world generation; its budget is the generating screen's
-wait (BL-317's constraint). The critical profile fact: **cost tracks the province table, not the
-fighting** — a seed with fewer battles can run 3× longer. Naive 10× years is therefore not 10×
-cost — Settle keeps growing the table, so late years cost more than early ones. Unoptimised, a
-4000-year run is tens of seconds of sim plus a recording cost that can dwarf it (BL-425, ages
-lazy sim).
-
-**The shape of the fix — in priority order.** Each rung is independent; measure after each
-(BL-403's profiling harness is the instrument).
-
-1. **Kill the O(provinces) scans first (BL-320, Era −1 sim perf).** A cell → province
-   spatial index removes Settle's occupancy scan; per-polity holdings and aggregates
-   maintained incrementally on change, never rebuilt per year. This converts per-year cost
-   from O(provinces) toward O(changes) — the prerequisite for everything below.
-2. **Event-driven quiet provinces** (BL-491, quiet-province fast path). Most of 4000 years, most provinces do nothing. Give
-   stable interior provinces a fast path: they wake on events (border change, strain band
-   crossing, route loss), not per year. Deterministic — wake conditions are state-derived,
-   never time-sliced by wall clock.
-3. **Banded year grain** (BL-492, banded year grain). The era's own premise (rulings, grain note) is that ages are
-   *long and quiet* punctuated by arcs. Simulate quiet bands at coarse grain (5–10 year
-   steps with scaled verb effects) and drop to yearly grain when any polity's strain, war
-   state, or culmination proximity crosses a band. The grain switch must be a **pure
-   function of sim state** — seeded, replayable, asserted by the determinism harness —
-   or it is a die roll wearing a timestep.
-4. **Record on change, at the reader's grain** (BL-493, record on change). The playback and
-   the history tab scrub decades in practice. Snapshot ownership on `owner_changes` and
-   per-decade otherwise; narrated lines are events, not per-year state. The BL-427
-   world-snapshot cache is the natural home for the memoised record so `--verify` pays
-   nothing.
-5. **Do not parallelise the sim.** Threading the polity loop trades a measured seconds
-   problem for a determinism problem the standing rules forbid. Single-threaded plus
-   algorithmic fixes is the whole toolbox.
-
-**What not to trade away.** Never fix by capping provinces — table growth *is* the history
-running longer. And every number here is measured on the sim that generates a world, at /O2,
-through the same parameter derivation (`era_minus_one.cpp`), never on a harness divergence.
-
-**Fit check.** Rungs 1–2 target the dominant cost (the table); rung 3 targets year count;
-rung 4 targets the recording half. If all four rungs together still miss the generation budget
-at 4000 years, the honest fallback is NR-357's option C —
-2–3 completed arcs per world, all four attractors asserted across the sweep — degrading
-density, never determinism or legibility.
+Folded into `../generation/CIVILISATION.md` § The long run is paid for by the table, not the
+fighting: cost tracks the region table, the five rungs in the order they pay, what not to trade
+away, and the fit check.
 
 ## Open questions
 

@@ -1,0 +1,784 @@
+{
+ "_note": [
+  "Verbatim snapshot of every backlog item CANCELLED on 2026-08-31, on Ben's instruction: \"The other backlog items shouldn't exist, so mark them as cancelled and move them to archive.\"",
+  "The session had refocused hard onto sprint 26 (watch the AI play) and sprint 27 (demand). Everything outside those two was cancelled rather than carried, on the same reasoning as the 2026-08-23 purge: an item left standing because it was once relevant is a stale reference, not a plan.",
+  "CANCELLED, NOT COMPLETED. Nothing here shipped. A cancelled item's intent returns to the backlog only by being re-authored fresh against the docs as they stand, per the cull's own resurrection rule - never by copying this record back.",
+  "Ids are retired and never reused.",
+  "What was KEPT: sprint 27 (the demand work, deliberately held for the next session) and the five sprint-26 AI items carried out of that sprint's wave-1 close."
+ ],
+ "cancelled_date": "2026-08-31",
+ "count": 18,
+ "items": [
+  {
+   "id": "BL-595",
+   "short_name": "NATION_STARTING_TREASURY",
+   "title": "Generation credits every nation's starting treasury before garrison sizing and contract-offer funding read it",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": "post-v0.1.15",
+   "sprint": null,
+   "category": "Generation",
+   "written": "2026-08-24",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "src/world/nation_generation.cpp",
+    "docs/generation/NATION_GENERATION.md",
+    "docs/politics/NATIONS.md"
+   ],
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "design": "Ruled 2026-08-24 (NR-580): a generation-time levy/tariff pass credits every nation's `nation_component::treasury` before `seed_nation_garrisons` (BL-571) and before any contract-offer derivation (BL-572) can run — the same conservation-checked transfer `apply_budget`'s levy already uses, fired once at world creation off whatever each nation's own resource/territory profile earns that first quarter. No new authored number; a rich nation starts richer because its profile already says so. Design settled in `docs/generation/NATION_GENERATION.md` § Pass 7 and `docs/politics/NATIONS.md` § 2 — read those before implementing. Not yet built: every garrison and offer in a freshly generated world still lands on its funding floor today."
+  },
+  {
+   "id": "BL-619",
+   "short_name": "RESEARCH_SYSTEM",
+   "title": "Develop the research system from the RESEARCH.md stub: RP accrual, the tech graph, unlock economy",
+   "status": "open",
+   "glyph": "·",
+   "priority": "C",
+   "difficulty": 3,
+   "version_goal": "v0.1.19",
+   "sprint": "19",
+   "category": "Economy",
+   "written": "2026-08-25",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "files": [
+    "docs/economy/RESEARCH.md",
+    "scripts/tech_tree.lua"
+   ],
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "design": "Filed 2026-08-25 with the stub authority doc (Ben: 'write a stub authority doc for RESEARCH.md now... it helps to have the concept in writing'). Settled: universities (City+) produce RP; RP purchases unlocks; three live consumption touchpoints exist (era-gate Rocketry per BL-087, the unlock_recipe tech arm per BL-588, province-ceiling relief per BL-513). Open and owned here: the RP economy (rates; per-corp vs per-nation; tradeability), whether scripts/tech_tree.lua's ~150 inert nodes become the graph, and nation-budget funding. A design session of its own before any build."
+  },
+  {
+   "id": "BL-622",
+   "short_name": "DENSITY_RETUNES",
+   "title": "Re-derive the density-coupled tunables against the 6.0 tiles/centre world",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": "post-v0.1.19",
+   "sprint": null,
+   "category": "Economy",
+   "written": "2026-08-25",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "files": [
+    "scripts/economy.lua",
+    "src/world/economy_system.cpp",
+    "src/world/market_clearing.cpp"
+   ],
+   "authority_doc": "docs/economy/POPULATION.md",
+   "design": "Ruled 2026-08-25 (Ben, Sprint 19 verdict form): keep 6.0 land tiles per centre; the retunes wait for the next (surfacing) sprint. The measured list from NR-630/NR-635, each a re-derivation against the live world, not a redesign: population_demand's demand_scale; workforce labour units per scale (1/3/10/30/100); the market carve's population anchoring; logistics node discounts (most tiles now near a centre); haulage_measure re-run for the price-band ceiling (its re-derive rule names map/scale changes). Measure first, then move constants - never clamp outcomes."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": "v0.1.20",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-628"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-629",
+   "short_name": "RIVAL_ACQUISITION",
+   "category": "AI",
+   "title": "Rivals buy firms too - buy_corporation joins the scored-utility candidate list",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/corp_ai.hpp",
+    "docs/ai/AI_OPPONENT.md",
+    ".claude/rules/io-standing-rules.md"
+   ],
+   "design": "The symmetry half of BL-628 (whole-firm buyout), and a widening of the BL-202/BL-203 exception in its established shape: deterministic, seeded, scored-utility, a legal verb and never a planner. THE WORK: score buy_corporation in corp_ai.cpp's existing candidate list, capped at one acquisition per evaluation, its price carried in the candidate's spend under the solvency gate so a rival cannot buy itself below its reserve floor. Availability is gated on the target's ownership class, not on the acquirer's cash - the 'never on cash' ruling's shape. Record the grant in the standing rules with its date, as every prior widening is recorded. SAVING UP IS NOT PLANNING, and this item owns the distinction: Ben's Sprint 20 goal wants a corp to accumulate cash toward an acquisition, but a scorer that defers a cheap build today in order to afford a firm tomorrow is edging toward the planner the standing rules forbid. The honest route needs no new machinery - accumulation is EMERGENT when the buy candidate outscores the marginal build, since a tick with no affordable positive candidate simply banks its cash. Whether that actually happens at the authored weights is a measurement, and BL-634 (acquisition viability) is where it is taken."
+  },
+  {
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "C",
+   "difficulty": 2,
+   "version_goal": "v0.1.20",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-630"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-632",
+   "short_name": "WARM_START_PROGRESS",
+   "category": "UI",
+   "title": "The loading screen's second phase - what the warm start shows while it runs",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/core/app.cpp",
+    "src/ui/startup_screens.cpp",
+    "docs/ui/STARTUP.md"
+   ],
+   "design": "Falls out of BL-630 (spawn shortlist): the warm start moves onto the loading screen as a second phase after the carve, and eighty econ ticks is long enough that it needs a surface. DESIGN-OWED - what it shows is Ben's call. The obvious candidates are the carve's own idiom (a ledger column of corps with their running net) or a plain progress read. Note the publish-contract limit the carve already documents: the tap is atomics-only, so a corporation's generated NAME cannot cross it."
+  },
+  {
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": "v0.1.20",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": "Container cannot approve the OS-level computer-use dialog (NR-622)",
+   "parked": false,
+   "id": "BL-636",
+   "short_name": "LIVE_CLICK_DEBT",
+   "category": "UI",
+   "title": "Three sprints of owed live clicks - dispatch form and Throughput lens container access",
+   "authority_doc": "docs/development/DELIVERY.md",
+   "files": [
+    "docs/development/DELIVERY.md",
+    "docs/development/NEEDS_REVIEW.json"
+   ],
+   "design": "Carried from Sprint 18 and named in NEXT_SESSION.md as owed in Sprint 20's definition of done. Two visual requirements were marked complete on a scripted capture alone, which the 2026-08-19 rule says is not sufficient: a capture proves a surface renders, not that a press on it is reachable. The dispatch form and the Throughput lens both owe a live click. BLOCKED, and the blocker is environmental rather than a design gap - NR-622 records that the container cannot approve the OS-level computer-use dialog, which is why this has slipped three sprints rather than one. DESIGN-OWED on the route out: either Ben clicks them himself in one pass, or the session gets a path to drive the live app that does not need that dialog. Filing it as an item so it has an owner instead of living only in a handoff note.\n\nSPRINT 23 ADDS ONE, and it is blocked differently from the rest (folded in from NR-706, 2026-08-28, on Ben's instruction to close that entry - the concern stays relevant, so it lives here rather than in the transient queue).\n\nBL-666's COMPANY destination has never been live-clicked. Not for want of access: the corporation half WAS clicked in the built app the same session. The blocker is the WORLD - a freshly generated campaign (seed 00000000, 20 settle years, 1960 Q1) carried no background firm holding any tile on the home body, so the Company lens tinted nothing across a fully zoomed-out view and there was nothing to press. The route is asserted green in lens_one_tier against a world that does have one.\n\nSo this row needs a world or a save with a background firm on the home body, not a permission dialog. Worth measuring while there: count background firms and their holdings at year 20 against year 100 - if they are genuinely absent early, the Company lens needs an EMPTY STATE, because a lens that tints nothing and says nothing is indistinguishable from a broken one."
+  },
+  {
+   "id": "BL-639",
+   "short_name": "CORP_PANEL_COLUMN_BUDGET",
+   "title": "The Corporations panel does not fit its column - names cut to one letter, Declare Hostile clipped",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": "v0.1.20",
+   "sprint": "24",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "authority_doc": "docs/ui/LAYOUT.md",
+   "files": [
+    "src/ui/corporation_panel.cpp",
+    "docs/ui/ledgers/corporation.md"
+   ],
+   "design": "OBSERVED LIVE, 2026-08-26 (BL-633's capture), and pre-existing - BL-633 changed no width and no column count. Five columns carrying 62+62+62+220 px of fixed width do not fit the shell fold-out column (380-460 px by resolution) at 1280x720: the Corporation NAME column collapses to a single letter ('F', 'E', 'C') and the Stance column's 'Declare Hostile' button clips off the right edge as 'De...'. This is BL-449's shape exactly - the surface that shipped clean on a compile AND a 36/36 harness while being unusable - still live in the same panel. THE WORK: re-budget the columns against shell_column_width(disp.x) rather than fixed pixels, and decide whether the stance presses belong in-row at this width at all or behind the row's Selection drill. Note NR-663: expect_no_clipping did NOT catch this, because ImGui SmallButton labels are not instrumented into the overflow ledger - so this needs a real look, not a green row.\n\nSUPERSEDED IN PLACE BY BL-674 (diplomacy by stance), 2026-08-29 - newest-dated wins, and this is recorded rather than quietly applied. BL-674 carries Ben's instruction to DELETE the Reach, Share and Stance columns and group the rows by stance instead, which removes the starvation this item proposed to re-budget: three of the five columns stop existing, so there is no fixed-width budget left to blow. This item's second half - whether the stance presses belong in-row at this width - is answered there too (they move into the row's own action affordance and keep their confirms). Left open rather than closed because Ben owns the close; do not build BL-639 and BL-674 as two changes to one file."
+  },
+  {
+   "id": "BL-650",
+   "short_name": "DISSOLUTION_COMPLETENESS",
+   "category": "Economy",
+   "title": "Finish the dissolution walk - ground follows the firm, and hoist the duplicated HQ rule",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": "v0.1.20",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-628"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/corp_command.cpp",
+    "src/world/corporation_generation.cpp",
+    "tools/verify/whole_firm_buyout.cpp",
+    "docs/economy/FINANCE.md"
+   ],
+   "design": "Two loose ends the wave-2 review barrier found in BL-628, neither a defect today. (1) world::province_holder takes a CORP id via battle_system.cpp's field_held_by, and dissolve_into's inventory does not carry it. Entity ids are monotonic with no recycling, so a stale holder is inert rather than aliasing - but R4's wording is 'no dangling reference survives', and ground is PROPERTY, so it TRANSFERS. Now written into FINANCE.md's three-way rule, which also gained a fourth outcome, KEEP, for the historical record - history is not property and is never rewritten, which is the one place a reference to the erased corp survives on purpose. Extend the harness fixture to hold a province, since it currently never constructs one. (2) recompute_hq in corp_command.cpp DUPLICATES designate_hq/corp_home_body from corporation_generation.cpp, including kProjectedReachUnits = 2.5f - unavoidable at authoring because another slice owned that file in the same wave. Both have landed; the review verified them line-for-line identical. Hoist to a shared seam so they cannot drift."
+  },
+  {
+   "id": "BL-651",
+   "short_name": "CHARTER_REACH_ON_THE_SEAM",
+   "category": "Generation",
+   "title": "charter_reach is computed at generation and silently zeroed on load",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": "v0.1.20",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-638"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/core/save_game.cpp",
+    "src/world/settlement.hpp",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "design": "Found by the wave-2 review barrier. BL-638 added settlement_state::charter (a charter_reach), and w_settlement/r_settlement do not carry it. The omission is SYMMETRIC so the stream stays consistent and no version bump is owed - it is not a corruption bug. It is a LATENT one: the field is silently zeroed on load, which is benign only while the sole readers are generate_corporations and its harness, both of which run before any save exists. It becomes wrong the moment BL-627 (profitability ledger), BL-629 (rival acquisition) or the generation ledger reads charter off a LOADED world - and it will read as 'this world has no charter' rather than as an error. TWO HONEST ROUTES, pick one and say why: serialise it (a version bump, claimed through next_save_version.js), or RECOMPUTE it on load from the ladder it is derived from, which costs no format change and cannot drift from its source. The second is probably right, since charter_reach is a pure function of already-serialised state."
+  },
+  {
+   "id": "BL-653",
+   "short_name": "RETURN_EIGHTH_FIELD",
+   "category": "Economy",
+   "title": "The eighth field - a return sees the whole quarter, not just the money loop",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.21",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-626"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/budget_system.cpp",
+    "src/world/components.hpp",
+    "src/core/app.cpp",
+    "src/world/world_save.cpp",
+    "src/world/corp_command.cpp",
+    "tools/verify/",
+    "docs/economy/FINANCE.md"
+   ],
+   "design": "Ben's ruling, 2026-08-26, on NR-655/NR-668 - option A of the three-way fork, and the measurement that forced it: a firm earning through mercenary contracts files a trailing_net IDENTICAL to a firm that earns nothing there, so BL-628's buyout undervalues it by exactly 640 credits (k 8.0 x the 80/quarter the record cannot see). Design in FINANCE.md section The eighth field. THE WORK: add `other` to quarterly_return = the whole-tick balance delta minus the money-loop net, and MOVE THE FILING from the end of apply_budget to after the tick's last balance mover - which is the part that needs care, since apply_budget does not own the tick and the headless harnesses call it directly. Then re-point corp_trailing_net at the mean of (net + other) so the buyout prices off the whole quarter. THREE PROPERTIES TO ASSERT: the seven flows still explain `net` unchanged; net+other telescopes EXACTLY over a run (the retain property extended from one function to the whole tick); and BL-628's own harness row that currently PINS the 640-credit blindness must be re-specified to pin the closure instead - do not delete it, invert it. `other` is deliberately NOT itemised: split into named lines it becomes a second budget breakdown competing with corp_budget, and the reason there is one accounting authority is that two of them disagree. Versions the save format."
+  },
+  {
+   "id": "BL-656",
+   "short_name": "PASS6_CAP_IS_THE_DESIGN",
+   "category": "Generation",
+   "title": "Decide what actually shapes background density - the ratio, or the per-resource cap",
+   "status": "complete",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": "post-v0.1.21",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-655"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "design": "Raised by BL-655's measurement and by its novelty flag. Pass 6 is documented as stopping on a 0.90 production/demand ratio, described as 'an emergent measurement rather than an injected clearing constant' and 'a stop condition, not a firm-count budget'. MEASURED: the ratio NEVER BINDS on the worlds we generate. `per_resource_firm_cap = 8` binds on every demanded resource, so the count is exactly specialists + 8 x basket breadth - which reproduced 104, 64 and 56 corps exactly across three configurations. Its own comment still says 'provisional - measure, then pin'. The doc has been corrected to describe what the code does; what is OPEN is which behaviour is wanted. THREE READINGS: (a) the cap is the real design and the ratio is dead weight - pin the cap deliberately, say density is breadth-driven, and delete the ratio; (b) the ratio is the real design and the cap is an emergency brake set too low - raise it until the ratio binds, which restores the 'calibrated, not authored' property the doc claims; (c) both, with the cap as a genuine guard against a pathological basket. Note the consequence either way: under (a) density becomes a function of how many DIFFERENT goods are wanted, so every demand channel Sprint 21 adds moves the world's size - which may be a feature.\n--- RULED 2026-09-06 (Ben, on the doc-reconciliation form): READING (a), THE CAP IS THE DESIGN ---\n\nPin the cap deliberately, say density is breadth-driven, and retire the 0.90 ratio outright. The\nalternative readings are both declined: raising the cap until the ratio binds would restore a\n'calibrated, not authored' property the code never actually had, and keeping both would leave a\nconstant in the file that has never once bound on any world we generate.\n\nTHE CONSEQUENCE IS ACCEPTED, NOT OVERLOOKED, and it is now written into the authority doc:\nbackground density is a function of HOW MANY DIFFERENT GOODS ARE WANTED, not of how much of them.\nA basket that grows in breadth grows the corp count; a world consuming twice as much of the same\ngoods gets the same firms. That makes the demand basket's breadth a DENSITY KNOB, and anything\nediting that basket is editing the size of the background economy.\n\nWRITTEN INTO docs/generation/CORPORATION_GENERATION.md § Pass 6 - Background firm generation,\nwhich also records that Pass 6 is a one-shot again: the economic settle it was described as\nrecurring through is retired by GENERATION_STRATEGY.md § The eight phases, and the background\neconomy's source is now the landscape phase 6 selects.",
+   "resolved": "2026-09-06"
+  },
+  {
+   "id": "BL-657",
+   "short_name": "A_FAILING_FIRM_FAILS",
+   "category": "Economy",
+   "title": "A firm underwater long enough exits - give interest the consequence it is supposed to have",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.21",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-628"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/components.hpp",
+    "src/world/corp_command.cpp",
+    "scripts/economy.lua",
+    "tools/verify/",
+    "docs/economy/FINANCE.md"
+   ],
+   "design": "MEASURED 2026-08-26 from Ben's own observation of the live build. Of 12 seeds, 3 clear with ZERO interest; the 9 that fail all dipped negative once and interest is then 43-60% of their whole loss, against an operating gap of only -24 to -40 cr/qtr. 1.02^80 = 4.9x over the warm start. The rate is not the defect - components.hpp's 'no insolvency consequence' is. A firm that would have died in year three trades for twenty and is handed to the player as wreckage. THE WORK: a firm underwater for N consecutive quarters EXITS - dissolved, or absorbed via BL-628's dissolve_into, which already moves holdings, pools, balance and returns and cancels the promises nobody is left to keep. N and the trigger are authored in economy.lua and MEASURED, not picked. DESIGN-OWED on three questions that are Ben's: (1) dissolve or absorb - absorption by a solvent neighbour is richer and reuses the buyout path, dissolution is simpler and leaves ground free; (2) does this run IN PLAY as well as in the pre-game, i.e. can the player's own corp fail - NR-670 already ruled a rival may not BUY the player out, and this is a different question about the player failing on their own account; (3) what happens to the ground and the workforce - a dissolved firm's tiles should probably become available rather than stay held. EXPECTED CONSEQUENCE, and the reason this is priority A: the field at seat time becomes self-selected for viability, so BL-630's shortlist floor should start being met instead of falling through to its fallback on 23 of 24 seeds."
+  },
+  {
+   "id": "BL-658",
+   "short_name": "FREE_FIRM_TRAP",
+   "category": "Economy",
+   "title": "The solvency gate tests the price, not the position after the debt transfers",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "v0.1.21",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-628"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/corp_command.cpp",
+    "tools/verify/acquisition_viability.cpp",
+    "docs/economy/FINANCE.md"
+   ],
+   "design": "MEASURED by BL-634, which found it by taking its own brief's gate literally. The acquisition price is max(0, book_value + k x trailing_net + balance) and the balance term is SIGNED, so a deeply indebted firm's negative cash cancels its book value, the sum goes below zero, and the floor hands it over FREE. On 5 of 8 seeds the cheapest buyable firm cost exactly 0 cr. The dissolution rule then transfers the debt at face value: one seed took on -13,358 cr for nothing, and 3 of 8 buyers that bought the cheapest firm were sunk by it. THE FLOOR IS NOT THE BUG - a worthless firm is worth nothing, and NR-648's reasoning stands. The bug is that the SOLVENCY GATE READS THE PRICE rather than the buyer's balance AFTER the transfer, which is the same shape as the non-finite-price bug BL-628 caught in its own code: a check applied to the wrong quantity. THE WORK: gate on the post-acquisition position, so a corp cannot be handed a liability it could never have chosen to take on. Then re-run acquisition_viability's --target cheapest sweep, where 'still earning after' should go 5/8 -> 8/8. Note the harness already measures BOTH gates and its --target flag exists for exactly this comparison."
+  },
+  {
+   "id": "BL-661",
+   "short_name": "population regional heatmap",
+   "title": "Population lens: regional heatmap with harder scaling, not a per-tile mark",
+   "status": "open",
+   "priority": "medium",
+   "created": "2026-08-28",
+   "sprint": "22",
+   "touches": [
+    "docs/ui/LENSES.md",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "Ben, 2026-08-28: \"Population: Let's see what this looks like as a heatmap with more extreme scaling. This way we should be able to see population regionally, not just on each tile.\"\n\nToday the lens draws \"per-tile value marks, workforce efficiency\" (LENSES.md routing table) - a per-tile read, which is why a region of moderate population and a region of none look similar at whole-planet zoom. Two changes: a continuous heatmap fill rather than discrete marks, and a scaling curve steep enough that regional differences separate instead of compressing into the middle of the ramp.\n\nEXPLICITLY AN EXPERIMENT, in Ben's own framing - \"let's see what this looks like\". The deliverable is a capture to rule on, not a settled design; expect a second pass on the curve. Worth measuring the actual population distribution first so the curve is fitted to the data rather than guessed - the same discipline BL-649's census brought to demand."
+  },
+  {
+   "id": "BL-662",
+   "short_name": "scarcity takes the opportunity glyph",
+   "title": "Scarcity lens: drop the dead Opportunity code, reuse its glyph, render market scarcity per resource",
+   "status": "open",
+   "priority": "medium",
+   "created": "2026-08-28",
+   "sprint": "22",
+   "touches": [
+    "src/ui/icons.cpp",
+    "src/ui/icons.hpp",
+    "src/ui/overlay.cpp",
+    "docs/ui/LENSES.md",
+    "docs/ui/ICONS.md"
+   ],
+   "design": "Ben, 2026-08-28: \"I support changing opportunity to scarcity. Drop the old code, reuse the glyph, and render market scarcity per resource.\"\n\nREAD AS: the lens KEEPS the name Scarcity - the earlier idea of renaming it to Opportunity is dropped - while the retired Opportunity lens's leftovers are deleted and its GLYPH is reused for Scarcity. Recorded explicitly because the instruction can be read in both directions, and because the session had just flagged that Opportunity is a name BL-604 retired; if this reading is wrong it is a one-line revert.\n\nWHY A GLYPH MATTERS HERE: Scarcity is keyboard-cycle only, which is why Ben listed it among the lenses needing glyphs. icons::opportunity survives in src/ui/icons.{hpp,cpp} with no caller since BL-604, so the mark exists and is unused - reusing it costs nothing and lets Scarcity earn a strip slot, since LENSES.md's rule is that an on-screen lens carries one distinct glyph.\n\nAlso dead and worth removing in the same sweep, though Ben named only Opportunity: icons::country (BL-601) and icons::production (BL-604), neither of which has a caller.\n\nThe behaviour half - \"render market scarcity per resource\" - may already hold: the lens draws \"per-market shortfall blocks + key\" keyed to the selected resource, and the 2026-08-28 sweep captured scarcity_lens_full_iron and _steel. Confirm before changing anything; the glyph may be the whole of the real work."
+  },
+  {
+   "id": "BL-663",
+   "short_name": "lens glyph roster",
+   "title": "Give every strip-eligible lens a distinct glyph (Company; Supply, Supply-routes, Reach deferred)",
+   "status": "open",
+   "priority": "low",
+   "created": "2026-08-28",
+   "sprint": "22",
+   "touches": [
+    "src/ui/icons.cpp",
+    "src/ui/icons.hpp",
+    "src/ui/overlay.cpp",
+    "docs/ui/ICONS.md",
+    "docs/ui/LENSES.md"
+   ],
+   "design": "Ben, 2026-08-28: \"It looks like we need to add glyphs for scarcity, supply, supply-routes, and reach.\"\n\nSCOPE NARROWED BY BEN THE SAME DAY: \"I don't think we need body-to-body lenses yet. Keep the code but ignore for this session.\" Supply, Supply-routes and Reach are all body-to-body, so their glyphs are deferred with them - the code stays, the work waits. Scarcity is covered by BL-662 (it inherits the Opportunity mark).\n\nWHAT REMAINS LIVE HERE IS THE COMPANY LENS, added 2026-08-28. It borrows icons::corporation while keyboard-only, on the precedent Reach and Supply-routes set. It cannot join the on-screen strip until it has its own mark, because Corp would be its immediate neighbour and LENSES.md forbids two strip neighbours sharing a glyph. A company is a background firm, so the mark wants to read as smaller/plural against the corporation's single solid form.\n\nThree glyphs are dead and free to cannibalise: icons::country, icons::opportunity (claimed by BL-662), icons::production."
+  },
+  {
+   "id": "BL-677",
+   "short_name": "LABOUR_READ_HAS_NO_HOME",
+   "category": "UI",
+   "title": "The labour read has no home, and wage competition is invisible",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": "v0.1.23",
+   "sprint": null,
+   "written": "2026-08-29",
+   "author": "Claude",
+   "requires": [
+    "BL-676"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "src/ui/",
+    "docs/economy/POPULATION.md",
+    "docs/ui/question_log.json"
+   ],
+   "design": "FILED SO A FINDING IS NOT DELETED ALONG WITH THE SURFACE THAT DISPLAYED IT WRONGLY. BL-676 retires the Economy panel on Ben's 2026-08-29 call. Two of its three views were duplicates and one was a visibility breach, but the Workforce view was answering a real question badly rather than answering a redundant one - and after the deletion nothing answers it at all.\n\nWHAT THE CAPTURE PASS MEASURED. The workforce table drew eighteen rows and every single one read \"82% (labour short)\". The panel's own doc had warned the mock fixture was uniform at 85% and said explicitly: verify against the live sim, not the CSV. Verified against the live sim - it is uniform there too.\n\nAND IT IS NOT A BUG. `report.workforce_contention` is the POOL-LEVEL min(1, supply/demand) keyed (corp, body), and every corp in the fixture holds on one body, so one pool yields one number correctly repeated eighteen times. The view is not broken; it is showing a quantity that cannot vary in the situation it is shown in.\n\nTHE ACTUAL FINDING: BL-614 (wage competition) SUPERSEDED that scalar and nothing surfaces what replaced it. economy_system.cpp says so in terms - when a pool is contended the uniform proportional scalar no longer applies; scarce labour allocates building by building, offered wage descending (base_wage x (1 + wage_bid)), building id ascending on a tie, each granted up to its demand until the pool is spent. The marginal building takes a partial grant and those below it get nothing. The factor a building actually runs at is `report.building_labour[id]`, and the pool aggregate survives only as a reporting figure.\n\nSo there is a real mechanic here - bidding for scarce labour, and losing a building's shift to a rival who bid higher - and the only surface that ever mentioned labour rendered it as one number eighteen times. `building_labour[id]` is per building and varies; it is the quantity a player would act on.\n\nDESIGN-OWED, AND DELIBERATELY NOT SCOPED HERE. Where this lives is open and is Ben's: a section on the building Selection card (per-building, where the number's grain actually is), a view on the Corporation dashboard beside the existing Workforce roll-up card, or a surface of its own. What is settled is only that it has no home today and that the Budget ledger's Wages tier currently has no visible consequence anywhere."
+  },
+  {
+   "id": "BL-694",
+   "short_name": "top-bar tracker",
+   "category": "UI",
+   "title": "A top-bar tracker for the quantities that gate progression - level and rate, e.g. \"200 Steel (+25/qtr)\"",
+   "status": "designed",
+   "glyph": "+",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "25",
+   "written": "2026-08-30",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": "BL-619",
+   "parked": false,
+   "authority_doc": "docs/ui/HEADER.md",
+   "files": [
+    "src/ui/header_panel.cpp",
+    "docs/ui/HEADER.md",
+    "docs/economy/RESOURCES.md",
+    "docs/economy/RESEARCH.md",
+    "docs/ui/question_log.json",
+    "docs/ui/ui_elements.json"
+   ],
+   "design": "Ben, 2026-08-30: \"a tracker for important items on the top-nav bar. We should show a stockpile for steel, a new type or resource (boost), which is untradeable, and research points. These can all have an absolute value for how much is in stockpile, and an addition to the right. E.g. '200 Steel (+25/qtr)'.\"\n\nTHE READ IT ADDS. The header today answers \"how is my money\" - BALANCE, STOCKPILE (one aggregated credit figure), NET/qtr and RUNWAY. It answers nothing about the GOODS a player is accumulating, so the three quantities that gate progression are invisible unless a ledger is opened. The tracker is the always-on half of that: a level and its rate, in the shape the header already uses for money.\n\nTHE FORMAT IS BEN'S AND IS THE WHOLE SPEC: `200 Steel (+25/qtr)` - absolute stockpile, name, and the per-quarter delta to its right. The delta is the same quantity the header's NET already reports for credits, so the two read as one family rather than two conventions.\n\nTWO OF THE THREE QUANTITIES DO NOT EXIST, and that is the item's real shape - it is a design item before it is a UI one. Do not start with the header.\n  1. STEEL exists. It is an Industrial-tier resource with a live recipe chain, so its stockpile and its per-quarter movement are both readable today. This third is buildable now and is the one that proves the format.\n  2. BOOST DOES NOT EXIST, and neither does untradeability. `RESOURCES.md` owns the roster and has no such resource; more importantly the model has no UNTRADEABLE PROPERTY - the nearest thing is a market opening at all-zero base_price, which is an accident of a fixture rather than a declared rule (`market_clearing.hpp`). An untradeable good is a genuinely new kind of thing: it cannot be bought, so the only way to have it is to make it, which makes it a different lever from every resource now in the game. That needs Ben's design, not an implementer's guess - what produces Boost, what consumes it, and what untradeable means at the order book (refused listing? absent from the goods table? present at no price?).\n  3. RESEARCH POINTS DO NOT EXIST either - grep finds no research_point quantity anywhere in `src/world`. `RESEARCH.md` is a stub and BL-619 (RESEARCH_SYSTEM) is an open DESIGN SESSION WITH BEN, not a build slice. This third is gated on that item and must not be faked with a placeholder number.\n\nSO THE ITEM SPLITS THREE WAYS, and only the first can start: build the tracker with Steel and a shape that takes N entries; add Boost when its design lands; add research points when BL-619 does. A header that shows one tracker is honest; one that shows three where two are zeros is not.\n\nWHERE IT LIVES. `docs/ui/HEADER.md` owns the top bar and is the authority for the surface. `docs/economy/RESOURCES.md` owns Boost and the untradeable property. `docs/economy/RESEARCH.md` and BL-619 own research points. The header is fixed chrome on every frame, so its cost is paid always - `LAYOUT.md`'s constraint, and the reason the entry count is a design question rather than a free parameter.\n\nCARRIED OUT OF A RETIRED SPRINT. This was the shell-chrome batch's subject (old sprint 25), which Ben deleted on 2026-08-30 as not needing a revisit. This is the one piece he kept, so it rides in sprint 25 (canvases) despite being header-grain."
+  },
+  {
+   "id": "BL-714",
+   "short_name": "instruments that cannot see",
+   "category": "Tooling",
+   "title": "Four verification instruments pass without seeing their subject, and one hangs the suite",
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/development/REVIEW_AUTOMATION.md",
+   "files": [
+    "scripts/verify/text_overflow_floor.lua",
+    "scripts/verify/budget_ledger_ranked.lua",
+    "scripts/verify/lens_strip.lua",
+    "src/core/verify_api.cpp"
+   ],
+   "design": "A green check that cannot see its subject is worse than a red one, and five are on record. Grouped because the fix is one discipline - a check must prove it LOOKED - not five unrelated repairs.\n\n* NR-614 / NR-663 - `expect_no_clipping`'s scope is draw-list text only, so it reported '0 failure(s), 0 record(s)' over a whole 31-capture shell pass while the Corporation dashboard visibly truncated 'Workforce 76% of labour demand n' mid-word and a genuinely clipped button was on screen. ZERO RECORDS is the tell: the ledger saw nothing, so the pass is vacuous. Any check that can report zero observations must FAIL on zero, not pass.\n* NR-714 - `budget_ledger_ranked.lua` is named for the Balance ledger's top-buildings ranking and captures two frames, neither of which contains it (one scrolled past it, one with the ledger shut).\n* NR-606 / NR-623 - four verify scripts fail for pre-sprint reasons and `lens_strip`'s three goldens are stale by world drift (blessed 2026-06-17). The strip is the subject; the map behind it is not - re-point them at something world-independent or retire them to capture-only.\n* NR-695 - `overflow_tile_v2` hung the suite: the History ledger's TILES view is a row per tile on the body, so the sweep burned CPU, collapsed memory and starved nine scripts behind it. A per-script wall clock would have turned a suite-wide stall into one red row.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "33",
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [
+    "BL-723"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-725",
+   "short_name": "SWEEP_PRICE_LEVERS",
+   "category": "Tooling",
+   "title": "Sweep 2 - base prices and the band, with the ceiling re-derived per cell",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "base_price scalar {0.5, 1.0, 2.0} (whole world_gen.kepler_market.base_price table) x price band {0.25/4, 0.25/10, 0.1/20}. The two levers are COUPLED, not independent: ceil_mult is derived (> 1 + max haulage / cheapest base), so every cell re-runs haulage_measure and the manifest records whether the cell's band still clears the derivation - a violating cell is measuring an unservable tail and says so rather than reporting it as tuning.\n\nWATCH: edge-pegged-good count per cell (ceiled-everywhere = absent industry, floored-everywhere = glut - the canon vocabulary, NR-676; today's baseline is exactly one, clean_water); GDP and net-income trends; convoy dispatches vs the 1055/802 haulage baseline (goldens cannot see trade collapse); rival sell-order floors, which ride base_price through trade_floor_multiple.\n\nSCOPE GUARD: the law-clamp veto (2026-07-11, a law is a modifier over the market) is honoured - this sweeps the band and the reservation prices, the legitimate min/max forms; no cell may implement a price control as law.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "33",
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [
+    "BL-723"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-726",
+   "short_name": "SWEEP_DEBT_DYNAMICS",
+   "category": "Tooling",
+   "title": "Sweep 3 - debt as dynamics: interest x opening capital, honestly bounded",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp",
+    "src/world/budget_system.hpp"
+   ],
+   "design": "k_debt_interest_per_quarter {0.0, 0.015, 0.03} x base_capital {200, 400, 800}. THE HONEST BOUND, stated up front: no borrow verb exists and the solvency gate keeps every rival above its reserve floor, so this sweep measures spiral depth and recovery - insolvent share of the field per tick, interest as a share of total losses (baseline 43-60%), first-crossed-zero tick, recovered-corp count - and never borrowing strategy. A debt-parameter effect on the trend is a statement about the money loop, not about play.\n\nThe interest rate is judged over the 80 warm-start compoundings (x3.3 at 0.015, x4.9 at 0.02 - the FINANCE.md rule), not over one quarter. Both constants are C++ (budget_system.hpp, corporation_generation.hpp): part of this item is giving them harness-reachable setters with the authored values untouched. debt_decomposition is the per-flow cross-check but runs a hand-built registry mirror - shape confirmation only, its numbers do not move with the Lua.\n\nOUT OF SCOPE: richer debt design - credit lines, firm exit (BL-657), the free-firm trap (BL-658) - is new design, not tuning, and stays in the cold store until Ben carries it.\n--- PREMISE VOID 2026-09-06 (BL-759 re-base) ---\n\nTHIS ITEM PREMISE NO LONGER HOLDS. It was filed on \"seed 1 still shows interest at 70% of\nnet loss at year 30 while seed 0 is at 5%; the spiral is half-tamed\". Re-measured on HEAD:\nBOTH seeds sit at 7%. The asymmetry the item exists to chase is gone, and sprint 33\ndone-when for interest (\"below a quarter of net loss on every seed\") is already met.\n\nDO NOT RUN THE SWEEP AS FILED. Decide first whether there is a debt question left at all:\nthe honest reading is that BL-747 changed the world enough that the spiral was a property\nof the old generation, not of the interest model. Re-scope against the re-based numbers or\nclose it - Ben call.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [
+    "BL-723"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-727",
+   "short_name": "SWEEP_SCARCITY_GEOGRAPHY",
+   "category": "Tooling",
+   "title": "Sweep 4 - scarcity as geography: abundance x ore-field concentration",
+   "authority_doc": "docs/generation/TILE_GENERATION.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "abundance x a global multiplier on the ore-province redistribution shares (copper 65% / petroleum 60% / iron 55% / coal 45% - sweep {0.7x, 1.0x, 1.3x}, clamped inside [0, 0.95]). Concentration is the geography half of scarcity, separate from world totals: higher shares mean spawn quality depends on being near one of 2-3 ore provinces.\n\nWATCH: chain-completeness spread per market (the demand_census R5 read - the SPREAD is the deliverable; reports, never gates); GDP trend per cell; trade volume. THE PREDICTION UNDER TEST: trade RISES with concentration, because trade arises from supply asymmetry (MARKETS.md property 5) - a cell where it falls instead is a finding about reach or the band, localisable against sweep 2. Optional third axis if runtime allows: drawdown {0, 0.5, 0.9} - thins the accessible fraction of the homeworld start.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [
+    "BL-723",
+    "BL-725",
+    "BL-728"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-729",
+   "short_name": "SWEEP_INTERACTIONS",
+   "category": "Tooling",
+   "title": "Sweep 6 - knob x knob: the interactions one-at-a-time sweeps provably miss",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "The coupled pairs, 2x2 or 3x3 each, run after their single-axis sweeps so the marginal cells have a baseline: (a) base price x ceiling - coupled through the haulage derivation; (b) opex (material-floor / wage scalar) x demand scale - the viability knife-edge, where the 30% idle floor was measured at ~61% of the residual spawn deficit; (c) unit upkeep x extraction levy - honouring the NATIONS.md sequencing rule (anchor and upkeep first, re-measure, then the levy: both at once makes the benchmark uninterpretable), so the interaction cell runs LAST and is read against the two singles.\n\nMETHOD AUTHORITY: DEVELOPMENT_PRACTICES' measuring-emergent-systems rules - measure the OFF state always; never assert a conservation you have not summed; a 28.2-point interaction once passed every per-knob sweep, which is why this item exists.\n\nDELIVERABLE: an interaction table per pair (effect of A at each level of B) and a ruling per pair on whether future tuning sessions may treat the two knobs as independent.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (BL-647 integration, cold-review finding 2)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-730",
+   "short_name": "TRADE_GOODS_MISC_BUYER",
+   "category": "Economy",
+   "title": "trade_goods_misc is produced, priced, and wanted by nothing - it needs an owner",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "scripts/economy.lua",
+    "tools/verify/chain_depth.cpp"
+   ],
+   "design": "BL-647's design names exactly four luxury goods (tobacco, spices, coffee, furs) and shipped exactly those - but two instruments (chain_depth.cpp, demand_census.cpp) had authored comments claiming BL-647 would also buy trade_goods_misc, which that landing falsified. The comments now point here.\n\nTHE QUESTION, not yet answered: which channel wants generic trade goods? Candidates: join the endemic luxury basket (cheapest - one Lua row - but dilutes the four-good directional-asymmetry design, since trade_goods_misc has no endemic geography); a wealth-scaled row in the ordinary household basket (a prosperity good without the endemism); or retirement from the roster if nothing distinctive wants it (a good with no buyer and no geography is a name, not a resource). Decide against MARKETS.md's admission rule: a consumer is a MECHANISM, not a noun, and every resource needs a path to a terminal sink in its band.\n--- RULED (Ben, 2026-09-06, on the market-work form): THE ENDEMIC LUXURY BASKET ---\n\ntrade_goods_misc joins the endemic luxury basket as its fifth member - the cheapest of the three\ncandidates, one Lua row, and it gives the good the one thing it lacked: a terminal sink in its own\nband. Not the wealth-scaled household row, and not retirement.\n\nBEN TOOK IT WITH THE COST STATED, so nobody rediscovers it as a defect. The other four luxuries carry\nGEOGRAPHY - each grows in one lat/sector and nowhere else, which is what makes the trade route\nasymmetric and the price a function of distance. trade_goods_misc has none; it is made wherever clay\nand a workshop are. Its row therefore DILUTES the directional asymmetry that is the point of the\nchannel. Admitted anyway, because a sink in the right band beats no sink, and the dilution is bounded\nby the row own weight.\n\nTHE ESCAPE HATCH IS NAMED IN THE DOC and belongs to a later item, not this one: if the channel\nasymmetry measurably weakens, give the good a GEOGRAPHY (an endemic recipe input, or a named luxury\nreplacing the placeholder) rather than widening the basket further.\n\nWATCH ON LANDING: demand_census produced-in-band-with-no-sink list should lose trade_goods_misc and\ndrop from four rows to three (ordnance, rigging, tools remain).\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (BL-644 integration, cold-review finding 1)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-731",
+   "short_name": "NATION_SCORER_HARNESS_ROT",
+   "category": "Tooling",
+   "title": "nation_scorer_harness does not compile - the mercenary teardown left it behind",
+   "authority_doc": "docs/development/REVIEW_AUTOMATION.md",
+   "files": [
+    "tools/verify/nation_scorer_harness.cpp"
+   ],
+   "design": "The harness references derive_contract_offers / contract_offer_params / world::mercenary_offers (~15 sites), all deleted by cc88997c (the mercenary teardown). It has not compiled since, which means the nation scorer's term-by-term guard rows have been unrunnable through every scorer change after the teardown - including BL-644's calm_space addition, which landed with zero direct scorer verification (nation_wiring's scored ticks cover it only indirectly).\n\nTHE WORK: strip the mercenary-era rows (their subject no longer exists - deleting them is truth, not weakening), get the remaining term guards compiling and green, and add a calm_space row on the harness's own mutate-what-it-reads pattern: raise calm, watch the space_programme weight move by calm_space x delta; zero calm_space, watch it stop. A check that cannot run is worse than one that fails (DEVELOPMENT_PRACTICES: rebuild before believing).\n\nSIBLING ROT FOUND 2026-09-02: tools/verify/battle_engagement_harness.cpp(726) calls active_mercenary_contract_for, torn out with the mercenary contract in cc88997c, so it no longer compiles - and because it sorts early, `nmake all` stops there and every later harness reads as ctest 'Not Run'. Fix or retire it with the nation scorer harness.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "A",
+   "version_goal": null,
+   "sprint": "29",
+   "written": "2026-09-01",
+   "author": "Ben + Claude (sprint 29 design form, 2026-09-01)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "difficulty": 2,
+   "id": "BL-733",
+   "short_name": "BIOME_BRUSH_ART_PIPELINE",
+   "title": "Biome brush and structure-stamp art pipeline (C-F direction)",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "assets/brushes/",
+    "docs/ui/design/"
+   ],
+   "design": "UNBLOCKED 2026-09-01 - the reference images arrived (docs/ui/design/renders/map/, C-F ratified). The authored-asset half of RENDERING.md: painterly biome brushes (canopy, scrub, marsh, rock...) and installation structure stamps in the C-F direction, judged against the it3 C-F panel; assets/brushes/ cwd-relative like fonts, Lua manifest with a provenance line per sheet, pages <= 4096^2. Fallback-by-coverage means partial delivery is shippable - author the highest-coverage biomes first. The near-future grade is NOT authored into brushes (it is a runtime pass; round-2 confirmed finding).\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "A",
+   "version_goal": null,
+   "sprint": "29",
+   "written": "2026-09-01",
+   "author": "Ben + Claude (sprint 29 design form, 2026-09-01)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "difficulty": 2,
+   "id": "BL-734",
+   "short_name": "GROUND_CHROME_LAYER_CONTRACT",
+   "title": "Ground/chrome layer contract - the fate of each analytic channel over atlas art",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "docs/ui/PLANETARY.md",
+    "docs/ui/CANVASES.md",
+    "docs/ui/LENSES.md"
+   ],
+   "design": "PARTLY RULED 2026-09-01 against the references: the on-ground grid RETIRES (selection/hover hex only) and building/settlement canvas glyphs RETIRE (installations are rendered geometry) - those two are settled in RENDERING.md and are not this item. THE REMAINING WORK, channel by channel over painterly C-F ground: lens tints (a saturated categorical fill over painterly terrain reads differently than over flat hues - weight/blend mode per lens), the land blend and per-lens province reduction table (the bake interpolation replaces the blend - reconcile PLANETARY.md), landform relief tint + glyphs and the procedural texture pass (likely redundant - the art carries material and relief), fog washes and survey mask over baked chunks, and where ownership/stack/count reads move now the silhouette+ring+badge are gone (hover/selection surfaces). Lands as edits to PLANETARY.md/CANVASES.md/LENSES.md/ICONS.md and closes this item. Open in the live app against the bake before ruling weights (Rule 0b). BORDER BAND: RULED and BUILT (Ben 2026-09-01 evening, under BL-735) - single frontier ring, 0.35 alpha, luma-muted; PLANETARY.md carries it. Do not re-rule.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "33",
+   "written": "2026-09-01",
+   "author": "Claude (operating-loss methods, Ben's rulings)",
+   "requires": [
+    "BL-741",
+    "BL-742",
+    "BL-746"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-738",
+   "short_name": "INDUSTRY_RATES_GO_LIVE",
+   "category": "Economy",
+   "title": "Building upkeep in goods stops shipping at zero - the Industry channel earns its keep",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "scripts/economy.lua",
+    "tools/verify/demand_census.cpp"
+   ],
+   "design": "Ben, 2026-09-01: 'Building should have upkeep too.' The machinery is all landed - BL-641 built the draw, BL-654 made it BID below the reservation ceiling (price_band.reservation_mult, authored 9.0) - only the RATES ship at zero. THE WORK: author non-zero per-type rates for goods genuinely produced in the campaign band (the 227->19 collapse came from drawing goods produced 0.0; the census's producibility columns are the guard), starting from the derived values kept in comments in scripts/economy.lua. MEASURED, NOT GUESSED: demand_census before/after per band, and a campaign_lapse knob-x-knob cell - processors sit at -0.44 cr/qtr operating and this adds their input cost, so the rate is tuned against BOTH sectors' operating net, not extraction's alone. A rate that starves buildings (supply-factor decay census-wide) is the named failure mode; land small and raise measured.\n\nSTAGE 1 MEASURED AND WITHDRAWN 2026-09-01: repair timber/stone rates ran a full campaign_lapse cell (tag after-fixes) - extraction operating net -6.75 -> -31.29 cr/qtr, operating-positive corps 29 -> 16, valued production x1.05 -> x0.91. The cost side landed; the income side cannot arrive until BL-741 (nation revenue breadth) and BL-742 (state buys meet the market) - now hard requires. The one clean positive: stone off the floor (0.42x -> 1.38x base, floored 5 -> 2 of 9 markets) - the price signal works. The full record is in scripts/economy.lua at the goods table and the two lapse run dirs (baseline-s0, after-fixes). Ben's ruling stands; the sequencing was wrong.\n--- SEQUENCED (Ben, 2026-09-06, on the market-work form): AFTER BL-746 STAGE 2 ---\n\nBoth original requires (BL-741 nation revenue breadth, BL-742 state buys meet the market) are\ncomplete, so the income side stage 1 lacked has landed. Ben ordering adds a third gate: THE FIELD\nMUST HOLD POWER FIRST. Stage 1 withdrawal is the reason - extraction operating net went -6.75 to\n-31.29 cr/qtr and operating-positive corps 29 to 16, on a field whose buildings were already decaying\nto zero for want of an unmet grid draw. Rates authored against that field would be tuned against the\ncliff rather than against what the field can supply.\n\nRE-MEASURE FROM SCRATCH when it opens: the stage 1 numbers were taken pre-floor, pre-no-wire and\npre-price-gate, and none of them is a valid before-figure any more.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "33",
+   "written": "2026-09-02",
+   "author": "Claude (BL-744 stage 2 field re-measure)",
+   "requires": [
+    "BL-746"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-745",
+   "short_name": "PROCESSOR_INPUT_BID_CAP",
+   "category": "Economy",
+   "title": "A processor never buys inputs worth more than its output - the anchor carried to live prices",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/market_clearing.cpp",
+    "scripts/economy.lua",
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "THE FINDING (BL-744 stage 2, 2026-09-02). With every recipe clearing the margin anchor at base price, the industrial field still collapses by tick 25 of an unwarmed lapse: expenditure runs 1.5-2.5x income from tick 4, corps go into debt, exit twelve quarters later, and the survivors are idled by their own agency. The anchor is evaluated at BASE; the sim runs at the CEILING - processed goods are ceiled in every market (10x base), so a processor pays up to 10x for inputs its recipe values at 2x, loses on every batch, and is idled as 'persistently loss-making'. Idling it removes supply, which keeps the ceiling on, which idles the next one. The ancient band takes the same wave and recovers because its chains are shallow; the industrial mid-chain (silicon, refined_copper, electronics) does not.\n\nTHE DESIGN, in the anchor's own terms: a processor's input purchase (pool bid, BL-654; auto-demand) is capped so that Σ inputs at the bid price <= output value at the current price minus the wage per batch - the M1 identity carried from authoring time to the live tick. Above the cap it does not buy and runs at the supply scalar it has (the shortfall rule: scale down, never idle - PRODUCTION.md). This is a per-recipe reservation ceiling in place of the flat reservation_mult (9x base) for processing inputs; the flat one stays for upkeep goods. It must be pure and deterministic, one rule at the one shared seam, and the rival scorer's dial_recipe reads the same number.\n\nMEASURE FIRST: campaign_lapse --epoch 1960 --warm 0 --ticks 40 (tags diag-ind, diag-anc are the 2026-09-02 traces) with the expenditure/income split per tick; the done-when is the sprint's - operating-positive survivors that keep producing. Also owed: the agency's 'persistently loss-making' idle rule should read operating net at the recipe's own bid cap, not realised loss at the ceiling, or it will keep idling the buildings the cap is meant to save.\n\nMEASURED 2026-09-02 (campaign_lapse debt instrumentation, industrial band, unwarmed, seeds 0/1 - build_gen/verify/lapse/debt-ind-s*/debt.csv): 129 of 129 debt entries are dominated by the EXPENDITURE flow, and in every one of them expenditure exceeded income over the four ticks before entry. But two differential runs re-order the levers. (1) Construction materials at market price are the FIRST wave: with resource_costs zeroed the early wave nearly vanishes (debtors at tick 20: 26 -> 4; median entry tick 22 -> 34), because a processor costs 25 steel at 8-10x base = 3-4k against a mine earning ~50/tick and the scorer builds through the boom. (2) The pool bids are NOT the drain: reservation_mult 0 changes nothing. (3) The tick-20 cliff is BL-746's, not this item's: with the industrial goods-upkeep draws zeroed there is no collapse at all. This item therefore drops to B and re-scopes to the two real purchase leaks - construction materials bought at the ceiling (the scorer's build tempo should price materials at the live market, and the cap here should bound them by the building's expected value) and processing inputs bought above the recipe's output value - AFTER BL-746 lands, measured on the same instrument.\n--- SCOPED (Ben, 2026-09-06, on the market-work form): BOTH LEAKS, ONE ITEM ---\n\nThe two purchase leaks the 2026-09-02 differential runs separated are taken TOGETHER here, not split\nand not sequenced: (1) construction materials bought at the ceiling - the scorer build tempo prices\nmaterials at the live market, and the cap bounds them by the building expected value; (2) processing\ninputs bought above the recipe output value - the M1 identity carried from authoring time to the live\ntick. They share one seam and one instrument, and splitting them would have measured each against a\nfield the other was still distorting.\n\nTHE IDLE RULE IS NOT IN THIS ITEM. The agency \"persistently loss-making\" test reading operating net\nat the recipe own bid cap rather than realised loss at the ceiling is BL-782 (idle rule reads the bid\ncap), on Ben call - a change to the agency judgement, not to the purchase, and it wants its own\nbefore/after.\n\nORDER: after BL-746 stage 2. The tick-20 cliff was BL-746 own, so a bid cap measured on today field\nwould be measured against a collapse it does not cause.\n\n--- FIGURES DATED 2026-09-06 (BL-759) ---\n\nEvery 1960-epoch number quoted above was measured PRE-BL-747 and is no longer\nreproducible from HEAD. It is not wrong about the code it measured. The re-based\nbaseline is on BL-759; re-measure against that before judging this item.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "33",
+   "written": "2026-09-02",
+   "author": "Claude (campaign_lapse debt instrumentation, Ben's instruction to track every balance)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-746",
+   "short_name": "UPKEEP_STARVATION_CLIFF",
+   "category": "Economy",
+   "title": "The industrial band goes dark at tick 20 - an unmet goods-upkeep draw decays every building to zero",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/economy_system.cpp",
+    "src/world/components.hpp",
+    "tools/verify/campaign_lapse.cpp",
+    "tools/verify/building_upkeep.cpp"
+   ],
+   "design": "THE FINDING (2026-09-02, campaign_lapse --epoch 1960 --warm 0, seed 0). Between tick 20 and tick 21 active buildings fall 219 -> 40 and idle rise 18 -> 198 in ONE tick, with unstaffed 0, exhausted 0 and labour unchanged (118.5 -> 119.0). 77 of 95 corps go from active to zero-active that tick, almost all extraction corps, many with positive balances. The per-corp mean supply factor decays from 1.0 at tick 1 toward 0 and reaches it at tick 20: supply_decay_permille = 50 is 5% per tick of a 0..1000 factor, so a building whose goods-upkeep draw is never met hits zero output exactly 20 ticks after it starts. In the industrial band every extraction site draws power 0.25 + timber 0.05 + stone 0.05 per tick and every processor power 0.40 + timber 0.08 + stone 0.08 (BL-708, BL-738 stage 2); power is a GRID good that reaches only network-connected tiles, generation is 18 falling to 3 units against a demand of 64, and a generator short of power throttles itself. The ancient band has no such draw and takes the same debt wave without a cliff. DIFFERENTIAL PROOF: with the two industrial goods baskets zeroed the field holds 207-257 active buildings through tick 60, income runs ahead of inputs from tick 25, produced value 16-31k/tick, debtors 19 -> 5. Nothing else was changed.\n\nWHY IT IS A DESIGN DEFECT AND NOT A TUNING ONE. PRODUCTION.md § A shortfall scales output; it never idles says the lights go dim, not out - but a factor that decays without floor DOES go out, and it goes out for every building the grid cannot reach, which is most of them. Three levers, and Ben's call which (NR-782): (a) a FLOOR on the supply factor (e.g. 0.5) so an unmet draw halves output and never zeroes it - the rule as the doc states it; (b) NO DRAW WHERE THERE IS NO WIRE - a building the network does not reach does not draw power and does not decay for want of it (it pays the no-grid penalty some other way, or none); (c) generation bootstrap - generators exempt from the power draw, and the draw switched on per building only once its market has ever priced power. (a) and (b) are one-line rules at the one shared seam; (c) is the census's own reading of BL-708. Then re-run the debt instrument: the done-when is no one-tick cliff and a field whose active count tracks its holdings.\n\nMEASURE with: campaign_lapse --epoch 1960 --seed N --warm 0 --ticks 60 --tag <tag>; corps.csv carries supply_factor_mean and bldg_supply_zero per corp per tick; world.csv buildings_active/idle. The 2026-09-02 traces are debt-ind-s0/s1 (the cliff) and exp-noupkeep (without it).\n\nSTAGE 1 LANDED 2026-09-02 (Ben approved NR-782 (a) and (b)). The floor: supply_floor_permille = 500 in economy.building_upkeep, parsed and range-checked like its siblings; run_building_upkeep decays to max(floor, factor - decay) and lifts a stranded factor to the floor. No wire, no draw: an unreached building's grid goods are struck from its basket before the shared draw (its ordinary goods still draw and bind), and an emptied basket draws nothing and counts as met. building_upkeep R8 (floor 500 holds at 500 over 41 ticks, recovers by the authored step, the number is the authored one, a factor below it is lifted) and R9 (an unreached building does not weaken for power on the grid; the same good off the grid decays 5 x 50; timber still binds on the unreached tile) - every row with its differential. RE-MEASURED (campaign_lapse --epoch 1960 --warm 0 --ticks 60, tags fix-ind-s0/s1): no building at factor 0 at any tick; active buildings 224 at tick 20 and 221 at tick 60 (seed 0; was 219 -> 2), 178 and 137 (seed 1); income at tick 60 13.4k / 6.8k (was 132 / 2.9k); produced value 16.1k / 10.1k (was 262 / 2.0k); debtors 11 of 86 / 6 of 73 (was 22 of 66 / 13 of 58). The ancient band is byte-identical (19 entries, same table) - it has no draw to floor. Debt entries fall 67 -> 57 and 62 -> 58 and their shape changes: starved 32 -> 7, loss-converting 30 -> 42 - the residue is BL-745's.\n\nSTAGE 2 (open, NR-782 (c) held): the field's mean supply factor settles at ~0.57 - most buildings sit AT the floor because power still does not arrive (generation 18 -> 3 units against a demand of 64; a generator short of power throttles itself; only network-reached tiles can receive it). The generation bootstrap - generators exempt from the power draw, a building drawing power only once its catchment market has priced it - is the next lever, measured on the same instrument: the done-when is the mean supply factor climbing off the floor.\n--- STAGE 2 RULED (Ben, 2026-09-06, on the market-work form): NO PRICE, NO DRAW ---\n\nNR-782 (c) is taken in its second form ONLY: A BUILDING DRAWS A GRID GOOD ONLY ONCE ITS CATCHMENT\nMARKET HAS PRICED IT. Not the generator exemption, and not a scorer nudge to make generation get\nbuilt - the gate alone. Written into PRODUCTION.md § A shortfall scales output as the third rung,\nbeside the floor and the no-wire rule that stage 1 landed.\n\nWHAT \"PRICED IT\" MEANS needs a definition before anyone builds it: the market this building clears\nagainst (market_for_tile) has resolved a real price for the good, rather than carrying the untouched\nauthored default. A market that has never had supply or demand for power has never run resolve_price\non it, and that is the state the gate keys on. The predicate must be a pure function of market state\nand positive-going only (once priced, always priced), or it becomes a building that flickers in and\nout of its own upkeep.\n\nTHE DONE-WHEN IS A PAIR, NOT A NUMBER, and this is the whole guard: mean supply factor climbing off\n0.57 toward 1, AND the power price real and moving in the markets that carry it. A supply factor that\nclimbs while power stays unpriced everywhere is the gate SILENCING the draw rather than letting the\nindustry form - and it is indistinguishable from success on the supply factor alone. Report both\ncolumns or the measurement does not mean what it says.\n\nSTILL OPEN, deliberately: what makes generation get BUILT. Ben did not take that lever. If the gate\nopens and generation still does not arrive, that is a finding for its own item, not a licence to add\na scorer weight here.\n\n--- FIGURES DATED 2026-09-06 (BL-759) ---\n\nEvery 1960-epoch number quoted above was measured PRE-BL-747 and is no longer\nreproducible from HEAD. It is not wrong about the code it measured. The re-based\nbaseline is on BL-759; re-measure against that before judging this item.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  },
+  {
+   "status": "cancelled",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": "33",
+   "written": "2026-09-06",
+   "author": "Ben (market-work form, 2026-09-06); Claude (itemisation)",
+   "requires": [
+    "BL-745"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-782",
+   "short_name": "IDLE_RULE_READS_THE_BID_CAP",
+   "category": "Economy",
+   "title": "The agency idles on realised loss at the ceiling, so it idles the very buildings the bid cap exists to save",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp",
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "SPLIT OUT OF BL-745 ON BEN CALL (2026-09-06, market-work form): \"its own item\". It is a change to the\nAGENCY JUDGEMENT, not to a purchase, and it wants its own before/after rather than riding the bid cap.\n\nTHE DEFECT. The background-agency rule that idles a \"persistently loss-making\" building reads REALISED\nloss - what the building actually paid at the live market price. Under BL-745 a processor is capped so\nit does not buy inputs above its output value, and instead runs at the supply scalar it has (the\nshortfall rule: scale down, never idle). But its realised operating net over the ticks BEFORE the cap\nengaged is still a loss, and the rule keys on that history. So the agency goes on idling exactly the\nbuildings the cap was built to keep alive, and the loop BL-745 describes - idle removes supply, which\nkeeps the ceiling on, which idles the next one - closes again one layer up.\n\nTHE CHANGE. The test reads operating net at the RECIPE OWN BID CAP - what this building would earn\nbuying inputs at the price it is now willing to pay - rather than realised loss at the ceiling. A\nbuilding viable under the cap is not persistently loss-making; it is a building that was being\novercharged. One rule, at the agency seam, pure and deterministic, reading the SAME number BL-745 cap\ncomputes - not a second copy of it, since two hand-synchronised copies is the divergence\nprice_band_harness exists to catch elsewhere.\n\nSCOPE GUARD. This does NOT make the agency slower to idle in general and must not become a blanket\nsoftening of firm exit: a building that loses money AT ITS OWN BID CAP is still loss-making and is\nstill idled. BL-743 (firm exit) is untouched.\n\nMEASURE: campaign_lapse on the same instrument as BL-745, differential - the count of buildings idled\nas loss-making before and after, with the survivors operating net at quarter 200. The named failure\nmode is the mirror of the defect: a field that stops culling anything and fills with zombies.\n\nDONE WHEN: the idled-as-loss-making count falls, no building viable at its bid cap is idled, and firm\nexit still removes corps that cannot pay.\n--- ARCHIVED UNSTARTED 2026-09-07 (Ben: 'anything from sprint 29, 33 or having no owner can also be archived... we will revisit this with a narrower focus down the line'). ---\n\nClosed CANCELLED rather than complete: no code was written for it. Kept WHOLE in the archive, so\nbacklog_query --touches still answers 'is this built?' with a no, and archive_landed.js --restore\nbrings the row back verbatim if the narrower revisit wants it. This is the 2026-08-24\nunstarted-plans precedent applied to items rather than to sprints.",
+   "resolved": "2026-09-07"
+  }
+ ]
+}

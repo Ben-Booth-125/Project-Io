@@ -1,5 +1,15 @@
 # Project Io — Nations
 
+> **Settles:** what a nation is once generation has finished making it · what it holds — territory,
+> treasury, budget weights, law · how a law reaches the market · what an import tariff does and
+> which direction it points · what a nation may do, what it does each tick, and in what order it
+> spends · what a nation wants.
+> **Not here:** how a nation comes to exist — territory placement, resource profile, character,
+> naming (NATION_GENERATION) · which quantity says how a nation reads a corporation (RELATIONS) ·
+> the predicate/effect substrate a law is composed from (META_LAYER) · a corporation's own money loop
+> (FINANCE).
+> **Confused with:** generation/NATION_GENERATION.md, politics/RELATIONS.md, META_LAYER.md.
+
 **The nation as an actor** — what a nation *is* once generation has finished making it, what it
 holds, what it may do, and what it does each tick. This document is the authority for that
 question, and it is the one `docs/generation/NATION_GENERATION.md` explicitly declines:
@@ -24,7 +34,7 @@ A nation is a **territorial polity** in the campaign era. It owns tiles, it has 
 holds money, it states what it cares about, and it is the only actor that can author law.
 
 It is **not** the player, and the player is not accountable to it beyond what law and stance
-impose. Under the ancient arc the player is a mercenary company: a **law subject**, never a
+impose. The player is a corporation: a **law subject**, never a
 legislator (`docs/MANUAL.md` § 1.2, and SYSTEMS.md § Policy). A nation is the thing whose rules you
 operate inside, route around, pay to have changed, or price in.
 
@@ -66,14 +76,30 @@ sentiment model, not two.
 
 `world::tile_to_nation` is the reverse index, and it is what gives a law its **jurisdiction**.
 
+### GDP
+
+**A nation's GDP is the value of production on its tiles at local market prices** (NR-774, promoted
+here 2026-09-15 as the player-facing figure Ben's opening map asks for). It is **derived, never
+stored**: a reading over what the nation's ground produces and what its markets pay, read over a
+trailing window in play and over output capacity at the seeded price field at the epoch
+(`../generation/DIGITISATION.md` § 5. Wealth inequality, market cap and GDP).
+
+**GDP per head is the axis of inequality between nations**, and output per centre is the axis
+within one. Neither is a household measure, and neither feeds the treasury — a levy does
+(§ 2). GDP says how much a nation makes; the treasury says how much the state holds.
+
+**A regime field sits beside the three character fields** as a stub, derived at the epoch from the
+Works fork, charter reach, subject history and whether the polity fought a world war
+(`../generation/DIGITISATION.md` § 6. Stubs). Its names are invented, never Earth labels.
+
 ### 2. The treasury — *a balance with both halves*
 
 `nation_component::treasury` is a float. It is zero the instant the field is constructed —
 deliberately, since a treasury that started full would be a balance change smuggled in as a
 field. **Generation itself is ruled to credit it before the campaign tick ever runs** (Ben,
-2026-08-24, NR-580) — see `docs/generation/NATION_GENERATION.md` § Pass 7 for the settled shape
-(a levy/tariff transfer, the same conservation-checked mechanism the campaign tick already uses,
-not yet implemented). The rule above is about the ONGOING campaign tick: nothing but the levy,
+2026-08-24, NR-580) — see `docs/generation/NATION_GENERATION.md` § Pass 7 for the settled shape:
+the Exploration span's 1660 polity treasury, folded across the handoff through one stated
+per-mille (BL-975, 2026-09-15). The rule above is about the ONGOING campaign tick: nothing but the levy,
 the tariff and the budget outflow may ever move this field once play starts.
 
 Two flows credit it; one pass debits it.
@@ -103,7 +129,7 @@ it holds** (Ben, 2026-08-22) — so a poor nation and a rich one of the same cha
 recognisably alike, differing in scale and not in kind, and no authored number is re-tuned when a
 treasury grows. All weights default to zero: a nation with no authored budget spends nothing.
 
-The nine lines, in their authored enum order (append-only once serialised — a weight vector is
+The ten lines, in their authored enum order (append-only once serialised — a weight vector is
 indexed by them):
 
 | Line | What it buys |
@@ -113,12 +139,11 @@ indexed by them):
 | `military_research` | force-side research, and a nation's own garrison upkeep (MILITARY.md § Nation garrisons) |
 | `academic_research` | the civil tech ladder — `science` is reached, not spent, and this is the debit BL-478 (ancient research spend) is shaped around |
 | `public_exploration` | state-funded survey — DISCOVERY.md's geographic fog |
-| `contracted_force` | buying force the nation does not raise — CONTRACTS.md § Where offers come from (BL-572) derives an offer from this line's spendable share |
+| `contracted_force` | buying force the nation does not raise — BL-572 (contract offers) derives an offer from this line's spendable share; the contract form itself carries no sell side to buy through (CONTRACTS.md § Explicitly out of scope) |
 | `strategic_reserve` | buying goods to **hold** — through BL-350's procurement seam from a named supplier, never on the market. Distinct from `reserve_fraction`, which withholds credits; this line spends them |
 | `public_works` | works a corporation builds and the nation pays for |
 | `charters` | paying a corporation to exist somewhere it otherwise would not |
-
-| `space_programme` | government satellite launches — `spacecraft_components` and `propellant`, bought through the procurement seam. The first buyer for space goods that is not a militia contract, and the state's own stake in the gate into space (BL-644) |
+| `space_programme` | government satellite launches — `spacecraft_components` and `propellant`, bought through the procurement seam and **consumed** (a terminal sink: the satellite launched). The first buyer for space goods that is not a militia contract, and the state's own stake in the gate into space (BL-644) |
 
 The first five are Ben's (2026-08-22); the next four were proposed alongside them and accepted;
 `space_programme` is Ben's, 2026-08-26.
@@ -129,9 +154,34 @@ The first five are Ben's (2026-08-22); the next four were proposed alongside the
 deliberate — it arrives in lumps, it follows a weight a rival can lobby to move, and it is therefore
 worth playing *politics* over rather than merely scaling into.
 The spend mechanics are generic over the enum, and a line no consumer claims on is simply skipped.
+(`logistics_maintenance` also buys goods, but it funds the **Infrastructure** channel, not the
+State one — its demand scales with network size, not with treasury × weight; the weight only
+decides how much of the bill gets paid.)
 Most lines take no subject — a flat weighted claim on the tick's spendable — but `line_takes_subject`
-(`nation_budget.hpp`) names the two that do: `public_exploration` and `contracted_force`, whose
-claims name a target (a survey site; an offer's escrow) rather than only an amount.
+(`nation_budget.hpp`) names the three that do: `public_exploration`, `contracted_force` and
+`space_programme`, whose claims name a target (a survey site; an offer's escrow; the body a launch
+lot stands on) rather than only an amount. The earmark's whole-or-nothing fill (rule 3a) is what
+makes `space_programme`'s spend a lump: a share that cannot cover a whole launch lot buys nothing,
+banks the difference, and fires later.
+
+`logistics_maintenance`'s consumer is `derive_network_upkeep_claims` / `settle_network_purchases`
+(`src/world/network_upkeep.{hpp,cpp}`; BL-643, network upkeep draws): each tick the nation's road
+network — road tiles by level plus active ports and hubs, tallied from the world, never stored —
+bills stone and timber at authored rates ([`LOGISTICS.md`](../economy/LOGISTICS.md) § 4 owns the
+channel). The same state-purchase shape as the space programme below, with one deliberate
+difference: the claim is **unearmarked**, so rule 3's pro-rata fill applies — upkeep is continuous,
+and half the repair budget meaningfully buys half the materials, where rule 3a's lump exists for
+purchases a fraction of which buys nothing. The goods are consumed; the player's corp is never a
+supplier.
+
+`space_programme`'s consumer is `derive_space_programme_claims` / `settle_space_purchases`
+(`src/world/space_programme.{hpp,cpp}`): the state picks the supplier pool holding the most stock
+that covers a whole lump, prices it at the supplier market's own resolved price (procurement's
+basis — never an order on the market), pays through the budget pass's ordinary transfer, and the
+goods leave the pool **without landing anywhere** — state demand is terminal. The lump sizes are
+data (`economy.space_programme`, scripts/economy.lua). The player's corp is never a supplier: a
+state purchase drains the supplier's pool unasked, which on a rival is the standing trading grant's
+reach and on the player's corp would be a forced sale.
 
 ### 4. Law authorship
 
@@ -207,18 +257,23 @@ mechanism.
 `all_nations` sentinel for the blanket form. The intended authoring path is a derivation at campaign
 setup from the Era −1 sim's pair outcomes.
 
-**The tariff has no author** (Ben, 2026-08-23, ruling on NR-400). This is a deliberate ordering, and
-it is stated here so the section above is not read as describing a live duty. `import_tariff` is a
-member of the law-effect vocabulary and of the save format, and `market_clearing` carries the whole
-duty pass — but **nothing enacts one**. No corp verb, no control, and no generation path authors a
-tariff law; the generator seeds the extraction levy alone. So `any_import_tariff_enacted` is false
-for the whole of a played campaign, and the duty pass is unreached.
+**Its author is the history that produced it.** `seed_national_tariffs` enacts one blanket tariff
+per nation whose inherited protection clears the floor, authored by that nation — so the duty falls
+in the author's own market and credits the author's own treasury, through the single
+`enacting_nation` field the levy already uses. No second author, no branch in `market_clearing`, no
+corp verb and no control: the *only* path that writes a tariff is the handoff out of pre-history
+(§ 4 Tariffs).
 
-That makes the tariff **vocabulary ahead of its consumer** — the same shape META_LAYER.md's unwired
-modifier subjects have, and subject to the same discipline: a shape is proven by an instance, and
-an instance is owed. What it is *not* is an inert mechanic the reader should design against as
-though it were charging anyone. The nation grant (§ The 2026-08-18 grant) is what a rate-setting
-author would be built on: setting a tariff rate is named there as a nation power.
+That is what closes the ordering this section used to record. `import_tariff` was **vocabulary ahead
+of its consumer** — a member of the law-effect enum and of the save format, with the whole duty pass
+built and nothing enacting one — the same shape META_LAYER.md's unwired modifier subjects have, and
+subject to the same discipline: *a shape is proven by an instance, and an instance is owed*. The
+instance is the generated posture, and it arrives from history rather than from a dial, which is the
+only form of it § 4 Tariffs would accept.
+
+**`any_import_tariff_enacted` therefore answers a real question now**, and the answer varies by
+world: a world whose pre-history produced no protective polity enacts nothing and pays nothing for
+the mechanism, exactly as before. No tariff is a legitimate world, not a gap.
 
 ---
 
@@ -266,7 +321,9 @@ somebody else's machinery:
    overwrites one entry of `w.nation_budgets`; the rest keep last quarter's weights.
 2. **Gather.** This tick's claims come off `economy_report::budget_claims`, emitted earlier in the
    same tick by `corp_ai`'s cash gate — a rival that wanted to survey a body and could not afford
-   it asks its home nation. Nothing here invents a claim. Every field of a claim is validated at
+   it asks its home nation — plus the state's own `space_programme` purchase claims, derived here
+   (§ A budget: the one line whose claimant is the nation itself, its payee the supplier).
+   Every field of a claim is validated at
    gather time, the line index included: a claim carrying an out-of-range line is dropped whole,
    never clamped onto a line nobody asked for, because the moment a claim arrives over `--serve`
    this is an untrusted input boundary.
@@ -340,7 +397,7 @@ It closes a circuit. The levy and the tariff **fill** a treasury; the budget is 
 makes a full loop — corp → nation → corp — instead of draining into a field no reader could account
 for.
 
-It also fits the player identity rather than straining it. A mercenary company is a **law subject,
+It also fits the player identity rather than straining it. A corporation is a **law subject,
 never a legislator**, which leaves it no lever of its own on the rules it works inside. Lobbying is
 the one mechanism that changes that without changing what the player is: **you do not pass the law,
 you pay someone who does.** The `lobby` verb is the *only* route to influence over a nation, and it
@@ -425,6 +482,57 @@ read a tariff and find the war behind it. Those same pair outcomes are the true 
 scorer's grudge term (§ 5).
 
 *Owned by BL-541 (directional tariffs).*
+
+**A polity's protection is a DERIVED output, not a scored verb (Ben, 2026-09-06).** The pre-history
+polity does not spend a round choosing protectionism. It carries a protection scalar moved
+deterministically by facts it already accumulates — when it industrialised relative to its
+neighbours (the axis `derive_national_character` already reads for ideology), and whether it holds
+colonies, since a metropole protects its ties. At handoff a polity above the threshold enacts an
+ordinary `import_tariff` law on its campaign nation, the rate banded off the scalar.
+
+**The timing term is a PRODUCT of two readings, and neither alone would do.** How much of the field
+is ahead — the share of surviving polities that lit a furnace strictly before this one — multiplied
+by how far behind it is, its own lag from the world's first furnace as a share of the span from that
+furnace to the epoch. Rank alone is uniform by construction: the last polity in a twelve-way field
+always scores top whether it lit two years late or never. Lag alone makes every non-industrialiser
+saturate, so a world where one polity of twelve industrialises would tariff eleven nations
+identically. The product says *behind, and far behind*.
+
+**A world where nobody lit a furnace scores zero for everyone**, and it falls out rather than being
+special-cased: with no furnace nobody is strictly ahead of anybody and the share term collapses.
+That is the honest reading — protection is a response to an industrial competitor, and a world
+without one has nothing to protect against.
+
+**The colony term is owed, not forgotten.** It has no input while a polity cannot claim ground across
+water; the colonial era's two claim verbs (`../research/COLONIAL_ERA.md` § Two ways to claim
+ground across water; BL-832, colonial ties) are what give it one, and it lands as an addend on the
+same scalar. A purchased province counts as a colony exactly as a conquered one does — a metropole
+protects what it bought no less than what it took. A far-flung holding is a large empire, not an
+overseas one, so no proxy stands in for it meanwhile.
+
+**A nation's opening treasury is the same span's output.** The wealth scalar the colonial era derives
+per polity (`../generation/EXPLORATION.md` § Capital arrives, and it sits in the capital) seeds the balance § 2 opens
+with — furnace timing, discoveries, purchases, spoils and lanes — so a rich nation is rich because
+its history was, and the spread across nations is reported rather than flattened.
+
+**Rates are banded, blanket, and first-cut.** Three ad-valorem bands above a floor, so the report can
+show *how hard* a history protects and not merely *whether* — a single threshold yields one number
+per world and cannot show whether the scalar carries variation, which is the measurement the
+paragraph below turns on. The directional form — `(author, target, resource) → rate` — stays
+BL-541's; scoping the first instance to one resource would be building half of that item here.
+
+The alternative — protection as a **verb** the polity spends a round on, which would make it a real
+strategy weighting alongside the others — is held as the **fallback, conditioned on a
+measurement**: if the derived form produces a *flat* distribution, where every world tariffs the
+same nations to the same degree or none at all, then the scalar is not carrying real variation and
+the verb is what would give it some. Flatness is the trigger and it is the only one; the verb costs
+a candidate per round and is not bought for elegance.
+
+This keeps the tariff inside the 2026-08-18 nation grant unchanged either way — setting a rate is
+named there as a nation power, and a derived posture is pure, seeded and replayable by
+construction. And it keeps the player-facing half honest: a home market sheltered because *its
+nation's history sheltered it* is a force with a visible cause, which is the standing requirement
+that market conditions never come from a term inside an agent.
 
 ### 5. What a nation wants — **a positional objective, not an accumulative one**
 
@@ -535,8 +643,8 @@ harness must say so where a reader would otherwise assume the channel's rule.
 **Related authorities.** `docs/generation/NATION_GENERATION.md` (how a nation is made),
 `docs/economy/FINANCE.md` (the money loop the levy is accounted in), `docs/economy/MARKETS.md`
 (§ Tariffs, the clearing-tick half), `docs/politics/RELATIONS.md` (sentiment, the substrate
-nation→corp stance reads), `docs/economy/CONTRACTS.md` (§ Where offers come from, the
-`contracted_force` line's consumer), `docs/military/MILITARY.md` (§ Nation garrisons, the
+nation→corp stance reads), `docs/economy/CONTRACTS.md` (§ Explicitly out of scope, the sell side
+the `contracted_force` line would buy through), `docs/military/MILITARY.md` (§ Nation garrisons, the
 `military_research` line's other consumer), `docs/SYSTEMS.md` (§ Policy, § Conditions),
 `.claude/rules/io-standing-rules.md` (the grant's exact terms).
 

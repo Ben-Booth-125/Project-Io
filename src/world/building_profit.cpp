@@ -50,7 +50,8 @@ building_profit estimate_building_profit(const world& w, const recipe_registry& 
         scalar = bl->second;
 
     const building_opex opex = compute_building_opex(b, reg.economics(b.type), scalar,
-                                                     body_mean_habitability(w, body));
+                                                     body_mean_habitability(w, body),
+                                                     reg.idle_maintenance_floor());
     out.maintenance = opex.maintenance;
     out.wages       = opex.wages;
 
@@ -175,7 +176,8 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
     // exactly — the pre-build number and the post-build Net must be the same quantity.
     const building_economics& econ = reg.economics(type);
     const building_opex opex =
-        compute_building_opex(bc, econ, 1.0f, body_mean_habitability(w, tc.body));
+        compute_building_opex(bc, econ, 1.0f, body_mean_habitability(w, tc.body),
+                              reg.idle_maintenance_floor());
     out.maintenance = opex.maintenance;
     out.wages       = opex.wages;
 

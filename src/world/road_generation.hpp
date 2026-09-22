@@ -1,6 +1,9 @@
 #pragma once
 
+#include "era_timelapse.hpp" // history_corridor / history_road_node (BL-768)
 #include "world.hpp"
+
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // Road-network generation (BL-146 — follow-on from the BL-077 logistics core)
@@ -44,3 +47,59 @@
 // finds the roaded corridors cheaper. Tuning (Ben, 2026-07-11): Track=1, Road=2,
 // Highway=3; major-centre threshold scale>=3, Town+ threshold scale>=2.
 void generate_roads(world& w, entity_id body);
+
+// ---------------------------------------------------------------------------
+// Ancient roads, STAMPED FROM the history (BL-768)
+// ---------------------------------------------------------------------------
+//
+// Ben, the 2026-09-03 eight-phase reorder, point 4: *"We should also be laying
+// simple roads to supply provinces."* This is that, and the emphasis is on
+// FROM: the roads are not laid inside the Era -1 sim — a feasibility pass came
+// back blocked on three independent structural grounds (era_timelapse.hpp
+// § The ancient road record) — they are stamped afterwards from what the sim
+// RECORDED walking. Each corridor is a campaign's staging-to-objective supply
+// line or a founding party's parent-to-daughter route, so the network's shape
+// is the history's own trunk routes rather than a plausible-looking lattice.
+//
+// AN ERA-APPROPRIATE TIER RULE, WHICH THIS ITEM OWED. `generate_roads`' gates
+// read a nation's qualification PERCENTILE (LOGISTICS.md § Roads), which is a
+// 1960-era field derived from industrialisation timing; an ancient road cannot
+// borrow it, and an antiquity world has no spread in it to read anyway. The
+// ancient rule keys on the two things the history does produce:
+//
+//   TRAFFIC       — how many times the corridor was actually used. A line an
+//                   empire supplied four campaigns and a dozen foundings along
+//                   is a Road; one walked once is a Track.
+//   WORKS         — whether BOTH ends raised something reach-bearing. A work
+//                   promotes the corridor one rung, and it is the ONLY route to
+//                   a Highway before the industrial era, so an ancient trunk
+//                   highway means traffic AND the stations to carry it.
+//
+// That keeps LOGISTICS.md's antiquity shape intact — "Roads on every Town+
+// backbone, Highways nowhere" for a world that built nothing — while giving the
+// works roster a payoff that persists onto the campaign map, which is what
+// BL-757's zero-works finding left it without.
+//
+// PURELY ADDITIVE, and deliberately run AFTER `generate_roads`. Stamping takes
+// the max on overlap, so no modern road is ever downgraded and the ancient
+// network appears exactly where the nation lattice did not already reach or
+// reached lower. Running it BEFORE was the other option and is rejected here:
+// the modern pass decides its MST and its tiers on terrain-weighted A* costs,
+// so pre-stamped ancient roads would silently re-route the whole national
+// lattice — a far larger change than this item's aim, and one that would move
+// every road-shaped measurement at once for a reason unrelated to the history.
+//
+// Deterministic: `corridors` arrives sorted by (a, b), the tier rule is pure
+// integer arithmetic over the corridor's own fields, and the stamp takes the max
+// per tile — so neither the walk order nor the overlap order can vary the field.
+// Roads are a land feature here exactly as in `generate_roads`: water tiles are
+// skipped and a corridor whose route crosses open ocean is not stamped at all.
+//
+// @param nodes      Indexed by region — where each region stood, and its
+//                   accumulated works reach. A corridor naming an index past
+//                   the end of this array is skipped.
+// @param corridors  `history_sim_state::supply_corridors`. Empty (a world with
+//                   no Era -1 pass) makes the whole call a no-op.
+void stamp_history_roads(world& w, entity_id body,
+                         const std::vector<history_road_node>& nodes,
+                         const std::vector<history_corridor>&  corridors);

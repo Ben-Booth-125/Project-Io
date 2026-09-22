@@ -114,3 +114,236 @@ struct continent_state
 /// @param seed Per-body seed, already folded with the campaign seed (same
 ///             convention as run_planetology and generate_body_tiles).
 continent_state run_continents(const planetology_state& pl, int gw, int gh, uint32_t seed);
+
+// ===========================================================================
+// BL-763 — the drift TIME AXIS
+// ===========================================================================
+//
+// `tectonic_plate::drift_col`/`drift_row` were documented "per-epoch" and NO
+// EPOCH LENGTH WAS DEFINED ANYWHERE. The drift vector existed and nothing
+// integrated it, so the pass produced an endpoint and no history: "where was
+// this ground at age T" was not a question the layer could answer. That is the
+// first of the three gaps behind the Life phase (BL-765); the other two —
+// ground that actually rides its plate, and a per-tile past climate — are
+// BL-764's and are NOT addressed here.
+//
+// WHY A DERIVED SNAPSHOT RATHER THAN A STORED SEQUENCE. The item asked for
+// `run_continents` to return an ordered sequence. It does not, deliberately:
+// `continent_state` is on the SAVE ENVELOPE seam (src/core/save_game.cpp), and
+// twenty `plate_id` rasters at 31,581 tiles each is ~2.5 MB of save per body
+// for data that is a pure function of five floats per plate. So the sequence is
+// DERIVABLE rather than stored — the epoch length and depth are defined
+// constants, and `continent_snapshot_at` reconstructs any epoch on demand. The
+// ordered sequence is `continent_snapshot_at(cs, e, ...)` for e in [0, depth],
+// and it costs nothing until someone asks for it.
+
+/// Years per drift epoch. One grid column on the home body is roughly 153 km
+/// (a ~40,000 km circumference over 261 columns), and Earth-like plate motion
+/// covers that in about 3-6 My — so 5 My per epoch puts `drift_col`'s clamped
+/// 0.15-1.2 columns per epoch at a plausible rate rather than an arbitrary one.
+/// It is a STATED constant, which is the whole point: the previous value was
+/// undefined and therefore unfalsifiable.
+inline constexpr int64_t continent_epoch_years = 5'000'000;
+
+/// How far back the drift record is meaningful, in epochs. 20 epochs is 100 My
+/// — deep enough to reach a carboniferous-analogue coal window, shallow enough
+/// that extrapolating a single linear drift vector is not a fiction. Past this
+/// the plates' straight-line motion stops being a defensible reconstruction.
+inline constexpr int continent_drift_epochs = 20;
+
+/// The plate configuration at one past epoch. Derived, never stored.
+struct continent_snapshot
+{
+    /// How far back this snapshot sits. 0 is the present.
+    int     epochs_back         = 0;
+    int64_t years_before_present = 0;
+
+    /// The plates with their seeds wound BACK along their drift vectors. Every
+    /// other field (drift, oceanic) is carried through unchanged — drift is a
+    /// constant of the plate, not a per-epoch state.
+    std::vector<tectonic_plate> plates;
+
+    /// [row*gw+col] index into `plates`, the Voronoi assignment at that epoch.
+    /// At `epochs_back == 0` this is bit-identical to `continent_state::plate_id`
+    /// by construction — same seeds, same comparison, same tie-break.
+    std::vector<int> plate_id;
+};
+
+/// The plate configuration @p epochs_back drift epochs before the present.
+///
+/// PURE, and it consumes NO RANDOMNESS. That is what makes it safe to add: the
+/// plate stream in `run_continents` draws position, direction and oceanic flag
+/// for every plate from one shared `rng` in a fixed order, so a single new draw
+/// anywhere in that loop would shift every subsequent plate and change the
+/// world. This function touches none of it — it winds existing seeds back and
+/// re-runs the Voronoi.
+///
+/// It also does NOT re-run the boundary classification or the rift-basin
+/// search. The basin search is the expensive half of the pass (O(total) per
+/// candidate pair with a 25-sample inlandness probe per corridor tile) and it
+/// describes the PRESENT surface; re-running it per epoch would cost more than
+/// the snapshot and mean less.
+///
+/// A stagnant-lid body (one plate) returns its single plate and an all-zero
+/// assignment at every epoch, which is correct: nothing drifted.
+continent_snapshot continent_snapshot_at(const continent_state& cs, int epochs_back,
+                                        int gw, int gh);
+
+// ===========================================================================
+// BL-764 — TILES RIDE PLATES (slice 1: the query)
+// ===========================================================================
+//
+// THE STRUCTURAL PROBLEM, restated so the fix is legible. `plate_id` answers
+// "which plate seed is nearest this FIXED grid cell". Under drifting seeds that
+// is a Voronoi partition reshuffling over stationary ground — the boundaries
+// move, the ground does not — so "this tile was at the equator in the
+// carboniferous" was not expressible. And latitude was the same problem in its
+// sharpest form: `band_for_row(row)` IS the raster row, fixed for all time, so
+// there was no representation in which a tile HAD a different latitude.
+//
+// THE FRAME. A tile is a MATERIAL POINT on the plate it sits on today. A plate
+// translates rigidly by its own drift vector, so the tile's offset from its
+// plate's seed is a constant of the tile, and its position at epoch e back is
+// simply the present position minus drift x e. That is the same winding
+// `continent_snapshot_at` applies to the seeds, applied to the ground instead —
+// which is exactly what makes the two consistent: a tile rides ONE plate at
+// every epoch, and never appears to hop between them as the partition reshuffles
+// underneath it.
+//
+// It also makes the epoch-0 identity trivial rather than delicate: drift x 0 is
+// zero, so the past position IS the present position, the band is the band Pass 3
+// assigned, and the moisture sample is the tile's own. Nothing downstream can
+// move until BL-765 asks for a non-zero epoch.
+//
+// WHAT THE FRAME DELIBERATELY DOES NOT DO — see CONTINENTS.md § The boundary
+// of the frame for the full list. It does not re-derive height, cover or ocean
+// at a past epoch; it does not flip longitude for ground that crossed a pole;
+// and it carries no body-global palaeo-thermal term, because over the 100 My
+// the drift record spans the radiogenic budget moves by well under a percent
+// and latitude is the whole story.
+//
+// The GENERATOR reads through it (BL-963): Pass 3 takes its present band
+// raster from `paleo_frame_at` at epoch 0 and the Life phase takes the fossil
+// epochs from the same function, so the present is the epoch-0 member of one
+// family rather than a separate lookup the query had to be proved equal to.
+// The epoch-0 identity is what keeps that safe, and continent_drift holds it.
+
+/// Where a tile WAS, and what climate it sat in, at a past drift epoch.
+///
+/// Derived, never stored — a pure function of the plate set and the tile's
+/// present position, exactly as `continent_snapshot` is.
+struct paleo_tile_state
+{
+    int     epochs_back          = 0;
+    int64_t years_before_present = 0;
+
+    /// The plate the tile RIDES. Read from the present assignment and constant
+    /// across the whole record: a material point does not change plates.
+    int plate = 0;
+
+    /// Past position on the grid's own axes. `col` is wrapped into [0, gw).
+    /// `row` is NOT clamped and NOT folded — a tile whose plate carried it past
+    /// a pole reports a row off the grid, which is the honest answer and is what
+    /// `on_grid` below is for.
+    float col = 0.0f;
+    float row = 0.0f;
+
+    /// |distance from the equator| at that epoch, in [0, 1]. Folded over the
+    /// poles: ground carried past a pole comes back DOWN in latitude rather than
+    /// running off the scale.
+    float latitude = 0.0f;
+
+    /// The climate belt that latitude sat in, under the body's thermal class.
+    /// At `epochs_back == 0` this is bit-identical to Pass 3's own assignment.
+    lat_band band = lat_band::temperate;
+
+    /// The body's moisture field sampled at the past position (nearest cell).
+    /// Zero when no field was supplied.
+    float moisture = 0.0f;
+
+    /// True when the past position landed inside the grid, so `moisture` is a
+    /// real sample rather than one taken at a clamped row. False is not an
+    /// error — it means the ground drifted over a pole, and the caller is being
+    /// told rather than handed a silently wrong number.
+    bool on_grid = true;
+
+    /// False when no moisture field was supplied, so `moisture` is 0 by default
+    /// rather than by measurement.
+    bool moisture_known = false;
+};
+
+/// Ask a tile where it was and what its climate was, @p epochs_back drift epochs
+/// before the present.
+///
+/// PURE, and consumes no randomness — the same property that makes
+/// `continent_snapshot_at` safe to add, and for the same reason: a single draw
+/// anywhere near the plate stream would shift every later plate and change the
+/// world.
+///
+/// @param cs       The body's continents result. An empty plate set or a
+///                 stagnant lid leaves the tile stationary at every epoch, which
+///                 is correct: nothing drifted.
+/// @param gw,gh    The tile grid the tile's (col, row) is on.
+/// @param col,row  The tile's PRESENT grid position.
+/// @param epochs_back  Drift epochs before the present; negatives clamp to 0.
+///                 Past `continent_drift_epochs` the linear extrapolation stops
+///                 being a defensible reconstruction (see that constant) — the
+///                 function still answers, and the caller owns the depth.
+/// @param temp     The body's thermal class, which sets the band boundaries.
+/// @param moisture Optional per-tile moisture field (`generation_record::moisture`),
+///                 sized gw*gh. Sampled at the PAST position, because the
+///                 Lagrangian premise is that ground moves through a climate
+///                 rather than carrying one with it. Null leaves `moisture` zero
+///                 and `moisture_known` false.
+paleo_tile_state paleo_tile_at(const continent_state& cs, int gw, int gh,
+                               int col, int row, int epochs_back,
+                               temperature_class temp,
+                               const std::vector<float>* moisture = nullptr);
+
+// ---------------------------------------------------------------------------
+// BL-963 — the climate FRAME, the raster form of the query above
+// ---------------------------------------------------------------------------
+//
+// `paleo_tile_at` answers one tile at one epoch. The generator does not want
+// one tile: Pass 3 wants every tile's band at the present, and the Life phase
+// wants every tile's band and moisture at the two fossil epochs. Those are the
+// SAME question asked of a whole raster, and answering it as a raster is what
+// makes the present a member of the family rather than a separate lookup — the
+// present band raster is the frame at epoch 0, the coal raster is the frame at
+// the coal epoch, one implementation between them.
+//
+// It is built BY the query, tile for tile, not beside it: a second winding
+// would be a second copy of the frame, and the two-callers-one-implementation
+// discipline BL-764 established for the band table holds for the winding too.
+// Derived, never stored, consumes no randomness — every property of
+// `paleo_tile_at` is inherited because it IS `paleo_tile_at`, gw*gh times.
+
+/// Every tile's plate-carried climate at one drift epoch, in raster order.
+struct paleo_frame
+{
+    int     epochs_back          = 0;
+    int64_t years_before_present = 0;
+
+    /// [row*gw+col] pole-folded |distance from the equator| in [0, 1].
+    std::vector<float> latitude;
+
+    /// [row*gw+col] the climate belt that latitude sat in. At `epochs_back == 0`
+    /// this IS Pass 3's band raster — not equal to it, the thing itself.
+    std::vector<lat_band> band;
+
+    /// [row*gw+col] the moisture field sampled where the ground was (nearest
+    /// cell). Empty when no field was supplied.
+    std::vector<float> moisture;
+
+    /// [row*gw+col] 1 where the past position landed inside the grid, so the
+    /// moisture entry is a real sample rather than one taken at a clamped row.
+    std::vector<uint8_t> on_grid;
+};
+
+/// The frame @p epochs_back drift epochs before the present: `paleo_tile_at`
+/// for every tile, laid out as rasters. Same parameters, same contracts —
+/// an empty plate set or a stagnant lid returns the present at every epoch,
+/// and epoch 0 returns the present exactly.
+paleo_frame paleo_frame_at(const continent_state& cs, int gw, int gh,
+                           int epochs_back, temperature_class temp,
+                           const std::vector<float>* moisture = nullptr);

@@ -9,12 +9,17 @@
 #include <imgui.h>
 
 #include "ui/detail_level.hpp"
+#include "ui/foldout_column.hpp"     // foldout_scroll_child — BL-904's wizard-column scroll verb
 #include "ui/generation_charts.hpp"
 #include "ui/generation_preview.hpp"
+#include "ui/history_lapse.hpp"      // BL-829/BL-830: round 4's map and its board
+#include "world/colonisation.hpp"   // colonisation_start_year -- the Culture round's own first year (BL-919)
+#include "world/era_timelapse.hpp"   // owner_slice_at — the whole replay substrate
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <random>
 #include <string>
@@ -27,6 +32,40 @@ void app::open_new_world_wizard()
     m_wiz_round = 0;
     m_wiz_dirty = true;
     m_screen    = app_screen::generating;
+
+    // THE EMPIRES ROUND STARTS AT 400 BCE (BL-871, revising BL-846's 4000;
+    // Ben, 2026-09-09). `era_minus_one_sim_params`'s single-span branch
+    // (`era_minus_one.cpp`) derives the sim's own start year as
+    // `epoch_year - prehistory_years`; at this wizard's epoch (0 CE — the
+    // "ancient refocus" default, NR-177) that means `prehistory_years` IS the
+    // number of years before 0 CE the sim starts at. 400 lands it at exactly
+    // 400 BCE, the year `CIVILISATION.md` § The span is 400 BCE to 1200 CE
+    // hands the Empires round.
+    //
+    // NOT SIXTEEN HUNDRED YEARS, AND THAT IS A KNOWN GAP, NOT AN OVERSIGHT.
+    // The design's full arithmetic is 400 BCE -> 1200 CE, 1,600 years — but
+    // reaching 1200 CE needs an epoch past it, and this wizard's epoch is
+    // still 0 CE: round 5 (Industrialisation) and pass 2's 1560 -> 1960 span
+    // (`GENERATION_STRATEGY.md` § Pass 2 is the economy pass) are not built
+    // yet (`draw_pass_round_placeholder`), so nothing today can watch the sim
+    // run past 0 CE. CIVILISATION.md's own words: "sixteen hundred years is
+    // the constraint on the phase going forward, not something to solve in
+    // this item." What BL-871 owes is the SPLIT and the STARTING YEAR the
+    // Culture round hands off at; the full depth is follow-on work once the
+    // epoch moves.
+    //
+    // THE MIGRATION IS NOT COUNTED HERE. It used to be: the OLD figure (4000)
+    // put the sim's own start at roughly 4000 BCE, so a single continuous run
+    // covered colonisation AND conquest and both wizard rounds replayed it.
+    // BL-871 splits them — the migration now runs to its own derived end year
+    // (`colonisation_start_year`, colonisation.hpp, -2400) and the world
+    // COASTS from there to 400 BCE holding what it left behind, so the sim
+    // itself only ever needs to start where the Empires round does.
+    //
+    // THIS IS ALSO WHAT "BEGIN" BUILDS (unchanged from before BL-846): the
+    // struct default already IS 400, so this line is written for clarity
+    // against the new arithmetic rather than for a numeric change.
+    m_pending_world_params.prehistory_years = 400;
 }
 
 void app::refresh_wizard_preview()
@@ -62,9 +101,14 @@ void app::refresh_wizard_preview()
         const auto tiles = generate_home_surface_preview(scratch, probe,
                                                          m_pending_world_params);
         m_wiz_surface.resize(tiles.size());
+        m_wiz_terrain.resize(tiles.size());
         for (std::size_t i = 0; i < tiles.size(); ++i)
-            m_wiz_surface[i] = ui::preview_pack(scratch.tiles.at(tiles[i]).substrate,
-                                                scratch.tiles.at(tiles[i]).cover);
+        {
+            const tile_component& tc = scratch.tiles.at(tiles[i]);
+            m_wiz_surface[i] = ui::preview_pack(tc.substrate, tc.cover);
+            m_wiz_terrain[i] = ui::pack_lapse_terrain(tc.landform, tc.river_edges,
+                                                      tc.river_downstream);
+        }
     }
     else if (m_wiz_surface_future.valid())
         m_wiz_surface_stale = true;
@@ -79,12 +123,413 @@ void app::launch_wizard_surface_build()
             world scratch;
             const entity_id probe = scratch.create_entity();
             const auto tiles = generate_home_surface_preview(scratch, probe, params);
-            std::vector<uint8_t> comp(tiles.size());
+            ui::wizard_surface out;
+            out.comp.resize(tiles.size());
+            out.terrain.resize(tiles.size());
             for (std::size_t i = 0; i < tiles.size(); ++i)
-                comp[i] = ui::preview_pack(scratch.tiles.at(tiles[i]).substrate,
-                                           scratch.tiles.at(tiles[i]).cover);
-            return comp;
+            {
+                const tile_component& tc = scratch.tiles.at(tiles[i]);
+                out.comp[i]    = ui::preview_pack(tc.substrate, tc.cover);
+                out.terrain[i] = ui::pack_lapse_terrain(tc.landform, tc.river_edges,
+                                                        tc.river_downstream);
+            }
+            return out;
         });
+}
+
+namespace {
+
+/// Lift the recorded era out of a finished generation report.
+///
+/// EVERYTHING THE ROUND DRAWS COMES FROM HERE, and it is all a reading: the
+/// change list, the settled regions' positions and names, and generation's own
+/// three era counters. Nothing is re-simulated and nothing is re-derived — see
+/// `app::launch_wizard_history_run` for why that matters more than it looks.
+///
+/// @param lapse_index Which lapse round this is: 0 = Culture (the migration),
+///                   1 = Empires, 2 = Exploration (BL-946). Culture's owners
+///                   are CULTURES and it therefore carries the lineage
+///                   palette (BL-919); Empires and Exploration's owners are
+///                   polities and carry none. Exploration reads its own
+///                   recorded span (`exploration_timelapse`) rather than the
+///                   Empires round's `prehistory_timelapse`.
+/// @param adopted    True when the report is the harness's own finished world
+///                   rather than a run stopped at this round's end. A finished
+///                   report's record is the Empires sim's, so the Culture round
+///                   folds the migration's own out of the settlement instead —
+///                   the same fold generation makes, on the same regions.
+ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_index,
+                                    bool adopted)
+{
+    const bool migration   = lapse_index == 0;
+    const bool exploration = lapse_index == 2;
+
+    ui::history_lapse h;
+
+    // The homeworld by its authored flag, not by name or position: names are
+    // generated and display-only (BL-257), and the body list can be reordered.
+    const generation_report::body_entry* home = nullptr;
+    for (const generation_report::body_entry& b : rep.bodies)
+        if (b.is_homeworld) { home = &b; break; }
+    if (home == nullptr) return h;
+
+    h.lapse  = exploration ? home->exploration_timelapse : home->prehistory_timelapse;
+    h.grid_w = home_grid_width;
+    h.grid_h = home_grid_height;
+
+    if (migration)
+    {
+        const settlement_state& ss = home->settlement;
+        if (adopted && !ss.regions.empty())
+        {
+            // The plurality on a finished report has drifted a little toward the
+            // conquerors (culture_shares shifts SLOWLY), so this is the migration
+            // as the sim left it rather than as it ended — an approximation the
+            // adopt path already accepts for the sake of not running the pass
+            // twice, and an honest one: every region still carries its people.
+            h.lapse = build_migration_timelapse(ss, colonisation_start_year,
+                                                ss.migration_end_year);
+            // The counters follow the record, not the report: a finished
+            // report's are the Empires sim's, and a migration is a diffusion
+            // with no battles in it (the worker path reports the same).
+            h.battles   = 0;
+            h.conquests = 0;
+            h.foundings = static_cast<int64_t>(ss.regions.size());
+        }
+
+        // THE CULTURE TREE, rebuilt from what the report carries. The cradle
+        // cultures themselves are not in the report — `creed_state` never
+        // crosses it — but every cradle is listed in `cradle_coined_year`, and
+        // the daughters are `spawned_cultures` whole, each naming its parent.
+        // Daughter ids run one past the last cradle culture (BL-856), so the
+        // flat index is cradles first, daughters after, in that order.
+        int32_t cradles = 0;
+        for (const auto& [cid, year] : ss.cradle_coined_year)
+            if (cid >= cradles) cradles = cid + 1;
+        std::vector<int32_t> parent(static_cast<std::size_t>(cradles), -1);
+        // BL-1017: a cradle never folds; a daughter carries its own fold.
+        std::vector<int32_t> folded(static_cast<std::size_t>(cradles), -1);
+        parent.reserve(parent.size() + ss.spawned_cultures.size());
+        folded.reserve(parent.capacity());
+        for (const culture& c : ss.spawned_cultures)
+        {
+            parent.push_back(c.parent);
+            folded.push_back(c.folded_into);
+        }
+        // THE LIVING TREE (BL-1017): the settlement record's daughters arrive
+        // folded, so the wheel is spent only on names that outlived the round.
+        ui::build_lineage_palette(h, parent, &folded);
+    }
+
+    h.region_col.reserve(home->settlement.regions.size());
+    h.region_row.reserve(home->settlement.regions.size());
+    h.region_name.reserve(home->settlement.regions.size());
+    for (const region& r : home->settlement.regions)
+    {
+        h.region_col.push_back(r.col);
+        h.region_row.push_back(r.row);
+        h.region_name.push_back(r.name);
+    }
+
+    if (!(migration && adopted))
+    {
+        // BL-946: Exploration reads its OWN counters -- the Empires round's
+        // battles/conquests/foundings describe a different span entirely, and
+        // showing them on this round would misreport what it actually ran.
+        h.battles   = exploration ? rep.exploration_battles   : rep.prehistory_battles;
+        h.conquests = exploration ? rep.exploration_conquests : rep.prehistory_conquests;
+        h.foundings = exploration ? rep.exploration_foundings : rep.prehistory_foundings;
+    }
+    return h;
+}
+
+} // namespace
+
+void app::launch_wizard_history_run(int lapse_index)
+{
+    // Out-of-range is a caller bug, not a display state: the array index below is
+    // the one thing here that cannot be clamped away silently.
+    if (lapse_index < 0 || lapse_index >= wizard_lapse_round_count) return;
+    if (m_wiz_history_future[lapse_index].valid()) return; // already running on this round
+
+    m_wiz_history[lapse_index]         = ui::history_lapse{};
+    m_wiz_history_playing[lapse_index] = false;
+    m_wiz_history_paused[lapse_index]  = false;
+    m_wiz_history_carry[lapse_index]   = 0.0f;
+    // Sentinel, not 0: a signed calendar year of 0 is a real year (0 CE), so
+    // it cannot double as "never parked yet". `poll_wizard_history_tap`'s
+    // first live update and `poll_wizard_history`'s landing both snap this to
+    // the record's own start_year on sight of it (BL-914) — the same "parks
+    // at its first year" this member's own comment always promised, just no
+    // longer forced to happen ONLY at landing.
+    m_wiz_history_year[lapse_index]    = INT32_MIN;
+
+    // BL-914: the tap for a fresh run. Reset FIRST, before anything can
+    // publish into it, then pointed at from `prog` — a worker started below
+    // reads `prog.lapse_tap` once, at its own leisure, and by then it is
+    // already this round's tap and already empty.
+    era_lapse_tap& tap = m_wiz_history_tap[lapse_index];
+    tap.reset();
+    m_wiz_history_tap_seen[lapse_index]       = tap.epoch_now();
+    m_wiz_history_tap_redraw_at[lapse_index]  = 0.0;
+
+    // The wait's own content. Cleared FIRST so no frame can read the previous
+    // run's pass split as this one's — the same ordering begin_new_game keeps.
+    generation_progress& prog = m_wiz_history_progress[lapse_index];
+    prog.stage.store(0, std::memory_order_relaxed);
+    prog.label.store(0, std::memory_order_relaxed);
+    // `stage_count` is published below, once this round's stop is known
+    // (BL-1053): it is the stages the round's run will report, not a table size.
+    prog.sub_progress.store(0, std::memory_order_relaxed);
+    prog.sub_total.store(0, std::memory_order_relaxed);
+    prog.lapse_tap = &tap; // BL-914: null-safe in run_history_sim/make_hard_coded_world.
+
+    // UNDER --verify, ADOPT THE WORLD THE HARNESS ALREADY BUILT. run_verify opens
+    // in_game on a generated world, so `m_generation_report` already holds this
+    // very record — running the pass a second time would cost a Debug harness
+    // minutes to reproduce a record it is already holding, and would produce the
+    // same one. Nothing is faked: it is generation's report either way.
+    if (!m_golden_dir.empty())
+    {
+        ui::history_lapse adopted = lapse_from_report(m_generation_report,
+                                                      lapse_index,
+                                                      /*adopted=*/true);
+        if (!adopted.empty())
+        {
+            m_wiz_history[lapse_index]      = std::move(adopted);
+            m_wiz_history_year[lapse_index] = m_wiz_history[lapse_index].lapse.start_year;
+            return;
+        }
+    }
+
+    // Lua and the works table are read on THIS thread before the worker starts:
+    // sol2 is not thread-safe, and `m_works` is generation's input (BL-321).
+    m_lua.load("scripts/world_gen.lua");
+    world_gen_config cfg{};
+    cfg.load_from_lua(m_lua);
+    ensure_works_loaded();
+
+    // STOP WHERE THIS ROUND'S OWN SPAN ENDS, AND NO FURTHER (BL-871, extended
+    // to a third span by BL-946). The three lapse rounds are no longer one
+    // fused pass replayed thrice: round 3 (Culture, lapse_index 0) wants the
+    // migration's own record and must stop BEFORE the Empires round's history
+    // sim ever starts; round 4 (Empires, lapse_index 1) wants that sim's
+    // record and stops once IT has run, before the Exploration span or
+    // borders/roads/companies are computed and thrown away; round 5
+    // (Exploration, lapse_index 2) wants ITS OWN span's record and stops once
+    // it has run, before borders, roads and companies — stages 9-12 — are
+    // computed and thrown away (measured 10,805 ms of 11,316, about 95% of
+    // the wait, and why the round visibly hung on "Laying roads", Ben,
+    // 2026-09-09).
+    //
+    // Note this is set on the COPY the worker takes, never on the campaign's:
+    // `begin_new_game` builds a whole world from its own config, and a world
+    // stopped at any of these points has no nations, roads or corporations in it.
+    //
+    // BL-1040: `stop_after_exploration` also keeps the Digitisation span out
+    // of round 5's run (generation gates the span on it), so this round plays
+    // Exploration's record alone whatever `digitisation_span_enabled` says.
+    // The Digitisation round's own stop, `stop_after_digitisation`, exists for
+    // the day that round plays a record; it is a placeholder today
+    // (`draw_pass_round_placeholder`) and launches no generation.
+    world_gen_config hist_cfg = cfg;
+    if (lapse_index == 0)      hist_cfg.stop_after_migration   = true;
+    else if (lapse_index == 1) hist_cfg.stop_after_ancient_era = true;
+    else                       hist_cfg.stop_after_exploration = true;
+
+    // BL-1053: the stages this stopped run will report (7 for the Culture
+    // round, 8 for the other two), published before the worker starts so the
+    // total never reads as the label table's size. Generation restates it.
+    prog.stage_count.store(generation_stage_count(hist_cfg), std::memory_order_relaxed);
+
+    auto run = [this, hist_cfg, lapse_index, params = m_pending_world_params]() {
+        generation_report rep;
+        // The world itself is DISCARDED. What the round wants is the era it
+        // recorded, and holding the world would only invite a second, divergent
+        // copy of the campaign's own.
+        (void)make_hard_coded_world(params, &rep, hist_cfg,
+                                    &m_wiz_history_progress[lapse_index], &m_works);
+        return lapse_from_report(rep, lapse_index, /*adopted=*/false);
+    };
+
+    if (!m_golden_dir.empty())
+        m_wiz_history_future[lapse_index] = std::async(std::launch::deferred, run);
+    else
+        m_wiz_history_future[lapse_index] = std::async(std::launch::async, run);
+
+    // A deferred future never becomes ready on its own, so a capture path
+    // resolves it here and now rather than spinning forever in poll.
+    if (!m_golden_dir.empty())
+        poll_wizard_history();
+}
+
+void app::poll_wizard_history()
+{
+    // Every lapse round, not just the one on screen: a player who presses Next
+    // while round 4 is still running must not strand its worker's result — the
+    // future is adopted wherever the wizard has got to by the time it lands.
+    for (int i = 0; i < wizard_lapse_round_count; ++i)
+    {
+        if (!m_wiz_history_future[i].valid())
+            continue;
+        if (m_golden_dir.empty()
+            && m_wiz_history_future[i].wait_for(std::chrono::seconds(0))
+                   != std::future_status::ready)
+            continue;
+        ui::history_lapse landed = m_wiz_history_future[i].get();
+        if (m_wiz_history_stale[i])
+        {
+            // The ground moved while this ran: it is a true history of a world the
+            // player has already rerolled away from. Dropped rather than drawn.
+            m_wiz_history_stale[i]   = false;
+            m_wiz_history[i]         = ui::history_lapse{};
+            m_wiz_history_playing[i] = false;
+            continue;
+        }
+        m_wiz_history[i] = std::move(landed);
+
+        // CONTINUITY (Ben, 2026-09-16): a round opens on the ground the round
+        // before it left. The predecessor's LAST frame is folded to one colour
+        // per region and handed over, and the map paints it under
+        // ground nobody holds yet, fading over the opening tenth of this span.
+        // Taken at LANDING rather than at draw time because the predecessor's
+        // own record is complete by then and never changes again — the carried
+        // frame is a fact about a finished round, not a second surface to keep
+        // in step. Round 3 has nothing behind it and carries nothing.
+        // NOT gated on the predecessor having SAMPLE steps: the migration's
+        // record carries ownership deltas and no polity samples at all (its
+        // board has no People column for exactly that reason), and gating on
+        // steps left the Culture round unable to hand anything over — the one
+        // hand-over this was built for. owner_slice_at reconstructs from the
+        // deltas, so a record with a span is enough.
+        if (i > 0 && m_wiz_history[i - 1].lapse.years > 0)
+        {
+            const ui::history_lapse& prev = m_wiz_history[i - 1];
+            const int prev_end = prev.lapse.start_year + prev.lapse.years;
+            const std::vector<uint16_t> last = owner_slice_at(prev.lapse, prev_end);
+            std::vector<uint32_t> cols(last.size(), 0u);
+            int held = 0;
+            for (std::size_t r = 0; r < last.size(); ++r)
+                if (last[r] != owner_none)
+                {
+                    cols[r] = static_cast<uint32_t>(ui::lapse_owner_colour(prev, last[r]));
+                    ++held;
+                }
+            if (held > 0) m_wiz_history[i].carry_colour = std::move(cols);
+
+            // AND THE REALMS KEEP THEIR COLOURS ACROSS THE HAND-OVER (Ben,
+            // 2026-09-16: the Exploration round "looks like it actually carried
+            // over from culture"). It had not: the carry was right and the
+            // PALETTE was not.  is a greedy graph colouring over
+            // one record's own adjacency, so the Empires record and the
+            // Exploration record — different spans, different neighbour sets —
+            // gave the same realm different slots, and a realm that changed
+            // colour at the round boundary read as a different world. The
+            // polity ids are the same table (one generation, one seed, the
+            // spans continue), so a shared id keeps the slot it already had
+            // and only realms the predecessor never saw take a fresh one.
+            //
+            // Polity rounds only: the migration's owners are CULTURES in their
+            // own id space and its lineage palette is a different thing
+            // entirely, so nothing is inherited across that boundary.
+            if (prev.culture_colour.empty() && !prev.polity_slot.empty())
+            {
+                std::vector<int32_t>& slot = m_wiz_history[i].polity_slot;
+                const std::size_t n = std::min(slot.size(), prev.polity_slot.size());
+                for (std::size_t p = 0; p < n; ++p)
+                    if (prev.polity_slot[p] >= 0) slot[p] = prev.polity_slot[p];
+            }
+        }
+
+        // BL-914: LANDING NO LONGER RE-PARKS THE PLAYHEAD AT THE START. Under
+        // the old design the future carried the whole record and this was the
+        // first moment any of it was visible, so parking at the start was the
+        // only sensible year. Now the live phase has usually already been
+        // playing this very round for most of its 30 seconds — snapping back
+        // to year one the instant the future resolves would look like the
+        // transport lurching backwards at exactly the moment it should read as
+        // seamless. So: clamp what is already there into the landed record's
+        // range, and only fall back to its start_year for a round that was
+        // never live-drawn at all (the `--verify`/adopted paths, whose year is
+        // still the launch-time sentinel).
+        // PARKED AT THE FIRST YEAR (Ben, 2026-09-16). BL-914 kept whatever
+        // year the live phase had reached, because snapping back would have
+        // looked like the transport lurching. There is no live phase any more —
+        // the wait is a wait — so the record plays from its beginning, which is
+        // also the only way its hand-over cross-fade is ever seen.
+        const int lstart = m_wiz_history[i].lapse.start_year;
+        const int lend   = lstart + m_wiz_history[i].lapse.years;
+        m_wiz_history_year[i]  = lstart;
+        m_wiz_history_carry[i] = 0.0f;
+        if (m_wiz_history_year[i] > lend) m_wiz_history_year[i] = lend;
+
+        // It plays the moment it lands (or keeps playing, if the live phase
+        // already had it going): the run was the wait, and the playback is
+        // what arriving on the round asked for. Frozen under --verify, where the
+        // year is set by the script instead (verify.history_year).
+        m_wiz_history_playing[i] = m_golden_dir.empty();
+        m_wiz_history_paused[i]  = false;
+    }
+}
+
+void app::poll_wizard_history_tap(int lapse_index)
+{
+    // Only a round whose worker is still running publishes anything new; once
+    // landed, `poll_wizard_history` above owns the record wholesale, and a
+    // round nobody has started yet has no tap worth reading either.
+    if (lapse_index < 0 || lapse_index >= wizard_lapse_round_count) return;
+    if (!m_wiz_history_future[lapse_index].valid()) return;
+    // FROZEN UNDER --verify, same reason every other wizard animation is: a
+    // capture must never race a live redraw, and a `--verify` run resolves its
+    // (deferred) future synchronously before the first frame draws anyway, so
+    // this branch would have nothing to do even without the guard.
+    if (!m_golden_dir.empty()) return;
+
+    era_lapse_tap& tap   = m_wiz_history_tap[lapse_index];
+    const uint32_t epoch = tap.epoch_now();
+    if (epoch == m_wiz_history_tap_seen[lapse_index]) return; // nothing new published
+
+    // THROTTLED INDEPENDENTLY OF THE PUBLISH RATE. A founding or a recorded
+    // step can publish a few thousand times across a run; re-deriving the
+    // drawable map (`finish_history_lapse`'s BFS + terrain bake + polity
+    // colouring) that often would cost far more than the animation it is for.
+    // Redraws every ~0.2 s regardless of how many publishes landed in between
+    // — always the LATEST snapshot, never a queued backlog of frames.
+    const double now = ImGui::GetTime();
+    if (now < m_wiz_history_tap_redraw_at[lapse_index]) return;
+    m_wiz_history_tap_redraw_at[lapse_index] = now + 0.2;
+
+    ui::history_lapse& rec = m_wiz_history[lapse_index];
+    int32_t start_year = 0, year_reached = 0;
+    m_wiz_history_tap_seen[lapse_index] = tap.snapshot(
+        rec.lapse.changes, rec.lapse.culture_changes, rec.lapse.events,
+        rec.region_col, rec.region_row, rec.region_name,
+        start_year, year_reached);
+
+    if (rec.region_col.empty())
+        return; // Geometry has not been published yet — nothing drawable this poll.
+
+    const bool first_populate = (rec.grid_w == 0);
+
+    rec.lapse.start_year    = start_year;
+    rec.lapse.years         = std::max<int32_t>(0, year_reached - start_year);
+    rec.lapse.region_stride = static_cast<int32_t>(rec.region_col.size());
+    rec.grid_w = home_grid_width;
+    rec.grid_h = home_grid_height;
+
+    // Force `finish_history_lapse` to re-run: new regions and/or new ownership
+    // widen the tile assignment and can move the polity adjacency graph, so
+    // the whole one-shot derivation (tile_region, the terrain bake, the
+    // palette) is invalidated rather than patched. See history_lapse.hpp;
+    // `derived()` reads `tile_region` alone, so clearing it is sufficient.
+    rec.tile_region.clear();
+
+    // The playhead parks at the record's own first year the moment there is
+    // anything to show at all — "arriving on the round IS the instruction to
+    // run it" (STARTUP.md), now true of the FIRST live frame rather than only
+    // of the moment the future eventually lands.
+    if (first_populate)
+        m_wiz_history_year[lapse_index] = start_year;
 }
 
 void app::poll_wizard_surface()
@@ -94,7 +539,9 @@ void app::poll_wizard_surface()
     if (m_wiz_surface_future.wait_for(std::chrono::seconds(0))
             != std::future_status::ready)
         return;
-    m_wiz_surface = m_wiz_surface_future.get();
+    ui::wizard_surface built = m_wiz_surface_future.get();
+    m_wiz_surface = std::move(built.comp);
+    m_wiz_terrain = std::move(built.terrain);
     if (m_wiz_surface_stale)
     {
         // Preferences moved while that build ran: it is already the wrong
@@ -139,6 +586,39 @@ void app::draw_main_menu()
         //     centred buttons below. ---
         world_params& wp = m_pending_world_params;
         ImGui::SeparatorText("New World");
+
+        // THE MENU OPENS ON A ROLLED SEED (BL-890; Ben, 2026-09-10). The
+        // default of 0 made every new game the same reference world unless the
+        // player thought to press Roll, which turns rerolling into a thing you
+        // must know to do rather than the ordinary way in. STARTUP.md carries
+        // the ruling.
+        //
+        // ROLLED HERE, AND ONCE, FOR TWO REASONS THE LIVE CHECK FOUND. Rolling
+        // per frame would make the field impossible to type into. Rolling when
+        // the WIZARD opens -- the first place this was tried -- silently threw
+        // away a seed the player had just typed or pasted into this very field,
+        // because New Game runs that path on the way out of this screen. The
+        // latch keeps the draw idempotent: the number is fresh on arrival and
+        // is then the player's.
+        //
+        // THE ENTROPY STOPS HERE, exactly as the Roll button's below already
+        // does. world/* stays a pure function of the seed, so save, replay and
+        // the multiplayer argument are untouched; seed 0 still names the
+        // reference world, it is simply no longer what you get by accident.
+        //
+        // NOT UNDER --verify. Every scripted capture reaches this menu, and a
+        // rolled seed would make each run a different world and turn the visual
+        // suite non-deterministic. `m_golden_dir` non-empty is this file's own
+        // test for "a harness is driving".
+        if (!m_seed_rolled)
+        {
+            m_seed_rolled = true;
+            if (m_golden_dir.empty())
+            {
+                std::random_device rd_seed;
+                wp.seed = static_cast<uint32_t>(rd_seed());
+            }
+        }
 
         // Seed — hex entry + a one-shot randomise. The random_device draw feeds ONLY
         // the seed value; no entropy ever enters world generation, which stays a pure
@@ -250,8 +730,130 @@ namespace {
 /// How many preference rows a round owns, and how many dim caption lines sit under
 /// them. Both feed the height reserved for the decision block, which is pinned to
 /// the bottom so the charts get everything left over.
-int round_pref_count(int r) { return (r == 0) ? 4 : (r == 1) ? 3 : 1; }
-int round_note_lines(int r) { return (r == 1) ? 3 : 1; } ///< B carries the iron/coal caption.
+/// File-local mirrors of app's round counts: those are private to `app`, and these
+/// helpers are free functions. draw_generation_screen static_asserts the pair against
+/// the real constants, so a drift here is a compile error, not a wrong layout.
+constexpr int planetology_rounds = 2;  // System, Life (BL-863)
+constexpr int pass_rounds        = 4;  // Culture, Empires, Exploration, Digitisation (BL-946)
+constexpr int lapse_rounds       = 3;  // Culture, Empires, Exploration all replay a real record
+
+/// Empires' historical-turbulence caption, shared between the layout-height
+/// estimate below and the actual draw call in the round switch, so the two
+/// can never drift apart the way the fixed-line-count guess did (BL-904).
+constexpr const char* kTurbulenceCaption =
+    "Calm: peoples differ less, neighbours let a riser rise, and "
+    "distance is cheap to hold. Turbulent: the warlike are more so, "
+    "a riser draws a coalition, and an over-reached empire cannot "
+    "feed what it took. It leans the forces - it sets no number of "
+    "realms, and either setting can surprise you.";
+
+/// Culture (round 2) and Empires (round 3) are PASS rounds, not planetology
+/// rounds, but each still carries exactly one lean row of its own -- Drawdown
+/// (moved here by BL-863) and the historical-turbulence lean (BL-839). The old
+/// `r >= planetology_rounds` guard zeroed both out, under-reserving the layout
+/// by one row and pushing each round's preference block and Next/Back footer
+/// below the visible fold at 1080p (BL-904, found via history_lapse_press.lua
+/// and round4_arc_reach.lua going red).
+int round_pref_count(int r)
+{
+    if (r == 0) return 4;
+    if (r == 1) return 3;
+    if (r == 2 || r == 3) return 1;
+    return 0;
+}
+int round_note_lines(int r)
+{
+    if (r == 1) return 3; ///< B carries the iron/coal caption.
+    if (r == 0) return 1;
+    // Culture's Drawdown carries no caption. Empires' turbulence caption is
+    // far longer than a fixed line count can safely predict, so its height is
+    // measured directly against kTurbulenceCaption where decide_h is built.
+    return 0;
+}
+
+/// A round's header text. The planetology rounds take theirs from the shared chain
+/// table (so the wizard and the History ledger name them identically); the three
+/// pass rounds are not chain rounds and carry their own, from STARTUP.md
+/// § Rounds 4, 5 and 6.
+struct wizard_round_head
+{
+    const char* name;
+    const char* question;
+};
+
+wizard_round_head wizard_round_head_at(int r)
+{
+    if (r < planetology_rounds)
+    {
+        const ui::chain_round& cr = ui::chain_round_at(r);
+        return { cr.name, cr.question };
+    }
+    static const wizard_round_head passes[pass_rounds] = {
+        // THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09). Round 4 used to fuse
+        // the peopling of the world with the empires that followed, and that cut
+        // failed twice over: it drew conquest with the migration already finished
+        // off-screen, then — once migration moved inside it — migration with no
+        // conquest at all. Two subjects, two rounds.
+        { "Culture",
+          "Who reached this ground first, and by which routes?" },
+        { "Empires",
+          // THIS ROUND'S OWN SPAN, SEPARATE FROM ROUND 3's (BL-871). Before the
+          // split both rounds replayed the same fused record — colonisation and
+          // conquest run together — so round 4 opened with the whole map
+          // already claimed and had nothing left to show but the tail of one
+          // pass. Now round 3 stops at the migration's own end and round 4
+          // starts the Empires sim at 400 BCE
+          // (`docs/generation/CIVILISATION.md` § The span is 400 BCE to
+          // 1200 CE), so this round watches conquest from a world that is
+          // freshly peopled rather than one already settled off-screen.
+          //
+          // Titled to what it plays rather than left aspirational, on the rule
+          // that a surface must not assert something the code has not delivered.
+          "Who claimed this ground, and who lost it, in the age before the epoch?" },
+        { "Exploration",
+          // BL-946: the fourth pre-game round, on the same shared engine as
+          // Empires (EXPLORATION.md sec The engine is shared) -- 1200 to 1660
+          // CE, where conflict moves off the home coast and a treasury, a
+          // fleet and a treaty become real.
+          "Who reaches beyond this ground, and what do they bring back?" },
+        { "Digitisation",
+          // Renamed from "Industrialisation" (BL-946); still the honest empty
+          // placeholder BL-914 built -- Digitisation's own content is out of
+          // this item's scope.
+          "What does that ground produce, and who trades it?" },
+    };
+    int i = r - planetology_rounds;
+    if (i < 0)             i = 0;
+    if (i >= pass_rounds)  i = pass_rounds - 1;
+    return passes[i];
+}
+
+/// The honest placeholder a pass round rests as until its pass is built. Labelled as
+/// a placeholder in as many words: an unlabelled empty pane reads as a finished
+/// surface, and the next session believes it.
+///
+/// Only the Digitisation round reaches this now — Culture, Empires and
+/// Exploration all play a real record (BL-946) — so it no longer branches on
+/// which pass round asked.
+void draw_pass_round_placeholder()
+{
+    constexpr ImU32 col_dim   = IM_COL32(120, 128, 145, 255);
+    constexpr ImU32 col_label = IM_COL32(205, 170, 90, 255);
+
+    ImGui::PushStyleColor(ImGuiCol_Text, col_label);
+    ImGui::TextUnformatted("PLACEHOLDER - this round is not built yet");
+    ImGui::PopStyleColor();
+    ImGui::Spacing();
+
+    ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+    ImGui::TextWrapped(
+        "Digitisation will run the economy pass: 1660 to 1960, then the substrate carve - "
+        "metros, colonial reach, firms and their charters, and the market carve. "
+        "Nothing runs yet; the globe beside this is still the planetology globe.");
+    ImGui::Spacing();
+    ImGui::TextWrapped("Reroll and Back work. Nothing on this round changes the world yet.");
+    ImGui::PopStyleColor();
+}
 
 /// One preference row: a name, then four segmented options with `Any` first.
 ///
@@ -291,6 +893,47 @@ bool lean_row(const char* id, const char* label, lean& value,
     return changed;
 }
 
+/// The turbulence lean's own row (BL-839), and NOT `lean_row` above.
+///
+/// THREE OPTIONS, NOT FOUR, and that is the whole reason this is a separate
+/// function. `lean_row` leads with "Any", which means "sample the whole viable
+/// range" -- honest for a planetology preference, which names a VALUE drawn
+/// from a distribution. This axis names a FORCE (`world/history_sim.hpp` sec
+/// THE HISTORICAL TURBULENCE LEAN), and there is no distribution of forces to
+/// sample, so an "Any" the resolver would silently read as "Ordinary" would be
+/// a control that lies about what it does.
+///
+/// NAMED SETTINGS RATHER THAN A SLIDER, for the reason STARTUP.md sec Rounds 4,
+/// 5 and 6 gives the wizard as a whole: the player has to be able to tell what
+/// they rolled. "Turbulent" is a thing you can look for in the arc readout
+/// above; a per-mille dial on a force nobody can see is not.
+bool turbulence_row(lean& value)
+{
+    static constexpr lean order[3] = { lean::low, lean::mid, lean::high };
+    const char* names[3] = { "Calm", "Ordinary", "Turbulent" };
+
+    ImGui::PushID("turbulence");
+    ImGui::TextUnformatted("History");
+
+    bool changed = false;
+    for (int i = 0; i < 3; ++i)
+    {
+        if (i > 0) ImGui::SameLine();
+        int v = static_cast<int>(value);
+        // `any` can arrive here from an old save or a bare `world_params`; the
+        // resolver reads it as ordinary, so the row shows it that way rather
+        // than lighting nothing and implying a fourth state.
+        if (value == lean::any) v = static_cast<int>(lean::mid);
+        if (ImGui::RadioButton(names[i], &v, static_cast<int>(order[i])))
+        {
+            value   = order[i];
+            changed = true;
+        }
+    }
+    ImGui::PopID();
+    return changed;
+}
+
 } // namespace
 
 void app::draw_generation_screen()
@@ -298,11 +941,19 @@ void app::draw_generation_screen()
     const ImVec2      disp  = ImGui::GetIO().DisplaySize;
     const ImGuiStyle& style = ImGui::GetStyle();
 
-    // One reroll counter per round; the wizard and the resolver have to agree on
-    // how many rounds there are.
+    // One reroll counter per PLANETOLOGY round: `roll` is a planetology input and
+    // reaches resolve_preferences, so it is keyed to the chain's rounds, not to the
+    // wizard's total. The wizard's two pass rounds carry their own counters
+    // (m_wiz_pass_roll) because they are not planetology inputs at all.
+    // AT LEAST ONE COUNTER PER ROUND (BL-863). `roll` keeps THREE rather than
+    // shrinking with the round count: it is on the save format
+    // (save_envelope_roundtrip asserts 8 leans + roll[3] survive), and shrinking
+    // it would make a UI reorder a save-format change. The spare counter is not
+    // dead -- it is the drawdown lean's, for when round 5 takes it.
     static_assert(sizeof(world_preferences::roll)
-                      == sizeof(uint32_t) * static_cast<std::size_t>(wizard_round_count),
-                  "world_preferences::roll must carry one counter per wizard round");
+                      >= sizeof(uint32_t)
+                             * static_cast<std::size_t>(wizard_planetology_round_count),
+                  "world_preferences::roll must carry one counter per planetology round");
 
     // Clamp first — Back/Continue and verify.generation_stage all write this.
     if (m_wiz_round < 0)                   m_wiz_round = 0;
@@ -315,6 +966,9 @@ void app::draw_generation_screen()
     {
         refresh_wizard_preview();
         m_wiz_dirty = false;
+        // The planetology chain just moved, so both pass rounds are stale: the
+        // history runs ON this world. Causality flows one way, downstream only.
+        invalidate_wizard_rounds_below(wizard_planetology_round_count - 1);
     }
     if (m_wiz_preview.empty())
         return; // defensive: the preview is the wizard's only data source
@@ -322,12 +976,144 @@ void app::draw_generation_screen()
     // Adopt a finished real-surface build (and chain a relaunch if the params
     // moved mid-build). Cheap zero-wait probe; runs every wizard frame.
     poll_wizard_surface();
+    // The same probe for round 4's history run (BL-829). Also every frame, and
+    // also cheap: the wizard must keep repainting while the pass works, because
+    // on this round the wait IS the content.
+    poll_wizard_history();
 
-    static_assert(ui::chain_round_count == wizard_round_count,
-                  "the wizard's round count and the shared chain-round table must agree");
+    // What this GUARDED, before the wizard grew past the chain (BL-816): that every
+    // wizard round the code hands to ui::chain_round_at has a chart-round entry
+    // behind it. It was written as an equality only because the two numbers happened
+    // to be the same when the wizard was planetology and nothing else. They are not
+    // the same number any more — the wizard walks six rounds, the chart chain still
+    // covers three — so the equality is re-expressed as the two facts it stood for:
+    // the chart chain covers exactly the planetology rounds, and the planetology
+    // rounds are a strict prefix of the wizard. Every chain_round_at call below is
+    // gated on `planetology_round` accordingly.
+    // COVERS AT LEAST, NOT EXACTLY (BL-863). The chart chain keeps all THREE
+    // groups because tile_inspector.cpp's History ledger reads the same table --
+    // dropping the third would delete the legacy/spend charts from the in-game
+    // ledger, which is not what retiring a WIZARD round asked for. The wizard
+    // walks the first two; the invariant that matters is that every round it
+    // hands to chain_round_at has an entry.
+    static_assert(ui::chain_round_count >= wizard_planetology_round_count,
+                  "the chart chain must cover at least the wizard's planetology rounds");
+    static_assert(wizard_planetology_round_count < wizard_round_count,
+                  "the planetology rounds are a strict prefix of the wizard's rounds");
+    static_assert(planetology_rounds == wizard_planetology_round_count
+                      && pass_rounds == wizard_pass_round_count
+                      && lapse_rounds == wizard_lapse_round_count,
+                  "the file-local round-count mirrors must track app's constants");
+    static_assert(wizard_lapse_round_count <= wizard_pass_round_count,
+                  "the lapse rounds are a prefix of the pass rounds");
 
-    const ui::chain_round& wr       = ui::chain_round_at(m_wiz_round);
-    const int              n_bodies = std::min(static_cast<int>(m_wiz_preview.size()),
+    // Which kind of round is on screen. The planetology rounds preview a pure chain
+    // per keystroke; the pass rounds cannot (STARTUP.md § The wait is the round).
+    const bool planetology_round = (m_wiz_round < wizard_planetology_round_count);
+    const int  pass_index        = m_wiz_round - wizard_planetology_round_count;
+
+    // ── A LAPSE ROUND'S playback, advanced once per frame and read TWICE — the
+    //    board on the left and the map on the right must show the same instant, so
+    //    the slice is materialised here rather than in each of them. Rounds 3, 4
+    //    and 5 (Culture, Empires, Exploration) are all lapse rounds and each owns
+    //    its own record slot (BL-946). ──
+    const bool lapse_round =
+        (!planetology_round && pass_index < wizard_lapse_round_count);
+    const int  lapse_index = lapse_round ? pass_index : 0;
+    // BL-914: pull whatever the round's own worker has published so far,
+    // BEFORE the empty() check below — this is what turns "empty until the
+    // future lands" into "has a growing record from the first publish on".
+    if (lapse_round) poll_wizard_history_tap(lapse_index);
+    std::vector<uint16_t> hist_slice, hist_lagged;
+    int hist_lagged_year = INT32_MIN; // the year `hist_lagged` was taken at (BL-1000)
+    if (lapse_round && !m_wiz_history[lapse_index].empty())
+    {
+        // The land mask comes from the wizard's OWN packed surface — the same
+        // raster the globe samples and the same one "Begin" builds — so the
+        // coastline a frontier stalls at is the coastline the campaign has. It is
+        // a no-op until that async build lands; the round simply retries.
+        ui::history_lapse& rec = m_wiz_history[lapse_index];
+        ui::finish_history_lapse(rec,
+                                 m_wiz_surface.empty() ? nullptr : m_wiz_surface.data(),
+                                 m_wiz_surface.size(),
+                                 m_wiz_terrain.empty() ? nullptr : m_wiz_terrain.data(),
+                                 m_wiz_terrain.size());
+
+        const int first = rec.lapse.start_year;
+        const int last  = first + rec.lapse.years; // BL-914: the YEAR REACHED SO FAR
+                                                    // while live — see poll_wizard_history_tap
+                                                    // — and the true final year once landed.
+        const bool live = m_wiz_history_future[lapse_index].valid();
+
+        // FROZEN UNDER --verify, for the reason the globe's rotation is: a capture
+        // must never race an animation. The year is then whatever the script set.
+        //
+        // BL-914: a LIVE round is always advancing — there is nothing to pause
+        // yet, only a frontier the playhead can be waiting at (`year == last`,
+        // handled by the clamp below rather than by stopping here). Once
+        // landed, `m_wiz_history_playing` is what the new Pause control drives.
+        if ((live || m_wiz_history_playing[lapse_index]) && m_golden_dir.empty())
+        {
+            // THE RATE IS AGAINST THE ROUND'S FULL SPAN, NOT AGAINST HOW FAR IT
+            // HAS GOT (Ben, 2026-09-11: "played at a constant (slower) rate
+            // than calculation"). `last - first` is the wrong divisor while
+            // live — it grows every publish, and dividing by a growing number
+            // would make the transport visibly slow down as history runs.
+            // Round 4's full span is known before a single owner_change
+            // exists (`sub_total`, set in `hard_coded_world.cpp` right before
+            // `run_history_sim` starts); round 3's migration record has no
+            // such upfront figure, but it is not built incrementally either
+            // (settlement.cpp is untouched by this item) — its very first
+            // publish already carries the WHOLE finished record, so
+            // `last - first` is already the true total the first time this
+            // branch ever runs for it, and never grows again afterward.
+            const int sub_total =
+                m_wiz_history_progress[lapse_index].sub_total.load(std::memory_order_relaxed);
+            const float span = sub_total > 0 ? static_cast<float>(sub_total)
+                                             : static_cast<float>(last - first);
+            // BL-948: the viewer's own choice of wall clock for the whole span,
+            // not a fixed 30 s. The divisor is the only thing that changed; the
+            // "against the full span, never against how far it has got" rule
+            // above is what keeps a live round from slowing down as it runs.
+            const float run_secs = m_wiz_history_secs[lapse_index] > 0.0f
+                                       ? m_wiz_history_secs[lapse_index]
+                                       : wizard_lapse_secs_default;
+            const float rate = span > 0.0f ? span / run_secs : 1.0f;
+            m_wiz_history_carry[lapse_index] += ImGui::GetIO().DeltaTime * rate;
+            const int whole = static_cast<int>(m_wiz_history_carry[lapse_index]);
+            if (whole > 0)
+            {
+                m_wiz_history_carry[lapse_index] -= static_cast<float>(whole);
+                m_wiz_history_year[lapse_index]  += whole;
+            }
+            // Stop-at-the-end applies only once landed: hitting the current
+            // frontier of a still-running pass is a WAIT (the clamp below
+            // holds the playhead there), never the end of the transport.
+            if (!live && m_wiz_history_year[lapse_index] >= last)
+            {
+                m_wiz_history_year[lapse_index]    = last;
+                m_wiz_history_playing[lapse_index] = false;
+            }
+        }
+        int& year = m_wiz_history_year[lapse_index];
+        if (year < first) year = first;
+        // NEVER READS A YEAR THE PASS HAS NOT REACHED (the determinism-
+        // adjacent half of this item's DONE WHEN): `last` is `year_reached`
+        // while live, so this is the fixed-rate/published-year clamp the
+        // design asks for, expressed as the one clamp the code already had.
+        if (year > last)  year = last;
+
+        hist_slice = owner_slice_at(rec.lapse, year);
+        // The lagged board, for the entry/exit marks. A twelfth of the span back:
+        // far enough that a rank move means something, near enough that the marks
+        // are not permanently lit.
+        const int lag = std::max(1, (last - first) / 12);
+        hist_lagged_year = year - lag;
+        hist_lagged = owner_slice_at(rec.lapse, hist_lagged_year);
+    }
+
+    const wizard_round_head wr       = wizard_round_head_at(m_wiz_round);
+    const int               n_bodies = std::min(static_cast<int>(m_wiz_preview.size()),
                                                prototype_body_count());
 
     // The homeworld is the subject of every single-body chart. Located by its
@@ -390,6 +1176,11 @@ void app::draw_generation_screen()
                              - style.ItemSpacing.x) / 3.0f;
         ImGui::BeginChild("##wiz_left", {col_w, 0.0f}, false,
                           ImGuiWindowFlags_NoBackground);
+        // BL-904: gives verify.scroll_panel("wizard", ...) a real scroller to
+        // aim at. The column is a plain BeginChild, not a foldout ledger, but
+        // `foldout_scroll_child` only matches on the id string it is handed,
+        // so it works here unchanged.
+        ui::foldout_scroll_child("##wiz_left");
 
         // ── (a) Header: the round name large, what it settles beneath, progress right ──
         {
@@ -410,7 +1201,8 @@ void app::draw_generation_screen()
         }
         dim_text(wr.question);
 
-        // Three pips, the current one lit: past rounds filled dim, future ones hollow.
+        // One pip per wizard round, the current one lit: past rounds filled dim,
+        // future ones hollow. Drives off wizard_round_count, so it grew with it.
         {
             ImDrawList*  dl = ImGui::GetWindowDrawList();
             const ImVec2 p  = ImGui::GetCursorScreenPos();
@@ -433,15 +1225,32 @@ void app::draw_generation_screen()
         const float frame_h  = ImGui::GetFrameHeight();
         const float line_h   = ImGui::GetTextLineHeightWithSpacing();
         // Each lean row is now a label line plus a 2x2 radio grid (three lines).
-        const float decide_h = static_cast<float>(round_pref_count(m_wiz_round))
-                                   * (line_h + 2.0f * (frame_h + style.ItemSpacing.y))
-                             + line_h * static_cast<float>(round_note_lines(m_wiz_round)
-                                                           + (m_wiz_resolved.gave_up ? 2 : 0))
-                             + style.ItemSpacing.y * 3.0f;
+        float decide_h = static_cast<float>(round_pref_count(m_wiz_round))
+                             * (line_h + 2.0f * (frame_h + style.ItemSpacing.y))
+                       + line_h * static_cast<float>(round_note_lines(m_wiz_round)
+                                                     + (m_wiz_resolved.gave_up ? 2 : 0))
+                       + style.ItemSpacing.y * 3.0f;
+        // Empires' turbulence lean is `turbulence_row`, not `lean_row` — ONE row
+        // of three radios (Calm/Ordinary/Turbulent), not the 2x2 grid
+        // round_pref_count's generic multiplier assumes for every other lean.
+        // Correct that one row back out, then add the caption's real height,
+        // measured rather than guessed (BL-904): it runs to five sentences,
+        // well past what a fixed line count could safely predict at every
+        // column width the wizard can be shown at.
+        if (m_wiz_round == 3)
+            decide_h += ImGui::CalcTextSize(kTurbulenceCaption, nullptr, false,
+                                             ImGui::GetContentRegionAvail().x).y
+                      + style.ItemSpacing.y
+                      - (frame_h + style.ItemSpacing.y);
         // Two button rows now: Reroll full-width above, Back / Continue below.
         const float footer_h = 34.0f * 2.0f + style.ItemSpacing.y * 3.0f;
         ImGui::BeginChild("##wiz_charts", {0.0f, -(decide_h + footer_h)}, false,
                           ImGuiWindowFlags_NoBackground);
+        // BL-1000: the lapse rounds' board, ticker and arc readout live in THIS
+        // child, and at 1080p the arc readout sits below its fold — so
+        // verify.scroll_panel("wizard_charts", ...) needs a scroller of its own
+        // to reach it, exactly as "wizard" reaches the outer column.
+        ui::foldout_scroll_child("##wiz_charts");
 
         // The player still watches the chain work link by link — they have just
         // stopped clicking between the links. Each stage measures its own column
@@ -453,9 +1262,240 @@ void app::draw_generation_screen()
         // opens. It also turns a long scroll into a readable chain: the round's
         // stages fit on one screen as verdicts, and the player opens the ones the
         // roll made interesting.
-        for (int s = static_cast<int>(wr.first); s <= static_cast<int>(wr.last); ++s)
-            ui::draw_stage_fold(chart_src, static_cast<chain_stage>(s), m_ui,
-                                detail_surface::generation_stage);
+        if (planetology_round)
+        {
+            const ui::chain_round& cr = ui::chain_round_at(m_wiz_round);
+            for (int s = static_cast<int>(cr.first); s <= static_cast<int>(cr.last); ++s)
+                ui::draw_stage_fold(chart_src, static_cast<chain_stage>(s), m_ui,
+                                    detail_surface::generation_stage);
+        }
+        else if (lapse_round)
+        {
+            // ── Rounds 3, 4 and 5: the wait, then the board (BL-829 / BL-830 /
+            //    BL-860 / BL-946) ──
+            //
+            // THE TRANSPORT IS DELIBERATELY PLAIN. The wizard's standing premise —
+            // *you set conditions here, you do not steer* — and the globe's own
+            // no-input ruling both argue for the plainer answer, and BL-829 files
+            // scrub/pause as a question to be settled by WATCHING rather than in
+            // advance. So: it runs, and it can be run again from the start. No
+            // pause and no scrub until Ben has watched one.
+            ui::history_lapse& rec = m_wiz_history[lapse_index];
+            if (m_wiz_history_future[lapse_index].valid())
+            {
+                // THE WAIT IS A WAIT, AND SAYS SO (Ben, 2026-09-16): "separate each
+                // part with an otherwise completely blank Loading X Round. This way,
+                // the player can see that they have to wait, and what they are
+                // watching is a time-lapse of that very fast calculation." One
+                // centred line, and no map beside it: the pass stages and the year
+                // counter went with it, because a reader who has been told to wait
+                // does not also need to be told which of twelve links the wait is on.
+                //
+                // THIS REVERSES BL-914 for the pass rounds, deliberately. "The wait
+                // is the round" put the sim frontier on screen as it computed; the
+                // calculation is fast and jerky where the lapse is paced and whole,
+                // so showing the first as if it were the second made the second
+                // unreadable — and a round that opened already chasing the frontier
+                // was past its hand-over cross-fade before anyone could see it.
+                {
+                    static const char* const k_loading[wizard_lapse_round_count] = {
+                        "Loading the Culture round",
+                        "Loading the Empires round",
+                        "Loading the Exploration round",
+                    };
+                    const char* const label = k_loading[lapse_index];
+                    const float w  = ImGui::GetContentRegionAvail().x;
+                    const float h2 = ImGui::GetContentRegionAvail().y;
+                    const ImVec2 sz = ImGui::CalcTextSize(label);
+                    ImGui::Dummy({w, std::max(0.0f, h2 * 0.40f)});
+                    if (w > sz.x)
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - sz.x) * 0.5f);
+                    ImGui::TextUnformatted(label);
+
+                    // THE WAIT HAS A BAR (Ben, 2026-09-18: "wire in a progress bar
+                    // for 'Loading x round'"). The same pair the building screen
+                    // draws (app::draw_building_screen), from the round's own
+                    // `generation_progress`: the outer bar counts the passes this
+                    // run reports, so it only moves forward; the inner one is the
+                    // sim's year counter inside a span, drawn only while a span
+                    // reports it, and it restarts when a round runs a second span.
+                    // Still no pass captions — the 2026-09-16 ruling above stands:
+                    // the wait says it is a wait, and now how far along it is.
+                    const generation_progress& prog = m_wiz_history_progress[lapse_index];
+                    const int   done  = prog.stage.load(std::memory_order_relaxed);
+                    const int   total = std::max(1, prog.stage_count.load(std::memory_order_relaxed));
+                    const float bar_w = std::min(420.0f, w);
+                    const float bar_x = std::max(0.0f, (w - bar_w) * 0.5f);
+                    ImGui::Dummy({w, 10.0f});
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + bar_x);
+                    ImGui::ProgressBar(std::clamp(static_cast<float>(done) / static_cast<float>(total),
+                                                  0.0f, 1.0f),
+                                       {bar_w, 18.0f}, "");
+                    const int sub_total = prog.sub_total.load(std::memory_order_relaxed);
+                    if (sub_total > 0)
+                    {
+                        const int sub_done = prog.sub_progress.load(std::memory_order_relaxed);
+                        ImGui::Dummy({w, 4.0f});
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + bar_x);
+                        ImGui::ProgressBar(std::clamp(static_cast<float>(sub_done)
+                                                          / static_cast<float>(sub_total),
+                                                      0.0f, 1.0f),
+                                           {bar_w, 10.0f}, "");
+                    }
+                }
+            }
+            else if (rec.empty())
+            {
+                // NO RUN BUTTON (Ben, 2026-09-09: "we can retire the 'run'
+                // button. Wire that to auto start when next is clicked in phase
+                // 3"). Arriving on the round IS the instruction to run it —
+                // there was never a second thing the player might have wanted
+                // here, so the button asked a question with one answer.
+                //
+                // The launch itself is on the PREVIOUS round's Next press rather
+                // than here, so the pass is already under way by the time this
+                // frame draws; see the navigation block below. This branch is
+                // only reached if a run has not been started or has been cleared.
+                dim_text(lapse_index == 0
+                    ? "The peopling of an empty world, run here rather than previewed: "
+                      "the pass behind it is the most expensive in the project, and it "
+                      "cannot be re-rolled on every keystroke the way the planetology "
+                      "rounds are."
+                    : lapse_index == 1
+                    ? "Claim and counter-claim from 400 BCE, run here rather than "
+                      "previewed: the history is the most expensive pass in the "
+                      "project, and it cannot be re-rolled on every keystroke the way "
+                      "the planetology rounds are."
+                    : "Treasuries, treaties and fleets from 1200 CE, run here rather "
+                      "than previewed: conflict moves off the home coast in this span, "
+                      "and it cannot be re-rolled on every keystroke the way the "
+                      "planetology rounds are.");
+            }
+            else
+            {
+                // NO RESTART BUTTON (Ben, 2026-09-11): with a scrubber below it
+                // is redundant — anywhere the run ever reached is a drag away —
+                // and its row goes to the ranking board this round's whole
+                // point is to show. BL-914's transport is Pause/Play plus the
+                // scrubber, both live only now that the record is complete
+                // (NR-813's deferral premise — no real arc to sit through — is
+                // gone since BL-906 lengthened round 4's own span).
+                //
+                // A TOGGLE (io-standing-rules.md § Toggle rule): the label IS
+                // the visible active state, so the same press that started
+                // playing undoes it.
+                const int  first_y = rec.lapse.start_year;
+                const int  last_y  = first_y + rec.lapse.years;
+                const bool playing = m_wiz_history_playing[lapse_index];
+                if (ImGui::Button(playing ? "Pause##wizhisttransport"
+                                          : "Play##wizhisttransport",
+                                  {ImGui::GetContentRegionAvail().x, 30.0f}))
+                {
+                    m_wiz_history_playing[lapse_index] = !playing;
+                    m_wiz_history_paused[lapse_index]  =  playing; // now paused iff it just stopped
+                    // Resuming from the very end restarts rather than sitting on
+                    // a Play button that visibly does nothing — the one case
+                    // Restart used to cover that a plain toggle would not.
+                    if (!playing && m_wiz_history_year[lapse_index] >= last_y)
+                    {
+                        m_wiz_history_year[lapse_index]  = first_y;
+                        m_wiz_history_carry[lapse_index] = 0.0f;
+                    }
+                }
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                int scrub_year = m_wiz_history_year[lapse_index];
+                if (ImGui::SliderInt("##wizhistscrub", &scrub_year, first_y, last_y,
+                                     ui::lapse_year_label(scrub_year).c_str()))
+                {
+                    // Dragging is itself an implicit pause — a scrubber that
+                    // fought the playhead for the same year would be
+                    // unreadable, and BL-914 only ever asks for Pause AND a
+                    // scrubber together, never scrubbing while still playing.
+                    m_wiz_history_year[lapse_index]    = scrub_year;
+                    m_wiz_history_carry[lapse_index]   = 0.0f;
+                    m_wiz_history_playing[lapse_index] = false;
+                    m_wiz_history_paused[lapse_index]  = true;
+                }
+                // BL-948 — THE SPEED CONTROL, on every lapse round. Three
+                // rungs of WALL CLOCK for the whole span (Ben: the lapses run
+                // too fast to watch), in the wizard's own three-way idiom —
+                // the same radio row Sparse/Lean/Standard uses on the menu, so
+                // it needs no explaining. It changes the rate the playhead
+                // advances at and nothing else: the scrubber above still goes
+                // anywhere, and a live round still draws as fast as the pass
+                // computes.
+                {
+                    ImGui::TextUnformatted("Pace");
+                    ImGui::SameLine();
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        // Minutes read as minutes: "1m 30s", never "90s".
+                        char id[32];
+                        const int secs = static_cast<int>(wizard_lapse_secs[i]);
+                        if (secs < 60)
+                            std::snprintf(id, sizeof id, "%ds##wizhistpace%d", secs, i);
+                        else if (secs % 60 == 0)
+                            std::snprintf(id, sizeof id, "%dm##wizhistpace%d", secs / 60, i);
+                        else
+                            std::snprintf(id, sizeof id, "%dm %ds##wizhistpace%d",
+                                          secs / 60, secs % 60, i);
+                        if (i > 0) ImGui::SameLine();
+                        if (ImGui::RadioButton(id, m_wiz_history_secs[lapse_index]
+                                                       == wizard_lapse_secs[i]))
+                        {
+                            // The carry is fractional years at the OLD rate;
+                            // keeping it would hand the new rate a debt it
+                            // never ran up. The playhead itself does not move.
+                            m_wiz_history_secs[lapse_index]  = wizard_lapse_secs[i];
+                            m_wiz_history_carry[lapse_index] = 0.0f;
+                        }
+                    }
+                }
+                ImGui::Spacing();
+
+                std::snprintf(buf, sizeof buf, "%s  -  %lld battles, %lld conquests, "
+                                               "%lld foundings in the full run",
+                              ui::lapse_year_label(m_wiz_history_year[lapse_index]).c_str(),
+                              static_cast<long long>(rec.battles),
+                              static_cast<long long>(rec.conquests),
+                              static_cast<long long>(rec.foundings));
+                dim_text(buf);
+                ImGui::Separator();
+
+                ui::draw_lapse_scoreboard(rec, hist_slice, hist_lagged,
+                                          m_wiz_history_year[lapse_index],
+                                          hist_lagged_year);
+                // BL-916: the ticker — the named moments at or before the
+                //         playhead, the newest of which is the marker on the map.
+                ui::draw_lapse_ticker(rec, m_wiz_history_year[lapse_index]);
+                // BL-891: the arc, so a rolled world can be judged without
+                //         watching the whole replay.
+                ui::draw_lapse_arc(rec);
+
+                ImGui::Spacing();
+                // WHAT THIS ROUND IS AND IS NOT (BL-871, then BL-906, then
+                // BL-946). The three lapse rounds stop at different points —
+                // the migration at its own derived end year, the Empires sim
+                // at 1200 CE, the Exploration span at 1660 CE — so they do
+                // not replay the same recorded age. BL-906 (2026-09-11) closed
+                // the gap this note used to name: the Empires round now runs
+                // its full 400 BCE -> 1200 CE span, decoupled from the epoch
+                // (`CIVILISATION.md` § The span is 400 BCE to 1200 CE).
+                if (lapse_index == 1)
+                    dim_text("This round's own span, separate from round 3's migration — "
+                             "the full 400 BCE to 1200 CE the design asks for.");
+                else if (lapse_index == 2)
+                    dim_text("This round's own span, 1200 to 1660 CE — where conflict "
+                             "moves off the home coast (docs/generation/EXPLORATION.md).");
+            }
+        }
+        else
+        {
+            // Round 6's real chart surface — the substrate readout — arrives with its
+            // pass. Until then the round says so in as many words rather than showing
+            // an empty column.
+            draw_pass_round_placeholder();
+        }
 
         ImGui::EndChild();
 
@@ -496,6 +1536,34 @@ void app::draw_generation_screen()
                              "Barely touched", "Worked", "Stripped"))                m_wiz_dirty = true;
                 break;
 
+            // THE EMPIRES ROUND TAKES THE TURBULENCE LEAN (BL-839; Ben,
+            // 2026-09-08). It is sited on the round whose own pass it leans, so
+            // the control and the thing it moves are on the same screen: set it,
+            // roll, and the arc readout beside it is the answer.
+            //
+            // IT SETS CONDITIONS, IT DOES NOT STEER. The three settings move the
+            // spread of culture aggression, how sharply neighbours coalesce
+            // against a riser, and how fast reach decays -- and not one of them
+            // names, targets or corrects a number of realms. A calm world that
+            // fragments anyway is a correct calm world. See
+            // `world/history_sim.hpp` sec THE HISTORICAL TURBULENCE LEAN.
+            case 3:
+                if (turbulence_row(pf.history_turbulence))
+                {
+                    m_wiz_dirty = true;
+                    // THIS ROUND'S OWN RECORD GOES TOO, which is why the
+                    // argument is `m_wiz_round - 1` and not `m_wiz_round`. The
+                    // setting is an INPUT to the pass this round runs, so a
+                    // record made under the previous setting is an account of a
+                    // history the player has just stopped asking for -- exactly
+                    // the silent failure `invalidate_wizard_rounds_below` was
+                    // wired ahead of the passes to prevent, one round earlier
+                    // than the reroll button needs it.
+                    invalidate_wizard_rounds_below(m_wiz_round - 1);
+                }
+                dim_text(kTurbulenceCaption);
+                break;
+
             default:
                 break;
         }
@@ -528,8 +1596,37 @@ void app::draw_generation_screen()
         // Reroll full-width and first — it is the wizard's main verb now.
         if (ImGui::Button("Reroll##wizroll", {bar_w, 34.0f}))
         {
-            ++pf.roll[m_wiz_round];
-            m_wiz_dirty = true;
+            if (planetology_round)
+            {
+                ++pf.roll[m_wiz_round];
+                m_wiz_dirty = true;
+            }
+            else
+            {
+                // Each pass round keeps its OWN reroll (Ben, 2026-09-08): the 4000
+                // years can be rerolled, and the focused 400-year economy pass is its
+                // own page with its own run and reroll.
+                ++m_wiz_pass_roll[pass_index];
+                m_wiz_pass_current[pass_index] = false; // re-run, not yet accepted
+                invalidate_wizard_rounds_below(m_wiz_round);
+                // A lapse round rerolls by RE-RUNNING its pass, not by re-drawing
+                // a cached one (STARTUP.md § Each pass round is rerollable) —
+                // which is the whole reason the wait had to be worth watching
+                // rather than merely tolerable.
+                if (lapse_round && !m_wiz_history_future[lapse_index].valid())
+                {
+                    // A DIFFERENT AGE OVER THE SAME GROUND (Ben, 2026-09-09:
+                    // "reroll should produce differences regardless"). The era
+                    // carries its own seed now, so this moves the recorded age
+                    // without touching the planetology rounds above it — folding
+                    // the roll into `params.seed` would re-draw the star and the
+                    // surface, which rounds-are-causal forbids in that direction.
+                    // See world_params::era_seed.
+                    ++m_pending_world_params.era_seed;
+                    m_wiz_history[lapse_index] = ui::history_lapse{};
+                    launch_wizard_history_run(lapse_index);
+                }
+            }
         }
 
         // Back always steps out one level, and the level outside round 0 is the main
@@ -545,12 +1642,37 @@ void app::draw_generation_screen()
                 --m_wiz_round;
         }
         ImGui::SameLine();
-        if (ImGui::Button(last ? "Begin##wizgo" : "Continue##wizgo", {half, 34.0f}))
+        // "Begin" is the wizard's ONLY generating press and it belongs on the LAST
+        // round alone (Ben, 2026-09-08: "in place of begin we should see next").
+        // Rounds 1-5 advance; only round 6 commits.
+        if (ImGui::Button(last ? "Begin##wizgo" : "Next##wizgo", {half, 34.0f}))
         {
             if (last)
                 begin_new_game(); // async since 2026-08-12 — see app::begin_new_game
             else
+            {
                 ++m_wiz_round;
+                // A PASS STARTS WHEN THE PLAYER ARRIVES, NOT WHEN THEY ASK
+                // (Ben, 2026-09-09: "wire that to auto start when next is
+                // clicked in phase 3"). Retiring the Run button means the press
+                // that MOVES ONTO a round is the press that begins it, so the
+                // pass is already under way while the round's first frame draws
+                // — which is the difference between a wait that started when
+                // you arrived and one that started when you found the button.
+                //
+                // EACH LAPSE ROUND STARTS ITS OWN (BL-860), rather than round 4
+                // alone: the arrival is generic, so round 5 gets the same
+                // treatment without a second special case.
+                //
+                // Guarded on there being nothing already in flight or landed on
+                // THAT round, so stepping Back and forward again does not throw
+                // away a finished record and re-run it.
+                const int arrived = m_wiz_round - wizard_planetology_round_count;
+                if (arrived >= 0 && arrived < wizard_lapse_round_count
+                    && m_wiz_history[arrived].empty()
+                    && !m_wiz_history_future[arrived].valid())
+                    launch_wizard_history_run(arrived);
+            }
         }
         ImGui::EndChild(); // ##wiz_left
 
@@ -560,6 +1682,51 @@ void app::draw_generation_screen()
         ImGui::SameLine();
         ImGui::BeginChild("##wiz_preview", {0.0f, 0.0f}, false,
                           ImGuiWindowFlags_NoBackground);
+        if (lapse_round)
+        {
+            // ── The lapse rounds replace the globe with a 2D MAP (Ben, 2026-09-08,
+            //    at the live app). A globe shows a world; a map shows a FRONTIER,
+            //    and the frontier is these rounds' whole subject — a border that
+            //    stalls at a strait reads as a stall on a map and as foreshortening
+            //    on a sphere. It inherits the globe's no-input rule: nothing here is
+            //    a widget. ──
+            // NOTHING BESIDE A WAIT (Ben, 2026-09-16). While the pass is still
+            // computing, this pane stays empty: the left column says "Loading the
+            // ... round" and that is the whole of the surface. Drawing the sim's
+            // own frontier here is what BL-914 did and what this reverses — the
+            // map appears when there is a finished record to play, and plays it
+            // from its first year.
+            if (m_wiz_history_future[lapse_index].valid()) { /* the wait draws nothing */ }
+            else if (m_wiz_history[lapse_index].empty())
+            {
+                ImGui::Dummy({0.0f, ImGui::GetContentRegionAvail().y * 0.45f});
+                ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+                // BL-914: the map now draws WHILE the pass runs, so this text
+                // is only ever seen for the first moment or two of a run —
+                // before its worker has published a first region and a first
+                // owner for it — rather than for the whole wait as before.
+                const bool running = m_wiz_history_future[lapse_index].valid();
+                if (lapse_index == 0)
+                    ImGui::TextWrapped(running
+                        ? "  The migration is starting."
+                        : "  The migration has not been run for this world yet.");
+                else if (lapse_index == 1)
+                    ImGui::TextWrapped(running
+                        ? "  The history is starting."
+                        : "  The history has not been run for this world yet.");
+                else
+                    ImGui::TextWrapped(running
+                        ? "  The exploration is starting."
+                        : "  The exploration has not been run for this world yet.");
+                ImGui::PopStyleColor();
+            }
+            else
+            {
+                ui::draw_lapse_map(m_wiz_history[lapse_index], hist_slice,
+                                   m_wiz_history_year[lapse_index]);
+            }
+        }
+        else
         {
             std::vector<ui::preview_body> pv;
             pv.reserve(static_cast<std::size_t>(n_bodies));
@@ -611,8 +1778,18 @@ void app::draw_generation_screen()
         // seed's resolved family and misses every reroll-dependent world.
         if (m_autostart_wizard % 20 == 10)
         {
-            ++m_pending_world_params.preferences.roll[m_wiz_round];
-            m_wiz_dirty = true;
+            // GATED ON THE PLANETOLOGY ROUNDS, exactly as the Reroll button is.
+            // `roll` is uint32_t[3] and is the last member of world_preferences,
+            // itself the last member of world_params — so indexing it with a
+            // round of 3 or 4 wrote past the end of m_pending_world_params into
+            // whatever followed it. The Reroll path was gated when the wizard
+            // grew to five rounds (BL-816); this driver was missed, and it is
+            // the path nobody eyeballs, which is why it survived.
+            if (m_wiz_round < wizard_planetology_round_count)
+            {
+                ++m_pending_world_params.preferences.roll[m_wiz_round];
+                m_wiz_dirty = true;
+            }
         }
         if (m_autostart_wizard % 20 == 0)
         {

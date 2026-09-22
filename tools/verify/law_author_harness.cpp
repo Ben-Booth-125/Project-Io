@@ -309,10 +309,18 @@ int main()
     {
         fixture f = make_fixture();
         seed_prototype_laws(f.w, k_rate);
-        check(f.w.laws.size() == 1 &&
-              f.w.laws.front().enacting_nation == f.nation_a &&
-              f.w.laws.front().enacted,
-              "AC1 the seeded levy is enacted by the player's home nation");
+        // BL-741: EVERY nation authors its own levy over its own jurisdiction
+        // (one law per nation, sorted author order, all enacted) — one seeded
+        // author left 42 of 43 treasuries empty and every state demand channel
+        // unfunded. The single-author contract this row used to pin is gone.
+        const entity_id lo = std::min(f.nation_a, f.nation_b);
+        const entity_id hi = std::max(f.nation_a, f.nation_b);
+        check(f.w.laws.size() == 2 &&
+              f.w.laws[0].enacting_nation == lo && f.w.laws[0].enacted &&
+              f.w.laws[1].enacting_nation == hi && f.w.laws[1].enacted &&
+              f.w.laws[0].id != f.w.laws[1].id,
+              "AC1 (BL-741) every nation authors its own enacted levy, sorted "
+              "author order, distinct law ids");
 
         // No player home nation: the largest territory wins, ties to lowest id.
         world w2;

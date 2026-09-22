@@ -46,6 +46,15 @@
 
 namespace {
 
+// BL-654: both upkeep passes now take an `economy_report&` — the shortfall bid
+// they place on the market lands in its `wants` / `purchases` / `upkeep_wants`
+// registers. Nothing in THIS harness reads those registers, and nothing here can
+// write to them either: `price_band_params::reservation_mult` defaults to 0 and
+// these fixtures hand-build their registry, so the bid path is off and the draw
+// is pool-only exactly as it was before BL-654. One shared scratch report keeps
+// that visible rather than scattering a fresh local at every call site.
+economy_report g_upkeep_report;
+
 int g_pass = 0, g_fail = 0;
 
 void check(bool ok, const char* what)
@@ -181,7 +190,7 @@ void u1_exact_charge()
 
     const float balance_before = f.w.corporations.at(f.corp).balance;
 
-    const unit_upkeep_tick t = run_unit_upkeep(f.w, reg);
+    const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(t.units == 3 && t.disbanded == 0 && t.unmet == 0,
           "U1a the pass saw three units, disbanded none, met every draw");
 
@@ -239,7 +248,7 @@ void u2_shortfall_decay()
     recipe_registry reg = registry_with_upkeep(0.0f, 1.0f, 150);
     f.w.pool_for(f.corp, f.body).quantities[ORD] = 5.0f;
 
-    unit_upkeep_tick t = run_unit_upkeep(f.w, reg);
+    unit_upkeep_tick t = run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(t.unmet == 1, "U2a a short draw is reported unmet");
     check(f.w.pool_for(f.corp, f.body).quantities[ORD] == 0.0f,
           "U2b the pool took what was there and floored at zero (never negative)");
@@ -248,7 +257,7 @@ void u2_shortfall_decay()
 
     // Repeat on a now-empty pool: the decay is linear and the stock stays at 0.
     for (int i = 0; i < 3; ++i)
-        run_unit_upkeep(f.w, reg);
+        run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(f.w.units.at(u).supply_factor_permille == 400,
           "U2d four ticks of unmet draw = four subtractions (1000 - 4*150)");
     check(f.w.pool_for(f.corp, f.body).quantities[ORD] == 0.0f,
@@ -256,7 +265,7 @@ void u2_shortfall_decay()
 
     // It floors at zero rather than running negative.
     for (int i = 0; i < 10; ++i)
-        run_unit_upkeep(f.w, reg);
+        run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(f.w.units.at(u).supply_factor_permille == 0,
           "U2f the supply factor floors at zero");
     check(unit_strength(f.w, f.w.units.at(u)) == 0,
@@ -265,7 +274,7 @@ void u2_shortfall_decay()
     // Restock and the SAME rule recovers it — one rule, symmetric.
     recipe_registry rec = registry_with_upkeep(0.0f, 1.0f, 150, 200);
     f.w.pool_for(f.corp, f.body).quantities[ORD] = 1000.0f;
-    run_unit_upkeep(f.w, rec);
+    run_unit_upkeep(f.w, rec, g_upkeep_report);
     check(f.w.units.at(u).supply_factor_permille == 200,
           "U2h a met draw recovers at the authored rate");
     check(near(f.w.pool_for(f.corp, f.body).quantities[ORD], 980.0f),
@@ -302,7 +311,7 @@ void u3_orphan_cleanup()
 
     recipe_registry reg; // shipped (zero) rates — orphan cleanup is unconditional
 
-    run_unit_upkeep(f.w, reg);
+    run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(f.w.units.size() == 3, "U3a nothing is disbanded while both bases stand");
 
     const bool demolished = demolish_building(f.w, f.corp, f.base);
@@ -310,7 +319,7 @@ void u3_orphan_cleanup()
     check(f.w.units.count(ua) == 1,
           "U3c demolish_building itself still does not touch w.units (the defect)");
 
-    const unit_upkeep_tick t = run_unit_upkeep(f.w, reg);
+    const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(t.disbanded == 1, "U3d the unit pass disbanded exactly one orphan");
     check(f.w.units.count(ua) == 0, "U3e the orphaned unit is gone");
     check(f.w.units.count(ub) == 1, "U3f the OTHER base's unit is untouched");
@@ -319,7 +328,7 @@ void u3_orphan_cleanup()
 
     // A unit whose owning corp is gone goes too.
     f.w.corporations.erase(f.corp);
-    run_unit_upkeep(f.w, reg);
+    run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(f.w.units.empty(), "U3h units of an erased corp are disbanded");
 }
 
@@ -353,7 +362,7 @@ rollout run_rollout(int ticks)
     rollout r;
     for (int i = 0; i < ticks; ++i)
     {
-        run_unit_upkeep(f.w, reg);
+        run_unit_upkeep(f.w, reg, g_upkeep_report);
         apply_budget(f.w, reg, flows, contention);
         r.balances.push_back(f.w.corporations.at(f.corp).balance);
         r.pool_ordnance.push_back(f.w.pool_for(f.corp, f.body).quantities[ORD]);
@@ -417,7 +426,7 @@ void u5_inert_at_zero()
 
     for (int i = 0; i < 25; ++i)
     {
-        run_unit_upkeep(f.w, reg);
+        run_unit_upkeep(f.w, reg, g_upkeep_report);
         apply_budget(f.w, reg, flows, contention, &breakdown);
     }
 
@@ -530,11 +539,91 @@ void u7_adapter()
           "U7g adapter output is identical across two runs of one seed");
 }
 
+// ---------------------------------------------------------------------------
+// U8 — BL-654: ONE RULE FOR EVERY GOODS DRAW
+// ---------------------------------------------------------------------------
+// The item's binding constraint is not that the unit CAN buy — it is that it
+// buys through the SAME path the building pass uses, with no parallel
+// mechanism. This row asserts the two halves of that rule on the unit side:
+// under the ceiling the shortfall reaches the want register and the shelf is
+// drained; above it, nothing happens at all and the existing decay rule stands.
+// building_upkeep.cpp's R7 asserts the same two halves on the other asset.
+
+void u8_the_reservation_ceiling()
+{
+    std::printf("\n-- U8: BL-654, a short pool bids up to the reservation ceiling --\n");
+
+    constexpr float base = 43.0f;   // ordnance's authored base price
+    constexpr float per_head = 0.1f;
+    constexpr int   heads = 10;
+    constexpr float need = per_head * heads;
+
+    // One market on the fixture's body, anchored on its only tile, holding stock.
+    auto add_market = [&](fixture& f, float market_price) {
+        const entity_id mid = f.w.create_entity();
+        market_component mc{};
+        mc.body        = f.body;
+        mc.centre_tile = f.tile;
+        mc.base_price[ORD] = base;
+        mc.price[ORD]      = market_price;
+        mc.inventory[ORD]  = 100.0f;
+        f.w.markets[mid] = mc;
+        return mid;
+    };
+    auto with_reservation = [](recipe_registry& reg, float reservation) {
+        price_band_params pb;
+        pb.floor_mult       = 0.25f;
+        pb.ceil_mult        = 10.0f;
+        pb.reservation_mult = reservation;
+        reg.set_price_band(pb);
+    };
+
+    // UNDER the ceiling: the shortfall is bid, billed and delivered.
+    {
+        fixture f = make_fixture();
+        add_unit(f, ROW_LEVY, heads, f.base);
+        const entity_id mid = add_market(f, base * 5.0f);
+        recipe_registry reg = registry_with_upkeep(0.0f, per_head, /*decay*/ 50, /*recovery*/ 0);
+        with_reservation(reg, 9.0f);
+
+        economy_report rep;
+        const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
+
+        const auto wit = rep.wants.find(std::make_pair(f.corp, f.body));
+        check(wit != rep.wants.end() && near(wit->second[ORD], need),
+              "U8 under the ceiling the unit's shortfall reaches the want register");
+        const auto pit = rep.purchases.find(std::make_pair(f.corp, f.body));
+        check(pit != rep.purchases.end() && near(pit->second[ORD], need),
+              "U8 and the fill is what the shelf supplied");
+        check(near(f.w.markets.at(mid).inventory[ORD], 100.0f - need),
+              "U8 the market's real inventory is drained by the fill");
+        check(t.unmet == 0, "U8 a draw the market covered is NOT unmet");
+    }
+
+    // ABOVE the ceiling: nothing at all, and the unit weakens as it always did.
+    {
+        fixture f = make_fixture();
+        add_unit(f, ROW_LEVY, heads, f.base);
+        const entity_id mid = add_market(f, base * 9.5f);
+        recipe_registry reg = registry_with_upkeep(0.0f, per_head, /*decay*/ 50, /*recovery*/ 0);
+        with_reservation(reg, 9.0f);
+
+        economy_report rep;
+        const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
+
+        check(rep.wants.empty(),     "U8 above the ceiling NOTHING reaches the want register");
+        check(rep.purchases.empty(), "U8 above the ceiling nothing is bought");
+        check(near(f.w.markets.at(mid).inventory[ORD], 100.0f),
+              "U8 the shelf is untouched — the unit went without");
+        check(t.unmet == 1, "U8 the draw goes unmet and the decay rule stands");
+    }
+}
+
 } // namespace
 
 int main()
 {
-    std::printf("=== unit upkeep + derived strength (BL-454 / BL-459) ===\n");
+    std::printf("=== unit upkeep + derived strength (BL-454 / BL-459 / BL-654) ===\n");
 
     roster_anchors();
     u1_exact_charge();
@@ -544,6 +633,7 @@ int main()
     u5_inert_at_zero();
     u6_derived_strength();
     u7_adapter();
+    u8_the_reservation_ceiling();
 
     std::printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

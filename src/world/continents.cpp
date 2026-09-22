@@ -50,6 +50,204 @@ float wrapped_dcol(float a, float b, int gw)
 
 } // namespace
 
+continent_snapshot continent_snapshot_at(const continent_state& cs, int epochs_back,
+                                        int gw, int gh)
+{
+    continent_snapshot out;
+    out.epochs_back          = epochs_back < 0 ? 0 : epochs_back;
+    out.years_before_present = static_cast<int64_t>(out.epochs_back) * continent_epoch_years;
+    out.plates               = cs.plates;
+
+    const int total = gw * gh;
+    if (cs.plates.empty() || total <= 0)
+        return out;
+
+    // Wind the seeds BACK along the drift vectors. Columns wrap; rows do not,
+    // and are deliberately left unclamped — a seed off the top or bottom of the
+    // grid is still a well-defined nearest-plate centre, and clamping it would
+    // pile plates against the poles as the epoch deepens.
+    const float back = static_cast<float>(out.epochs_back);
+    for (tectonic_plate& p : out.plates)
+    {
+        float c = p.seed_col - p.drift_col * back;
+        const float w = static_cast<float>(gw);
+        if (w > 0.0f)
+        {
+            c = std::fmod(c, w);
+            if (c < 0.0f) c += w;
+        }
+        p.seed_col = c;
+        p.seed_row = p.seed_row - p.drift_row * back;
+    }
+
+    out.plate_id.assign(static_cast<std::size_t>(total), 0);
+    if (out.plates.size() == 1)
+        return out; // Stagnant lid: one plate owns everything, at every epoch.
+
+    // The SAME comparison and the SAME tie-break as run_continents' own Voronoi
+    // (strict <, so the lowest plate index wins a tie). That identity is what
+    // makes epochs_back == 0 reproduce continent_state::plate_id exactly, and it
+    // is asserted rather than assumed.
+    const int plate_count = static_cast<int>(out.plates.size());
+    for (int row = 0; row < gh; ++row)
+    {
+        for (int col = 0; col < gw; ++col)
+        {
+            int   best    = 0;
+            float best_d2 = 1e30f;
+            for (int i = 0; i < plate_count; ++i)
+            {
+                const float dc = wrapped_dcol(static_cast<float>(col),
+                                              out.plates[static_cast<std::size_t>(i)].seed_col, gw);
+                const float dr = static_cast<float>(row)
+                               - out.plates[static_cast<std::size_t>(i)].seed_row;
+                const float d2 = dc * dc + dr * dr;
+                if (d2 < best_d2) { best_d2 = d2; best = i; }
+            }
+            out.plate_id[static_cast<std::size_t>(col + row * gw)] = best;
+        }
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// BL-764 — a tile as a MATERIAL POINT on its plate
+// ---------------------------------------------------------------------------
+paleo_tile_state paleo_tile_at(const continent_state& cs, int gw, int gh,
+                               int col, int row, int epochs_back,
+                               temperature_class temp,
+                               const std::vector<float>* moisture)
+{
+    paleo_tile_state out;
+    out.epochs_back          = epochs_back < 0 ? 0 : epochs_back;
+    out.years_before_present = static_cast<int64_t>(out.epochs_back) * continent_epoch_years;
+    out.col                  = static_cast<float>(col);
+    out.row                  = static_cast<float>(row);
+
+    if (gw <= 0 || gh <= 0 || col < 0 || row < 0 || col >= gw || row >= gh)
+        return out; // Off-grid input: nothing to reconstruct, and no guess made.
+
+    const std::size_t idx = static_cast<std::size_t>(col) + static_cast<std::size_t>(row)
+                          * static_cast<std::size_t>(gw);
+
+    // WHICH PLATE THE GROUND RIDES. Read from the PRESENT assignment, once —
+    // that is what makes the tile a material point rather than a cell the
+    // partition sweeps over. A stagnant lid (one plate, zero drift) and a body
+    // with no continents pass both fall through with the tile stationary, which
+    // is the correct answer in both cases.
+    if (idx < cs.plate_id.size())
+        out.plate = cs.plate_id[idx];
+    if (out.plate < 0 || static_cast<std::size_t>(out.plate) >= cs.plates.size())
+        out.plate = 0;
+
+    // A STAGNANT LID IS IMMOBILE, and its single plate's drift vector is
+    // VESTIGIAL. run_continents draws position, direction and speed for every
+    // plate in one loop and only then early-returns on plate_count == 1, so a
+    // stagnant body's plate carries a drift nothing consumes: the pass never
+    // runs the Voronoi, never classifies a boundary, never applies the bias.
+    // `continent_snapshot_at` already treats that body as unmoved (it returns an
+    // all-zero assignment at every epoch), and CONTINENTS.md is explicit — the
+    // interior is locked into one stagnant plate, no subduction, terrain from
+    // impact and volcanism alone. Winding the ground back along that vector would
+    // manufacture a drift history for a world whose whole characterisation is
+    // that it has none.
+    if (cs.plates.size() > 1)
+    {
+        const tectonic_plate& p = cs.plates[static_cast<std::size_t>(out.plate)];
+        const float back = static_cast<float>(out.epochs_back);
+
+        // Wind the GROUND back along its plate's drift, the same winding
+        // continent_snapshot_at applies to the seeds. Columns wrap, exactly as
+        // the seeds do; rows do not, and are left unclamped for the same reason
+        // — a clamp would pile ground against the poles as the epoch deepens.
+        float c = static_cast<float>(col) - p.drift_col * back;
+        const float w = static_cast<float>(gw);
+        c = std::fmod(c, w);
+        if (c < 0.0f) c += w;
+        out.col = c;
+        out.row = static_cast<float>(row) - p.drift_row * back;
+    }
+
+    // PALEO-LATITUDE, folded over the poles. Latitude as a function of the row
+    // fraction p is a triangle wave of period 2: ground carried past a pole comes
+    // back down the far side rather than running off the scale. Folding rather
+    // than clamping is what keeps a deep epoch honest — clamped, every polar
+    // drifter would read as sitting exactly on the pole forever.
+    const double p = (gh > 1)
+        ? static_cast<double>(out.row) / static_cast<double>(gh - 1)
+        : 0.5;
+    double u = std::fmod(p, 2.0);
+    if (u < 0.0) u += 2.0;
+    const double d = (u <= 1.0) ? std::fabs(2.0 * u - 1.0) : std::fabs(3.0 - 2.0 * u);
+
+    out.latitude = static_cast<float>(d);
+    // The SAME boundary table Pass 3 uses, not a second copy of it. At
+    // epochs_back == 0 the row is unmoved, so p and d are the doubles
+    // band_for_row computes and the band is bit-identical to Pass 3's.
+    out.band = band_for_distance(d, temp);
+
+    // MOISTURE IS SAMPLED WHERE THE GROUND WAS, not where it is: the Lagrangian
+    // premise is that ground moves THROUGH a climate rather than carrying one
+    // with it. Nearest cell, so epoch 0 returns the tile's own value exactly.
+    const int sc = static_cast<int>(std::lround(out.col));
+    const int sr = static_cast<int>(std::lround(out.row));
+    out.on_grid  = (sr >= 0 && sr < gh);
+    if (moisture && moisture->size() == static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+    {
+        const int wc = ((sc % gw) + gw) % gw;
+        const int wr = std::clamp(sr, 0, gh - 1); // clamped, and `on_grid` says so
+        out.moisture       = (*moisture)[static_cast<std::size_t>(wc)
+                                       + static_cast<std::size_t>(wr)
+                                       * static_cast<std::size_t>(gw)];
+        out.moisture_known = true;
+    }
+
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// BL-963 — the frame: the query, gw*gh times
+// ---------------------------------------------------------------------------
+paleo_frame paleo_frame_at(const continent_state& cs, int gw, int gh,
+                           int epochs_back, temperature_class temp,
+                           const std::vector<float>* moisture)
+{
+    paleo_frame out;
+    out.epochs_back          = epochs_back < 0 ? 0 : epochs_back;
+    out.years_before_present = static_cast<int64_t>(out.epochs_back) * continent_epoch_years;
+    if (gw <= 0 || gh <= 0)
+        return out;
+
+    const std::size_t total = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+    const bool sample_moisture = moisture && moisture->size() == total;
+    out.latitude.resize(total);
+    out.band.resize(total);
+    out.on_grid.resize(total);
+    if (sample_moisture)
+        out.moisture.resize(total);
+
+    // Raster order, and NOTHING the per-tile query does not do: the frame is
+    // the query's answers laid side by side, so a row of the harness can hold
+    // the two to each other tile for tile at every epoch.
+    for (int row = 0; row < gh; ++row)
+    {
+        for (int col = 0; col < gw; ++col)
+        {
+            const std::size_t idx = static_cast<std::size_t>(col)
+                                  + static_cast<std::size_t>(row) * static_cast<std::size_t>(gw);
+            const paleo_tile_state s =
+                paleo_tile_at(cs, gw, gh, col, row, out.epochs_back, temp,
+                              sample_moisture ? moisture : nullptr);
+            out.latitude[idx] = s.latitude;
+            out.band[idx]     = s.band;
+            out.on_grid[idx]  = s.on_grid ? 1u : 0u;
+            if (sample_moisture)
+                out.moisture[idx] = s.moisture;
+        }
+    }
+    return out;
+}
+
 continent_state run_continents(const planetology_state& pl, int gw, int gh, uint32_t seed)
 {
     continent_state out;

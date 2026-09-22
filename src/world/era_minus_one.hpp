@@ -70,10 +70,29 @@ class works_registry;
 /// Does generation run the Era -1 sim for these params, as far as the params
 /// alone can say?
 ///
+/// THE EPOCH NO LONGER DECIDES THIS (BL-747). It used to: an `epoch_year`
+/// at or above 1700 skipped the pass outright, on the reasoning that the
+/// settlement pass had already pre-computed that history and the era had
+/// nothing left to simulate. The two-span design replaces that — the epoch
+/// now decides only whether the run has a SECOND span, not whether it runs at
+/// all, so a 1960 arc plays the same engine across an ancient span and then
+/// an industrial one (docs/lore/HISTORY.md § The epoch and the run).
+///
+/// What remains is the SCOPE KNOB: `prehistory_years == 0` skips the pass, and
+/// that is how the harnesses that do not test the era avoid paying its cost
+/// (world_params::prehistory_years). Not a tuning dial.
+///
 /// The real gate has a third clause — `!settlement.regions.empty()` — which is
 /// not a question about params, so it stays at the call site. Ask
 /// `era_minus_one_fixture::ran` for the answer that includes it.
 bool era_minus_one_enabled(const world_params& params);
+
+/// Does this epoch carry an INDUSTRIAL span? Above 1700 the sim plays the
+/// run-up to an industrial start, so the boundary sits `industrial_years`
+/// before the epoch and the higher bands unlock there. At an ancient epoch
+/// there is no second span and the derivation below leaves every new field
+/// at its inert default.
+bool era_minus_one_has_industrial_span(const world_params& params);
 
 /// The `history_sim_params` generation runs the era on.
 ///
@@ -90,6 +109,73 @@ history_sim_params era_minus_one_sim_params(const world_params& params);
 /// The seed generation hands the era. A per-pass fold off the master seed, in
 /// the same shape as every other pass in `make_hard_coded_world`.
 uint32_t era_minus_one_sim_seed(const world_params& params);
+
+// ---------------------------------------------------------------------------
+// BL-931 — the Exploration span's own derivations, on the same footing as the
+// three above. A SECOND CALL to `run_history_sim`, over the same engine, with
+// `history_sim_params::resume_polities`/`resume_grudges`/`resume_contacts`/
+// `resume_corridors` set by the caller from the closing `pass_one_output` —
+// this file derives the SPAN and the SEED only, exactly as it does for the
+// Empires round; the resume pointers are per-call state this file has no
+// business holding.
+// ---------------------------------------------------------------------------
+
+/// Does generation run the Exploration span for these params? Requires the
+/// Empires round itself to be enabled and single-span
+/// (`!era_minus_one_has_industrial_span`) — see `world_params::
+/// exploration_sim_enabled`'s comment for why a two-span epoch is out of
+/// scope here — plus the opt-in flag itself.
+bool exploration_sim_enabled(const world_params& params);
+
+/// The `history_sim_params` the Exploration span runs on: `start_year =
+/// params.empires_stop_year` (1200 by default, wherever the Empires round
+/// actually closed), `stop_year = params.exploration_stop_year` (1660 by
+/// default). A single tick band at 4 years, the same cadence the Empires
+/// round's own single-span closes on. `exploration_upkeep_enabled` is set —
+/// this is the one caller that wants the (still-empty) upkeep hook running.
+/// The resume pointers are NOT set here; the caller fills them in from its
+/// own `pass_one_output` immediately before calling `run_history_sim`.
+history_sim_params exploration_sim_params(const world_params& params);
+
+/// The seed generation hands the Exploration span. Folded off the same
+/// master seed with its own constant, so it is neither the Empires round's
+/// seed nor a caller-invented one.
+uint32_t exploration_sim_seed(const world_params& params);
+
+// ---------------------------------------------------------------------------
+// BL-1040 — the Digitisation span's own derivations, on the same footing as
+// Exploration's: this file derives the SPAN and the SEED; the resume pointers
+// (every table of the closing `exploration_output`) are per-call state the
+// caller sets immediately before `run_history_sim`.
+//
+// THERE IS NO `digitisation_span_enabled(params)` PREDICATE HERE, AND THAT IS
+// THE POINT. The span runs if and only if Exploration ran (Ben, 2026-09-18),
+// so the call site nests it inside the block that ran Exploration and gates it
+// on `world_params::digitisation_span_enabled` alone. A params-only predicate
+// would be a second reading of Exploration's own gate -- one more place for
+// the two to drift, and one more place an epoch test could creep back in.
+// ---------------------------------------------------------------------------
+
+/// The `history_sim_params` the Digitisation span runs on. STARTS FROM
+/// `exploration_sim_params` (struct defaults plus Exploration's overrides),
+/// NEVER the Empires derivation -- copying the wrong base silently changes the
+/// verb set (supply upgrades, universal creeds, army upkeep). Then only:
+///   - the span: `start_year = params.exploration_stop_year` (1660, wherever
+///     Exploration closed), `stop_year = params.digitisation_stop_year`
+///     (1960), one band at Exploration's 4-year cadence (NR-888): 75 rounds;
+///   - the Industry tree ON from the span's own open (BL-1038, TREES.md sec
+///     Milestones), and on in this span only.
+/// Both 1200 anchors (`consolidation_year`, `near_home_cutoff_year`) are
+/// Exploration's, unchanged: consolidation happens once and a pair met after
+/// 1200 stays far however late a span opens (Ben, 2026-09-18). BL-1037's
+/// `resume_seeds_corridor_tier` keeps its default (off); BL-1044 turns it on
+/// with the re-bless.
+history_sim_params digitisation_sim_params(const world_params& params);
+
+/// The seed generation hands the Digitisation span: its own constant, own
+/// additive fold, so polity temperaments re-roll at 1660 as they did at 1200
+/// (DIGITISATION.md, PROPOSED 2026-09-18, not overturned).
+uint32_t digitisation_sim_seed(const world_params& params);
 
 /// EXACTLY what generation handed `run_history_sim`, captured at its own call
 /// site — the arguments, and the three counts the run produced.
@@ -147,4 +233,187 @@ struct era_minus_one_fixture
     int64_t conquests = 0;
     int64_t foundings = 0;
     int64_t years     = 0;
+
+    // --- The generation budget (BL-754) -----------------------------------
+    //
+    // WHY THE TIMINGS LIVE HERE AND NOT ON `generation_report`. The report is
+    // serialised in full by src/core/save_game.cpp, so a field on it is a
+    // SAVE-FORMAT change — and a wall clock is the worst possible thing to put
+    // through a save: it differs every run on the same machine and differs
+    // again on another, so a saved world would carry a value no two loads
+    // agree on. This fixture has no save-seam presence at all (see the type
+    // comment above), which makes it the only surface in the Era -1 path where
+    // a measurement can sit without becoming world state.
+    //
+    // NOTHING BELOW MAY EVER ENTER A DIGEST OR HASH. These are milliseconds of
+    // wall clock; folding one into `state_hash` would make generation
+    // non-deterministic by construction, which is the standing rule this whole
+    // layer is built around. They are REPORTED, never asserted and never
+    // compared — a budget is read by a human, not by a check.
+    //
+    // Zero when the caller asked for no fixture, and zero for any pass that
+    // did not run.
+
+    /// Wall clock of `make_hard_coded_world` end to end, in milliseconds.
+    int64_t ms_world_total = 0;
+
+    /// Wall clock of the Era -1 year-tick sim alone — the pass BL-754 exists
+    /// to price.
+    ///
+    /// DO NOT QUOTE A FIGURE HERE WITHOUT ITS BUILD TYPE. An earlier draft of
+    /// this comment said "~6.4 s of an ~11.2 s single-span build", which was a
+    /// misreading of a harness line (6.45 s was the whole world build, and no
+    /// build ever produced 11.2 s). Measured 2026-09-03: the Release harness
+    /// path (`build_lua_harness.bat` -> `build_gen/verify/`) prices the 400-year
+    /// ancient span at ~323 ms of an ~8.2 s world, while a Debug `build/` prices
+    /// the same pass at ~26 s of ~73 s. The pass's SHARE of the build differs by
+    /// roughly 9x between them, so any ratio taken from this field is a fact
+    /// about one build type and must say which.
+    int64_t ms_era = 0;
+
+    /// Wall clock of the settlement pass that precedes the era, and of
+    /// everything before it (planetology, continents, tiles, provinces). The
+    /// three plus `ms_era` account for `ms_world_total` up to the passes that
+    /// run after the era (nations, corporations, roads), which fall into
+    /// `ms_after_era`.
+    int64_t ms_before_settlement = 0;
+    int64_t ms_settlement        = 0;
+    int64_t ms_after_era         = 0;
+
+    // --- BL-937: the Exploration span's own capture -----------------------
+    //
+    // SAME DISCIPLINE AS THE EMPIRES CAPTURE ABOVE: a harness needs the span's
+    // real input and output, and re-deriving either here would be the second
+    // construction this file exists to prevent. Populated only when
+    // `exploration_sim_enabled(params)` held AND the Empires round actually
+    // produced a living polity to hand it (hard_coded_world.cpp's own gate) —
+    // `exploration_ran` says which; every field below is the struct default
+    // otherwise.
+
+    /// True when generation actually ran the Exploration span this call.
+    bool exploration_ran = false;
+
+    /// The span/clock the Exploration round ran on. Its resume pointers are
+    /// NULL (BL-1053): they pointed into a local freed before generation
+    /// returned; a re-run sets its own onto the `pre_exploration_*` copies.
+    history_sim_params exploration_params;
+    uint32_t           exploration_seed = 0;
+
+    /// The directed contact table AS THE SPAN OPENED — `pass_one_output::
+    /// contacts` at 1200 CE, i.e. before a single Exploration-round campaign
+    /// ran. This is the "already met by 1200" baseline BL-937's displacement
+    /// reading classifies a battle's pair against: a pair present here is a
+    /// LONG-CONTACTED NEIGHBOUR; a pair absent here but present in
+    /// `exploration_state.contacts` met for the first time DURING this span,
+    /// i.e. is a NEWLY-CONTACTED, frontier pair.
+    std::vector<contact> pre_exploration_contacts;
+
+    /// The Exploration span's own full output, EXACTLY as generation's own
+    /// (untraced — `exploration_params.trace_battles` is false in the real
+    /// run) call produced it — polities, the closing contact table,
+    /// battles/conquests/foundings, all of it. The ground-truth counts a
+    /// harness's own re-run (below) must reproduce bit for bit.
+    history_sim_state exploration_state;
+
+    // --- The Exploration span's PRE-SIM inputs, for a harness re-run -------
+    //
+    // WHY A SECOND CAPTURE RATHER THAN JUST TURNING ON `trace_battles` ABOVE.
+    // The Empires capture above never sets `trace_battles` on the run
+    // generation itself performs either — the field's own comment states a
+    // traced and an untraced run are byte-identical in every other output,
+    // but that guarantee is exactly why tracing belongs in a harness's own
+    // second, disposable run rather than in the one the player's world is
+    // built from: it costs memory (one `battle_trace` per battle) that a
+    // shipped generation pass has no reason to carry. So a harness wanting
+    // BL-937's per-battle attacker/defender pairs re-invokes `run_history_sim`
+    // from these captured PRE-Exploration inputs with `trace_battles` forced
+    // on, on the same "capture, do not re-derive" footing as the Empires
+    // block: everything below is what generation itself handed the span,
+    // copied before the call rather than reconstructed independently.
+    settlement_state      pre_exploration_settlement; ///< `kepler_settlement` as the span opened.
+    creed_state           pre_exploration_creeds;     ///< `kepler_creeds` as the span opened.
+    std::vector<polity>   pre_exploration_polities;   ///< `pass_one_output::polities` at 1200.
+    std::vector<grudge>   pre_exploration_grudges;    ///< `pass_one_output::grudges` at 1200.
+    std::vector<history_corridor> pre_exploration_corridors; ///< `pass_one_output::surviving_corridors` at 1200.
+
+    // --- BL-956: the Exploration handoff, and what world setup consumed ----
+
+    /// The Exploration -> Digitisation handoff value exactly as generation
+    /// folded it (`make_exploration_output`), default-constructed when
+    /// `exploration_ran` is false.
+    exploration_output exploration_handoff;
+
+    /// The grudge table world setup actually handed `seed_grudge_sentiment`,
+    /// and the corridor set it actually handed `stamp_history_roads`,
+    /// captured at those two consumption sites (populated whenever a fixture
+    /// was asked for, whichever span supplied them). A harness binds these
+    /// against the LAST close that ran -- `digitisation_handoff` when the
+    /// Digitisation span ran (BL-1053), else `exploration_handoff` -- to prove
+    /// that close's values were the ones read, rather than an earlier span's.
+    std::vector<grudge>           setup_grudges;
+    std::vector<history_corridor> setup_corridors;
+
+    /// BL-1053: the two other setup reads of the history, captured at their
+    /// consumption sites on the same terms. The polity-indexed treasuries
+    /// world setup handed `generate_nations` (`nation_params::
+    /// polity_treasuries`), and the corridor record the market carve counted
+    /// junctions over (`kMarketJunctionDegree`) -- the second reader of the
+    /// record `setup_corridors` holds, captured separately so a harness sees
+    /// each consumer's own input rather than inferring one from the other.
+    std::vector<int64_t>          setup_polity_treasuries;
+    std::vector<history_corridor> setup_junction_corridors;
+
+    // --- BL-1040: the Digitisation span's own capture ---------------------
+    //
+    // Same discipline as the Exploration capture above. Populated only when
+    // generation actually ran the span -- `world_params::
+    // digitisation_span_enabled` set, Exploration run, and no stop knob that
+    // ends generation before it; `digitisation_ran` says which, and every
+    // field below is the struct default otherwise. The span's INPUT is
+    // `exploration_handoff` above, the value the span resumed from, PLUS the
+    // span-open survey (BL-1051), which is why the region table it opened on
+    // is captured below rather than re-derived.
+
+    /// True when generation actually ran the Digitisation span this call.
+    bool digitisation_ran = false;
+
+    /// BL-1051 — the region table the span actually OPENED ON: the 1660
+    /// handoff's regions with `survey_regions_at_span_open` applied, captured
+    /// between the survey and the call. It differs from
+    /// `exploration_handoff.regions` in `survey_fuel_q` and `survey_forest_q`
+    /// and the shares they are taken from (`survey_fuel_raw`,
+    /// `survey_forest_raw`: BL-1059) and in nothing else, and a harness resuming the span must open on it
+    /// (the survey reads tiles, which a fixture does not carry).
+    std::vector<region> digitisation_open_regions;
+
+    /// The span/clock the span ran on. Resume pointers NULL, as above: a
+    /// re-run points them at `exploration_handoff`'s tables, and its regions
+    /// at `digitisation_open_regions` (BL-1051, BL-1053).
+    history_sim_params digitisation_params;
+    uint32_t           digitisation_seed = 0;
+
+    /// The 1960 close exactly as generation folded it
+    /// (`make_digitisation_output`), default-constructed when the span did
+    /// not run.
+    digitisation_output digitisation_handoff;
+
+    /// The span's own full sim output, as generation's untraced call produced
+    /// it -- its counters (battles, subjections formed and freed) count THIS
+    /// span only, because a resumed run starts them at zero.
+    history_sim_state digitisation_state;
+
+    /// Decision rounds the span ran (`history_sim_profile::decision_rounds`,
+    /// read straight after the call): 75 at the defaults, 1660 -> 1956.
+    int64_t digitisation_rounds = 0;
+
+    /// Wall clock of the span's `run_history_sim` call alone, in
+    /// milliseconds. REPORTED, NEVER ASSERTED, and never folded into a digest
+    /// or a branch -- the same rule the BL-754 timings above obey, for the
+    /// same reason. Say which build type produced a figure when quoting it.
+    int64_t ms_digitisation = 0;
+
+    /// BL-1041: the span's industry-point scale accrual alone
+    /// (`history_sim_profile::ns_industry_points`), in nanoseconds, summed
+    /// over its rounds. Same footing as `ms_digitisation`: reported only.
+    int64_t ns_digitisation_industry_points = 0;
 };

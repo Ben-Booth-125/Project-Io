@@ -17,12 +17,23 @@
 
 namespace ui {
 
-// The tick calendar and the generated history count from the same year, and
-// nothing else forces them to agree — the world layer cannot include a UI
-// header, so ::campaign_epoch_year (planetology.hpp) is a deliberate duplicate.
-// This is the only place both are in scope, so the guard lives here.
-static_assert(fmt::campaign_epoch_year == static_cast<int>(::campaign_epoch_year),
-              "History dates and the tick calendar must share a campaign epoch");
+// BL-705 retires the static_assert that stood here. It read
+//
+//     static_assert(fmt::campaign_epoch_year == (int)::campaign_epoch_year)
+//
+// and was described as forcing "the tick calendar and the generated history" to
+// count from the same year. They do not count from the same year, and never
+// needed to: `::campaign_epoch_year` (now `::history_datum_year`) is the FIXED,
+// SERIALISED datum `history_event::years_before_epoch` is measured against,
+// while `fmt::campaign_epoch_year()` is the year the LIVE CAMPAIGN opens on —
+// `world_params::epoch_year`, which is 0 by default and 1960 on the industrial
+// start, and both of which are supported (ERAS.md § Where the ladder starts).
+//
+// Asserting them equal is what pinned the tick calendar at 1960 while every
+// default campaign generated at 0 CE. The two are now separately named, the
+// calendar reads the live world, and there is nothing left here to guard: the
+// history side renders absolute calendar years off its own datum, so no
+// agreement between the two is required for either to be right.
 
 /// A calendar year as the Ages transport should read it.
 ///

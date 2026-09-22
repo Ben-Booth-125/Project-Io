@@ -2,6 +2,10 @@
 
 #include "world.hpp"
 
+#include <algorithm> // BL-741: the sorted nation walk
+#include <string>    // BL-741: per-nation law ids
+#include <vector>
+
 law_effects evaluate_laws(const world& w, entity_id subject_corp)
 {
     law_effects fx;
@@ -97,27 +101,92 @@ entity_id choose_levy_author(const world& w)
 void seed_prototype_laws(world& w, float rate)
 {
     // BL-480: a law with no author cannot exist. No nations, no law.
-    const entity_id author = choose_levy_author(w);
-    if (author == null_entity)
-        return;
-
-    law levy;
-    levy.id      = "LAW-EXTRACTION-LEVY";
-    levy.name    = "Extraction Levy";
-    levy.effect  = law_effect_kind::extraction_levy;
-    levy.rate    = rate;
-    levy.scope_resource  = law::all_resources;
-    levy.enacting_nation = author;
-    // Empty condition_set: unconditional once enacted (BL-155's common case,
-    // and the path that exercises BL-342's always-true degenerate branch).
     //
-    // ENACTED at generation by its author nation (BL-480) — enactment is a
-    // governing-body act, not a player checkbox. The charge is now a transfer
-    // into the author's treasury, bounded by its jurisdiction, so what ships is
-    // a nation taxing extraction in its own territory rather than a free-floating
-    // money sink a corporation could switch on.
-    levy.enacted = true;
-    w.laws.push_back(levy);
+    // BL-741 (2026-09-01): EVERY nation authors its own levy, not just one.
+    // Measured motivation: with a single seeded author, 1 of 43 nations held
+    // any treasury (sum 108.3 cr over an 80-tick warm start), so every
+    // state-side demand channel — network upkeep (BL-643), the space programme
+    // (BL-644), the garrison line — was throttled by an empty wallet, funding
+    // 138 of 3,357 derived purchase intents. The charge machinery was built
+    // for this from the start: each schedule is jurisdiction-bounded and
+    // transfers into its own author's treasury, so N laws is the same
+    // arithmetic N times, and a corp extracting in nation A pays A, never B.
+    // Sorted walk: the law list is serialised state and its order is semantic.
+    std::vector<entity_id> nation_ids;
+    nation_ids.reserve(w.nations.size());
+    for (const auto& [nid, nc] : w.nations)
+    {
+        (void)nc;
+        nation_ids.push_back(nid);
+    }
+    std::sort(nation_ids.begin(), nation_ids.end());
+
+    for (const entity_id author : nation_ids)
+    {
+        law levy;
+        levy.id      = "LAW-EXTRACTION-LEVY-" + std::to_string(author);
+        levy.name    = "Extraction Levy";
+        levy.effect  = law_effect_kind::extraction_levy;
+        levy.rate    = rate;
+        levy.scope_resource  = law::all_resources;
+        levy.enacting_nation = author;
+        // Empty condition_set: unconditional once enacted (BL-155's common case,
+        // and the path that exercises BL-342's always-true degenerate branch).
+        //
+        // ENACTED at generation by its author nation (BL-480) — enactment is a
+        // governing-body act, not a player checkbox. The charge is a transfer
+        // into the author's treasury, bounded by its jurisdiction, so what ships
+        // is every nation taxing extraction in its own territory rather than a
+        // free-floating money sink a corporation could switch on.
+        levy.enacted = true;
+        w.laws.push_back(levy);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BL-750 — the generated tariff
+// ---------------------------------------------------------------------------
+
+float tariff_rate_for_protection(int protection_q, const tariff_bands& b)
+{
+    if (protection_q < b.threshold_q) return 0.0f;
+    if (protection_q >= b.high_q)     return b.rate_high;
+    if (protection_q >= b.mid_q)      return b.rate_mid;
+    return b.rate_low;
+}
+
+void seed_national_tariffs(world& w,
+                           const std::vector<entity_id>& nation_ids,
+                           const std::vector<int>& protection_q,
+                           const tariff_bands& bands)
+{
+    for (std::size_t ni = 0; ni < nation_ids.size(); ++ni)
+    {
+        if (ni >= protection_q.size()) break;
+        const entity_id author = nation_ids[ni];
+        // BL-480: a law with no author cannot exist, and a dangling one charges
+        // nothing — so an ill-formed record is never written in the first place.
+        if (author == null_entity || w.nations.find(author) == w.nations.end())
+            continue;
+
+        const int   pq   = protection_q[ni];
+        const float rate = tariff_rate_for_protection(pq, bands);
+        if (rate <= 0.0f) continue; // under the floor: this history protects nothing
+
+        law duty;
+        duty.id      = "LAW-IMPORT-TARIFF-" + std::to_string(author);
+        duty.name    = "Import Tariff";
+        duty.effect  = law_effect_kind::import_tariff;
+        duty.rate    = rate;
+        // BLANKET, not directional. The directional form — (author, target,
+        // resource) -> rate — is BL-541's and needs the pair outcomes this
+        // handoff does not carry; scoping the first instance to one resource
+        // would be inventing half of that item here.
+        duty.scope_resource  = law::all_resources;
+        duty.enacting_nation = author;
+        duty.enacted         = true;
+        w.laws.push_back(duty);
+    }
 }
 
 // ---------------------------------------------------------------------------

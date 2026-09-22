@@ -17,7 +17,8 @@
 //       world and an envelope equal to the ones written.
 //   S2  The CLOCK survives -- every field distinct, so a field read into its
 //       neighbour shows.
-//   S3  `world_params` and the generation report survive.
+//   S3  `world_params` and the generation report survive -- including the
+//       per-body settlement record and its BL-766 urban fields.
 //   S4  The app-owned histories survive, values and order.
 //   S5  The ui_state slice survives -- the two enums and the nine floats, each a
 //       distinct non-dyadic value, so a swapped pair cannot pass.
@@ -30,6 +31,7 @@
 // Kept outside src/ so the CMake game glob does not pull it into the build.
 
 #include "core/save_game.hpp"
+#include "world/settlement.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 
@@ -146,12 +148,164 @@ save_envelope make_envelope()
     e.params.seed        = 0xC0FFEEu;
     e.params.abundance   = abundance_level::sparse;
     e.params.epoch_year  = -350;
+    // BL-760 (2): the two year fields must differ from EACH OTHER and from the
+    // authored default. Both default to 400, so a run that left them there would
+    // round-trip clean even if the writer swapped their order — an assertion that
+    // cannot fail is not an assertion. 137 and 291 are distinct, non-default, and
+    // not each other's transposition.
+    e.params.prehistory_years = 137;
+    e.params.industrial_years = 291;
+    e.params.body_count       = 7;
+    // preferences is the SEVENTH field and the one most exposed to the defect
+    // this row exists for: save_game writes EIGHT consecutive same-typed `lean`
+    // enums plus roll[3], all read back under one bound, so any two of them
+    // could be transposed and every default-valued round-trip would stay green.
+    // Each is therefore given a DISTINCT value, so a swap of any pair shows.
+    e.params.preferences.star         = lean::low;
+    e.params.preferences.world_size   = lean::mid;
+    e.params.preferences.interior     = lean::high;
+    e.params.preferences.metal        = lean::low;
+    e.params.preferences.ocean        = lean::high;
+    e.params.preferences.oxygen_story = lean::mid;
+    e.params.preferences.coal_basins  = lean::high;
+    e.params.preferences.drawdown     = lean::low;
+    // BL-839 (save_game_version 12): the turbulence lean is the NINTH lean and
+    // the newest, so it is the one most exposed to a writer/reader drift. Given
+    // `high` -- distinct from its neighbour `drawdown` above and from the field
+    // default (`mid`), so neither a transposition nor a silently-unread field
+    // round-trips clean.
+    e.params.preferences.history_turbulence = lean::high;
+    e.params.preferences.roll[0]      = 11;
+    e.params.preferences.roll[1]      = 22;
+    e.params.preferences.roll[2]      = 33;
 
     generation_report::body_entry be;
     be.name         = "Vhessari Prime";
     be.id           = 41;
     be.is_homeworld = true;
+
+    // BL-766, the urban record on `region`, and the S3 precedent this file set
+    // for BL-747: two ints and an int64 appended to a record whose other ints
+    // are also small — so every one of them gets a DISTINCT, non-default value
+    // and the population is distinct from the urban population, or a writer
+    // that emitted `centres_razed` where `centres` belongs would round-trip
+    // clean and this row would assert nothing.
+    //
+    // Two regions, and the SECOND is the one carrying the razed count, so a
+    // reader that dropped a field would desynchronise the vector rather than
+    // merely mis-set one member.
+    region r0;
+    r0.name                 = "Ashen Quarter";
+    r0.anchor               = 913;
+    r0.farm_q               = 641;
+    r0.population           = 84213;
+    // BL-748's field, added in the MERGE rather than by its own agent: it could
+    // not build this harness from a worktree, so the merged v6 stream carried a
+    // field with no round-trip assertion at all. 47 and 213 are distinct from
+    // each other and from every other int in the record.
+    r0.industrial_lag_years = 47;
+    r0.centres              = 3;
+    r0.centres_razed        = 0;
+    r0.urban_population     = 31775;
+    // BL-777's field, at a DISTINCT NON-DEFAULT value on both regions, which is
+    // the whole point of setting it here: `region_domain::land` is the struct
+    // default and a default round-trips clean even through a writer that
+    // transposed the field or dropped it. r0 takes `coastal_water` and r1 takes
+    // `open_ocean` — the extreme of the range, so the `r_enum` bound
+    // (`max_region_dom`) is exercised at its edge rather than in its middle.
+    //
+    // That `open_ocean` is a value GENERATION no longer produces is not a
+    // contradiction: this harness asserts the SERIALISER carries every value of
+    // the type, and the generation-side claim (no region anchors on open ocean)
+    // is sim_water_census's to make.
+    r0.domain               = region_domain::coastal_water;
+    // BL-835's field, and the SECOND time this harness has met the same shape
+    // of gap: the comment above records BL-748 arriving through a merge with no
+    // assertion because its agent could not build this harness from a worktree.
+    // `army_stock` arrived exactly that way. It is written directly beside
+    // `manpower_stock`, which is the whole hazard - two adjacent i64s that both
+    // default to zero transpose CLEANLY, so a writer that swapped them would
+    // pass every other check in this file. Four distinct values, none equal to
+    // any other int in the record, is what makes the swap detectable.
+    r0.manpower_stock       = 5104;
+    r0.army_stock           = 1662;
+    region r1;
+    r1.name                 = "Torrend Reach";
+    r1.anchor               = 274;
+    r1.farm_q               = 388;
+    r1.population           = 19507;
+    r1.industrial_lag_years = 213;
+    r1.centres              = 1;
+    r1.centres_razed        = 5;
+    r1.urban_population     = 12099;
+    r1.domain               = region_domain::open_ocean;
+    r1.manpower_stock       = 2873;
+    r1.army_stock           = 941;
+    be.settlement.regions.push_back(r0);
+    be.settlement.regions.push_back(r1);
+    be.settlement.lacunae                = 6;
+    be.settlement.median_industrial_year = 1843;
+    be.settlement.urban_map_drawn        = true;
+
+    // THE PLAYBACK RECORD, save_game_version 11 (BL-817). Distinct values in
+    // every field of every entry, and DIFFERENT BETWEEN the two entries of each
+    // array, for the reason the army-pool check above states: a dropped field
+    // desynchronises the whole stream and fails everything after it, but a
+    // TRANSPOSED pair reads back clean unless the two sides differ.
+    be.prehistory_timelapse.region_stride = 2;
+    be.prehistory_timelapse.start_year    = -4000;
+    be.prehistory_timelapse.years         = 4000;
+    be.prehistory_timelapse.changes.push_back(owner_change{-4000, 0, 3});
+    be.prehistory_timelapse.changes.push_back(owner_change{-1200, 1, 7});
+
+    be.prehistory_timelapse.steps.push_back(timelapse_step{-4000, 0, 2});
+    be.prehistory_timelapse.steps.push_back(timelapse_step{-1200, 2, 1});
+
+    polity_sample ps0; ps0.population = 84213; ps0.polity = 3; ps0.regions = 11;
+    ps0.cap_military = 2; ps0.cap_materials = 5;
+    polity_sample ps1; ps1.population = 19507; ps1.polity = 7; ps1.regions = 4;
+    ps1.cap_military = 6; ps1.cap_materials = 1;
+    polity_sample ps2; ps2.population = 550021; ps2.polity = 3; ps2.regions = 29;
+    ps2.cap_military = 4; ps2.cap_materials = 3;
+    be.prehistory_timelapse.samples.push_back(ps0);
+    be.prehistory_timelapse.samples.push_back(ps1);
+    be.prehistory_timelapse.samples.push_back(ps2);
+
+    culture_change cc0;
+    cc0.year = -4000; cc0.region = 0;
+    cc0.id[0] = 2; cc0.id[1] = 5; cc0.id[2] = -1;
+    cc0.weight_q[0] = 610; cc0.weight_q[1] = 300; cc0.weight_q[2] = 0;
+    cc0.other_q = 90;
+    culture_change cc1;
+    cc1.year = -1200; cc1.region = 1;
+    cc1.id[0] = 9; cc1.id[1] = -1; cc1.id[2] = -1;
+    cc1.weight_q[0] = 1000; cc1.weight_q[1] = 0; cc1.weight_q[2] = 0;
+    cc1.other_q = 0;
+    be.prehistory_timelapse.culture_changes.push_back(cc0);
+    be.prehistory_timelapse.culture_changes.push_back(cc1);
+    // BL-916, save_game_version 13 -- the event layer. Every field distinct
+    // from its neighbours so a transposition between the three u16 slots is
+    // visible; one entry carries the none sentinel so it survives the range
+    // check as the sentinel and not as an out-of-stride index.
+    be.prehistory_timelapse.events.push_back(lapse_event{-3900, 0, 0, 3, lapse_event_none});
+    be.prehistory_timelapse.events.push_back(lapse_event{-1200, 2, 1, 7, 3});
+    be.prehistory_timelapse.events.push_back(lapse_event{-1150, 5, 0, 2, 1});
+
     e.report.bodies.push_back(be);
+
+    // BL-768's three report counters, at DISTINCT non-default values.
+    //
+    // ADDED ON MERGE, and that is now a pattern rather than an accident: this is
+    // the THIRD save-format change this sprint to land with its fields written
+    // and read but never ASSERTED, because no worktree agent can build this
+    // harness (it links imgui, so neither headless builder compiles it) and the
+    // authoring agent therefore cannot extend it. The field goes in, the version
+    // bumps, and the only thing standing between a transposition and a silent
+    // corrupt load is that somebody downstream noticed. Whoever owns the builder
+    // gap should treat this as its cost.
+    e.report.prehistory_corridors = 3187;
+    e.report.prehistory_junctions = 124;
+    e.report.markets_from_trade   = 41;
 
     e.balance_history     = { 1.5f, -2.25f, 3.125f };
     e.income_history      = { 10.5f, 11.75f };
@@ -221,12 +375,142 @@ int main()
                   && le.speed == env.speed,
               "S2 the clock survives (five distinct fields)");
 
+        // EVERY field, not three of six. prehistory_years and industrial_years
+        // were both unasserted on a record whose version was just bumped to 4,
+        // and both default to 400 — so an order swap in the writer round-tripped
+        // clean and the comment guarding it was the only check (BL-760 (2)).
         check(le.params.seed == env.params.seed && le.params.abundance == env.params.abundance
-                  && le.params.epoch_year == env.params.epoch_year,
-              "S3 world_params survives");
+                  && le.params.epoch_year == env.params.epoch_year
+                  && le.params.prehistory_years == env.params.prehistory_years
+                  && le.params.industrial_years == env.params.industrial_years
+                  && le.params.body_count == env.params.body_count,
+              "S3 world_params survives (the six scalar fields)");
+        const world_preferences& lp = le.params.preferences;
+        const world_preferences& ep = env.params.preferences;
+        check(lp.star == ep.star && lp.world_size == ep.world_size
+                  && lp.interior == ep.interior && lp.metal == ep.metal
+                  && lp.ocean == ep.ocean && lp.oxygen_story == ep.oxygen_story
+                  && lp.coal_basins == ep.coal_basins && lp.drawdown == ep.drawdown
+                  && lp.history_turbulence == ep.history_turbulence
+                  && lp.roll[0] == ep.roll[0] && lp.roll[1] == ep.roll[1]
+                  && lp.roll[2] == ep.roll[2],
+              "S3 world_params.preferences survives (9 leans + roll[3], each distinct)");
+        // Pinned to a LITERAL, not compared to the original: a writer and
+        // reader that both omitted the field would compare equal at the default
+        // and say nothing. BL-839's field default is `mid`, so `high` here can
+        // only have arrived through the seam.
+        check(lp.history_turbulence == lean::high,
+              "S3 the BL-839 turbulence lean survives (high, not the mid default)");
+        // The differential the requirement actually asks for: the two year
+        // fields must come back DISTINCT and in the right slots. Comparing
+        // round-tripped-to-original cannot catch a swap if the writer and reader
+        // swap symmetrically, so this pins them to their literal values.
+        check(le.params.prehistory_years == 137 && le.params.industrial_years == 291,
+              "S3 the two year fields land in the RIGHT slots (137/291, not swapped)");
+        // Pinned to literals, not compared to the original: three consecutive
+        // int64s of the same type are exactly the shape a symmetric writer/reader
+        // transposition survives.
+        check(le.report.prehistory_corridors == 3187
+                  && le.report.prehistory_junctions == 124
+                  && le.report.markets_from_trade == 41,
+              "S3 the BL-768 report counters survive (corridors / junctions / markets, each distinct)");
         check(le.report.bodies.size() == 1 && le.report.bodies[0].name == "Vhessari Prime"
                   && le.report.bodies[0].id == 41 && le.report.bodies[0].is_homeworld,
               "S3 the generation report's body entry survives (name, id, homeworld flag)");
+
+        // BL-766: the urban record. Pinned to LITERALS rather than compared
+        // field-to-field, for the reason the year-slot row above gives — a
+        // writer and reader that swap symmetrically compare equal to each other
+        // and are still wrong.
+        const bool settlement_ok =
+            le.report.bodies.size() == 1
+            && le.report.bodies[0].settlement.regions.size() == 2
+            && le.report.bodies[0].settlement.regions[0].name == "Ashen Quarter"
+            && le.report.bodies[0].settlement.regions[0].population == 84213
+            && le.report.bodies[0].settlement.regions[0].industrial_lag_years == 47
+            && le.report.bodies[0].settlement.regions[1].industrial_lag_years == 213
+            && le.report.bodies[0].settlement.regions[0].centres == 3
+            && le.report.bodies[0].settlement.regions[0].centres_razed == 0
+            && le.report.bodies[0].settlement.regions[0].urban_population == 31775
+            && le.report.bodies[0].settlement.regions[1].name == "Torrend Reach"
+            && le.report.bodies[0].settlement.regions[1].population == 19507
+            && le.report.bodies[0].settlement.regions[1].centres == 1
+            && le.report.bodies[0].settlement.regions[1].centres_razed == 5
+            && le.report.bodies[0].settlement.regions[1].urban_population == 12099
+            // BL-777, save_game_version 7: the appended domain byte, distinct
+            // and non-default on BOTH regions and different BETWEEN them.
+            && le.report.bodies[0].settlement.regions[0].domain
+                   == region_domain::coastal_water
+            && le.report.bodies[0].settlement.regions[1].domain
+                   == region_domain::open_ocean;
+        check(settlement_ok,
+              "S3 the region urban record and domain survive (centres / razed / urban heads "
+              "/ domain, "
+              "each distinct, both regions)");
+        // BL-835, save_game_version 10. Asserted as a PAIR against its
+        // neighbour: the failure this catches is not a dropped field (which
+        // would desynchronise the whole stream and break every check below it)
+        // but a TRANSPOSED one, and only distinct values on both sides can
+        // tell those apart.
+        check(le.report.bodies.size() == 1
+                  && le.report.bodies[0].settlement.regions.size() == 2
+                  && le.report.bodies[0].settlement.regions[0].manpower_stock == 5104
+                  && le.report.bodies[0].settlement.regions[0].army_stock == 1662
+                  && le.report.bodies[0].settlement.regions[1].manpower_stock == 2873
+                  && le.report.bodies[0].settlement.regions[1].army_stock == 941,
+              "S3 the army pool survives BESIDE the manpower pool it is raised "
+              "from, unswapped (BL-835, both regions)");
+        // BL-817, save_game_version 11 -- the playback record. Written as one
+        // predicate over every field of every entry, because the failure worth
+        // catching here is a transposition inside a fixed-size array (the three
+        // culture slots) and only distinct values on both sides can see it.
+        {
+            const era_timelapse& t = le.report.bodies.empty()
+                                   ? env.report.bodies[0].prehistory_timelapse
+                                   : le.report.bodies[0].prehistory_timelapse;
+            const era_timelapse& o = env.report.bodies[0].prehistory_timelapse;
+            bool play_ok = le.report.bodies.size() == 1
+                        && t.steps.size() == o.steps.size()
+                        && t.samples.size() == o.samples.size()
+                        && t.culture_changes.size() == o.culture_changes.size();
+            for (std::size_t i = 0; play_ok && i < o.steps.size(); ++i)
+                play_ok = t.steps[i].year == o.steps[i].year
+                       && t.steps[i].first_sample == o.steps[i].first_sample
+                       && t.steps[i].sample_count == o.steps[i].sample_count;
+            for (std::size_t i = 0; play_ok && i < o.samples.size(); ++i)
+                play_ok = t.samples[i].population == o.samples[i].population
+                       && t.samples[i].polity == o.samples[i].polity
+                       && t.samples[i].regions == o.samples[i].regions
+                       && t.samples[i].cap_military == o.samples[i].cap_military
+                       && t.samples[i].cap_materials == o.samples[i].cap_materials;
+            for (std::size_t i = 0; play_ok && i < o.culture_changes.size(); ++i)
+            {
+                play_ok = t.culture_changes[i].year == o.culture_changes[i].year
+                       && t.culture_changes[i].region == o.culture_changes[i].region
+                       && t.culture_changes[i].other_q == o.culture_changes[i].other_q;
+                for (int k = 0; play_ok && k < timelapse_culture_slots; ++k)
+                    play_ok = t.culture_changes[i].id[k] == o.culture_changes[i].id[k]
+                           && t.culture_changes[i].weight_q[k]
+                                  == o.culture_changes[i].weight_q[k];
+            }
+            check(play_ok,
+                  "S3 the playback record survives whole -- steps, per-polity samples and "
+                  "the culture-share change list, slot for slot (BL-817)");
+            bool ev_ok = t.events.size() == o.events.size();
+            for (std::size_t i = 0; ev_ok && i < o.events.size(); ++i)
+                ev_ok = t.events[i].year   == o.events[i].year
+                     && t.events[i].kind   == o.events[i].kind
+                     && t.events[i].region == o.events[i].region
+                     && t.events[i].polity == o.events[i].polity
+                     && t.events[i].other  == o.events[i].other;
+            check(ev_ok && o.events.size() == 3,
+                  "S3 the event layer survives whole, field for field, sentinel included (BL-916)");
+        }
+        check(le.report.bodies.size() == 1
+                  && le.report.bodies[0].settlement.lacunae == 6
+                  && le.report.bodies[0].settlement.median_industrial_year == 1843
+                  && le.report.bodies[0].settlement.urban_map_drawn,
+              "S3 settlement_state's own scalars survive, urban_map_drawn included");
 
         check(le.balance_history == env.balance_history
                   && le.income_history == env.income_history
@@ -325,6 +609,25 @@ int main()
             f.write(reinterpret_cast<const char*>(&bad), sizeof(bad));
         }
         check(!read_save_game(k_path, lw, le), "S7 a bad magic is refused too");
+
+        // BL-916, save_game_version 13: the IMMEDIATE previous format, PINNED
+        // TO A LITERAL. A v12 stream has no event-list length where v13 expects
+        // one, so a reader that accepted it would take the next body entry's
+        // name length as an event count. Refused whole. The literal is a PAST
+        // format, which is the only kind this file pins (save_roundtrip.cpp's
+        // rule): it can never be broken by a later bump, only made older.
+        static_assert(save_game_version >= 13,
+                      "BL-916 released layout 13; S8 names v12 as a refused predecessor");
+        {
+            write_save_game(k_path, w, make_envelope());
+            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(4, std::ios::beg);
+            const uint32_t v12 = 12;
+            f.write(reinterpret_cast<const char*>(&v12), sizeof(v12));
+        }
+        le.speed = 99;
+        check(!read_save_game(k_path, lw, le) && le.speed == 99,
+              "S8 a v12-versioned stream (pre event layer) is refused with the destination untouched");
     }
 
     std::remove(k_path);

@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include "agent_seam.hpp"
+#include "ground_layer.hpp" // BL-732: baked-ground chunk cache
 #include "sim_loop.hpp"
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
@@ -15,6 +16,7 @@
 #include "world/world.hpp"
 
 #include "ui/canvas_command.hpp"
+#include "ui/history_lapse.hpp"    // BL-829/BL-860: the lapse rounds' time-lapse record
 #include "scripting/persona_pack.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/plot_history.hpp"
@@ -28,6 +30,7 @@
 #include <cstdint>
 #include <deque>
 #include <future>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -69,10 +72,49 @@ public:
     /// run().
     void host_agent(uint16_t port) { m_agent_port = port; }
 
+    /// BL-705: override `world_params::epoch_year` for every world this process
+    /// generates (`--epoch <year>`). Absent = the struct's own default.
+    ///
+    /// WHY A FLAG EXISTS AT ALL. The 1960s industrial start is a live branch —
+    /// `era_band_for_epoch` puts the recipe registry on the industrial band, and
+    /// `era_minus_one` skips the antiquity prehistory above 1700 — but nothing
+    /// in `src/` ever *set* the field, so reaching it meant editing a source
+    /// default. Both starts are supported (`docs/economy/ERAS.md` § Where the
+    /// ladder starts), so selecting between them belongs at the command line.
+    ///
+    /// Applies to a NEW world only; a save carries its own epoch and the load
+    /// path is not overridden. Call before run() / run_autostart().
+    ///
+    /// @param year Calendar year the generated world begins at (< 1700 takes
+    ///             the antiquity branch).
+    void set_epoch_year(std::int64_t year)
+    {
+        m_epoch_year_override = year;
+        m_epoch_year_set      = true;
+        m_pending_world_params.epoch_year = year; // the plain interactive path never re-seeds
+    }
+
     /// Open into this save on the next `run()` instead of the main menu.
     /// Set by `--load <path>`; consumed once. Empty = the normal menu entry.
     /// @param path Save file to open.
     void open_save(std::string path) { m_pending_load = std::move(path); }
+
+    /// Enter the session in SPECTATOR MODE — no human seat
+    /// (AI_OPPONENT.md § 10i). Set by `--spectate`; call before run().
+    ///
+    /// ENTRY AT START, and only at start. § 10i's model is that a spectated
+    /// session has no human owner, so the standing prohibition's PRECONDITION
+    /// is absent rather than waived — which is a property of the whole
+    /// session, not a view a watcher steps into and out of. A mid-run flip
+    /// would change halfway through which corps the scorer may legally act
+    /// on, so no in-game control clears this and the only way in is at
+    /// launch. Off by default, so an ordinary played session is untouched.
+    ///
+    /// The flag lands on `m_ui.spectating` immediately: `m_ui` is a plain
+    /// member, live from construction, and nothing outside the verify API
+    /// reassigns it — so setting it here carries through the menu, the
+    /// wizard, the warm start and every campaign the session opens.
+    void spectate_session() { m_ui.spectating = true; }
 
     /// Run a non-interactive visual-verification session: set up a deterministic
     /// world (seeded, sim paused), expose the `verify` Lua API (which drives view
@@ -220,10 +262,62 @@ private:
     /// capture path so the menu is golden-verifiable.
     void draw_main_menu();
 
+    /// Discard every PASS round strictly after @p round, because something at or
+    /// above it moved. ROUNDS ARE CAUSAL (STARTUP.md § Rounds 4, 5 and 6):
+    /// rerolling round 4 invalidates rounds 5 and 6, exactly as rerolling a
+    /// planetology round re-draws the ones below it. Called from the wizard's
+    /// reroll and from every planetology recompute — a planetology change moves the
+    /// ground both lapse passes run on, so all three pass rounds go with it.
+    void invalidate_wizard_rounds_below(int round)
+    {
+        for (int i = 0; i < wizard_pass_round_count; ++i)
+            if (wizard_planetology_round_count + i > round)
+                m_wiz_pass_current[i] = false;
+
+        // A LAPSE ROUND'S RECORD GOES WITH ITS FLAG (BL-829, generalised to both
+        // lapse rounds by BL-860). A history is a history OF a world, so a
+        // planetology move makes the one on screen a plausible account of ground
+        // that no longer exists — the silent failure this function was wired ahead
+        // of the passes to prevent. A run already in flight cannot be recalled, so
+        // it is marked instead and discarded when it lands; the round is then empty
+        // and the player's next arrival on it starts a fresh one, because starting
+        // the project's most expensive pass unbidden is not a repair.
+        for (int i = 0; i < wizard_lapse_round_count; ++i)
+        {
+            if (wizard_planetology_round_count + i <= round) continue;
+            if (m_wiz_history_future[i].valid())
+            {
+                m_wiz_history_stale[i] = true;
+                // BL-914: a live round already has a partial record drawn from
+                // its tap — that ground is gone the instant the planetology
+                // moved, exactly as much as a landed one would be, so it stops
+                // being SHOWN here even though the worker cannot be recalled
+                // and keeps publishing into a tap nothing reads any more.
+                m_wiz_history[i] = ui::history_lapse{};
+            }
+            else m_wiz_history[i] = ui::history_lapse{};
+            m_wiz_history_playing[i] = false;
+            m_wiz_history_paused[i]  = false;
+        }
+    }
+
+    /// Which lapse record the wizard's CURRENT round owns, clamped into range.
+    /// A round that is not a lapse round answers 0 rather than a sentinel: every
+    /// caller is a verify hook parking or reading a record, and the wizard's own
+    /// draw gates on `lapse_round` before it asks.
+    int wizard_lapse_index() const
+    {
+        const int i = m_wiz_round - wizard_planetology_round_count;
+        if (i < 0)                            return 0;
+        if (i >= wizard_lapse_round_count)    return wizard_lapse_round_count - 1;
+        return i;
+    }
+
     /// Draw the New World wizard (BL-167) — the surface between "New Game" and the
-    /// first frame of play. The player walks THREE rounds, each stacking the charts
-    /// and explanations of its chain stages and then taking that round's
-    /// preferences. The charts come from a live resolve_preferences + preview_system
+    /// first frame of play. The player walks SIX rounds: the three PLANETOLOGY rounds,
+    /// each stacking the charts and explanations of its chain stages and then taking
+    /// that round's preferences, then the two PASS rounds (the history, then the
+    /// economic substrate). The charts come from a live resolve_preferences + preview_system
     /// run, so they show the world the roll actually produced.
     ///
     /// NOTHING is generated here. Every frame runs the chain over the prototype body
@@ -244,15 +338,15 @@ private:
     void refresh_wizard_preview();
 
     /// Actually start the campaign, from the params the wizard settled: rebase the
-    /// sim clock, build the world, load the economy, run the pre-game warm start,
-    /// and hand over to play. The wizard's "Begin" button.
+    /// sim clock, build the world, load the economy, search the landscape and run
+    /// the winner's validation ticks, and hand over to play. The wizard's "Begin"
+    /// button.
     ///
-    /// SPLIT 2026-08-12 (the AppHangB1 stall): the tail no longer runs as one
-    /// synchronous block inside a frame. `start_new_game_prelude` does the cheap
-    /// main-thread setup (~20 ms), then poll_worldgen runs the 80 warm-start
-    /// ticks in time-boxed slices — one slice per loading-screen frame — and
-    /// `finish_new_game` rebases the clock and enters play. The UI repaints
-    /// between slices, so Windows never judges the app hung.
+    /// `start_new_game_prelude` does the main-thread setup, then poll_worldgen
+    /// runs the `validation_ticks` (BL-978, warm start retired) in time-boxed
+    /// batches — one per loading-screen frame, so the window keeps repainting
+    /// and Windows never judges the app hung (the 2026-08-12 AppHangB1 stall) —
+    /// seats the player, and `finish_new_game` rebases the clock and enters play.
     void start_new_game_prelude();
     void finish_new_game();
     /// Kick generation onto a worker and switch to the loading screen. Loads the
@@ -269,6 +363,12 @@ private:
     /// run_verify() so both start from the same deterministic state. @p params is the
     /// world descriptor (seed + knobs); defaulted so run_verify() stays deterministic-cold.
     void setup_world(world_params params = {});
+
+    /// A default-constructed `world_params` with the `--epoch` override applied
+    /// (BL-705). Every "start from scratch" site goes through this rather than
+    /// `world_params{}`, so the flag reaches the interactive wizard, both
+    /// autostart paths and run_verify alike.
+    world_params fresh_world_params() const;
 
     /// Load the economy Lua data layer (scripts/recipes.lua + scripts/economy.lua)
     /// into m_registry, then author processing recipes onto the generated assets
@@ -332,14 +432,58 @@ private:
     /// Re-load the UI font atlas at the size for m_settings.ui_scale_step (BL-063).
     void apply_ui_scale();
 
-    /// How many rounds the New World wizard walks (BL-167). Declared here rather than
-    /// beside the wizard code because the verify API — registered long before it —
-    /// clamps against the same count.
-    static constexpr int wizard_round_count = 3;
+    /// How many rounds the New World wizard walks (BL-167, extended to five by
+    /// BL-816 and to SIX by BL-860). Declared here rather than beside the wizard
+    /// code because the verify API — registered long before it — clamps against the
+    /// same count.
+    ///
+    /// The first `wizard_planetology_round_count` are the PLANETOLOGY rounds, which
+    /// are the chart chain's own rounds (ui::chain_round_count) and take
+    /// `world_preferences`. The remainder are the PASS rounds — round 3 the
+    /// migration (Culture), round 4 the history to 1200 CE (Empires), round 5 the
+    /// Exploration span to 1660 CE (BL-946), and round 6 the Digitisation
+    /// placeholder — which run an expensive pass inside the round rather than
+    /// previewing it per keystroke (STARTUP.md § Rounds 4, 5 and 6). The two counts
+    /// are deliberately separate: the wizard grew, the chart chain did not.
+    ///
+    /// WHY MIGRATION AND HISTORY ARE TWO ROUNDS (Ben, 2026-09-09: *our rounds are
+    /// not continuous*). One round covering both the peopling of the world and the
+    /// empires that followed showed conquest with the migration already finished
+    /// off-screen, and then — once the migration was moved inside it — migration
+    /// with no conquest at all. Different subjects, different rules, different
+    /// terminating conditions; see STARTUP.md § Rounds 4, 5 and 6.
+    // SIX ROUNDS, TWO OF THEM PLANETOLOGY (BL-946, revising BL-863's five;
+    // Ben, 2026-09-13). System, Life, Culture, Empires, Exploration,
+    // Digitisation. The third planetology round -- 'Inheritance', which
+    // carried the drawdown lean -- retires into Digitisation, which is what
+    // draws a world down in the first place. Digitisation is the renamed
+    // Industrialisation placeholder (BL-946); it is still the honest empty
+    // placeholder BL-914 built, not new content.
+    static constexpr int wizard_planetology_round_count = 2;
+    static constexpr int wizard_round_count            = 6;
+    /// The pass rounds, which own a reroll counter each rather than a preference block.
+    static constexpr int wizard_pass_round_count =
+        wizard_round_count - wizard_planetology_round_count;
+    /// The pass rounds that play a TIME-LAPSE, and so own a record of their own:
+    /// round 3 (Culture, the migration), round 4 (Empires, the history) and now
+    /// round 5 (Exploration, BL-946). The Digitisation placeholder round does
+    /// not, so it is deliberately NOT `wizard_pass_round_count`.
+    ///
+    /// THE THREE LAPSE ROUNDS RUN THREE DIFFERENT SPANS on the one shared
+    /// engine (EXPLORATION.md sec The engine is shared): the migration's own
+    /// walk, the Empires history to 1200 CE, and the Exploration span to 1660
+    /// CE — each stopped at its own close by `world_gen_config::
+    /// stop_after_migration` / `stop_after_ancient_era` / `stop_after_exploration`.
+    static constexpr int wizard_lapse_round_count = 3;
+
+    /// BL-948 — the three autoplay durations offered on every lapse round, in
+    /// seconds for the whole span, and the one selected by default.
+    static constexpr float wizard_lapse_secs[3]      = {30.0f, 60.0f, 90.0f};
+    static constexpr float wizard_lapse_secs_default = 60.0f;
 
     /// Which top-level screen is active. run() opens on the menu; "New Game" enters
     /// `generating` (the New World wizard, where the player takes the three rounds of
-    /// Planetology preferences) and the wizard's "Begin" hands over to play; run_verify() jumps
+    /// Planetology preferences and then the three pass rounds) and the wizard's "Begin" hands over to play; run_verify() jumps
     /// straight to in_game (the harness renders the live world, not the menu, unless
     /// a script asks for it via verify.show_menu / verify.show_generation). Only
     /// `in_game` simulates.
@@ -349,9 +493,9 @@ private:
     /// reported the process as "not responding" — indistinguishable from a crash.
     // BL-630 retired the `choosing_corp` stage that used to sit between
     // `building` and play: the player is no longer asked which corporation to
-    // be, they are SEATED on one drawn from the spawn shortlist after the warm
-    // start (STARTUP.md § The seat). `building` now hosts both phases — the
-    // carve, then the warm start — and hands straight to `in_game`.
+    // be, they are SEATED on one drawn from the spawn shortlist after the
+    // winner's validation run (STARTUP.md § The seat). `building` hosts the
+    // carve and the validation run, and hands straight to `in_game`.
     enum class app_screen { menu, generating, building, in_game };
     app_screen m_screen = app_screen::menu;
     /// Pending `--load` target, consumed by run() before the frame loop.
@@ -364,8 +508,22 @@ private:
     sim_loop        m_sim_loop;
     lua_state       m_lua;
     world           m_world;
+    /// One-shot latch for BL-890's rolled seed. The menu draw rolls
+    /// `m_pending_world_params.seed` the FIRST time it runs and never again, so
+    /// the field the player sees is already a fresh world and anything they
+    /// then type, paste or Roll into it survives. Rolling per-frame would make
+    /// the field impossible to edit; rolling when the wizard opens would throw
+    /// away a seed they had just entered on this very screen.
+    bool            m_seed_rolled = false;
     world_params    m_pending_world_params; ///< Edited by the New World menu and then by the wizard; consumed by start_new_game (BL-114/167).
     world_params    m_active_world_params;  ///< The descriptor the live world was built from; shown as the "seed used".
+
+    /// BL-705: the `--epoch <year>` override, and whether one was given.
+    /// A separate presence flag rather than a sentinel value, because a
+    /// negative epoch year is legitimate (BCE, astronomical numbering) and 0 is
+    /// the real default — so no in-band value can mean "absent".
+    bool            m_epoch_year_set = false;
+    std::int64_t    m_epoch_year_override = 0;
 
     // Generation (BL-167). The report is a PRESENTATION artefact filled by
     // setup_world; it never enters `world`, so it stays off the serialisation seam.
@@ -374,11 +532,25 @@ private:
     generation_report m_generation_report;   ///< Per-body Planetology results + per-stage summaries for the world that was built.
 
     // --- New World wizard state (BL-167) ---
-    // The wizard walks THREE rounds (each covering several chain stages), recomputing
-    // a THROWAWAY preview of the whole system whenever a preference or a reroll
+    // The wizard walks SIX rounds. The first three (the planetology rounds, each
+    // covering several chain stages) recompute a THROWAWAY preview of the whole system whenever a preference or a reroll
     // changes. None of this touches m_world: the world is built once, on "Begin",
     // from m_pending_world_params.
     int  m_wiz_round = 0;    ///< Round the player is on, 0 .. wizard_round_count-1.
+    /// Reroll counter for each PASS round (round 4 the migration, round 5 the
+    /// history, round 6 the substrate), indexed by `m_wiz_round -
+    /// wizard_planetology_round_count`. The planetology rounds keep theirs in
+    /// world_preferences::roll; these cannot, because they are not planetology
+    /// inputs and never reach resolve_preferences.
+    ///
+    /// ROUNDS STAY CAUSAL (STARTUP.md § Rounds 4, 5 and 6): rerolling round 4
+    /// discards rounds 5 and 6, exactly as rerolling a planetology round re-draws
+    /// the ones below it.
+    std::uint32_t m_wiz_pass_roll[wizard_pass_round_count] = {};
+    /// Whether each pass round's output is current. A pass round is invalidated by
+    /// any reroll at or above it. The lapse rounds carry the record itself in
+    /// `m_wiz_history`; round 6's flag is still ahead of its pass (BL-819).
+    bool          m_wiz_pass_current[wizard_pass_round_count] = {};
     /// --autostart-windowed wizard driver: frames spent in the wizard so far, or
     /// -1 when inactive (every interactive run). While >= 0 the wizard advances a
     /// round every ~20 frames and presses Begin from inside its own draw — the
@@ -400,7 +572,11 @@ private:
     // golden capture never races the worker. The future is never destroyed while
     // pending (std::async's dtor would block); a params move mid-build sets the
     // stale flag and the poll relaunches on arrival.
-    std::future<std::vector<uint8_t>> m_wiz_surface_future;
+    //
+    // Since BL-915 the build returns TWO rasters: the packed axes the globe
+    // samples, and the packed landform + river edges the lapse maps draw their
+    // terrain base from (ui::wizard_surface).
+    std::future<ui::wizard_surface> m_wiz_surface_future;
 
     // --- Async world generation (2026-08-12) --------------------------------
     /// The worker running make_hard_coded_world. Valid only while `building`.
@@ -420,9 +596,107 @@ private:
     std::vector<int16_t> m_carve_view;
     uint32_t             m_carve_seen = 0;
     std::vector<uint8_t> m_wiz_surface;       ///< Raster compositions; empty = not yet built.
+    std::vector<uint16_t> m_wiz_terrain;      ///< Packed landform + river edges per tile (ui::pack_lapse_terrain, BL-915); same length as m_wiz_surface.
     bool m_wiz_surface_stale = false;         ///< Params moved while a build was in flight.
     void launch_wizard_surface_build();       ///< Start the worker for the CURRENT pending params.
     void poll_wizard_surface();               ///< Per-frame: adopt a finished build, relaunch if stale.
+
+    // --- Rounds 4 and 5: the two time-lapse rounds (BL-829 / BL-830 / BL-860) --
+    //
+    // THESE ROUNDS INVERT THE WIZARD'S MODEL and STARTUP.md § The wait is the
+    // round says why: rounds 0-2 re-run a cheap chain preview on every control
+    // move, and the history sim cannot be previewed per keystroke at any budget.
+    // So arriving on the round runs the pass, it runs inside the round, and the
+    // wait IS the content (Ben, 2026-09-08: *a watched wait needs no budget*).
+    //
+    // ONE SLOT PER LAPSE ROUND, and today both slots run the SAME pass and hold
+    // the same kind of record — which the rounds say in as many words rather than
+    // implying a separation the code has not made. The generation-side split (a
+    // migration span with its own terminating condition, then a history span to
+    // 1200 CE) is BL-858/BL-861. Indexed by `m_wiz_round -
+    // wizard_planetology_round_count`; see `wizard_lapse_index`.
+    //
+    // WHAT THE WORKER ACTUALLY RUNS is `make_hard_coded_world` — generation's own
+    // single invocation — and it throws the world away, keeping only the recorded
+    // era. That is the same argument `generate_home_surface_preview` is built on:
+    // the ground the history runs on must be the ground "Begin" hands over. A
+    // partial re-derivation of settlement-plus-era up here would be a SECOND
+    // construction of the Era -1 invocation, which is precisely the drift
+    // `world/era_minus_one.hpp` exists to stop (BL-462, and NR-733 for the last
+    // caller that did it). No caller is added: the record is read off the report
+    // the run already fills.
+    ui::history_lapse              m_wiz_history[wizard_lapse_round_count];        ///< Each lapse round's record; empty until its run finishes.
+    std::future<ui::history_lapse> m_wiz_history_future[wizard_lapse_round_count]; ///< The run in flight on that round, if any.
+    /// The wait's own content per lapse round: which pass, which year.
+    ///
+    /// ON THE HEAP, AND THAT IS LOAD-BEARING (measured 2026-09-09). A
+    /// `generation_progress` is 66,080 bytes — nearly all of it the carve sink's
+    /// per-cell atomics — and `main` declares `app a;` in SIX separate scopes.
+    /// MSVC in Debug does not overlap the frames of sibling scopes, so every byte
+    /// added to `app` is charged to the main thread's 1 MB stack SIX times: a
+    /// second inline progress block took `sizeof(app)` from 152,728 to 218,808 and
+    /// the process died at startup with 0xC00000FD before printing a line.
+    /// `app.cpp`'s own note says the repair is to heap-allocate the sink rather
+    /// than raise the bar, so that is what this does — and it leaves `app`
+    /// SMALLER than it was before the second lapse round existed.
+    ///
+    /// NOTE THE STATIC_ASSERT DID NOT CATCH IT: `sizeof(app) < 512 KB` is the
+    /// wrong bar when the true budget is 1 MB / (number of `app a;` scopes).
+    std::unique_ptr<generation_progress[]> m_wiz_history_progress =
+        std::make_unique<generation_progress[]>(wizard_lapse_round_count);
+
+    /// BL-914: the live tap each lapse round's worker publishes into while it
+    /// runs. Heap-allocated for the exact reason `m_wiz_history_progress` is
+    /// (see its own comment) — one more array member here is one more array
+    /// member charged six times to the main thread's stack in Debug. Reset by
+    /// `launch_wizard_history_run` before the pointer is handed to a fresh
+    /// worker; `m_wiz_history_progress[i].lapse_tap` is pointed at
+    /// `&m_wiz_history_tap[i]` at the same site.
+    std::unique_ptr<era_lapse_tap[]> m_wiz_history_tap =
+        std::make_unique<era_lapse_tap[]>(wizard_lapse_round_count);
+    /// The tap epoch this round's live poll last copied out. Compared against
+    /// `era_lapse_tap::epoch_now()` so a still frame (nothing published since
+    /// the last poll) costs one relaxed load and no copy.
+    uint32_t m_wiz_history_tap_seen[wizard_lapse_round_count] = {};
+    /// Wall time (`ImGui::GetTime()`) of the last live re-derive
+    /// (`finish_history_lapse` re-run). Throttled independently of the tap's
+    /// own publish rate — see `poll_wizard_history_tap` — because a BFS over
+    /// the whole homeworld raster on every one of a few thousand publishes
+    /// would cost far more than the animation it draws.
+    double m_wiz_history_tap_redraw_at[wizard_lapse_round_count] = {};
+
+    int   m_wiz_history_year[wizard_lapse_round_count]    = {}; ///< Where playback stands, in calendar years.
+    bool  m_wiz_history_playing[wizard_lapse_round_count] = {}; ///< Advancing on wall time.
+    /// Set once a landed record has been manually paused (the transport BL-914
+    /// adds once the future lands). Never true while a round is still live —
+    /// there is nothing to pause yet, only a frontier to wait at.
+    bool  m_wiz_history_paused[wizard_lapse_round_count]  = {};
+    /// The planetology moved while a run was in flight, so what it returns is a
+    /// history of a world that is gone. Discarded on arrival rather than shown.
+    bool  m_wiz_history_stale[wizard_lapse_round_count]   = {};
+    float m_wiz_history_carry[wizard_lapse_round_count]   = {}; ///< Sub-year accumulator for the advance.
+
+    /// BL-948 — THE AUTOPLAY DURATION, per round, in seconds of wall clock for
+    /// the WHOLE span. Ben, 2026-09-13: the lapses run too fast to watch;
+    /// 2026-09-16: the rungs are 30 s, a minute and a minute and a half, after 90 /
+    /// 180 / 270 read as far slower than he had in mind. The rate the transport
+    /// advances at is (span in years) / this, so a longer span at the same
+    /// setting moves faster per second rather than taking longer to watch —
+    /// the setting is the wall clock, which is the thing a viewer budgets.
+    /// Per session and per round, deliberately: a viewer who slows the Empires
+    /// round down has said nothing about the migration.
+    float m_wiz_history_secs[wizard_lapse_round_count]{
+        wizard_lapse_secs_default, wizard_lapse_secs_default, wizard_lapse_secs_default};
+    /// Start lapse round @p lapse_index's pass for the CURRENT pending params.
+    /// Synchronous under `--verify` (a capture must never race a worker), exactly
+    /// as the wizard's surface build already is.
+    void launch_wizard_history_run(int lapse_index);
+    /// Per-frame: adopt any finished run and park its playback at its first year.
+    void poll_wizard_history();
+    /// Per-frame, BL-914: while a lapse round's run is still in flight, pull
+    /// whatever its tap has published so far into `m_wiz_history[lapse_index]`
+    /// and re-derive the drawable map from it, throttled — see the .cpp.
+    void poll_wizard_history_tap(int lapse_index);
 
     // --- The seat (BL-630, 2026-08-26) --------------------------------------
     //
@@ -446,22 +720,50 @@ private:
     spawn_seat_result m_seat_result;
     void seat_player();                ///< Draw the seat and re-point the player-scoped caches.
 
-    /// Pre-game warm start: 20 in-game years of quarterly econ ticks (Ben,
-    /// 2026-08-10) — see start_new_game_prelude's warm-start comment.
-    static constexpr int pre_game_ticks = 80;
-    /// Warm-start ticks completed so far, or -1 when no warm start is in
-    /// progress. >= 0 marks the sliced phase between generation finishing and
+    /// Phase 6's static score of the WINNING landscape, kept from the search to
+    /// the seat (BL-1020, the seat floor reads the static score): the shortlist
+    /// gates and ranks on it rather than on a trailing net the twelve-tick
+    /// settle cannot produce. Presentation state, like `m_seat_result` — never
+    /// serialised, overwritten by the next search.
+    landscape_score m_landscape_winner_score;
+
+    /// The winner's VALIDATION RUN (BL-978, warm start retired): the one short
+    /// tick-simulation phase 6 runs on the searched landscape to confirm the
+    /// static proxy held — GENERATION_STRATEGY.md § Three passes, ERAS.md § the
+    /// opening position. It is the settle that hands play its opening position;
+    /// there is no other pre-game tick loop, and the eighty-tick warm start it
+    /// replaces is gone.
+    ///
+    /// The length is MEASURED, not round (ERAS.md § The opening position carries
+    /// the series): `haulage_measure 5 80 --per-tick`, pooled over five seeds,
+    /// shows the per-tick convoy dispatch count climb from zero and settle; this
+    /// is the first tick at which both its 4-tick and 8-tick trailing means sit
+    /// within 5% of the 80-tick level, so a longer run buys nothing the player
+    /// can see. The seat is NOT read off this run's returns: its floor is the
+    /// static landscape score (BL-1020), because twelve ticks over a ramping
+    /// field file no trading record a viability verdict could stand on. The
+    /// trailing figures the run files reach the seat card as information only.
+    static constexpr int validation_ticks = 12;
+    /// Validation ticks completed so far, or -1 when no validation run is in
+    /// progress. >= 0 marks the batched phase between generation finishing and
     /// play starting: poll_worldgen runs a time-boxed batch per call and the
-    /// loading screen draws its inner bar from it (2026-08-12, the hang fix).
-    int m_warm_ticks_done = -1;
-    /// True while the warm-start ticks run. step_economy suppresses the persona
-    /// counsel while set: measured at ~1.05 s per tick against ~80 ms for the
-    /// whole rest of the tick (2026-08-12), it was 93% of the stall, and its
-    /// output is advisory chat for pre-game quarters the player never saw.
-    bool m_warm_starting = false;
-    std::chrono::steady_clock::time_point m_warm_begin; ///< Warm-start wall-clock start, for the timing report.
+    /// loading screen draws its inner bar from it. Batched because a tick on a
+    /// searched landscape costs ~0.9 s in Release (2026-09-03), so the whole run
+    /// in one frame would trip the AppHangB1 kill (2026-08-12).
+    int m_validation_ticks_done = -1;
+    /// True while the validation ticks run. step_economy reads it for two
+    /// things: nobody is seated yet, so every corp is scorer-driven (BL-630);
+    /// and the persona counsel and battle dispatches are suppressed — advisory
+    /// chat for pre-game quarters the player never saw, and ~1.05 s/tick besides
+    /// (measured 2026-08-12).
+    bool m_validation_run = false;
+    std::chrono::steady_clock::time_point m_validation_begin; ///< Validation-run wall-clock start, for the timing report.
 
     ui_state        m_ui;
+    ground_layer    m_ground;            ///< BL-732: baked painterly ground for the Planetary canvas.
+    /// True while a --verify script drives frames: the ground cache bakes every
+    /// chunk synchronously so a capture never races the per-frame bake budget.
+    bool            m_ground_bake_all = false;
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.
@@ -471,10 +773,10 @@ private:
     std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
     std::unordered_map<entity_id, int> m_counsel_channel; ///< corp -> its lazily-created Counsel chat_channel index.
     uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
-    /// Count of step_economy() calls this campaign — warm start included — and
-    /// the value mirrored onto world::current_econ_tick before each step. The
-    /// cadence key (BL-568). On load it resumes at pre_game_ticks + envelope
-    /// econ_tick, so a loaded campaign rotates exactly as an unsaved one.
+    /// Count of step_economy() calls this campaign — validation run included —
+    /// and the value mirrored onto world::current_econ_tick before each step.
+    /// The cadence key (BL-568). On load it resumes at validation_ticks +
+    /// envelope econ_tick, so a loaded campaign rotates exactly as an unsaved one.
     uint64_t        m_econ_steps = 0;
     std::vector<float> m_balance_history;      ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
     std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds the Budget ledger's profit chart.
@@ -513,6 +815,24 @@ private:
     std::string m_golden_dir;            ///< Directory holding golden reference PNGs (script dir / "golden").
     bool        m_verify_bless = false;  ///< When true, captures overwrite the golden instead of comparing.
     int         m_verify_failures = 0;   ///< Count of captures that failed their golden diff; sets the exit code.
+
+public:
+    /// Per-script wall-clock budget for a verify run, in seconds (BL-714 / NR-695).
+    ///
+    /// A BACKSTOP AGAINST A RUNAWAY, not a performance assertion. `overflow_tile_v2`
+    /// swept a row-per-tile ledger view and starved the nine scripts queued behind
+    /// it, so a stall cost a whole pass and reported nothing about what it never
+    /// reached. Exceeding this raises a Lua error, which BL-423's existing
+    /// keep-going path already turns into one red row.
+    ///
+    /// Set far above any legitimate script so tripping it means a real defect rather
+    /// than a slow machine. MEASURED, not guessed: `text_overflow_floor` — the widest
+    /// committed check, ~60 captures over every ledger, lens and wizard round — runs
+    /// in 174 s on the Debug build here, so this default is a 3.4x margin.
+    /// Override with `--verify-budget <seconds>`; 0 disables the watchdog.
+    double      m_verify_script_budget_s = 600.0;
+
+private:
     int  m_prev_speed = 1; ///< Speed remembered across a pause, so unpausing restores it.
 
     double m_last_orbit_days = 0.0; ///< elapsed_days at the previous orbit advance; gives the per-frame delta.
@@ -535,7 +855,7 @@ ui::frame_stats& frame_stats_instance();
 /// Process-lifetime per-phase accumulators for app::step_economy (ms):
 /// [0] convoys, [1] run_economy_step, [2] clear_markets, [3] apply_budget,
 /// [4] tech gates, [5] standings+credit, [6] agency comms, [7] persona counsel,
-/// [8] history recorders. Dumped by start_new_game's warm-start timing
+/// [8] history recorders. Dumped by finish_new_game's validation-run timing
 /// (the 2026-08-12 stall hunt).
 ///
 /// [9] and [10] SPLIT [7] into its two candidate halves (BL-398): the C++

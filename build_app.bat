@@ -45,11 +45,31 @@ if not defined VSCMD_VER (
     exit /b 1
 )
 
+REM COLD-CONFIGURE IF build\ IS ABSENT (2026-08-31, NR-755).
+REM
+REM build\ is gitignored, so a FRESH GIT WORKTREE has none and this script used
+REM to hard-fail here. That is not a cosmetic inconvenience: every worktree
+REM sub-agent then improvises its own configure, and a different generator can
+REM produce different codegen - which is exactly what forced an independent
+REM re-verification of a state_hash result in sprint 26 wave 1. One agent
+REM reached for Ninja; the answer happened to match, but nobody could know that
+REM without redoing it.
+REM
+REM So configure here, with the SAME generator and build type the script has
+REM always used, and every worktree gets a toolchain identical to main's.
+cd /d "%~dp0"
+if not exist "build\CMakeCache.txt" (
+    echo build_app: no configured build - cold-configuring NMake Makefiles / Debug
+    cmake -S . -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug
+    if errorlevel 1 (
+        echo BUILD_FAILED configure
+        exit /b 1
+    )
+)
+
 cd /d "%~dp0build"
 if not exist CMakeCache.txt (
-    echo ERROR: no configured build in %CD%.
-    echo Configure first, e.g.:
-    echo   cmake -S . -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug
+    echo ERROR: no configured build in %CD% and the cold-configure above did not produce one.
     exit /b 1
 )
 

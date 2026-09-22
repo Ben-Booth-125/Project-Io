@@ -10,5889 +10,2855 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## 2026-08-29 — Sprint 24a: every ledger rebuilt, and three deletions that took a ruling with them
+## 2026-09-20 — Sprint 45's last builds: the charter spend hardened, a load that replays, and a refusal that would have gone quiet
 
-**Mode:** Design → Full (Batch Delivery, eight waves). **Sprint 24a: closed.**
-**Runtime:** one long session. Eleven worktree agents, one measurement workflow, eight integrating builds.
+**Runtime:** ~17 h (07:50 to 01:00, the sweep unattended at the end). Delivery — Full (three lanes with four fix rounds, four cold
+reviews, chain 12 plus three long verification runs) with four design calls on elicitation forms.
 
-Twenty-two items. The sprint set out to *review* the ledgers against captures and ended having
-rebuilt most of them, deleted one outright, added two, and found four designed mechanisms that
-have never run in a played world.
+### What landed
+- **BL-1060 (charter spend hardening)** took four rounds and ships the ceiling at 120 (NR-902), the
+  turn skipping a good it cannot place (NR-903), and each good keeping an even share of a binding
+  ceiling as a RESERVATION (NR-905, and NR-906 after the cap reading held room back). Chain 12 on
+  `9a39152a`: digest check 16/16, the budget modes 3/3, every body landing 120 firms with all ten
+  goods of the turn holding some.
+- **BL-1050 (order-independent reads)** is built and verified on its branch: seven readers (not the
+  five the review named — the lane found a sixth, its reviewer a seventh) now walk sorted ids, and a
+  saved-and-loaded world settles byte-identical to its original on **16 of 16 seeds**, where seed 28
+  used to diverge at tick 0. The 16-seed pin check fails on the two TICK digests only, never on
+  generation, so BL-1044's re-bless stays the shape NR-894 authorised.
+- **BL-1043 (real-stockpile charter sweep)**: the harness half merged and stage 1 started — 16 seeds
+  x three firm prices, in two parallel shards after Ben asked to halve the wait.
 
-### The instrument was wrong before the work was
+### The review that paid for itself
+Round 3 of BL-1060 was rescued from a lane that stalled mid-edit, and its cold review found the new
+world refusal reading the UNCAPPED yard want instead of the places actually reserved. Dormant on
+today's data — and at the 0.30 seed rate `economy.lua` itself records as measured, it refuses every
+world, whereupon the search silently falls back to the legacy no-budget world. A data tune would have
+switched the charter web off with one printed line. Round 4 fixed it and the probe now fails on all
+four assertions if the old reading comes back.
 
-Every density judgement made in the first half of this session was taken at **1280×720**. Ben
-reviews at 1920×1080, and he said so: *"the UI doesn't shrink at smaller resolutions."*
+### What the sweep is already saying
+Legacy seat anchors run 6 to 17 specialists across the library; the budget at the provisional firm
+price opens 24, 33 and 182 on the first three seeds. So the provisional price is far too cheap, and
+20k brackets the anchor on two of three. Separately, 128 of 132 extraction buildings extract a good
+other than the one they were chartered for — so "every good holds firms", the property NR-903 and
+NR-905 protect, is bookkeeping rather than ground truth. Both go to Ben with the sweep's figures.
 
-He was right and the arithmetic says why the difference is entirely vertical. `shell_column_width`
-is `0.20 · disp_x` clamped to [380, 460] — 380 px at 1280, 384 px at 1920, four pixels across the
-whole common range. But the chrome above and below is fixed: the profile tile, and a bottom band
-whose height derives from `minimap_width = max(336, 0.28 · min(disp_x, disp_y))`, which is 336 at
-both. **All 360 extra rows land in the ledger's content height.**
+### Also
+The phase rename Ben raised (Digitisation names computing, not 1660-1960) is filed into the sprint 46
+drafts with the name left to him. Three continuity items came out of the reviews: BL-1061, BL-1062,
+BL-1063. Two self-inflicted costs are recorded as hazards: chain 8 was re-run for ~90 minutes because
+a memory saying it had finished was not read at session start, and a chain-12 digest check 10 hours in
+was killed as a supposed orphan.
 
-Measured on the Market ledger: **3.5 goods at 720p, nine at 1080p.** So several arguments for a
-redesign were made against half the height the reviewer has. Re-measured, the Budget ledger's
-complaint **dissolved entirely** — at 1080p it fits chart, levers, laws, assets and the full
-ranking at once — while the Corporation dashboard's got **worse**, its four verdict lines sitting
-above ~700 px of void.
-
-`ledger_pass` moved to 1080p. `shell_pass` deliberately stayed at 720p, and that split earned
-itself within the day: the fourteenth rail slot put its centre at **y = 746 against the 720 px
-floor**, leaving Contracts drawn and unpressable. Invisible at 1080p. **The review resolution and
-the fit resolution are different questions.**
-
-### Three deletions, three orphaned rulings
-
-The pattern only became visible because it happened three times:
-
-- **BL-176's empty-room fix** went with the Buildings tab in a 2026-08-15 rework. The Construction
-  panel went back to opening on an empty queue, and nothing recorded that the fix had been undone
-  (NR-718).
-- **NR-245's controls-on-the-card** went with the levers when Ben ruled that the Selection centre
-  presents and does not operate (BL-683).
-- **BL-591's growth-track readout** went with the Production card (NR-724) — a readout built
-  precisely because `corp_reached_depth` gated five places and displayed in none.
-
-All three were found by *reading*, none by a check. A deletion should ask what a ruling placed
-there, and nothing in the method prompts that question.
-
-### Measurement overturned the brief five times, and twice the wrong premise was mine
-
-- **The `x0` convoy.** I wrote into `convoys.md` that the display "is reporting what it was given".
-  It was **rounding** what it was given: 1669 dispatches over five seeds, **zero empty holds**, and
-  77 carrying a positive cargo below 0.5 that `"x%.0f"` renders as `x0`.
-- **`body_average_price`.** I predicted the pressure was on the graph's width. It was the column
-  count — with the column, 13 of 45 names fit; without it, 36 of 45.
-- **The roster is 45 goods**, not the ~42 the docs and I both repeated.
-- **The Trades gate's shut half is unreachable by selection**, because only one market-bearing body
-  ever exists.
-- **Chain depth's retirement** does not hand gating to tech, because tech is an allowlist of locks
-  with nothing to withhold.
-
-### Four designed mechanisms that have never run
-
-This is the sprint's real yield, and none of it was on the plan.
-
-- **Off-world markets.** One market-bearing body at 16, 60, 120, 240 and **400 econ ticks**. Markets
-  seed home-only and an off-world one needs a building to *complete* there; nothing ever builds
-  off-world. So spontaneous emergence, its distance pricing and its counterpart-demand rule describe
-  behaviour no played world has met (NR-725).
-- **Rival acquisition.** `FINANCE.md` says rivals buy, in the present tense, naming `corp_ai.cpp`.
-  `buy_corporation` appears nowhere in that file. I relayed the doc as fact to an agent and to Ben;
-  the agent found it by asking why a clean result was clean (NR-717).
-- **The mercenary contract.** `can_accept = fully_escrowed && !expired`, and client nations never
-  fund their own offers — seven offers at `escrow 0/400`. The player's stated income loop has never
-  been exercisable. Ben retired it the same day (BL-693).
-- **Chain depth as a growth gate.** Sawmill, Stonemason, Potter's Kiln and Weaver are depth-0, open
-  today, and produce **0.0**. Depth was never the brake (NR-727).
-
-### The seam that finally got a test
-
-`save_envelope_roundtrip` exists. NR-708 had recorded that **no envelope field had ever had
-round-trip coverage**, on a seam where `read_save_game` refuses the whole file on a version
-mismatch. The change that would have added one more untested field brought the assertion instead —
-20 rows, including a **wrapped** exchange ring.
-
-And in passing: since the v0.1.21 cut, roughly **thirty harnesses could not compile from a clean
-configure**. Warm trees kept passing on stale objects, so everyone saw green, and **a release was
-cut over it** (NR-721).
-
-### What Ben ruled
-
-The Selection centre presents data and never holds levers, reversing NR-245. The game does not play
-itself — declining a build-opportunity ledger — then the qualification that makes it usable: rank
-where the top row is *one input among several*, never where it *is* the move. Closure retired for
-companies. Convoys earned slot 7. Chain depth retired as a gate. Mercenary contracts retired.
+### Stage 1 came in overnight, and moved a ruling
+Three parallel shards (Ben freed memory for a third) finished 16 seeds by 00:40 — seeds 9 and 0 ran
+in two shards at once and agree to the digit, a free cross-process determinism check. The reading
+overturned the premise the seat-menu anchor rested on: the library's stockpiles run 24.7M to 133.6M
+points and a fixed price's seats track them almost proportionally, while the no-budget roster does
+not track them at all (seed 31 holds 95.3M and offers 6 legacy seats; seed 9 holds 27.5M and offers
+16). At 40000 a firm, the poorest world opened 1 seat and the richest 91 against an anchor median of
+9 — no single number sits inside both tails. **Ben ruled (NR-907) that a charter's price is a SHARE
+of the world's own stockpile**, fixed once at build, so the menu is the same size everywhere and the
+specialist keeps its price in firm charters. **BL-1064** builds it; stage 2 then sweeps the divisor
+rather than a fixed band.
 
 ### Left open
-
-The growth track's new home (NR-724), whether off-world investment is meant to happen at all
-(NR-725), `quarterly_return` R2 failing on main with no owner (NR-720), and whether a clean
-configure belongs in the loop (NR-721). Goldens are knowingly red on Ben's instruction. The
-**live click** is owed on every surface this sprint touched.
-
----
-
-## 2026-08-28 — Sprint 23 closes: a lens becomes a question, and the answer stops disagreeing with itself
-
-**Mode:** Design, then Full (Batch Delivery, three waves). **Sprint 23: closed, goal met.**
-**Sprint 24 opened.**
-
-Thirteen items. The sprint began as a design session on selection and ended with every planned item
-landed, both carried review-queue entries answered, and the next batch opened with four defects
-already filed against its own surfaces.
-
-### The rule
-
-Ben opened with a principle rather than a review: *"when lenses are active, selection is only one
-tier, as opposed to the default lens, which may cycle through elements with multiple clicks."* Two
-rulings followed — *"Markers do not outrank lenses"* and *"for lenses which return none, just don't
-surface a hover, and clicks will do nothing."*
-
-Written into SELECTION.md and LENSES.md before any code, then built as **BL-664**. The interesting
-consequence was accepted rather than inferred: Population, Industry and Throughput draw a per-tile
-value field with no structure grain, so under the rule they became entirely non-interactive — two
-of the three are on-bar lenses, so it is visible.
-
-**BL-665** gained the corporation and company area resolvers. Their absence had been *measured*, not
-assumed — the first draft of that switch reported `tile` on empty ground and `building` on owned
-ground, never `corporation`, because a marker always won the press. BL-664 removed the precedence
-and the objection dissolved with it.
-
-### Where the review barrier earned its place
-
-**BL-666**'s first cut routed a corporation press to `show_corporation_panel` — which drives the
-**player's own dashboard**. That is NR-700 reproduced one commit after the item that filed it. The
-two ui_state flags are named the wrong way round (`show_corporations_table` drives
-`draw_corporation_panel`), and the check could not have caught it either: `pointer_target` had no
-name distinguishing the two corporation surfaces, so the assertion passed for both. Two independent
-guards failed to the same naming confusion (NR-704).
-
-The same pass found a **save-breaking bug the batch made reachable**: `max_overlay` was hand-kept at
-`supply_routes` while two lenses had been appended after it, so a save written under Throughput or
-Company would not reopen — the whole envelope, not one field (NR-703).
-
-### Measurement overturned the plan, twice
-
-Ben asked for a **quadratic** throughput ramp. A new census (`throughput_field_census`) said no: the
-ramp was already sqrt, quadratic is *worse* (45% of the grid in one tenth of the ramp against 32%),
-and no curve over `cost/max` could work because the input is bunched — 1917 anchors where the sqrt
-was calibrated against 57, median cost 6.75 against a max of 81.58. The denominator was the problem.
-p90 is 42.58, so the top decile of cost was eating half the ramp while holding a tenth of the tiles.
-p90 + sqrt: worst bucket 21%. **BL-669.**
-
-An assertion written to prove the convergent and divergent boundary masks are exclusive **failed**,
-and was not weakened. A tile at a junction between a closing pair and an opening pair is genuinely on
-both, and `height_bias` has always taken both terms there. The false claim was corrected in the
-header, the `.cpp` and CONTINENTS.md (NR-707).
-
-### The rest
-
-**BL-667** one hover mark under a lens; **BL-668** the workforce heatmap (it was the only lens
-answering by *adding a mark* rather than colouring the ground); **BL-670** the rung-keyed lens strip,
-which dissolved a discovery problem that a layout constraint had been deciding — the old array of six
-was chosen by what fit a 240 px bar, leaving six of twelve built lenses reachable only by a key
-nothing on screen mentions.
-
-**BL-671** gave the deposit and the plate Selection-band cards. Both channels had been *write-only*:
-the canvas set them and nothing read them, so a press showed the previous subject — not blank, which
-is the worse failure. **BL-660** landed in two halves, a Tectonics view plus the divergent boundary
-mask the generator had been classifying and discarding. **BL-673** gave each structure lens its own
-hover card, reading the resolver so the card's subject cannot disagree with the click's.
-
-**BL-672** closed NR-698 on Ben's ruling: `verify.find_deposit_tile` answers *where* a good is
-deposited — one tile, raster order, no other tile data — recorded as a scoped exception beside the
-standing rule it narrows. It bought the identity assertion, which a blind sweep could never make:
-press two goods' deposits, require two different selections. The check went 7 rows to 21.
-
-### Verification
-
-`lens_one_tier` 38/38, `lens_region_destinations` 21/21, `lens_strip_and_fields` green,
-`continents_harness` ALL PASS, `throughput_field_census` reporting. Four durable checks where batch 1
-left none — that batch was capture-only, with a human eye as the entire test. Live-clicked in the
-built app: the marker rule, the inert lens, the band clearing to resting, and the corporation
-destination.
-
-### Open for Ben
-
-- The **Company destination** has never been live-clicked, and the blocker is the world rather than
-  access — a fresh campaign carried no background firm on the home body at all. Folded into BL-636.
-  If they are genuinely absent early, the Company lens needs an empty state.
-- **31 archived backlog records** sit in an `undated` bucket. The cause is fixed (the bucketer now
-  reads all four date field names); the residue is historical and would need a full restore to move.
-- **No envelope field has save round-trip coverage**, and the save version moved to 2 (NR-708).
-
----
-
-## 2026-08-26 — Sprint 20 closes: the loop closes, and the instruments were measuring a different world
-
-**Mode:** Full (Batch Delivery, six waves). **Cut:** v0.1.21. **Sprint 20: closed, goal met and proved.**
-
-The first half of this session is the entry below. This is the second: five more waves, the
-sprint's own definition of done actually run, and the discovery that a day of reasoning had been
-taken against a world nobody plays.
-
-### The goal, measured
-
-Ben's criterion, set when Sprint 20 opened: *a corporation can save up over a few economy ticks to
-buy another company, and still be making a profit afterwards.* **BL-634 ran it and it holds** —
-7/8 seeds accumulate (mean +51 cr/qtr), all 5 seeds offering an above-zero-priced public firm
-reached its price in 1–25 quarters (mean **8.6**, about two in-game years), the buy applied through
-the real `buy_corporation` verb, and **5/5 were still earning 20 quarters later** with the acquired
-maintenance folded in. Rival solvency 79.7 → 73.7 %, field holdings **+39.4 %** — the gate did not
-go green by draining the world.
-
-Spawn viability went **3/12 seeds solvent → 12/12, with interest charged nowhere.**
-
-### The finding that reframes the rest
-
-`make_hard_coded_world`'s `gen_cfg` defaults to a C++ fallback pricing **10 of 47** resources where
-`scripts/world_gen.lua` authors **42**. Markets are seeded from that table. `spawn_solvency` omitted
-it — so **BL-635's diagnosis, its attribution, and a day of reasoning were taken in a world where a
-third of the ancient roster could not be sold at any price.** Corrected, the seated corp's operating
-net went **−19.13 → +17.38 cr/qtr** and the "60 % of the residual is dead maintenance" figure became
-**1.0 %**.
-
-Worse: the morning's *fix* for a related defect added the **load** and not the **parse**, and was
-reported as confirming the original conclusion. Three harnesses carried the omission. It was found
-by an agent sent to test a *different* hypothesis — mine, about the maintenance floor — which it
-then disproved, and it refused to touch the constant I suspected because its own numbers did not
-support it.
-
-### The shape that appeared four times
-
-Always in the verification layer, never in the game:
-
-- a clipping check passing **vacuously** on a frame containing a clipped button;
-- a build **copying nothing** while printing `BUILD_OK` (NR-686 — a Lua-only change never reached
-  the play build);
-- a wrapper returning **exit 0** on a run where the linker failed;
-- and the config omission above.
-
-**A check whose green means less than it appears to.** Sprint 21's visibility pass now owns all four
-as one problem rather than four notes.
-
-### Measurement overruled the brief, repeatedly, and was right every time
-
-BL-630's goldens did not move though the brief asserted they would "by construction". BL-655 found
-the demand-scale lever **inert** — density is basket *breadth* × a per-resource cap, and Pass 6's
-documented 0.90 ratio **never binds**, correcting the doc that sent it. BL-641 measured a 227 → 19
-collapse in operating firms and **shipped its rates at 0.0** rather than pick a smaller number that
-would have hidden the same defect behind a slower decay — yielding MARKETS.md's property 3, *a
-channel that consumes without pricing cannot bootstrap its own supply*. BL-634 took its gate
-literally and found the **free-firm trap**: the price term is signed, so the cheapest buyable firm
-is the most indebted one, handed over free with its debt transferring at face value — −13,358 cr on
-one seed, three of eight buyers sunk. The floor is not the bug; the solvency gate reads the *price*
-rather than the position *after* the transfer. Same shape as the NaN-before-floor bug the buyout
-caught in its own code: **a check applied to the wrong quantity.**
-
-### Ben's rulings
-
-Opening capital **0 → 400** (the zero was his own earlier steer; it had never met compounding debt),
-interest **2 % → 1.5 %**, **no standing army at spawn** (parameterised, not deleted; symmetric across
-player and rivals; consumes no randomness). Each did what it was aimed at, and the measurement said
-so honestly at each step *including where it fell short*.
-
-### Left deliberately not green
-
-`chain_depth` carries **one intended failure** on eight goods — the way to green it is to build the
-channel that buys them. `building-upkeep-goods` R5 is pending behind BL-654. Both are gates, not debt.
-
-### Owed to Ben
-
-BL-627's `question_log` wording · BL-632 · BL-657 (does a failing firm exit, and can the player's own
-corp fail) · BL-656 (is the per-resource cap the design, or the ratio) · NR-678 (should an industrial
-household buy electronics) · the `works_registry` divergence both harnesses still carry.
-
----
-
-## 2026-08-26 — The ledger, the buyout, and the discovery that the demand side was never built
-
-**Mode:** Design → Full (Batch Delivery, three waves across two sprints).
-**Runtime:** one long session. Ten worktree agents, two review barriers, four integrating builds.
-
-### What Ben asked for, and what it turned into
-
-The session opened on a design request: *a table ledger that tracks profitability, updated each
-quarter with company balance sheets*, feeding a buyout menu in-game and a spawn shortlist before it.
-It closed having discovered that **the economy has no demand side**, and with a second sprint opened
-to build one.
-
-### Sprint 20 — the books open (eight items, landed)
-
-**Wave 1.** BL-626 (quarterly return — a *retain* over `corp_budget`, rolling 40 quarters, world-side
-and serialised), BL-631 (ownership class, derived not authored), BL-637 (save-version reservation —
-Sprint 19's retro asked for it by name, and this wave needed it immediately since two items bumped
-the format concurrently).
-
-**Wave 2.** BL-638 (charter ownership), BL-628 (whole-firm buyout), BL-633 (retire the standing
-bands), BL-635 (spawn solvency). Plus BL-650/BL-651 filed for the loose ends.
-
-### The five findings that mattered more than the items
-
-1. **A filed return cannot see subsidies or contract payouts.** `apply_budget` runs at `app.cpp:1271`,
-   `run_nation_step` at `:1281`. So the buyout undervalues a firm earning through mercenary
-   contracts — CONTRACTS.md's *income loop* — by a measured **640 credits**, exactly k(8.0) × the
-   80/quarter the record cannot see. The harness now asserts the blindness so no future fixture
-   hides it. Ben's fork, unanswered: NR-655 / NR-668.
-
-2. **The default world classed every corporation `closed`.** Pass 2b read HISTORY.md's Stage 4
-   (energy transition), which antiquity skips — so `median_industrial_year` stayed 0 across all 1,298
-   regions and 64 corps on 8 seeds. Nothing filed, nothing was buyable. The fix was hiding in the
-   design's own justifying sentence: read **Stage 1, the enforceable promise**, whose output already
-   exists as `history_ladder::charter_cradle`. 0 of 8 worlds → 8 of 8. **This was the era-relative
-   gates class Sprint 19's retro named as its lesson, recurring one sprint later in a design written
-   that morning** — and caught the same way, by an agent measuring a distribution and naming the
-   consequence instead of shipping it.
-
-3. **BL-635 found the cause by refusing to rank by size.** Interest was the largest number at
-   2,160 cr/qtr and is charged only on an already-negative balance — the compounding of the deficit,
-   never its cause. The real answer was upkeep at 89.9% of outgoings, and under *that* a units bug:
-   rates authored per **head**, units hired per **batch** of 50, so a levy spear cost 40 credits to
-   raise and 1,200 a year to keep.
-
-4. **A zero floor laundered a NaN into a free firm.** `max(0, price)` applied before the validity
-   check meant `NaN > 0` was false, `max` returned a clean `0.0f`, and the seam's own `isfinite`
-   guard passed it. The clamp *was* the vulnerability — which is the AI-facing-seam rule's own point,
-   arriving from a direction nobody had written down.
-
-5. **All three wave-1 worktrees were cut from the session-start commit**, five behind HEAD — including
-   both `src/` agents, briefed to read doc sections written that morning. Two noticed and
-   fast-forwarded; the third reported it could not find its own requirements. NR-654.
-
-### The question that changed the session
-
-Ben, mid-flight: *how much profit do we really expect to make anyway — do we have a list mapping
-resources to consumers?* There was no such list. The **constraint** existed (PRODUCTION.md's
-admission rule, `chain_depth` R1/R1b) but not the map. Building it found:
-
-- The ancient band has **two live demand sinks**. `background_demand` is entirely industrial goods
-  and therefore inert at 0 CE; three of `population_demand`'s six goods are unproducible there.
-- **Seven goods are produced in-band with no buyer at all** — including tools (25.50) and rigging
-  (14.50), the roster's most valuable ancient outputs.
-- Ten resources passed the orphan check by naming a **"mercantile demand" that does not exist**.
-  `market_clearing.cpp` has exactly three injections and none of them is it.
-
-Which explains BL-635's residual exactly: iron ore and agricultural produce run 80/80 ticks; stone,
-timber and fibre idle 80/80 with unexhausted deposits under them. **Spawn viability is not a constant
-anyone can tune — the demand side was never authored.** The supply side landed 2026-08-24; its
-counterpart did not.
-
-### Sprint 21 — demand (opened, wave 0 landed)
-
-Written into MARKETS.md as **eight demand channels** rather than a list of fixes, on one rule: *a
-consumer is a mechanism, not a noun.* Three properties the register must hold — demand scales with
-the economy or decays into a fixed basket; demand is **era-banded exactly as recipes have been since
-BL-433**; and every channel is a lever on what the player chases.
-
-**Wave 0** deliberately built the guard and the instrument before any channel:
-
-- **BL-648** makes an exemption resolve against a registry of real injectors. It is **red on eleven
-  goods** and that is the item working — one more than predicted, `spacecraft_components`, because
-  procurement is a resource-agnostic *transfer* and admitting it would substantiate the whole roster.
-  Four of five probes read the Lua vectors the running passes multiply by, so a channel landing in
-  `economy.lua` flips a good green with no harness edit. The fifth couldn't, so the pass was made to
-  **declare its own draw** — a pattern no doc owns (NR-673).
-- **BL-649**, the census, matched the hand-built list exactly and then supplied the magnitude:
-  **65.7% of all 0 CE demand names goods the ancient band cannot make.**
-
-It also found that `spawn_solvency.cpp` claimed to load `world_gen.lua` and did not — so BL-635's
-diagnosis was measured without market prices. Re-measured: **the conclusion is unchanged**, because
-the missing demand pointed at goods that band cannot produce anyway. The mechanism underneath got its
-own item (BL-652): both basket injectors **silently skip** a resource they cannot price, which is why
-two separate bugs were invisible on the same day.
-
-### Left deliberately not green
-
-- `spawn-solvency` **R2 FAILED** — 3/12 seeds. The money loop is fixed; the residual is demand.
-- `retire-standing-bands` **R2 PENDING** — no live click reachable; not marked green on a capture.
-- `chain_depth` carries **one intended failure**, flagged in its skill entry with an explicit
-  do-not-fix, because the way to make it green is to build the channels.
-
-### Owed to Ben
-
-NR-655/NR-668 (the eighth return field, worth 640 credits an acquisition) · NR-659 → BL-638's
-re-pointing, taken on his behalf · NR-662 (a corporation reads its own books — my error, corrected in
-two docs) · NR-666 (the industrial epoch now yields *fewer* public firms than antiquity) · NR-670
-(may a rival buy the player out?) · NR-675 (`refined_copper` untagged) · BL-627's `question_log` pair
-· the v0.1.18–v0.1.20 tags.
-
----
-
-## Session — The warm-start stall found and killed; settlements become visible (flood-field pathfinding; BL-625; NR-645) (2026-08-25, latest)
-
-**Runtime:** ~3.5 h wall-clock. Modes in sequence: Design (perf assessment on Ben's "20 years
-of history hangs" report) → Delivery (the flood-field fix, Rule 0a-B) → branch surgery
-(Ui-Development bugfixes cherry-picked to main) → Delivery (BL-625) → close-out.
-
-**The stall, measured.** Ben reported the wizard hanging at the market-stabilisation step.
-Timed headless: generation + 12 warm ticks took **35m23s** — two causes stacked. (1) The play
-build was the Debug config (`/Od /RTC1`); a Release build of the same workload took 5m01s
-(7×). (2) Inside that, per-phase instrumentation put the whole cost in `dispatch_convoys`:
-76–109 s per warm tick, because rival `place_road` (BL-599) clears the A* cache at tick rate
-and the pair search re-flooded 45,240 tiles per priced pair — the 2026-08-12 AppHangB1
-disease, new carrier.
-
-**The fix.** The pair search was already Dijkstra with an early exit, so it now runs once to
-completion per anchor tile and is kept (`world.logistics_flood_fields`);
-`intra_body_path` reconstructs any pair from the field at walk cost, byte-identical answers.
-Same invalidation contract. Measured: gen+12 ticks 5m01s → **19.8 s**; steady state ~1 s/tick.
-Verified: interdiction, save_roundtrip, supply_advance, spectator_determinism, haulage_measure
-(1,722 convoys — trade flows). logistics_harness's six T7 dispatch fails reproduce at pristine
-HEAD — pre-existing drift, filed NR-645, not touched.
-
-**Settlements visible (BL-625).** Ben saw no settlements in play: the conurbation clustering
-(authored for 20–40 centres/body) collapsed the post-BL-623 density — 1,823 centres → 49
-marks, measured. Replaced with the LOD ladder on the canvas's two existing pivots: far zoom
-scale≥3 skylines + a civic density dot for the tail, mid adds towns, close shows every centre
-with razed ones as the new `settlement_razed` ruin glyph. Captures confirm the region reads
-settled; Ben approved live.
-
-**Housekeeping.** Build trees trimmed to `build/` (Debug) + `build_rel/` (Release play build;
-`build_app.bat` header updated); Ui-Development pushed with the tech-tree restyle and left
-behind; bugfixes cherry-picked to main; landed items archived (BL-621, BL-623–BL-625).
-
-**Open.** BL-619 (research system) still design-gated; far-zoom density-dot legibility is
-tuning Ben may yet call; NR-645 (logistics_harness drift) awaits a rebase session.
-
----
-
-## Session — Population design settles, Sprint 19 opens and lands both build waves (BL-610–BL-618, BL-620; NR-628–NR-641) (2026-08-25)
-
-**Runtime:** ~5 h wall-clock (estimated). Modes in sequence: Design (the population session —
-doc summaries, Ben's four ideas, the elicitation form, the settled design written into
-POPULATION.md / PROVINCES.md / GLOSSARY.md / LOGISTICS.md plus the new RESEARCH.md stub) →
-Full, Batch Delivery ×2 (Sprint 19 waves 1 and 2, five worktree agents total) → integration,
-review barrier, harness sweeps, close-out.
-
-**Design.** Ben's four ideas (town-per-province, qualification, roads-by-qualification,
-migration) plus six advisor questions resolved on one form. Settled: centres from Era −1
-demography; every land province anchored by a centre that decides its nation; urban ground
-stamped; per-nation qualification raised by schooling/universities and consumed by complicated
-methods; wage-competition labour clearing; stratum placement gates (university at City+);
-promotion/decline with raze-only destruction; stance-gated migration with real brain drain;
-RESEARCH.md stub (universities produce RP). Cost of living deliberately left unquantified
-(POPULATION.md § Open items).
-
-**Wave 1** (agents G/E/P): BL-610 centres from demography (density ~40× — 6.04 land tiles per
-centre, s1-heavy histogram), BL-611 province anchors (nation-locked land fill; 6,266/6,266
-anchored), BL-612 urban stamping, BL-613 qualification (+ save v13), BL-614 wage clearing
-(+ v14), BL-615 stratum gates. The save-version collision between two agents was resolved by
-stacking to v14 at merge. verifier-review returned FIX FIRST — a stale static_assert, two
-unasserted requirements (both got real harness rows), and a ghost-preview gate mismatch — all
-fixed before the compile.
-
-**Wave 2** (agents W2E/W2G): BL-616 promotion/decline + the raze_centre verb, BL-617 migration
-(stance gate latent — nothing declares nation stance yet), BL-620 road generation restructured
-(backbone over towns, village spurs; world build 2.90 s → 0.70 s under g++ — the 56 s road wall
-is gone), BL-618 qualification-gated tiers (the antiquity default world is now all-Track —
-NR-641, Ben's call).
-
-**Open at close:** BL-619 (research design session, gated); BL-615's live click (access);
-NR-637/640/641 presentation-and-ordering calls; the NR-630/635 density retunes. Observed in
-passing: story_check has 50 dead-trace fails from the 2026-08-23 backlog purge (pre-existing);
-the MCP verb table is 10 verbs stale (NR-639, task chip offered).
-
-**Runtime:** ~8 h wall-clock (estimated — the four worktree agents alone ran 79–99 min each,
-concurrently). Modes in sequence: Light (the ROADMAP trim) → Review (the shell pass) → Design (the
-nine-item list) → Full, Batch Delivery (Sprint 17b) → Light (Ben's two closing changes).
-
----
-
-### 1. ROADMAP.md: 1,336 lines → 119
-
-Ben: *"I don't think we need versioned releases right now, but in any case ROADMAP.md should not be
-so verbose."* It had become a devlog with a version number attached — eight done-definitions for
-minors already tagged, per-minor cut findings, the v0.1.0 audit results, superseded status banners.
-All of that is *state*, which DEVLOG/SPRINTS/backlog own.
-
-Item ids came out throughout: since the 2026-08-23 purge the hot backlog carries no `version` field,
-so every `BL-` in the roadmap pointed at nothing queryable. The old text is archived verbatim at
-`archive/ROADMAP-2026-08-24.md` — the done-definitions written at each past cut are the reason to
-keep it.
-
-**NR-607** files the versioning question rather than acting on it, with the observation that
-supports it: item-level versioning *already* ended with the purge, and the nation/province/watch
-lanes have been landing real work under no tag at all.
-
----
-
-### 2. The shell pass — 31 captures, 13 findings
-
-Ben's plan was: make a save game, load it, bless goldens off it. The save works. **The load does
-not give back the world it took**, and finding that out was the pass's first result.
-
-- The world half is exact — `player_balance` returns bit-identical. But `state_hash` does not
-  round-trip once any econ tick has run, while a world with *zero* ticks does. That localises it:
-  `verify.econ_step` advances `world::current_day_tick` and never `sim_loop`, so the save writes the
-  loop's day (0 under `--verify`) and the load hands it back. The hash is keyed on that day.
-- The visible consequence is the one that matters: the activity fog ages every glimpse against that
-  tick, so **a loaded campaign renders dimmed**. And the comms log is not in the envelope at all, so
-  the dock comes back empty. (**NR-608**, **NR-609**.)
-
-So `shell_pass.lua` stages its own world (`stage_ui_fixture` in `lib.lua`) rather than opening the
-snapshot; `ui_shell_fixture.lua` still writes it and captures *both sides of the round trip*, which
-is where that evidence lives.
-
-The findings, filed **NR-598–NR-615**. The largest:
-
-- **Every date reads 1960.** `campaign_epoch_year` is hard-coded in two headers while
-  `world_params::epoch_year` defaults to 0, and *nothing* under `src/ui` reads that field. On one
-  frame the header said 19 quarters elapsed, the time panel said Jan 1st Q1, and the decision feed
-  said the 13th.
-- **Six of seven gradient lens keys were drawn and buried** under the always-open Selection band,
-  rendering as ghosts at a tenth of their contrast. Only the Continent key had ever been fixed
-  (BL-376); the collision was never generalised, and nothing had captured the other six to notice.
-  I got this one wrong twice before measuring it properly — first cropping to the minimap and
-  reporting the legend missing, then reporting the Population lens keyed nothing.
-- **Nav slot 8's corporations table** draws its name column ~10 px wide, one letter per row. It was
-  also the one rail slot with no `show_panel` hook — so no script could open it and nothing had ever
-  captured it. Direct evidence for the rule the battle-card check states.
-- **`expect_no_clipping` returned "0 records" over 31 visibly-clipping frames.** It only sees
-  draw-list text; the ~524 `ImGui::Text*` sites are clipped by ImGui and invisible to it.
-- **There is no way to save from the UI** — Resume and Exit Game are the whole menu, and BL-070
-  shipped exactly that scope. The gap is an unclaimed seam between two landed items.
-
-Published as an artifact for Ben to comment on, which is how the nine-item list came back.
-
-**Goldens deliberately held** (NR-600): the captures are full frames dominated by the canvas, and
-the pass existed to change several of these surfaces. Blessed once at the sprint's close instead.
-
----
-
-### 3. Sprint 17b — the shell stops fighting the map
-
-Ben's nine improvements, filed as **BL-596–BL-604** and slotted between Sprints 17 and 18, which is
-also the only place they fit: SPRINTS.md carries a sprint-number ceiling of 18 and a count cap with
-exactly one free slot.
-
-**Batched on Ben's instruction**, and the batch paid for itself: six of the seven waved items touch
-`body_surface_canvas.cpp` or `overlay.cpp`, and the answers genuinely depended on each other — two
-slices each retired an `overlay_mode` value and their strip edits had to be *unioned* at the merge;
-one slice's plate removal and another's country-tint removal were the same three lines of one
-function.
-
-**Four calls went to Ben as an elicitation form and came back the same day.** Three changed the
-shape of the work:
-
-- **The blend stays and is dialled back** — *"just reduce the amount of smearing"*. The smallest of
-  the three options offered, and the best: it turned BL-597 from a redesign into one named constant
-  and **decoupled it from BL-601**, which had been filed as one design with it.
-- **The border is the nation's click target**, making BL-601 the first structure-grain selection in
-  the shell — so it was built as the general case, because BL-603 generalises exactly it.
-- **The province rung dissolves**, so no gesture selects a province without a tile.
-
-**Wave 1 — four `ui-dev` slices in worktrees**, carved by subject rather than by disjoint files:
-the ground (BL-597/601), the markers (BL-596), the lens roster and its chrome (BL-604/602), the
-selection element (BL-598). **Wave 2 — BL-603** in the main session, because the pivot consumes all
-four.
-
----
-
-### 4. What the work found that nobody went looking for
-
-- **BL-514 is not held — it landed**, 2026-08-22, and it is *what made the land smear*. Its design
-  prose still says "held awaiting Ben's look"; the code says the blend crosses province borders and
-  the edge stroke is gone. So the chain is three rulings and the middle one is the cause, and
-  BL-597 reverses the 2026-08-22 widening rather than the original province-grain design.
-- **BL-086's ambient opportunity read was the Opportunity lens itself** — it closed with *no new
-  code* — so retiring the lens retires it (**NR-603**). Ben asked for the lens to go, not for that.
-- **Four doc fictions.** LENSES.md's rung table claims Circumplanetary/Solar surfaces for Scarcity,
-  Reach and Supply-routes that were never built (Production's retired with its lens); censused
-  mechanically, every lens is Planetary-only except Market and Supply. A fourth was in the routing
-  table — *"a building under the Corporation lens resolves through to its corporation"*, stated
-  since 2026-06-15, never implemented — found because BL-603's check asserted the **documented**
-  behaviour and failed. That one is now implemented; the other three stay as **work**, since
-  authority docs are state-independent (**NR-604**).
-- **Four verify scripts are rotten**, found by the first full sweep anyone has run: two on a stale
-  fixture, one asserting a building at 100% workforce produces output and measuring **0.0**, and
-  `battle_card` dying on `verify.goto_surface()` with no argument — a script that had **never
-  executed** (**NR-606**).
-
----
-
-### 5. The method lesson, four times in one sprint
-
-**A check that hard-codes a screen coordinate has a shelf life, and two of these were green while
-looking at nothing:**
-
-1. `built_tile_render.lua` was framing open ocean and passing (found by the markers slice).
-2. `border_band.lua` passed in its author's worktree and failed the instant four slices merged.
-3. `lens_structure_pivot.lua` failed its own control twice — once pressing a tile that had a marker
-   on it, once on a point cached before a press that *opened a ledger and narrowed the canvas*.
-4. `selection_accordion.lua` drove the accordion by clicking header rows at measured offsets; when
-   the accordion became a nav those rows stopped existing and it **kept passing**, capturing the
-   same section five times under five different names.
-
-Each fix resolves from the world at the point of use, or — where a coordinate is unavoidable —
-follows every press with an assertion that it *worked*, so a drift fails loudly instead of going
-quiet. Three seams were added to make that assertable: `pointer_target` now reports
-`selection_kind`, `open_panel` and `selection_section`.
-
----
-
-### 6. Ben's three closing changes
-
-- **Reduce the band on edges facing unclaimed ground** → `k_border_unclaimed_scale = 0.40` on wash
-  *and* stroke, with political winning where both meet (so the depth-0 scan no longer breaks on the
-  first foreign edge) and the stroke resolving per **edge** while the wash inherits per tile.
-- **Widen the time controls to the balance bar's corner** → the top band becomes one row of three
-  tiles sharing a bottom edge. The `- margin` the header carried was the shell's only internal
-  gutter; the bottom band never had one. Free consequence: the extra width let the header fit a
-  RUNWAY field it had been eliding.
-- **The accordion out, a section top nav in** — Ben ruled the accordion in the morning and ruled it
-  out on sight the same day. The numbers are why: five stacked headers spent **169 of the band's
-  258 px** on chrome to leave the open section **89**. The nav spends one frame height. What the
-  accordion was *for* survives as the `i/N` beside the title. It also closes **NR-605** by removing
-  its subject.
-
----
+BL-1064 (the derived price), then BL-1043 stage 2 over the divisor, its serial timing pass and its
+remaining calls, then BL-1044 — the one re-bless, with BL-1050 merging in the same integration. See
+`NEXT_SESSION.md`.
+
+## 2026-09-19 — Sprint 45 wave 1 lands: seven items delivered, the Fuel Doctrine and the charter spend ruled nine times
+
+**Runtime:** ~19 h wall clock (02:20 to 21:15, long unattended chains). Delivery — Full (five
+worktree lanes with seven fix rounds, nine cold reviews or checks, four main-session chains and
+the timed rows) with nine design calls on elicitation forms.
+
+### Picked up from the sleep
+BL-1041's fix round had committed in its worktree before the PC slept; its source change was comments
+only, so it merged first and chain 8 verified it with everything else. **Chain 8 on `849a358d`**
+(digest check 16/16, fidelity 16/16, seed library unmoved, digests unchanged) closed **BL-1040 (the
+Digitisation span)** and **BL-1051 (span-open survey)**. A cold review nobody had run closed **BL-1053
+(setup reads span close)**: no 1660 read left on the span path; two checks that cannot fail went to
+BL-1058 for the continuity pass. The `--through 1960` readings closed **BL-1041 (industry points)**.
+
+### The Fuel Doctrine, re-ruled twice
+- **NR-896 and NR-897 (option A both).** The forest and fuel pulls read the SHARE of held regions over
+  the world mean, not the best one (a best-of-held maximum grows with the realm); treasury points
+  spread over a polity's centres by urban scale, not onto the capital. **BL-1056 (points
+  size-neutral)** built it. Its cold review found the rounding of the spread broke the instrument
+  behind BL-1041's headcount test, silently, and a fallback that still grew with size; the fix round
+  added a report-only treasury tally and one region set for both pulls. Chain 9 on `2867cdaa`: top
+  region's share of points 0.280 -> 0.039, digest check 16/16.
+- **NR-899 (option C).** The share against the mean pushed the split further toward Charcoal
+  (coke 142 / charcoal 373), because coal is concentrated and forest is not. Ben ruled each pull
+  counts regions in its own resource's top third, a bar fixed at the span open. **BL-1059
+  (top-third bar)** is building.
+
+- **NR-900 and NR-904.** BL-1059's first build ranked only regions carrying the resource; its cold
+  review showed that brings back a milder rarity tilt and leaves a cliff where scores pile at the
+  survey's cap. Ben ruled every region, on the unclamped share, and a tie at the cut clearing whole.
+  Chain 11 on `be5b3d72`: each bar clears a third of the world on every seed; coke 239 / charcoal
+  277 / neither 340. **BL-1059 delivered.**
+
+### The charter spend
+- **BL-1039's 21 timed rows** ran on a quiet machine once League closed (7126 s). Ceiling 160 never
+  bound — each good's own cap filled first — and cost a 12-31% dearer tick at 4x: Ben ruled **120**
+  (NR-902). With chain 11's empty/zero/refused checks, **BL-1039 delivered.**
+- **BL-1042 (stockpile to budget)** built the split of a region's points over its campaign centres.
+  Its review found 44% of seed 0's stock parked on townless ground; Ben ruled a polity with no town
+  converts nothing, and razed ground loses its points (NR-901).
+- **BL-1060 (charter spend hardening)** carries the review findings and three rulings: the turn
+  skips a good it cannot place (NR-903), and when the ceiling binds each good keeps an even share
+  (NR-905) — a reservation, not a cap (NR-906, confirmed by Ben after the cap reading held room back).
+
+### Also
+Sprint 46's 19 item drafts were written from a fresh three-lane code read
+(`docs/development/drafts/sprint-46-items.json`); the read found BL-1047 misses a seventh arc
+selector (a 1960 epoch switches Exploration, and so the span, off). `stockpile_budget_check` joined
+the verifier-headless skill with Ben's permission. BL-1057, 1058 filed for the continuity pass.
 
 ### Left open
-
-- The four rotten checks (NR-606), `recipe_workforce` first — a building at full workforce producing
-  nothing is either a real economy defect or a stale fixture, and Sprint 17 is about to lean on that
-  area.
-- The three unbuilt lens rungs (NR-604): work, or a ruling that removes them from the design.
-- A glanceable "where is demand unmet" read, if Ben wants one back (NR-603).
-- The Selection band's resting state, still ~90% empty (NR-611). Cheap now that the section machinery
-  exists; what it needs is Ben naming the sections, because naming them is the design.
-- `backlog_lint` reports its fusion check INERT while the hot backlog is empty. Not a defect —
-  an empty file is the intended resting state between sprints — but the wording says "shape has
-  changed", which will read as alarming to whoever sees it next. It resolves itself the moment the
-  next sprint files an item.
-
-**Sprint 16 closed** (v0.1.15 cut) and **Sprint 17b closed, goal met**. Nineteen completed items
-archived to `archive/backlog-complete-2026-08-24.json`; the hot backlog is empty, which is this
-convention's resting state between sprints.
-
-## Session — Sprint 17 designed, delivered end to end, and cut as v0.1.17 (BL-585–BL-594) (2026-08-24)
-
-**Runtime:** ~9 h wall-clock across one continuous session, mode Design then Full (Batch
-Delivery). One worktree sub-agent (generation-dev, BL-586 slice 2). A full live playthrough
-against the built exe via computer-use closed the session.
-
-**Design.** Ben's steer (2026-08-15, restated in an elicitation form) named the growth spine as
-**chain depth**, the roster past 20 building types, alternate production methods with real
-trade-offs, and progression "not always clear that a more advanced method is better (depending
-on which market it builds to)." Six rulings collected via a second form (2026-08-23): a full
-content sprint, delete-dominated-siblings later corrected to "author the missing content instead"
-(NR-589, PRODUCTION.md's four "dominated pairs" were false positives of a retracted guard), the
-depth readout on the corporation dashboard, per-named-building construction materials, pay the
-save-format bump for new goods, and start only after Sprint 16 merges. Re-planned against the
-code rather than the stale archived designs: three of the six original carry items had already
-landed, the rest absorbed by later work. Ten fresh items authored, BL-585 through BL-594.
-
-**Sequencing.** BL-587 (interchangeable methods) was the one item with zero file overlap against
-Sprint 16's in-flight set, so it landed standalone ahead of the merge gate. Sprint 16 merged to
-`main` (v0.1.15 cut) partway through the session; this branch merged `origin/main` and the
-remaining nine items proceeded in three dependency waves.
-
-**Wave 1** (BL-588, BL-590, BL-591 — later joined by BL-585+BL-586 slice 1). `unlock_recipe`
-became the tech-effect union's third arm (`tech_gate.hpp`/`.cpp`), checked at both
-`construct_building` and `try_switch_recipe`, and in `corp_ai.cpp`'s scorer. Two gates authored
-fresh rather than transcribed from `tech_tree.lua`'s unreviewed node list (NR-591); a real
-predicate defect (`E1-EC-01`'s surplus-only first draft, satisfiable by any solvent corp
-regardless of what it had built) caught by `tech_gate_harness`'s own T3 fixture and corrected
-before landing. `resource_build_cost_for(type, target, recipe)` became the single lookup every
-material-cost site goes through (13 occurrences, 4 files); the whole ancient roster costs
-timber/stone instead of a shared steel default. The corporation dashboard's Production card
-gained a three-line growth track (reached depth + the good that set it, next rung, missing
-inputs); a real pre-existing UI defect found and fixed along the way — `ui::resource_name` had
-stale nulls for three BL-429-era goods. `resource_type` grew four values (ceramics,
-dressed_stone, planks, tools; `resource_count` 38→42), `world_save_version` 8→9;
-`spectator_determinism`'s golden re-blessed with dated provenance after confirming
-reproducibility across two independent builds.
-
-**Wave 2** (BL-589, BL-593). The start-gate audit measured a fresh ancient corp saw FIVE open
-Build-door groups, not the item's own four-group guess; five concrete calls put to Ben rather
-than defaulted, closing only Metal Foundry's `refined_copper` behind a new gate (`E0-EC-03`) and
-confirming several duplicate-looking siblings as genuine supply routes, not redundant methods.
-`chain_depth` gained a new G5 row asserting the ruled opening exactly. The Build-door item found
-a second, unrelated real bug before any ruling was needed: `selection_panel.cpp`'s candidate
-filter never checked `recipe_unlocked` at all, so a tech-locked recipe was showing as a normal
-buildable option with no explanation. Ruled filtered-out, matching the era/depth-lock precedent.
-
-**Wave 3** (BL-592, BL-586 slice 2, BL-594). `chain_depth`'s R2 grew a second reference-price
-vector (fuel-cheap, fuel-dear) so a method only better in one market isn't misread as dominated;
-a new R3 row checks every named building's material override is obtainable in its own era band,
-generic over the whole roster. BL-586's remaining three chains (Tannery, Weaver, Shipwright) were
-delegated to a generation-dev sub-agent in an isolated worktree — five new resources (hides,
-fibre, leather, cloth, rigging; `resource_count` 42→47), `world_save_version` 9→10, hides ruled
-**endemic** (like furs) and fibre ruled ordinary cover-based on ambiguous design calls put to Ben
-first. The sub-agent's own report surfaced a real regression rather than hiding it: the bare
-`resource_count` widening (not the new economic content — differentially proven by temporarily
-reverting the Lua) broke `spectator_determinism`'s R1 A/B family-coverage check. Put to Ben;
-ruled the check **retired** (commented with full provenance, not patched or weakened to pass) —
-bit-identical RNG-stream determinism across a content change is not a property that harness needs
-to hold. Filed as `NR-596`, with a clarifying note added to `io-standing-rules.md`'s BL-409
-section on what the harness still guarantees.
-
-**The live playthrough (BL-594).** Played via `computer-use` against the built exe — a Start Menu
-shortcut was created for `ProjectIo.exe` so `request_access` could resolve it, closing the
-`NR-593`/`NR-595` gap this sprint kept hitting. Confirmed live, across two separate generated
-worlds/corps: the Build door on a fresh corp shows only the ruled opening set, with a
-reason-coded Military Base lock and no filtered-out recipe standing in as a processing group's
-representative; the dashboard growth track reads legibly on both corps; BL-586 slice 2's new
-content (Fibre, Shipwright) is reachable in both surfaces; and an actual construction click
-succeeded ("Construction started", Clay Pit, 103cr against a 257cr balance). A method-switch for
-a stated market reason and a tech gate resolving were not reached live — both need more
-simulated economy time than one sitting covers, and the first corp tried was too deep in
-starting debt to build anything at all (a real, seed-dependent finding, not a defect). Ben's
-ruling: accept as substantially confirmed rather than push further. Two real findings surfaced
-and logged, not absorbed: `NR-597` (the corp-selection screen's per-row "Choose" buttons don't
-respond to clicks, reproduced twice — logged rather than filed as a backlog item since
-`KNOWN_BUGS.md` is retired, Ben's call), and one low-confidence, unreproduced anomaly (a
-full-canvas takeover control once returned the app to the main menu, not reproduced on two later
-clean attempts of the same control).
-
-**The cut.** `ROADMAP.md`'s v0.1.17 bullet gained its done-definition, written at the cut per
-NR-103; `MANUAL.md` §4.4 gained the three-lock model (era/depth/tech) and the growth-track
-readout. Merging into `main` found local `main` two commits ahead of this branch's own base — a
-concurrent session's "Conclude the Sprint 16 review queue" and "Purge Sprint 16 from the hot
-backlog" — reconciled by hand rather than trusting git's line-based merge: `NEEDS_REVIEW.json`
-and `backlog.json` both took `main`'s purged/resolved state as the base and spliced in only this
-session's genuinely new entries (`NR-589`–`597`; `BL-585`–`594`), not resurrecting anything the
-concurrent session had already archived; `REFINED.md` took `main`'s drained "empty between work
-blocks" form and named both sprints' closes in one line, matching the pattern the Sprint 16 close
-already set.
-
-All ten Sprint 17 items landed complete. `CHANGELOG.md` stamped, tagged `v0.1.17`.
+BL-1060 round 3 (mid-edit in its lane at the sleep), chain 12 on the final main (closes BL-1060 and
+BL-1042), then BL-1043, BL-1050 and BL-1044 (the re-bless), then the sprint 46 cut. See
+`NEXT_SESSION.md`.
 
 ---
 
-## Session — Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575) (2026-08-23)
+## 2026-09-18 — Sprint 45 cut and mostly built: the span, Beat 1's points and the charter rules, behind switches; sprint 46 shaped
 
-**Runtime:** ~3 h wall-clock, mode Design then Full (Batch Delivery). Two worktree agents in
-Wave 1 (general-purpose for BL-569, ui-dev for BL-575), run concurrently.
+**Runtime:** ~10.5 h. Design (four elicitation forms, two read workflows) and Delivery — Full (eight
+worktree lanes, every one cold-reviewed, five with a fix round; nine main-session verification chains).
 
-**Design ratification.** Ben ruled the BL-571/BL-572 elicitation forks: garrisons seed at the
-capital plus threatened borders, treasury-scaled; garrison upkeep is a `military_research`
-budget claim; contract offers target the weakest border province against the highest-grudge
-neighbour; and — overriding the proposed one-at-a-time shape — a nation may hold **several
-offers open concurrently**. Ratified into `MILITARY.md` § Nation garrisons and `CONTRACTS.md`
-§ Where offers come from (the latter rewritten off a stale history_sim claim onto the live
-nation-budget mechanism). The concurrent-offer tick-share split (oldest-issued-first) was a
-call taken on Ben's behalf — NR-576. Commit `28ecf209`.
+### The cut
+A five-lane engine read with an adversarial check per lane mapped the seams before any item was filed.
+Ben ruled the sprint on a form: the span runs whatever the epoch and ships on at epoch 0; Beat 1
+stockpiles, with treasury paid in as a consequence rather than a verb; every living polity enters the
+Industry tree at 1660 and its root is ungated; the per-resource cap scales by a square root under a
+density ceiling. Every world-mover landed behind a switch, so sprint 45 spends one re-bless (BL-1044).
 
-**Batch planning.** All ten Sprint 16 items promoted into `REFINED.md` as a six-wave dependency
-plan (an item's `requires` chain), each with an item-spanning requirement in
-`requirements.json` (batch `2026-08-23-sprint-16-mercenary-slice`). Commit `a2d73c4c`.
+### What was built, all neutral with switches off
+- **BL-1034 (world copies diverge):** MSVC's `unordered_map` copy reverses every multi-key bucket, and
+  `body_mean_habitability` sums floats in that order. `faithful_unordered_map` makes copies iterate in
+  their source's order. The same review found **a saved-and-loaded world still diverges** — BL-1050
+  (order-independent reads) now rides sprint 45's re-bless (NR-894).
+- **BL-1036/1037:** a lossless span resume (dated objects, civilisations, creeds; anchors explicit at
+  1200) proven by a fidelity check, and a road-tier switch.
+- **BL-1038, BL-1051:** the Industry tree wired, with a span-open fuel and forest survey.
+- **BL-1040:** the Digitisation span as its own call from `exploration_output`.
+- **BL-1053:** world setup reads the 1960 close when the span runs.
+- **BL-1041:** located industry points from scale, surveyed fuel, Industry capacity and treasury.
+- **BL-1039:** the charter spend rules (round 2 after Ben reversed the unspent-points capital the same
+  day it was ruled: it opened 10 of 11 specialists with nothing).
+- The wizard's "Loading the X round" wait gained a progress bar; Ben watched it live.
 
-**Wave 1 build.** BL-569 (province holder) and BL-575 (unit marker + march UI) — no
-dependencies, disjoint files — built concurrently in worktrees, merged, integrating-built, and
-independently re-verified (standing rule: never trust an agent's self-report). The
-re-verification found and fixed real fallout from BL-569's save-version bump (3→4): a
-`save_roundtrip.cpp` static_assert pinned to the old version, and `spectator_determinism`'s
-pinned state_hash golden (re-blessed with dated provenance, matching three prior legitimate
-moves already recorded in that file). Four other suite failures (`ai_skill_harness`,
-`tier_margin`, `nation_scorer_harness`, `history_conquest_gap`) are pre-existing and unrelated
-— confirmed by content (economic-balance/iteration-order/timeout, no reference to anything
-Wave 1 touched) and by `tier_margin` matching the already-archived BL-436 finding. Commit
-`e9c2c5ac`.
+### What the reviews caught
+Cold reviews found something real in every lane: BL-1036's index reuse at 1200 (BL-1049), BL-1040's
+setup still reading 1660 records (BL-1053), BL-1039's capital and breadth problems, `furnace_lit`
+constant wherever it is read (twice), BL-1041's biased headcount reading. No lane's figures were quoted
+to Ben until a main-session chain reproduced them; every one did.
 
-**Live-click pass (BL-575).** Opened the built app, selected the starting unit, armed March,
-and clicked a confirmed-different province — the mode disarmed without falling through to
-normal selection, strong evidence the command dispatched; `corp_command.cpp`'s march_unit case
-reads correct on inspection and `unit_march_harness` independently passes. Did not confirm the
-unit's marker visibly moving — this build's economy/march tick is quarterly-cadence, only one
-quarter boundary elapsed during the pass, and relocating the marker afterward on an unfamiliar
-generated world proved impractical in the time spent. Recorded as NR-577, not a blocker.
+### Sprint 46 shaped
+Ben asked for a sprint that brings the work into the wizard and hands it cleanly to the game. A
+three-lane read found the play list almost untouched (11 of 15 rows with no item), every nation reading
+"Isolationist" on screen, tariffs enacted as zero, and the game on the ancient roster at 0 CE. Ben ruled
+twelve calls (NR-898): the flip lands in sprint 46 after the superseded arc is retired, round 6 plays
+the span, Begin adopts the wizard's world, all eight offered play-list rows carry, and a
+select-corporation screen closes the sprint.
 
-**One real design call surfaced in passing:** BL-575's marker hit-testing now ranks unit above
-building (previously building > market_centre only) — justified against `SELECTION.md`'s own
-repeat-click cycle, where Soldier already precedes Building. Ratified into that doc.
-
-Both items flipped `complete`, design prose archived, `REFINED.md` Wave 1 drained. Waves 2–6
-(BL-570 onward) are next, strictly sequential.
-
-**UPDATE, same session: a concurrent session's push discovered and reconciled.** Fetching
-before Wave 2 found `origin/main` two commits ahead — a separate concurrent session (sharing
-this checkout) had purged `NEEDS_REVIEW.json` (240→2 open entries, Ben's review-queue form
-answered) and filed six items (BL-579–584). Reconciled by hand rather than trusting git's
-line-based merge, since both sides had reformatted the same JSON: `NEEDS_REVIEW.json` took
-origin's purged state as the base and re-appended this session's still-relevant entries,
-renumbered off an id collision (origin's `NR-576` is now canonical, archived; this session's
-became `NR-577`/`578`); `backlog.json` took origin's 16-item structure and spliced in this
-session's four changed items. Commit `f38ddd55`. (First attempt at this merge accidentally
-landed on a different concurrent session's `sprint/32-logistic-points-kickoff` branch — this
-checkout's HEAD moved while the merge was in flight — caught before pushing, redone clean on
-`main`, that branch left untouched.)
-
-**Wave 2 build.** BL-570 (condition province subject) and BL-571 (nation garrisons) — both
-depend only on BL-569, disjoint files — built concurrently, merged, and re-verified. Both
-worktrees had started from a stale base and merged an *older* `main` into themselves before
-this session's own reconciliation landed, so each merge into `main` repeated the doc-conflict
-resolution above, plus one genuine new collision: both items independently bumped
-`world_save_version` 4→5 for different fields (`condition::province`; a `nation_component`
-capital-tile field); combined into one coherent bump to 6. `condition_set_harness` 67/67,
-`battle_engagement_harness` 64/64 (new case B17, corp-vs-nation), `save_roundtrip` clean.
-`spectator_determinism`'s golden re-blessed again — garrisons are new units, folded into
-`state_hash` unconditionally. Commits `0a8f6de2`, `b409fc6f`.
-
-Two things flagged, not blockers: `NR-579` (BL-570's Lua fee/deadline numbers are legible
-placeholders) and `NR-580` — every nation's treasury is 0 at generation, so BL-571's garrisons
-all land on the sizing floor with no wealth differentiation, **the same gap seen from a second
-system**: BL-572 (contract offers, next) derives its fee from the same always-zero treasury.
-Worth a decision before BL-578's playthrough hits it live; recommended accepting it for this
-slice (a levy has ticks to credit a treasury before the playthrough needs an offer) rather than
-wiring nation income into generation now.
-
-Both items flipped `complete`, design prose archived, `REFINED.md` Wave 2 drained. Wave 3
-(BL-572) is next.
-
-**UPDATE, same session: Wave 3 lands (BL-572, contract offers).** A single item this wave, no
-sibling agent — the worktree was a clean ancestor of `main` this time, no reconciliation needed.
-`derive_contract_offers` (`nation_step.cpp`, called from `run_nation_step` after garrison
-upkeep): targets the weakest border province of the highest-grudge neighbour, accumulates the
-`contracted_force` line's spendable share into a per-offer `offer_escrow` until the fee clears,
-funds several open offers oldest-issued-first, expires unanswered offers after `offer_ttl_ticks`
-and refunds their escrow. `nation_scorer_harness` gained R8 (34 checks, all pass — targeting,
-clamping, oldest-first funding, expiry+refund, tie-break, replay); `save_roundtrip` clean
-(`world_save_version` 6→7). `spectator_determinism`'s golden held — a default world's
-`mercenary_offers` stays empty while treasury is 0 (NR-580), so no new state entered the hash
-this time.
-
-**Deliberately deferred, not a shortcut:** offer fee/deadline are a hardcoded
-`contract_offer_params`, not a live `contract_template_registry` lookup — that registry needs
-sol2/Lua, unreachable from `world/*`'s Lua-free superset, the same reason `recipe_registry` is
-threaded in as a plain parameter rather than loaded by `world/*` itself. BL-573 (accept_offer)
-is the natural point to wire a real lookup, since accepting an offer needs the template's actual
-predicate anyway. Filed `NR-581` alongside one tested, deterministic quirk worth knowing about:
-an offer that expires while its nation still wants the same target reopens the SAME tick,
-funded by its own refund — correct and conserved, but worth collapsing into one dispatch message
-once BL-577 exists to announce it.
-
-Item flipped `complete`, design prose archived, `REFINED.md` Wave 3 drained — with a pointer
-left in Wave 4's brief for the `contract_template_registry` threading. Wave 4 (BL-573) is next.
-
-**UPDATE, same session: Wave 4 lands (BL-573, contract record and verbs).** The widest-reaching
-item in the batch so far — the first real consumer of `budget_claim` against `contracted_force`,
-and the item BL-571's stub battle trigger has been waiting on since Wave 2. `mercenary_contract`
-+ `world::mercenary_contracts`; `corp_verb::accept_offer`/`abandon_contract` appended after
-`withdraw_from_battle` on the corp-command seam (full untrusted-boundary validation); tick
-evaluation after `run_battles` settling completed/failed; `contract_template_registry` threaded
-from the app-layer boundary into `world/*` the way `recipe_registry` already is, closing
-NR-581's deferred half; `active_mercenary_contract_for` (BL-571's stub) now resolves for real.
-New harness `tools/verify/mercenary_contract_harness.cpp` (51 checks); `save_roundtrip` clean
-(`world_save_version` 7→8). All six re-run harnesses (the new one, `save_roundtrip`,
-`nation_wiring`, `condition_set_harness`, `sentiment_harness`, `nation_scorer_harness`)
-independently confirmed green — `nation_scorer_harness`'s 2 pre-existing R1c failures unchanged.
-`spectator_determinism`'s golden held.
-
-**One brief-correcting deviation, caught and right:** the task brief said pay the completion
-remainder through the existing `budget_claim` rail; the implementation instead pays directly
-from the offer's own escrow, because the treasury was already debited in full while BL-572's
-escrow filled — routing it through `budget_claim` again would have double-debited the same
-contract. Verified against the code: `derive_contract_offers` genuinely does `nc.treasury -=
-pay` at accumulation time, so the direct-transfer call was correct and the brief's wording was
-the one that was wrong.
-
-One flagged number, not a blocker: `NR-582` — `contract_failed`'s sentiment magnitude (-4.0
-Trust) is authored at exactly double `contract_cancelled`'s (-2.0), a ratio rather than a
-measured value, same discipline as NR-579/580's placeholders.
-
-Item flipped `complete`, design prose archived, `REFINED.md` Wave 4 drained — with a correction
-left in Wave 5's brief: `mercenary_contract_harness.cpp` now already exists (BL-573 created it
-with a smoke suite); BL-574 extends it with the M1–M7 terminal-state cases rather than creating
-a new file. Wave 5 (BL-574, BL-576, BL-577 — the three-way fan-out) is next.
-
-**UPDATE, same session: Wave 5 lands (BL-574, BL-576, BL-577) (2026-08-24).**
-
-Three-way fan-out — **BL-574 (contract harness), BL-576 (Contracts ledger), BL-577 (messages +
-income)** — all built in separate worktrees, merged to `main`
-(`e1a1a44a`, `9e9f581d`, `9bc93591`). All three flipped `complete` in backlog.json, design prose
-archived. `mercenary_contract_harness` grew from 51 to 66 checks (BL-574's M1–M7 terminal-state
-cases); new `contract_dispatch_harness` (20 checks) proves the five dispatch phrasings and the
-one-shot abandon-event flag. Independently rebuilt and re-run on the fully merged tree, not
-trusted from any agent's self-report; `spectator_determinism`'s golden held.
-
-Two genuine mid-batch collisions, both from a concurrent session sharing this checkout: an
-`NR-583` id collision (the concurrent session's own entry was already canonical — renamed mine
-to `NR-584`), and a `question_log.json` conflict between BL-576's and BL-577's own additions
-(resolved as a union, both kept).
-
-**Live-click pass (main session, computer-use, 2026-08-24)** against a real generated world with
-real funded offers: the Contracts ledger's rail slot, the toggle rule, all three views
-(Offers/Active/History), the Accept→force-picker→Confirm flow (balance visibly credited), and
-the Abandon confirm-with-reputation-cost popup all confirmed reachable and correct by mouse
-click. One real gap, not silently papered over: **BL-577's contract card has no live selection
-trigger** — clicking an Active-view contract row selects nothing; the card's own rendering code
-exists and reads correct, it is just unwired. Flagged in `requirements.json` and carried into
-Wave 6's brief as a routing note, not a blocker.
-
-Two design calls flagged for Ben: `NR-585` (`abandoned_event_posted` is deliberately
-unserialized — a saved-then-reloaded abandoned contract re-announces itself once) and `NR-586`
-(the ledger took a new nav-rail slot 13 — the curated nine plus the developer tail were both
-full).
-
-Item flipped `complete` for all three, design prose archived, `REFINED.md` Wave 5 drained.
-Wave 6 (BL-578, the slice playthrough — needs all nine prior items) is next, not yet started;
-its brief carries a note on routing around the contract-card gap above.
-
-**UPDATE, same session: Wave 6 lands (BL-578), Sprint 16 closes, v0.1.15 is cut (2026-08-24).**
-
-`scripts/verify/mercenary_slice.lua` (new) writes the six-capture scripted playthrough from a
-fresh world — offer, force picker, marching, contact, a completed contract (History view), and
-the Balance ledger's "Contract income" line. Getting the force picker's own button pressed for
-real (`verify.click`, not staged ui_state) and the balance line's own line (scrolled into view,
-captured the same tick a payout lands, before `subsidies` resets) were the two real snags; both
-solved, documented inline. `mercenary_contract_harness`, `contract_dispatch_harness`,
-`save_roundtrip`, `determinism_harness` and `spectator_determinism` all re-run green on the
-merged tree.
-
-**A real capture-4 problem, investigated rather than routed around silently.** The plan was to
-reuse `battle_card.lua`'s own proven declare_hostile+march+step-until-select_battle technique for
-a from-scratch corp-vs-corp fight. It did not work. Debug-printed (temporarily, reverted, never
-committed) straight into `run_battles`: discovery correctly finds the co-located hostile/
-contracted pair and opens an `active_battle`, but `campaign_battle_params::rounds_per_tick` (3)
-was enough to reach a terminal state for EVERY matchup tried this session — including
-`battle_card.lua` re-run completely unmodified against the current build, which now also fails
-("no battle opened within 120 ticks") — so the fight opens and concludes inside the same
-`econ_step` call every time, and `verify.select_battle` (which can only observe state between
-whole ticks) never once returns true. Filed as `NR-587` rather than guessed at: this may be
-ordinary seed-dependent luck, or a real pacing regression against `battle_card.lua`'s own
-historical passing runs. Capture 4 instead shows the moment of contact — the Field-channel
-dispatch line plus the garrison's own casualty count — which the fight's real, observable
-consequences (province flip, contract completion) do not depend on.
-
-**Live-click pass (main session, computer-use, 2026-08-24)** confirmed the whole loop by hand: a
-fresh generated world, the Contracts ledger's nav-rail icon, a REAL nation-issued offer (Zeithketh,
-province #21928) accepted through the real force picker, and a real march order that visibly
-walked the committed unit onto the garrison's own tile. **Did not reach a literal payout**: the
-offer's deadline (161 econ ticks) measured at roughly four real minutes per tick even at the
-game's fastest speed setting — on the order of ten real hours to the deadline `run_
-mercenary_contract_tick` evaluates the "take" predicate at. Paused and asked Ben rather than
-either waiting it out or quietly calling it done; he ruled the mechanical proof (offer, accept,
-march, all confirmed live) satisfies R2 in the deadline's place. Filed as `NR-588` — sharper than
-NR-579/580's existing "these are placeholder numbers" framing, since this is not about the
-NUMBER being untuned but about the CURRENT number making a real payout unreachable in one human
-sitting, for every offer (all four seen in the live session sat in the same 160–170 tick band).
-
-**The build gate.** Two partial `ctest --test-dir build` sweeps (interrupted mid-run, ~63 and
-~42 of 114 harnesses respectively, at Ben's call once a couple of naturally slow entries —
-`era_world_harness` 118s, `haulage_measure` timing its own 60s budget out — made the full suite
-not worth the wait) covered every Sprint-16-relevant harness plus a broad cross-section of the
-rest with zero failures beyond the known pre-existing `nation_scorer_harness` R1c case. Every
-harness this batch actually touches (`mercenary_contract_harness`, `contract_dispatch_harness`,
-`save_roundtrip`, `spectator_determinism`, `determinism_harness`, `nation_scorer_harness`'s own
-R8 suite) was additionally run standalone and green. The full 114-harness sweep was not run to
-completion.
-
-**The cut.** `CHANGELOG.md`'s stale `[Unreleased]` (two orphaned BL-348/BL-349 entries from a
-prior, never-cut batch) stamped as `[0.1.15]` alongside the new Sprint 16 entries; `README.md`'s
-release summary and `ROADMAP.md`'s v0.1.15 done-definition both written (replacing "owed at the
-cut, per NR-103"); `MANUAL.md` §4.10 rewritten off the shipped mechanism (was still describing
-the retired `history_sim` scorer) with small additions to §3.7 and §4.9. `sprints.json`'s Sprint
-16 entry closed with a retro. Tagged `v0.1.15` locally on the release commit; **not pushed** —
-push is a standing confirm-first action, left for Ben.
-
-Sprint 16 is closed. All ten items (BL-569–BL-578) complete; the mercenary vertical slice plays
-end-to-end, live-confirmed by both a script and a human. Three findings carried forward, none
-blocking: `NR-577` (BL-575's unit-visibly-moving gap), `NR-587` (battle-card observability) and
-`NR-588` (offer-deadline real-time pacing).
-
-**UPDATE, same session: the review queue closes and the backlog is purged again (2026-08-24).**
-
-Ben reviewed the eleven open-call entries the batch raised (`NR-577` through `NR-588`, minus
-`NR-583`'s renumbering) via one form, with extra explanatory context per item since several
-needed real thought. Ten were confirm/leave-as-is calls, resolved with no code change. One was a
-real fork: `NR-580` (zero starting treasury flattening both garrison sizing and offer funding)
-ruled **A) wire nation income before generation's garrison/budget passes run** — settled into
-`docs/generation/NATION_GENERATION.md` § Pass 7 and `docs/politics/NATIONS.md` § 2, filed as
-`BL-595` (NATION_STARTING_TREASURY, designed, no sprint), not built this session. Two small
-follow-through fixes landed alongside: `requirements.json`'s BL-574 M4 wording corrected from
-"the escrow returned" to "the deposit forfeit" (NR-584), and `battle_card.lua` gained the
-NR-587 fragility note in its own header. All eleven archived to
-`archive/needs-review-2026-Q3.json`.
-
-With Sprint 16 fully closed, the ten complete items are purged out of the hot `backlog.json`
-into `archive/backlog-purged-2026-08-24.json` (same shape as the 2026-08-23 purge), leaving only
-`BL-595` in the hot file — no sprint claims it yet. `REFINED.md` drained back to empty. A
-concurrent session already has a `sprint-17-kickoff` branch in flight (`BL-594` seen via
-`next_id.js`'s collision scan) — not touched here; whoever merges it next authors Sprint 17's
-items fresh against the authority docs, per the hot file's own convention.
+### Left open
+Chain 8's 16-seed digest check (paused by the PC's sleep), BL-1041's fix round, BL-1039's timed rows
+(2026-09-19), NR-896 and NR-897, then BL-1042, 1043, 1050 and 1044, then the sprint 46 cut. See
+`NEXT_SESSION.md`.
 
 ---
 
-## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23)
+## 2026-09-17 — Digitisation picked up: the 1960 baseline measured, then the corporate web's plumbing
 
-**Runtime:** ~2.5 h wall-clock, mode Corpus then Design. Fan-out: 11 doc-sweep agents in place
-(disjoint files), one gap-map agent; main session took the rules, CLAUDE.md, the backlog.
+**Runtime:** ~11 h. Design (cutting the plan, four elicitation forms), Delivery — Full for sprint 43
+(one lane) and sprint 44 (three worktree lanes, each cold-reviewed, two with a fix round).
 
-**Ruling 1 (Ben):** *authority docs drive development and we should strive to make sure they are
-correct when authored* — the time-slice rule (backlog owns a design while open, the doc once
-landed) is wrong. Replaced in `DELIVERY.md` § Design state and the standing rules: a settled
-design goes into its authority doc the moment it is settled; whether it is built is a backlog
-fact (`backlog_query.js --touches`). A BL id survives in a doc only as the owner of a design;
-dated rulings survive as provenance.
+### The plan was re-cut before anything was built
+The handoff said Digitisation was designed and its build plan archived as "highly unstructured". Seven
+read-only lanes and an adversarial cross-check mapped the engine first, and the cross-check earned its
+keep: three lanes said running 1660 → 1960 needed a third resumed sim call, and it needs one parameter
+(`world_params::exploration_stop_year`) with no source change. The handoff also expected the run to
+un-zero *advanced chains*; the recipe band follows `epoch_year`, so it cannot. **`epoch_year = 1960`
+selects the superseded 1160 → 1560 → 1960 two-span arc with Exploration off** — never a baseline.
 
-**The sweep.** 62 docs under `docs/` (minus `development/` and the two generated mirrors)
-rewritten to present-tense design: 2,500 → 1,238 BL refs, zero "Build status" / "What is
-absent" sections, 71 files, −1,563 lines. Stripping history exposed false claims in most docs;
-those were rewritten from the code (terrain tables, `building_type` has eight values not six,
-29 recipes not three, ledger surfaces, pipeline order, the rivals' real verb set — no road, no
-demolish). Every deleted hole was audited against the backlog: 411 lines, 161 NO ITEM, 94 STALE,
-archived at `archive/doc-sweep-holes-2026-08-23.md`. Commit `fd386180`.
+Ben ruled the plan on a form: sprint 43 filed in full, 44–45 as goal rows; the seed library re-blessed
+with replacements; the charter budget's only source is Beat 1's stockpile, no stand-in; **the budget
+charters the whole web, specialists included**; both inherited weaknesses measured in 43 and ruled at
+its gate.
 
-**CLAUDE.md** is a router now (7.6K → 2.1K words): session-mode table first (Design / Light /
-Full / Corpus / Review / Rival), a complete one-line-per-doc map (24 docs had been unlisted),
-condensed method. Player identity and the syndicate tier moved to CONCEPT.md / GLOSSARY.md.
+### Sprint 43 — the 1960 baseline (four items, one day, no shipped world moved)
+- **BL-1026 (seed library re-read).** `exploration_sweep` gained `--seeds`/`--out`; the library reads
+  its own table. Every one of the 16 seeds had moved under wave A. Nine rationales were reworded; six
+  went to Ben, who replaced four (4 → 9, 6 → 40, 19 → 38, 17 → 28) and kept 12 and 13. Seed 19 was not
+  on his original list: it was neither rich nor inward any more.
+- **BL-1027 (span cost to 1960).** `--through` and `--cost`. The run stopped at 1660 reproduces every
+  library fingerprint, so the continued world *is* the shipped world. **1660 → 1960 costs a median
+  1.7–1.9 s a seed in Release — less than the 460 years before it.** Reach is 2–17% of sim time, not
+  the dominant term.
+- **BL-1028 (weakness counters).** Trace-only counters ported from two unmerged commits (never their
+  re-scaled capability reference), per half, in a worktree lane with a cold review. Digests identical.
+  **The alarm is a seal, not a deterrent:** ~89% of near-home reads at the ceiling, 99%+ of near-home
+  campaigns treaty-blocked, pooled displacement 3.02 → 1.74. **Polities meet and never bind:** 1,250
+  first contacts by 1660, 0 of 492 new pairs holding non-aggression, 43 new contacts in the 300 years
+  after.
+- **BL-1029 (readings at 1960).** `--through` plus a 1660 control held to the library fingerprint
+  (16/16). **On Exploration's forces the continued world coasts:** urban share 14.7% → 14.6%, subjects
+  median 3 → 3 with none lost on 14 of 14 worlds, flows 51 → 52, checkered regions 1 → 0; only
+  industrial polities climb, 12 → 21. Advanced chains stays a structural zero and now prints as one.
+  A first run's two prefix mismatches were the check comparing a folded flow count against a raw one.
 
-**Incident.** A concurrent session committed three times in this checkout (17:18–17:34) and its
-path reset the working tree; every uncommitted edit was lost once and redone. CLAUDE.md now
-warns that the checkout is shared.
+`EXPLORATION.md`'s contact paragraph rested on an unmerged snapshot artefact ("the seeds that met one
+polity"); it now states main's measurement. At the gate (NR-888) Ben inherited both weaknesses into
+Digitisation's beats — Beat 3 carries its own displacement force, this phase binds far pairs itself —
+on Exploration's 4-year band.
 
-**Ruling 2 (Ben):** *purge and regenerate backlog.json — many fewer items; address the earliest
-sprint which isn't complete, file completely new items which are relevant.* All 530 items are
-snapshotted verbatim in `archive/backlog-purged-2026-08-23.json`; the hot file holds ten new
-items for **Sprint 16, the mercenary vertical slice** (open since 2026-08-12, never finished):
-BL-569 (province holder), BL-570 (condition province subject + Lua contract templates), BL-571
-(nation garrisons, design-owed), BL-572 (contract offers, design-owed — absorbs Sprint N3 slice
-2 and NR-572), BL-573 (contract record and verbs), BL-574 (contract harness), BL-575 (unit
-marker and march UI), BL-576 (contracts ledger), BL-577 (messages, card, income line), BL-578
-(the playthrough and the v0.1.15 cut). Authored from a gap map that found every step of the
-loop absent or built for a different party. 39 requirement groups for purged items cancelled
-with a pointer; lint clean. Orphan holes from the sweep are **not** filed.
+### Sprint 44 — the corporate web's plumbing (three of four items)
+Ben ruled the charter calls: **one specialist per centre that can afford one, richest first**; today's
+starting capital kept; the no-specialist world deferred to sprint 45; Pass 1's nation balancing dropped
+on the budget path.
 
-**Open for Ben:** NR-573 (flat-statement call; MANUAL.md lost its built/designed marks), NR-574
-(Sprint 16 as target; Sprint N3's ids retired mid-flight), NR-575 (the six session modes).
+- **BL-1030 (parity).** `player_seed_sweep` was measuring an off-product world: no `world_gen.lua`, no
+  works registry, no `set_era`, ticks numbered from 1, the convoy credit given the wrong tick, no firm
+  exits. Two helpers in `harness_params.hpp` now mirror `app.cpp` line by line. Baseline move: 109 of
+  170 specialists shortlisted (was 81 of 158), a different seat on every seed, negative trailing net
+  93.8% → 74.3% — which re-reads NR-886 item 3's figure.
+- **BL-1031 (the world pin).** Nothing pinned world bytes across a commit: `world_determinism` never
+  calls the search, and `state_hash` cannot see a building's tile or assets. Four FNV digests per seed
+  (search, after the landscape, after the validation run, after the seat), pinned for all 16 seeds on
+  the pre-seam tree. Tamper tests: a changed search seed fails all four; a validation run one tick short
+  fails only the last two.
+- **BL-1032 (the charter budget seam).** Off by default, and pinned: **16/16 seeds hold the pins with no
+  budget and again with an empty one**, an all-zero and a refused budget too, with the refusal flags
+  asserted. `app.cpp` takes a comment and nothing else. Two cold reviews and a fix round: a refused
+  budget now mutates nothing (it used to wipe the roster), each centre spends in turn, a charter cannot
+  anchor in a far region, and holding spill is measured.
+- **BL-1033 (the cost instrument).** Eleven rows a seed — 1x/2x/4x crossed with the per-resource cap
+  kept and lifted, a specialist-price ladder, and a build-only row that forces the province cap to bind.
+  The sweep itself runs on a quiet machine after this entry.
 
----
+### What the seam found, and what it costs
+**A charter budget cannot raise a body's firm count above Pass 6's breadth cap.** On seed 0 at 4x, 219
+of 348 points found no good to serve; lifting the cap spends 244 of 348. That is two of Ben's rulings
+meeting, filed as **NR-889** — he chose to measure both before ruling. The dense rows are the cost
+risk: 443 s against 198 s for 1x, nearly all of it economy ticks.
 
-## Session — Housekeeping, and the nation spines go live (BL-568, Sprint N3 slice 1; NR-566–NR-572) (2026-08-23)
+**A copied world does not tick byte for byte as its original** (seed 28: D_settle 18F78EB9B2B20F29
+against the pinned 265C48A23E313B1A). Latent today — the search copies but never ticks a copy — filed
+as **BL-1034** with **NR-890**, scheduling Ben's call.
 
-Full mode. Opened as branch housekeeping, became a phantom-feature triage and a
-Sprint N3 delivery. Runtime ~4h (estimate); one understand-workflow (13 agents),
-three worktree build-agents, one main-session integration.
+### Left open
+NR-886 (four of seven calls), NR-889 (the density cap), NR-890 (scheduling BL-1034).
 
-**Housekeeping first.** Fast-forwarded `main` 45 commits to `origin/main`, deleted
-41 merged local branches and 61 merged remote branches, and pruned five merged
-agent worktrees. Two unmerged branches carried real work and were reconciled onto
-main: `quirky-fermat` (seven bug reports + Ben's rulings) and `bl-519-520`
-(Sprint 28 findings). Both had minted ids that collided with main's — renumbered
-BL-537–545 → BL-559–567 and NR-491–493 / NR-510–513 into free ranges, splicing
-by id rather than by text so nothing else moved.
+**Closed the next morning (2026-09-18).** The cost sweep ran 33 rows over seeds 0/28/46 (the PC slept
+22:07 -> 09:03 mid-run; the one straddled row was re-run). Keeping the cap freezes firms at 81 a body
+and leaves 208-228 of 348 points unspent at 4x; lifting it reaches the 200-per-body guard at 4-6x the
+legacy live tick; clustering alone costs up to 6x on seed 28. The readings and a recommendation (keep
+the cap for now) are on NR-889. BL-1033 and sprint 44 closed.
 
-**The Sprint 28 T3 fix was NOT landed (NR-566).** `bl-519-520` carried a
-settle-feasibility gate whose "byte-identical at production params" claim predated
-BL-462's fixture correction. Re-measured on the corrected `history_conquest_gap`
-it moves every production seed and raises the silent-world count 1/8 → 3/8; parked
-on `feat/sprint28-settle-feasibility` for measurement alongside the weighting call
-(NR-565), not merged inside a housekeeping pass.
-
-**Phantom-feature triage.** Ben's read was right: the 08-22/08-23 commits authored
-invisible features. The national budget (BL-537) and nation scorer (BL-542) were
-built and green in isolation but **nothing in the tick called them**, and sentiment
-decayed at an authored zero. The design layer already knew — BL-555/BL-558/BL-556
-are the v0.1.25 surfaces it filed for exactly this. Recommended order: wire the
-spines live first, then draw them.
-
-**BL-568 — half the rivals never acted (`3a1aa21f`).** Scoping surfaced a real bug.
-corp_ai's cadence was keyed on `world::current_day_tick`, which is `90n` at every
-quarter boundary; `90n mod 4 ∈ {0,2}`, so rivals at sorted index 1 or 3 (mod 4)
-**never evaluated in a played game**, while every harness and `--serve` loop passed
-`1..N` and rotated all four slots — the suite certified a schedule the game never
-ran. Fixed by mirroring a per-campaign econ counter onto `world::current_econ_tick`
-(set by every driver beside the day tick) and keying the cadence on it.
-`tools/verify/cadence_schedule.cpp` guards it, mutation-checked (4 of 7 rivals go
-dark on the old key). Landed first, its own commit.
-
-**Sprint N3 slice 1 — the wiring (`f5d68ff1`).** Three worktree agents, disjoint
-by the collision map: S1 (`world::nation_budgets` + save v3 + `nation_ai` registry
-home), S2 (`budget_transfer` record, earmarked-claim rule 3a, the corp_ai claim
-producer), S3 (sentiment decay authored at a nine-quarter half-life, loader guard,
-stale comments). Integration in the main session: `run_nation_step`
-(`nation_step.{hpp,cpp}`) scores due nations → overwrites the weight map →
-`run_national_budget` → **dispatches each earmarked survey** (credit in, survey
-cost out, same tick, per Ben's NR-568 ruling; clawed back if dispatch fails).
-Wired into all three drivers after `apply_budget`, before the tech gates.
-`state_hash` folds treasuries + the weight map only when non-trivial, so every
-zero-nation fixture is byte-identical — spectator determinism's unspectated hash
-is unchanged (`A330346EFCEE78AA`, same before and after; its golden mismatch is
-the pre-existing NR-452 staleness).
-
-**The finding, measured not rigged — NR-572 (blocker).** `nation_wiring.cpp`
-proves the loop closes on a funded fixture (R1–R5: paid + dispatched same tick,
-conservation, inertness at zero treasury, replay determinism through the fold).
-But at the scorer's own ~1.3% exploration weight it does **not** close in a played
-game: an indivisible survey earmark (Ben's whole-or-nothing rule) cannot be met
-from a thin line's single-tick share (~89k cr treasury needed per cheapest
-survey), and the default world enacts no levy so treasuries are 0. The harness
-measures and prints the shortfall rather than seeding a treasury to force green.
-Options A–E filed; recommendation D (wire nation income first) then A (earmark
-lines accumulate). R9 stays pending Ben's ruling.
-
-**Ruling calls delegated (NR-568):** exploration credit is earmarked (not a
-fungible top-up), claim is the full survey cost, sentiment forgets a cancellation
-in 9 quarters, contracted force is slice 2. Delegated on the map's recommendation
-(NR-569): weight map on `world`, conditional hash fold, player corp not funded
-this cut, national pass runs under spectating.
-
-**Verification.** `nation_budget_harness` 49/49, `nation_wiring` all pass,
-`cadence_schedule`, `save_roundtrip`, `money_conservation`, `corp_ai_harness`,
-`sentiment_harness` 47/47, `world_determinism` green; app builds and `--verify`
-runs clean (economy.lua with the new sentiment table loads, 0 golden failures).
-Two pre-existing reds unchanged and confirmed at the parent commit
-(`spectator_determinism` golden NR-452; `nation_scorer` R1c MSVC/g++ fixture).
-
-**Open, and left clean.** NR-572 is the decision that unblocks the rest. R8 (live
-check) and R9 (realistic funding) are the two pending requirement rows. `main` is
-11 commits ahead of `origin` — left local per the push policy (development, not a
-release). Review queue carries NR-566 through NR-572.
+**The queue ruled the same morning.** NR-889: the per-resource cap **scales with charter capital** on a
+budget world (the deeper option over keeping it). NR-890: BL-1034 first in sprint 45. NR-886: coastal
+cheapness and the trade re-base accepted as built; seat solvency moved to sprint 45's capital call;
+the three red harness rows filed as BL-1035; the small-grudge fade documented in CIVILISATION.md; the
+culture fold accepted. The review queue is empty.
 
 ---
 
-## Session — Ownership separates from identity: the syndicate tier (BL-524–BL-530, NR-491–NR-497) (2026-08-21)
+## 2026-09-16 (late) — The queue emptied, the backlog cut, wave A built, and the rest archived
 
-Full mode, **design only** — no `src/` change, nothing started. Ben raised a framing idea; it
-became seven backlog items, a new canonical term, a named minor, and six review entries.
+**Runtime:** Design (the review queue), Corpus (the backlog cut), then Delivery — Full as one batch of
+twelve worktree lanes, stopped by Ben at the end of wave A.
 
-**The brief.** Ben: *"not all companies are public... company ownership is completely divorced
-from player identity. As in the player can trade companies and invest in them... The current focus
-we have on roughly 40 companies can be twisted so that instead we have 7 corporations, and each
-company has the ability to automatically run itself."*
+### The review queue: fifteen calls in one form
+Ben ruled every open entry (NR-807..884) in one elicitation form. The ones that moved docs: the
+**industrial arc is the live product** (CONCEPT.md, ROADMAP.md) while the player identity was left to
+its own ruling and raised as **NR-885** (the corpus says mercenary company, the seat work says
+corporation); **COLONIAL_ERA.md folded and retired** to docs/research (claim verbs and sea lanes to
+EXPLORATION.md, the search seed to DIGITISATION.md); **poverty is the brake** (NR-878); **a seeded
+grudge fades by design** (NR-829), which exposed that RELATIONS.md credited campaign sentiment with
+a job the generation-span carry does. The NR-877 re-bless was authorised and pinned.
 
-**The finding that reframed the whole item — the layer already exists.** Before designing
-anything, the current state was measured rather than assumed, and it contradicted the premise in
-the useful direction. `corporation_count = 8` already — the player plus 7 named rivals, so the
-"7 corporations" were never missing. Background firms are not a fixed 40: `generate_background_firms`
-runs a *measured* stop condition (~90% of demand), bounded at 200/body as anti-runaway, and the
-working figure is ~80. And since **BL-365** every one of them runs the **full** `corp_ai`
-scored-utility layer, identical to a rival, with no separate code path.
+### The backlog cut
+Eighteen rows closed on a second form (four already delivered by later work, checked in code; BL-880's
+seat-canvas ruling written into STARTUP.md, which still said "no corp-selection stage"). Then wave A
+opened over the 16 items with no open prerequisite and no wall-clock measurement.
 
-So the self-running AI layer the brief asked for was **already built**. The item stopped being
-"give companies autonomy" and became "hang **ownership** on autonomy that already exists" — which
-is what made a framing change of this reach affordable, and which is now the first thing BL-524
-says.
+### Wave A: what the lanes found
+| item | outcome |
+|---|---|
+| BL-1006 far-trade reading | 0.0 units sold at a destination on every seed: per-body pools send every same-body haul home |
+| BL-1009 digest sees the money | 8/8 new fields proven visible; the old digest missed 7 |
+| BL-982 Digitisation readings | 3 measured, 1 partial, 9 n/a; cities beat goods for firm density in only 6/16 worlds |
+| BL-1023 Forest branch | tree 29 -> 36 nodes; arid and stone stated as hostile country |
+| BL-1016 creed classifier | the raw compare picked a consolidator in 0/872 polities; by rank both kinds appear |
+| BL-1017 culture fold | tree -85.5%, and nothing moved: one culture re-parented in 16 seeds |
+| BL-1010 era_world reds | two stale checks; one real: no furnace lights in any 1960 world |
+| BL-1022 coastal cost | coastal ground is ~15% cheaper to take, via garrison size |
+| BL-1008 six harnesses | re-read on the 12-tick settle; two rows honestly red |
+| BL-1020 seat floor | old floor empty on 7/16 curated seeds, new floor on 0; live click not run |
+| BL-842 small grudges | min decrement above the floor; cold review found it correct |
+| BL-1021 trade re-base | trade 0.19% -> 3.86% of production; R2 half-holds |
+| BL-996 demand ladder | ARCHIVED: cold review found six issues; fix round stopped |
+| BL-841 assimilation | REVERTED: the slot claim evicts large peoples on a one-unit gain |
+| BL-1018/1019 alarm, first crossing | ARCHIVED: an unsaturated alarm collapses displacement (2.73 -> 0.50); finding kept in EXPLORATION.md |
 
-**Recommendation given, and overridden.** The advice was to save the idea to the backlog rather
-than work it: BL-094 (player-identity pivot) is parked and unlanded, this reads as the *fourth*
-framing on player identity in seven weeks, and settling a fourth on paper before the third ships
-is how churn compounds. Ben chose to work it. Recorded as **NR-495** (novelty flag) rather than
-buried — the concern was real and was overridden deliberately, and the counter-argument (BL-094
-explicitly left non-mandate revenue open; equity income *answers* that rather than replacing the
-identity) is on file as mine to be tested, not inherited.
+**Cold review earned its place again.** Two of the three world-movers it read were sent back on
+substance (BL-996, BL-841) after their lanes reported green. The digest also could not see BL-996's
+economy change at all (the search winner moved on 3 of 5 seeds with every digest identical).
 
-**The ruling that made it designable (NR-491).** `io-standing-rules`: *"the player's own corp is
-never auto-acted on strategically."* Corporations that self-run while the player owns them puts
-that rule's **subject** in question. Taken on Ben's behalf, on **BL-409 (spectator mode)**'s
-precedent — the prohibition protects a corp *because a human owns it*, so a changed ownership
-relation changes the *precondition* rather than carving an exception: **equity never confers
-operating control, at any fraction, including 100%.** The rejected alternative (a control
-threshold) would have reintroduced the ~88-build-queue micromanagement the economic premise
-exists to prevent, forked `corp_ai`'s uniform iteration, and re-muddied the subject BL-409 spent
-a ruling to clear.
+### The re-bless (32e04a19)
+Causes: BL-1009 (coverage), BL-842 and BL-1021 (world). Over 16 seeds the Empires round fights less
+(battles 158,215 -> 145,345) and the Exploration phase's shape holds (pooled displacement 2.73 ->
+2.67, displaced seeds 12 -> 12). The R3b pin fixture nearly stops fighting (322 -> 30) from BL-1021
+alone; it is the w_want_q = 0 variant and not the phase's reading.
 
-**...and overturned by Ben the same session.** He ruled **"above a majority threshold"**: past
-> 50% a syndicate does inherit the corporation's operating decisions. The recommendation lost on
-its merits, and the counter-argument is better than the one it replaced — **control costs
-attention**, and the exposure is bounded by *majorities held* rather than corporations in the
-world, so a syndicate chooses between spreading thin and staying financial, or concentrating and
-taking the wheel. That is a real strategic question; "never" had only one answer.
+### Stopped
+Ben: *"This work is highly unstructured, so just leave it at wave A and we can reinvent anything
+important later. (So archive)."* The 24 items of waves B-D were archived unbuilt; each design stands in
+its authority doc. The calls left on merged work are **NR-886**.
 
-The three costs the "never" position defended against were not deleted from the design, because
-they did not stop existing — they became costs with owners. Micromanagement is bounded by the
-carve (which makes BL-526's carve count load-bearing against *attention*, not just portfolio
-interest). `corp_ai`'s uniform iteration genuinely forks, and BL-529 now owns that control gate
-under two constraints from BL-409: it must not shift any other corp's cadence slot, and it has no
-subject under spectate. And the prohibition's subject stays crisp by **deriving** control from the
-equity relation rather than storing a flag. One question fell out of the ruling that the "never"
-design could not have had — NR-499, what happens the moment a majority flips — and its fourth part
-(can a rival take control of a corporation the player controls) is a standing-rule *grant*, not a
-mechanism, so it is flagged rather than assumed.
+**Found and not filed** (reinvent if wanted): raw leans still steer the Exploration tree's node choice
+(the one-scale defect BL-1016 fixed in the sweep); sea legs sit at 580-820 on every polity, so the
+landlocked consolidator never appears; material_floor's reconciliation row passes on nothing at its
+default; spawn_solvency ticks with the player seated and skips the search; no non-SDL constant carries
+the 12-tick settle; population centres are generated exactly on their rung, so one loss demotes them;
+the Digitisation readings generate at epoch 0; the wizard's lineage palette (BL-1017) was never viewed
+live. Harness hazard: lanes shared one scratchpad and one lane overwrote another's build script.
 
-The ruling also answered BL-528's open question for free: if a majority confers *operating*
-control it plainly confers *financial* policy, so the majority holder sets the payout ratio and
-the financial-versus-operating carve that item proposed collapses.
+## 2026-09-16 (after the sprint) — Measurement parity, sixteen saved worlds, and an evening at the live app
 
-**Ben's terminology ruling, and what it surfaced (NR-492 → NR-497).** His framing used
-*corporation* for the holder and *company* for the operator — inverted from the settled terms.
-His call: **keep `corporation` as the operator, name the holding tier something else.** The word
-chosen on his behalf is **syndicate**, scored on semantic fit, grep-cleanliness (zero hits in
-`src/`, zero real in `docs/`) and whether it reads in *both* arcs; `house` lost on
-greenhouse/warehouse noise plus a noble-family promise the game doesn't model, `trust` on a
-head-on collision with the standing rules' own untrusted-boundary language.
+**Runtime:** Delivery — Light, then a long live session with Ben watching the wizard. Everything
+here was found by looking at the thing running.
 
-The rename then **surfaced a design hole that the original vocabulary had hidden**. Under Ben's
-wording the named corps simply *became* the holders, so nothing needed carving. Keeping
-"corporation" for the operator breaks that — today's ~8 named corporations own buildings, and a
-pure holder cannot take them along. Resolution, now in BL-526: each named corp **splits** into a
-syndicate plus one or more operating corporations carved from its holdings, the syndicate seeded
-with a majority stake, carved corps inheriting the parent's `industrial_focus` so the specialists
-premise survives. The payoff is that every syndicate opens with a **portfolio** rather than an
-empty balance sheet, so the mechanic is live from turn one. A naming decision paying for itself in
-mechanism is worth recording as such.
+### The sweeps were measuring a world nobody plays (BL-1007)
 
-It also sharpened NR-491: with two type names the standing rule's subject is readable straight off
-the type — a **syndicate** is never auto-acted on, a **corporation** always is. Under one word
-that sentence needed a qualifier at every citation.
+Two gaps, not one. `history_sweep` and `exploration_sweep` generated with `world_gen_config`'s
+struct defaults where the app loads `scripts/world_gen.lua`, AND passed a null works registry,
+which makes `build_work` a dead branch — no polity in a swept world had ever raised a work. Both
+now load the shipped data layer the way `app::begin_new_game` and `ensure_works_loaded` do, and
+print the configuration on their face.
 
-**What landed.** BL-524 (syndicate tier) parent plus six children — BL-525 (equity data model,
-integer shares never floats, because repeated float ownership arithmetic drifts a replay),
-BL-526 (the carve + ownership class, derived from the history ladder on BL-219's
-derive-don't-author precedent), BL-527 (valuation through `resolve_price`, not a parallel
-engine), BL-528 (dividends as a sixth `apply_budget` flow), BL-529 (rival syndicate behaviour —
-the one the symmetry rule makes mandatory), BL-530 (portfolio ledger). Three genuinely new
-mechanics; the rest reuses `resolve_price`, FINANCE profitability, BL-350's negotiation seam and
-BL-218's timing scalar. **v0.1.23 — Who owns whom** named in ROADMAP on Ben's ruling (NR-494),
-carrying the affordability argument and the NR-495 hold recommendation forward so a roadmap-only
-reader sees both.
+| reading (16 seeds) | struct defaults | parity |
+|---|---|---|
+| seed 0 Empire battles | 6,253 | 11,824 |
+| median battles / conquests | 6,762 / 5,843 | 9,932 / 7,913 |
+| pooled displacement | 1.28 | 2.73 |
+| silent seeds | 2 | 0 |
+| Exploration battles per century | 28.7 | 69.3 |
 
-**Doc drift found in passing (NR-496).** CLAUDE.md and README both still described the pivot as
-being to a **governing body** — superseded twice over, first by BL-094's 2026-08-10 militia
-rewrite and then by the 2026-08-12 two-arcs split that put a mercenary company in the live seat.
-README also still carried the pre-NR-177 1960 epoch. Both corrected. The lesson worth keeping:
-these two files are what a fresh session and a fresh reader start from, so a stale framing there
-propagates further than the same staleness in a subject doc nobody reads without traversing to it.
+**Sprints 40 and 41 tuned deterrence against a crippled world.** On the real data layer the phase
+displaces conflict about twice as strongly as the reading Ben authorised. Both artefacts are
+regenerated; the live app and the sweep now agree seed for seed (the wizard's own round 4 readout
+says 11,824 battles on seed 0, which is what the sweep prints).
 
-**Review queue closed out.** All seven entries put to Ben and answered in-session: he overturned
-NR-491 (control at majority), took NR-493 literally (**seven** syndicates total, the player one of
-them — `corporation_count` drops 8 → 7), confirmed NR-497 (*syndicate*), and ruled NR-495 —
-**hold BL-525 until v0.1.15 is cut.** So the minor is designed and deliberately not started, which
-is the outcome the novelty flag was arguing for. NR-496 closed as an observation; NR-498 became
-BL-531 (session-close indent preservation), per the standing pattern that an answer creating work
-becomes an item rather than a longer review entry.
+### Sixteen worlds saved for Digitisation
 
-**Runtime.** ~2.5h, Full mode (design/refinement only, remote, no build). Eight backlog items, one
-new GLOSSARY term, one named minor, nine review entries — NR-491 → NR-499, eight resolved in
-session, one (NR-499) newly raised by Ben's own ruling.
+A seed IS the save — generation is a pure function of the descriptor — so what was missing was not
+a snapshot format but the REASON a world is worth opening. `docs/generation/seed_library.json`
+holds sixteen, chosen off a 48-seed parity sweep, each with the readings that made it interesting
+and a five-counter fingerprint; `tools/session/seed_library.js` queries it (`--for`, `--seed`,
+`--check`, `--bless`). They span what the next phase forms companies on: a median chest of 27.1M
+(seed 46) against 245 (12), 112 polities (11) against fourteen (17), eight colonial subjects
+(13, 41) against none (37, 4), thirty post roads with little trade (32) against no roads and
+plenty (10).
 
----
+### The live session, and what watching found
 
-## Session — Tiles gain a third axis, and a fight finally happens (NR-438/439, BL-519, BL-521, BL-520, BL-516, BL-467; Sprints P1 closed + C3) (2026-08-21)
+**BL-1000 closed on a real click** — menu to round 4 by presses, on a rolled seed. Worth recording:
+three access requests were denied because the Start-menu entry for ProjectIo resolves to
+`.claude/worktrees/elated-mclean-7dd61c/build/ProjectIo.exe`, a build from 14 September in a
+worktree git no longer lists. It launched twice instead of the real build and briefly looked like a
+regression in the board. Granting the running process by basename reached the right one.
 
-Full mode, two sprints: P1's tile/province arc closed out, then C3 opened and its two
-named items taken. Six items on PR #49 plus BL-467 after it. Three worktree agents and
-one 15-agent adversarial scout.
+Then five things Ben saw and asked for, in the order he saw them:
 
-**The ceiling, ruled and generalised.** NR-438/439: 12 tiles becomes a *preference*, 20
-the asserted hard cap, and the over-12 share is **reported and never asserted** — "rare"
-was never defined, and inventing a threshold would have invented half a rule. That shape
-was reused within hours by BL-516's sea provinces, which hit the identical wall at 82
-against Ben's "say 80" (NR-460). A ruling that produces a reusable discipline is worth
-more than one that produces a number.
+1. **The white event pings** fired several a year and drew the eye off the borders. Every one of
+   fifteen region-carrying kinds drew the same ring, so a realm dying and a trade route opening
+   were one mark. Removed entirely (`BL-1011`); the record, the ticker, the arc readout and the
+   corridor overlays are untouched.
+2. **The Exploration round's wait** read "Running the ancient era — year 397 of 460" while the
+   ancient era is 1,600 years long: the stage label was last set at stage 8 and never moved. A
+   fourteenth label is published before the Exploration pass; it now reads 613 of 1600 (`BL-1011`).
+3. **Roads wrapping the whole view** (`BL-1012`). The world is a cylinder and both corridor bakes
+   stored raw anchor columns, so a ten-column hop over the seam was drawn as a 250-column line —
+   and the same columns fed the over-water sample, the bridge test and the exemplar's midpoint.
+   Fixed at the bake; the draw strokes each corridor twice, a world width apart, inside the map's
+   clip rect.
+4. **A pace control** (`BL-948`), filed 2026-09-13 as 45/90/180. Ben chose 90/180/270 on the form,
+   watched it and called it "much slower than I imagined": the rungs are 30 s / 1 m / 1 m 30 s,
+   a minute by default. It sets wall clock for the whole span, so a longer span moves faster.
+5. **Continuity between rounds** (`BL-1013`, then `BL-1014`). A round now opens on the ground the
+   round before it left, cross-fading over the opening tenth of its own span, and it generalises:
+   Empires carries the migration, Exploration carries Empires, Digitisation joins when it exists.
 
-**BL-519 — the tile axis split.** `terrain_composition` was doing three unrelated jobs:
-substrate, cover, and state. Ben's brief — *"a mountain might have a forest or not"* —
-named the case it could not express, and `urban` was the proof rather than the exception:
-it overwrote the composition, so paving a metallic tile destroyed the fact that it was
-metallic. 522 references across ~110 files, migrated **by meaning**, shim deleted in the
-same pass on Ben's call.
+### Three fixes the continuity work needed, each found by watching
 
-The structure is what made an L-difficulty split landable in one go: Pass 4a's tables are
-unchanged **draw for draw**, and both new passes consume **no RNG stream**, so the claim
-"nothing drifted" became testable rather than assertable. The 120-seed `earthlike_tile_census`
-came back **bit-identical**, and that single measurement is what made every other moved
-number attributable.
+- The first cut gated the carry on the predecessor having polity SAMPLE steps. The migration record
+  has none — its board shows dashes in People for that very reason — so the one hand-over the
+  feature existed for was the one that could never fire.
+- The second painted the carried frame only under UNCLAIMED ground. Right for Culture into Empires
+  (400 BCE is nearly all unorganised); invisible for Empires into Exploration, where every realm
+  already holds its land at 1200 CE. It now goes under the whole map.
+- Ben: *"it looks like it actually carried over from culture."* It had not. `polity_slot` is a
+  greedy graph colouring over each record's OWN adjacency, so the same realm got a different colour
+  in each round and the boundary read as a different world. A shared polity id now inherits its slot.
 
-**The finding that justified measuring the NEW behaviour, not just the regression.** The
-forest-on-rock threshold was set at the value the design implied (moisture ≥ 0.55), measured,
-and found to fire **zero times** — the biome table only ever draws rocky ground in the dry and
-middling columns, so wet rock does not exist for the branch to find. The item's headline case
-would have shipped inert and looked implemented (NR-446).
+### The reversal worth naming (BL-1014)
 
-**BL-521, BL-520, BL-516** followed: click injection driving ImGui's real event queue (with
-double-click promotion forced per press, because ImGui decides it by accumulated frame time);
-texturing as grain-on-substrate plus pattern-on-cover, 13 composable marks against 84
-enumerated; and water gaining lake/coast/ocean kinds decided **structurally**, with sea
-province spacing pinned *by measurement* rather than chosen.
+Ben: *"there is a clear phase where the simulation is done rapidly, and this sort of breaks the
+narrative flow of the time-lapse... separate each part with an otherwise completely blank Loading X
+Round."* That and the missing fade were ONE defect: a round that opens chasing the sim's frontier is
+past its own cross-fade before anyone sees it. The wait is now one centred line and nothing else,
+and the lapse plays from its first year. This reverses BL-914's "the wait is the round" for the pass
+rounds, and `STARTUP.md` records it in his words.
 
-**The fan-out lesson (NR-459).** All three agents were briefed "off the current HEAD" and all
-three got worktrees at the **session's** base. One fast-forwarded itself; one did not, and
-built an entire item against the enum BL-519 had just deleted. The port was cheap only
-because that agent had routed every water test through one choke-point predicate. Two agents
-also independently minted the same review ids — `next_id.js` exists for backlog ids because
-minting off a local file collides, and `NEEDS_REVIEW.json` has the same shape with no such tool.
+### Also answered, in passing
 
-**Sprint C3 — BL-467, and the method note that is this session's real output.** Both battle
-resolvers were compiled, harnessed and **called by nothing**: the military layer could compute
-a fight but could not have one. `battle_system.{hpp,cpp}` is the trigger and the step, running
-before `run_unit_march`. A fight now happens through the real tick — 1000 men → 648 in one tick.
-
-Then an adversarial scout read the code **after it compiled and passed 26 checks**, and found
-**four real defects** (NR-463): a withdrawal that cost no men (strength captured after the
-withdrawal, not before), a mutual-hostility dedup that silently no-oped with three corps
-(`std::unique` collapses only *adjacent* equals), an unscreened all-naval 0-vs-0 that resolved
-as a false defender victory with 400/200 casualties, and zero-count units that were never
-reaped — because the item's own aftermath ruling was **false about the code**.
-
-My own harness row had passed over the first one, because it asserted the withdrawal request
-was *accepted* rather than that it *cost* anything. **P1's method note was "build it, look at
-it, then rule" — about renders. C3's is its counterpart, about code: compiling and going green
-is evidence a thing does not crash, not evidence it works.** What found the defects was an
-agent told to *refute* rather than confirm, defaulting to "unverified" when it could not
-confirm from what it actually read.
-
-**The rider, measured and deliberately not taken (NR-467).** `unit_upkeep_rates` sweeps five
-candidate rate sets. The finding is a design question the number hides: a flat per-head rate
-costs a 1000/tick corp 7.8% of income and a 50/tick corp **155%** — it does not scale a cost,
-it selects which corps may field an army at all.
-
-**Verification.** 83 of 100 harnesses pass; 14 cannot build here (sol2/ImGui/non-`world` TUs).
-The 3 failures — `ai_skill_harness` (28), `history_sim_harness` (8), `spectator_determinism`
-(1) — were each proven **pre-existing** by building them at the parent commit in a separate
-worktree and diffing the pass/fail patterns byte-for-byte. None re-blessed. The
-`spectator_determinism` one matters beyond itself: it asserts a `state_hash` **quoted by value
-in the standing rules**, and it was already stale before this session (NR-452).
-
-**The standing debt.** Nothing built in P1 was ever *rendered*. Four of its six items have a UI
-half, the container cannot build the GUI, and no golden was blessed — blessing an unseen frame
-pins whatever got built. For a sprint whose own method note is *build it, look at it, then rule*,
-that is the thing to fix first, and BL-521 (built the same session) is what makes the looking cheap.
-
-**Runtime.** ~7h, Full mode (two sprints: one closed with a retro, one opened and half taken).
-23 review entries, NR-445 → NR-467.
+Does the Exploration round really continue the Empires world, or start fresh? **It continues, by
+determinism, but recomputes**: each wizard round calls the generator from scratch with the same seed
+and stops at its own span, so round 5 replays the migration and the whole Empires era first. Proved
+twice — a run that stops after Empires and one that continues into Exploration produce identical
+Empires spans on all sixteen seeds, and live, round 5 scrubbed to 1200 CE shows round 4's realms in
+the same order. The cost (four full generations by the time Begin is pressed) is `NR-811`, still open.
 
 ---
 
-## Session — The province becomes a thing you can see (BL-458, BL-513, BL-511, BL-466, BL-515, BL-517, BL-392, BL-463; Sprints 27/B2/B3/C3/D4 + P1) (2026-08-20 → 08-21)
+---
 
-Full mode, two Batch Deliveries and a design arc: nine worktree build agents, one cold
-static reviewer, and a long tail of rulings made against renders rather than specs.
-Ben's brief opened as *"deliver a few sprints in parallel"* and ended as a tile-model
-redesign, by way of the province being drawn for the first time.
+## 2026-09-16 — Sprint 42 wave 1: sixteen items, five that moved the world, and the measurements that outran them
 
-**Batch one — four lanes, one blocker caught by the gate.** BL-458 (supply lines can be
-cut: `convoy_tile_at` lifted out of the renderer, interdiction on a declared hostile
-stance — the act that finally earns *pirate* its first mechanic since 2026-08-07),
-BL-513 (the province building ceiling, k=12.6468 pinned by measurement), BL-511's seam
-half (`march_unit` retargets tile → province), and the sprint-B2/B3 generation cuts
-(road-less nations 14 → 0; settlements 31-flat → 44-77, derived from land area and
-nation count rather than a 180x84-era constant). The pre-compile static review caught a
-**blocker of my own making**: my hand-resolution of a `law.hpp` conflict kept BOTH
-sides' author fields, and only `nation_tariff_rate` read the dead one — so in the
-shipped binary every tariff resolved to zero and the whole clearing-tick tariff pass was
-a no-op. The harness passed 25/25 because it built laws in the shape only the harness
-used. Fixed at `bd238d5`; the lesson is that a green harness can be evidence of nothing.
+**Runtime:** Full / Batch Delivery, continuing the same session. Sixteen worktree agents, one per item,
+merged in dependency order on `sprint-42-wave-1`; every branch base-checked and every agent's claim
+independently re-run in the main session before its merge was trusted. Two agents were stopped
+mid-flight by a usage limit and were finished here from their own commits and snapshotted diffs.
 
-**Batch two — the province gets rendered, and the rulings start reversing.** BL-511
-landed the blend, province selection, the `march_unit` payload change and a per-lens
-reduction decided for all thirteen overlay modes. Then Ben looked at it. Three rulings
-followed, each superseding the last and each made against a picture: **~4 tiles** (from
-a design form, before any render) → **7-12** (after seeing it drawn) → **the packed
-lattice ruled out entirely** (after seeing THAT drawn) — *"packing each province
-perfectly looks nice, but it is scarcely how borders were defined in history."*
+**What landed.** The physical stages: the tile pipeline splits at the Body/Life boundary so the Life
+half re-runs over a cached record (the 120-seed census re-runs in 13% of the time), planetology keeps
+a per-epoch thermal series the fossil pass samples, and Pass 3 bands from the plate-carried position
+so the present is the frame's epoch 0 rather than a lookup proved equal to it. The history stages:
+rivers take the same corridor discount as the coast, fleets and standing armies pay a per-head bill
+from the treasury, every node of the two wired trees now does something through one generic apply,
+and every seat a polity holds folds its stores into the capital at 1200. The seam: nations open with
+the money their history banked, the landscape search sees road tiers and rosters, and the warm start
+is retired in favour of the search's own 12-tick validation run. Plus the readings — the held-seed
+census, the ephemeral-culture count — and two doc items, one of which retired `COLLAPSE.md`.
 
-**BL-515, the third partition of the day.** Provinces grown from population centres by
-cost-weighted fill: river edges and elevation gradients expensive, a road link cheap
-because a road BINDS. Both coefficients pinned by measurement rather than picked — the
-height cost against the p90 of adjacent-land steepness over 653,910 edges, the road
-divisor by a published sweep whose lift the agent honestly described as concave with no
-knee. Prerequisite BL-517 landed first (height retained; `sizeof(tile_component)` 336 →
-340, no RNG stream perturbed). Ben then retracted *"don't reject tiny provinces"* on
-seeing the result, and a singleton-absorption pass took sub-3 provinces from 3,008 to
-911 — leaving 51 true islands, each verified to have zero land neighbours rather than
+**Five causes moved the world, each measured alone**, and `NR-877` asks Ben to authorise them as one
+act: the thermal series (fossil magnitudes about a percent), the river discount (the migration reaches
+inland 4,000-11,000 tiles earlier per world), the upkeep bill, the tree effects, and the nation
+treasuries. Digests `457483363D79D700 / 728607C66CE6A4BE / F9BF05466A631FF9 / 851FE345B2E37618`
+become `983298AE413B0A8E / F2A66ACE583F1784 / 5346EB2A9C4E1144 / 82EE79155BA2F47D`. The shape, over
+16 seeds: the Empires span ends with more and smaller realms (powers 49 -> 55, largest share by people
+110 -> 100 per mille) and slightly more fighting; the Exploration round is half as violent
+(55.9 -> 28.7 battles per century) with displacement's median up (1.35 -> 1.70) and its pooled ratio
+down (1.68 -> 1.28).
+
+**Three measurements outran their items, and they are the session's real output.**
+
+1. **Nothing in the scorer reads the purse** (`NR-878`). With the saturation caps gone the median
+   polity ends the span with a treasury of 211 against 1.26M before, and 14% of polity-rounds cannot
+   pay their army bill. At a tenth of the rate the median still collapses, so it is structural: the
+   caps were hiding a 600x treasury spread.
+2. **Four of the six held seeds have no frontier at all** (`NR-880`). They meet one polity across a
+   landmass in 460 years, because the first crossing almost never happens. And alarm saturates at
+   1000 on essentially every near pair, so the deterrence weight tuned in sprint 41 is acting as a
+   flat constant.
+3. **The sweeps and the app generate different worlds** (`BL-1007`). `history_sweep` builds with
+   `world_gen_config`'s struct defaults while the app loads the Lua config: seed 0 fights 6,479
+   battles in the sweep and 9,928 in the game. Every figure this sprint argued from is internally
+   consistent and describes a world the player never gets.
+
+**Gates on the integrated tree:** `world_determinism`, `pass_one_handoff`, `colonisation_harness`,
+`deposit_origin`, `planetology_harness`, `continent_drift`, `tile_height_retention`,
+`survey_endowment_harness` (34/0), `earthlike_tile_census` (120 seeds, 0 fail), `tree_lint` (four
+stores, both headers fresh), `landscape_score`/`search`, `haulage_measure` (2035 / 1627 against the
+1055/802 baseline), `demand_census` — all green. `history_sim_harness` sits at its 2-failure baseline.
+Two reds stand deliberately: the exploration R3b pin, which is what NR-877 re-blesses, and
+`era_world_harness`'s R1/R2/R5, which fail at the wave base too and are now filed (`BL-1010`).
+
+**One integration break worth recording.** The Body/Life split and the plate-carried frame landed in
+the same function from two worktrees; the merge was clean and the build was not, because Pass 3 now
+needed a continents pointer the Body half's new signature did not carry. Caught by the gate run, not
+by the merge.
+
+**Owed:** BL-1000's live click (access was denied when requested, so the visual row stays open),
+`BL-1007` measurement parity, `BL-1008` six harnesses still simulating an 80-tick warm start,
+`BL-1009` the digest's blind spots — region treasury moved by 80% with every digest identical.
+
+---
+
+---
+
+## 2026-09-15 — Sprint 42 wave 0: instruments before mechanisms, and the harness that paid for itself the same day
+
+**Runtime:** Full / Batch Delivery, the same session as the audit below. Nine worktree agents,
+one per item, briefed to fast-forward first and block on their own runs; the main session merged
+each branch on `sprint-42-wave-0` after `agent_base_check` (9/9 PASS) and re-ran every harness the
+agent cited before trusting the merge. A cold `code-reviewer` pass over the integrated diff found
+eleven items; four were fixed here, two corrected the bookkeeping, the rest confirmed.
+
+| Item | Landed | Verified on the merged tree |
+|---|---|---|
+| BL-981 (colonisation D1/D3 regression) | the schism verb demoted every seat in a residue block; seats now walk out as seats, block hinterland keeps its seat or re-points at the new one, parent ground whose seat left re-points at the parent capital | `colonisation_harness` 0 failures (2484/206, 2773/168, 1720/116) |
+| BL-980 (corpus reconcile) | 8 contradictions corrected, 4 calls filed (NR-868..871), the 0.90 ratio deleted from code | `header_graph --strict` 81 → 81 dangling in clean worktrees |
+| BL-974 (tree roots and header lint) | two stores reoriented (7 and 14 leaves had derived as root), one-root rule, header-matches-store check | `tree_lint all` OK, both headers byte-identical |
+| BL-962 + BL-964 | endowment spread asserted (floor 40% after review); drift digest `481BDCA5300AF14F` and a cost ceiling | `planetology_sweep` OK, `continent_drift` ALL PASS |
+| BL-966 (terrain economic gate) | census bands asserted; `survey_endowment_harness` (34 rows); `survey_endowment` exposed from the anonymous namespace | both green, census 120 seeds in 29 s |
+| BL-970 (shares by population) | both columns on the face and in the JSON; scoreboard on population, region check kept beside it after review | `history_sweep 16` regenerated on the merged tree |
+| BL-971 (displacement weighted) | pooled and volume-weighted beside the median; silent floor 20; `exploration_sweep.json` checked in | reproduced byte-identical pre-BL-981, regenerated after |
+| BL-979 (instruments run the winner) | `apply_shipped_landscape` in `harness_params.hpp`; ten call sites; `fraction_in_band` | haulage on the winner **2183 / 1614** (seed candidate 1839 / 1411; baseline 1055 / 802) |
+| BL-969 (validators in production) | both handoff validators on the shipped path; culture table crosses and is checked against `creed_state`; `save_game_version` 14 → 15 | `world_determinism` ALL PASS with R3.6/R4.4; `pass_one_handoff` ALL PASS; `save_envelope_roundtrip` PASS via the CMake tree |
+
+**The one world-mover, attributed.** BL-981 alone moves seedA/on `49FB45407FF7C3C0` → `457483363D79D700`
+(the reviewer's control build at the merge before it reproduces main's digests exactly); seedB/on,
+seedA/off and the 1960 two-span are unchanged. `exploration_sim_harness` R3b (the exact-counter pin)
+is red by the same cause: battles 306 → 308, conquests 304 → 306, foundings 522 → 472, owner changes
+2174 → 2196. Not re-pinned. **NR-875 asks Ben to authorise the wave re-bless** against the shape:
+seed 2 holds 116 seats where the razing world held 154, because breakaway realms keep theirs.
+Exploration sweep on the integrated tree: pooled displacement 1.58 → 1.68, median 1.33 → 1.35, held
+6 → 6, silent 2 → 1, Exploration battle rate 43.5 → 55.9/century. History sweep on the integrated tree: all 16 rows moved; medians top share 85 → 89‰ by regions and 101 → 110‰ by population, powers at 1200 CE 52 → 49, rose-and-fell 74 → 67 by regions and 22 → 22 by population, battle and conquest medians unchanged; ALL PASS.
+
+**Findings that outrank the items.** NR-872: six of the ten varying endowments move together with
+metallicity, so 55.5% of accepted homeworlds are poor in nothing. NR-876: by population the largest
+polities are 2–5 points *more* concentrated than region count showed, while rose-and-fell counts
+drop three times (74 → 22 per world) — the audit's "growth inflates the arc" premise was wrong on
+concentration and right on shape. NR-874 records the design call taken in BL-981 (a schism moves
+seats, it does not raze them).
+
+**Review fixes made here.** `ownership_class` ran the search on an empty registry (now the stated
+seed candidate); the population scoreboard row could pass vacuously with no playback record (both
+columns now asserted, unrecorded fails); the planetology floor had 0.5 pp of headroom (40 now);
+ERAS.md, MARKETS.md and GENERATION_STRATEGY.md had been reworded to build state by BL-980 and are
+back to design state. All nine BL-979 instruments build on the merged tree; `ownership_class` ALL PASS on the stated seed candidate; `demand_census` PASS with pooled fraction-in-band 211 of 2335 (0.0904) industrial, identical to the agent's pre-merge figure — which, with haulage reading 2183/1614 both with and without the 0.90 ratio, also answers the reviewer's first finding: the deletion did not move the winner.
+
+**Authorised the same day (Ben, 2026-09-15, on the form).** NR-875: the wave re-bless. `exploration_sim_harness` R3b re-pinned to 308 / 306 / 472 / 2196 (ALL PASS); **authorised digest baseline:** seedA/on `457483363D79D700`, seedB/on `728607C66CE6A4BE`, seedA/off `F9BF05466A631FF9`, 1960 `851FE345B2E37618`. The other eight calls: a schism moves seats (NR-874, into CREEDS.md); measure a cause per held seed before any constant moves (NR-873 → BL-999); accept the arc's shape and rank the wizard board by population (NR-876 → BL-1000, CIVILISATION.md); metal endowments share the metallicity axis by design (NR-872, into PLANETOLOGY.md); every seat folds into the capital at 1200 (NR-871 → BL-998, world-moving); the default epoch moves when Digitisation lands (NR-869, into DIGITISATION.md); COLLAPSE.md folds and retires (NR-868 → BL-1001); the breadcrumb is dropped (NR-870 → BL-1002). All nine entries archived. Sprints 38, 39 and 41 closed and archived on Ben's word; sprint 42 is the only hot sprint.
+
+**What the builder bought.** Every agent's first harness build was 22 s cold and each rebuild
+seconds; the regression BL-981 fixed had shipped through two sprints because the harness that
+catches it cost 12 minutes on top of a clean compile nobody paid.
+
+**Owed.** Six of BL-979's instruments were built but not run for their headline movement
+(campaign_lapse, acquisition_viability, material_floor, chain_conversion_probe, convoy_cargo_census,
+player_seed_sweep). `history_sim_harness` stays at its 2-failure baseline (R3a2/R3a3). Haulage seed
+4 scores composite 0, so the search cannot move there — BL-977's to look at.
+
+---
+
+---
+
+## 2026-09-15 — The generation audit: every stage delivers its struct and the next reads two fields of it; BL-960 lands, sprint 42 opens
+
+**Runtime:** Design → Light delivery → sprint open. Ben asked, before Digitisation: do the existing
+generation stages fill their promises, what tooling would make change cheaper, and will the chain end
+in a working market — with two improvements per step.
+
+**The audit.** Five parallel readers, one per stage group (physical stages; Culture and Empires;
+Exploration and the trees; the political map to the market; the tooling loop), each checking the
+authority doc's promises against the code, the harnesses and the sprint record. The verdict, stage
+by stage: each stage delivers its own struct and the harnesses prove that well; the promises break
+at the **handoffs**. The Exploration span writes treasuries, scarcity signals, trade flows and
+preference into `exploration_output`, and the campaign economy consumes grudges and roads and drops
+the rest into a test fixture; `nation_component::treasury` is 0.0 at generation. The shipped default
+is `epoch_year = 0` with a history ending in 1660, so the industrial span, tariffs and ruptures never
+run while GENERATION_STRATEGY.md says the campaign is the 1960 arc. No stage measures its economic
+output until the end: deposit spread is printed and never asserted, chain completeness did not move
+when 40% of reach was cut, the landscape search sees one live axis of three, and the warm start the
+docs call retired still runs 80 ticks. The Empires arc is now present in the spread (31/32 seeds
+eliminate polities and fall from a peak, 0/32 hegemony) but its share readings divide by a region
+count that grows 2–6× inside the run. Exploration's displacement median is carried by one constant
+pair, with two frozen seeds and zero-neighbour seeds dropped. Node effects in both wired trees reach
+the sim nowhere; three nodes are hand-wired by index or string. Twelve doc-versus-code
+contradictions were listed (peat rows, the plate serialisation claim, five stale contract rows,
+COLLAPSE.md unbuilt, the "three terms" header, the warm-start retirement, the 0.90 ratio, the epoch
+and pass map, the ledger breadcrumb, NEXT_SESSION, the README, the 1200 consolidation).
+
+**Ben's call: A then B, then build.** File the improvements, build the shared harness library, then
+return to the filed items in development mode — "sharpen each prior step before the instrumental
+one (digitisation), where the generation becomes the world players see."
+
+**Filed:** BL-960..BL-980 (two per stage, the corpus pass, the harness library). **Built:** BL-960 —
+`build_harness.js` compiles the 62-TU world set once per configuration and links every harness
+against the cached objects through a response file. Cold 22 s + 6 s link; unchanged rebuild 5 s;
+one world TU touched 12 s. Before: 3.3 GB of the same objects 59 times over and a clean build per
+edit. Objects are linked directly, not archived, so every world TU still reaches the link.
+
+**The first harness through the new path found a regression.** `colonisation_harness` D1/D3 is red
+on seed 2 (one dangling seat pointer), the exact shape closed at sprint 39; sprints 40 and 41 never
+ran this harness. Reproduced byte for byte through the previous builder before attributing it to the
+code. Filed as BL-981, first in sprint 42.
+
+**Sprint 42 opened** — "generation sharpened before Digitisation": twenty-one items in four waves,
+instruments before mechanisms, every world-moving wave re-blessed once. The perf CSVs and
+`history_sweep.json` remain modified in the tree from an earlier session; untouched here (the sweep
+JSON is stale against the harness schema, which BL-970 regenerates).
+
+---
+
+---
+
+## 2026-09-14 — Sprint 41 (Exploration trade): goods flow, spend is chosen, displacement clears 1.0 — gated on authorisation
+
+**Runtime:** long session, Design → Review → Full / Batch Delivery. Opened as a design question
+("what levers ensure global trade, and what does Digitisation expect?"), became a 16-seed review of
+the Exploration round, then a nine-item batch across four waves.
+
+**The review that opened it.** `exploration_sweep` over 16 seeds showed the round busy but not
+trading: the trade-access clause, the foreign scarcity reader and cultural preference had no caller
+in the sim; ports, navies and armies were bought whenever affordable; nothing crossed the handoff,
+and world setup read 1200 CE grudges and corridors onto a 1660 map. Displacement median 0.08.
+
+**Design, settled on a form (Ben, 2026-09-14)** and written into `EXPLORATION.md` before any code:
+trade is a want met by throughput, opened ONLY by the trade-access clause; trade value counts toward
+a binding (the only thing that lets a distant pair bind); flow income replaces the flat market
+income; a met want relieves the signal; an eleventh reading (Trade); spend is a scored allocation
+inside upkeep (Ben chose this over new verbs). Three further calls taken on his behalf: NR-863.
+
+**The bisect (NR-862).** BL-950's 0.88 starting point was a 3-seed median resting on one seed; the
+wave-4 tree read 0.33 over 16 seeds, and the schism verb (BL-944, `3d58001d`) cut it to 0.08 by
+changing the Empires world Exploration opens on. No reading went red because the sweep reports.
+
+| Wave | Items | Landed | 16-seed displacement |
+|---|---|---|---|
+| 1 | BL-952, BL-951, BL-956, BL-953, BL-954 | sweep builds once; strength by treasury; `exploration_output` handoff + 1660 sentiment/roads; outward wants; trade flows | 0.08 → 0.10 |
+| 2 | BL-955 | scored spend; paid standing armies persist (the muster had disbanded them every year — a sprint-40 defect) | 0.10 → 0.17 |
+| 2b | BL-958 | sweep stops at the Exploration close: 16 seeds ~25 min → 99 s (Ben: build it before tuning) | — |
+| 3 | BL-949, BL-950 | road rung recoverable (`history_corridor::tier`, resumed spans seed live uses) and bought (30M); deterrence Alarm 575 / far penalty 700 | 0.17 → 0.06 → **1.34** |
+
+**Every wave was independently rebuilt and reverified here, and every wave had a cold review that
+found real defects:** one want imported once per seller (shared); a holding sold to every buyer
+(shared); treaty value double-counting the shared want (marginal); flows outliving their clause; a
+squared proportional-loss formula; the campaign scorer pricing a levy the muster no longer raises;
+an army cap reading only the capital. A `generation-dev` agent labelled two check blocks both "R6"
+and one report named the wrong branch — both caught by checking, not trusting.
+
+**Final state (16 seeds, `41e2f5c7`):** displacement 1.34 (1.34 also without the quiet seeds);
+battle rate 44.8/century (Empires 404.9); 710 flows, 7.1% crossing landmasses, top-decile pairs
+73%, every flow on a clause; post roads in 12/16 seeds; navies 454 → 189; consolidators in the top 3
+still 0/16. **Cost:** seeds 0, 3, 9, 14 fight under 5 battles/century (lowest before: 11.5).
+
+**Digests (not re-blessed):** seedA/on 584D731FC7E5DDD0 → CC34FD59D4E79580, seedB/on
+1BFB3594DB6A319A → 728607C66CE6A4BE; seedA/off F9BF05466A631FF9 and 1960 851FE345B2E37618
+unchanged. Harnesses: `exploration_sim_harness` 43 → 109, all pass; `history_sim_harness` at its
+2-failure baseline (R3a2/R3a3); `save_roundtrip` OK. `story_check`'s 55 failures are pre-existing
+dead traces to long-archived ids.
+
+**Status:** 8 of 9 items complete and archived. **BL-950 (displacement clears the bar) is gated on
+NR-867** — Ben authorises the world shape at Alarm 575, at the gentler 525, or not yet.
+
+**Design-direction Q&A for Ben** (all in the queue, none blocking the merged code):
+- NR-867 — authorise the world shape; four near-frozen seeds.
+- NR-865 — wants plus trade did not point conflict outward (0.08 → 0.10); weaken the doc claim?
+- NR-866 — spend saturation is a scorer brake; replace with a per-head upkeep bill?
+- NR-864 — creed leans are on incommensurable scales; reading 3's 0/16 cannot yet indict the creeds.
+- NR-863 — flow income at both ends; shared holding; holding as a share not a quantity.
+- NR-862 — accept the schism verb's cut to displacement as a real force?
+- NR-861 — treaties almost never break (5 in 6140).
+
+**Filed for later:** BL-957 (world digest sees sentiment and roads), BL-959 (Empires corridor
+upgrade records its uses).
+
+**Authorised the same day (Ben, NR-867 and NR-865).** Alarm weight 575 -> **525**: displacement median
+1.33, battle rate 43.5/century, quiet seeds 4 -> 2 (9 and 14). **Authorised digest baseline:** seedA/on
+`49FB45407FF7C3C0`, seedB/on `728607C66CE6A4BE`, seedA/off `F9BF05466A631FF9`, 1960 `851FE345B2E37618`.
+`EXPLORATION.md` § A want points a campaign outward became § A want ranks a campaign: wants rank,
+deterrence, treaties and ports displace. BL-950 closed; sprint 41 complete. The release play build
+(`build_rel`) was rebuilt at 525 for Ben to watch the round live before the remaining five calls.
+
+---
+
+---
+
+## 2026-09-12 — Sprint 40 (Exploration) closes in full: six waves, fifteen items, one new phase
+
+**Runtime:** long session, Full / Batch Delivery. Opened on a stale `NEXT_SESSION.md` (still
+describing sprint 39, already fully closed) and a design branch (`claude/exploration-era-design-
+e0f6d7`) sitting unmerged with sprint 40's full decomposition already on it.
+
+**The merge.** The design branch predated main's sprint-39 close-out by one commit, conflicting
+only in `backlog.json`; resolved as main's dropped-BL-928 state plus the branch's sixteen new
+items. A parallel independent merge of the same conflict (by Ben, in the design branch's own
+worktree) landed on GitHub moments later with the identical resolution — confirmed by diff, not
 assumed.
 
-**Identity moved twice and landed better than it started.** Allocated-and-serialised →
-**derived from the lowest member tile**, which removes the determinism hazard instead of
-guarding it (an id that is never handed out cannot be handed out in the wrong order) and
-serialises nothing new. Safe only because Ben ruled borders move during **generation
-only** — so ids churn while the Era -1 sim redraws them and are frozen before anything
-outside generation can hold one.
-
-**Lane 0 settled the determinism question that was blocking trust.** No leak:
-`spectator_determinism` reproduces across two independently built worlds; the single
-failure was byte-identity against a golden pinned before four deliberate world changes.
-Re-blessed with provenance. Provinces stay OUT of `state_hash` — that hash folds what a
-*tick* mutates and the partition never moves after generation — and the real gap, that
-nothing checked it at all, closed in `determinism_harness` instead.
-
-**Design work, unbuilt:** BL-514 (blend all tiles — HELD at Ben's instruction until he
-sees the organic borders; the A/B capture exists), BL-516 (lake/coast/ocean tile kinds
-and sea provinces, ocean capped at 80 tiles), BL-518 (the Era -1 sim redrawing borders as
-its wars resolve), BL-519 (the tile axis split) and BL-520 (texturing).
-
-**The axis-split finding.** A mountain WITH a forest is already expressible
-(`composition=forest` x `landform=mountain`); what cannot be said is a *rocky* mountain
-that happens to be forested, because the composition slot is spent on the forest.
-`terrain_composition` is doing three jobs — substrate, cover, state — and `urban` is the
-proof rather than the exception: it is a one-way transform that OVERWRITES the
-composition, so paving a metallic tile destroys the fact that it was metallic (NR-442,
-filed separately as live data loss). The split un-mixes an overload rather than adding a
-concept, and it costs 330 call sites across 49 files with no save migration, because
-there is no save format at all.
-
-**Corrections I made to my own reports, recorded rather than quietly fixed:** my
-"81/81" verification of `unit_march_harness` was hollow — M6 indexed an empty path on a
-refused order and segfaulted mid-M5, so M6 and M7 never ran and the process exited 139
-while I read the printed pass count (NR-425). My claim that a one-row body always
-collapses to one province was false above 19 tiles (NR-426). My BL-517 brief asserted a
-tile serialisation seam that does not exist (NR-430). And two `tools/verify/README.md`
-conflict resolutions spliced a sentence into the middle of another one, which a later
-agent spotted and correctly declined to guess at (NR-432).
-
-**Runtime:** ~12 h wall across two days, largely autonomous; refinement → four-lane
-batch → design forms → province redesign → tile design. Nine build agents, one review
-agent, ~40 commits, NR-384 through NR-444 filed.
-
----
-
-## Session — The watch + meta open: an AI plays the rendered game (BL-412, BL-408, BL-411, BL-479, BL-480, BL-335; Sprints W1/D1/D3) (2026-08-19 → 08-20)
-
-Full mode, Batch Delivery: a six-agent research workflow, five worktree build agents, an audit
-agent, a static reviewer and a harness runner. Ben's brief: map sprints onto versioned releases,
-align versions with his real aim — *"developing meta, and finding a way to observe AI playing
-the game — even if that means downloading a local model"* — then batch-deliver in parallel.
-
-**The version map realigned first** (form verdicts → `0303800`): the 36-item v0.1.16 holding
-pen split five ways — v0.1.16 re-themed **The watch**, v0.1.19 ancient conflict & seams,
-v0.1.20 stance & force, v0.1.21 the credible rival, v0.1.22 harness truth; v0.1.18 defined as
-economy truth; four stale version goals re-homed; BL-306/BL-335 un-parked; BL-477 (era collapse
-defines meta — Ben's paradigm verbatim), BL-478 (ancient research spend, extracted from parked
-BL-087), BL-479 and BL-480 filed; Sprints W1/D1/D3 opened.
-
-**The batch: five slices, all landed same-day.** BL-412 (live agent control seam — the rendered
-app gains a loopback *listen* socket drained at tick boundaries into `apply_corp_command`;
-transcript = replay artifact; 22/22), BL-408 (god view — sight never hands; 7 captures),
-BL-411 (strategy readout — counts not credits, the NR-226 fence held), BL-479 (tech effect
-union + the shared modifier vocabulary, `collapse_strain` included; 35/35; no-effect world
-bit-identical vs a genuine pre-change build), BL-480 (a law has an author; the levy became a
-conserved transfer into the author nation's treasury; the enact checkbox and its dictionary
-entry removed; 14/14 + 24/24). verifier-review: **GO COMPILE, zero criticals**, 13 findings
-applied or filed. Integrating build BUILD_OK; 9/10 harness families green.
-
-**The first watch session happened.** Ollama + `qwen2.5:3b-instruct` (installed this session)
-attached to the rendered app through the seam: the gated clock released ticks 1–8; the actor
-gate refused a wrong-corp read live; and on the corrected fact filter the model issued a
-grounded command — **march unit 46816 toward tile 41647**, both ids read from its own
-blackboard slice. BL-335's measurement closed the loop's economics: the ~300-token *output*
-assumption holds 5×, the *input* premise fails 60× (18.5K tokens per raw blackboard read) —
-BL-481 (compact encoding) filed as the fix.
-
-**The one red, left red on purpose:** the levy's placeholder rate (1.0 cr/unit, all resources)
-never bit while the law shipped un-enacted; enacted, it drives every rival insolvent
-(−3.6M…−5.2M, 30/30 below zero). Blessing that would record bankruptcy as expected — the
-NR-269 shape — so `ai_skill`'s bands stay red-and-attributed pending the NR-382 rate ruling.
-Also this session: the N1 audit (BL-437 flipped complete on evidence; five holds bounded;
-BL-443 confirmed unbuilt but gated on NR-296), four stale IN FLIGHT markers flipped with
-hashes, BL-482 (pools leak) filed from a BL-408 side-finding.
-
-**The session ended inside a two-machine merge.** The mobile design session (entry below) and
-this one both minted BL-476..482 and NR-356..362 from opposite sides of origin; Ben's merge
-`97c12bb` renumbered origin's BL ids (→ BL-504..510) and local's committed NR ids
-(→ NR-373..379), with this session's late entries landing as NR-377..382 — the full record is
-NR-383. Board verified post-merge: zero duplicate ids, lint clean, every cross-reference
-reconciled.
-
-**Open at close:** four live-check rows (Ben at the keyboard — relaunch:
-`build/ProjectIo.exe --autostart-play --host-agent`); Ben's calls NR-380 (aggregate
-visibility), NR-382 (levy rate), NR-296 (debt lever), NR-269 (BL-439 bands); verifier-skill
-listings for three new harnesses + two scripts (permission owed); BL-481/BL-306 as the watch
-minor's remainder.
-
-**Runtime:** ~6 h wall, largely autonomous; research → board surgery → five-lane batch →
-review → integrating build → first live demo → merge reconciliation.
-
-## Session — the corpus gets delegated: saved roles and scoped instructions (BL-497) (2026-08-20)
-
-Light/doc-config mode, remote session, no `src/` logic touched. Ben's brief: the folder is too
-large for a session to consume cheaply — *let's have different sessions be prompted differently*.
-
-**What landed (BL-497, session delegation roles).** Three saved agent roles in
-`.claude/agents/` — `economy-dev`, `ui-dev`, `generation-dev` — joining the existing
-`code-reviewer`. Each carries its slice's reading list, hard invariants, verify path and
-commit discipline; a spawn now needs only the task-specific brief.
-
-Two directory-scoped instruction files: `src/world/CLAUDE.md` (determinism, the serialisation
-seam, the AI-agency exception map, a subject→authority table) and `src/ui/CLAUDE.md` (ImGui,
-the toggle rule, the question-log and ACTIONS.json duties, the visual-verify path). These load
-automatically for any session working in those directories.
-
-**The binding principle: pointer, not copy.** Every line in a role or scoped file cites an
-authority doc rather than restating it, so drift cannot fork the design. Recorded in
-DELIVERY.md § Sub-agents & worktrees, which gained the pointer paragraph.
-
-**Deliberately not done** (NR-360, decision-taken): no `military-dev` role yet — military work
-routes through economy/generation briefs until the slice recurs; and the root CLAUDE.md router
-was left unthinned, though its entries have drifted toward design prose. Both are Ben's call.
-
-**Second wave (Ben, mid-session).** The **novel-work flag**: a fourth NEEDS_REVIEW kind,
-`novel-work`, raised by a session about its own task when no authority doc, role, or pattern
-fits — a drift detector, so novelty is chosen, not accreted. Standing rule added; the three
-role files tell sub-agents to flag it in their reports.
-
-And the **scope-drift reword**: README.md and CLAUDE.md intros no longer describe a bare 4X
-prototype. Both now frame four strands — economy loop (shipped), generated Era −1 history,
-military layer (partial), AI direction — with the governing-body pivot as the destination.
-The framing carve is Claude's wording, recorded as NR-361 for Ben to overturn.
-
-**Third wave: the roles tested on a real audit.** Two cold `code-reviewer` spawns swept
-`src/world` and `src/ui` for rework-worthiness. Both said **no broad rework** — the core's
-determinism discipline and the UI's shared chrome are assets — and surfaced six scoped items,
-filed as **BL-498** (shared hire-gate table) through **BL-503** (entity builders converge),
-plus **NR-362** (snapshot-serialiser timing, the one rework-scale call, Ben's).
-
-The findings stayed out of the role files (state, not method); what was saved is the **brief
-shape** — `code-reviewer.md` gained a codebase-audit mode section (payback bar, measure-don't-
-gesture, mandatory leave-alone list). `run_economy_step`'s inline-block accretion was noted
-as extract-as-you-touch hygiene, deliberately not filed.
-
-**Runtime:** ~1.25h, Light (doc/config + audit), remote.
-
----
-
-## Session — COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-483–BL-496, BL-504–BL-510) (2026-08-20)
-
-Design mode, mobile doc session, no code touched. Ben's brief: *consider high-level strategies /
-metagames for surpassing the Era −1 Collapse* — extended in-session three times, each extension a
-Ben steer answered and recorded the same turn.
-
-**The doc.** `docs/lore/COLLAPSE.md`, new. The framing ruling first: Sprint 30 holds collapse
-inevitable for a major, so "surpassing" decomposes into *when / how / who inherits*. Six polity
-strategies (Tortoise, Pulse, Hydra, Phoenix, Metropole, Temple), seven culminating events
-(fragmentation, devolution, absorption, transformation, exodus, slow fade, systemic cascade), a
-strategy × culmination matrix that doubles as the harness assertion table, and the ideological
-axis — seven real narrative patterns (mandate withdrawn, translation of empire, declinist mirror,
-etc.) transferred as mechanisms, never nouns.
-
-**Ben's rulings, dated in the doc.** All four allegories (Rome arc, British devolution, dynastic
-cycle, Bronze-Age systemic) as **tuned attractors** — one parameter space, sweep-asserted rates,
-never templates. All four chain **sequentially per world over 4000 years**: the shipped 400-year
-band *was a placeholder*, reversing the Sprint 26b doc-truth correction knowingly. The story
-surfaces in the **history tab, quietly** — seeing beats telling; deep-dig optional. The 4000-year
-optimisation is designed in the doc as a five-rung ladder (kill the O(provinces) scans → quiet-
-province fast path → deterministic banded year grain → record-on-change → never parallelise).
-
-**The decomposition.** Nineteen items (BL-483–BL-494, BL-504–BL-510 — renumbered on merge from BL-476–BL-494 after an id collision with the 2026-08-19 local session), all v0.1.16, on Ben's steer *many specific
-items over a few hard ideas*: the strain accumulator (digestion retires strain, loss does not),
-the fragmentation and Release verbs, the hegemony measure, readable/transferable/reach-fed strain,
-the E4–E7 culminations, creed axes, strategy weightings, the narration bank, the attractor sweep,
-and the perf ladder closing in BL-494 (the 4000-year extension itself).
-
-**Queue close-out.** The review queue's four open *questions* were put to Ben and resolved in one
-pass: NR-356 (reach feeds strain — BL-510 confirmed, per BL-325's one-reach-field ruling), NR-317
-(held convoy cargo stays visible to the price signal, BL-422's convention — filed BL-495), NR-321
-(ordnance rate rides Lane C's engagement trigger — tripwire filed BL-496), NR-343 (LP is a
-per-tick rate, not a stock — BL-464's prose amended in place). NR-357 (run-length tension) was
-raised and resolved inside the same session.
-
-**Runtime:** ~1.5h across mobile turns; design/decomposition, Light ceremony throughout.
-
-## Session — Sprint 25a: armies get something to eat (BL-457, BL-455, BL-452/453, BL-456, BL-454/459) (2026-08-17 → 08-18)
-
-Full mode, Batch Delivery, three worktree sub-agents. Ben's brief was *"what can we build to pad out
-the military and logistics systems?"* — answered by proposing the **seam between them** rather than
-more of either, then rescoped on his steer to carry interdiction, then split when the rescope cost
-the sprint its independence. Six items landed; PR #44.
-
-**The audit's finding, which shaped everything after it.** Both systems are largely built and
-largely unreachable. The convoy layer — `supply_system.cpp` plus the whole pathfinder plus four
-rendering paths, and the *only* coupling between two markets' prices — owned **zero of the fifteen
-`corp_verb`s**. And `w.units` appeared in `economy_system.cpp`, `budget_system.cpp` and
-`construction.cpp` **zero times**, so an army was bought once and free forever while every building
-beside it paid maintenance and wages every tick.
-
-**Sprint 22's reachability audit could not have found the first one, and the reason is structural**
-(NR-308). It joined seam, dictionary, surface and scorer *over the verbs that exist*, and all fifteen
-are reachable from at least one direction. A join over existing verbs is blind to the absent verb.
-BL-444 gains an authored subsystem column so a subsystem owning no verb is visible rather than
-inferred.
-
-**The military half of the refocus had no object at all.** BL-340 terminates the chain in
-`spacecraft_components` and BL-350's contracts buy it, so the *space equipment* half of the
-2026-08-10 militia refocus landed — and **weapons did not exist anywhere in the 37-value enum**. It
-went unnoticed for a week because nothing consumed one, which is the admission rule working in
-reverse: a good with no consumer never announces its own absence. **BL-457** appends `ordnance`,
-one value not the three Ben named, priced **derived rather than picked** — the processing roster
-marks outputs up over their input basket at 1.415–1.443, and 43.0 puts ordnance at 1.433.
-
-**Seven review rulings were taken live, and two overruled the recommendation on file.** Stance is
-the **hybrid** — hostility directed, friendship symmetric — which is the most expensive of the three
-options and the only one honest to both halves at once (you can be attacked without agreeing; you
-cannot be befriended without agreeing). Unit strength becomes **genuinely fixed-point** rather than
-having its doc comment corrected. Putting that question found a sharper defect than either review
-entry had recorded: both writers set `strength` to the *same value* as `count`, so it was a literal
-duplicate, not an ambiguously-scaled field.
-
-**The resolution is that `strength` stops being stored at all** — derived as
-`count × roster_type_quality × supply_factor` at ×100, so the duplicate cannot return. `supply_factor`
-is written by the upkeep pass, which means an unpaid ordnance draw weakens an army **in the
-resolver**, not merely in the budget. BL-325 S3's decay, BL-454's shortfall and this factor collapsed
-into **one rule with two triggers**.
-
-**And it landed the adapter three items had been waiting on.** Nothing anywhere converted a
-`unit_component` into an `army_stack_entry`, so neither battle resolver could ever have been handed a
-campaign force. The BL-456 doc agent found this independently while reading the source, which is
-the corroboration that made it safe to act on.
-
-### What the method did, and where it failed
-
-**Verification was partial by force, and every gap is written down rather than papered over
-(NR-313).** This session could not build Lua, sol2, SDL or ImGui — the dependency host is blocked by
-egress policy, and it was not routed around. So `chain_depth` (BL-457's own named guard) never ran,
-no Lua file was ever parsed, and the entire UI half of two items is unverified. **43 of 47 world TUs
-compile with plain g++**, which is what made the rest possible: `unit_upkeep` 62/62,
-`convoy_command` 50/50, `condition_set_harness` 41/41, `order_book_harness` 69/69, plus the usual
-sweep. Requirement rows that could not be executed are marked **pending**, not complete.
-
-**Every new guard was shown to fail before it was trusted, and one found a real defect immediately.**
-`resource_table_check.js` — a static join across the four hand-maintained transcriptions of
-`resource_type` — was run against the pre-change tree in a detached worktree and failed with the
-three habitability goods that had rendered as "(unnamed resource)" since 2026-08-11. That defect is
-**structurally invisible to the compiler**: a short initialiser list for a sized array is legal C++
-and silently zero-fills.
-
-**All three worktree agents branched from the session-start commit, not the branch head** (NR-316).
-This is verbatim the v0.1.9 failure Sprint 17's retro recorded — *worktrees isolate writes, not
-history* — and the mitigation recorded then (read every hunk at integration) is a cure, not a
-prevention. The severe case was the upkeep agent: `ordnance` did not exist in its tree and its whole
-item is "units draw ordnance", so it was one step from a second append to a serialised enum. Caught
-because the docs agent mentioned its `backlog.json` looked stale. **The prevention is one line —
-`git merge <working-branch>` as the first instruction in every worktree brief.**
-
-**A claim was made and retracted inside the same task.** An alignment check on `presentation.cpp`
-reported eight goods rendering under wrong names; the check had skipped the three explicit
-`{ nullptr }` placeholder rows that hold the alignment. Re-reading the file gave the real and much
-smaller defect. Worth recording because the wrong version was more interesting than the right one,
-which is exactly when a measurement wants re-reading.
-
-**The agents outperformed their briefs twice.** The convoy agent found that convoys are not entities
-at all — `w.convoys` is a plain vector — so the `subject` field the brief specified had nothing real
-to name, and it used a monotonic id in `cmd.order` instead, following `sell_order` (NR-318). The
-upkeep agent structured the goods draw as authored data before the merge brought it `ordnance`, and
-kept that shape afterwards — so naming a good is now a data change rather than an enum reference.
-
-### Left open
-
-- **The rates ship at ZERO** (NR-321), so nothing consumes ordnance at runtime yet and BL-457's
-  admission argument is true structurally but not in play. One line in `economy.lua`, and it wants a
-  measurement rather than a guess.
-- **`spectator_determinism` needs a Windows re-bless with TWO named causes**, isolated across three
-  commits rather than assumed: `resource_count` 37 → 38, and `unit_component`'s two new hashed
-  fields. The `military_points` deletion moved it not at all. Its golden is MSVC-derived and cannot
-  pass under g++ at any commit (NR-319).
-- **Phase 25b (BL-458, interdiction) is not promoted** — it needs Sprints 21 and 23.
-- Two `question_log` entries owed for materially changed surfaces (NR-323); three tools want skill
-  wraps (NR-320); a held convoy is still free forever (NR-317).
-
-**Runtime:** not summed — seventh consecutive entry. The format's Runtime line has now gone
-uncollected far longer than it was ever collected; wire `tools/session/timer.js` in or drop the line.
-
----
-
-## Session — the score was never the reason (BL-417 step 1, BL-439) (2026-08-17)
-
-Full mode. Continued Sprint 19 on its next item, BL-417 (AI build score is quadratic). The item
-landed as designed — its **step 1 only**, which is what it asks for. The session's actual result is
-the thing found while checking BL-417's premise, and it invalidates part of why BL-417 was filed.
-
-**The finding: the AI cannot build a processing facility.** `corp_ai.cpp` emits `corp_verb::build`
-from exactly two places — the `ranked_sites` loop, hard-coded to `building_type::extraction_site`,
-and one `military_base` candidate. There is no `processing_facility` candidate anywhere in the
-scorer. This is exhaustive, not a sample: both emission sites set `c.cmd.type` to a literal. The
-seam is not at fault — `corp_command.cpp` builds a processor, recipe and all, when a command asks
-for one (BL-388) — so a player or an MCP agent can build one and the deterministic scorer simply
-never asks. **A rival corp owns only the processors it was generated with, for the whole campaign.**
-Filed as **BL-439 (AI never builds processors)**, priority A.
-
-**It reassigns the blame BL-417 was filed to test (NR-265).** BL-436's design says the build scorer
-"is being asked to prefer processors on a payback curve that does not reward them." It is not being
-asked anything of the sort. No curve over a candidate set that excludes processors can prefer one.
-"The AI prefers mines" is **structural**, not a scoring artefact — so BL-417 step 2, "decide whether
-the quadratic bias is wanted", is a narrower question than it looked: how extraction sites rank
-against each other and against the flat-scored military base. Retuning it cannot make a rival build
-a processor. Step 2 stays open and stays Ben's, now with that correction attached.
-
-**And it breaks a shipped calibration narrative (NR-266).** BL-436's `calibration_sweep` explains
-the x4 collapse as corps "spending the extra income building processors that lose MORE per tick at
-higher scale". That mechanism is impossible here — the processor population does not respond to
-income, because nothing in the AI can add to it. Whatever the sweep measured, it measured generated
-and warm-start processors only. The conclusion may still hold; it is currently unsupported, and the
-standing instruction is to measure rather than tune, so it is recorded for re-derivation rather than
-patched. A third consequence, latent rather than live: BL-428's chain-depth gate is climbed by
-operating deeper processors, so **the growth ladder has no AI player** (NR-267). Ancient-only today,
-so it does not bite a 1960 campaign.
-
-**BL-417 step 1, and why it needed a local run.** The score now reads `(net * net / capex) * …`
-directly; `payback = capex / net` is gone, and a comment states that the quadratic bias is retained
-deliberately because `focus_weight`/`jitter`/`glut` were tuned against this curve. The item calls
-this "a no-op refactor, zero behavioural change" — **which was not established when it was written.**
-`net / (capex / net)` and `(net * net) / capex` round differently in float, so the rewrite could
-have moved every candidate score, hence world evolution, hence every blessed golden — making step 1
-exactly the thing the item says it is not. Measured, not assumed: A/B on the pinned MSVC 14.44
-build, `ai_skill_harness` **byte-identical** across all five seeds and `spectator_determinism`
-byte-identical with `played=855E07DE529684EC` / `spectated=5AC90B4ACE717FCF` unchanged. It is free
-on this toolchain — by rounding luck, not by algebra (NR-268). Had it moved, the re-bless would have
-been reported as part of step 1 rather than smuggled in.
-
-**The blessed bands are compiler-bound, and that is now demonstrated rather than suspected.** The
-GCC baseline numbers carried into this session differ from MSVC on *every* seed — seed 3 finals
-306437.4 (GCC) against 498537.6 (MSVC). The previous entry recorded `ai_skill_harness`'s "stale GCC
-bands" and `spectator_determinism`'s R2 failure as pre-existing; both pass cleanly here. They are
-not stale, they are **MSVC bands**, and a GCC run is not a valid comparator for them. Recorded in
-NR-268 with a suggestion that a non-MSVC run refuse the comparison rather than report a misleading
-failure.
-
-**Also corrected in passing.** The `military_base` candidate's comment claimed it must never out-bid
-"a genuine extraction/processing net-positive candidate" — prose asserting a candidate class that
-does not exist. Now says extraction, and points at BL-439.
-
-**Base correction.** The session opened on `main` (BL-435) rather than the branch the handoff named;
-`origin/claude/latest-sprint-4ivgg8` had BL-422 on top and was a strict fast-forward. Re-based onto
-it and **re-ran the whole A/B on that base** rather than trusting the earlier one — both baselines
-turned out identical, so BL-422 moves neither instrument, but the measurement that counts is the one
-taken against the base being committed to.
-
-**The gate the remote session could not run.** `cmake` configure works locally, so the full CTest
-logic tier ran rather than a hand-rolled subset: **78 of 79 pass**, 4 skipped by their own gates,
-863 s — including all eight Lua-linked harnesses a remote container cannot reach. The one red test
-is **`tier_margin`**, and it is pre-existing — *proven* rather than asserted, by building and running
-it both with and without the change and diffing: byte-identical. It fails BL-436's two open
-assertions, and since it is BL-436's own instrument, its numbers are now attached to NR-266 rather
-than left in a log: **extraction nets +1659.18 per building-tick against processing's −7.92**; a
-processor never pays back its 200 cr capex. The cause is mostly not price. R6 states it plainly —
-deposit richness (mean 53.34) multiplies a mine's `base_rate` of 20 to ~1067 against a processor's
-**flat** 8, a ~133:1 rate ratio *before* any price applies — and of 1590 processing building-ticks,
-30.9% starved on a missing input. Three recipe inputs (ids 8/9/10) have deposits, are usually the
-richest thing on their tile, and are produced by nothing at all, which reads as siting/reach rather
-than margin. All cost-side, therefore Ben's: measured here, not touched.
-
-`interbody_pull_harness` — BL-406's guard, and Lua-linked — passes in 36 s, which de-risks the item
-after next.
-
-**Runtime:** not summed (eighth consecutive entry — see the standing caution in SPRINTS.md).
-
----
-
-## Session — the shelf stops carrying goods nobody sold (BL-422) (2026-08-16)
-
-Full mode. Continued Sprint 19 at its own sequencing: BL-436's remaining half is a calibration
-call that is Ben's, and the previous session stopped there deliberately, so this session took the
-sprint's other early item — the one its plan says to clear first *because* phantom supply distorts
-every price BL-436 is measured against.
-
-**The defect was larger than "a pricing nicety", and the reason is one line of `components.hpp`.**
-`market_clearing.cpp` credited a standing order's **listed** quantity to `market_component::inventory`
-before clearing ran. Harmless while everything listed also sold; BL-386 ended that by making the
-floor a reservation price. But `inventory` is not a display figure — `economy_system.cpp` draws
-processor inputs from it (lines 312/363/563) — so a held order's stock was bought by a processor,
-decremented, and **never paid for by anyone**. Goods from nothing on one side, money destroyed on
-the other. Same family as BL-351's over-listing, found the same way: by asking what a field is
-actually read by rather than what it is called.
-
-**The fix is a conservation law, not a tally.** The credit now sits in the same statement as each
-of the three pool debits — auto-surplus clearing, matched trades, the auto-clear pass. Inventory
-gains exactly what pools lose, and the two cannot drift apart in a later edit because separating
-them means deleting a line next to the one that pays for it.
-
-**A determinism bug fixed as a side effect, unnoticed until the sites were counted.** The old
-credit iterated the sell books in `unordered_map` order — a float sum accumulated in an
-unspecified sequence, inside the economy tick. All three new sites are ordered (`std::map` pools,
-sorted market and resource keys). Nothing was looking for this; it fell out of moving the credit
-to where the debits already were, which is the argument for that shape independent of BL-422.
-
-**Three of the twelve new guard rows were run against the pre-fix build first**, and fail there
-(R7.2, R7.3, R7.10). Sprint 18's retro recorded a check that ran green while pointed at a deleted
-tab; the cheap inoculation is to make the new rows fail once, on purpose, before accepting them.
-`order_book_harness` 64/64.
-
-**The measurement that is worth more than the fix.** `ai_skill_harness` is **byte-identical** on
-all five benchmark seeds before and after — same net worth, same solvency, same action counts. The
-AI places 9–10 standing sell orders per seed, so orders exist; none of them hold. That makes the
-change provably safe to land, but the useful half is the other reading: the AI benchmark has never
-measured the held-order regime at all, because `trade_floor_multiple` currently prices every AI
-order low enough to clear. BL-436's calibration moves resolved prices *down*, straight under those
-floors. Recorded as NR-263 against BL-436 rather than as a footnote here.
-
-**Scoped out deliberately, both recorded.** Held stock stays visible to the supply-side price
-signal, against BL-422's own stated default (NR-261) — hiding it is a fixed point, since a hold is
-decided by the resolved price and the resolved price is computed from `supply`. And an explicit
-matched trade still delivers to the shared market shelf rather than the buyer's stockpile
-(NR-262), which is dormant until BL-160 gives the buy side a verb. MARKETS.md now states the
-`supply` = offer / `inventory` = delivery asymmetry rather than leaving it to be rediscovered, and
-two stale claims in that doc — "the sell side is unchanged", "the SELL side still has no cap" —
-were corrected in passing; both predate BL-386.
-
-**A method finding, and it may be worth more than the item (NR-264).** NR-240 and NR-241 record
-work that shipped uncompiled from a remote session, on the belief that a remote container cannot
-build. It can. What is blocked is `cmake` *configure* — SDL3 and Lua arrive by FetchContent and the
-download is refused — not compilation. The 43 `src/world/*.cpp` sources need neither, and every
-harness in the CMake glob batch links that set alone: build the objects once (~14 s with `-P8`),
-`ar` them into a static lib, link each harness against it (~5 s). **63 of 77 harnesses build and
-run this way**, including every economy, determinism and generation check that does not read a Lua
-script. That is how this session verified its own work, and it is proposed as a saved tool rather
-than left as a note.
-
-Suite swept: the only failures anywhere are pre-existing and identical before and after —
-`ai_skill_harness`'s stale GCC bands (self-declared in its own output), `spectator_determinism`'s
-R2 byte-identity against the MSVC-blessed pre-BL-409 golden, and `history_sim_harness`'s five
-Era −1 rows. None are reachable from this change.
-
-**Runtime:** not summed (seventh consecutive entry — see the standing caution in SPRINTS.md).
-
----
-
-## Session — the roster invariants land, and the roster shrinks (BL-432, NR-243, NR-257) (2026-08-16)
-
-Full mode. Opened on triage as asked. The queue's three named entries all moved, and two of them
-moved because a measurement contradicted the filed premise — the same pattern Sprint 18's retro
-recorded, now three sprints running.
-
-**BL-432 complete.** Its two owed invariants landed as `chain_depth`'s R1/R2 rows; the other two
-assertions had already shipped as D4 (acyclicity) and G3 (building reachability) with BL-428's gate.
-
-**NR-243 dissolved rather than fixed, and no recipe magnitude changed.** Ben's call was option C —
-settle the tier-vs-alternate axis before retuning anything. The axis turned out to be **already
-written in `recipes.lua`'s own comments** (ids 22 and 23): distinct raws feeding a shared good is an
-ordinary multi-producer fact, *not* an alternate METHOD. Measured against it, three of the four
-"dominated" pairs have **disjoint inputs** — supply routes, where deposit access rather than price
-decides which you run — and the fourth (propellant) differs by a placement precondition. All four
-were artefacts of grouping by `(primary output, era)`. The guard was regrouped and moved: every
-sibling pair is now bucketed as a supply route, an explicitly-exempted precondition pair, or a
-genuine interchangeable method, and **only the third is price-compared**. Bucketing every pair is
-what stops one escaping by being unclassifiable. The duplicate in `recipe_switch_harness` was
-**deleted** rather than left as a second answer to the same question; that harness went ALL PASS.
-
-A finding worth carrying: the roster contains **zero genuine interchangeable methods**. BL-430 built
-the alternate-method feature and no content yet uses it, so R2's dominance half guards an empty set
-until BL-430 authors a real same-inputs pair (NR-258).
-
-**Two measurement traps, both of which gave a confident wrong answer first.** `era_band::industrial`
-is a band like any other and masks the *entire ancient roster* — mid-build it reported charcoal,
-iron_blooms, timber, clay and peat as orphans and hid two of the four sibling pairs; both rows use
-`era_band::any`. And endemic goods reach the world via `planetology::endemics` in
-`tile_generation.cpp`, **not** `k_extractable`, so without that second obtainability route all four
-endemics read as orphans. Neither was visible by reading; both took a run.
-
-**R1 shipped RED on eight resources, and that was the check working.** Five were orphaned in both
-directions — grain, fodder, salt, transport_capacity, bullion — which are *exactly* the five BL-432's
-own design text predicted ("eleven values added with behaviour unfiled, and five of them still have
-no consumer today"). The check reproduced that claim independently rather than being told it.
-
-**Then Ben cleared it, in two calls.** First: give the three one-directional orphans consumers
-(NR-257 option D) — three recipes **appended** as ids 24–26 (machinery → Heavy Assembly Plant, PGM →
-Contact-Grade Electronics Lab, regolith → In-Situ Smelter), each with inputs disjoint from its
-sibling's. A first attempt **inserted** them mid-file and was reverted: recipe ids are positional, and
-that would have silently repointed the Peat Kiln from 23 to 26 along with every saved building's
-selection. The file's own id-6 note is what caught it.
-
-Then: price regolith — which forced a second change nobody asked for. At 8 regolith per steel, any
-price low enough to mean "high mass, low unit value" makes the deliberately *poor* in-situ route the
-**most profitable steel in the game** (clearing 3.2 against the Smelter's 1.0). The ratio moved to
-12:1 alongside `base_price` 0.6, giving 0.8 — the worst of the three industrial routes, as authored.
-**Pricing a good and setting the ratio of the recipe that consumes it are one decision, not two**,
-and both files now say so at both ends.
-
-**Finally: remove the five (NR-257 option B).** `resource_count` 42 → 37, every id after them shifted
-down by five. Six sites carried them and all six were cleaned — the enum, two name→enum maps, the
-**positional** presentation table (the dangerous one: indexed by enum order, so a missed row
-silently mis-colours every good after it — alignment re-verified at six checkpoints), the default
-base-price block, and a name switch in `corp_terrain_matrix`. `chain_depth` is now **ALL PASS for the
-first time since it was written**: 37 resources, 0 unobtainable, 0 unwanted.
-
-One golden moved and was re-blessed **with its reason in the file**, per that harness's own stated
-policy: `spectator_determinism`'s BL-409 byte-identity hash, because `state_hash` walks every
-per-resource array and those arrays changed length. Structural, not behavioural — every other
-assertion in the file, including the prohibition and cadence rows, passed unchanged.
-
-**NR-256 advanced without being closed.** The diagnostic it specified is now in the code — all three
-of `run()`'s exits print `[exit] <name>`. An unattended re-run did not reproduce the termination, and
-then the accident that mattered: hours later a build failed with LNK1168 because **PID 3036 was still
-alive**. The app never self-terminated at all; the earlier run's apparent end was a harness timeout
-failing to propagate a kill. That points hard at candidate (b), but the three original terminations
-reported a clean exit 0, which a non-propagating kill does not obviously explain. Left open; the
-interactive-terminal run is cheap now that the diagnostic prints.
-
-**NR-253** left at 1 tick on Ben's call, pending playtest.
-
-Runtime: not summed (the format's Runtime line remains uncollected — fifth consecutive entry).
-
----
-
-## Session — chain depth becomes the growth gate (BL-428 slice 2), Method-page fix, seed sweep (2026-08-16)
-
-Full mode. Sprint opened by triaging the review queue as asked: nothing blocking (no `blocked` rows,
-`review.json` empty), so two cheap entries were cleared as part of the sprint and the rest left for
-Ben. One correction worth recording — the queue holds **18 entries, 15 open**, not the 36 first
-reported; the initial count accidentally measured `_note`'s lines rather than `items`.
-
-**BL-428's gate half landed — the part that makes chain depth the growth TRACK.** The metric
-(`depth_of`, `is_raw`, `max_depth`) shipped 2026-08-15 with BL-429/430/431, but nothing consumed it:
-there was no `reached_depth` anywhere and `placement_rules` had no depth check, so a corp's reach
-down the graph opened nothing. Now `recipe_required_depth` (a recipe's deepest input, computed in
-the same bounded fixed point as `depth_of` so it cannot drift from the graph or the era mask) meets
-`corp_reached_depth` over a new `corporation_component::produced_ever`, set at the two sites a good
-is genuinely made. **Produced-once-ever and never cleared**: progress must not evaporate because a
-building idled, and monotonicity is the property the gate rests on — a placement that was legal must
-not silently become illegal. It also means a corp cannot buy its way up the ladder, since the bit is
-set by the act of making rather than by holding.
-
-**Gated at both doors, and that is not redundancy.** Guarding only `construct_building` left a
-one-click bypass: place the shallowest ancient method reachable, retool onto the deepest sibling in
-the same group, and the ladder is never climbed. `try_switch_recipe` refuses too; both map to
-`corp_command_result::rejected_depth_locked` so the seam cannot tell the routes apart. Ben's call
-was **ancient roster only**, and the band check sits on the RECIPE, so an `any`-band recipe stays
-ungated even in an ancient campaign and no 1960 campaign changes shape.
-
-**A real pre-existing wrong-recipe bug, found by wiring the gate (NR-254).** The Build door stored
-the era-MASKED browse index in `candidate.recipe` and passed it where an ABSOLUTE id was expected.
-The two spaces coincide exactly while the mask is the identity — every `any`-band campaign — so it
-was invisible in normal play and would have stayed invisible, while naming the wrong recipe in
-precisely the ancient campaigns BL-429/430/431 have been building out. Two sibling call sites in the
-same file already converted correctly via `recipe_id(name)`; the door did not.
-
-**The verify script could not reach the pages it claimed to check (NR-246).** Rewriting
-`building_management_shell.lua` onto the Selection pager needed a new verb,
-`verify.building_page(n)` — `fold("building_metric", k)` sets the drill KEY, not the page, so the
-first rewrite still captured page 1 three times. **The first honest photograph of the Method page
-immediately showed a live defect**: the profit figure printed straight through the method name
-("Food Rations" with "+7.0/tick" over it), both of the row's load-bearing values illegible at once.
-That is the whole argument for the check existing, and it had gone unseen because the old script was
-photographing a tab BL-431 deleted.
-
-**Fixing that overlap took two changes, and the first alone made it worse.** Measuring the profit
-first and eliding the name (through `ui::fit_text`, so an over-long name records in BL-215's
-overflow ledger instead of clipping silently) turned the name into "...". The measured reason:
-the row was `avail * 0.62` = **160 px** trying to hold **248 px** — pip 27.8 + name 103 + gap 8 +
-profit 70 + Switch 33 + padding 6, leaving the name **16 px**. The 0.62 was arbitrary; the
-2026-08-15 "slimmer strip, not a denser fit" call was about row HEIGHT against the square tiles it
-replaced, and argues against cramming rather than for it. Full width now, capped at 280.
-
-**Opening the app for Ben exposed a flag misuse, then a seed problem.** `--autostart-windowed` is a
-SMOKE TEST — 120 frames then exit 0 — so pointing a human at it looks exactly like a crash two
-seconds in, which is what happened. Added `--autostart-play`: same wizard walk, no cap, with
-`run()`'s bool widened to an `autostart_mode` so the two intents cannot be confused again.
-
-That live look then found the real problem: **the player's corp had no processing facility at all**,
-so the Method page had nothing to show. `tools/verify/player_seed_sweep.cpp` was written to measure
-it, and **corrected the premise it was written under**. Ben asked to keep only *profitable* seeds;
-across 24 seeds every one ends positive (1.3k-55k cr) and **not one dips below zero**. The single
-failing condition is that **13 of 24 hand the player a pure-extraction corp**, three with no
-production building at all. So a seed filter would have discarded half the generator's output to fix
-what is really an ASSIGNMENT problem — every one of those 13 worlds contains corporations that do
-have processors. Ben's ruling: do not filter; build the selection screen. Filed as **BL-435**
-(starting-corp selection, v0.1.18), with rejection-sampling and a curated whitelist both recorded as
-deliberately-not-doing, since each hides the distribution rather than exposing it.
-
-**Toolchain correction.** The `verifier-headless` skill's documented `vcvars64` path (VS18 Community,
-recorded 2026-07-28) **cannot build the configured tree**: it puts 14.51 STL headers on `INCLUDE`
-while CMake invokes the 14.44 `cl.exe`, and `yvals_core.h` hard-fails on the first translation unit.
-The skill now pins `-vcvars_ver=14.44` against the BuildTools 2022 path and prefers
-`cmake --build build --target <name>` over the raw `cl` line.
-
-**Left open.** NR-256: `--autostart-play` worked interactively but terminated on its own three times
-unattended (~20s/34s/~60s, exit 0, no error, frame cap ruled out) — either a stray window-close event
-or the background shell reaping a GUI process, and "it worked while a human watched" is not a
-diagnosis. NR-243's four dominated recipe pairs are still the one red row in
-`recipe_switch_harness`, untouched by this work. BL-432 still owes `chain_depth` its remaining two
-roster invariants.
-
-**Runtime:** ~3 hours, Full mode — one Delivery lifecycle (BL-428, 6 tasks / 4 requirements) run in
-the main session rather than fanned out, plus two Light follow-ons driven by live playtest.
-
----
-
-## Session — building Selection card playtest, sub-facility groups (BL-431, BL-434) (2026-08-16)
-
-Full mode. Started by pulling a mobile session's BL-429 finish (slices 2-3, already merged via
-PR #40), then a long iterative playtest pass over the just-landed BL-430/BL-431 economy-breadth
-UI, driven turn-by-turn against Ben opening the live app and reporting back.
-
-**Buildings tab retired.** The management ledger's "Buildings" tab (`draw_buildings_tab` /
-`draw_selected_section`, ~620 lines) duplicated what the Selection card now covers — deleted
-outright. Its two real capabilities that had no home yet (Workforce controls, Close/Dismantle)
-moved into the Selection card's own accordion and action grid. The foldout panel is Construction-
-only now (`"Building"` -> `"Construction"`); the Manage action-grid button that used to route
-there was removed once it had nowhere useful left to point.
-
-**Building card normalised to the tile card's shape and proportions.** 3-column band (1/4 zoomed
-tile view . 1/2 paged accordion . 1/4 action grid), matching `draw_tile_selection` exactly rather
-than the original rework's 1/3 . 5/12 . 1/4 split. The tile-neighbourhood render in the left
-column was replaced by a per-building-type glyph placeholder (`icons::building`, the same glyph
-the Build door and canvas markers use). A placeholder Soldier/unit selection card was added,
-sharing the same 3-column family, reading real `unit_component` fields (`strength`, `count`,
-roster-table `type` lookup, `owner`) rather than fabricated numbers. A repeat-click tile-cycle
-(Soldier -> Building -> Tile) was added to `body_surface_canvas.cpp`'s click handler — its first
-implementation was checked on `marker_hit == null_entity`, which almost never held on a built
-tile (the building's marker covers nearly the whole hex), so the cycle silently never fired
-there; fixed by checking the anchored-tile match first, before marker resolution.
-
-**Profitability, Method, Workforce, Lifecycle — several playtest rounds each.** Final shape:
-Profitability shows Revenue/Expenses bars (Expenses segmented into input cost / maintenance /
-wages, each hover-labelled, folding in what was briefly a separate Inputs chart) beside a
-6-month net-profit line, budgeted to 90% of the accordion's available height so it never pops a
-scrollbar even at a near-exact fit. Method is a single narrow tiled column (was a 2-column grid),
-Switch drawn as a large glyph in a deliberate accent blue rather than the neutral grey every other
-glyph button uses, offering only same-group recipes, with an "(active)" text tag dropped in
-favour of the row's existing border/text highlighting. Workforce lost its heading and 6-button
-tier grid for a 1% `SliderInt`, and a visible "Retooling - N ticks left" progress bar replaced a
-hover-only cooldown tooltip. Depth and Chain were dropped as standalone pages (Depth's info
-wasn't landing as useful; Chain folded into Profitability's input breakdown). Lifecycle stopped
-being a page — Mothball/Reopen (distinct glyphs, not a shared toggle label) and Dismantle live as
-action-grid buttons instead, alongside a relocated Workforce-Auto toggle.
-
-**A real ImGui bug, not a design complaint.** Ben reported the Workforce Auto button as
-"game breaking." Root cause: `ImGui::Button(autolbl, ...)` had no `##` separator, so the widget's
-id *was* its label text — and the label baked in the live `workforce_target` percentage, which
-`solve_workforce_target` re-solves every tick while Auto is active. The button's identity churned
-every frame the number moved, corrupting ImGui's hover/active/focus state continuously. Fixed
-with a stable `"Auto##wf_auto"` id, percentage shown as separate text.
-
-**BL-434 (sub-facility groups), filed and landed same session, then partly retracted in the
-same session.** Ben, mid-playtest: "Now is also the time to implement the building splits...
-It should also cost money for any building to undergo a large change, making it in some cases
-cheaper to just build another." First cut: every recipe gained a `group` field (Metal Foundry,
-Refinery, Food Processing, Chemical Works, Electronics, Advanced Fabrication, Welfare Goods,
-Fuel Production, Artisan Goods), the Build door collapsed to one candidate row per group instead
-of one per recipe, and a cross-group recipe switch was priced at a steep multiplier
-(`cross_group_multiplier`, first-cut 6.0x) on top of BL-430's existing switch cost. Minutes after
-it landed, Ben reconsidered: "switching methods can mean changing to a different building type —
-we should retire that completely." Retracted to a hard refusal (`recipe_switch_result::
-cross_group`) rather than a price; the Method page's candidate list now filters to same-group
-recipes so a cross-group option is never even offered. Dismantle + rebuild via the tile selector
-is the only way left to change a building's group. `cross_group_multiplier` was removed rather
-than left dead. The BL-434 item and its retraction are both recorded in its `design`/`resolution`
-fields rather than only in code comments, since the reversal happened inside the same session a
-future reader might otherwise assume was linear.
-
-**The recipe-switch cooldown, separately.** Ben asked how long a switch actually takes; the
-honest answer was 6 economy ticks x 90 days/tick, ~1.5 in-game years — long enough that the
-disabled Switch glyph just read as "not possible," not as a running cooldown (compounded by the
-progress bar not existing yet). Dropped to 1 tick, flagged (NR-253) as a first cut needing real
-playtest pacing, not a measured value.
-
-**One correctness sweep, at housekeeping time.** A background implementation agent had invented
-a plausible-looking but nonexistent backlog id (`BL-436`) across a dozen files' comments while
-building the sub-facility-groups work — `next_id.js` confirmed no such item existed. Renamed to
-the real next free id, **BL-434**, and filed it retroactively in `backlog.json` (status
-`complete`, both the tiered-price design and its retraction recorded) so the many code comments
-citing it resolve to something real.
-
-**Time panel:** the 5x speed button was riding the screen edge — the six speed buttons divided
-`ctrl_w` exactly, with no margin for rounding. Narrowed to 92% of the exact division.
-
-**Two agent-coordination near-misses, both self-corrected.** One background agent returned a
-plausible-sounding completion report after making zero file changes — caught by checking
-`git status` before trusting the report, and relaunched with an explicit "you have no sub-agent
-access, implement directly" instruction. Two separately-launched agents ended up mid-session
-editing the same file; each detected the other's in-progress work on disk and reconciled onto one
-consistent design rather than silently overwriting it — verified by an independent rebuild
-afterward rather than trusting either self-report. Both incidents reinforce the same practice:
-verify a background agent's report against the actual working tree before acting on it.
-
-**Verification.** Every step of this session rebuilt (`build_app.bat`) before proceeding to the
-next; the final combined diff (25 files) builds clean. `recipe_switch_harness`: S1-S5 (BL-430's
-original mechanism) and the new S6a-f (BL-434's refusal path) all PASS; R1's pre-existing
-no-dominance finding (NR-243, four dominated recipe pairs, unrelated to this session) is
-unchanged and still fails as documented. No visual harness exists yet for the Selection card
-rework itself (BL-431's own requirement group is still open) — every visual check this session
-was Ben looking at the live app directly, turn by turn, which is how the playtest iteration
-loop actually ran.
-
-**Open for Ben (NEEDS_REVIEW).** NR-248 (Expenses' revenue/expense split is the finest real data
-`building_profit.hpp` tracks — no sub-breakdown of revenue exists). NR-249/NR-250 (two placeholder
-trend graphs and a fixed-clamp layout budget, both first-cut numbers). NR-252 (two recipe-group
-taxonomy calls: Hydroponics Bay's group, and whether Advanced Fabrication should split). NR-253
-(the 1-tick cooldown needs real playtest pacing). NR-245 is resolved-in-place (the Manage button's
-destination changed, then the button was removed entirely once the Buildings tab it pointed to no
-longer existed).
-
-**Runtime:** ~5 hours, Full mode, iterative playtest/build/verify loop across roughly a dozen
-background implementation passes plus direct edits for small contained fixes.
-
----
-
-## Session — BL-429 slice 3: the ancient roster gets glyphs (2026-08-15)
-
-Full mode, direct continuation of slice 2 in the same session — Ben asked to close R5's glyph
-clause next rather than move on to BL-430/BL-431.
-
-**Built.** `icons::building()` gained a fourth parameter, `resource_type identity`: an
-extraction site's target resource, or a processing facility's PRIMARY OUTPUT. The output-lookup
-helper (`primary_output_resource`) moved from a construction_panel.cpp local into
-recipe_registry.hpp as a shared free function, so every UI file draws the same identity from one
-source. 14 new hand-drawn vector glyphs (icons.cpp) cover the 9 extraction + 5 processing
-resource keys the ancient roster reaches — Quarry, Woodcutter's Camp, Sand Pit, Clay Pit, Peat
-Cutting, Iron Mine, Copper Mine, Water Extractor, Farm/Fishing Wharf, plus a charcoal-kiln dome,
-a lump-cluster bloomery, a trapezoid ingot, a cinched goods sack, and a strapped ration pack for
-processing. All four `icons::building()` call sites updated to pass a real identity: the Build
-door, the Buildings-tab identity plate, the on-canvas marker, and the placement ghost preview.
-
-**A design call, not a gap: shared glyphs by resource, not by recipe.** Two or more named
-buildings that reach the same good share one glyph — Charcoal Burner and the Peat Kiln (both
-`-> charcoal`), Potter & Weaver and the Glassworks (both `-> trade_goods_misc`), and the ancient
-Smithy/Miller sharing with the industrial Smelter/Food Processor (it genuinely is the same steel,
-the same rations). Documented in ICONS.md's new § 1c as the deliberate identity model: the glyph
-says WHAT a building makes, not which specific recipe — the same rule that already lets two Iron
-Mines on different tiles share a glyph.
-
-**A real correctness fix found while wiring the canvas marker.** The pre-existing
-under_construction pattern in body_surface_canvas.cpp resolves its representative-building lookup
-only on `k == 0` of the wrap-copy loop (the tile's un-wrapped screen copy) and leaves the flag at
-its default for every other `k`. Mirroring that pattern for the new marker identity would have
-shown the WRONG glyph on every wrap copy of a non-default-resource building — instead, the
-target/recipe lookup was hoisted out of the k-loop entirely, computed once per tile alongside
-`built_type`, so every wrap copy reads the same (correct) identity. under_construction's own
-existing k==0-only quirk was left alone — pre-existing, out of scope, higher risk to touch without
-a build to verify against.
-
-**requirements.json's `ancient-chain-roster` group is now all six rows complete (R1-R6).**
-BL-429's own backlog status stays `designed` rather than flipping to `complete` — see the caveat
-below; `backlog_lint` now carries this as its 7th (of the same pre-existing shape) warning,
-consistent with how the project already tolerates a completed requirement group sitting ahead of
-its item's terminal status.
-
-**The caveat that matters most this entry (NR-240, NR-241).** None of this was compiled or
-rendered. This session ran remote with `codeload.github.com` blocked (SDL3/sol2/ImGui
-FetchContent — an organization policy denial, confirmed via the proxy's own README, not routed
-around). The 14 new vertex lists were hand-checked for angular ordering (each is a simple,
-non-self-intersecting perimeter) but never seen on screen — "silhouette distinct" is reasoned by
-shape family, not verified the way ICONS.md's own "Adding a new glyph" process asks for. NR-241
-is the follow-on: build, open the Build door on an ancient-band tile, the Buildings tab, and a
-built ancient building on the Planetary canvas, and fix proportions on sight before promoting
-BL-429 to `complete`.
-
-### Verification
-
-C++: **not compiled** — see NR-240/NR-241. Brace-balance checked across every touched file
-(`grep -o` count) as the cheapest available syntax sanity pass; every call site's field types and
-recipe/registry accessor usage manually re-traced against their declarations. `backlog_lint`: 0
-fail, 7 warnings (one new, same pre-existing shape as the other six). No visual or headless
-harness run this entry — icons.cpp only links in the GUI target.
-
-### Open for Ben
-
-- NR-241: the 14 new glyphs need an actual look before BL-429 can close.
-- The remaining `k_extractable` targets outside the ancient roster (coal, petroleum, silica,
-  rare-earth ore, iron-nickel ore, platinum-group metals, regolith) still fall through to the
-  generic ore-chunk — named in `extraction_building_name()` but not glyphed. Worth a follow-on,
-  or leave them generic since they're outside this item's ancient-arc scope?
-
-**Runtime:** not tracked this session (same standing gap NR-177's retro already named).
-
----
-
-## Session — BL-429 slice 2: the ancient roster gets names (2026-08-15)
-
-Full mode, continuing Sprint 17 (economy breadth). Slice 1 landed the ancient production chains
-(BL-428 depth metric, BL-429's five recipes); this session picked up R5/R6, the roster's remaining
-requirements — named identities and closing the last two orphan raws.
-
-**Built.** A `recipe::display_name` field (recipe_registry.hpp/.cpp), authored for the five slice-1
-ancient recipes — Charcoal Burner, Bloomery, Smithy, Potter & Weaver, Miller — and read by both the
-Build door (selection_panel.cpp) and a live building's method selector (construction_panel.cpp) in
-place of the raw recipe key / the old "Processing: X" prefix; it defaults to a title-cased recipe
-name when unauthored, so every recipe keeps a legible label with nothing new required. A parallel
-`extraction_building_name()` lookup does the same for extraction rows (Quarry, Woodcutter's Camp,
-Sand Pit, Clay Pit, Peat Cutting, Iron/Copper Mine, Water Extractor, Coal Mine, Oil Field, Silica
-Quarry, Rare-Earth Mine), and Farm/Fishing Wharf now read as distinct names instead of sharing one
-"Extraction: Agricultural Produce" label.
-
-**R6 closed.** Sand and peat — "still orphaned" per slice 1's own note — each got a consumer:
-Glassworks (sand -> trade_goods_misc, recipe 22) and Peat Kiln (peat -> charcoal, recipe 23). Both
-are a second producer of an existing output from a different raw, the same multi-producer shape
-`steel` already has (coal-smelter / iron-nickel / bloomery) — not BL-430's alternate-method feature,
-which is a different item.
-
-**A real pre-existing gap found and fixed on the way.** `placement_rules::k_extractable` never
-listed `resource_type::peat`, despite `tile_generation.cpp` authoring peat deposits on wetland tiles
-— no extraction_site could ever have targeted it. Fixed by adding it; `buildings_rework_harness`'s
-R1 (`n >= 15`) still holds at 16.
-
-**R5's glyph clause deliberately NOT done, and recorded rather than glossed (NR-239).** Every named
-extraction building still renders `icons::building`'s shared ore_chunk glyph; every processing
-building the shared square — exactly how Farm/Smelter/Hydroponics Bay already render, not a
-regression, but the roster's "each with its own glyph" clause stays open. Hand-authoring 16
-silhouette-distinct vector icons (ICONS.md's own per-glyph process) is real asset work this slice
-did not attempt; it needs its own follow-on rather than let R5 read as met without it.
-
-**Environment note (NR-240): this session ran remote, without a compiler.** `cmake -B build`'s
-SDL3/sol2/ImGui FetchContent steps pull from `codeload.github.com`, which this session's network
-policy denies (confirmed a 403 organization policy denial, not a transient fault — the proxy's own
-README says not to route around it). Lua changes were syntax-checked with `luac5.4 -p` and pass; the
-C++ changes were manually re-read against every call site of the touched fields but never compiled.
-Owed at the next session with real toolchain access: `cmake --build`, then
-`buildings_rework_harness` / `chain_depth` / `resource_chain_harness`, then a live look at the Build
-door on an ancient-band tile.
-
-### Verification
-
-Lua: `luac5.4 -p scripts/economy.lua scripts/recipes.lua` both pass. `backlog_lint`: 0 fail, 6
-warnings, all pre-existing and unrelated. C++: **not compiled** this session — see NR-240. Ancient
-Build-door row count reasoned by hand from the era-masked recipe/extraction lists: ~9 named
-extraction rows + 9 named processing rows (2 any-era + 7 ancient) + 4 infrastructure rows, past the
-R5 threshold of 20+ named buildings.
-
-### Open for Ben
-
-- NR-239: per-building glyphs for the ancient roster are unbuilt — worth a standalone follow-on
-  item, or folded into BL-431's chain/method UI?
-- NR-240: this diff needs its first compile at the next session with real network access before
-  anything else builds on top of it.
-
-**Runtime:** not tracked this session (Runtime line remains uncollected — same standing gap NR-177's
-retro already named).
-
----
-
-## Session — Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden demotion (2026-08-14/15)
-
-Mixed mode, and the block that kept reframing itself. Started as three gate-hygiene items;
-ended with the visual harness rebuilt, the map resized, five stale-state classes measured out
-of existence, and the golden policy itself on Ben's desk.
-
-**Landed.** BL-415 (sweep gate): exclusion by machinery — `run_sweep.cmake` reports Skipped
-without `IO_RUN_SWEEPS`; `CONFIGURATIONS` was tried first and measured not to gate a
-single-config generator. BL-416 (AI bands): re-blessed and restructured to the derived form
-(observed table + named slack; the failure output prints its bless line), then re-blessed
-AGAIN same-session for the resize — seven numbers per seed, as designed. BL-423
-(`--verify-all`): one ~40 s generation per pass instead of one per script; equivalence needed
-FIVE isolation layers, each found by instrument (state_hash, a chat dump, pixel diffs), and
-the run survives Windows now (hidden window, ghosting disabled, event heartbeats — five
-Application Hang 1002 events over two days each matched a silently truncated pass). BL-424:
-the homeworld at 70% area (312×145 → 261×121), single-source constants; `population_mvp` and
-`stack_capacity_harness`, red for sessions, PASS on the smaller world.
-
-**Measured, and worth remembering.** The verify cost was never rendering: a capture is 0.25 s;
-`make_hard_coded_world` is ~40 s on the Debug build and is TILE-COUNT-INSENSITIVE (the resize
-moved it not at all — the Era −1 sim, planetology and firm calibration dominate).
-`history_ages` runs its lazy Era −1 time-lapse past 8 minutes and is parked (BL-425). The
-stale-exe trap bit twice more in one day — a 72/74-green ctest on pre-resize binaries read
-exactly like a green gate (BL-426 filed: the gate should detect it). BL-427 (Ben's proposal):
-cache the post-generation world behind a state-hash guard, the right lever for solo runs.
-
-**Open on Ben's desk.** NR-237: whether golden-diffing earns its place at all — his question,
-and the measured evidence half-supports him (every diff this week was intended change or world
-drift; the genuine catches were harness bugs; there is no CI to run them). Recommendation in
-the entry: demote to a world-independent curated set + assertion-based checks, re-freeze per
-surface approaching v0.1.0. The suite-wide bless (BL-402's remainder) is HELD on that ruling —
-~200 binary files should not be committed the day before a demotion deletes them.
-
-**Ruled and executed (2026-08-15): option B — goldens demoted.** Ben: golden-diffing kept only
-for a curated world-independent set (currently the icon_silhouettes pair, PASS 0.0000%);
-everywhere else captures are the product and assertions are the verdict. 221 tracked + 16
-untracked goldens deleted; `--bless` hardened to refresh-only so the set cannot silently
-regrow (app_capture.cpp); policy rewritten in DEVELOPMENT_PRACTICES § Visual verification and
-the verifier-visual skill (skill edit = executing the ruling). Reintroduction criterion:
-freezing — a surface joins the set when its pixels stop being expected to change.
-
-**Status:** BL-402/415/416/423/424 complete; BL-425/426/427 filed; NR-237 resolved-and-pruned.
-**Runtime:** ~8 h across the two days' boundary (through the golden demotion and the
-next-session scheduling), Full, measurement-heavy.
-
----
-
-## Session — Seam batch: the money printer closed and the word interface given a door (2026-08-14)
-
-Full mode, Batch Delivery over four items — BL-386 (sell-order floor prints money, S),
-BL-387 (seam actor authority, S), BL-396 (wire parser validates nothing, S), BL-397 (seam read
-privacy, A). The three S-tier items were the entire S tier; all four share one root cause:
-`--serve` turned a trusted in-process seam into an external input surface.
-
-**What landed.** The floor is a reservation price: the auto-clear pass holds any order whose
-floor exceeds the resolved price and pays the resolved price otherwise — the `max(rp, floor)`
-crediting that let a seller name the price a perfect counterparty pays is gone, and
-`trade_floor_multiple` re-tuned 1.0 → 0.25 so rivals keep trading under the honest rule. The
-serve seam gained a session actor (`--as <corp|any>`, default the player corp): COMMAND refuses
-to act as any other corp, BLACKBOARD refuses to read one, and `--as any` is the explicit
-bot-vs-bot research opt-in. Every COMMAND field now parses wide, range-checks against its real
-domain, and rejects the whole command on violation — `verb=256` no longer builds a building,
-`type=200` no longer segfaults the server, `quantity=1e300` fails as the float it lands as. The
-`remove_sell_order` oracle is closed (foreign and nonexistent ids indistinguishable).
-
-**Method notes, both directions.** Two worktree agents did the code (economy slice; seam slice
-across three items with per-item commits); both worktrees were cut from a base TWO COMMITS
-STALE — the new `agent_base_check.js`, written this morning for exactly this, caught both
-pre-merge and a rebase cured each cleanly. It also found its own first bug (named-branch
-filtering) and three leftover stale agent branches from earlier sessions (NR-235). The review
-barrier earned its place: verdict FIX FIRST with three real Criticals (a harness assertion
-certifying the pre-BL-397 oracle, the spectator golden, a missing smoke case the requirement
-named) plus two suggestions taken (the float path still accepted garbage via `atof`; trailing
-junk tolerated on integer tokens) and one filed (BL-422, held orders still credit market
-inventory at listing time — a listing==selling equivalence BL-386 broke).
-
-**Verification.** order_book_harness 52/52 with the new R6 family (hold/clear/income-invariant,
-bite-proven against a reverted fix); econ_harness ALL PASS after updating four fixtures that
-certified the old spec (floors moved to legal values so the BL-351 clamp semantics stay
-exercised); econ_stability ALL PASS; integrating MSVC build green; smoke.js ALL CHECKS PASSED
-(actor refusals with byte-identical state snapshots, the range family, the closed oracle,
-`--as any`); spectator_determinism re-blessed 3CBAD1D44EE71EDE → DD166049DA180508 (deliberate,
-reproducibility confirmed first; the golden is toolchain-specific — noted in the harness).
-ai_skill_harness moved exactly as BL-386's design predicted — net-worth bands fail on every
-seed while solvency/survival/thrash hold and rivals still list 6–7 orders/seed. **Deliberately
-not blessed here**: BL-416 (golden stewardship) owns the re-bless and now carries the post-fix
-numbers in its design note, so the bands get blessed once, against the honest economy.
-
-**Docs.** MARKETS.md step 11 restated (with the correction's history); the cold-store
-`player-sell-orders` R2 rewritten (the requirement certified the defect); ACTIONS.json's
-`place_sell_order`/`remove_sell_order` entries corrected and mirrors regenerated; AI_OPPONENT.md
-§ 6 records the session-actor model; the standing rules gained the untrusted-boundary invariant
-(delegated call — NR-234).
-
-**Status:** Complete — 4 items landed, 4 requirement groups complete (16/16 rows), BL-422 filed.
-**Runtime:** ~2.5 h, Full, Batch Delivery (2 worktree agents + review barrier).
-
----
-
-## Session — Doc-system weight: requirements hot/cold split + DEVLOG rollover (2026-08-14)
-
-Light mode (tooling + docs, no `src/`). Ben asked what to improve now the project is large; the
-measured answer was context weight, so this session built the missing half of the hot/cold
-machinery. **BL-421 (requirements query + cold store)** filed and landed in one pass.
-
-**The finding.** `doc_weight.js` put the reading order at ~824K tokens against its 150K budget.
-The largest un-queried store was `docs/development/req/requirements.json` — 556 KB / ~142K
-tokens, 223 of 232 groups frozen history, and the policy doc itself already named a query tool
-as a "candidate follow-on".
-
-**The fix is the backlog's own pattern, applied verbatim.** Three new tools in `tools/session/`:
-`req_store.js` (shared shape + `resolve()`, mirroring `archive_store.js`),
-`archive_requirements.js` (moves resolved groups' `rows`+`resolution` to
-`archive/requirements-<quarter>.json`; `--dry-run`/`--restore`; round-trip verify), and
-`requirements_query.js` (index default over in-flight groups; `<brief>`/`--full` resolves cold
-transparently; `--failed`/`--class` row-level sweeps; `--grep`, `--count`, `--table`).
-
-**First run:** 219 groups (399.9 KB) moved into 3 cold files; `requirements.json` 556.5 KB →
-124.0 KB (78% smaller). Along the way the tool normalises legacy statuses per REQUIREMENTS.md
-("normalise on sight": 9 group `completed` + 1 `closed` → `complete`) and backfilled the 16
-legacy `brief: null` groups with deterministic title slugs so the cold store can key on brief.
-`story_check.js` now resolves through the pointer (it went 10-fails red when rows moved cold —
-caught and fixed in-session); `backlog_lint.js` unaffected (0 fails, 5 pre-existing warnings).
-
-**Second lever, existing machinery:** `devlog_index.js --rollover 2026-08` moved 47 July
-sessions into `archive/DEVLOG-2026.md`; the live DEVLOG dropped 431.8 → 239.8 KB. The backlog
-design archive was checked and already current (0 items to move).
-
-**Net:** reading order ~824K → ~666K tokens. The next levers are structural, not mechanical, and
-were left as recommendations: terminal backlog items still hold ~330 KB of hot *index* fields
-(a schema call), and the 42 items parked at `post-v0.1.0` are a triage pass, not a tool.
-
-Docs updated as part of landing: REQUIREMENTS.md (hot/cold + querying sections), DELIVERY.md
-(§ shed the weight gains the requirements sibling), CLAUDE.md (traversal line, requirements
-authority row, DEVLOG volume boundary). Decisions on Ben's behalf recorded as **NR-233**
-(status normalisation + slug backfill — the two edits to permanent history).
-
-**Status:** Complete — BL-421 landed; no requirement group (doc/tooling-only, exempt per
-REQUIREMENTS.md § Scope).
-**Runtime:** ~1 h, Light, tooling/doc-infrastructure.
-
----
-
-## Session — AI gameplay: the word interface made runnable, and the rival's idle/resume oscillation measured (2026-08-13)
-
-Full mode. Two strands, both under the v0.2.0 AI-opponent theme: the `--serve` word interface an
-out-of-process agent plays through, and the deterministic scorer that is the shipped rival.
-
-**Framing first, because it changed what was worth building.** A SOTA refresh (the last sweep was
-2026-08-03) found the external field essentially static for strategy-game agents in that window —
-Vox Deorum presented at FDG '26 and shipped a diplomacy layer over its planner, and no new 4X
-agent paper landed at all. What did move sits underneath: the **constraint-tax finding that
-§ 10g's ruling partly rests on has been reframed**. "Capacity, Not Format" locates the penalty in
-a model's *spare capacity* rather than in the output format, and reasoning-before-structure APIs
-largely remove it. The ruling stands, but on its other legs — the behavioural-cloning ceiling and
-legibility — and the stronger contemporary argument is **multi-turn** tool-call accuracy, where the
-small-model class Io targets still scores 35–56% on BFCL v4. Recorded so the ruling's basis stays
-honest rather than quietly resting on a superseded number.
-
-**Strand 1 — BL-278's seam was landed on paper and unrunnable in practice.** It was smoke-tested
-once by hand on the day it landed and never again, and five defects had accumulated since, none of
-which had ever failed a run because nothing re-ran it. `tools/mcp/server.js` spawned
-`build/ProjectIo.exe`, which the primary (Linux) target never produces — **the MCP server could not
-start on the main dev platform at all**. The `COMMAND` opcode parsed nine argument keys while the
-enum had grown three verb families past it (BL-324 hire, BL-293 order book, BL-350 procurement), so
-**six of fifteen verbs were unreachable**, not partly supported. `corp_command_result_name` had no
-cases for BL-350's four declines, so "the supplier holds no capacity" and "you are embargoed"
-both reached an agent as *your arguments are malformed* — which removes exactly the typed-failure
-property § 10a leans on. `run_serve` never called `advance_surveys`, so `survey` was an applicable
-verb whose effect never arrived and no tile was ever revealed for `build` to target; the tick
-sequence was duplicated verbatim between the warm-up loop and the `TICK` opcode, which is how the
-step came to be missing from *both*. And nothing on the protocol yielded a **body id**, though
-`survey`, `place_sell_order` and `request_quote` all take one — the blackboard keys market facts by
-*market* id, so an agent could read a price on a body it had no way to sell into.
-
-All five fixed. New `BODIES` opcode and `list_bodies` tool (seven tools now), the exact sibling of
-NR-061's `list_corps` and filed for the same reason. New **`tools/mcp/smoke.js`**, committed rather
-than run ad hoc: it drives the raw line protocol and asserts *shape* — every opcode answers, all
-fifteen verbs reach the seam and return a code that is genuinely in `corp_command_result`, a
-well-formed sell order is distinguishable from a malformed one. It found the body-id gap on its
-first run, which is the argument for having written it.
-
-**Strand 2 — the rival AI's dominant behaviour was reversing its own decisions.** `ai_skill_harness`
-could not name six of the fifteen verbs (its `verb_name` switch stopped at `hire_unit`, pooling the
-AI's entire trading behaviour into an unnamed `action[?]` row). Making it exhaustive exposed the
-real signal underneath: **`resume` outnumbered every other verb about 10:1** — 134–255 resumes per
-30-tick rollout against 12–17 idles and 3–6 builds.
-
-Two structural causes and three arithmetic ones. **Structural:** the reflex tier and the
-strategic tier own the same `decommissioned` flag and neither knew the other existed — BL-079's
-block idles a building directly on the component and set no `ai_cooldown`, so BL-202's scorer
-could reverse an eight-tick-loss idling on its very next evaluation. And the two sides used
-different estimators, idle scoring on `estimate_building_profit` while resume hand-rolled
-revenue-minus-wages with no maintenance, input cost, stack decay or depletion taper.
-
-Reaching for `estimate_prospective_profit` to close that was right. Reaching for it *naively* was
-not, and the first cut looked like a partial success — resume down 30–56% — which is exactly how a
-plausible fix hides a real defect. An **adversarial review of this session's own diff** found three
-compounding errors in how the estimator was being called:
-
-**It priced a hypothetical building, not this one.** The function authors a fresh probe at
-`construct_building`'s defaults (0.5 assigned, target 100), so a site the scorer had dialled to 200
-— or to 0 — was priced at a staffing level it would never come back at. It now takes an optional
-`existing` building.
-
-**It counted the building as an extra member of its own stack.** `stack_members` filters on
-tile/type/target only, so an existing site is already in that list; the default `size() + 1` rank
-charged it a further step of BL-193 decay against itself — 0.8× lone, 0.512× at rank 3.
-
-**"Maintenance is paid either way" is false.** BL-049 splits maintenance into a fixed material
-share that survives decommissioning and a labour share that does not, so idling saves 70% of it.
-Crediting the full running figure overstated every resume by 0.7 × maintenance — a systematic bias
-toward running, in the one estimate whose whole purpose is to stop the AI resuming what it should
-leave idle. The idle candidate carried the mirror-image error; the two were self-consistent, which
-is why neither ever produced a single-tick flip and why both went unseen.
-
-A third, independent defect in the same block: **the workforce dial could only ever move one way per
-building.** Its gain was `variable × (proposed − target) / target` with `variable = revenue − inputs
-− wages`, taking its *sign* from `variable` rather than from the model — so a profitable building
-could only be scored for raising its target and a loss-maker only for cutting one, and the interior
-optimum `solve_workforce_target` exists to find scored negative in both directions and was
-discarded. The solver now reports its own modelled gain through an optional out-param; it already
-computed both endpoints.
-
-**Measured, and the result is categorical rather than incremental.** `resume` goes
-134/178/193/153/255 → **0/0/0/0/1** across the five benchmark seeds. The reflex tier's own idlings —
-the buildings it was idling only for the scorer to resume straight back into losses — go
-67/137/132/93/198 → **9/8/7/6/7**. Net worth is **up on every seed**, so none of the churn was
-profitable. Solvency, survival and determinism unchanged (R0 byte-identical).
-
-The harness now counts those reflex-tier idlings too; they issue no command, so without that the
-oscillation was not readable from this instrument at all. Dial-thrash ceilings tightened 230–410 →
-40–69, because they had been blessed from runs containing the very oscillation they exist to catch.
-
-**One hypothesis raised and killed by measurement.** The residual looked like a price-response limit
-cycle — idle, price recovers, resume, price collapses — so BL-203's glut forecast was applied to the
-resume candidate. It moved **not one number** on any of the five seeds. The reason is the finding:
-the forecast is **bimodal, not graded**. At tick 30 every `(market, resource)` slot carrying a demand
-signal sits at supply/demand between **78 and 339** against a veto ratio of 2.0, and the rest carry
-no demand signal at all, where the design deliberately applies no penalty — the taper band between
-1.0 and 2.0 has **zero occupancy**. So the Victoria-3 import § 4 calls "the single most important
-design import" is running as a coin flip between off and veto. The change was reverted rather than
-kept as an unverified behaviour change, and the prior question — why does market demand max out
-around 8 while supply reaches 15,000? — is filed as the thing to settle first, because it may be a
-commensurability error in `market_clearing` rather than an AI-tuning problem at all.
-
-**Deliberately not built.** Nothing frame-specific for the 0 CE mercenary refocus. BL-377
-(mercenary contracts) is design-only and requires BL-315 (conflict spine), which is design-owed at
-v0.3.0 behind BL-094 (governing body); anything built against that today is a bet on unlanded
-design. The seam repaired here is the frame-agnostic layer — opcodes, argument forwarding, typed
-rejections, a smoke check — that a mercenary verb plugs into when one exists.
-
-**The review pass earned its cost, and that is the session's real lesson.** Four adversarial lenses
-were run over this session's own uncommitted diff, and one of them found a **critical** defect the
-change had introduced: teaching the parser to read floats let `std::atof` admit `nan`, which passes
-`floor_price < 0.0f` (every comparison against NaN is false), enters `world.sell_orders`, is folded
-into `state_hash`, is written to the save stream, and reaches `clear_markets`' book sort — where it
-stops the comparator being a strict weak ordering and makes `std::sort` undefined behaviour. The
-same lens found an infinity overflowing a `static_cast<int>` in the procurement lead time. Both are
-now refused at the protocol edge, which is the general rule worth keeping: **the AI-facing seam is
-an untrusted input boundary in a way the UI is not**, because a control cannot emit a NaN and the
-validation downstream of it never had to.
-
-The same pass found the three estimator errors above, which is why the oscillation actually closed
-rather than merely damping. Two of the file's own new assertions were also flagged as **vacuous** —
-the survey check compared fact counts, which would have passed whether or not the survey ever
-advanced, and the result-code check could not detect the switch fall-through it claimed to detect
-because the fall-through returns a code that IS in the valid set. Both rewritten to assert the
-thing: the survey's own progress counters must move, and a BL-350-specific decline must be
-observable.
-
-**A fourth lens read the prose rather than the logic, and that was the one that paid oddest.**
-Pointed at the session's own *claims* instead of its code, it found four assertions that did not
-survive contact with the source — all now corrected. "Six verbs could not be issued at all" was
-five, because `hire_unit`'s `unit_type` defaults to 0, a valid roster index, so it worked and could
-only ever raise row 0 — and the comment had explicitly denied exactly that reading. "Nothing else
-yields a body id" was false: the blackboard keys pool facts by `(corp, body)`, so the real gap is
-narrower and better stated. "-Wswitch catches the next one the way it did not catch this one" was
-backwards — the flag was on and had been warning on every compile, under `-Wall` without `-Werror`,
-and the warnings were ignored. And "resume at ~10x every other verb combined" was ~2.7x combined,
-~10x the next single verb. None changed what the code does; every one would have entered the
-permanent record as fact, in a project whose documents are its audit. Filed as NR-185.
-
-**Review queue.** Eight entries filed as the work happened (NR-178 the oscillation and its five
-causes, NR-179 the workforce-dial signature change taken on Ben's behalf, NR-180 the bimodal
-forecast and the supply/demand question under it, NR-181 goldens blessed from the behaviour they
-exist to catch, NR-182 the action dictionary running four verbs behind the seam it transcribes,
-NR-183 the constraint-tax leg of the 10g ruling superseded in framing, NR-184 the NaN boundary,
-NR-185 the four overstated claims and the claims-lens practice that caught them).
-
-**The review's verification pass then caught the fix itself.** 38 findings were raised across four
-lenses and 36 were refuted under adversarial verification; the two that survived were both in this
-session's own work, and one of them was the NaN guard. Returning the *default* on malformed input
-is not the same as refusing it: `quantity`'s default of 0 is rejected downstream, so substituting
-it refuses by accident — but `floor_price`'s default of 0 is **meaningful**, read by the seam as
-"accept the market price". So `floor_price=inf` turned "sell only above this floor" into "sell at
-market, every tick", answered `applied`, and said nothing. A worse failure mode than the crash it
-replaced, and it took a verifier reading the downstream *meaning* of a default to see it. The
-parser now reports malformation and the handler answers `rejected_invalid`; the smoke check asserts
-it for `nan`, `inf` and `1e400`. The second survivor was `smoke.js` hard-coding `r < 31` for
-`resource_count` (42) — the exact stale-literal defect the commit before it set out to remove — now
-read off the blackboard's own `price:<n>` facts instead.
-
-**Full tier: 64/68, and the four reds are all pre-existing.** `ai_skill_harness` is green across the
-complete run. The failures are `data_creep_harness` (NR-171), `population_mvp` (NR-170),
-`stack_capacity_harness` (stale since BL-366) and `history_sim_harness` (six assertions). The last
-was adjudicated the way SPRINTS.md prescribes rather than by inspection — a throwaway worktree at
-`4e0118d`, configured and built from cold, produced the identical six failures. Two of the four had
-no record anywhere before today; NR-186 now carries all of them, and argues the `history_sim` six
-are the priority, because NR-177's refocus makes that sim the ancient product's *generator*.
-
----
-
-### Second phase, same session — the review queue, then AI play
-
-**The queue first.** Worked the AI/seam/tier cluster: open entries **64 → 49**. Five closed on work
-already done, two advanced as standing practices, three consolidated (NR-143/145/171 were one
-finding filed three times), and **two were refuted rather than resolved** — NR-129 asked for a guard
-that already existed in the very commit it reviewed, and NR-171's "climbs ~1.25/tick, possibly
-unbounded" is disproved by a 4000-tick trace showing dead-flat counters for 3000 ticks.
-
-**NR-180 was the priority and the answer was neither option it offered.** Supply and demand are not
-a stock/flow blunder — both are zeroed together each tick. The ratio is a non-measure anyway:
-`clear_markets` is an unconditional buyer of last resort so supply is unbounded by demand *by
-construction*; only 12 of 42 resources have a standing consumer and **no raw ore has one**; and the
-two sides are authored three orders of magnitude apart, with measured maximum demand (8.25) sitting
-at the population basket's structural ceiling (7.5). The gate is **inverted** — `demand <= 0` returns
-"no penalty", and those are the real gluts. It also suppresses inter-body **convoy dispatch**, which
-gates on `demand − supply > 0`, corroborated by `data_creep`'s own coverage note. Filed as **BL-381**
-with a proposed fix: score the glut off the resolved **price**, which is bounded, defined for every
-priced good, and already public.
-
-**The tier went four reds to one.** Three were stale harnesses encoding rules the code had
-deliberately changed; each is fixed and each restored a check that was testing nothing. The fourth
-is **BL-384**: `history_sim` fights 267 battles and takes **zero** provinces across 1960 years, with
-no assertion covering conquest count — which is exactly why six red assertions never surfaced it,
-and one of the six passes *vacuously*. NR-177 makes that sim the ancient product's generator.
-
-**Then Ben's steer, and it paid immediately.** *"Pushing for AI play will expose more bugs and give
-us actionable improvements now."* Recorded as § 10h and acted on: `tools/mcp/session.js` (the play
-driver — batch-shaped, because determinism makes appending a move and re-running a byte-identical
-replay), then five agents given the seam and an agenda.
-
-**Eleven of the session's seventeen filed items came from play**, on code that had already been read,
-instrumented, and put through four adversarial review lenses the same day.
-
-Two are priority **S**. **BL-386** — a sell order's floor price is `max(ref, floor)`, credited with
-no counterparty and no cap; listing at `1e12` reached cash 1.587e17. Independent triage found the
-matched-trade loop *twelve lines above* correctly debits the buyer: one path was written as a market
-and the other as a wish. It also **resolves NR-144** — the AI lists at `base_price` while the market
-sits pegged at `0.25 × base`, so every rival unit sold earns 4× the market rate from nothing. NR-144
-had concluded the scorer was probably innocent; it was, and the market was not. **BL-387** —
-`apply_corp_command` never checks the caller may act *as* the corp it names; a player drove rivals
-and moved their balances by tens of millions.
-
-**The pattern worth keeping.** Three findings are the same shape — a constraint that lived in the
-only caller and looked like a rule until a second caller appeared. NR-184 (float validation assumed
-a UI that cannot emit NaN), BL-387 (`cmd.corp` was never attacker-controlled because the scorer set
-it), BL-394 (`hire_unit` has no cost or cap; the only brake is `corp_ai_params`, a *scorer policy*).
-Three instances is a rule: **the AI-facing seam is an untrusted input boundary in a way the internal
-caller never was, and validation written for a trusted caller does not transfer.**
-
-**What the players could not do was as informative as what broke.** No processing facility produced
-a single unit across ~80 building-ticks — `--serve` never loads `world_gen.lua` so coal has no price
-(**BL-389**), and `build` silently discards its recipe so every seam-built processor is a steel
-smelter anyway (**BL-388**). The procurer swept 26 suppliers and could not *compare* them, because
-`request_quote` returns neither id nor price (**BL-390**). The militarist raised 25 units and found
-no verb that takes a unit as a subject (**BL-393**).
-
-**Play corrected two dictionary entries written earlier the same day** — `request_quote`'s `subject`
-is not "context rather than a constraint", it is not read at all; and `place_sell_order` was telling
-agents `floor_price` is a reservation price while the engine pays it as a bonus. Both now carry the
-defect and name the item that will remove the caveat.
-
-**Fixes were filed, not landed**, per Ben's instruction to propose in the backlog. BL-386 in
-particular will move every economy golden and should cut AI net worth by roughly the tripling NR-144
-recorded — that fall is the fix working.
-
-**Runtime.** ~7 h, Full mode (research sweep; two build strands; two committed checks; one hypothesis
-measured and discarded; an adversarial review pass that changed the outcome; a review-queue sweep
-taking open entries 64 → 49; and a five-agent play session that found eleven of the day's seventeen
-filed items).
-
----
-
----
-
-## Session — BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing (2026-08-11)
-
-Full mode, one item, continuing the same session as BL-263/BL-368/BL-366 below.
-
-**BL-130 — real market inventory, landed.** The last link before BL-365 itself. Adds
-`market_component.inventory` — real, persistent per-resource stock, never reset per tick (unlike
-`supply`/`demand`, which stay per-tick flow figures). **Fills** from real corp sales only
-(auto-surplus + standing sell orders, tallied separately so the BL-078 substrate's abstract
-supply — a pricing fiction nobody actually sold — cannot inflate real stock). **Drains** during
-production (`run_processing`) and construction (`run_construction`), both of which run before
-`clear_markets` in the same tick, against whatever survived prior ticks' sales.
-
-The real behavioural change: `run_processing`'s old special case — *any* market body runs an
-unconditional full batch, auto-buying whatever the pool didn't cover — is retired. Coverage is
-now `(pool + market inventory) / need` per input, and the two-threshold partial-run model (full
-at `t_full`, scaled to `t_idle`, idle below) governs uniformly whether or not a market backs the
-body. `run_construction`'s BL-095 pacing rate swaps its old "last tick's cleared supply" proxy
-for the same real field, and now actually drains it. Both consumers draw the same live inventory
-in a fixed, already-deterministic tick order (construction, then production), and a processor's
-run fraction is bounded by the coverage-min across every input by construction — so nothing can
-double-spend the same stock; no proportional-fairness math was needed. The **sell side is
-unchanged** — still unconditional, per the standing prototype invariant.
-
-**A live crash, found and fixed in passing.** Verifying against the real generated world
-(`pregame_balance_harness`) turned up a silent `abort()` — the harness printed two Lua-load lines
-and stopped, exit code 3, no message. Added a top-level try/catch (kept — a real improvement to
-the harness) to surface it: `Unknown resource 'clean_water' in recipe 'clean_water' outputs`.
-BL-368 had added three `resource_type` values but never registered their Lua names in
-`recipe_registry.cpp`'s `resource_from_name` table — every hand-built harness that constructs a
-`recipe_registry` directly in C++ was blind to this, so **the actual game has been crashing on
-startup since BL-368 landed earlier this session**, unnoticed until this check. Fixed by adding
-the three missing table entries. Confirmed pre-existing (not a BL-130 artifact) by
-stashing-and-rerunning against the BL-263 baseline first — same crash, same message.
-
-**Two existing-harness fixture gaps, fixed.** `econ_harness` and `resource_chain_harness` hand-
-build a `recipe_registry` + `market_component` and expect the old unconditional-auto-buy
-behaviour; `construction_gate_harness` seeds `mc.supply` (the retired proxy) to represent "the
-market has stock". All three needed `mc.inventory` seeded alongside their existing fixtures —
-not a change in test intent, just which field now carries "the market has real stock". Caught
-these the hard way: a first regression pass showed everything green, which turned out to be
-**stale `.exe` files** — the individual harness CMake targets are separate from the `ProjectIo`
-target and were never rebuilt after the source edits. This is the *third* time a stale-exe
-mistake surfaced this session (see NR-169); every harness in the sweep was explicitly rebuilt
-from clean before the numbers below were trusted.
-
-**Verification.** New `tools/verify/market_inventory_harness.cpp` (14/14 PASS): idle with
-nothing available, a full batch from ample market stock with an exact drain check, pool-then-
-market draw order, the two-threshold model applying uniformly on a market body, a real sale (not
-substrate) landing in inventory, and construction's own gate reading/draining the same field.
-Full `ProjectIo` build clean. The complete 15-harness suite rerun clean from a fresh rebuild.
-`pregame_balance_harness` (the real generated world, 80-tick warm start): climbs cleanly to a
-~108k plateau, no crash, no negative balance, all 5 dynamism/determinism assertions pass —
-different plateau value than the pre-BL-130 substrate-driven trajectory (expected: the underlying
-model materially changed), but the shape is sane. `ai_skill_harness` moved from 8 to 9 golden-
-band failures (one new: seed 4 net-worth min) — attributable and expected this time, a real
-economic consequence of the mechanic working as designed, not instability; recorded in NR-169
-rather than re-blessed.
-
-docs/economy/MARKETS.md gains § Real market inventory and corrects two stale passages (the
-"no stored inventory" limitation, the auto-demand/auto-clearing step descriptions);
-docs/economy/PRODUCTION.md's stale 2026-07-31 "thresholds bypassed on market bodies" note is
-corrected. backlog.json BL-130 → `complete`; requirements.json § real-market-inventory (R1–R5,
-all complete); REFINED.md drained.
-
-**BL-365's blocker chain is now fully closed.** BL-253, BL-366, BL-368, BL-263 and BL-130 are all
-`complete`. BL-365 itself — the keystone, difficulty 5 — is next.
-
-**Runtime.** ~2 h, Full mode (one item, but the deepest of the session's chain: a core-model
-rewrite touching every read site of market supply, plus a live production bug found and fixed).
-
----
-
----
-
-## Session — BL-263 lands: BL-365's blocker chain, first link (2026-08-11)
-
-Full mode, one item, continuing the same session as BL-368/BL-366 below.
-
-**The blocker chain, found before writing any code.** Moving to BL-365 (the Sprint 10 keystone)
-next, its design's own `blocked_on` field named **BL-130** (real market inventory) as a hard
-prerequisite — settled 2026-08-11 in BL-365's own design pass: *"a market that conjures any
-shortfall undercuts the whole point of modelling real producers."* BL-130 itself `requires`
-**BL-263** (spontaneous market emergence), also un-landed. Neither was in Sprint 10's original
-plan. Surfaced to Ben rather than pushed through silently, per the standing sequencing rule; his
-call was to work the chain in order — BL-263 → BL-130 → BL-365.
-
-**BL-263 — spontaneous market emergence, landed.** All five of Ben's 2026-08-02 settled calls
-implemented as specified. **Trigger**: the first building *completing* (not placing) on a body
-with no market — `maybe_spawn_market`, wired into both `construct_building`'s instant-completion
-path (`build_duration_ticks <= 0`) and `run_construction`'s pacing-loop completion
-(`economy_system.cpp`); survey completion is explicitly *not* the trigger, keeping the geographic
-and commercial fogs independent. **Who**: any corporation — no player-only gate; a rival-created
-market on an unvisited body needed no new fog code, since the existing activity fog (BL-089)
-already gates on presence/routes, not market existence directly. **One market per body**
-off-world, checked before spawning; the home body's BL-096 carved seeding is untouched.
-**Never disappears**: no deletion code exists anywhere for markets, so persistence-with-dormancy
-falls out for free — a dormant outpost is just the ordinary zero-supply/zero-demand case.
-**Opening prices**: the home market's own `base_price`, marked up by a distance proxy
-(`|orbital_radius_au` difference`|`, moon-approximated at its parent — a cheaper stand-in for
-`supply_system.cpp`'s precise tick-pure angular distance, adequate for a price curve though not
-for real haul routing). **What clears**: new `inject_interbody_demand` pulls a
-distance-discounted slice of the home body's own unmet demand onto every outpost market each
-tick (`economy.market_emergence` in Lua) — the mechanism that stops an outpost with real supply
-and no local population from collapsing to the price floor the instant it starts producing,
-independent of `dispatch_convoys`' own physical routing.
-
-**No save-format work** — named in the design as a real consequence, but there is no general
-serialisation system in this codebase yet to extend (no `src/world/serialisation.cpp`), so that
-half of BL-263's design stays deferred to whenever the save seam actually lands, not built here.
-
-**A self-correction.** BL-368's `ai_skill_harness` finding (below) claimed a *different* 5-failure
-set after landing, versus the BL-366-only 8-failure baseline. Rebuilding `ai_skill_harness` fresh
-before trusting it against BL-263 caught the error: the "5" reading was a **stale `.exe`**, never
-rebuilt after the stash-and-pop investigation that produced the 8-failure baseline. A clean
-rebuild with BL-366+BL-368+BL-263 all applied reproduces the exact same 8 failures as the
-BL-366-only baseline — BL-368 and BL-263 do not move the bands further, at least not detectably.
-NR-169 corrected accordingly; the lesson (rebuild after any stash/pop before trusting a result)
-is recorded there too.
-
-**Verification.** New `tools/verify/market_emergence_harness.cpp` (16/16 PASS): no market before
-any building, correct spawn on completion, correct `centre_tile`, exact opening-price and
-pulled-demand formulas checked arithmetically (not just sign), no second market on a second
-building, no self-pull on the home market, and a graceful all-zero-price degenerate fixture with
-no home market at all (no crash). Full `ProjectIo` build clean. Reran `econ_harness`,
-`econ_stability`, `resource_chain_harness`, `determinism_harness`, `construction_harness`,
-`world_audit`, `construction_gate_harness`, `buildings_rework_harness`,
-`multi_building_tile_harness`, `population_demand_harness`, `habitability_tranche_harness`,
-`supply_advance`, `trade_routes_harness`, `commercial_fog_harness` — all clean, checked for real
-`FAIL` lines rather than trusting a `grep -c FAIL` count (which false-positives on summary text
-like "0 failures").
-
-docs/economy/MARKETS.md gains § Spontaneous market emergence. backlog.json BL-263 → `complete`;
-requirements.json § spontaneous-market-emergence (R1–R5, all complete); REFINED.md drained.
-
-**Still blocking BL-365.** BL-130 (real market inventory) is next — the last link before the
-keystone itself.
-
----
-
----
-
-## Session — BL-368 lands: Sprint 10's second foundation, and a stale bug claim corrected (2026-08-11)
-
-Full mode, one item, continuing the same session as BL-366 below.
-
-**BL-368 — real population demand + habitability tranche, landed.** Generalises the BL-190 flat
-`agricultural_produce`-only population demand stub into a real, price-elastic, multi-resource
-basket (`population_demand_params`, `economy.population_demand` in Lua) — the same elastic shape
-as the BL-078 nation-substrate model, but population-only: no supply term, a pure consumer.
-`inject_population_demand` (`market_clearing.cpp`) now takes the `recipe_registry` and sums
-`scale × demand_scale × basket[r] × (base/price)^elasticity` across every resource in the basket,
-for every population centre, into its catchment market.
-
-**A stale premise, corrected in passing.** BL-368's own design cited a "known shipped bug" —
-population demand zero-reset by `clear_markets` before it could be read. Reading the actual code
-before writing any showed the bug had already been fixed by **BL-190** (2026-07-31);
-`inject_population_demand` already runs after the reset. `docs/economy/MARKETS.md`'s
-Known-limitations list repeated the same stale claim as current — corrected here rather than left
-to mislead the next reader (`io-backlog-prose-goes-stale`: check the authority doc before trusting
-a filed premise).
-
-**The habitability tranche.** Three new `resource_type` values (39 → 42): `clean_water`,
-`consumer_goods`, `medical_supplies` — the three RESOURCES.md's habitability table names as goods
-population centres actually consume as tradeable goods. Building Materials and Utilities stay
-deliberately absent (a different consumption path / an abstracted budget cost, per that table's
-own note). Three new recipes on the generic `processing_facility` (`scripts/recipes.lua` ids
-14–16, no new `building_type` values, matching the shipped set): `clean_water` (water → clean
-water), `consumer_goods` (food rations + steel → consumer goods — "refined goods (various)" in the
-design, steel standing in as the one already-shipped refined input), `medical_supplies` (water +
-agricultural produce → medical supplies — no standalone "chemical" resource exists in the
-prototype set, so water stands in, mirroring Hydroponics Bay's own water-as-process-input
-precedent). Base prices in `scripts/world_gen.lua`.
-
-**Deliberately not built**, named per Rule 0c: the undersupply *effects* (habitability, workforce
-efficiency, growth) RESOURCES.md's table names — the demand signal now moves prices, but does not
-yet feed back into the population/workforce model. Construction Yard and Power Plant (Building
-Materials / Utilities) also stay unbuilt, per the scope note above.
-
-**Verification.** `population_demand_harness` gained an R4 (elasticity + multi-resource +
-untradeable-skip, 4/4 PASS); its existing R1–R3 were updated to hand-configure a basket, since the
-default registry basket is now empty (population demand used to be an unconditional flat stub, now
-it is data-driven and a bare `recipe_registry` carries no data). New
-`tools/verify/habitability_tranche_harness.cpp` (9/9 PASS): all three goods produced, none pegged
-at the market band ceiling over 80 ticks, and a population centre's demand for all three reaching
-the market. Full `ProjectIo` build clean. Reran `econ_harness`, `econ_stability`,
-`resource_chain_harness`, `determinism_harness`, `construction_harness`, `world_audit`,
-`construction_gate_harness`, `buildings_rework_harness`, `multi_building_tile_harness` — all clean.
-
-**`ai_skill_harness` golden-band drift, investigated and filed rather than silently absorbed.**
-A stash-and-rerun of BL-368's own files against the BL-366-landed baseline found **8** golden-band
-failures, not the **5** recorded as pre-existing at Sprint 11's close (NR-140) — BL-366 alone had
-already moved the bands, unchecked at that landing since `ai_skill_harness` was not on its
-regression list. With BL-368 applied the count returns to 5, but a *different* five. Filed as
-**NR-169** rather than re-blessed on the spot: the bands are drifting with every Sprint 10/11
-landing and BL-365 (background industry, ~80 new firms) will almost certainly move them again —
-a standing stewardship gap, not a one-off to paper over.
-
-docs/economy/RESOURCES.md, PRODUCTION.md and MARKETS.md updated (habitability tranche tables, the
-clearing-tick step list gains population demand injection, the Known-limitations correction).
-backlog.json BL-368 → `complete`; requirements.json
-§ real-population-demand-habitability-tranche (R1–R5, all complete); REFINED.md drained.
-
-**Note on the working tree.** `docs/development/backlog.json` and `NEEDS_REVIEW.json`/`.md` also
-carry unrelated in-flight content from a separate concurrent session (BL-370/BL-371 filed items,
-NR-168) — not authored here, left intact rather than reverted, flagged for whoever commits next.
-
-**Still open in Sprint 10.** BL-365 (background industry, the difficulty-5 keystone with an open
-corp_ai-scope question — both foundations it needed, BL-366 and BL-368, are now landed),
-BL-367/BL-130/BL-132/BL-369.
-
----
-
----
-
-## Session — BL-366 lands: Sprint 10's first foundation, the living world resumed (2026-08-11)
-
-Full mode, one item. Origin pulled 174 commits behind onto `main` (fast-forward to `c491b14`,
-v0.1.14/Sprint 11 stamp); a status check on Sprint 10 found only its BL-253 prerequisite landed —
-the five real content items (BL-366, BL-368, the BL-365 keystone, BL-367, BL-130/BL-132/BL-369)
-were all still `designed`, nothing promoted to REFINED.md. Ben's call: resume Sprint 10 now,
-foundations first.
-
-**BL-366 — multi-building tile stack cap + urban transform, landed.** Answers the half of BL-193
-(building stacks) the item deferred: non-extraction buildings (processors, ports, hubs, admin,
-military base, research institute) are no longer capacity-1 per tile. A new `terrain_composition
-::urban` value (12th, `components.hpp`) plus a per-composition non-extraction cap table
-(`non_extraction_stack_cap`, `placement_rules.cpp`) — grassland/forest/wetland 6, tundra 3,
-barren/rocky/regolith/metallic 4, volcanic/icy 2, urban 12, ocean 0 (exempt). The cap counts
-**every non-extraction type on a tile combined**, not per type — a new
-`non_extraction_buildings_on_tile` aggregate counter, distinct from the existing per-(tile, type,
-target) `buildings_on_tile` extraction stacking uses. Filling the cap fires a one-way
-`maybe_transform_to_urban`, wired into `construct_building` (`construction.cpp`) right after a
-non-extraction placement lands. Once urban: `can_place` refuses new extraction/ambient placement
-(`no_deposit`) even against a real seeded deposit, sites already standing are grandfathered and
-keep operating untouched, and tile habitability is raised to at least 0.80 (never lowered).
-Extraction stacking itself (`k_richness_per_site`, richness/50) is untouched — a separate axis.
-`presentation.cpp` / `hex_render.cpp` gain the urban name + colour (built-over grey).
-
-**Deliberately not built**, named per Rule 0c: the per-composition build-cost/logistics discount
-and a transform notification/log line — both named in the design as implementation-time tuning
-values, not committed there.
-
-**Verification.** New `tools/verify/multi_building_tile_harness.cpp` (26/26 PASS): the cap table,
-aggregate cross-type occupancy firing the transform on the 6th mixed-type placement (not the 6th
-of one type — the case that actually distinguishes this from the old per-type rule), urban's own
-higher cap admitting a 7th, extraction refusal post-transform, grandfathering of a pre-transform
-extraction site, the habitability floor holding in both directions (raised when below, untouched
-when already above), and extraction's richness-bound stacking left unchanged. Reran
-`construction_harness`, `determinism_harness`, `world_audit`, `construction_gate_harness`,
-`buildings_rework_harness` — all clean, zero regression. Full `ProjectIo` build clean (CMake/MSVC
-14.44). `docs/economy/TILES.md` gains § Urban transform (cap table + rationale);
-`docs/economy/PRODUCTION.md`'s non-extraction-stacking paragraph updated from "deferred" to
-"answered by BL-366". backlog.json BL-366 → `complete`; requirements.json
-§ multi-building-tile-urban-transform (R1–R5, all complete); REFINED.md drained.
-
-**Still open in Sprint 10** (not started this session): BL-368 (real population demand — see the
-same day's follow-on entry above, which also found the "known shipped bug" cited here was already
-fixed), BL-365 (background industry, the difficulty-5 keystone with an open corp_ai-scope
-question), BL-367/BL-130/BL-132/BL-369.
-
-**Runtime.** ~1.5 h, Full mode (one item: design review, implementation, new harness, doc
-propagation, backlog/requirements bookkeeping).
-
----
-
----
-
-## Session — The warm start converges, and the substrate is condemned (2026-08-10)
-
-Full mode, design + one Light code change. Two design passes (BL-340/BL-350 jointly, BL-365–369 as
-a new cluster), one measured behaviour change, and a sprint re-sequence — all landed against a
-repository that spent most of the session mid-merge.
-
-**The measurement is the session.** `pre_game_ticks` was 12, and its own comment justified that
-defensively: *"~3 in-game years … short enough not to diverge under the prototype's un-tuned
-economy."* Ben asked for 20 years. Rather than assume, the warm-start length was made a parameter
-of `pregame_balance_harness` and measured. The fear does not hold — the economy **converges**:
-
-| Phase | Ticks | Behaviour |
+**The six waves**, each built by a `generation-dev`/`ui-dev` sub-agent in its own worktree, then
+independently rebuilt and reverified in this session (full app build, `exploration_sim_harness`,
+`exploration_sweep`, `world_determinism`, `history_sim_harness`) before merging — no wave was taken
+on a sub-agent's self-report alone:
+
+| Wave | Items | What landed |
 |---|---|---|
-| Linear | 1–23 | ~5,530 cr/tick, dead straight |
-| Knee | ~24 | growth begins decaying |
-| Plateau | **47–80** | **~185k cr, ±60 oscillation, drifting slightly down** |
+| 1 | BL-930, BL-931 | Exploration tree wired; the 1200→1660 span runs on the shared engine, opt-in (`exploration_sim_enabled`, default false) |
+| 1.5 | BL-937 | The ten readings instrumented; 1-2 measured for real, 3-10 honestly scaffolded |
+| 2 | BL-932, BL-939, BL-940 | Treasury, scarcity signal, corridor throughput — BL-930's stubbed scorer terms go live |
+| 3 | BL-933, BL-934, BL-935 | Treaties with a term, colonies as subjects, ports/navies/armies with decay |
+| 4 | BL-941, BL-942, BL-936 | Deterrence, creed-weighted strategy, cultural preference |
+| 5 | BL-938, BL-943 | Industry tree ring-1 migration (not a trim — ring 4 survives whole); lapse-map fleet/caravan exemplars |
+| 6 | BL-944 | The schism verb; the reassertion floor raised per Ben's call |
 
-All five economy assertions still pass at 80, determinism holds, and the balance never goes
-negative. `pre_game_ticks` is now **80**, at ~3.5 ms/tick — about 240 ms of extra startup.
+**The displacement reading's arc is the sprint's clearest signal.** BL-937's ratio moved
+0.16 (wave 1.5, no mechanism) → 0.01 (wave 3, treaties suppressed both sides evenly, briefly
+*worse*) → 0.88 (wave 4, deterrence finally split near-home cost from far-away cost) — exactly the
+shape a phase-wide claim should take across a sprint that builds its cause incrementally: invisible,
+then briefly wrong, then genuinely better once the real mechanism exists. Still not over the
+harness's own bar (median > 1) — real progress, not a closed reading (NR-855).
 
-**That plateau is what condemned the substrate.** The player corp saturates at ~185k not from any
-lack of ambition but because `inject_substrate_demand` clears a fixed fraction and there is nothing
-further to trade against. Ben's call, on seeing it: *"replace the substrate entirely."* Filed as
-**BL-365** (background industry) plus **BL-366** (multi-building tiles), **BL-368** (real population
-demand), **BL-367** (management surface) and **BL-369** (warm-start calendar semantics).
+**Fourteen NR entries filed** (NR-846 through NR-859) as things arose, not batched at the close:
+a build-order bug in the handover's own wave table; an opt-in-default flag; a road-ladder rung that
+never fired in any sweep across the whole sprint (NR-849); a treasury income-cadence reading;
+displacement's non-movement then partial recovery (NR-851, NR-855); the creed axes not yet
+separating consolidator/expansionist strategies on a small sweep (NR-856); a trade-province proxy
+(NR-854); a one-commit-for-three-items deviation, twice (NR-853, and wave 4's equivalent); a
+novel-work flag — the Exploration span's own events don't reach the lapse-map surface yet (NR-857);
+a live-click-denied-so-verified-by-capture resolution (NR-858); and the Empire-span digest movement
+BL-944's floor-raise caused, the first sprint-40 change not gated behind `exploration_sim_enabled`
+(NR-859).
 
-Two things the design pass corrected rather than accepted. **"A tile is one building" was never the
-shipped rule** — `stack_capacity` already returns 1–5 for extraction sites and counts per
-`(tile, type, target)`, so BL-366 completes the question BL-193 explicitly deferred rather than
-pivoting away from a philosophy the code never had. And **who owns background industry is settled
-by the rulebook, not by taste**: the standing rules forbid a nation actor and sanction background
-corporations, so it is more firms, not nations (NR-150).
+**One correction worth naming plainly.** BL-944's own backlog text claimed reassertion fired ZERO
+times in 16 worlds. Re-measured before touching anything: it was already a thin but non-zero 90
+fires/16 worlds, because sprint 39's unrelated changes had moved it. The floor was raised anyway
+per Ben's explicit instruction, and the result (426 fires, 14/14 creed-worlds) was the right outcome
+regardless of the stale diagnosis — recorded so nobody re-diagnoses the same "zero" claim from the
+old text.
 
-**BL-340 and BL-350 were designed jointly**, because each is incoherent alone — one is the buying,
-the other the thing bought. The decision that makes the pairing real is that
-`spacecraft_components` gets **no background demand**, so the militia's contracts are its only
-buyer. BL-340's own filed premise turned out backwards: the enum extension is nearly free (every
-per-resource array is already sized off `resource_count`), while the real work is that three of the
-four raws its recipes consume carry `base_price` 0 and so **cannot be bought at all**. The item's
-centre of gravity is closing the minable-but-unsellable asymmetry.
-
-**The sprint order then flipped, and the reason is BL-350's own design.** Its counterparty model
-needs suppliers to choose between; against eight lean corps *"another supplier may still quote"* is
-usually false, and it would have shipped correct and unexercised — the exact shape of Sprint 9's
-`hire_unit` (NR-121). Sprint 10 now cuts **v0.1.13** (the living world), procurement moves to
-Sprint 11, and everything after shifts one. v0.1.13 was the natural home: it had been hollowed out
-when BL-340 left for v0.1.14, and BL-130/BL-132 were already orphans belonging to this work.
-**BL-253** (the O(corps × tiles) scan) was re-goaled C/v0.2.0 → **A/v0.1.13** as a hard
-prerequisite — the term is linear in corp count and this multiplies corp count tenfold, in front of
-an 80-tick warm start that runs before the first frame.
-
-**Working against a mid-merge tree shaped the session's method.** `backlog.json`,
-`NEEDS_REVIEW.json`, `requirements.json`, `REFINED.md` and `DEVLOG.md` all carried conflict markers
-for most of it, and `backlog_query.js` — a plain `JSON.parse` — failed hard rather than degrading.
-Both design passes were therefore written to staging files under `docs/development/pending/` and
-folded in only once the merge landed. Reading the *incoming* branch before finalising was not
-optional: BL-293 added a second flat-binary stream, which reversed a conclusion this session had
-already reached about BL-107 (NR-157) and rewrote BL-350's answer on how procurement should reach
-the order book.
-
-Two findings recorded rather than fixed. `pregame_balance_harness` passes BL-112 R1 off a price
-pegged at exactly **4.00× base** — the hard band ceiling — rather than a discovered margin, in both
-the 12- and 80-tick runs (NR-156). And PRODUCTION.md's Smelter table has disagreed with
-`recipes.lua` about coal for some time (NR-158). Both are handed to the items that will touch them.
-
-**Runtime:** not tracked. Design-heavy; the code change is one constant plus a harness parameter.
-
-**Still open after this:** v0.2.0 has now been deferred twice in one day, both times in the same
-direction (NR-159). And BL-365's dominant question — whether ~80 background firms can run the full
-`corp_ai` layer or need a reduced model — is a two-tier-actor design commitment, not a build-time
-detail (NR-160).
+**Session close.** All fifteen designed items built, verified, archived. `BL-945` (depletion
+retrofit) stays parked for Digitisation. Sprint 40 closed to
+`archive/sprints-2026-Q3.json`. Backlog is empty but for the one parked row.
 
 ---
 
 ---
 
-## Session — Hygiene wave 2: app.cpp halves, and the review barrier earns its place (2026-08-10)
+## 2026-09-11 — Sprint 39's session concludes: the full-tree reading, BL-928 dropped, levers accepted for sprint 40
 
-Full mode, Batch Delivery — six worktree slices over BL-361/BL-362/BL-363, the three items the
-morning's hygiene batch filed but did not deliver. Two waves, because BL-361 rewrites the file two
-BL-363 tasks edit.
+**Runtime:** closing entry for the same session as the two below. Full / Batch Delivery close-out,
+final step.
 
-**The headline is BL-361: app.cpp went 3,826 → 1,422 lines** across four extractions (verify Lua
-API + capture, startup screens, time panel, the post-econ-step history recorders), one commit
-each, moved by line-range copy so logic reordering was not possible. The verify API's 60 registered
-function names were diffed byte-identical, because `scripts/verify/*.lua` call them by name.
+### The full-tree 16-seed reading, on top of the wave-1 reading already on file
 
-**The argument of the session is that the review barrier caught three faults a green build and
-passing goldens could not.** Everything compiled, 25 harnesses passed, and five visual checks were
-render-identical — and `verifier-review` still returned FIX FIRST, correctly:
+The two entries below each carry a reading taken partway through integration (wave 1 alone, then
+the wave-2/3 close-out that didn't re-sweep). This is the honest one: all fifteen sprint-39 items
+together, 16 seeds, `--epoch 0`, against the pre-sprint main baseline (`6995b41e`):
 
-- **The hover stick threshold stopped firing on the frame it used to.** Converting dwell from
-  frame counts to seconds looked clean, but summing `1/60` in float32 reaches 2.49999833 after
-  150 additions — just under `2.5f` — so the card stuck at frame 151 where the integer counter
-  fired at 150, and the appear threshold cleared by roughly one ulp. `hover_freeze.lua` hid it by
-  spending 153 frames. Thresholds now carry a half-frame epsilon.
-- **A cache that never invalidated under `--verify`.** `current_day_tick` is maintained by the
-  interactive loop only, so a capture session left it at 0 and every tick-stamped cache froze for
-  the whole run. This is the nastiest shape a UI bug can take: *the golden is the stale render*, so
-  the check certifies the fault. `verify.econ_step` now advances the tick — which, since BL-354,
-  also means the harness's convoys stop pricing every haul at the epoch orbital position.
-- **A retained-pointer cache whose guard could not fire.** The tech-tree geometry cache stamped on
-  registry address plus entry counts; `verify.new_world` reloads the same file into the same member,
-  so both are unchanged while every cached `const tech_node*` dangles. The registry now carries a
-  reload generation. The code comment had asserted the stamp covered exactly this case.
+| metric | pre-sprint-39 baseline | wave 1 alone | full tree (all 15 items) |
+|---|---|---|---|
+| powers at epoch | 42 | 42 | 59 |
+| largest share | 11% | 21% | 8% |
+| battles/world | 3114 | 689 | 6694 |
+| conquests/world | 1812 | 311 | 5569 |
+| secessions/world | 2 | 2 | 164 |
+| regions ever conquered | 54 | — | 621 (of ~1340) |
+| taken once & kept | 66% | 66% | 24% |
+| taken 3+ times | 31% | 25% | 67% |
+| worlds showing rise-and-fall | 15/16 | 7/16 | 16/16 |
 
-**A second lesson, this one about the instruments.** Five visual checks failed at ~11.5% and the
-first read was the known capture-before-render artifact — Ben said so, and he was right that it
-happens. It wasn't that: the captures were complete. The goldens were stale by **119 commits**,
-including BL-257 (generated body names — the home body is "Huhaidar" now, not "Kepler") and
-BL-348/349 (province tongues). Mass re-blessing would have buried 119 commits of unreviewed world
-change under a UI commit, so instead the batch was verified against **control goldens blessed from
-the pre-wave-2 build** — which is the attribution the committed goldens could no longer give.
-NR-130 records the owed re-bless pass. A related find (NR-131): `pop_markers.lua` frames a
-hard-coded tile that world drift left empty, so it has been "passing" while capturing none of the
-markers it exists to verify. The new `settlement_labels.lua` shows the fix — locate the subject via
-`verify.population_centres()` and frame whatever the world actually generated.
+Two things worth naming plainly, since they pull in opposite directions. Rise-and-fall is now
+**universal** — every one of 16 worlds shows at least one empire forming and later falling, up
+from 7/16 with wave 1 alone and 15/16 on the pre-sprint baseline: the "drama" the sprint set out
+to deliver is unambiguously present. But TAKEN 3+ TIMES more than doubled to 67%, which
+`CIVILISATION.md`'s own diagnostic reads as the BAD reading ("the same ground trading hands,
+which logs conquests without ever moving the political map") rather than accumulation — worse
+than the 31% baseline BL-924 was built specifically to bring down. Secessions went from a
+baseline of 2/world to 164/world, roughly a fifth of the map. No single item's own isolated sweep
+predicted this; it is very likely genuine compounding across BL-920 (many more, smaller starting
+polities), BL-921 (bigger realms field disproportionately bigger armies, so a win snowballs
+further before the next one), and BL-923 (anything overextended fragments hard) — three
+mechanisms that each read as reasonable alone and as considerably more violent stacked.
 
-Also landed: the per-frame recompute pass (vision model, marker maps, industry lens, lens-key
-chrome, selection tile metrics, tech-tree geometry; `intra_body_path` returns a const ref instead
-of copying the tile vector on every A* cache hit, all 8 call sites lifetime-audited);
-`SOL_ALL_SAFETIES_ON` with the persona-pack shape checks it demands; `sell_orders` moved from
-`ui_state` to `world` where a save seam can see it; and the odd-r hex neighbour table single-sourced
-— all six pasted copies verified byte-identical first, so no latent geometry bug was hiding in the
-duplication.
+**Ben's call, 2026-09-11: accepted as-is.** The levers for sprint 40 ("the new world," the
+exploration/colonisation phase) are declared in place on this reading — no dial was touched, and
+none is proposed here. The churn number is on record for whoever next reads this sweep, not
+silently resolved.
 
----
+### BL-928 dropped
 
-## Session — The hygiene audit that became a batch: four reviewers, thirteen items, ten landed (2026-08-10)
+`BL-928` (a river and a mountain defend, in the resolver and the scorer) was deferred at filing
+on exactly this precondition — "before this we must ensure we can see strong growth" — which the
+table above settles. Ben's call was not to take it up now regardless: cancelled, backlog now
+empty, folded into "a future pass on history alongside tech" rather than filed as its own item.
 
-Full mode, Batch Delivery — seven worktree agent slices, integrated and verified in the main
-session. Runtime: not tracked (timer.js not started); the batch ran from audit to green suite
-inside one session.
+### Session close
 
-**The session began as a question, not a work order** — "does the codebase have any major
-faults?" Four parallel reviewers (world/sim, UI/app, cross-cutting, a `-Wall -Wextra` sweep
-build) answered with three genuine simulation bugs, one determinism leak into the money loop,
-and a family of per-frame full-world scans. Ben then asked for the findings to be filed and
-delivered. Thirteen items filed (BL-351–BL-363); ten delivered as one batch; three held
-(BL-361 app.cpp split, BL-362 UI frame caches, BL-363 misc sweep).
-
-**The three bugs were real and none was subtle in hindsight.** BL-351 (sell-order over-commit):
-duplicate sell orders each validated against the same un-decremented pool snapshot — a
-player-exploitable money mint, now a running remainder with per-order matched bookkeeping.
-BL-352 (hire-gate live store): the hire gate summed per-building `w.stockpiles`, which nothing
-has ever credited — every gated roster row was unbuyable and ungated rows hired free; it now
-reads `corp_body_pools`, so rival hiring genuinely changes (NR-127). BL-354 (orbital tick
-purity): convoy dispatch priced hauls off frame-advanced orbital angles, so the same seed
-diverged by frame rate — dispatch now reads `orbital_angle_at_tick`, and the harness was
-red-checked (reverting the fix yields 9 failures including a flipped source choice).
-
-**The recurring lesson recurred: worktree bases go stale mid-day.** The slices were cut hours
-after Sprint 9 landed BL-325 S2 (hires require a completed muster base), and slice D's new
-harness scenarios — written and passing on its older base — failed on the integrated tree
-until the main session planted the base. Same class as the 2026-08-09 v0.1.9 session's
-branched-from-a-moved-base finding; the integrating harness run caught it, as designed.
-
-Also in the batch: BL-353 (a throwing persona pack no longer kills the session), BL-355 (enum
-growth from the militia work had outrun five switches — a hire could post an *empty* nation
-chat statement; tech-locked builds mis-reported as malformed; now `rejected_tech_locked`, with
-ACTIONS.json updated), BL-356 (the body→market index — the single highest-leverage perf fix,
-removing a per-call map rebuild from both the tick and the lens draw path), BL-357 (population
-growth now reads the body's whole id-sorted market basket instead of one hash-arbitrary
-market), BL-358 (sorted-iteration leftovers; `state_hash` now covers tile depletion and
-units), BL-359 (the construction panel's mid-draw demolish routed through the pending seam —
-uncovering that tile-selected dismantles had silently never worked), BL-360 (`is_coastal` via
-the raster index; building-profit lookup de-quadratified).
-
-Verification: verifier-review over the integrated diff (GO COMPILE, zero criticals), then the
-integrating build (230 targets) and a 17-harness sweep — all green after the one integration
-fix. Review-log entries NR-123–NR-129 carry the delegated calls (version-goal mapping, the
-orbital approach, the hire-gate retarget) and the open questions (dead buy-order book, terrain
-preferences for the new building types, the AI's tech-locked candidate churn). Housekeeping
-noticed in passing: `/tmp` is 100% full on this machine (builds now point TMPDIR at
-`build_linux/gcc_tmp`), and BL-266's stale requirement group was closed per lint.
+Backlog is empty. Sprint 39 is closed at fifteen items. No sprint 40 decomposition happened this
+session — its own record (`sprints.json` id 40, "the new world") is still open and empty by
+design, waiting on someone to read this table and start filing.
 
 ---
 
-## Session — Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases (2026-08-10)
+---
 
-Full mode, Delivery — three items, built sequentially in the main session rather than fanned out.
-Runtime: **not tracked** — `tools/session/timer.js` was never started, so the only hard number
-is the commit span (09:24–09:53), which measures the landing, not the work. Full mode
-throughout: delivery, release, then a backlog-structure pass.
+## 2026-09-11 — Sprint 39 closes in full: waves 2 and 3 land, eight items, one cross-item bug caught and fixed
 
-**The whole session is one argument: BL-342 was the load-bearing item, and it is thirty lines of
-switch statement.** Two minors had been sitting design-forward for weeks, and last session's
-diagnosis found why — BL-155 (laws) and BL-156 (techs) had *independently* settled on the same
-object, *"a flat AND-list of atomic conditions"*, and neither built it, because each was scoped
-design-only. Nobody owned the thing they both needed. Building it once made both minors shippable
-inside a single session, which is the strongest evidence yet for the shape of that diagnosis:
-**the blocker was not effort, it was ownership.**
+**Runtime:** long session (continuation of the same session that closed wave 1 below), Full /
+Batch Delivery, seven parallel worktree agents across two waves plus main-session merge/build/
+verify/live-click. **Items:** BL-914 BL-917 BL-920 BL-921 BL-924 BL-925 BL-929 BL-923. Sprint 39
+("the drama of the time-lapse") is now fully closed — fifteen items across three waves.
+
+### Wave 2, six independent items dispatched in parallel
+
+BL-914 (the tap mechanism: rounds render live instead of only after the pass finishes, Restart
+retired for Pause+scrubber), BL-917 (promoted roads and river bridges drawn on the Empires map,
+pure render, zero sim impact), BL-920 (the Empires opening reframed onto culture ground: city
+states seed above a 300,000-head population threshold, a new ORGANISE verb grows them onto
+reachable unorganised ground), BL-921 (a campaign's stack pools every held region's garrison
+weighted by capital-read `network_supply_q`, so a 30-region polity now fields ~2.9x a 3-region
+polity's stack at the same frontier — the structural fix for "no compounding"), BL-924 (region
+value reads what stands on it, not just endowment, so a seat is worth attacking), BL-929
+(a polity can spend its capital stockpile to deliberately upgrade a supply site). All six merged
+clean or with small, expected conflicts (two new `sim_verb` enum cases, two new dispatch `case`
+blocks) — every merge built and re-verified individually before the next.
+
+### The one real bug this wave: BL-924 broke the shared scoring currency
+
+BL-924's first cut folded its "what stands here" term directly into `region_value_q` — the
+function `history_sim.cpp` documents explicitly as "THE COMMON CURRENCY... every verb scores in
+ONE unit... 0-1000." Summing endowment and the new built/seat terms let it run to 3000, silently
+rescaling the currency every OTHER verb (Settle, Consolidate, `build_work`'s reach gain, a
+polity's own holdings-value sum) also reads. Cost `history_sim_harness` six checks — B318c,
+BL384a, R5, B384c, BL837b1, M2b — nearly all "Campaign never fires" symptoms of a threshold read
+against an inflated scale. Caught only because the wave-1 close-out had already established a
+clean 2-failure baseline to compare against; the merging agent's own brief hadn't asked it to run
+`history_sim_harness`, only `history_sweep` and `world_determinism` — an omission in this
+session's own briefing, not the agent's error, now worth remembering for the next batch. Root-
+caused by bisection (disabling the seat premium, then the built term, then scaling it) down to
+the fact that Campaign's own target valuation never went through `region_value_q` in the first
+place — it reads `w_farm`/`w_ore`/`w_port` against the target directly. Fixed by reverting
+`region_value_q` to its original pure-endowment form and adding the prize term
+(`campaign_prize_q`, a new `w_prize` weight) only at Campaign's own scoring site. Back to the two
+pre-existing tracked failures (R3a2/R3a3) after the fix; the churn reading BL-924 was built to
+move (seats' share of conquest, TAKEN 3+ TIMES) is unchanged in shape.
+
+### Wave 3: BL-923, and a second, narrower cross-item interaction
+
+BL-923 replaces BL-896's contiguous-block secession with city states, one per cut-off seat
+(Ben's ruling on NR-837, reversing NR-826 call 2; call 3 stands). Building it exposed a second,
+much narrower defect: BL-920's new "unorganised ground points at its geometrically-nearest seat"
+pointer interacts with BL-896's old secession code, which demotes a seat's `is_seat` flag with no
+knowledge of that new pointer type — `colonisation_harness`'s D1/D3 check (BL-866, "every
+hinterland region shares its seat's nation") caught it as one dangling pointer on one of three
+seeds. Fixed in two steps: first, a genuine, narrower regression from BL-920 itself (unorganised
+ground correctly has NO nation to match, so the check's nation-mismatch test needed to exempt it
+— this alone took `colonisation_harness` from a larger mismatch count to 1 remaining dangling
+case); second, BL-923's own rewrite of the secession block closed the dangling case as a natural
+consequence of replacing the code that caused it. `colonisation_harness`: 0 failures once both
+landed. 16-seed sweep: breakdowns median 119/world (was 2), pieces overwhelmingly city-state
+sized, and — the qualitative point BL-922 exists to make possible — most breakdowns now occur on
+ground the reach model calls connected, not only graph-disconnected islands.
+
+### Live-clicked the fully integrated tree
+
+Opened a fresh build in the wizard and played rounds 3 and 4 to completion (1200 CE). Confirmed
+live, not just in harness output: the map draws and animates from the moment each round arrives
+(BL-914) with no Restart button; kin cultures cluster by hue (BL-919, wave 1); the ticker
+narrated a broke-away line (BL-923) and two cross-border trade openings (BL-925) by name and
+year; the board carries Land/Rgn/Pop/Mt; the map shows terrain relief, rivers, and the promoted
+road network (BL-915/917, several sessions' worth of rendering work all present at once).
+
+### Bookkeeping
+
+All eight items' `req/requirements.json` rows flipped complete (BL-929's render row marked
+`partial` — the mechanism and its event/ticker feedback are live, but a bespoke waystation glyph
+and a road-stroke distinct from BL-917's own were cut for scope, left as a follow-on) and
+archived; all eight backlog rows flipped complete with resolution prose and evicted; `REFINED.md`
+emptied — sprint 39 carries no more active work. `backlog_lint.js` 0 fail(s).
+
+### What's next
+
+Sprint 39 is closed. The 16-seed reading recorded in the wave-1 entry below — largest share
+roughly doubled, rise-and-fall shape now appearing in fewer worlds rather than more — was taken
+before waves 2/3 landed; a fresh 16-seed sweep on the fully-integrated tree (all fifteen items
+together) would be the honest next reading before any tuning conversation, per
+`GENERATION_STRATEGY.md`'s "measured, not argued" rule. No sprint 40 planning happened this
+session.
+
+---
+
+---
+
+## 2026-09-11 — Sprint 39 wave 1 closes out: seven items verified, re-blessed, and a 16-seed reading for Ben
+
+**Runtime:** long session, Full / Batch Delivery close-out (no new build this session — wave 1's
+seven items, BL-926 BL-927 BL-918 BL-919 BL-915 BL-916 BL-922, were already merged to main by the
+prior session; this one runs the close-out checklist `NEXT_SESSION.md` left owed). **Items:** BL-926
+BL-927 BL-918 BL-919 BL-915 BL-916 BL-922.
+
+### Close-out checklist, run in full
+
+`build_app.bat` BUILD_OK. Re-built and ran every harness the handoff named: `world_determinism`
+(ALL PASS, digests moved as expected on BL-918/BL-922 — recorded below), `save_roundtrip` and
+`save_envelope_roundtrip` (both green, save format 13), `history_sim_harness` (down to the two
+pre-existing, tracked failures R3a2/R3a3 — both about far-objective under-supply, which is exactly
+the mechanism BL-922 changed, so their persistence is expected, not a regression), and
+`colonisation_harness` (0 failures). A `verifier-review` static pass and a separate cold
+`code-reviewer` adversarial pass (author ≠ reviewer, correctness-focused: overflow, sentinel bugs,
+serialisation symmetry) both came back clean — no blocking findings, two non-blocking hygiene
+suggestions noted for later. Live-clicked the wizard's rounds 3 and 4 in a fresh `build/ProjectIo.exe`
+(this worktree's own Debug build, not the stale `build_rel` the handoff named — equivalent evidence):
+confirmed rivers, terrain relief, seat markers and frontier lines on both maps, kin cultures sharing
+hue families on round 3, and the event ticker plus Population/Might board columns on round 4,
+animating live from 44 BCE to the 1200 CE epoch.
+
+**One authorised `world_determinism` re-bless for the whole wave**, per the handoff's instruction
+(never per item): seedA/on `DA6F5E1E50BC9A68`, seedB/on `A78B4BB975568091`, seedA/off
+`F9BF05466A631FF9`, 1960/two-span `1785663397FA92CD` — all reproduce bit-identical across two runs;
+ALL PASS, 0 failures. (The wave's earlier BL-922-only re-bless recorded in `NEXT_SESSION.md`,
+seedA/on `5A641C67838E8B54` etc., is superseded — BL-918 moved the digest again on top of it.)
+
+### The 16-seed reading Ben asked to see before any dial moves
+
+Per `GENERATION_STRATEGY.md` § The asymmetry is political, this is reported, not acted on.
+`history_sweep 16 --epoch 0` on the wave-1 tree, against the pre-wave main baseline
+(`6995b41e`: powers 42, largest share 11%, battles 3114, conquests 1812, secessions 2, reach
+refusals 0, rose-and-fell 2/world in 15/16):
+
+| metric | baseline (main) | wave 1 (16 seeds) |
+|---|---|---|
+| powers at epoch | median 42 | median 42, range 20–72 |
+| largest single share | median 11% | median 21%, range 12–32% |
+| battles per world | 3114 | median 689, range 57–2023 |
+| conquests per world | 1812 | median 311 |
+| taken 3+ times | 31% | 25% |
+| secessions per world | 2 | median 2 |
+| REFUSED reach gate | 0 | median 10,471 of ~207,935 contacts examined |
+| worlds showing rise-and-fall | 15/16 | **7/16** |
+| rose-and-fell, median | 2/world | **0/world** |
+
+The two-seed integrated reading the prior session took (largest share 30%, battles 844, reach
+refusals 28,921 combined) sits at the aggressive end of a much wider 16-seed spread, not the
+centre of it — battles alone range 57 to 2023 across seeds, a 35× spread. The headline tension:
+**largest share roughly doubled while the rise-and-fall shape Ben asked sprint 39 to deliver
+("drama") appears in fewer worlds, not more** (15/16 → 7/16). `terrain_reach_cost_q` (currently
+4000; 3000 refuses far fewer contacts per the BL-922 agent's own measurement) is the one number
+`NEXT_SESSION.md` names as the candidate to shift, but no dial was touched this session — the
+finding is filed for Ben's read, not resolved.
+
+### Novelty and decisions taken, filed
+
+- **NR-840 (novel-work):** `culture_kinship_years` tested `year < 0` for "undated," but every
+  culture in the migration is coined BCE, so the function returned −1 for every pair on every
+  world since BL-870 — the kin-opposition discount has never fired in a real run. Fixed in the
+  BL-918 commit (sentinel is now `INT64_MIN`) because the split census could not proceed without
+  it; recorded separately because BL-918 didn't ask for it.
+- **NR-841 (decision taken):** the wizard's Culture/Empires preview surface never ran the river
+  pass; BL-915 needed it to, so `generate_home_surface_preview` now runs `generate_rivers` with the
+  campaign's own seed formula. A generation-layer change made inside a UI item's scope.
+- **NR-842 (decision taken):** round 3 under `--verify` used to silently replay the Empires sim's
+  polities instead of the migration; BL-919 needed the real migration record for the lineage tree,
+  so the adopt path now calls `build_migration_timelapse` for round 3 specifically.
+- **NR-831 resolved:** BL-927 moved the `w_aggr_q` lean outside the season loop, confirming the
+  compounding this entry flagged was real and unintended; battle/conquest medians unchanged by
+  this item alone.
+
+### Bookkeeping
+
+All seven items' `req/requirements.json` rows flipped complete with result metrics and archived to
+`archive/requirements-2026-Q3.json`; all seven backlog rows flipped complete with resolution prose
+and evicted to `archive/backlog-design-2026-Q3.json` via `archive_landed.js` (verified byte-exact
+round trip); `REFINED.md`'s wave-1 task blocks are stale now that the rows are archived (left in
+place — wave 2/3 blocks below them are still live); `backlog_lint.js` 0 fail(s). A `mirror_check.js`
+run separately found `docs/ai/ACTIONS.md`/`ACTIONS_INDEX.json` stale against a change from an
+earlier, unrelated commit — reverted out of this batch and spawned as its own follow-up rather than
+bundled here.
+
+### What's next
+
+Wave 2 (BL-914, BL-917, BL-920, BL-921, BL-924, BL-925, BL-929) and wave 3 (BL-923) are briefed in
+`NEXT_SESSION.md` (now stale on the close-out section, live on the wave-2/3 briefs) and
+`REFINED.md`. The 16-seed table above is Ben's to read before any of `terrain_reach_cost_q`,
+the reach-gate constants, or the aggression/fear lean magnitudes move again.
+
+---
+
+---
+
+## 2026-09-11 — Sprint 38 closes for real: the whole closure contract wired, twelve items, and the phase pronounced too lively
+
+**Runtime:** very long session (survived one crash and a full resume), Full / batch delivery,
+heavy parallel sub-agent fan-out. **Items:** BL-891 BL-901 BL-902 BL-903 BL-904 BL-905 BL-906
+BL-907 BL-908 BL-909 BL-910 BL-911 BL-912.
 
 ### What landed
 
-**BL-342 — `condition_set`.** An atomic condition is `<subject> <comparator> <operand>` plus the
-qualifier its subject reads; a set is a flat AND-list; `evaluate` is pure. Three properties are
-load-bearing and all three are asserted (40 assertions):
+**BL-906 first, alone, because everything else depended on it.** Pass 1's stop year decoupled
+from the epoch (`world_params::empires_stop_year`, default 1200) — the Empires phase now runs its
+full 400 BCE → 1200 CE, not the 400-year slice it had been silently running. Every sprint-38 figure
+re-read at full span: hegemony 0/16 unchanged, largest share barely moved (median 11% vs 12%),
+wall clock roughly quadrupled as warned.
 
-- **Deterministic.** Only one subject (`market`) sums floats over an unordered container, and it
-  sums in ascending entity-id order. The harness asserts two structurally-identical worlds measure
-  bit-identically.
-- **An empty set is true**, and true by *falling out of the loop* rather than by a special case in
-  front of it — because BL-155's common case is that a law is unconditional once enacted.
-- **A subject may be military.** `military_units` and `military_strength` ship beside the six
-  promoted economic labels. Not needed by the prototype; shipped because a shape is only proven by
-  an instance, and the harness asserts a mixed economic-AND-military predicate resolves.
+**Then the closure contract, in two waves of parallel agents.** `CIVILISATION.md`'s seven readings
+— explorer set, strength spread, contact, directed wants, markets, inherited network, grudges —
+are now ALL live in `history_sweep`'s report, each measured over the 16-seed spread with no target
+numbers set. `BL-908` (contact, the grudge table's shape reused for a different cause) and `BL-910`
+(capitals/markets, a pure read of existing seat state, no new placement pass) landed wave one, in
+parallel with `BL-901` (a culture that crossed water now carries that fact into sea legs), `BL-902`
+(harness fixture repointed at real generation instead of a strip that stopped producing war),
+`BL-904`/`BL-891` (the wizard's footer was never actually unreachable — a scripted-walk limitation
+plus a genuine smaller layout undercount), and `BL-905` (below). Wave two closed the loop: `BL-909`
+(directed wants, gated on contact, no price) and `BL-912` (the empire tree wired into the sim —
+real per-polity state, a deterministic scorer, a fork that closes for real, the rim milestone
+crossing the handoff) both required wave-one's output and both landed clean. `BL-907`'s scoreboard
+was built partway through and two of its seven readings were re-wired from stale MISSING
+placeholders as their sources landed on top of it in the same wave — the same bug class as a stale
+UI string caught live in the wizard the same session (see below).
 
-Three calls taken on Ben's behalf, all in NEEDS_REVIEW (**NR-112/113/114**): `evaluate` carries a
-subject corp the sketch did not (every consumer is per-corp, so a world-only predicate could not
-have answered either question); `era` measures launchpad ownership, because ERAS.md is
-designed-not-implemented and that is the only space gate the code actually has; `market` measures
-the mean price across all markets.
+**BL-912 found a real bug in itself.** The empire tree's root node was permanently unlockable
+under the first cut's symmetric neighbour-mask construction — every child that named the root as a
+prerequisite fed a "needs a neighbour held" requirement back onto the root itself. Caught by the
+sweep showing 0 nodes bought at any span before the fix, 8–51 after.
 
-**BL-343 — the laws MVP.** The item's one real open design question was *where enforcement hooks
-into the economy without breaking determinism*, and it is now settled on one rule:
+**Twelve of thirteen items shipped; the thirteenth taught the most.** `BL-903` (a communication
+rung, gating a polity's ability to act on ground it cannot hear from) was built exactly to its
+settled spec and measured `REFUSED comms gate median 0` on every seed — not a tuning miss but a
+structural one: Campaign's own candidate-generation loop already only ever enumerates directly-held
+border ground, so the gate's first condition is true by construction for every candidate it ever
+sees. Reverted rather than shipped as a no-op (`NR-833`), and retired outright once Ben read the
+finding — the candidate-generation widening that would make it real is a bigger, separate item.
 
-> **A law is a modifier OVER the market, never an override OF it.**
+### The finding that outranks the rest
 
-That is the same principle that vetoed price clamps on 2026-07-11 — a clamp fights price
-resolution instead of shifting a flow's cost. So the levy applies where the flow is **accounted**
-(`apply_budget`) and never where the price is **resolved** (`clear_markets`). Two consequences
-worth naming: the market stays the only thing that sets prices, and the player sees the tax as its
-own number rather than as an unexplained worse price.
+`BL-905`, independently converging with `BL-903`'s dead end: the reach gate — `CIVILISATION.md`'s
+named PRIMARY LEVER — refuses campaigns via a **step function, not a gradient**. Probed the
+`sustainable_campaign_floor_q` directly: 250 refuses 0, 700 refuses 0.1%, 999 refuses 94% and
+collapses battles 815→34/world. No value threads the needle, because `campaign_supply` prices from
+the staging hub rather than the capital, so an ordinary neighbour-adjacent march's distance term
+barely decays the currency. `CIVILISATION.md` was corrected to name what's actually filtering
+campaigns today (score threshold and verb competition, not reach) rather than have a constant
+re-guessed against it. This is a real design decision, not yet taken.
 
-The design predicted the legibility would be free, and it was — a sixth **Levies** bar on the
-Finance card, no new surface. The one deliberate placement choice: the enact checkbox went into the
-Budget ledger *directly beneath the two policy-tier stubs*, so the difference between a drawn lever
-and a working one is visible in one glance rather than in a tooltip.
+### Ben's verdict, live
 
-`apply_budget`'s new `production` argument defaults to null and charges nothing, which is why
-**not one existing economy harness changed** — the whole feature is invisible to any caller that
-does not opt in, and `L1c` asserts a world with the law seeded is bit-identical to a world with no
-laws at all.
+Ben reviewed the phase running in `build_rel` and called it: **"really lively, and perhaps too much
+so… I think this would work as a precursor to the next phase of generation, but I want to tighten
+some levers."** Sprint 39 was renamed from its previous placeholder ("the new world," moved intact
+to sprint 40) to **"tighten the levers"** — the tuning pass that follows sprint 38's now-fully-wired
+mechanism, starting from `BL-905`'s reach-gate finding and `NR-833`.
 
-**BL-344 — the techs MVP.** `tech_tree.hpp:49` stored the gate as a descriptive **string**, so no
-tech had ever been earned and the F9 constellation viewer was a picture of a system rather than the
-system. Promoted to `condition_set`, with one live gate: `E0-ML-01` "Standing Garrison Doctrine"
-unlocks the Military Base on two extraction sites plus Cr 2,000.
+### Investigated and closed: NR-834
 
-**The unlock is military on purpose**, and that is BL-094's test rather than flavour: *a technology
-that can only unlock a building is being designed for the corporate player we are pivoting away
-from*. Gating the base cost exactly what gating a smelter would have.
+`BL-909`'s build hit an intermittent, unreproducible-by-inspection crash in `history_sweep`, fixed
+empirically by switching two lookups to bounds-checked `.at()` without the actual mechanism ever
+being pinned. Static read: every index BL-909 touches is either loop-bound-guaranteed or explicitly
+range-checked before use, so the `.at()` calls cannot actually throw as written — itself evidence
+against a real logic bug. Reverted to plain `operator[]` and ran a single ISOLATED 32-seed sweep
+(no concurrent harness) — ALL PASS, no crash. Most likely cause: this session's sandbox spawning
+duplicate/concurrent harness processes against shared output state, independently reported by the
+`BL-907` agent the same session — not a real out-of-bounds read. `.at()` restored anyway as cheap,
+reasonable defensive bounds-checking, and `NR-834` closed.
 
-Two things the promotion forced, both worth recording because neither was in the design:
+### What went wrong, worth remembering
 
-1. **`earnable` had to be a separate flag.** An empty `condition_set` is *true* by BL-342's own
-   property 2 — so the ~130 nodes with no authored gate would have earned themselves on the first
-   tick. Absence has to be modelled by absence from the gate table, never by an empty predicate.
-   This is the first place where two of the session's own decisions collided, and the collision was
-   caught by writing the harness assertion (`T1c`) before trusting the default.
-2. **The predicate could not live in Lua.** `tech_tree.cpp` pulls in sol2 and is excluded from
-   `IO_WORLD_SOURCES`, so a gate that gates `construction.cpp` could neither be linked nor tested
-   headlessly from there. It lives in the Lua-free `tech_gate.cpp`; `scripts/tech_tree.lua` authors
-   identity, topology and prose and reads the predicate *back* by id, so the viewer cannot display a
-   requirement the simulation does not enforce (**NR-116**).
+**A worktree agent's stale base cost real integration risk.** `BL-912` (the empire tree, difficulty
+6) branched from a commit 9 behind main despite being explicitly briefed to fetch and fast-forward
+first — it built the whole feature against a base with none of `BL-908`/`910`/`911`'s new fields.
+Auto-merged clean by luck (the additions landed in different regions of the same files), but this
+is the `BL-480` shape and it will not always be luck. The main session's independent re-verification
+after every merge — never trusting an agent's self-reported PASS — is what caught it in time to
+matter here rather than after.
 
-### The one honest regression, and what it was worth
+**The session itself crashed mid-batch**, losing three just-launched agents (`BL-907`, `BL-909`,
+`BL-912`) before they had made a single commit. Checked their worktrees for partial work first
+(none — clean bases, zero commits) before relaunching fresh rather than trying to resume an unknown
+crashed state.
 
-`buildings_rework_harness` broke — `construct_building` refused a military base it had placed
-happily the day before. That is the gate working, not a defect: the harness tests BL-325's
-placement and staffing rules, so it now grants the tech in its setup rather than manufacturing the
-industrial base the predicate wants. Worth noting because it is the *only* thing in the gate that
-moved: three new systems, ~14 apply_budget call sites, a widened placement signature, and one
-test needed a two-line change.
+**Two stale-copy bugs, both caught only by looking, not by a green harness.** A wizard disclaimer
+insisting the Empires round was "not yet the full 1,600 years" kept asserting that after `BL-906`
+made it true — caught live-clicking the wizard, not by any script. `BL-907`'s scoreboard carried
+two hardcoded MISSING readings that went quietly false the moment their sibling items landed in the
+same wave — caught by rereading the report after the merge rather than trusting the build-time
+snapshot. Both are the same lesson `io-same-day-ruling-orphans-siblings` already names: a fact
+asserted at one moment does not update itself when the ground under it moves.
 
-### The retro's two lessons, applied
+### Where the backlog stands
 
-Both cost real time last session, and both were cheap to honour here:
+Zero open items. `docs/development/sprints.json` now carries sprint 38 (open — the phase's
+mechanism is complete but Ben has not called it closed), sprint 39 (open, "tighten the levers,"
+empty — the tuning items are not yet decomposed), and sprint 40 (open, "the new world," unchanged).
 
-- **A green gate can lie.** No messy merge this session (everything landed on `main` in one
-  sequence), so `--clean-first` was not needed — but the two *bench* failures at `-j 4` were
-  re-run idle before being believed, and both passed, exactly as the v0.1.9 retro predicted they
-  would. 58 tests, 0 failures.
-- **Worktree agents isolate writes, not history.** Avoided entirely: the three items are one
-  dependency chain (BL-343 and BL-344 both consume BL-342's header), and two ~2-file slices are
-  not worth an integration pass. Stated as a call rather than a default.
+---
+
+---
+
+## 2026-09-11 — Sprint 38 closes the phase: seven items, five agents, and a lever that refuses nothing
+
+**Runtime:** long session, Full / batch delivery. **Items:** BL-823 BL-838 BL-839 BL-887 BL-893
+BL-895 BL-896 BL-897 BL-898 BL-899.
+
+### What landed
+
+**The economy of war closed (`BL-895`).** Materials had no sink but campaigns — hundreds against
+hundreds of millions produced — so the trade income shipped the session before could not gate
+anything however large it was. Two sinks now compete for a realm's stock: a standing army eats
+every year, with the unpaid share of a garrison walking home; and a corridor promotion costs the
+acting seat, a refused one held one short rather than discarded. The magnitude was chosen against a
+**stated target** rather than by feel — at 200 per 1,000 heads the sinks claimed 63% of production
+and refused 324 road builds a world, which is poverty governing the network; at 20 they claim 8%
+with 43 refusals.
+
+**Collapse became mechanical (`BL-896`).** Ground whose reach from its own seat falls under a floor
+**secedes** as a contiguous block rather than falling to a neighbour — a successor with real ground,
+carrying its new seat's own culture and its parent's ladders. Median 2 secessions and 14 regions a
+world, arc intact.
+
+**The two creeds (`BL-897`, `BL-899`).** Ben settled eight design calls in one form. A universalising
+creed is coined new and belongs to nobody, arises from humiliation *and* density together, and
+splits the institution from the people so the two can disagree — 2 of 16 worlds, which is the spread
+the item demanded. Sea legs are a reduced ration scaled by how seafaring a people is, earned from
+facts already recorded; 405 crossings now land fed where none did, which finally moved `BL-893` from
+"changes no outcome" to a real one.
+
+**Grudges became consequential without becoming an agent term (`BL-898`).** The item's original
+design said a grudge must change who a polity campaigns against — precisely what `BL-827` ruled out.
+The corrected route seeds nation-to-nation sentiment at the handoff instead, and `history_sim.cpp`
+is **unchanged by the diff**, which is how the claim was verified rather than asserted.
+
+**And the dangerous lever, built in the admissible form (`BL-838`).** A realm is attacked for what
+it did to peoples like the decider's own, never for its size. It needed a dated widening of the
+AI-behaviour prohibition, raised rather than assumed — the rule it moves is written at the field
+itself. The scope is asserted on a built ledger where **the peaceful polity is the larger one**;
+clearing the ledger with nothing else changed drops both to zero, which a rank term could not do.
+
+### The finding that outranks all of it
+
+Three agents, working different items with no contact, independently hit the same line:
+
+> `REFUSED reach gate   median 0`
+
+`BL-823`'s own resolution promoted reach-gating from one lever among six to **the** primary lever,
+and `CIVILISATION.md` is built on that claim. It refuses nothing. That explains two null results at
+once: `BL-887`'s centre-chain relay measured no movement because cheaper reach can only unlock
+ground a price was keeping shut — tripling the rebate reproduced the figures *exactly*, which is
+what turned it from a tuning question into a finding — and `BL-839`'s turbulence lean pulls three
+forces of which two are inert. `BL-905` carries it, with the explicit instruction not to raise a
+floor until the cause is measured.
+
+### What this session got right, and what it got wrong
+
+Right: **every null result was reported as one.** Reassertion fired zero times in `BL-897` and was
+not tuned into firing; no launched crossing starves in `BL-899` and the floor turned out redundant
+with the port gate; calm and turbulent worlds are indistinguishable in `BL-839`. Each is recorded
+with its cause rather than smoothed.
+
+Wrong, and worth remembering: the saved implementer agent definitions carried **prose where a tool
+list belongs** (`tools: "All tools except Agent"`), so every spawn came up with `Agent` as its only
+tool. That is the "subagents were unusable" note from the previous handoff — a config fault, not a
+brief problem, and it cost two wasted spawns before it was diagnosed. Fixed, but definitions are
+cached at session start, so the five slices ran as `general-purpose` instead.
+
+Also wrong, and mine: a merge resolution in the sweep report left one brace too many. The compiler
+caught it immediately and it never went anywhere, but it was the integrating session's error rather
+than any agent's.
 
 ### Left open
 
-- **NR-115** is the one thing genuinely for Ben: generation still places starting military bases
-  through the tile-only check, so a corp can begin the campaign with a base it has not researched.
-  Defensible as fiction (inherited, not researched) and it keeps BL-331 working unchanged, but it
-  is a real asymmetry with a one-line fix either way.
-- **v0.1.3 and v0.1.4 both cut with leftovers re-targeted, not dropped** — BL-155, BL-186, BL-280,
-  BL-156 and BL-332 moved to v0.1.11. Both done-definitions were written **at** the cut, per NR-103,
-  and both name their exclusions explicitly.
-**Gate:** 58 tests, 0 failures (55 → 58; three new harnesses). Tags `v0.1.3`, `v0.1.4`.
-
-### Then: the `post-v0.1.0` sweep (NR-101)
-
-Ben, same session: *"now tackle the 42 post-v0.1.0 items."* It was the largest structural job left
-in the backlog and the same class of problem the done-definitions had just fixed — a label doing
-duty as a decision.
-
-**Most of it was reconciliation, not judgement, and that is the finding.** Twenty of the 45 were
-*already assigned* by ROADMAP.md **in prose** — the whole v0.4.0 politics substrate, most of the
-v0.3.0 Era −1 arc — while their `version_goal` still read `post-v0.1.0`. So the roadmap and the
-backlog disagreed about what was in which version, and **the disagreement was invisible unless you
-read both**: the prose was not queryable and the query did not read prose. Fixing that needed no
-decisions at all, only a script.
-
-The residue after reconciliation was 14 items of real prototype work with no theme to belong to,
-and it clustered more cleanly than expected — **v0.1.12 Logistics modes** (convoy distance pricing,
-rail, sea trade, and the supply lens that makes any of it visible) and **v0.1.13 Markets &
-materials** (runtime market emergence, the processing roster, real inventory, co-generation, and
-the save-format version header that adding resource types is precisely the case for). Four more
-folded into v0.1.11, whose theme got written down for the first time.
-
-Four items moved on their **content** rather than on prose, and the reasoning is not obvious from
-their titles, so it is recorded: BL-253 is the *opponent's* scaling term (`run_corp_strategic_step`,
-O(corps × tiles)) and belongs to v0.2.0, not to a performance bucket; BL-314 waits on a seam only
-BL-315's conflict spine creates; BL-182's real content is an **operate-gate**, a permission over
-where a corporation may act, which under BL-094 is a thing a governing body grants; and BL-212
-stayed in the prototype band because its own settlement says it does not wait on BL-218.
-
-Result: **every open item names a minor.** 71 open across v0.1.5 (2), v0.1.6 (2), v0.1.7 (4),
-v0.1.11 (10), v0.1.12 (4), v0.1.13 (6), v0.2.0 (12), v0.3.0 (22), v0.4.0 (9).
-
-Two things deliberately *not* done. The 21 **complete** items still carrying `post-v0.1.0` were
-left alone — they landed before the arc was mapped, so back-filling a minor would fabricate history
-rather than record it. And naming two new minors is a roadmap-shape call that is Ben's, so it is
-filed as **NR-119** with the alternatives (merge them; renumber against the uncut v0.1.5–v0.1.7)
-rather than left as a silent default. Neither costs anything to reverse: a `version_goal` is one
-field, and the band already treats numbering as advisory.
-
-**Still open after this:** NR-102's sequencing decoupling. A minor per item is not an order to
-build them in.
+`BL-891` is the only item blocked on something a session cannot do alone: the arc readout renders
+and reads well on a headless capture, but the scripted walk cannot reach round 4, and the verify API
+has **no scroll verb for the wizard column**, so no script can test the path a human would take.
+`BL-904` owns that, including the discovery that the verify window reports 1720×1080 while captures
+come out 1920×1080 — if those are different spaces, every wizard coordinate ever read off a capture
+was read in the wrong one.
+
+### How the session actually ended, which matters more than what it built
 
----
-
----
-
-## Session — Cut v0.1.10: three items whose own diagnosis was wrong, and a green gate that lied (2026-08-10)
-
-Full mode, Batch Delivery + release — the fifth cut of the session, spanning midnight. Ben:
-*"cut v0.1.10 next."* Six worktree sub-agents; a machine crash mid-flight; integration, every
-conflict resolution and the investigation in the main session.
-
-**THE THROUGH-LINE: three items were wrong about their own cause, and measurement caught all
-three.** That is worth stating as the finding rather than as trivia, because in each case the
-plausible story would have produced a plausible fix.
-
-1. **BL-338 (wetland)** blamed the 2026-08-04 relief commits. **Refuted empirically** — the agent
-   rebuilt `world_audit` at `802421c^` and got a byte-identical census. The real cause is
-   conceptual and better: wetland is the ONE composition the `(band, moisture)` table cannot
-   express, because a marsh is defined by *where water fails to leave* — an elevation question —
-   and elevation had no say in composition at all. 12 tiles → 159.
-2. **BL-347 (econ tick)** named three suspects. **None dominated.** The sort flagged as O(n log n)
-   was 3% of the added cost; the real cost was `std::map` node allocation the restructure
-   introduced incidentally, per tick, in worlds containing no stack at all. 8×256 min 2.045 ms →
-   **0.87 ms**, better than the pre-regression baseline.
-3. **BL-346 (profit estimator)** — my own filed claim that BL-079's loss-streak reflex acted on an
-   inflated number was **wrong and is retracted**. `estimate_building_profit` reads *realised*
-   credit. The real site was `estimate_prospective_profit` (+213% at mid-band reserve), and BL-181
-   was inflated via its own inline model instead.
-
-**BL-284 answered the question it was filed to ask.** BL-218 bought the expensive settlement-sim
-path on the argument that fragmentation would fall out for free. It pays: **60 emergent exclaves
-against 136 from orphan-island cleanup — 31% by component count but 49% by tile count.** The
-attribution is *exact, not heuristic* (the settlement BFS is water-blocked, so cleanup can only
-fire on a seedless landmass), and the audit prints both numbers because quoting the raw count would
-overstate the sim's contribution twofold.
-
-**BL-290 produced kinship nobody authored.** Names are now coined from each culture's own
-phonology, and because the word-coiner is a pure function of the tongue, two passes reach the same
-morphemes without sharing a stream: *Rerekua Tekua* / *Kuamreiteik Tekua* share a realm word,
-*Duagual* / *Shualgual* / *Vegual* a settlement morpheme. Generation as consequence, not lookup.
-
-**A GREEN GATE THAT LIED, and the reason to record it.** `logistics_reach_harness` failed 3 of 27
-assertions on a hand-built fixture — "five plains steps cost 5.0" — which looked exactly like a
-real regression, and passed at v0.1.9. It was not code. The trace:
-
-- `logistics.cpp` and the harness source were **byte-identical to v0.1.9**.
-- Suspected the new `propellant` enum widening `tile_component`; tested it by adding a dummy 32nd
-  resource *to v0.1.9* — still passed, so that hypothesis died cleanly.
-- Bisected the six merges: failed at the BL-257 merge (36 conflicts) — **but that commit PASSED in
-  a clean worktree.** Same commit, same sources, different result.
-- Compared object files: every world object byte-identical, only the harness's own `.o` different,
-  from a source whose md5 matched exactly.
-
-Deleting that one object and rebuilding: ALL PASS. A conflict-heavy merge left ninja holding a
-stale object it would not rebuild, because git's checkout churn set mtimes such that the object
-looked current — and `touch`-ing all of `src/world/` did not fix it, since the harness's own source
-had not changed. **A green gate from a stale tree is worse than a red one.** This is the second
-stale-build incident of the session, after the morning's missed build. Standing lesson: run
-`cmake --build build_linux --clean-first` before cutting after a messy merge, and if a harness
-fails suspiciously, build the same commit in a throwaway worktree before believing it.
-
-**Goldens re-blessed a second time in two days**, and the direction is the mirror image: UP, where
-2026-08-09's was down. BL-283 moved holdings off dead ground onto settled ground, BL-338 restored a
-habitable composition, BL-346/347 moved the workforce dial. Seed 4's survival fell 0.71 → 0.29
-while its net worth trebled; the band was loosened to admit it but the number is flagged as a
-**hypothesis, not a measurement** — winners winning harder is plausible, and if a later session sees
-rivals dying across many seeds the band should tighten rather than stretch again.
-
-**The crash.** Three agents were mid-flight when the machine went down; none had committed. Two had
-salvageable worktrees and were resumed from their transcripts; the third had nothing and was
-relaunched with an explicit *commit as soon as something works* instruction, which it followed.
-
-**Gate:** 55 tests. **Runtime:** not tracked; spanned a crash and a midnight rollover.
-
----
-
----
-
-## Session — The order book stops being a picture and starts being state (2026-08-08)
-
-Full mode, delivery. One item: **BL-293 (order book unreachable by command)**, landed. Runtime:
-~2.5 h.
-
-**The item was filed as "three presses have no `corp_verb` — add them", and that is not the
-work.** The 2026-08-07 scope correction found why: `sell_order` was *defined* in
-`world/components.hpp` but *stored* in `ui/ui_state.hpp`, and handed to `clear_markets` by the
-caller. A `corp_verb` mutates `world&`, so there was nothing for a trade verb to mutate. One
-misplacement produced three symptoms at once — clearing was something the UI *drove* rather than
-something the simulation *does*, no text-driven player could trade, and standing orders sat
-outside the save seam entirely, so they would not have survived a save. Ben's ruling (NR-083):
-*"Order book needs to be a background process, the AI must be able to trade as a player does."*
-The player-only fence proposed alongside it was explicitly rejected.
-
-**What landed.** The book is `world::sell_orders` / `buy_orders`, with stable per-order ids so
-removal names identity rather than an index. `order_book.{hpp,cpp}` serialises it — magic `IOOB`
-+ version, the second flat-binary stream in `world/*` after `history_log`, refusing a bad stream
-rather than reinterpreting it. `clear_markets` **dropped both order-list parameters** and reads
-the world, so a headless tick sells a standing order with nobody handing it over. Three verbs
-joined the seam (`place_sell_order`, `remove_sell_order`, `set_workforce_auto` — the enum is 11
-wide now, append-only). The Market Ledger's buttons queue `corp_command`s that `app::render`
-applies through `apply_corp_command`: the player's press and the AI's command are one
-implementation rather than two that agree.
-
-**Rival corps trade, and the first cut is deliberately dull.** "Can trade" is not "trades well" —
-a scorer that dumps stock at the floor is worse than one that does not trade, because it drags
-the resolved price down for everyone including itself. So: surplus past a hold threshold, half
-the excess, floored at the market's rarity price, scored *at the floor*. Three numbers in
-`corp_ai_params`, so tuning is a data change. The two honest gaps are recorded rather than
-papered over (NR-087): `base_price` is a rarity floor and not a production cost, and the book is
-one-sided — `buy_order` has world state and a save format but still no verb.
-
-**The standing rules were amended, and flagged rather than slipped in** (NR-085). The rival-corp
-exception enumerates what the scored-utility layer may do, and trading was not on the list;
-Ben's ruling widens it, so the rule file changed in the same commit. It is a grant of *reach*,
-not of skill, and the amended text says so.
-
-**Found along the way.** `set_workforce` never cleared `workforce_auto`, though `ACTIONS.json`
-has always claimed it did and the UI has always done it — so a command-driven agent's target was
-silently re-solved by the profit-max solver on the next tick, which is the worst failure mode a
-word interface has (the press appears to succeed, then evaporates). The seam now matches the
-press (NR-086). `state_hash` was missing `workforce_auto` too (NR-088).
-
-**Verification.** `order_book_harness`, 43/43 PASS. The assertion the move earns is R4.5: the
-same orders in a different *sequence* hash differently, because matching is price-**time**
-priority, so the book's order is state and not an implementation detail. `econ_harness`,
-`corp_ai`, `corp_agency`, `history_log`, `econ_stability` and `corp_ai_predictive` all green.
-
-**Two things measured rather than assumed.** `ai_skill_harness`'s net-worth golden bands fail —
-but a worktree at unmodified HEAD fails 5 of them already, and every BL-204 determinism assertion
-passes on both sides. Not re-blessed: doing so inside a trade commit would have hidden both the
-pre-existing drift and the intended behaviour change (NR-090). And the app does not build at
-HEAD at all — `src/ui/tile_inspector.cpp`, committed at ca22b3a, includes
-`world/sim_terrain_build.hpp`, which exists in no commit or branch (NR-091). That blocks BL-293's
-one visual requirement; both touched UI units compile clean in isolation.
-
-**Dictionary last, as required.** The seam changed first, then `ACTIONS.json` was re-transcribed
-from `corp_command.hpp` and the mirror re-rendered. The "full word interface" overclaim turned
-out to live in `render_actions.js`'s hardcoded preamble as well as in `_note`; both corrected,
-and the replacement states what is still *not* reachable rather than making a fresh sweeping
-claim.
-
-**The static review earned its place.** Reading the listing loop next to the debit loop found
-that overlapping sell orders on one `(corp, body, resource)` were each listed against the *full*
-pool and each debited it — a pool of 10 with two orders of 10 ended at **−10 units with the corp
-paid for 20**. The economy could mint value. Pre-existing and reachable from the ledger the whole
-time, but putting placement on the command seam turned it from something a careful player avoids
-into something a scorer can do in a loop. A second, opposite bug sat beside it: the auto-clear
-subtracted one corp's whole matched total from every one of its orders on the triple. Both fixed,
-both now covered by `order_book_harness` R1b (NR-092). No build catches this class; that is the
-argument for the no-compile tier.
-
-**And one signal not papered over.** `data_creep_harness` R1 passes at unmodified HEAD and fails
-here: rival trading pushes the build plateau from tick 500 out to tick 1000 (still flat from 1000
-to 1500). The mechanism is indirect — a standing order takes its triple off the auto-surplus
-path, which moves prices, which keeps builds scoring above the hysteresis margin for longer. Not
-re-blessed; NR-093 carries the decision, and it raises a real question about whether that
-whole-triple yield rule — written for a player's deliberate order — is the right rule now that a
-scorer places them.
-
-**Also filed.** BL-325 (corp borders on the hex grid) from Ben's steer that the corp border
-circle "basically tells us nothing" — a circle is a picture of a scalar, and it is about to
-contradict BL-323's irregular logistics-reach field. Two design questions owed first (NR-089).
-
----
-
-## Session — Cut v0.1.9: five worktree agents, and three of them branched from a base that had already moved (2026-08-09)
-
-Full mode, Batch Delivery + release — the fourth cut of the session. Ben: *"cut v0.1.9 next."*
-Five worktree sub-agents (roads; History+Economy; stacks; shell; disclosure), integration and every
-conflict resolution in the main session.
-
-**Four rulings taken up front rather than letting them stall the batch.** Nine items, four of which
-carried open design questions, so they were batched into one Q&A before any code was written: the
-road-tier legend goes **contextual** (Selection/hover); roads **do** dim with the fog; the Economy
-panel **gets a door** rather than being retired; and **BL-229** moves to v0.1.10 because the item
-says in as many words *"DESIGN OWED — do not guess the layout. Ben designs this one."* Asking cost
-one round trip; guessing would have cost the item.
-
-**THE LESSON OF THIS BATCH: three of five agents branched from a base that had already moved, and
-every one of them produced code that would not merge cleanly.** Worktrees isolate writes, which is
-what they are for — they do not isolate you from the *history* moving underneath. The three cases,
-because the shape repeats:
-
-1. **Roads agent** reintroduced `ui_state::selection_hidden_for`, deleted hours earlier by BL-266
-   (Selection always open). Its hunk restored a close button on a band that no longer closes.
-2. **History agent** dropped the **Ages** view along with Tiles. BL-281 does say "drops to two
-   views" — but it was designed 2026-08-03 and Ages landed 2026-08-05. *The design predates the
-   feature rather than judging it.* Ages kept; only Tiles retired. That renumbered Ages from view 3
-   to 2, so `history_ages.lua` was re-pointed — without which the Ages check would have driven a
-   stale index and silently captured Story.
-3. **Disclosure agent** paired Story with Tiles and referenced `detail_surface::history_tiles`,
-   removed by the History agent *in the same batch*. It would not have compiled.
-
-None of these is an agent failing at its task; each did its own job well. They are the cost of
-parallelism over a moving `main`, and the mitigation is that integration reads every hunk rather
-than trusting a clean auto-merge.
-
-**A fourth agent got it right in the way that matters most.** The shell agent found that BL-216's
-sections 1–3 are **superseded by BL-227**, a *complete* item that landed a different, later geometry
-on Ben's own 2026-07-30 call — and refused to implement its brief, because doing so would have
-reverted a landed decision. Newest-dated wins. It shipped the half that was still true: the
-`shell_metrics` module and the migration of all five `app.cpp` sites that each re-derived the same
-rect by hand. It also surfaced a live **8 px drift** (BL-312 flushed the minimap to the screen edge;
-four siblings did not follow), now expressed once instead of invisibly five times.
-
-**The measurement that nearly got waved away.** `econ_stability` began failing after the stacks work
-merged. It is a `bench`-labelled test — the label *this session added* precisely so a failure there
-reads as "re-run it idle" — and load was 2.35, so the easy conclusion was available and wrong.
-Rebuilding the harness at the parent commit and running both on the same machine:
-
-| bodies × corps | pre-BL-193 min | post min | factor |
-|---|---|---|---|
-| 1 × 8   | 0.0106 ms | 0.0181 ms | 1.71× |
-| 8 × 256 | **0.9581 ms** | **2.0449 ms** | 2.13× |
-
-`min` is the load-insensitive statistic, and the cost appears at **every** rung including the
-smallest — the signature of fixed per-tick work, not a scaling term. Filed as **BL-347** (priority
-A) with the table and a fix direction. **Prototype scale is unaffected** (0.20 ms mean, 5× headroom),
-so it is lost growth headroom, the same category BL-250 filed BL-253 for. The `bench` label did its
-job — it stopped the failure being read as a regression *automatically* — but it must not become a
-reason to stop looking.
-
-**BL-260's codegen has nothing to feed.** Ben ruled codegen-at-build-time the same day; on
-implementation, BL-247's in-UI question log and the `why_note` seam it would generate into turn out
-to have been removed 2026-08-02 (NR-018). No call sites exist. Codegen whose output nothing includes
-is machinery for its own sake — which is what *"the docs are the audit"* rules out — so the store
-ships as documentation and the ruling is recorded in its own `_note` for whenever a consumer
-returns. 13 of 16 entries are `drafted`, because writing the pair **is** the design check.
-
-**Gate:** 54 tests, **2 failures**, both known, filed and named in the changelog —
-`world_audit`'s biome balance (BL-338) and `econ_stability`'s absolute bound (BL-347). Visual
-inspection by eye per the Linux policy (goldens are Windows-authoritative): shell renders correctly
-post-merge, roads read with tier-varying brightness, fogged regions dimmer than the lit centre.
-
-**Runtime:** not tracked.
-
----
-
----
-
-## Session — Cut v0.1.8: ten test failures, one real defect, and a tool that had been lying since it was written (2026-08-09)
-
-Full mode, Batch Delivery + release — the third cut of the session. Ben: *"move BL-288 and cut
-v0.1.8."* Two worktree sub-agents (next_id.js; the SDL3 posture), the entangled harness/golden
-core in the main session.
-
-**BL-288 moved from v0.1.3 first.** A priority-A build-health item had been sitting inside the
-Laws design stub, where it blocked a minor it had nothing to do with.
-
-**The finding that reframed the whole minor.** Every item here was filed on the premise that
-something was *broken*. Measurement said the tooling was mostly **misreporting**, which is worse.
-`build_linux/` is already Ninja + Release, so BL-288's "the default tree is Debug" premise was
-already obsolete on Linux — and a full Release run reported **ten failures of which exactly one
-was a failing assertion**. Running each harness alone on an idle machine sorted them:
-
-- **Four pass but exceed the flat 60 s bound** — `earthlike_lean_trace` 121 s, `notable_worlds`
-  105 s, `mediterranean_sweep` 87 s, `earthlike_tile_census` 58 s (passing by *luck*, 2 s under).
-- **Two never finish** — `history_sim_harness` and `history_sweep` both ran past 400 s. They are
-  open-ended research sweeps, not regression checks; their cost is the point.
-- **Two are load artifacts** — `econ_stability` and `home_surface_bench` assert *absolute*
-  wall-clock times, pass standalone, and failed only because a concurrent session's build was
-  loading the box.
-- **One is a world-generation finding** — `world_audit`, 1 failing assertion of 26 (BL-291).
-- **One was real** — `ai_skill_harness`'s stale GCC goldens, which had sat unnoticed among nine
-  false positives for days. *That* is the cost of a noisy gate, stated as a measurement rather
-  than as a principle.
-
-Fix: three tiers (default 60 s, long 240 s widened to the four measured slow ones), a `sweep`
-label with no timeout excluded from the gate, and a `bench` label so a wall-clock failure reads as
-"re-run idle". Gate went **10 failures → 1**, the survivor being `world_audit`'s biome balance —
-carried by BL-338, and the gate reporting it is the gate working.
-
-**BL-322 — the root cause nobody would have guessed.** `execSync` runs through `/bin/sh`, which is
-`dash` here, and the unquoted `(` in `--format=%(refname)` made dash abort with a syntax error
-*before git ran*. `stdio: ['ignore']` discarded the message and `catch { return [] }` turned total
-failure into "this repo has no branches". Platform-dependent, so it worked on the Windows box where
-it was written and failed silently everywhere it was needed. It had been issuing ids **25 below the
-true ceiling** — the direct mechanical account of how BL-326..BL-333 each landed twice. Refs
-scanned 0 → 53. A second latent silent failure was caught in passing: `backlog.json` at 832 KB
-against node's 1 MB default `maxBuffer`, 79% of the way to throwing ENOBUFS into the same
-swallowing `catch`.
-
-**BL-302 — the item's own preferred option was disproved by testing it.** A shared
-`FETCHCONTENT_BASE_DIR` *hard-fails* across build trees, because each `<dep>-subbuild` carries a
-generator-locked cache and this checkout has four trees side by side. Per-dependency
-`FETCHCONTENT_SOURCE_DIR_<dep>` works and landed. Honest limit recorded rather than papered over:
-a from-cold configure **succeeds** on Linux in ~74 s, so the Windows schannel fault does not
-reproduce here and the fix is untested against its own symptom — filed as **BL-341**, and moved to
-v0.1.9 rather than left open inside the minor being cut, which is the exact trap v0.1.1 fell into.
-
-**BL-285 — the judgement call worth Ben's eye.** The GCC re-bless moves **downward**, unlike the
-MSVC re-bless of 2026-08-02 which was uniformly upward: seed 1 fell 81% and went from highest of
-the five to lowest, while seed 4 fell only 25%. Constraining siting (v0.1.2's reach rule) and
-adding a cash outflow (unit hiring, 21 per seed) should cost net worth, and a *per-seed reshuffle*
-is what a placement constraint would produce, so the shape matches the cause; survival held in
-band on all five, so corps are poorer rather than dying. Recorded in the harness rather than waved
-through, because "the AI got poorer" is also what a genuine skill regression looks like. Also
-flagged in place: the **MSVC set is now stale for the identical reason** and will fail on the next
-Windows run. Task 2 landed too — ladder lines carry a `ladder_rung` tag, so H4 filters structurally
-instead of matching the prose "granary"/"Charter Act"/"Great Accord".
-
-**Runtime:** not tracked. Gate takes ~9.5 minutes, which is itself worth an item.
-
----
-
----
-
-## Session — Cut v0.1.1: the word interface ships, and the retrofit that made it uncuttable is undone (2026-08-09)
-
-Full mode, release — the second cut of the same session, immediately after v0.1.2. Ben:
-*"cut v0.1.2 first, then v0.1.1."*
-
-**The diagnosis, restated because it is the whole point.** v0.1.1's theme — the word interface —
-had been complete since 2026-08-03: blackboard export (BL-206), action dictionary (BL-270) and Io
-MCP server (BL-278) all landed. The minor stayed open anyway because three later waves of
-unrelated work were hung on it after the fact, 26 items at the peak. `ROADMAP.md` recorded this
-in its own words — *"Retrofitted 2026-08-08 — still open"* — without registering it as a problem.
-It is the concrete instance of NR-103: **a theme with no done-definition has no test for
-*finished*, so it absorbs work indefinitely.**
-
-**The cut.** 28 items terminal. Beyond the three theme legs the minor genuinely carried a lot —
-the sticky-card family (BL-194–BL-198, BL-214, BL-247), the corporation dashboard (BL-248), the
-commercial-activity fog (BL-150–BL-154), hover freeze and glance-then-stick (BL-228, BL-230), the
-radial tech-tree viewer (BL-310), the minimap/header reflow (BL-312, BL-313), the wizard's
-real-tile preview (BL-319), the Mediterranean rift sea (BL-276) and the GPU/multicore pass
-(BL-267). A done-definition was written at the cut, on the v0.1.0 model.
-
-**The narrowing, stated rather than papered over.** The write leg is partial: `place_sell_order`,
-`remove_sell_order` and `set_workforce_auto` are in the dictionary but have no `corp_verb`. The
-cause is structural, not three missing verbs — sell orders live in `ui_state`, the world holds no
-order book to mutate, and no serialisation path touches them (BL-293's own 2026-08-07 scope
-correction). `ACTIONS.json`'s note already says so explicitly, so the dictionary does not
-overclaim. BL-293 moves to v0.2.0, where a text-driven player is what needs it.
-
-**The re-homing (NR-111, decision-taken).** The 24 items still open went to three coherent new
-minors — **v0.1.8** build health, **v0.1.9** shell & legibility, **v0.1.10** generation & content —
-with BL-293 and BL-262 (standing) to **v0.2.0**. None cancelled; all kept their priority. The
-judgement call worth checking is the *numbering*: they were appended rather than inserted at
-v0.1.3, so no existing minor had to be renumbered — at the cost of their number understating
-their priority, since all three are buildable now while v0.1.3–v0.1.6 are design-forward stubs.
-The roadmap states plainly that number is not sequence here.
-
-**Gate.** Rebuilt after the concurrent session's `src/` changes (21 files, BL-215/BL-266 work) —
-green. The CTest baseline established earlier in the session stands: 45/55, ten failures identical
-to the 2026-08-08 set.
-
-**Two versions cut in one session**, against a six-day stretch where 119 commits produced none.
-
-**Runtime:** not tracked.
-
----
-
----
-
-## Session — Cut v0.1.2: the buildings rework ships, and the roadmap gets its first per-minor done-definition (2026-08-09)
-
-Full mode, release. Ben, after a roadmap gap review: *"cut as many versions as we can now, rather
-than working on the lofty, conceptual stuff"* — then, on the plan: *"cut v0.1.2 first, then
-v0.1.1."*
-
-**What the review found.** 119 commits since the `v0.1.0` tag and not one version cut, with
-`CHANGELOG.md`'s `[Unreleased]` still reading *"Nothing yet"* — so the changelog was not merely
-un-stamped, it was not accruing. In the same window the roadmap kept extending *forward* (v1.0.0
-named, the Era −1 arc folded into v0.3.0, stub minors re-sequenced). The root cause, filed as
-**NR-103**: the roadmap writes done-definitions for exactly two versions, v0.1.0 and v1.0.0, and
-those are the only two ever cut or scheduled. A theme with no done-definition has no test for
-*finished*, so it absorbs items indefinitely — which is precisely what v0.1.1 did, taking on 26
-retrofitted items after its own three legs had shipped. Seven findings filed, **NR-097**–**NR-103**.
-
-**The cut.** v0.1.2 was the cheapest available: six items, all terminal, the work landed and
-verified 2026-08-07/08. Closing it needed bookkeeping rather than code —
-
-- **BL-340** (processing-chain roster) filed, because BL-323's own completion note scoped out the
-  processing half of S1 in as many words (new `resource_type` values with market/price/
-  serialisation wiring — a save-format change, not Lua authoring) and no item carried it. Closing
-  BL-323 without it would have silently dropped the work.
-- **BL-323** flipped to `complete` with a resolution covering all four strands, and its 11.3 KB of
-  design prose archived to the Q3 cold store.
-- **A done-definition written for v0.1.2** — six bullets on the v0.1.0 model, the first of the
-  per-minor definitions NR-103 asks for.
-
-**Gate.** Full rebuild green (150/150, app + every harness); the app smoke-launched clean; CTest
-**45/55**, and the ten failures are exactly the pre-existing baseline set recorded in
-`LastTestsFailed.log` on 2026-08-08 — `ai_skill_harness`, `earthlike_lean_trace`,
-`earthlike_tile_census`, `econ_stability`, `history_sim_harness`, `history_sweep`,
-`home_surface_bench`, `mediterranean_sweep`, `notable_worlds`, `world_audit`. No new failure
-introduced. Six of the ten are 60-second timeouts, which is most of the suite's 573-second runtime.
-
-**Three things the cut surfaced that the gate would otherwise have missed.**
-
-1. **`main` did not compile.** The BL-266 merge (Selection always open) retired
-   `ui_state::selection_hidden_for` but left the hire-unit path in `app.cpp` assigning to it. Found
-   by running the release build; fixed at `711b666` while this session was in flight. Worth noting
-   for what it says about the gate: there is no CI, so a broken `main` stays invisible until
-   somebody builds it.
-2. **`archive_designs.js` reformats the entire backlog.** It writes `JSON.stringify(data, null, 2)`
-   while `backlog.json` is stored at 1-space indent, so archiving one item produced a
-   7531-insertion / 7502-deletion diff and *grew* the file by 11.5 KB while reporting
-   *"-1% smaller"* (the size delta prints negated). Normalised back to indent=1 by hand, which
-   returned the diff to 32/3. Filed as **NR-109** — a two-line fix that will bite on the next
-   landing if left.
-3. **Two sessions were writing this repo at once**, and it showed: a duplicated NR-104, cut
-   bookkeeping swept into an unrelated commit (`7c423fa`), and `main` advancing four times
-   mid-cut. Filed as **NR-110**, with the suggestion that concurrent main-tree sessions use
-   worktree branches the way sub-agents already do.
-
-**Runtime:** not tracked.
-
----
-
----
-
-## Session — Build-heavy v0.1.1 batch: BL-215, BL-266, and the XS sweep, three worktree agents (2026-08-09)
-
-Full mode, Batch Delivery, first all-Linux delivery session (no PowerShell — status read via
-`backlog_query.js`; builds via `build_linux/` Ninja). Three concurrent worktree agents, merged
-in the main session with an integrating build after each. Runtime: ~1h wall (agents 10–28 min each).
-
-**BL-215 (text-wrap render audit, A)** — `ui::text_fit` module + overflow ledger; display floor
-1280×720 enforced via `SDL_SetWindowMinimumSize`; charts measure-first rework; § 6 site adoption;
-`verify.expect_no_clipping` + `scripts/verify/text_overflow_floor.lua` (PASS, 0 clipped —
-one real overflow found and fixed in the wizard legends). verifier-visual SKILL.md section added
-with Ben's in-session approval. Riders: NR-107 (tick abbreviate threshold), NR-108 (golden drift).
-
-**BL-266 (selection always open, B)** — `selection_hidden_for` deleted (18 sites, not the design's
-11); Esc terminates at the system menu; band rests on the player corp (swap-draw-restore keeps
-deselect representable). Rider: NR-104 — golden re-bless list + the Continent-lens-key overlap call.
-
-**XS sweep (C)** — BL-294 (dead `diverging_colour`/`icons::unit` + two doc corrections), BL-295
-(phantom-id comment rewritten), BL-339 (parked `draw_building_selection` deleted, ~410 lines).
-
-Merge notes: main moved mid-flight (another session's header-chrome drain + NR renumber), so all
-three merges were true merges; the BL-215 branch carried stale NR ids — its two entries re-filed
-as NR-107/108, two duplicates of NR-088/094 dropped. One committed-mid-flight bare `AddText`
-(`generation_preview.cpp`) marked fit-exempt. NR-095 records BL-262 (scoring) skipped as
-not-buildable (production axis needs a visible-information proxy). Goldens NOT re-blessed on this
-box (environment mismatch, 5–10% drift on untouched captures) — Ben's Windows pass owns that.
-
----
-
----
-
-## Session — Two of NR-094's footnotes promoted to their own backlog items (2026-08-08)
-
-Light mode, doc-only. Ben: the C-route ruling's open questions shouldn't just sit as prose inside
-BL-334. Filed **BL-335** (measure the real per-decision token cost through BL-278 — cheap,
-independent, no dependency on BL-334 landing) and **BL-336** (the goal-layer/myopia question,
-explicitly PARKED pending observed evidence — a fix for a failure mode nobody has measured Io's
-own scorer producing yet is scope, not defense). BL-334's design field and AI_OPPONENT.md § 10g's
-closing note updated to point at them instead of carrying the questions inline. The other two of
-BL-334's open questions (BL-207-vs-Stage-C precedence, model attach mechanics) stayed as BL-334's
-own design-owed detail — they resolve when BL-334 itself is promoted, not independently.
-
----
-
----
-
-## Session — Ruling on NR-094: Stage C takes the dialogue layer, the scorer keeps the action seam (2026-08-08)
-
-Light mode, design ruling — no code. Ben, direct instruction after reading the pulled-in cloud
-research: *"Rule on NR-094 now."* Runtime: not tracked.
-
-**The ruling.** Accepted the C-route feasibility note's layer recommendation
-(`docs/ai/LANGUAGE_POLICY_FEASIBILITY.md` § 9). `corp_ai.cpp`'s deterministic scored-utility core
-stays the action generator indefinitely — distilling it can only reproduce it (no skill upside),
-and the note's measured constraint tax (91.5% → 48.0% executable accuracy under a hard schema)
-is a live, avoidable risk at exactly the scale a local model would run at. The diplomacy
-capability that motivated the C-route in the first place is separable from action generation —
-Cicero's own architecture proves it at 2.7B — and Io already named this Stage ("the LLM planner
-speaks in-character in channels") in `AI_OPPONENT.md` § 7 back on 2026-07-26, just never
-decomposed it into a buildable item.
-
-**AI_OPPONENT.md gained § 10g**, recording the ruling and — this is the actual correction, not
-just an endorsement — naming precisely where § 10d drifted: its "small local model plays through
-text" framing reads as the model calling `issue_command` directly, which is Stage A/B territory,
-not Stage C. MCP, BL-278, and the local-model-as-runtime-target all stand unchanged; only which
-Stage the model occupies was wrong.
-
-**BL-334 filed** (design-owed): Stage C's dialogue layer, shaped by the ruling — a small model
-(Cicero's reference point, 2.7B) conditioned on the `corp_decision` ring's winning command +
-reason code as an intent, speaking into the Public/private channels, never emitting
-`corp_command` itself. The concrete build (trigger cadence, prompt template, composition with
-Stage A's existing templated messages) is left open; the shape is settled, the item is not
-promotable yet. **BL-279 rescoped in place**, not cancelled or reopened: its corpus now trains
-BL-334 instead of an action-emitting model, bootstrapped from `corp_ai.cpp`'s own decision ring
-first per the note's own instruction, before any cloud spend.
-
-**Left deliberately open, not ruled on.** The note's third recommendation (a goal layer above the
-scorer, for the documented step-wise-myopia failure mode) — filed as an open question inside
-BL-334 rather than accepted or rejected, since Io's own play has not yet shown that failure mode;
-ruling on a mitigation for an unobserved problem would be guessing. The ~300-token-per-decision
-figure the note flags as an assumption also stays unmeasured — noted as a cheap, independent
-follow-up, not a precondition on this ruling.
-
-**NR-094 resolved.** Regenerated `NEEDS_REVIEW.md`.
-
----
-
----
-
-## Session — C-route feasibility: both gates pass, and Cicero says the model is on the wrong layer (2026-08-08)
-
-Full mode, doc-only (no `src/` touched, so the item-spanning requirement gate doesn't apply).
-Ben, carrying context from the 2023 entailment-tree dissertation into Io: *see what patterns we
-can use for one-shot generation of actions (not reasoning structures this time)* — then the gate:
-*if it can't be compressed, or if it is not technically possible on our machines, then it's not
-worth pursuing, and we can use traditional RL methods.* Runtime: ~50 min.
-
-**Both gates pass, and the second was computed rather than estimated.** Compression is supported
-at 3–8B on current distillation evidence — the bar is low because Vox Deorum's 2,327 games showed
-open weights tying the tuned algorithmic AI with *no* fine-tuning, so the fine-tune's job is to
-reach a bar already cleared untrained. Latency was derived from `sim_loop`'s own constants
-(`econ_tick_days = 90`, `seconds_per_day_1x = 2.0`, the `{0.25, 0.5, 1, 4, 16}` curve) against
-`corp_ai_params::cadence_k = 4`: with 8 rival corps the per-decision budget is ~90 s at 1x, ~22 s
-at 4x and ~5.6 s at 16x, versus ~3–7 s of measured 8B-Q4 decode on consumer GPUs. The load-bearing
-detail is that the planner is out-of-process and the scorer runs every tick regardless, so a late
-decision never blocks the sim — latency gates only how *stale* the macro layer may be, which is a
-far weaker requirement than a per-tick deadline.
-
-**The 2023 negative result does not transfer, and the reason is prescriptive.** The dissertation
-rejected its H1 because *selection* was the bottleneck: candidate fact-pairings grow factorially
-and the model had no admissibility oracle, only a single gold tree to be scored against. Io
-inverts every term — `corp_command` is a flat fixed-arity record rather than a recursive tree,
-candidates are already bounded (`top_m_sites = 8`), and `placement_rules::can_place_in_world` plus
-`corp_command_result`'s seven typed rejections *are* the oracle. The prescription: enumerate the
-legal candidates and hand them to the model; never ask it to select blind.
-
-**The finding that changes what should be built.** Cicero — still the reference for full-press
-negotiation — runs a strategic planner that selects actions and conditions a dialogue model on
-those actions as *intents*, explicitly "offloading the responsibility of learning game legality
-and strategy to other modules". That dialogue model was **2.7B**, and it did not choose the moves.
-So the capability the C-route is being pursued *for* — diplomacy, larger strategy — is separable
-from action generation, and Io already emits the intent stream it would consume (`corp_decision`).
-Against that, making the model the action generator buys little: distilling `corp_ai.cpp` cannot
-exceed `corp_ai.cpp`, and it walks straight into the **constraint tax** (a 1.5B model measured at
-91.5% → 48.0% executable accuracy under hard tool-call schema, with the damage entering where
-instructions suppress deliberation rather than at the decoder).
-
-**Left open, deliberately.** The layer recommendation contradicts § 10d, which Ben *accepted* on
-2026-08-03, so it is filed as **NR-094** (`decision-taken`, open) rather than written into
-`AI_OPPONENT.md`, and the note itself carries a `⟳` saying plainly that it does not supersede
-§ 10d. The § 4–5 feasibility findings stand independently of the § 7/§ 9 judgement call, and the
-NR entry separates them so Ben can accept one and reject the other. The recommended first move is
-neither: § 10 flags the ~300-token-per-decision figure as an assumption, and one real decision
-through the already-landed BL-278 MCP server would replace it with a measurement for free.
-
-**Not done.** No `backlog.json` item was filed — the note is evidence for a ruling, not a build
-brief, and BL-279's scope depends on which way NR-094 goes.
-
-**Id note (2026-08-08 merge):** filed on the cloud session's branch as NR-079, which collided
-with an unrelated, already-landed local entry of that id (era-minus-1 rebase fallout) — renumbered
-to NR-094 integrating this session, per the same collision-renumbering practice as the morning's
-roadmap-extension merge.
-
----
-
----
-
-## Session — Critique batch delivered: build ledger grouping, construction glyph, reach-circle retirement, military start (2026-08-08)
-
-Full mode, Batch Delivery, sub-agent fan-out (Ben's steer). Promoted BL-326, BL-327, BL-328,
-BL-329, BL-330 from the prior session's critique into REFINED.md as a three-way file-disjoint
-split; delivered, verified, drained. Runtime: not tracked.
-
-**A — build ledger grouping + pre-commit warning (BL-326 + BL-328), one sub-agent, worktree-
-isolated.** `selection_panel.cpp`'s candidate list now groups by building family (Extraction /
-Processing / Infrastructure / Military) and sorts two-tier alphabetical — group, then row name —
-replacing the profit-ranked flat list Ben rejected ("not most profit first"). Each row also
-surfaces `construction_rate()` before commit: a stalled or supply-limited build says so up front
-instead of via the post-hoc paused status. **The agent's own worktree had branched from a stale
-base** (missing the Military Base row landed earlier this session) — its diff was extracted and
-hand-applied onto current `main` rather than merged wholesale. **One real bug found integrating
-it**: the warning rendered even on an already-invalid candidate ("Cannot build on water" AND
-"Local market can't supply materials" stacked on the same row) — fixed by gating the warning on
-`c.pr.ok()`, and the row height (four lines, hardcoded) clipped the new fifth line — fixed by
-reserving it unconditionally so every row stays a uniform height.
-
-**B — construction glyph + reach-circle retirement (BL-327 + BL-329), main session (same file,
-recently-authored code).** A new `icons::under_construction` — a stroke-only crane silhouette
-(mast, boom, back-stay, hook) — draws IN PLACE OF a building's type silhouette while
-`ticks_remaining > 0`, replacing the BL-323 S4 desaturation Ben found read as "faded" not "being
-built"; full owner-tinted colour, so identity still reads. `draw_corp_border`'s `AddCircle` ring
-is gone (renamed `draw_corp_hq`) for both the player's always-on chrome and rival borders under
-the Corporation lens — Ben's read: a fixed-radius ring that never grew as the player built
-outward showed nothing informative once the BL-323 reach fog existed to show supply reach
-properly. The `hq` star marker is unaffected. `influence_range` stays computed and stored (a
-future operate-gate may want it); LENSES.md, PLANETARY.md, `components.hpp`'s own doc comment,
-and `corporate_reach.lua`'s comments all updated to describe the marker rather than the retired
-ring.
-
-**C — military start (BL-330), one sub-agent, twice.** The first dispatch returned a placeholder
-("I'll report back once it completes") without actually editing anything; its worktree was
-auto-cleaned (no changes made) before the resume could reach it. The SECOND dispatch (or the
-same agent, retried) implemented it directly — the diff simply appeared in the main tree,
-complete and correct: the player corporation is seeded with one `military_base` and one unit
-(roster index 0, manpower 50, mirroring `hire_unit`'s own constant) at generation, on the nearest
-valid land tile to its HQ, skipped gracefully on a degenerate land-poor world. Rival corps are
-NOT seeded — player-only, per scope. `author_building`'s zero-staff condition extended to
-`military_base` to match.
-
-**Verification, all three slices.** Full `ProjectIo` build clean throughout. CTest: 45/55 —
-**investigated the one count that changed** (`home_surface_bench`, not in the prior session's
-documented baseline) by re-running it standalone (0 failures — a CTest parallel-load timing
-artifact, not a regression) and separately **isolated `ai_skill_harness`'s 7 failures** by
-`git stash`-ing this session's entire diff and re-running against the pre-batch commit: identical
-7 failures, confirming they predate this batch rather than being caused by BL-330's extra RNG
-draws (a real question worth checking, not assumed). Visual: `tile_build_ledger.lua`,
-`corporate_reach.lua`, and two ad-hoc zoomed captures (`glyph_check`, `mil_zoom`) inspected by eye
-per DEVELOPMENT_PRACTICES.md's Windows-authoritative rule (Linux golden-diffs on these all FAIL
-by the expected 4–7% platform noise; not re-blessed since none of the touched surfaces have a
-Windows-blessed baseline to diff against in this environment).
-
-**REFINED.md drained** per the retain-one policy. Requirements: requirements.json §
-critique-batch-ui-polish (R1–R6, all complete).
-
----
-
----
-
-## Session — Live critique: seven items filed, the building-selection bypass fixed (2026-08-08)
-
-Light-to-Full mix: Ben played the day's landed work in the live app and critiqued surface by
-surface; the sliced-globe render (committed separately, same sitting: 48 slices, Ben's pick from
-a six-form comparison) came out of the same session. Runtime: not tracked.
-
-**Filed from the critique, one item per directive** (all dated, all carrying Ben's words):
-BL-326 (build-ledger groups — expandable, two-tier alphabetical, explicitly NOT profit-first),
-BL-327 (a dedicated under-construction glyph REPLACING the BL-323 S4 dimming — superseded
-same-day, the dimming read as "faded" not "building"), BL-328 (pre-commit "this building won't
-get materials" warning — construction_rate already computes it, the ledger just never shows it),
-BL-329 (retire the corp-reach circle now the reach fog shows supply properly; blocked on
-BL-333), BL-330 (player starts with a military base + one unit), BL-331 (nuclear weapons develop
-in-game — WW3 is a nuclear threat; design-owed, hangs off BL-223's averted rupture and the
-BL-087 tech constellation), BL-332 (military points produced by bases + a dedicated research
-building, because nothing today measures how tech gets done; design-owed, the two halves
-designed together).
-
-**The one outright bug, fixed in-session (BL-333).** Selecting a player building bypassed the
-Selection element entirely — draw_selection_content routed it straight into the full management
-card (the 2026-07-22 "four-numbers card is useless" layout call, now superseded). A building now
-takes the same action|facts Selection view as every other kind: construction status, an
-Operate → **Manage** button (opens the construction ledger's Buildings tab, which already keys
-off selected_entity), profitability facts right. The ~300-line rich management card is PARKED
-`[[maybe_unused]]`, not deleted — whether it becomes the Buildings tab's detail pane or dies is
-NR-093, Ben's call. Verified by capture: the Selection band shows header / status / Manage /
-profitability on a fresh player building.
-
-**Approved in the same critique, no action needed:** the wizard globe (committed as the sliced
-render) and the reach-fog display of supply reach.
-
----
-
----
-
-## Session — Military base S1: the muster building lands (2026-08-08)
-
-Full mode, Delivery: BL-325 (military bases + supply) promoted, S1 delivered and drained; S2
-(hire-at-base) and S3 (out-of-supply decay) deliberately left in the item. Same sitting as the
-hardening entry below. Runtime: not tracked.
-
-**The type, end to end.** `building_type::military_base = 6` — economics array bumped 6 → 7 (the
-kind of silent-size bug the array's own comment now names), Lua name-map + `economy.lua` entry
-(produces nothing, staffs at zero alongside port/hub, dearer than a hub, cheaper than a
-launchpad), an explicit `can_place` case (any non-ocean land, no deposit requirement), named in
-`presentation.cpp`. The BL-323 machinery applies without a line of new code: the reach rule gates
-placement (deliberately NO anchor-type exemption — ruling 3 says the base extends nothing), the
-S3 site-time multiplier prices its build, and the S4 construction dimming renders it.
-
-**The glyph.** A filled shield — flat top, shoulders tapering to a bottom point — in
-`icons::building`, catalogued in ICONS.md per its add-a-glyph rule. Echoes the unit chevron's
-martial downward-point reading while staying unconfusable with it: the chevron is stroke-only,
-every building glyph is filled.
-
-**The surfaces and the dictionary.** Offered in the tile build ledger and the Selection primed
-check; `gameplay.build`'s ACTIONS.json entry updated (typed-args domain + reason_to_select names
-the base as where units muster once S2 moves hire onto it) and the mirror regenerated. The verify
-seam's `place_mode` was also missing launchpad and logistics_hub, not just the new type — all
-three added, so scripts can now arm any placeable building.
-
-**Verified.** `buildings_rework_harness` extended R6/R7: 19/19 PASS — land-in-reach placeable,
-ocean refused, beyond-reach refused (no exemption), staffs at zero, and ruling 3 held in code (a
-COMPLETED base is not a supply anchor; building one changes nothing in the reach field). A
-campaign `--verify` run placed one through the real construct path (tile 135,83) and the zoomed
-capture shows the shield rendering dimmed-under-construction with the Selection band naming it.
-Requirements: requirements.json § military-base-s1 (R1–R5, all complete).
-
----
-
----
+Ben closed it by naming the thing none of the ten items addressed: *"we are still yet to work on the
+output data, and what our age of exploration expects to find after the age of empires."*
+
+That reframes every null result above. `BL-887` moved nothing, `BL-839`'s forces are inert,
+`BL-838` didn't shift the figure it was written against, and `BL-905` found the primary lever
+refusing zero campaigns — four shrugs in one session. The common cause is not any of the
+mechanisms: it is that **nothing downstream asks pass 1 for anything specific**, so no mechanism can
+be judged, and a lever that stopped firing was noticed by nobody because no consumer would have
+missed it.
+
+The next block is therefore a design session on the **pass 1 → pass 2 contract**, not more
+mechanism. Items stay open deliberately; the handoff says do not open by tuning.
+
+One good report from the build: the round-4 time-lapse — `BL-817`'s record, `BL-830`'s scoreboard
+and `BL-891`'s arc readout together — **looks great**. That is the surface this whole phase is read
+through, and it is working.
+
+---
+
+---
+
+## 2026-09-10 (sprint 37 closes) — The seven owed items, and a delegation bug caught mid-flight
 
-## Session — Reach-rule hardening: three S2 defects ruled and fixed, and the military-base design settled (2026-08-08)
-
-Full mode, same sitting as the first-slice delivery below. Ben's steer: consider outside-the-box
-problems with BL-323 (buildings × visibility, buildings × the unfinished logistics system,
-buildings × military), then work the bugs one by one with a Q&A. Runtime: not tracked.
-
-**The review found three real defects in the already-landed S2, each ruled live via Q&A.**
-
-- **Stale caches (Ben: invalidate on EVERY event, the simple rule).** Placing a port/hub never
-  cleared `body_reach_cost` — the new anchor took effect only when an unrelated road placement
-  happened to clear the cache. Demolition cleared nothing, leaving ghost anchors. Fixed with a
-  shared `invalidate_logistics_caches` helper (logistics.hpp) called at every place, demolish,
-  construction completion, decommission/resume flip (all five flip sites: the corp-command idle
-  verb, the Selection panel's Idle/Resume pair, the construction panel's Decommission button, the
-  economy system's idle-a-loser reflex) and road placement.
-- **The virgin-body bootstrap was broken (Ben: first anchor free on anchor-less bodies).** The
-  anchor-tile exemption only covered tiles that already WERE anchors — none exist on a virgin
-  body, so the all-infinite field refused everything including the first hub, making Era 1
-  off-world expansion impossible once reach is enforced. An anchor-type placement now skips the
-  rule when `body_has_supply_anchor` is false. The guard: EXISTENCE of any committed anchor
-  (under construction included) ends the exemption, so the player cannot spam free hubs across a
-  virgin body while the first is still building.
-- **An unbuilt hub anchored supply (Ben: anchor only when complete).** `is_supply_anchor` ignored
-  `ticks_remaining` while the convoy-discount path required completion — the two disagreed, and a
-  construction-site shell extended placement reach. Now both use the same contract
-  (`ticks_remaining <= 0 && !decommissioned`), and hub-chaining outward gains natural build-time
-  pacing: the next reach step waits for the hub to finish.
-
-**Verified.** `logistics_reach_harness` extended with R9–R11 (completion contract, bootstrap with
-its no-spam guard, invalidation through the REAL construct/demolish path with no manual clears):
-26/26 PASS. Sibling harnesses re-run clean (buildings_rework, construction, corp_ai,
-supply_advance, trade_routes, econ). Full app build clean. Requirements:
-requirements.json § reach-rule-hardening (R1–R4, all complete).
-
-**The military thread settled into BL-325 (military bases + supply), four rulings via Q&A.**
-One new `building_type::military_base` (muster building, distinct rule + glyph); hiring moves
-onto the base (superseding BL-324's hire-anywhere — the base becomes the economy→military
-interface); **one reach field, not two** — Ben's own words: "a nation's reach for economy is also
-the military reach," so the economic logistics network IS the military supply envelope and the
-base is NOT an anchor (recorded as an interpretation in NR-091, overturnable — his "directional"
-could also have meant forward bases extend the envelope); units beyond the boundary suffer
-deterministic per-tick strength decay, the campaign twin of the Era −1 sim's supply attrition.
-Filed `designed`, priority B, v0.1.5 (the military-systems minor), requires BL-324.
-
-**Also logged.** NR-090 (question): rival construction state is publicly visible via the S4
-dimming — BL-068 never ruled on it; recommended ratifying it as public. NR-092 (observation):
-reach gates placement but never operation — a grandfathered remote building operates and ships
-freely; the asymmetry stands until BL-288's transport-capacity work and is noted for its design.
+**Mode:** Full, batch delivery, closing a reopened sprint.
+
+Delivered sprint 37's full owed list: BL-849 (province partition takes settled cells as a hard
+input, via a settlement lock mirroring the existing nation lock), BL-852 (fragmentation now
+derives from culture-contact interpenetration, retiring the kinship-blind tribal marches), BL-853
+(the sim's shared terrain view carries rivers — turned out narrower than filed, since production
+colonisation already had them via BL-857), BL-854 (B384a retired per Ben's ruling — capability
+carries to the history round, not asserted in the migration round), BL-855 (region adjacency
+degree-capped at 10, bounding the graph BL-844's heap fix could not reach), BL-859 (cancelled,
+redirected to BL-888: narrowed the polar/subpolar latitude bands, shrinking ice-cap extent ~36%),
+BL-861 (measured rather than fixed directly — resolved as a side effect of the other four,
+confirmed via `history_sweep` across 16 seeds; later found superseded by sprint 38's own
+independent resolution of the same pathology, reached first with Ben's ruling — NR-824).
 
----
-
----
-
-## Session — Buildings rework, first slice: extraction padding, site-dependent build time, construction legibility (2026-08-08)
-
-Full mode, Delivery lifecycle: promote BL-323 (Buildings rework) into REFINED.md, deliver, drain.
-Runtime: not tracked. Ben's steer: pull from origin, work the roadmap, land the uncommitted
-tree, then pick up BL-323 next.
-
-**Scoped honestly rather than promoted whole.** BL-323 has four sub-slices; S2 (logistics reach)
-and its S2b UI wiring were already landed in the prior session. Of the remaining three, S1
-(roster pad) was promoted **partially**: PRODUCTION.md's designed extraction table (Mine, Quarry,
-Lumber Camp, Ice Extractor, Surface Extractor) all target resources already in the current
-`resource_type` enum, but most of its processing chains (Chemical Plant, Electronics Lab,
-Fabricator, Assembly Plant, most Refinery outputs) need NEW resource types with no market/price/
-serialisation wiring — a design item of its own, not a Lua-authoring pass. Flagged in REFINED.md
-rather than silently narrowing the item's promoted scope.
-
-**A — extraction roster padded, zero logic changes.** `k_extractable` (`placement_rules.hpp`)
-widened from 4 to 15 targets: coal, silica, copper_ore, rare_earth_ore, stone, sand, clay, timber,
-iron_nickel_ore, platinum_group_metals, regolith — every resource `tile_generation.cpp` already
-deposits (confirmed by reading the generation code, not assumed) but that no extraction target
-reached. `can_place`, the build-mode target picker (`selection_panel.cpp`, `body_surface_canvas.cpp`),
-and the resource presentation table (names, short codes, colours) were all already generic over
-this list, so the whole pad is an 11-line whitelist addition.
-
-**B — the Smelter's second recipe.** `iron_nickel_ore -> steel` added to `recipes.lua`
-(PRODUCTION.md's designed Era-1 Smelter input, no carbon reagent needed since metallic asteroids
-are already reduced) — no enum churn, recipe count 4 -> 5.
-
-**C — build time depends on the site (S3, landed in full).** `construct_building` now scales the
-base `build_duration_ticks` by three multipliers at placement, each 1.0 at the cheapest case so an
-anchor-adjacent plains first-of-its-kind build reproduces the old flat behaviour exactly:
-**landform** reuses `landform_logistics_cost` (plains 1.0 .. mountain 2.0, no second terrain
-table); **reach** is linear in the tile's distance from its nearest supply anchor, from 1.0 at the
-anchor to `1 + site_time_reach_scale` at the `max_logistics_reach` budget edge; **stack** discounts
-an established site (a tile already carrying the same building type), floored at
-`site_time_stack_min`. New `construction_params` fields (`recipe_registry.hpp`), authored in
-`economy.lua`. `ticks_remaining` floors at 1 for any real-duration type; a 0-duration type (some
-infrastructure, by design) stays instant regardless of site.
-
-**D — construction reads as such at a glance (S4).** A building with `ticks_remaining > 0` renders
-desaturated/half-alpha on the Planetary canvas — previously identical to a finished building until
-clicked. The glance-then-stick hover card (`hover_building_supply` in `hover_content.cpp`) gained a
-"under construction — N ticks remaining" line, outranking the decommissioned/idle status lines
-(construction has no output to explain yet regardless of workforce). The Selection panel's fuller
-rate/stall diagnosis (`construction_status`, already existing) is unchanged — this closes the
-canvas-legibility gap the item's own design record named, not the click-through detail, which
-already existed.
-
-**Verification.** New `tools/verify/buildings_rework_harness.cpp`: 12/12 PASS (every widened
-`k_extractable` target placeable on its own deposit and refused without one; the iron-nickel
-recipe resolves distinctly from the iron recipe; landform/reach/stack each move `ticks_remaining`
-the right direction; the 1-tick floor and the 0-duration instant case both hold). One harness bug
-caught and fixed in-session: the R5 fixture built only the tiles under test rather than the full
-grid, so the reach-field's A* found a gap and read the remote test tile as unreachable
-(`out_of_logistics_range`) rather than merely far — fixed by building a complete grid, as the
-existing `logistics_reach_harness` fixture already does. Full `ProjectIo` build clean. CTest
-46/55 — the 9 non-passing (`ai_skill_harness`, `econ_stability`, `world_audit` failures;
-`earthlike_lean_trace`/`earthlike_tile_census`/`history_sim_harness`/`history_sweep`/
-`mediterranean_sweep`/`notable_worlds` timeouts) all match the pre-existing failures the prior
-session's audit note and this session's own environment already documented — reproduced
-identically without this change, not a regression it introduced. A zoomed `--verify` capture
-(`zoomcheck_built`, not a golden — a one-off inspection tool) confirmed the desaturated marker
-renders correctly on a freshly-placed, still-building tile.
-
-**What stayed open, recorded in BL-323's own design field rather than silently dropped.** The
-processing-chain half of S1 (see above). Requirements: requirements.json § buildings-rework-
-first-slice (R1–R7, all complete). REFINED.md drained per the retain-one policy.
+**A genuine tooling failure cost real time, caught and reported rather than worked around.** The
+`generation-dev` sub-agent, given the Agent tool via a blanket "All tools" grant, recursively
+spawned further sub-agents instead of implementing directly — eight runaway agents made zero
+commits before this was caught and killed via `TaskStop`. A same-session self-correction agent,
+launched without worktree isolation by mistake, then discarded a set of legitimate uncommitted
+edits from the *shared* worktree along with the duplicate's — caught immediately via the
+on-disk-change warning and redone before anything was lost. Filed a background investigation task;
+Ben (in a separate session) fixed the root cause mid-session (`Agent` removed from
+`generation-dev`/`economy-dev`/`ui-dev`'s toolset, commit `eb3c1186`). A second wave of agents,
+post-fix, still hit assorted glitches (one losing all tool access mid-task, one resuming into a
+tools-less spawn) but did real, mergeable work before stalling — every stall was recovered by
+treating the stalled agent's worktree as a diff to inspect and finish directly (build it, run its
+own stated verification, commit) rather than trying to "resume" it (no such tool exists in this
+environment; a second Agent call is always a fresh spawn in a fresh worktree).
 
----
+**Honesty over a clean number, twice.** BL-855's own measured result did not cleanly hit its
+stated "flat ms/rebuild" criterion at the larger region counts this run reached — reported as
+such, with NR-825 filed rather than the number quietly rounded up to a pass. BL-888's
+boreal-share-of-unfarmed-land number moved more modestly than its raw tile-incidence number, for a
+real and stated reason (freed ground reclassifies into other marginal cold-adjacent classes, not
+farmland) — also reported plainly.
 
----
+**Merging surfaced concurrent sprint-38 work.** Root `main` had moved 2 commits ahead (a backlog
+purge/consolidation, plus sprint 38's own independent resolution of the no-conquest pathology and
+BL-868) while this session worked in its worktree. Merged cleanly with real conflict resolution in
+`backlog.json`/`sprints.json`/`NEEDS_REVIEW.json` (one NR-id collision, renumbered), rather than
+force-pushing over either side. `build_rel` rebuilt and confirmed working after the merge.
 
-## Session — landing the uncommitted generation-preview / Era -1 terrain work (2026-08-08)
-
-Full mode: review and land the foreign uncommitted working-tree state the prior audit-note entry
-(below) found but deliberately left untouched. Runtime: not tracked. Ben's steer: sort out the
-uncommitted work before picking up new roadmap items.
-
-**What it actually is, confirmed against the code rather than assumed from the audit note.**
-Four distinct pieces, all real and all verified, none previously landed:
-
-- **BL-316 S1 (Era -1 real terrain).** `src/world/sim_terrain_build.hpp` (new) — the ECS-to-view
-  adapter `build_sim_terrain` that raster-samples a body's tiles into the `sim_terrain_view` the
-  history sim reads. Before this every Era -1 battle in every run was fought on default
-  grassland/plains, so `terrain_combat`'s modifiers were dead code. `history_sim_harness` and
-  `history_sweep` wired to use it; the sweep's grid dims were also silently wrong (168×90 vs the
-  real 180×84 — both 15120 tiles, so the mismatch never crashed, it just misaligned every terrain
-  lookup) and its S2 recheck was comparing against an EMPTY terrain view rather than the real one
-  used to produce the row being rechecked — a guaranteed false result the moment terrain affects
-  a decision. Both fixed.
-- **BL-323 S2b (the reach-budget gate's last two call sites).** The item's own design record
-  named this as "required rather than cosmetic" and still owed at three UI call sites; two were
-  already fixed, this session's diff wires the third and fourth: `run_verify`'s tile-scan path
-  (was offering tiles the authoritative gate would then refuse) and the live canvas render
-  loop's per-frame `body_reach_field` build (the interactive game was never calling it at all).
-- **BL-321 wiring.** `works_registry` (landed as `src/world/works_roster.{hpp,cpp}` in an earlier
-  commit) gets an `m_works` member and a `load_from_lua("scripts/works.lua")` call in
-  `app::load_economy` — the runtime loader was written but never actually wired into the app.
-- **The wizard's real-surface preview pane — NOT BL-256.** `src/ui/generation_preview.{cpp,hpp}`
-  (new) plus `generate_home_surface_preview` (new in `hard_coded_world.{hpp,cpp}`, extracted
-  from `make_hard_coded_world` so the wizard and the real build share one seed-choice function
-  by construction) replace the wizard's charts-only screen with a 1/3-controls : 2/3-preview
-  split, painting a hex-sampled orthographic globe of Kepler's ACTUAL generated surface (parity
-  verified tile-for-tile against `make_hard_coded_world`, see below), built async off-thread so a
-  control click never blocks and synchronous under `--verify` so goldens don't race the worker.
-  **This is a smaller, different thing than BL-256** (`GENERATION_GLOBE_PREVIEW`, still
-  `designed`, v0.1.1): no player pan (rotation is wall-clock only), no pole-treatment
-  measurement, no BL-265 fold-vocabulary integration for the demoted charts, no debug-window
-  task-1 prototype. Filed as NR-089 rather than silently treated as BL-256's landing — Ben's
-  call on whether BL-256 is now superseded/narrowed or still wanted in full.
-
-**Verification, since none of this had run before.** Fixed one real bug found in review: the new
-`generate_home_surface_preview` declaration had landed mid-way through `make_hard_coded_world`'s
-own doc comment in the header, splitting it from the function it documents. `home_surface_bench`
-(new harness, `tools/verify/home_surface_bench.cpp`) confirms the preview surface is
-byte-identical to `make_hard_coded_world`'s Kepler across five seeds, worst case 793 ms (under
-the 1 s ceiling the wizard's async path exists to guard against). `works_roster_harness` 18/18
-PASS. Full `ProjectIo` + `home_surface_bench` + `history_sim_harness` + `history_sweep` +
-`works_roster_harness` build clean. The wizard/menu goldens in the tree were already re-blessed
-for the new layout; Linux golden-diff numbers (0.75–20%) are expected noise per
-DEVELOPMENT_PRACTICES.md's Windows-authoritative rule — inspected all six captures by eye
-instead, all correct (`planetology_wizard_1_life.png` shows the real Kepler terrain painted as
-hexes, matching the live canvas's own rendering). `history_sim_harness` and `history_sweep`
-themselves ran past two minutes in this environment without finishing — consistent with the
-prior audit note's finding that this specific harness runs anomalously slowly here independent
-of code changes; not re-litigated, since the code-level correctness (terrain adapter, dimension
-fix, recheck fix) was verified by reading and the harness's own logic is unit-testable by
-inspection.
-
-**Local-only artifacts discarded, not committed.** `docs/ui/mockdata/*.csv` and the six
-`perf_*.csv` files at repo root are regenerated output from running verify scripts locally, not
-source — reverted rather than landed, per the prior audit note's own read of them.
+**Runtime:** several hours, spanning a sub-agent-heavy delivery pass, a debugging detour into the
+delegation bug, and a merge/build/verify pass. Items: BL-849, BL-852, BL-853, BL-854, BL-855,
+BL-859 (cancelled), BL-861 (cancelled), BL-888 (new). NR-825 filed and open.
 
 ---
 
 ---
 
-## Session — military design thread + BL-324 batch delivery (2026-08-08)
-
-Full mode: design conversation (BL-157/BL-324/BL-305/BL-280), then Batch Delivery of the two
-items that reached `designed`. Runtime: not tracked — no session timer available in this
-environment; treat as missing rather than guessed.
-
-**Military design thread (BL-157).** Recorded as an open thread, not a ruling: hybrid units
-(lean toward blended roster-entry class weights over a composite/force model, to avoid
-reopening BL-157's own "no force record, unit grain" settlement), zone of control (a
-radius-1 tile-neighbourhood projection, 5-8 tiles, open question on what it actually denies),
-and multi-round battle resolution (a bounded outer loop around `resolve_battle`, seeded RNG,
-keeping the Era -1 sweep's single-evaluation cost contract intact). Three rendering sketches
-produced to react to, none chosen. See BL-157's `design` field for the full write-up.
-
-**Three items designed in one pass, question-by-question.** BL-324 (unit hire surface): hire
-gate reads the corp's own stockpile/market access; the `unit_component.body`->tile grain fix
-lands inside this item rather than reopening BL-157; rival AI corps get the hire verb from day
-one. BL-305 (nation/corp generation visibility): territory carve watched live on the
-generation screen; corp step splits by surface (canvas for placement, card for the financial
-profile). BL-280 (negotiated tax rate): negotiation surface (Laws ledger) and cadence
-(player-initiated, at a cost) settled; the counterparty-cost mechanism stayed explicitly
-parked, so BL-280 stays `design-owed` — not every open question resolves in one pass.
-
-**BL-324 promoted and delivered in full — all 5 tasks, all 7 requirements met.**
-- **A — the unit record.** `unit_component.position` (a tile id, replacing `body`) + a
-  fixed-point `strength` scalar; `world::units` already existed as the id-keyed map BL-157
-  asked for. Two other consumers of the old `.body` field were still on it and needed fixing
-  alongside components.hpp: `entity_summary.cpp`'s Selection-panel render and `view_nav.cpp`'s
-  go-to-selection navigation — both resolve the body through the tile now.
-- **B — the campaign hire gate.** `unit_roster.cpp` gained a `gate_met` overload taking four
-  raw ints (shared by both the province path and this one) plus `campaign_gate_input`, which
-  derives ore/farm/port/energy axis values from the corp's own summed stockpile
-  (`corp_stockpile_total`, exported for corp_command.cpp to reuse) and whether it holds a
-  port. Binary presence (1000 or 0) by design — a yes/no supply-chain question, not graduated
-  tuning.
-- **C — the hire verb.** `corp_verb::hire_unit` debits a flat per-axis cost from the gated
-  resources (two-phase check-then-commit, all-or-nothing) and constructs the unit at the
-  target tile. `corp_ai.cpp` scores it in its own candidate bucket, capped at one hire per
-  eval — and, after the AI skill harness measured the consequence, at **three units per corp
-  total**: the presence-based gate never runs out on its own (unlike build sites or
-  unsurveyed bodies), so without a ceiling a corp with steady extraction hired every single
-  eligible eval, forever (measured: 525 hires in a 300-tick/5-corp run, identical across all
-  five benchmark seeds — the count was gate-driven, not score-driven). The cap is a first-cut
-  brake (a modest garrison, not full mobilisation), not a tuned balance figure.
-- **D — the hire affordance.** A Hire section in the tile Selection element's construction
-  ledger (`selection_panel.cpp`), beside the existing Build candidates — not folded into that
-  loop, since hiring never touches building slots or placement validity. `selection_kind::unit`
-  was already wired end-to-end (label, render) from BL-157's stub; this is what finally makes
-  it reachable.
-- **E — the standing-rules record.** `io-standing-rules.md` gained the rival-corp hiring
-  exception entry, alongside BL-079/BL-202/BL-181.
-
-**Two harness regressions found and fixed, both from the same root cause.** `corp_ai_harness`'s
-cooldown check and `ai_skill_harness`'s dial-thrash-ceiling check both classify "not build, not
-survey" as a per-building dial — `hire_unit` is neither (it never sets `cmd.subject`), so both
-harnesses needed `hire_unit` excluded from that classification. Caught by running the harnesses
-after each change, not assumed clean from a compile pass.
-
-**What stayed out.** BL-305 was promoted into REFINED.md (4 tasks, requirements written) but
-**paused before any code**, on discovering its file scope (`hard_coded_world.cpp`, `app.cpp`)
-exactly matches the uncommitted generation-preview/Era -1 work already sitting in the tree from
-another session (see the entry below). Recorded as NR-085, `decision-taken`: safer to land the
-disjoint, complete BL-324 delivery than risk colliding with unreviewed foreign edits on the same
-files. BL-305's tasks stay in REFINED.md, ready to resume.
-
-**Pre-existing failures surfaced, none caused by this session's changes** (verified by stashing
-this session's diff and re-running against the bare tree, twice — before and after the unit
-cap): `ai_skill_harness`'s seed 0/1 net-worth bands and seed 3's dial-thrash ceiling, and
-`world_audit`'s S2 forest+wetland target, all fail identically with or without this session's
-code. `history_sim_harness` alone (no contention) still ran past 30s in isolation against its
-own documented ~2.1s budget — so `earthlike_lean_trace` / `history_sweep` /
-`mediterranean_sweep` / `notable_worlds` timing out under CTest's 60s bound is plausibly the
-same cause, not CPU contention. All of these touch files the uncommitted foreign work already
-modifies (`hard_coded_world.cpp`, the Era -1 sim's terrain view); left unreviewed and unfixed
-per this session's scope, consistent with pausing BL-305 for the same reason.
+## 2026-09-10 (sprint 38) — City states become empires, eight of nine
 
----
+**Mode:** Full, batch delivery.
+**Runtime:** one extended session, largely parallel sub-agents in separate worktrees; the main
+session merged, built, verified, and reconciled backlog state at the end.
 
----
+### What started it
 
-## Session — audit note: uncommitted generation-preview / Era -1 terrain work found in the tree (2026-08-08)
-
-Not a build session — nothing here was authored in this session. Recorded per Ben's steer
-("fill a phantom devlog for the work... if we don't have to review it, that's ok") so a chunk of
-real, uncommitted working-tree state doesn't sit unexplained for whoever finds it next. Runtime:
-not applicable — this is an inspection record, not delivered work, ~10 min of `git diff`/`grep`.
-
-**What was found.** While auditing whether the buildings rework (BL-323) was actually complete
-(it isn't — see the entry below), `git status` turned up a second, unrelated body of uncommitted
-work already sitting in the tree, apparently mid-flight from another session:
-
-- `src/ui/generation_preview.{cpp,hpp}` (new, 525 lines) + an `app.hpp`/`app.cpp` diff — the New
-  World wizard's preview pane now builds the REAL homeworld surface asynchronously
-  (`generate_home_surface_preview`, new in `hard_coded_world.hpp`) instead of a stylised
-  painting; async off-thread so a wizard control click never blocks, synchronous under
-  `--verify` so goldens don't race the worker. `tools/verify/home_surface_bench.cpp` (new)
-  benches it.
-- `src/world/sim_terrain_build.hpp` (new) — an ECS-to-view adapter for the Era -1 sim (BL-316
-  S1). Its own header comment records a real bug this fixes: every Era -1 battle before this was
-  fought on default grassland/plains regardless of actual terrain, so `terrain_combat`'s
-  defence/attrition modifiers were dead code in every run to date.
-- `app.hpp` also wires in `works_registry` (BL-321, Era -1 works table).
-- `tools/verify/history_sim_harness.cpp` / `history_sweep.cpp` — R7's timing bound relaxed
-  1s -> 3s, with an in-code comment explaining why (the settle-occupancy fix quadrupled real
-  province count — correct behaviour, more work — measured ~2.1s; the sub-second bar is filed to
-  return once BL-320, Era -1 sim runtime, lands its index).
-- `perf_*.csv`, `docs/ui/mockdata/*.csv`, and the re-captured golden PNGs are just local
-  perf/verify-script output, not source changes.
-
-**State.** BL-316, BL-321 and BL-274 (era-keyed rosters, which this touches too) are all still
-`designed` in `backlog.json` — no matching `complete`/`resolution`, no prior DEVLOG entry, no
-stash. This is live, uncommitted, working-tree state, most plausibly another session still open
-elsewhere. Left untouched — not reviewed, not committed, not reverted. If it's yours, it's
-exactly where you left it.
+Ben: mint backlog items for the Empires round out of the CIVILISATION.md design (closed
+2026-09-09), mirroring how the colonisation wizard stage presents, and batch-deliver the whole
+chain — "if there are problems that come up, or if you have any questions, just ask."
 
----
+### What landed
 
----
+Eight of sprint 38's nine items, all verified on main: BL-873 (culture coining year), BL-871
+(empire span split, 400 BCE→1200 CE, so Culture and Empires stop running the same simulation),
+BL-866 (sparse settlements — seats and hinterland pointers, conquest carries a whole hinterland
+at once), BL-837 (ancient roads — a heavily-walked edge gets cheaper, campaigns beyond
+sustainable reach are denied outright), BL-867 (materials spent on action — labour splits
+subsistence/industry/muster, a captured seat carries its material stock rather than resetting),
+BL-870 (culture relations — opposition PERMITS conquest rather than forbidding it, corrected
+from an initially backwards formula), BL-869 (civilisations from mixing — named records with an
+ethic, gated by an opposition bar so estranged cultures never coin one), and BL-872 (centres
+from supply/governance — a population centre grows only where the road network can still feed
+and rule it; cut-off ground freezes rather than razes).
 
-## Session — The Era -1 arc's second day: Ages view, sweep verdict, review, and the fixes (2026-08-05)
-
-Retroactive entry, written 2026-08-07: this session's five commits reached `main` that day by
-rebase onto `origin/main`, and the arc had no DEVLOG record until this repair (NR-079). Full
-mode, delivery. Runtime: reconstructed from commit stamps — 08:42 to 12:26, ~3.7 h.
-
-**The Ages view** (*The Ages view: two thousand years of borders, scrubbable*). A fourth History
-tab replaying the Era -1 sim's ownership change list: year scrubber, Play/Restart transport,
-provinces coloured by polity, the run's own cost printed under it. The sim runs lazily over a
-COPY of the body's settlement state — deliberately not in the generation path, so BL-271's
-(Era -1 history sim) open question 2 stayed open rather than being answered by accident. Delta
-encoding is what makes it possible: any year materialises from 654 changes / 5.2 KB. Captures
-inspected, NOT blessed — the software renderer fails on this machine, so a golden blessed here
-would be GPU-specific.
-
-**The sweep, and the answer is no** (*The history sweep, and the answer it gives is no*).
-BL-275 (history sweep distributions) landed as `tools/verify/history_sweep.cpp` — reports, does
-not gate. First spread: hegemony 0/12, elimination 0/12, powers-at-epoch equals powers-at-start
-in every world. BL-224's non-hegemony invariant satisfied for a degenerate reason — elimination
-and collapse are unreachable — which is the false confidence the sweep existed to expose. Filed
-in-session as the no-elimination finding, priority A (see the id note below).
-
-**Rosters and two great powers** (*Rosters, two great powers, and a death spiral that does not
-quite kill*). BL-274 (era-keyed rosters) landed as `src/world/unit_roster.{hpp,cpp}` — 19 rows
-over four bands, availability derived from province endowment, resolving INTO combat's types
-rather than combat gaining a roster table it was designed not to have. BL-299 (great-power
-seed) seeds two majors with opposed creeds off `history_sim_params`. The first no-elimination
-fix attempt (cohesion, a settle gate, a sack, transfer relief) made hegemony reachable (0/12 to
-1/12) but not elimination (still 0/12); the weakest power measures median 6 provinces, range
-1..22 — the model "gets to the brink and stops", recorded as a FAILED requirement row rather
-than re-scoped.
-
-**The review that reframed it** (*The review lands, and the sim stops in year 458*). Cold
-review, nine findings. The severe one: the four verbs score on incommensurable scales, so
-Invest pins at its ceiling once populations mature and no other verb can win the argmax again.
-Measured: last ownership change at median year 458 of a 0–1960 run, 36% of changes in the first
-tenth. Three quarters of every run inert — which supersedes the no-elimination diagnosis. Four
-items filed (see the id note below).
-
-**Four review items: three land, one reverts** (*Four review items: three land, one reverts,
-and the stall was never real*). The settle-stacking fix was the biggest lever in the arc: an
-occupancy search instead of nine untested candidates, conquests 201 → 3568, LAST CHANGE YEAR
-458 → 967, first-tenth share 36% → 5%. The Ages cache re-keyed on a generation fingerprint. The
-verb-scales fix REVERTED — normalising by each verb's own range structurally favours the
-narrowest range; the real fix is one scale by construction, a scorer redesign. And the
-vacuous-stall finding exposed the arc's biggest design correction: with the radius widened and
-`w_dist` zeroed, under-supplied campaigns still TAKE the far province — the stall that BL-277's
-(Era -1 military strategy) Q2 attributed to supply decay is a score preference, not a physical
-limit. Full-run cost measured at ~2.1 s (749 real provinces instead of 191 — the growth is the
-improvement).
-
-**The id note (2026-08-07 rebase).** These sessions filed their findings as backlog ids 308–313
-and review-queue notes 064–066; the rebase onto `origin/main` kept origin's ids, which the
-2026-08-06 sessions had already spent on unrelated items (propellant, deeds, tech tree, works
-doctrine, minimap, time panel). The landed fixes need no re-file. The two still-open findings —
-no-elimination and verb scales — currently have NO backlog id (the scorer redesign sits
-unnumbered in the 2026-08-07 working tree), and BL-277's (Era -1 military strategy) design
-prose lost both its five answers and the Q2 correction. NR-079 records the debt; requirement
-groups `history-sweep`, `era-rosters-and-great-powers` and `era-minus-1-review-fixes` carry the
-corrected citations.
+Several caught real defects before shipping: an integer-truncation bug that zeroed campaign
+material cost under 250 raised heads; two directional inversions relative to CIVILISATION.md's
+stated design (opposition's discount ran backwards; a test fixture skipped `draw_region_urban`
+and compared against the wrong baseline); a test seed that happened to land on a peaceful world.
 
----
+### What didn't
 
----
+BL-868 (creeds raise armies — a culture's `aggression_q` should lean the Campaign score) failed
+verification seven times running. The wiring has looked correct since the first attempt; every
+failure has been in the TEST — vacuous metrics, calibration outside default ranges, a genuine
+confound (a symmetric arms race between two aggressive cultures can end a war EARLY, logging
+FEWER campaign events for the more warlike world, not more), and finally, once that confound was
+fixed, a fixture that no longer fights at all under BL-837/BL-872's reach gate and supply floor —
+both landed after BL-868 was first designed. Left open; see NEXT_SESSION.md.
 
-## Session — Roadmap extension: v0.1.x retrofitted, the Era −1 arc given a home, v1.0.0 named (2026-08-08)
-
-Full mode, doc-only (no `src/` touched, so the item-spanning requirement gate doesn't apply).
-Ben: *the roadmap should be extended to match sprints — anything after v0.2.0 isn't canonical,
-read the docs and the latest backlog, then map a path to a playable game with basic AI rivals.*
-Runtime: ~45 min.
-
-**The gap was already named, just not closed.** NR-076 (2026-08-07, still open) had flagged that
-the Era −1 sandbox arc — the history sim, ancient tech ladder, mil-sim and diplomacy work, ~15
-items and the most active recent work in the backlog — appeared nowhere in `ROADMAP.md`, whose
-arc section stopped at v0.4.0. That is the concrete shape of "not canonical": v0.3.0/v0.4.0 were
-named in prose but thin, and the largest live body of work sat outside the map entirely.
-
-**Two structural calls, put to Ben directly rather than decided silently** (per the tone rule —
-present options, let the developer choose): where does the Era −1 arc live, and does the roadmap
-need a terminal "playable game" milestone? Answers: fold the arc into **v0.3.0**'s writeup as
-groundwork (it never ships to campaign play itself, so it's named the way v0.1.0 named its audit
-instruments — tooling, not a release) rather than minting a new v0.2.x band; and yes, name the
-terminal cut — **v1.0.0**, not v0.5.0 (Ben's correction), reachable "by following current steps"
-rather than by inventing new scope.
-
-**`ROADMAP.md` changes.** v0.3.0 gained the conflict spine (**BL-315**, filed 2026-08-07, the
-governing body's answer to "what force does it command"), the Era −1 groundwork writeup (combat
-engine, diplomacy seam, ancient tech ladder — with BL-271's own architecture-only transfer
-contract stated explicitly), BL-087's real home (it had drifted from its nominal v0.1.3 stub),
-and the point where AI rivals graduate from corp-level (v0.2.0, Trade only) to nation-level (the
-runtime-actor residual BL-094 specifies fresh, now that its old container BL-054 is closed and
-redistributed — NR-075 — contesting Conflict too) — the "basic AI rivals" bar the request asked
-for. v0.4.0 gained the culture-region/history-ladder generation cluster
-(BL-222/223/224/238/239/240/311) as the substrate its political layer promotes into something
-real. A new **v1.0.0** section plus a **Done-definition — v1.0.0** section (mirroring v0.1.0's
-structure) name the whole-game bar: governing-body play, AI rivals across both pillars, law/tech/
-politics reaching military outcomes, a standing/scoring system, the word interface covering every
-pillar, determinism preserved throughout.
-
-**v0.1.x retrofitted against current `backlog.json` status**, since it had drifted since
-2026-08-04: BL-203/BL-204 (corp AI predictive spending, skill harness) are complete, not
-"queued"; BL-205 (corp chat log) was cut 2026-08-07 (NR-075) and its stale "queued" mention
-removed; 13 items surfaced 2026-08-01→08-04 (the documentation-audit findings, the BL-262
-standing/scoring system, several settled-but-unbuilt UI revisions, a build-health bug) were added
-to v0.1.1, which never actually closed; BL-280 (negotiated tax rate) added to v0.1.2; BL-157
-(military stub) noted as firmed up by the 2026-08-07 military design session rather than still a
-blank stub.
-
-**Left deliberately open.** NR-076's other three Band-3 scope calls (cut BL-160, cut-or-park
-BL-207, cut the generation-flavour tail) are Ben's to rule on and this pass doesn't pre-empt
-them — recorded as still-open in the new NR-078 entry rather than silently resolved. `CLAUDE.md`'s
-`ROADMAP.md` pointer paragraph was updated to match; `NEEDS_REVIEW.md` regenerated.
+### What was found late
 
----
+BL-867's backlog record was still unmarked days after its code landed on main (`b25db602`) — the
+delivery commit happened, the bookkeeping commit didn't. Caught and fixed during this session's
+close-out; a reminder that the last step of a batch delivery is as easy to drop as any other.
 
----
+### What is open
 
-## Session — Red herrings and the rupture: making Era 1 failure a skill test (2026-08-05)
-
-Light mode, doc-only, continuing the tech-tree sitting. Ben: *little red herrings that make Era 1
-failure (WW3) more likely — more advanced does not mean better; the player must be skilled at
-avoiding danger, in each dimension of play.* Runtime: ~30 min.
-
-**The load-bearing half isn't the herrings.** A red herring with nothing to trigger is flavour. So
-the draft supplies the quantity they feed — and takes BL-223's own discipline verbatim (the
-deterrence ceiling is *a per-nation scalar, not a nuclear-equivalent object*): **two per-nation
-scalars**, **Ceiling** (BL-223's, unchanged) and **Alarm** (new — how threatened a nation feels,
-moved by others' *visible* capability, severed trade, posture, domestic instability).
-
-**The rupture check.** The seeded date decides when the rupture is *tested*, not the outcome. Alarm
-above Ceiling and it goes hot: Era 1 fails, and the Era event's selective destruction lands on
-exactly the orbital and heavy-industrial assets the space programme needed. Deterministic
-threshold, seeded date, visible countdown — no random ruptures.
-
-**Seven herring kinds**, one danger per dimension of play: escalator, legibility trap,
-interdependence severer, brittle optimisation, contextual dud, tempo trap, domestic destabiliser.
-Every one carries a **tell that precedes commitment** — the legible-in-hindsight rule, and the
-difference between a skill test and a gotcha.
-
-**The space row makes it work, because it is unavoidable.** Heavy Ballistic Lift is on the critical
-path to Era 1 and is the biggest single Alarm source — the same stack that reaches orbit is a
-missile. The player's job isn't to dodge the dangerous tech; it's to buy the reassurance that lets
-them hold it (Open Launch Inspection, Civil Telemetry Network).
-
-**One inverse herring, deliberately.** Hardened Dispersed Basing looks aggressive and is
-*stabilising* — a survivable second strike removes the use-it-or-lose-it panic. If every
-menacing-looking node were a trap, "menacing" would just become the tell.
-
-**Also settled in passing:** trade interdependence as the cheapest Alarm suppressant makes the
-Trade pillar **defensive** — a claim about the game's shape, not a tuning knob. NR-068 carries the
-scalar for Ben's call; four questions open, including whether Era 1 failure ends the campaign or
-delays it (lean: delays, expensively).
+BL-868 (above). BL-887 (reach-as-centre-chains) was filed and deliberately deferred — Ben's own
+call: too few small polities survive Round 4, and a "new world" should remain for a future
+exploration/colonisation phase, but the fix (chains of population centres, Logistic Points)
+waits on tech progression being wired into generation first. BL-861 and BL-823 both need a
+re-scoping pass before implementation; their prose predates this sprint's mechanics changes.
 
 ---
 
 ---
-
-## Session — The Era 1 tree, first draft: keystones opened by deeds (2026-08-05)
-
-Light mode, doc-only, same sitting as the effects pass below. Ben: *consider the shape of the
-Era 1 tree — it will be the first tech tree to gate keystones via quests, i.e. tangible actions
-done in game*, with the node list explicitly reserved for his own hand. Runtime: ~25 min.
 
-**The missing primitive.** The condition vocabulary is entirely **state** — `research`,
-`structure`, `stockpile`, `market`, `surplus`, `era` are predicates sampled at a tick, each of
-which can be true today and false tomorrow. None can say *"you did this."*
+## 2026-09-10 (sprint 40 opens) — Three trees, one grammar
 
-So the draft adds a seventh: **`deed`** `{subject, scope, count, recorded}` — a one-time event that
-fires at a tick and stays true. Monotonic, deterministic, serialises as a flag plus a tick. NR-067
-carries it as a decision taken; it is an addition to a closed vocabulary, so it is Ben's call.
+**Mode:** Design, out of order — sprint 40 opened ahead of 38 and 39 on Ben's call.
+**Runtime:** one session; two sub-agents authoring disjoint doc+JSON pairs in place, the main
+session authoring the grammar, the lint, the Empire tree and its scorer.
 
-**Shape.** Five sectors (Launch / Volatiles / Mobility / Yards / Extraction) × three rings
-(**Reach** — can you get there; **Foothold** — can you stay; **Industry** — does it pay). Power
-and Automation stays a **standing line**, not a sector, per this doc's own rule that standing
-lines never gate an era.
+### What started it
 
-**Four keystones, each opened by a deed, none visible until it fires:** Lift Doctrine after **Ten
-Flights**, Propellant Doctrine after **The First Tank**, Yard Doctrine after **The First Truss**,
-Autonomy Doctrine after **The Empty Shift**. You don't pick your propellant chemistry from a menu
-— you make propellant off-world once, and *then* the fork appears.
+Ben's sprint-40 brief: design specific technology trees for Empire, Colonisation and Industry,
+using the placeholder trees for inspiration, and consider how generation produces research points
+and what motivates a polity to pursue a branch. The first assessment found three tech objects and
+only one running — the sim held seven capacity bands and drew a picture of a tree beside them —
+and that the three trees Ben named are the three simulated spans, each with a different way of
+acquiring a node.
 
-**The node list is a draft and says so.** ~45 objects with effects typed against the new taxonomy,
-nothing transcribed to any store — deliberately, so the review isn't reviewing something that
-already looks settled. Four review questions carried: whether four keystones is right (Autonomy is
-weakest), whether a deed is a world first or a personal one, whether rivals see your deeds, and
-whether an unfired deed hides its keystone or shows it locked.
+### What was settled
 
----
-
----
-
-## Session — Effects: what a tech actually does, mapped to real buildings (2026-08-05)
-
-Light-plus mode, doc + data, no `src/`. Ben: *let's map this to real buildings and units* —
-with seven categories named (unlock / upgrade / retire / recon / law-tax-automation / space /
-war-and-comms doctrines). Runtime: ~35 min.
-
-**The structural call.** The seven categories mix three things: effect **kinds** (unlock,
-upgrade, retire), subject **domains** (reconnaissance, space) and **systems** that are themselves
-unlocked (laws, doctrines). Collapsed they cannot compose. Split into a pair — `(kind, target)` —
-they do, and one node can carry several effects, which nearly every interesting node does.
-
-**Eleven kinds, closed**, in `docs/research/TECH_EFFECTS.md`: `unlock upgrade retire modifier
-access reach intel institution doctrine resource open`. Closed for the BL-155 reason — the
-consumer must switch exhaustively. `open` is BL-156's settled capstone rule unchanged.
-
-**Seven categories the list omitted**, each already implied by a doc we have: placement access,
-continuous modifiers, logistics reach, resource realisation, demography, finance/credit terms,
-instrument access.
-
-**The region is typed.** 62 effects across rings T4–T5 — modifier 19, institution 11, unlock 10,
-upgrade 5, reach 4, retire 4, access 3, intel 3, resource 2, doctrine 1; shipped 15 / designed 29
-/ unbuilt 18. **Modifiers outnumber unlocks two to one**, which is exactly the class an
-unlock/upgrade reading misses.
-
-**Two nodes land on shipped machinery.** Railway → **Inland Logistics Hub** (BL-149's placeable
-haul-cost discount *is* a railway) and Germ Theory → **tile hazard penalty** (already a
-`(1 − hazard)` multiplier on extraction). No new mechanism needed for either.
-
-**Honesty markers throughout.** `building_type` has six values and `recipes.lua` has three
-recipes, so most named buildings are design vocabulary, not enum values; units do not exist
-(BL-157 stub); laws do not exist (BL-155). Every effect carries `shipped | designed | unbuilt` so
-the mapping cannot read as more real than it is. `ladder_lint.js` validates the vocabulary and
-fails if any object in the typed region is left untyped.
-
-**Open:** NR-066 — retirement breaks BL-156's monotonic unlocked set (grandfathering,
-availability-vs-economics, reversibility under blockade), plus whether pre-game effects ever
-*fire* or are only read at the 1960 handoff. NR-065 resolved by this pass.
-
-**Settled same day (Ben), the visibility half of NR-066:** obsolete content is **not rendered at
-all** — *"there's no use for a player to see 'water mill' if they will never build it."* No greyed
-row, no struck-through entry; the absent-not-disabled rule extended to the far end of the
-lifecycle. His Martian-water-mill aside carries the real constraint: **obsolescence is contextual,
-not global** — a mill obsolete on a 1960 homeworld isn't obsolete on a body where nothing better
-runs, so retirement is a per-context predicate, which is what a BL-087 availability window already
-is. Rule recorded: *hide what this player cannot build here, not what the tech tree has moved past.*
-
----
-
----
+Ben's calls: three trees, not one web; the sim reads nodes, not bands; each tree its own doc and
+its own JSON; nodes are minor, major and milestone, with milestones unlocking the next tree; a
+central spire branching outward. Then the five grammar proposals, agreed as put: the sizes with a
+64-node cap (one 64-bit mask per tree, the `works_built` precedent); forks as majors with
+`excludes`; minors diffuse free by contact, majors by their class, milestones never; a milestone
+needs two branches at its own ring; home `docs/generation/trees/`.
 
-## Session — The industrial neighbourhood: the second worked region of the tech web (2026-08-05)
-
-Light mode, design pass only — no `src/` touched. Ben: *another pre-game tech tree centred around
-the industrial revolution, to go alongside the pre-game early Civilisation tech tree.*
-Runtime: ~40 min.
-
-**The reading.** "Another tree" is a second worked **region of the one shared web** — rings T4–T5
-and the T4/T5 crossings — not a second web. The constellation geometry is one object; what makes
-the region feel like its own tree is that a nation traverses it two millennia later, under gates
-that bind where ring 1's barely did. Recorded as NR-063, with the four other calls the pass took.
-
-**What was authored.** `ANCIENT_TECH_LADDER.md` § The industrial neighbourhood, at the settled
-medium grain: **7 new techs** (Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation,
-High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade,
-General Incorporation), **4 vertex quests** (The Unwearied Fire / The Cheap Ton / The Scheduled
-World / The Freed Hands — the fifth crossing already had The Disciplined Sovereign), and **2
-keystones**. Fuel Doctrine moved inward one ring so The Cheap Ton can require it *taken* — the
-ring-1 Written-Ledger interlock, repeated, which makes it the house rule.
-
-**The two new forks are the point.** **Labour Doctrine** (Cleared Holdings ⊘ Smallholder Tenure)
-makes the human price of industrialisation a choice and feeds BL-273 (province demography).
-**Works Doctrine** (State Arsenal ⊘ Private Works) decides who owns the heavy plant — and
-therefore the terms a player corporation operates on in 1960. It is not Sovereign Doctrine
-restated: one fork asks whether courts bind the sovereign, the other asks who owns the furnaces.
-
-**New rule, adopted not proposed:** fork count scales with the band's divergence. Ring 1 carries
-one keystone; this region carries four. A band where everyone lands in the same place needs one
-choice to differentiate it; a band that opens 3-band gaps needs the gaps explainable.
-
-**Kept honest.** Everything is transcribed into `ancient_tech_ladder.json` (provenance
-`industrial-pass`, with `amended` on the two objects an earlier pass authored), and
-`ladder_lint.js` was generalised to print **one line per worked region** so the doc's counts are
-checked rather than asserted — region 38 objects, web-wide 88, extrapolating to ~120–135. Open,
-in NR-064: whether Works Doctrine gates corporation generation (lean yes — file it when BL-296
-lands), and whether the region earns its own viewer tab (lean no — the era strip means eras).
+### What was written
 
----
+`TREES.md` (the grammar, the five lintable adjacency rules, the scorer shape, the JSON schema,
+where research comes from before a university exists), then three docs and three stores:
+Colonisation 29 nodes carried by time on ground, Empire 52 nodes with `pursued_when` on every
+node, Industry 62 nodes with four forks. `tools/session/tree_lint.js` enforces every rule and
+cross-checks doc and store both ways; all three pass. The Empire scorer is specified per node —
+the term that makes it the top pick and the state of the world in which that happens — with
+thirteen terms, each a reading of state the sim already carries.
 
----
+Two grammar additions taken on Ben's behalf while authoring and recorded to be overturned:
+`requires_fork` (either side) and `requires_any` (any N of a set), because a carried tree cannot
+demand two named branches of a people coined on one ground (NR-820). The old ladder is kept as a
+calibration reference under a superseded banner rather than deleted (NR-821).
 
-## Session — Roster bands become a partition, and the Era -1 sim lands (2026-08-04)
-
-Retroactive entry, written 2026-08-07 alongside the 2026-08-05 arc entry above — the rebased
-commits carried no DEVLOG record (NR-079). A late-evening sitting, commits at 23:06 and 23:30.
-Full mode, design then delivery. Runtime: reconstructed from commit stamps; the visible span is
-the last ~25 min of a longer evening.
-
-**The partition** (*Roster bands become a partition, and the Era -1 scorer is designed*). The
-ladder's roster grouping had T2 in two groups at once — never a partition, so never
-implementable. Settled off the Military column: classical=T1, medieval=T2–T3, gunpowder=T4,
-industrial=T5–T6, the T1/T2 break resolving forward because stirrup heavy cavalry IS the
-medieval military revolution. Consequence: a 0 CE start is classical alone; shock cavalry is a
-T2 unlock, not an epoch unit. BL-277 (Era -1 military strategy) had all five of its questions
-answered in design: ring-closure objectives, supply-decay force commitment, naval as
-crossing-enabler only, marginal-score peace at province granularity, creed-led doctrine.
-Seasonality amended against BL-271 (Era -1 history sim): season is an axis of the action, not a
-phase of the clock — a year tick stands, and "campaign in winter" is a scored candidate.
-Convergence settled as rejection sampling on the 1960 output, reusing the C1 rejection-census
-idiom. (The rebase later dropped these design-prose edits from `backlog.json`; the answers
-survive in the commit message and this entry — see the id note in the entry above.)
-
-**The sim** (*Era -1 history sim: the year tick runs, and the scorer decides*). Landed as
-`src/world/history_sim.{hpp,cpp}` — a year tick over polities seeded from cultures, each
-picking from a bounded candidate set by integer score: the corp-AI stage-A idiom, reused
-because BL-271's transfer contract says the architecture graduates and the constants do not.
-Territory moves at province granularity, never tile; `combat.{hpp,cpp}` untouched. The harness
-flushed three defects, all fixed rather than tuned around: the 1.87 MB per-year ownership grid
-delta-encoded down to 6 KB; a quadratic candidate scan cut from 2554 ms to 626 ms with a
-prebuilt neighbour index; and winter campaigns scored-but-never-chosen until the defender
-readiness penalty entered the score. The first Linux CTest baseline was recorded in-session:
-43/49, six failures predating the work (Windows-blessed goldens and sweep timeouts).
+### What is open
 
----
+Twelve farm classes in the classifier against four Colonisation branches (NR-819). Every
+magnitude in the three stores is a placeholder; BL-886 (tree sizing sweep) prices them. How a JSON
+store reaches a Lua-free sim is BL-881's first decision. Six items minted, BL-881..BL-886.
 
 ---
-
-## Session — A world that begins at 0 CE (2026-08-04)
-
-Full-lite mode, same sitting as the arena re-base below. Ben: "generate a world which begins
-at 0 CE, rather than 1960 CE". Runtime: ~45 min.
-
-**The knob.** `world_params::epoch_year` (default 1960 — legacy byte-identical). Below 1700:
-`run_settlement` gains a `stop_year` — provinces founded later do not exist yet, Stage 4 never
-runs (no furnace has lit by antiquity), and demography is finally **seeded** — the graduation
-path the province struct always named as BL-271's (Era −1 sim) job. Founding band 2k–26k
-settlers off `farm_q`, then `advance_province_demography` does the centuries to year 0.
-`hard_coded_world` gates ruptures, institutional history and globalisation behind the same
-flag — that history is the year-tick sim's to produce, not the pass's to pre-compute.
-
-**The instrument.** `tools/verify/era_world_harness.cpp` (requirement group
-`era-minus1-antiquity-start`, 12/12 PASS): stop holds, demography within capacity, multipolar,
-deterministic, 1960 arc untouched. Its dossier is the deliverable: **82 provinces, 21 nations,
-20.65 M people, 258 k manpower, foundings −1999 to −1502** on the canonical seed.
-
-**Honest limits, on the record.** The 1960 economy scaffolding (corps, markets, roads) still
-generates underneath — out of frame for the sandbox, gated properly in BL-271's build. On this
-seed every province founds before −1500, so the founded-after-0 filter had nothing to drop.
-Two cosmetic name collisions ("Rekmaik lower" ×2) — `region_word` granularity, noted not fixed.
 
 ---
 
----
+## 2026-09-09 (sprint 39 design) — The colonial round sets the demand, and the corporations come after
 
-## Session — The arena comes home: text-only Rival, the diplomacy battery, and the RTS that lived for an hour (2026-08-04)
-
-Mixed mode: research sweep (Light), backlog filing, one Light `src/` seam extension. Runtime:
-~3.5 h wall clock, interactive with Ben.
-
-**The sweep.** Ben asked for a fresh state-of-the-art pass on running the Rival agent via text
-alone. It overturned a premise: 0 A.D. ships an official agent seam (`--rl-interface`, Alpha 24,
-the in-tree `zero_ad` client) — recorded as NR-057; the literature (BALROG, lmgame-Bench) finds
-text observations *beat* pixels for decision quality.
-
-**Filed.** BL-306 (text Rival harness — summarizer / dispatch-grammar / MCP socket), BL-307
-(Era −1 diplomacy seam — nation blackboard + typed verbs over a year-tick command queue),
-BL-308 (diplomacy test battery — seven checks, two of them pre-LLM), BL-309 (great-power seed —
-self-preservation vs civilising mission, frozen era, periphery-richness clause), BL-310 (myth &
-theology generation, design-owed — structurally accurate myths, old gods persisting under
-conquest). Ben's steers captured verbatim in BL-309/BL-310: low-friction economics ("don't
-invent the steam engine"), and "we should not miss the richness of each other civilisation".
-
-**The RTS that lived for an hour.** On "install that release", Release 28 went on and its RL
-seam answered on port 6000 — then Ben saw the game launch and named the crossed wires: "0 AD"
-means the *year* (the Era −1 sandbox), not Wildfire Games' game. Uninstalled same session,
-verified clean (NR-060); the Rival docs re-based — the arena is Project Io's own word interface.
-
-**Mid-session, Ben integrated the tech-ladder branch** — both sides had minted BL-296/NR-054,
-and he renumbered the local WIP (NR-059). This session's ids moved accordingly; the transcript
-cites the old ones.
-
-**The smoke that passed.** `Project-Rival/tools/harness/io_smoke_test.js` drives the Io MCP
-server end-to-end: 7/7 checks — corps enumerate, the player blackboard returns 364 facts, ticks
-advance, the dictionary resolves, an illegal command rejects typed. It surfaced a real seam gap:
-nothing answered "who am I?", fixed as a `CORPS` opcode + `list_corps` tool (NR-061, Light —
-the BL-278 tool roster is now six, pending Ben's read).
+**Mode:** Design, while sprint 38 runs. No code.
+**Runtime:** one session; one background agent measuring generation cost at `/O2`.
 
----
+### The question
 
----
+Whether to approach markets directly from where the empires left them, or to run a colonial
+precursor first — and whether either can be generated fast enough that the wait does not bore.
 
-## Session — The ancient tech ladder, mocked up (2026-08-04)
-
-Remote session, doc-only, Light mode. Ben asked for an ancient tech tree mockup — the major
-advancements from 0 CE, and what inequality between nations is realistic by 1960.
-
-**Delivered.** `docs/research/ANCIENT_TECH_LADDER.md` — six bands (T1 Classical → T6 Machine
-Age) × seven domains, ~60 load-bearing nodes with prereqs, endowment gates over the settlement
-pass's classes, and a three-class **diffusion axis** (artifact / practice / capacity) that
-generates the realistic 1960 spread: knowledge ~0 bands apart, capacity 3–4, military artifacts
-1–2. Artifacts leapfrog, practices follow contact, capacity follows the map.
-
-**The framing call.** BL-274 (era-keyed rosters) records Ben's stance that a player-facing tech
-tree only works in a 1900s+ start — so the mockup is a tree in *structure* (data the BL-271
-Era −1 sim evaluates) and a ladder in *play*: no nation clicks a node. Recorded as NR-054 so it
-can be overturned rather than becoming precedent; NR-055 records the six-band spine vs BL-274's
-four-band roster lean (proposed: rosters group the same spine).
-
-**Filed.** BL-296 (ancient tech ladder), priority B, post-v0.1.0, the tracked home; design
-conversation happens against the research doc. T6's exit hands off to `scripts/tech_tree.lua`'s
-Era 0 quests, so the two trees meet at the campaign epoch without overlap.
-
-**Follow-up, same session — the constellation.** Ben named the Path of Exile passive tree as the
-shape he's imagining, with two additions: exclusion / binary choices at branches, and the whole
-web never visible at once. Settled as § Geometry in the doc: rings = bands, sectors = domains,
-entry point = endowment (the 1960 spread becomes pathing distance), travel-OR / meaning-AND,
-keystone exclusion via availability windows, and a **tech fog** — the third fog after
-DISCOVERY.md's two. **This overturns BL-087 (tech quest system) Q1** — binary tree, no
-re-converging mesh, 2026-07-08 — on Ben's explicit call; supersession banners sit on
-`ERA1_TECH_LANDSCAPE.md` § Q1 and in BL-087's design field. Q1's motive survives via node-count
-discipline (~100–200 nodes, not the reference's 1,325) and the fog.
-
-**The density test.** Ben wants the detail level judged by *fun*, against real examples — so the
-doc's § Density test writes one slice (the steam transition) at three grains: coarse (4 nodes),
-medium (8, one endowment-explainable Fuel Doctrine fork), fine (20+, reference grain). The
-principle the examples surfaced: detail only pays where someone chooses or reads — so density
-should follow the consumer, per region of the web. Recommendation medium; the call is NR-056
-(density grain).
-
-**Third exchange — the Institutions comparison slice, and vertices become quests.** Ben asked
-for Institutions at medium grain as the second density example, with invented quests for key
-future technology placed at clear vertices. New geometry rule: **vertices are quests** — the
-BL-087 gate=quest=tech object at each ring crossing, capstone carrying the economic conditions,
-completion opening the next ring region. The slice: eight practice-class techs, the **Sovereign
-Doctrine** keystone (Chartered Capital ⊘ Command Estate — HISTORY.md Stage 3 turned from
-narration into a choice, creed-picked for AI nations), and three vertex quests (The Enforceable
-Promise / The Disciplined Sovereign / The Lettered Public). Comparison finding worth keeping:
-**gates differentiate in Materials/Energy, keystones differentiate in Institutions** — practice
-diffusion flattens the sector into adoption lag, so the fork is where its differentiation
-lives, not decoration.
-
-**Fourth exchange — grain settled, first full region worked.** Ben chose **medium** against the
-two slices (NR-056 resolved), and asked for the full ring-1-to-2 neighbourhood at that grain.
-Delivered in the doc plus a generated SVG sketch: 20 techs + 5 vertex quests + the **Granary
-Doctrine** keystone (Temple Stores ⊘ Open Granaries — the campaign's markets-not-command
-premise made a ring-1 *choice*, BL-275-assertable) + 2 roster regimes ≈ 28 objects,
-extrapolating to ~130–150 web-wide — inside the § Geometry budget. New rule adopted: the
-**sparse-sector rule** — a vertex quest only where the crossing is a genuine capability regime
-(Military crosses on the BL-274 roster turnover, Medicine on a plain edge).
-
-**Runtime:** ~2.5h remote across four exchanges, Light/design. **Left open:** band count
-(NR-055), per-domain state shape, C++-vs-Lua data home.
+### What was settled
 
----
+Both, sequenced: **pass 2 thin, then pass 3.** The colonial era (1560 → 1960, on the polity engine)
+claims ground across water by **purchase** or **conquest**, records **who discovered which luxury
+good**, derives **how wealthy each nation is**, and leaves **sea lanes** on the map. Then the static
+search selects a corporate landscape over that world, seeded from the strength of the trade
+network. Two wizard rounds — 5 the colonial era as a **still**, 6 the corporations — because one
+round doing both "complicates the story for the user". Authority: `docs/generation/COLONIAL_ERA.md`
+(new); items BL-874..BL-880; sprint 39 proposed.
 
----
+### What moved the design
 
-## Session — The earth-like battery, generation retuned, and a sky (2026-08-04)
-
-A long generation session. Built the five-instrument earth-like battery, acted on what it
-measured, and closed with the galaxy minimap. Full detail in the commits; this entry records the
-findings that outlive them and the handoff to the next session.
-
-**Built (all in `tools/verify/`).** `planetology_sweep`'s C1 rejection census; `earthlike_corridor`
-(per-knob viability edges); `earthlike_pairs` (knob × knob interaction atlas); `earthlike_tile_census`
-(what the map actually looks like); `earthlike_lean_trace` (does the wizard's language deliver);
-`notable_worlds` (search for specific playable seeds, not distributions).
-
-**Landed in generation.** Wizard bands set from measured always-viable spans. The S6 epoch fix —
-two gates were asking about present-day tectonic heat to decide events billions of years past. Ore
-provinces (Open call 4). Mountain ranges seeded on convergent plate boundaries. Eclipse geometry,
-narrowed to Earth's near-miss band. A stellar-lifetime cap that finally gives the `star` preference
-a consequence. Rivers routed by a priority flood so they reach the sea. Plus BL-287 (verify tier
-compiles the world layer once, not 44 times) and the galaxy minimap.
-
-**Left open.** BL-288 (two Release-only harness failures, undiagnosed). NR-049 (the arable floor is
-mechanically a hard ocean cap at 0.7143, and Earth is 0.71 — which is why generated worlds sit at
-46% land against Earth's 29%). BL-289 (supernovae as real extinction drivers; deliberately flavour
-for now). `data_creep_harness`'s plateau window, which the river change tripped without any actual
-data creep.
+**The tie's consumer was dormant.** `MARKETS.md` § Where the order book lives: no press and no
+`corp_verb` submits a buy order, so the preferred-seller routing the design had seeded ties into
+runs for nobody. The tie became a **sea lane** — a stamped discount on sea-leg traversal cost, the
+water analogue of the ancient roads — read by convoys, reach and placement alike because traversal
+cost is one weight function. Wider than a market preference, and intended.
 
----
+**The endemic channel was the consumer the demand output needed.** `inject_endemic_demand` already
+injects a wealth-scaled, character-flavoured want; the colonial era moves its weights, and "set
+demands for goods" is a mechanism rather than a noun.
 
-### For the next session: diplomacy and military
-
-You inherit more than it looks like. **Read this before designing.**
-
-**What already exists.** `src/world/combat.{hpp,cpp}` and `terrain_combat.{hpp,cpp}` (BL-272's typed
-unit stacks and doctrine-parameter resolve, plus BL-233's measured terrain scalars).
-`nation_generation.cpp` produces ~21 nations; `creeds.cpp` gives them belief weights. BL-273 landed
-province demography — population growth, drawdown, and a **manpower budget**, which is the number an
-army costs and the one that makes war hurt. `docs/lore/HISTORY.md` is the institutional ladder that
-explains why the 1960 world is market-based and non-hegemonic. `Project-Rival/` is the discipline
-that plays 0 A.D. to refine military doctrine from actual play, and it hands back numbers and
-doctrine, never names.
-
-Relevant items already filed: **BL-223** (averted rupture → diplomacy origin), **BL-277** (Era −1
-military strategy), **BL-274** (era-keyed unit rosters), **BL-157** (military datamodel stub),
-**BL-280** (negotiated tax rate), **BL-094** (the governing-body pivot, priority A). Query, don't
-re-derive.
-
-**Three hard constraints, in order of how badly they bite.**
-
-1. **BL-224's non-hegemony invariant.** The world must not produce a runaway winner. This is the
-   single strongest constraint on any military system, and BL-240 already settled how to honour it:
-   measure the hegemony **rate across seeds** and constrain the inputs — never enforce the outcome
-   per world. "Constrain the inputs, never clamp the outputs" is the house rule and it is not
-   negotiable.
-2. **Determinism.** No `std::` distributions, no `exp`/`log`/`pow` in any gate path. Combat
-   resolution is a gate path. `planetology.cpp`'s header states the reasoning; follow it.
-3. **The AI-behaviour rule.** Standing rules still defer *nation* behaviour (BL-054). Rival-corp
-   strategic AI got an explicit exception (BL-202/203) because it is deterministic scored-utility
-   over a legal command seam. Diplomacy AI needs the same kind of exception, argued the same way —
-   not assumed.
-
-**Method, from a day of being wrong in instructive ways.**
-
-- **Build the instrument before the feature.** Every real finding today came from a measuring tool,
-  and none was visible by reading code. Diplomacy is worse than generation here: you cannot look at
-  a screenshot and see whether relations are interesting, so the instrument matters *more*, not less.
-- **Always measure the OFF state.** Ore provinces reported 15.8% concentration and looked like they
-  worked. The baseline was 15.7%. Twice today a feature appeared to work and did nothing, and only a
-  provinces-off comparison caught it. Any relation system will emit plausible numbers from day one.
-- **Never assert a conservation property you have not measured.** I claimed the province field only
-  redistributed ore. It was losing 47% of a world's petroleum. If you write "this only moves
-  influence around", prove it with a sum.
-- **Watch for quantities that cancel.** `star_mass` was measurably inert because the derived orbit
-  cancelled it exactly — two good decisions that annihilated each other. If combat strength is
-  normalised by the opponent's, absolute scale vanishes; if diplomatic weights are normalised
-  per-nation, global weights vanish. Check explicitly.
-- **Diplomacy is interaction by construction, so build the joint measurement early.** The corridor
-  harness said every knob was individually fine; the pair atlas then found a 28.2-point interaction
-  that one-at-a-time sweeps could never have seen. Relations between N parties are *inherently*
-  joint — treat a pair/joint instrument as day-one work, not a contingency.
-- **Ask for the interesting war, not the average war.** The battery measured medians for most of a
-  day before `notable_worlds` turned the search around and found specific playable seeds. A
-  distribution is for calibration; a player experiences one campaign.
-- **Adding an enum surfaces latent bugs.** Extending `resource_type` by eight exposed uninitialised
-  arrays (a NaN in Release only), an out-of-bounds name table (a segfault), and a null-pointer
-  presentation row. You will add enums — relation state, treaty kind, war goal, casus belli. Grep
-  for hand-held table sizes and `[resource_count]`-style declarations first.
-- **Build Release and run the suite.** Four harnesses fail in Release and had gone unnoticed because
-  the default `build/` is Debug. There is undefined behaviour in the tree. Use `build_rel` (Ninja +
-  Release); BL-287 made a full verify build cheap.
-- **A guard that never fires is not a guard.** Ten of fourteen homeworld-floor clauses never fire,
-  because the sampling bands were tuned to sit inside them. A war-weariness cap or a relations floor
-  that never binds is the same bug wearing different clothes — check that your constraints can
-  actually trigger.
-- **Decide flavour vs cause deliberately, and write down which.** BL-289 is the template: the
-  supernova is narration today, with the causal version and its three hard problems recorded rather
-  than reconstructed later. Diplomacy will face this constantly — is a grievance a story or a term
-  in a scoring function?
-- **Any new verb must land in the seam AND the dictionary.** `corp_command` is the write seam;
-  `docs/ai/ACTIONS.json` is what the AI player reads for meaning. A war-declaration verb in one and
-  not the other misleads the AI exactly the way a stale golden misleads a visual check. That is a
-  standing rule, not a nicety.
-
-**One last thing.** The single most valuable half-hour today was building `notable_worlds` — the
-tool that stopped asking "what does the median world look like?" and started asking "show me one
-worth playing." For diplomacy and military, that question is: *show me a war that was worth
-fighting.* Build that instrument early and let it tell you whether the systems are producing drama
-or arithmetic.
+**The seat is a choice again.** Ben reversed the 2026-08-26 draw: Begin is to open a corporation
+selection canvas. Noted as BL-880 (corporation selection canvas), priority B, not sprint 39's — it
+needs the rounds to hand a world forward (NR-811), which is the larger half of it.
 
----
+### The numbers, and a correction
 
----
+Pass 1 is **not** low seconds any more. `history_span_cost` seed 0 at `/O2`: 400 years 0.9 s at
+1,742 regions; 2,000 years 34 s; 4,000 years **66 s** at 3,734 regions, reach 34–55%. So the
+3,600-year pass sits near a minute and NR-809 (region count vs adjacency) is the live cause. Pass 2
+is 400 years at the end-of-span count — expected in the low seconds, **measured on landing** because
+sea legs widen the neighbour graph. The wait the player feels is the unwatched bar: `world_determinism`
+puts post-era at 10–25 s, the warm start is 72 s and is retired by the search, and Begin re-pays
+round 4's build.
 
-## Session — Documentation retrofit: seven audits, and what the corpus was lying about (2026-08-04)
-
-**Runtime:** ~3 h. Full mode, doc-retrofit delivery. Ran alongside a concurrent star-map coding session.
-
-Seven read-only agents audited the whole doc corpus against the code and against the newer
-direction — core vision, economy, generation, UI, AI/tech, process, plus one extracting the vision
-delta from the backlog and review queue. Their verdict in one line: **the corpus is current where
-the work landed with its doc, and stale at the top of the tree.** PLANETOLOGY, CONTINENTS,
-RESOURCES, AI_OPPONENT, ROADMAP and POPULATION kept up. CONCEPT, SYSTEMS, TECH_FOUNDATIONS and
-GLOSSARY still described a corporate economy player with no combat engine and no agent seam.
-
-**The three findings that mattered most were all of one kind — a doc that would actively misdirect
-the next session**, not merely one that had aged.
-
-1. **LAYOUT.md and MENU.md documented `ui::why_note` as a live control.** Ben removed it under
-   NR-018, and `detail_level.cpp:121` carries "do not reinstate a draw path here without reopening
-   NR-018". The doc was an instruction to rebuild a rejected surface.
-2. **DEVELOPMENT_PRACTICES named CI as "the signal" guarding `main`.** `.github/` was deleted
-   2026-07-31 (`debcefd`). Nothing guards `main` but a local build, and a session trusting that
-   section would trust a gate that cannot fire.
-3. **TECH_FOUNDATIONS excluded combat resolution in two places** while `src/world/combat.cpp` ships
-   `resolve_battle` (BL-272, 15/15 PASS, consumed by the Era −1 sim).
-
-**Ben authorised closing the pivot docs ahead of BL-094 landing**, which the time-slice rule had
-been holding. CONCEPT, SYSTEMS and GLOSSARY now carry the governing-body aim with his stated
-reason — law, policy and science reaching military outcomes — and the design test it implies:
-*does this system reach military as well as economic outcomes?* Written forward-looking and clearly
-unlanded rather than in the governing body's voice (NR-053).
-
-**The naming rule is broken in shipped code, not in the docs.** Every generation and lore doc
-passed the Earth-proper-noun sweep. `nation_generation.cpp:577-608` did not: a *global* phoneme
-bank that ignores the per-culture phonology `creeds.cpp` already rolls, with plainly Latin/European
-tables. Filed as BL-290 — and the interesting half is the global-ness, not the Latin-ness, because
-consuming the phonology the chain already produces makes the Earth-flavour problem structurally
-impossible rather than merely corrected.
-
-**Numbers that had gone stale invisibly.** Every row of PLANETOLOGY's knob table had moved;
-TILE_GENERATION's Pass 5 said mountain seeds `0/2/4/5` against an actual `0/5/11/13`; the "two pure
-post-multiplies" contract is three since ore provinces landed. TILES.md's *measured* landform census
-is marked stale-and-blocked rather than guessed at, because `world_audit` — the harness that
-produced it — currently fails (BL-291).
-
-**One lesson worth keeping.** `_critic_notes.md` *certified* a set of mock-data figures as verified,
-and the fixture was re-blessed afterwards, so the note laundered stale numbers into six sibling
-docs. A verification note that pastes measured values ages the moment the goldens move, and ages
-invisibly. Record the method, not the measurement.
-
-**Filed:** BL-290 … BL-295, six code defects the audit found. **Review queue:** NR-050 … NR-053.
-**Not done:** the BACKLOG_ARCHIVE.json retirement Ben asked for — deferred by his own call until the
-concurrent coding session lands, with the scope question (closed items only, not an id range) still
-open.
+### Housekeeping
 
----
+`archive_landed.js` has no `--help`; it ran and evicted BL-871 and BL-873 (both complete) to the
+cold file — their correct home, kept. BL-833 (tariff posture from history) cancelled as a duplicate
+of the delivered BL-750. Two calls taken on Ben's behalf: NR-819 (a purchase keeps culture shares),
+NR-820 (the canvas offers the shortlist).
 
 ---
 
-## Session — BL-287: one world layer instead of forty-four, and the three bugs it flushed out (2026-08-04)
-
-**The build was the symptom, not the problem.** A verify-tier rebuild was taking 45–90 minutes.
-Cause was one line — `CMakeLists.txt:433` handed every harness `${IO_WORLD_SOURCES}` as its own
-sources, so 44 harnesses × 30 world TUs = **1,320 compilations** of the same files, producing
-byte-identical objects 44 times. Compounded by the default `build/` being single-threaded NMake +
-Debug while a Ninja + Release `build_rel/` already existed and nobody reached for it.
-
-**Fixed by an OBJECT library.** `io_world_obj` compiles the world layer once; the foreach and both
-Lua harnesses link it. Include dir and `cxx_std_20` are PUBLIC so consumers inherit them;
-`IO_WARNING_FLAGS` stays PRIVATE so it does not leak onto a consumer's TU. **1,320 → 30.**
-Full-tier incremental rebuilds now run in 1.5–6.5 s.
-
-**Three latent bugs, one family.** All were code that had baked in the old width of `resource_type`,
-and BL-286's widening 23 → 31 exposed them in sequence:
-
-1. **`market_component`'s `supply`/`demand`/`price`/`base_price` and `tile_component`'s
-   `resource_deposit` carried no initialiser** — every sibling array has `= {}`. They relied on
-   every slot being authored, which held only while the authored set covered the whole enum. The
-   eight new goods kept stack garbage, one decoded as NaN, and it reached
-   `prospective_profit`'s revenue estimate. **Release only** — Debug's fill pattern hid it.
-2. **`econ_bankruptcy`'s `resource_name` guarded on `idx < resource_count` against a 19-entry
-   table** — out of bounds since `resource_count` was 23. The overrun grew to 12 slots, and
-   BL-287's link-order change put it on unmapped memory. Segfault.
-3. **`ui/presentation.cpp`'s `resource_table[resource_count]`** zero-fills new rows, so
-   `resource_name()` returns a **null pointer** every caller hands to `"%s"`. Unreached today only
-   because callers guard on a positive quantity — a protection that expires when BL-287–290 give
-   the goods behaviour.
-
-**Attribution was measured, not assumed.** BL-286's three source files were reverted to the
-pre-merge commit and the failing targets rebuilt: `prospective_profit` passed pre-merge (a real
-regression), the other four failed pre-merge too (pre-existing → BL-288).
-
-**Left open.** BL-288 (four Release-only failures, unexplained — at least `settlement_harness`
-passes in Debug and fails in Release at the same commit). NR-048: a **fresh** configure cannot
-download SDL3 (`unable to check revocation for the certificate`), so a new clone, worktree, or CI
-runner cannot configure at all; existing dirs work from cache, which hides it completely. That also
-means BL-287's from-cold timing is still unmeasured.
-
-**Worktree triage.** Only three branches unmerged, all stale and small; every `worktree-agent-*` is
-already in main. But `next_id` reports **9 in-flight ID collisions** — those three assign
-BL-217/218/219 different meanings than main does, so they need cherry-picking with renumbering,
-never a plain merge.
+## 2026-09-09 (sprint 37) — The world stops opening already full
 
----
+**Mode:** Batch delivery in three waves, on a design pass that had closed the same morning.
+**Runtime:** one long session; 3 sub-agents in worktrees; all lanes merged, built and verified in the main session.
 
----
+### What started it
 
-## Session — Earth-like generation: the three-instrument battery, S6's epoch bug, and bands from measurement (2026-08-04)
-
-**Runtime.** ~3h wall across an autonomous stretch. Full (touches `src/world/planetology.cpp` —
-every generated world changes — plus a new measurement section in an existing harness).
-
-**The ask.** Ben, from a Project-Rival session: design tests that show which parameters lead to
-earth-like worlds. Then, after reading the findings: "go straight to the live change. Do follow
-procedure to document well."
-
-**What was built.** A `C1` rejection census inside `tools/verify/planetology_sweep.cpp` — the first
-consumer of `viability::reason`, a field the header has documented "for the sweep's histogram"
-since BL-167 and which nothing read. It draws one unshaped attempt per seed and histograms *which
-floor clause rejected it*, plus what the rejects became and where in the chain they died.
-
-`resolve_preferences` only returns the draw that PASSED, so rejections are invisible from outside
-it. They are recoverable because a draw is a pure function of (preferences, seed, attempt), replayed
-through the public `checkpoint_rng`. That mirrors the sampling band table, and mirrors drift — so
-every censused draw is cross-checked against the live function (viable replay ⇒ `attempts == 1` with
-bit-identical params; rejected replay ⇒ `attempts >= 2`). A band edited in planetology.cpp fails the
-harness rather than silently re-pointing the histogram. 20,000/20,000 agreed.
-
-**What it found.** Ten of the floor's fourteen clauses never fire. The sampling bands were
-calibrated against this very sweep and now sit strictly *inside* the floor — ocean draws 0.42–0.72
-against a 0.40–0.75 window, the carbonate thermostat pins temperature to ~277–288 K inside 275–305,
-`home_mass` lands inside the gravity window. **The bands, not the floor, are the specification of
-Earth.** The floor's live surface is oxygen and arable land, and ~74% of all rejection pressure is
-the oxygen story.
-
-**The bug that fell out.** `interior=low` ("cold and old") cost 2.52 draws against a ~1.24 baseline
-— twice any other preference. Cause: `theta` was computed at present-day age and then used to gate
-the NOE, an event billions of years earlier. Fixed with `theta_at(age)` / `mobile_lid_at(age)`; the
-NOE is now tested at `age - noe_at`. Present-day `st.theta` / `st.mobile_lid` / `profile.geology`
-are bit-identical, so Continents and tile terrain are untouched.
-
-**A call taken and then reversed by measurement.** I also re-sited the GOE gate for symmetry,
-measured it, and reverted: acceptance fell 78.5% → 60.2% with 69% of rejects becoming Mat Worlds.
-That gate is an upper bound whose 2.4 constant was calibrated against present-day theta, and I had
-no independent basis for a new one. Inventing one to make the numbers look right is the forced
-outcome Ben rejects. The asymmetry is commented at the site and filed as **NR-046**.
-
-**Result.** Acceptance unchanged (78.4% vs 78.5%), worst preference 2.52 → 1.94 and now
-`oxygen_story=low` — a genuine design axis rather than a modelling artifact. `interior` spread
-narrowed from 2.25× to 1.64×. `planetology_harness`, `continents_harness`, `world_determinism`,
-`determinism_harness`, `history_ladder_harness` and `mediterranean_sweep` all pass.
-
-**Unplanned bonus.** Running the census under both g++ 15.2 (WSL2) and MSVC 14.44 gave *identical*
-counts on all 20,000 worlds — the first empirical check that PLANETOLOGY.md's determinism discipline
-holds **across compilers**, not just across runs of one build.
-
-### T2 — knob corridors (`tools/verify/earthlike_corridor.cpp`)
-
-Holds every parameter at its Sol default, steps one across its clamp range, 96–128 seeds per step,
-orbit derived per seed as the generator derives it. Draws two spans on each axis: where the floor
-rejects, and where the wizard's `any` band samples.
-
-**Only three of ten knobs can reject a world** — oxygenation (always-viable 0.30–0.91), radiogenic
-(0.57–1.73), home_ocean (0.40–0.68). The other seven never reject anywhere in range. This
-cross-validates C1 independently: the four knobs C1 measured at a flat 1.24-draw cost are exactly
-the four shown here to be incapable of rejecting. Two instruments, same answer.
-
-It also killed a plausible idea. Sweeping `star_mass` 0.60 → 1.50 moves surface temperature only
-282.4 K → 281.1 K, because the derived orbit compensates exactly — a brighter star just sits further
-out. **The only lever on climate variety is the orbit multiplier `{0.985, 1.400}`**, and widening it
-puts the homeworld inside the *continuously* habitable zone (habitable now, doomed as the star
-brightens). That is a design decision about what Earth means, not a tuning knob. Still Ben's.
-
-### Bands become the measured always-viable spans
-
-Ben: "change the band to always viable." Each `any` band is now the span the corridor measures at
-100% viability, with the three leans re-partitioned into thirds. The change cuts both ways — the
-three rejecting axes narrow, the six that never could reject widen to the room they were already
-entitled to.
-
-**Acceptance and variety both rose**, which is not the usual trade: 78.4% → 81.4% acceptance, while
-coal spread went ×6.99 → ×10.79, copper ×2.72 → ×5.84, iron ×1.82 → ×2.59, petroleum ×3.22 → ×4.47.
-The floor also became more load-bearing — 5 of 14 clauses fire now, up from 4. Surface temperature
-stayed pinned at ×1.04, exactly as T2 predicted.
-
-**Cost, recorded rather than tuned away.** `interior=high` is now the worst lean at 2.97 draws. The
-corridor's spans are one-at-a-time slices and do not compose: young age and high radiogenic are each
-individually always-viable but together push theta past the GOE gate's 2.4 ceiling. It is the same
-compounding fold that caused the original `interior=low` problem, arriving from the other end. Under
-R2's <12-draw bar. Filed as NR-047.
-
-### T3 — tile census (`tools/verify/earthlike_tile_census.cpp`)
-
-C1 and T2 both stop at the body level, where "Earth-like" is a set of scalars. None of that says the
-world *looks* like Earth. T3 replicates hard_coded_world's Kepler wiring — including the BL-276
-two-bar sea gate and the `generate_rivers` sibling pass — and runs the LAND mask through the same
-hex component labelling `mediterranean_sweep` runs over the ocean mask.
-
-**The maps are not very Earth-like** (120 seeds, medians): land 47.9% of surface against Earth's
-29%; largest landmass 78.8% of land (p95 99.1%) against 57%, i.e. mostly one supercontinent, median
-3 landmasses over 100 tiles; forest 6.3% against 31%; icy 24.6% against 10%; barren 11.1% against
-33%; mountain 1.0% against roughly 24%. Cold, flat, under-vegetated, land-heavy supercontinents.
-Report-only per BL-275 — the Earth figures are orientation, not targets, and nothing is asserted.
-
-**The largest lever on Earth-likeness is not a planetology knob at all.** Mountains and forest are
-tile-pass parameters — a different layer from anything this session touched.
-
-**Left open.** The GOE asymmetry (NR-046) and the band-composition cost (NR-047). Whether a floor
-with nine inert clauses is the right shape. The orbit-multiplier decision above. And one consequence
-worth a second look: `home_ocean`'s always-viable span 0.40–0.68 **excludes Earth's own 0.71 ocean
-fraction**, which the previous 0.42–0.72 band did reach — optimising the band for "always viable"
-trimmed the wet end and moved the distribution further from Earth. Recorded, not reverted; the T3
-spread is the evidence to set that band against.
-
-**Owed.** The three new harnesses (`planetology_sweep`'s C1 section, `earthlike_corridor`,
-`earthlike_tile_census`) are not registered in the `verifier-headless` skill — that needs Ben's
-authorisation, per the tool-creation rule.
+`docs/generation/COLONISATION.md` had landed that morning and the build objective was Ben's: a
+wizard page carrying the 2D grid-map, evidence it produces interesting cultures, and regions
+becoming provinces without aiming for a small set.
 
----
+The sprint's real subject turned out to be narrower and better: **the world used to open already
+full.** `run_settlement` placed and dated every region before the sim's first tick, so a time-lapse
+of the ancient era could only ever show borders moving. There was no origin to watch. Everything
+below follows from fixing that and then looking at what the fix revealed.
 
-## Session — Io MCP server: BL-278 built and landed (2026-08-03)
-
-**Runtime.** ~1h wall. Full (new `src/` seam — `main.cpp` + `tools/mcp/`; no save-format or
-economy change, but a new external-process attach surface).
-
-**The ask.** Ben, after pulling the LLM-grand-strategy research session: "let's use this session
-to implement the ideas we just pulled." BL-278 (Io MCP server) was the actionable item — `designed`,
-SS priority, moved into v0.1.1 because it touches no simulation code.
-
-**What was missing.** BL-278's design assumed the three legs (blackboard export, action
-dictionary, corp-command) were ready to wrap. Two were; the write leg wasn't: `apply_corp_command`
-had never been reachable from outside the in-process AI/ImGui callers — no CLI, no stdin, no
-socket. `--export-blackboard` and `--verify` are both one-shot parse-run-exit modes, so neither
-gave a persistent process an MCP server could attach to.
-
-**What was built.** `ProjectIo --serve [--ticks N]` (`src/main.cpp`) — a new persistent headless
-mode: builds the canonical world once (identical warm-up to `--export-blackboard`), then loops
-reading one request per line from stdin (`TICK`, `BLACKBOARD corp=<id> ticks=<n>`,
-`COMMAND corp=<id> verb=<0-7> ...`, `SHUTDOWN`), writing one response per line. `BLACKBOARD`
-reuses `export_corp_blackboard`/`to_jsonl` verbatim (byte-identical JSONL, BL-206's schema
-untouched); `COMMAND` builds a `corp_command` and calls `apply_corp_command` — the same
-player-grade seam, no bypass. `tools/mcp/server.js` spawns that process and speaks MCP-over-stdio
-to it: hand-rolled JSON-RPC 2.0 (no SDK — none was in the repo, and the surface is small enough
-not to need one) covering `initialize`, `tools/list`, `tools/call`
-(`get_blackboard`/`issue_command`/`advance_tick`/`lookup_action`/`list_actions`),
-`resources/templates/list` and `resources/read` (`blackboard://<corp>`).
-
-**Design calls followed, one bug caught.** `get_blackboard` always pushes the full blackboard —
-§ 10c.5's "push state, don't make the model pull it." `issue_command`'s verb enum is exactly
-`corp_command.hpp`'s eight verbs. One real bug surfaced in smoke-testing: the child process's
-`[Lua] ...` startup banner raced the first request and got swallowed into that response's lines —
-fixed by filtering banner lines unconditionally in the line handler rather than gating on
-`pending` alone.
-
-**Verification.** Compiled clean via `build_app.bat` (VS2022 BuildTools/MSVC 14.44, per the pinned
-toolchain). Smoke-tested end-to-end: `tools/list` returns all 5 tools with schemas,
-`get_blackboard` against a live corp id returns real facts, `issue_command`
-(`set_workforce`) returns `result=applied`, `resources/read` on `blackboard://<corp>` round-trips.
-No visual/golden requirement applies — doc-only surface, nothing renders.
-
-**Left open.** `prompts/*` (the `reason_to_select` leg) not yet exposed as MCP prompts —
-`lookup_action`/`list_actions` cover the same data as tools for now. BL-279 (trace corpus) still
-needs a real client attached to this server before it can start.
+### What landed
 
----
+**The migration happens on camera.** Settlement now hands the sim a *founding schedule* and the
+year loop founds each region as its year arrives. Measured at the 4,000-year span: 10 ownership
+changes at the opening frame, 523 during, across 319 distinct years. The world opens as ten cradles
+and fills.
 
----
+**Culture is earned rather than assigned.** `run_settlement` takes each founding's date *and*
+culture from a single multi-source flood over the tile raster. C11 is the acceptance test on real
+worlds: 23–33% of regions carry a culture a Voronoi over the map's own observed origins would not
+have given them. The RNG draw in the founding date is gone — an arrival year is a consequence of
+the ground, not a roll on top of one.
 
-## Session — two direction points: invented names, and the governing body (2026-08-03, later still)
-
-**Runtime.** ~25m wall. Light-to-Full (doc authority + one standing rule; no `src/` change).
-
-**The ask.** Two points from a prompt that never reached me (the "did my prompt get lost?"
-check was about these). Ben: (1) *"even if we do use real history as an analogy, we should use
-sci-fi / fantasy random names"*; (2) *"the aim that we're going for now, is to really play as a
-governing body. The reason for that is that it allows law, policy and science to use military
-might - not just economic."*
-
-**Point 1 — real history in, invented names out.** Filed as a **standing rule**
-(`io-standing-rules.md` § Terms & docs) plus a full section in `GENERATION_STRATEGY.md` with a
-transfers/does-not table. The distinction: mechanism transfers (how a charter enforces a
-promise, how a front stalls at a strait, how an inland sea concentrates littoral power), proper
-nouns never do. Two traps named because they are easy to fall into — **"culture-flavoured" must
-not mean "Earth-culture-flavoured"** (a name a player can place as "the Roman one" has failed
-however good the mechanism under it), and **analogy language in docs is for the reader, not the
-generator**. Stamped onto BL-271 (Era −1 sim) and BL-277 (Era −1 military strategy), the two
-items filed off "use Rome as a sandbox". Project-Rival is the sole exception and only outside Io
-— it plays a real RTS and returns numbers and doctrine, never names.
-
-*The code was already fine* — nation/corp/city naming is seeded template banks plus phoneme
-tables with no authored lists. The exposure was entirely in the design layer, where the Era −1
-arc could have imported Roman nouns as content.
-
-**Point 2 — the governing body, and its reason.** BL-094 has been settled since 2026-07-04 but
-never carried a *reason*. It does now, and the reason is load-bearing: a corporation's levers
-are all economic, so a corporate player can be handed laws and research and both remain flavour
-on an economy — a law changes a cost, a tech unlocks a building, neither reaches force. A
-governing body **wields** law, policy and science and can point them at military might.
-
-That is also **Conflict's route to being load-bearing**: the house rule says every system must
-feed Trade or Conflict, and under a corporate player laws/techs/politics could only ever feed
-Trade — which is exactly why Conflict has stayed the least-designed pillar and kept sliding. It
-also retroactively converts the 2026-07-04 call that *Military anchors the pivot first* from a
-risky preference into the obvious consequence.
-
-**What it changes.** The v0.1.x stub band (laws BL-155, techs BL-156, military BL-157, politics
-BL-158) was themed "ponder and stub what the expanded prototype will need" — vague because
-nobody had said what the stubs were *for*. They are the governing body's levers, and each now
-carries a design test: **does this system reach military as well as economic outcomes?** If it
-can only change a cost or a price, it is being designed for the player we are pivoting away
-from. Written into ROADMAP's v0.1.x banner and BL-094; deliberately *not* written into the four
-stub items, which stay design-owed until reached.
-
-**Calls taken (NR-045).** BL-094 **unparked and raised F → A** — "the aim we're going for now"
-is not compatible with a parked F item — and retitled to Ben's word, *governing body*, rather
-than "nation". CONCEPT.md's player-identity statement was **left alone** despite being the doc
-his point most directly closes: the authority time-slice rule is unambiguous and the cost of
-waiting is low. NR-045 asks whether that was too conservative, and pushes the ROADMAP sequencing
-question that has been open since 2026-07-31 — a priority says "important", a version goal says
-"when", and "when" is the actual open question.
+**The coast became the road**, rivers cheaper still, and streams cross straits by a *crude* bounded
+hop of at most three water tiles. The bound is the specification: it crosses a strait and never an
+ocean, which is what keeps "people got everywhere" from becoming "people sailed".
 
----
+**Migration coins its own peoples**, derived from their parents — the tongue drifts rather than
+re-rolling, so daughters read as kin. They divide on **country** (settling a farm class they were
+not coined on) and on **size**. Distinct peoples holding ground: **12 → 38 / 56 / 33**.
 
----
+**The wizard walks five named rounds** — System, Life, Culture, Empires, Industrialisation — each
+pass round starting its own pass on arrival, with no Run button: arriving *is* the instruction.
 
-## Session — clearing the review queue: 14 decisions, six of them overturning what shipped (2026-08-03, later)
-
-**Runtime.** ~1h wall. Full (decision intake + doc/backlog authority; no `src/` change — every
-overturned call is filed as work, not applied in place).
-
-**The ask.** Ben, on mobile, asked what was worth doing from a phone and then took the thorough
-option: work all 14 open forks in `NEEDS_REVIEW.json` rather than the three live ones. Queue
-went **19 open → 6**.
-
-**Ratified as recommended.** NR-022 (BL-262 scoring — the six-call package ratified as written,
-diegetic publication confirmed, rival figures stay banded), NR-029 (BL-208 checkpoint timestamps
-keep the documented simplification), NR-042's arena reading, NR-043 (Ben installs 0 A.D.
-himself), NR-025's two-rupture reading, NR-037's sequencing.
-
-**Overturned — six calls I had taken, reversed.** (1) **NR-024**: Tax is not read-only after
-all; the player is a *chartered* corporation that **negotiates** its rate with its home nation,
-which keeps Ben's original intent and makes it coherent → **BL-280**. (2) **NR-020**: the
-History ledger's Tiles view is **retired**, not renamed — History becomes Story + Chain →
-**BL-281**. (3) **NR-030**: trade-route entries push **two** records, one per endpoint, so a
-body filter sees a route from either side → **BL-282**. (4) **NR-035**: Pass 3 placement is
-**constrained to the home province** rather than softening BL-219's wording → **BL-283**.
-(5) **NR-036**: BL-054's territorial half is **reopened** as its own measurable item rather than
-counted complete on an unmeasured argument → **BL-284**. (6) **NR-042**: **the played civ flips
-to Rome** — Han becomes the rival.
-
-**NR-023 — the reserved item, released.** Ben delegated BL-229's four layout questions rather
-than reserving them further, so they are answered against the measured widths and the item flips
-`design-owed` → `designed`; **v0.1.1 now has no design-owed items**. The answers: hex
-neighbourhood stays in the left quarter (it is the one column needing no rival-degradation
-logic); four accordion pages ordered symptom → cause; the two levers go in a strip *under* the
-accordion, keeping "right quarter = actions" stable across both siblings; the 2×3 grid stays,
-Manage dropped, Demolish bottom-right. Recorded explicitly as a *delegated* design, not a
-matched eye — the recourse if it near-misses is Ben's mockup.
-
-**v0.1.1 re-themed (NR-034 + NR-044).** The minor is now **the word interface** plus the
-standing shell set: BL-270 (dictionary, complete) + BL-206 (export, complete) + **BL-278 (MCP
-server, moved down from v0.2.0)**. Ben took the recommendation that the server land early
-because it touches no simulation code and is what lets a first real text-driven play attempt
-happen. BL-279 (trace corpus) stays v0.2.0.
-
-**Project-Rival flipped to Rome.** `RIVAL-ROME.md` → `RIVAL-HAN.md` (scholarship unchanged — it
-was always two-sided); CLAUDE.md, MISSION.md, ENVIRONMENT.md, CAMPAIGN.md and annals/README.md
-updated. The autostart civ flags swap, the annal register goes classical Chinese → Latin, and
-the rite inherits a real consequence: we now play the side that must *generate* campaigns, so a
-quiet year is a Han success and a Roman embarrassment.
-
-**Also.** ERAS.md's Era 0→1 gate corrected now rather than waiting on BL-087 (NR-025) — the
-three conditions gate a quest tree, not an Era; the two ruptures are distinct and CONCEPT.md
-stands unamended. **BL-285** files the GCC re-bless + the H4 chain_stage fix.
-
-**Left open.** Six entries, all older. One owed check before Rival's Year 1: confirm Pantheon's
-voices corpus has a Latin register — if not, propose one rather than faking it.
+### The corrections that mattered more than the features
 
----
+**A ruling was overturned the same day it was made.** COLONISATION.md settled the span's end as a
+*stated* year and explicitly recorded the derived alternative as considered-and-rejected. A fixed
+span then left seed 0's last 1,300 years measurably static, and the terminating condition became
+derived. The replacement turned out to need no safety stop at all: "wait until nothing more is
+going to happen" is answered by a flood that finishes, so it is one field read off a walk that
+terminates, not the mechanism the item budgeted for.
 
----
+**Round 4 was split in two after watching it.** Fused, it showed conquest with the migration
+already finished off-screen; once migration moved inside it, it showed migration with no conquest
+at all. Two subjects, two rounds.
 
-## Session — LLM grand strategy: the public field, MCP, and the small-local-model direction (2026-08-03)
-
-**Runtime.** ~1h wall. Full (research + doc authority — no `src/` change; two backlog items,
-one project charter amended).
-
-**The ask.** Ben: "are there other publicly available projects that have tried to use LLMs for
-grand strategy? Do a wide search on the web, and come back with actionable plans." Then, on the
-findings: "We can use MCP, but please explain to me exactly what that is... our aim is just fair,
-text driven, small and local models... Cloud usage is just going to be finding tons of input and
-output sets, for when we fine tune a smaller model of our own."
-
-**The survey.** Eleven public projects, written up as `AI_OPPONENT.md` § 10b: Cicero,
-**Vox Deorum** (Civ V + Vox Populi, the load-bearing one), civ6-mcp/CivBench, civStation,
-CivAgent, CivRealm, SAGA, Richelieu, Agents of Change, DSGBench, WarAgent. Sixteen new sources
-in § 10f. Closed the two citation gaps § 9 had left open since 2026-07-23 — Vox Deorum's
-per-decision latency (~1 min) and per-game token cost (20.35M in / 555k out for `gpt-oss-120b`).
-
-**The findings that mattered** (§ 10c). (1) *Open-weight models already reached parity with a
-tuned algorithmic 4X AI* — 97.5% vs 97.3% survival across 2,327 games, with a simple prompt and
-no fine-tuning; the gap Io must close is size (120B → local), not capability. (2) The field
-universally puts the LLM on **macro only** and delegates tactics to algorithmic subsystems —
-independent confirmation of the A → B → C staging. (3) Personality is emergent and free (+31.5%
-domination victories for one model, unprompted). (4) The failure modes are consistent and none
-is about intelligence: step-wise greed/myopia, CivBench's **sensorium effect** and
-**knowing-doing gap**, the observation-belief and belief-action gaps measured on exactly the
-open-weight class Io targets, and spatial blindness. (5) A ranked list of what actually improves
-play, cheapest first — *push state rather than making the model pull it* sits at the top and is
-an interface decision, not a model decision.
-
-**Direction set (Ben).** MCP as the interface; a **small, local** runtime model; cloud inference
-demoted to corpus generation for a fine-tune. Written into `AI_OPPONENT.md` § 10d, with § 10a
-explaining what MCP is and why Io is unusually close to ready — BL-206 (blackboard export) and
-BL-270 (action dictionary) already built the read and meaning legs, `corp_command` is the write
-leg, and the mapping onto MCP's tools/resources/prompts is near-mechanical.
-
-**Filed.** **BL-278** (Io MCP server, SS, v0.2.0) and **BL-279** (AI trace corpus + fine-tuning
-pipeline, S, v0.2.0). ROADMAP's v0.2.0 section names both.
-
-**Also.** NR-040 (the "what plumbing does C-route need?" question, open since 2026-08-02) is
-**resolved** — the answer is one wrapper, not a subsystem. Project-Rival's charter, which read as
-a house-wide ban on API hooks, is narrowed to what it actually is: computer-use is how Rival
-plays *0 A.D.*, because 0 A.D. exposes no agent interface — not a position that protocol
-interfaces are forbidden (`Project-Rival/CLAUDE.md`, `docs/MISSION.md`).
-
-**Left open.** NR-044 records four calls taken on Ben's behalf — the two-item split, the SS/S
-priorities and v0.2.0 goals for both, the charter narrowing, and leaving § 2C's staging intact.
-The live question in it: BL-278 touches no simulation code, so it may belong in v0.1.x rather
-than v0.2.0, which would let a first real text-driven play attempt happen sooner.
+**Half a continent of "unsettled" land was settled.** Ben's screenshot showed grey masses that
+never took a colour. The cause was arithmetic: 604 foundings against 523 ownership changes — 81
+regions founded and owned by nobody, because polities are seeded once from the cradle cultures and
+a region carrying a coined culture matched none. Seeding a polity on demand fixed it, and brought
+conquest with it (~472 ownership transfers where the span had zero).
 
----
+### The failure mode of the sprint, in six costumes
 
----
+Every one of these looked like coverage and was not:
 
-## Session — Mediterranean rift sea: measure, mechanism, gate (BL-276) (2026-08-03)
-
-**Runtime.** ~2h wall. Full (delivery — seed exploration turned same-session Full-mode item;
-touches deterministic generation across `continents.cpp` + `hard_coded_world.cpp`).
-
-**The ask.** Ben: explore seeds for a near-Mediterranean structure and make it "almost
-inevitable"; hard-coding on the table. Measured first (new `mediterranean_sweep` harness, 500
-campaign seeds through Kepler's exact pipeline): an enclosed sea ≥ 300 tiles existed on only
-**44%** of seeds — TILE_GENERATION.md's "lacks enclosed seas" note was stale but directionally
-right. Options filed as NR-041; Ben chose **hybrid at ~90%**: "interesting worlds if it is
-HARD to form something like Rome. But it will never be impossible to try."
-
-**Built (BL-276, Mediterranean rift sea).** (1) *Mechanism, consequence-not-dice*: in
-`run_continents`, the divergent continental-continental boundary with the longest
-land-interior segment (per-tile inland-ness ≥ 0.75 over plate ownership) founders — adaptive
-width (short rift → wide Black-Sea oval), depth 0.65, and a +0.50 **rift-shoulder rim** that
-seals the sea off from the world ocean; worlds with no such pair get an **intracratonic sag
-basin** (Caspian shape) at the continental inland-ness argmax. One dated biography line each;
-zero shared-stream RNG. (2) *Backstop gate* in `hard_coded_world.cpp`: Kepler's tile seed is
-attempt-folded — three attempts at the **arena** bar (enclosed sea ≥ 300 tiles), six at the
-**floor** (≥ 30), attempt 0 kept honestly on exhaustion.
-
-**Measured after.** Floor **100%**, arena **89.6%** over 500 seeds — on Ben's ~90%, with the
-1-in-10 hard-Rome tail intact. The sweep asserts wide regression bars (floor ≥ 97%, arena
-82–96%) and mirrors the gate loop line-for-line.
-
-**Verified.** `mediterranean_sweep` PASS; `continents_harness` 11/11, `world_determinism`,
-`determinism_harness`, `world_audit` all PASS on the new surface. Docs: CONTINENTS.md
-§ Rift-basin sea (new), TILE_GENERATION.md § Deferred coastline note updated. NR-041 resolved.
-
-**Left open.** The default-seed world visibly changes (ocean relocates into the basin) — worth
-Ben eyeballing the live Planetary canvas; `mediterranean_sweep` still needs naming in the
-`verifier-headless` skill (permission owed); CMake reconfigure will auto-register it with CTest.
+1. A synthetic route case whose two cradles were **equidistant**, so its proximity assertion was a tie.
+2. A cradle-outcome classifier that asked *how much ground* and so measured **crowding**, reporting 317 encircled / 0 sterile — a number a sweep would have tuned the barrier costs against.
+3. `stop_after_ancient_era` shipping an **empty map for 4,000 years** while its header reported 611 foundings, because `--verify` adopts the harness's own world and never takes that branch.
+4. A harness **segfault reported as exit 0**, because it was piped through `grep` and a pipeline returns the *filter's* status.
+5. A `sizeof(app)` `static_assert` whose bar was **~6× too loose** while the process died at startup with `0xC00000FD` and no output.
+6. An out-of-bounds write that **both** harness builds passed — `/O2` because it is silent there, `--debug` because that flag drops optimisation but not MSVC's `_ITERATOR_DEBUG_LEVEL`. Only the app's real Debug build caught it.
 
----
+The standing lesson, adopted mid-session: **run verification to a file and read the exit code**, and
+never let a pipeline's status stand in for a program's.
 
----
+### What actually found the defects
 
-## Session — filing the Era −1 sim: Rome as sandbox, units instead of scalars (2026-08-02, later)
-
-**Runtime.** ~30m wall. Light (filing only — five backlog items, Sprint 5 re-theme, two doc
-banners; no `src/` change).
-
-**The ask.** Brainstorm-turned-decision. Ben's chain: a 0 AD start is blocked for the *game*
-(tech/laws/materials only work 1900s+), but a pre-industrial world is the cleaner **sandbox**
-for bootstrapping the nation AI and mil-sim — "just use Rome as a sandbox." Then: run it as
-Sprint 5, generate a spread of earth-like worlds through 0–2000 CE to refine the philosophical
-development — and **overturn one decision**: simulated history fights with *real units and real
-tactics*, as typed unit types the main era later inherits. Filed directly at Ben's instruction
-rather than parked in NEEDS_REVIEW.
-
-**Filed** (all `designed`, post-v0.1.0, Sprint 5): **BL-271** (Era −1 sim — year-tick loop over
-the BL-218 world, sandbox purpose bounded in writing, Rome as calibration reference not
-content); **BL-272** (unit/doctrine combat — records the overturned abstract-war decision;
-"real tactics" pinned as doctrine parameters, never battlefields, or the sweep dies; one engine
-shared with the main era, since `unit_component` is a stub the sandbox gets to define);
-**BL-273** (province demography — logistic growth off farm_q, manpower as the self-limiting
-army budget, POPULATION.md's first honest consumer); **BL-274** (era-keyed unit rosters — an
-authored material-gated table, deliberately *not* a tech tree; forge-god cultures field iron
-early, first industrialisers field rifles against pike); **BL-275** (history sweep — BL-210's
-remaining batch-sweep scope gets its payload: hegemony rates, war frequency, lacunae, ideology
-distributions across a seed spread; report-don't-gate until Ben has seen the raw spread).
-
-**Sequencing effects.** Sprint 5 re-themed (persona audit rides along at its original small
-scope). BL-224's non-hegemony becomes an emergent tuning target instead of an assertion; BL-223
-(averted rupture) gets designed against simulated near-ruptures; BL-054's runtime half and the
-BL-155/156 stubs get their proving ground.
+Driving the built app. The empty map, the fused round and the grey continents were all found by
+opening the game and looking, and every one of them sat behind green harnesses. The live-click rule
+earned its place three times in one day.
 
----
+### Two diagnoses I got wrong
 
----
+**BL-862** said coined cultures never win a region anchor. They win 81 of them — the measurement
+behind the claim was taken at the 400-year span, where the founding schedule is *empty*, so it never
+tested the case that mattered.
 
-## Session — documentation compression: the backlog sheds 42%, and the reading order gets measured (2026-08-02)
-
-**Runtime.** ~1h wall. Full (tooling + a data migration + the doc policy that follows from it).
-Filed from Project-Gyre, which is where the ergonomics are being generalised.
-
-**The ask.** Ben, from the process repo: "what can we do to compress the amount of data used for
-documentation? What tools does it seem like Io would benefit from?"
-
-### What the measurement said
-
-`docs/` was 3.7 MB, and very top-heavy: `backlog.json` 1.25 MB, `req/requirements.json` 448 KB,
-`DEVLOG.md` 444 KB, then the generated pairs. Breaking the backlog down by status found the
-real shape of it — **176 `complete` items were carrying 435 KB of design prose and 89 KB of
-close-out notes, ~44% of the file** — paid for by every reader that only wanted the 30 KB of
-live metadata underneath.
-
-### What was built
-
-**The hot/cold split — `tools/session/archive_store.js` + `archive_designs.js`.** CLAUDE.md
-already said authority *time-slices*: `backlog.json` owns an item while it is open, the subject's
-authority doc owns it once the work lands. The prose never actually left, so the rule was true on
-paper only. It now moves: on landing, `design` / `resolution` / `completion_note` /
-`progress_note` go to `docs/development/archive/backlog-design-<quarter>.json`, and the item keeps
-the `@`-pointer form its own `_note` already blessed, plus an `archived` field. **1.22 MB → 710 KB,
-42% smaller**, 172 items moved, round-trip verified on write. `--restore` reverses it; nothing is
-deleted.
-
-**`tools/session/backlog_query.js` — the retrieval primitive.** Same principle as
-`actions_query.js` (BL-270): hold an index, fetch records. Defaults to five index fields over open
-items; `--status --priority --version --category --touches --grep --fields --table --count` filter
-it, `--full` pulls the prose and resolves the cold pointer transparently, so an archived item reads
-exactly like a hot one. `backlog_view.js` resolves the same way.
-
-**`tools/session/devlog_index.js` — find the session without loading the log.** Generates
-`DEVLOG_INDEX.md`: one line per session (date, title, the `BL-` ids it touched, which volume holds
-it), 110 entries in 16 KB. `--rollover 2026-07` moved the 56 pre-July sessions into
-`archive/DEVLOG-2026.md`, leaving DEVLOG.md at 228 KB with the 54 live ones. The index spans both.
-
-**`tools/session/mirror_check.js` — the generated mirrors, actually checked.** Every mirror carried
-a "Generated file" stamp and nothing enforced it. It re-runs each renderer and diffs. **It found
-`NEEDS_REVIEW.md` stale by 11.6 KB on its first run** — the exact 2026-08-02 drift its own renderer
-header was written to prevent, recurred. `--check` reports without touching; the default fixes.
-
-**`tools/doc_weight.js` — the reading order, as a number.** Walks the doc paths CLAUDE.md names,
-estimates tokens, compares against a budget, and lists the heaviest files it does *not* name.
-Verdict: **~610,000 tokens across 40 files**, against a whole-`docs/` corpus of ~924,000.
-
-**`backlog_lint.js` gained two invariants.** An `archived` pointer with no record behind it is a
-hard FAIL (data loss wearing a reference's clothes); frozen history back over 30% of `backlog.json`
-is a warning that the close-out step is being skipped. Both are wired into DELIVERY.md step 5,
-alongside `mirror_check` and `devlog_index`.
-
-**`tools/gyre.py` opened `backlog.json` without an encoding** and died on Windows cp1252 the moment
-it met a `✓`. Fixed in passing.
-
-### Decisions taken
-
-**CLAUDE.md no longer says "read the documents below before responding to any request."** That
-instruction was written when the doc set was small; at ~610K tokens it cannot be followed, so it
-was being ignored silently and unevenly, which is worse than a narrower instruction that holds. It
-now instructs traversal — read the doc that owns the question, and prefer an index or a query tool
-over loading a file. Recorded as **NR-038** because it changes the contract at the top of the one
-document every session reads.
+**The Begin crash** I reasoned was pre-existing (three worlds in Debug, likely `bad_alloc`) and gave
+better-than-even odds. One bisect refuted it flatly. The cause was my own change breaking an
+invariant a *comment* was holding — *"sized to the polity table, which the sim never grows"* — true
+when written, false the moment a polity could be born mid-run. The comment is rewritten to what is
+now true rather than deleted.
 
 ### Left open
 
-Not committed — the tree carries the migration, the three new archive files, and the doc edits for
-Ben to look over first. `requirements.json` (448 KB) is the next candidate and has had no pass.
-The eight `docs/ui/mockdata/*.csv` files are fixtures sitting in the doc corpus and probably want
-a different home.
+- **The roads pass crashes the full generation pipeline** (Ben, known) — the autostart never reaches in-game.
+- The scoreboard normalises **Land%** over *claimed* land, understating how empty the world is.
+- The **drawdown lean** is editable nowhere until the Industrialisation round is built.
+- **~95% of coined cultures never hold ground** — bounded and harmless, but most are ephemeral.
+- Regions are **~3× where the day started** (609 → 1,906), which lands on the watched wait and on Begin; NR-809 measured reach as roughly quadratic in region count, and BL-844 is already spent, so the cap is the **adjacency model** (BL-855).
 
 ---
 
 ---
 
-## Session — the history backend: provinces, gods on the ground, and a record that can be burned (2026-08-02)
+## 2026-09-08/09 (sprint 35) — Generation gets two more rounds, and the measurements refute nearly everything
 
-**Runtime.** ~2h wall. Full (BL-218 + BL-219 — new generation module, four seams, a new
-harness, five authority docs, promoted with a requirement group).
+**Mode:** Design → Batch delivery in waves → paused mid-sprint on Ben's call → review barrier and close.
+**Runtime:** one long session; 5 sub-agents in worktrees; 3 lanes merged, built and verified in the main session.
 
-**The ask.** Ben: "complete 2b, and finish with the backend of history implementation… as long
-as there is a way to map belief systems onto existing and warring civilisations." Plus,
-explicitly: "don't be afraid to have parts of the record erased when two nations go to war, just
-try to think about mapping Pantheons to existing locations and environment (e.g. ancient resource
-deposits)."
+### What started it
 
-### What was built
+Ben: *"everything up to the planetology looks great"* — and nothing after it is visible at all.
+The wizard is the one generation surface that works, and it stops at phase 1. The two passes a
+player would most want to have watched — the ancient history and the industrial economy — happen
+behind a loading bar. Sprint 35, opened that morning on the startup budget, was repurposed.
 
-**`src/world/settlement.{hpp,cpp}` — HISTORY.md Stages 3–4, made mechanical.** It sits between
-the creeds and the political map and introduces the **province**: the unit that carries belief,
-ancient endowment and industrial timing *at once*.
+### What was settled
 
-That is why the province had to exist at all. A cradle is a *people*; a nation is a *territory*;
-neither can say "these fields, under these gods, sitting on this ore". Once the province can,
-Ben's three asks stop being three separate features:
+The wizard grows to **five rounds**. Round 4 is the **history**: a 2D map replaces the globe and
+runs a time-lapse of 4000 years to 1200 CE, with an ordered **top-sixteen scoreboard** on the left.
+Round 5 is the **economy pass, 1560 → 1960**, its own page with its own run and reroll. `Begin`
+moves to the last round; the 4000 years can be rerolled, which is what forces the wait to be
+genuinely affordable rather than merely tolerable. Ben: *a watched wait needs no budget* — which
+dropped the startup-budget chain the sprint had opened on.
 
-- **Pantheons map onto ground.** A province inherits its *nearest cradle's* culture, so the
-  distribution of gods is a record of who walked where rather than a per-province re-roll.
-- **Gods and deposits are one fact read twice.** A forge god only exists where the cradle's
-  window held ore (CREEDS.md, one stage earlier) — so "the forge god's country industrialises
-  early" is not flavour painted over data, it is the data read again. The charter culture's
-  sealed-oath god buys a smaller bonus, which is Stage 3's contract law reaching capital.
-- **Wars burn the record.** A won war plants the victor's pantheon on the provinces it takes and
-  **erases** the lines naming them, leaving a dated lacuna carrying a count of what was lost.
-  Four of six seeds lost part of their record. A conquered province keeps its founders in
-  `founding_culture` and its conquerors in `culture` — the erasure is of the record, never of
-  the fact, which is the pair a later religion or diplomacy layer needs to describe a grievance.
+That fixed the calendar: 4000 years to 1200 CE, a deliberate **coast** to 1560, then 1560 → 1960,
+epoch 1960. An industrial-band campaign, where the 0 CE default gave an ancient one.
 
-**Nations (BL-218).** Seeds are now province anchors — *seeding changes, expansion does not*, so
-BL-053's tuned growth machinery is reused untouched and the size variance **emerges** rather than
-being dialled in. The three political axes became outputs: expansionism from the border-contest
-integral, economic_focus from the class of provinces settled *during* industrialisation, ideology
-from industrialisation timing ranked against neighbours. The ruptures are BL-217's **second
-checkpoint class**, reusing `resolve_checkpoint` unchanged — exactly what that item predicted, so
-no second branch mechanism was written.
+### Three measurements, and every one of them said no
 
-**Corporations (BL-219).** Focus derives from the corp's home *province* — per-province, not
-per-nation, because a nation average would make every corp in a nation alike and kill the
-specialists premise — shifted one tier up the value chain for an early industrialiser. The
-authored table is retired on that path; diversity becomes a world-level reject-and-reroll against
-a floor on the **set**, never a quota on any member.
+This is the session's actual content. Wave 0 existed to stop the sprint being planned on a guess,
+and it did exactly that — three times over.
 
-### Decisions and corrections worth keeping
+**4000 years is not free.** I had read the sim and concluded the span was probably already
+affordable: it works on the region graph, the O(N²) neighbour build sits outside the year loop, and
+the stepped decision clock already amortises decisions. Wrong. Per-year cost at 4000 years is
+**6–9× its cost at 400**. Reach is **66–86%** of the run, and `rebuild_reach` caches into a *single
+shared slot* — so twelve polities evict each other every round, 12,000 rebuilds over 1,000 rounds.
+Its own comment claims the cache survives until a capital moves. With more than one polity it does
+not survive one iteration (BL-834).
 
-**The first endowment scoring was wrong, and the harness caught it.** Absolute per-class gains
-saturated all 75 of Kepler's provinces to `farm`. Replaced with **world-relative** scoring (500 =
-the world's own mean), which separates cleanly — 27 farm / 20 ore / 8 energy / 20 port — and,
-unplanned but welcome, is immune to the `deposit_scalar` abundance tier: a lean world still has
-its own ore provinces, just poorer ones.
+**Most of the war is not war.** An R5 regression after the culture-shares merge was first diagnosed
+as a fragile fixture, and then by me as a scoring reorder. Both wrong. All 258 battles of the
+seed-0 fixture are **the same region** — zero population, zero defenders — taken and retaken for
+four thousand years. `battles == conquests == 258`, exactly 1:1, which the shipped harness had been
+printing unread all along. Culture shares were exonerated by direct experiment: the pre-change
+equality test gives identical counts (BL-835).
 
-**A whole-world change moves goldens; check rather than assume.** `ai_skill_harness` failed 9
-assertions. Rather than filing it under the known BL-252 platform caveat, stashed the change and
-rebuilt: it passed at baseline, so the failure was genuinely ours. Every divergence was *upward*
-— net worth up on three seeds, solvency and survival still in band — which reads as corps
-anchoring to provinces that actually industrialised. Re-blessed the MSVC block only, per that
-file's own rule; the GCC set is untouched and now stale by design.
+**And the batch was about to close green on five real defects.** The step 4a barrier — one cold
+review across the whole integrated set — returned five confirmed findings, including an
+out-of-bounds write in the `--autostart-windowed` driver, which indexed a `uint32_t[3]` with a
+round counter the wizard had just widened to 0..4. The Reroll button was gated when the wizard
+grew; the driver was missed, and it is the path nobody eyeballs. Fixed here; BL-840–843 filed for
+the rest, two of which mean headline behaviours of the grudge and share systems do not actually
+occur in the sim.
 
-**One assertion was narrowed, and that is recorded rather than quietly done.**
-`history_ladder_harness` H4 demanded every line in the recorded-history window be strictly older
-than the next — true only while the ladder owned that window alone. Two provinces founded in the
-same year are a fact about the world, not a stage-ordering violation. Narrowed to assert the
-ladder's own causal claim (granary → charter → accord) on its own three lines.
+### What landed
 
-**Unrelated pre-existing break, fixed in passing.** `trade_routes_harness` had not linked since
-BL-170 landed rivers: its hand-declared CMake link set never picked up `river_generation.cpp`.
-Removed the hand-declaration so the generic batch builds it against the world superset — the fix
-`CMakeLists.txt` already prescribes for this rot, and the third target it has caught.
+Wizard rounds 4 and 5 with labelled placeholders, verified by a live click-through on the release
+build (BL-816, BL-824). The span-cost harness and its profiling counters (BL-825). Culture shares,
+the grudge ledger and the `pass_one_output` handoff (BL-826, BL-827, BL-828 — the last half done by
+the author's own admission; its consumers are not rewired).
 
-### Verified
+### What Ben settled when development paused
 
-New `tools/verify/settlement_harness.cpp` (S1–S8): determinism, belief-mapped-onto-ground,
-character-as-output, seeds-are-provinces, the erasure and its bookkeeping, ruptures-as-transforms,
-BL-219's tier rules and the diversity floor, plus a six-seed spread. **Full CTest 39/39.**
+**Population is civilian, armies are distinct, and stage 4 does not simulate total warfare.** That
+is the root fix for the dead region: war stops *producing* empty ground, so the pathology has no
+cause rather than a block. It also gives culture shares their subject back, since conquest now
+transfers people. The scorer gains two questions — *can I keep it* (logistics and ancient roads) and
+*will others attack me for fear of being next*, which is what finally makes the balancing-coalition
+lever admissible: fear reads a **behaviour**, not a rank. And **turbulence is round 4's lean** —
+roll for a world with fewer or more countries, tuning forces and never clamping a count.
 
 ### Left open
 
-Three entries in `NEEDS_REVIEW.json` (NR-035…037): corp asset *placement* still anchors to the
-nation rather than to the home province its focus came from; BL-054's territorial-fragmentation
-half was folded into BL-218 on an argument nothing yet measures (no exclave is asserted anywhere,
-and Pass 2b could be manufacturing the ones that exist); and the golden re-bless plus the
-assertion narrowing above. BL-219's rarity-tuning sweep is not done. BL-210's umbrella is down to
-its batch-sweep extension and TILE_GENERATION.md's share of the propagation.
+Six review-queue entries, the sharpest being NR-807: `CONCEPT.md` still names the ancient arc as
+the live product. I fixed the generation-side citation and deliberately did not touch that one —
+it names who the player is, which is a product call rather than a reconciliation.
+
+Sprint 35 is **paused, not closed**, with `NEXT_SESSION.md` as the handoff.
 
 ---
 
 ---
 
----
+## 2026-09-07 (sprint 33 opens) — The corpus stops charging every session, and two tools are found lying
 
-## Session — the action dictionary: 114 controls, five agents, one afternoon (2026-08-02)
+**Mode:** Design (one question, two calls) → Corpus/Batch delivery in one wave → close.
+**Runtime:** one session; 7 sub-agents in worktrees, no compile — not one line of `src/` changed.
 
-**Runtime.** ~1.5h wall (agent authoring ran in parallel). Full (BL-270 — new AI-facing
-store, five-file doc surface, promoted with requirements per the lifecycle).
+### What started it
 
-**The ask.** Ben, same day: promote the "complete dictionary of every button press —
-A) expected output, B) reason to select" so an AI plays via words; "not really one item,
-it's the whole process of gameplay/development." Design settled by elicitation (four
-calls: every control including chrome; + typed args and preconditions, cost and
-provenance deliberately out; docs/ai/ home; both consumers — generation then play).
-Multi-agent fan-out explicitly requested.
+Ben asked whether the query tools reading *both* the hot backlog and its archive defeats the
+archive's purpose, and whether reading the relevant docs was creating context creep.
+
+Half of that answer was easy and stayed easy. The archive exists to keep `backlog.json` meaning
+exactly one thing — open work — so the hot file never needs disambiguating. The union exists
+because `--touches` has to see closed items or it cannot answer "is this built?". Those two do not
+fight: the archive keeps the *file's meaning* clean, the union keeps the *question* answerable.
+
+The other half was the real cost, and it was somewhere else entirely: ~650K tokens of authority
+docs with no summary layer, so a nearly-right traversal opens a 40K doc to discover it wanted the
+sibling; `--full` prose resolving out of 1.9MB of archived designs; and `CLAUDE.md` plus the
+standing rules loading whole for a one-line doc tweak. Five items, filed as **sprint 33**; the
+market-viability sprint that held that number moved to **34** unchanged.
 
 ### What was built
 
-`docs/ai/ACTIONS.{json,md}` — 114 entries across five families (11 gameplay / 24 canvas /
-15 lens / 36 ledger / 28 chrome), each `{press, typed args, preconditions,
-expected_output, reason_to_select}`. **Five parallel agents authored the families** into
-disjoint fragment files (no worktrees needed — disjoint write-sets by construction); the
-main session merged with per-fragment validation, wrote `tools/session/render_actions.js`
-(mirror generator = shape check: required fields, family-prefixed ids, no dupes, no extra
-fields), and wired AI_OPPONENT.md § 6a + the CLAUDE.md § Documents entry with the
-keep-entries-current rule. The gameplay family is *transcribed* from `corp_command.hpp` —
-verbs, typed args (workforce [0,200], road_tier [1,3]), rejection semantics — not authored.
-
-### What the sweep caught (transcribe-from-code pays immediately)
-
-- **LENSES.md's supply-routes access note was stale**: it claimed `overlay_mode_count`
-  was still 13 and the lens unreachable; code anchors the count to `supply_routes`+1=14
-  with a static_assert. Doc corrected in three places; the entry records code truth.
-- **Esc's precedence ladder has seven rungs**, not the six the summaries state (the corp
-  roll-up drill reset, BL-248, sits between card-unwind and fold-up). `chrome.esc`
-  transcribes all seven; the canvas family's duplicate was dropped at merge.
-- Smaller honesty wins: no settings row exists for the frame HUD (F11 only); the budget
-  tier steppers are stubbed (entries say so); buy orders have no player press; sell-order
-  placement lives in the market ledger (BL-159), not the Selection panel.
-
-**Open.** The milestone items this feeds — the text-play harness (blackboard + dictionary
-→ LLM → corp_command) and word-driven generation — are unfiled until NR-034 (the
-milestone's ROADMAP slot) is answered.
-
----
-
----
-
----
-
-## Session — "the engine is thrashing": measured, diagnosed, and fixed in one pass (2026-08-02)
-
-**Runtime.** ~2.5h. Full (BL-268 — the planetary canvas hot loop; earns the lifecycle by
-touching the project's single most-drawn code path, though it spans only two logic files).
-
-**The ask.** Ben: the build is "starting to thrash" — how hard would GPU + multicore be?
-Then: stutter while panning; "go and report the numbers, then let's work on the solution."
-
-### What the measurement found (BL-267, GPU & multicore — its own named first step)
-
-Built a scripted tap on BL-249's frame instrument — `verify.frame_reset`/`frame_csv`/`window`
-plus `scripts/verify/pan_perf.lua` (300-frame sustained pan, three zooms, pan-vs-static) —
-after discovering the "verify runs a dummy driver" belief was **wrong**: nothing in `src/`
-sets one, so `--verify` measures the real renderer with real vsync. Findings, 1720×1080:
-
-- **The daily build is unoptimised Debug** (`/Od /RTC1`): 41–53 ms work/frame at every
-  zoom — every frame over the 16.7 ms refresh, ~20 fps always. Panning adds nothing
-  (pan ≡ static); motion just makes 20 fps visible.
-- **The cost was one flat O(all-tiles) canvas overhead**: `tile_at` hash map rebuilt per
-  frame by scanning every body's tiles, a 15k-id sort per frame, and full lens/colour work
-  for all 15,120 tiles before any cull (no vertical cull existed).
-- **Neither GPU nor multicore is implicated**: sim + event pump 0.01–0.04 ms; submit/present
-  small. BL-267's two architectural forks both declined at prototype scale; item kept open
-  only as the post-fix re-measure gate.
-
-### What was built (BL-268, planetary canvas cull + cache — filed and landed same session)
-
-The canvas now reads the per-body raster **logistics already caches** on
-`world.body_tile_index` (`body_tile_grid`, BL-077) — `app::render` ensures it, the canvas
-stays `const world&`. Iteration is row-major over the raster (provably the old sorted-by-id
-draw order: generation creates tiles rows-outer with sequential ids — so **pixel-identical**),
-culled to the visible row band, with the horizontal wrap-window hoisted above the per-tile
-lens work as the column cull. Verified: six goldens exit 0 **un-blessed** against a
-baseline-blessed set; play-zoom pan **11.26 → 4.98 ms** (Release), **41.21 → 6.74 ms**
-(Debug). Whole-grid residual (155k verts, genuinely all visible) filed as BL-269
-(zoomed-out LOD / terrain draw cache).
-
-### Calls taken on Ben's behalf (NR-032/033; NR-026 superseded)
-
-The stale-golden discovery: every full-grid golden had been failing since BL-170's river
-generation shifted the world RNG — nobody re-blessed. Re-blessed all 40 from the unmodified
-baseline (stash round-trip) so R1's un-blessed pass isolates the refactor exactly; committed
-separately from the item. `build_rel/` (Ninja Release, same pinned 14.44 toolchain — ninja
-ships inside BuildTools' CMake) now stands beside the Debug tree as the play/perf build;
-Ben should play Release from here on. The frame_budget_hud.lua header's dummy-driver claim
-corrected in place.
-
-**Open.** BL-269 (zoomed-out draw cache, B). BL-267 re-measure gate closes when Ben confirms
-the live feel. A `build_rel.bat` convenience wrapper was recommended in NR-032 but not built.
-
----
-
----
-
----
-
-## Session — the world history log: the project's first serialisation seam (2026-08-02)
-
-**Runtime.** ~3h. Full (touches the economy/serialisation seam, spans well over 2 logic files,
-carries a genuine determinism/reconciliation risk — earns the lifecycle by Rule 0).
-
-**The ask.** Build BL-208 (world history log): the append-only, tagged, single-interleaved world
-log the item's design settled on 2026-08-02, laying the project's first flat-binary serialisation
-path ahead of BL-218 (nations rewrite) and BL-219 (corporations rewrite), which are expected to
-write into this same substrate.
-
-### What was built
-
-`history_topic` + `world_history_entry` on `world::history_log` (`src/world/world.hpp`); the
-genesis+checkpoint bridge `seed_genesis_history` (new `src/world/history_log.{hpp,cpp}`), called
-from `app::setup_world` right after `make_hard_coded_world` — the first time PLANETOLOGY's
-per-body dated history and checkpoint decisions ever reach `world` state rather than staying
-presentation-only in `generation_report`; and the serialiser itself
-(`write_history_log`/`read_history_log`) with a leading magic+version header (BL-107's own rule),
-field-identical round-trip, and rejection — not misreading — of a corrupt/wrong-magic/wrong-
-version/truncated stream. The three live sources wired additively at their existing emission
-sites: `corp_ai.cpp` (decision + agency, strategic tier), `economy_system.cpp` (agency, the BL-079
-reflex tier), `supply_system.cpp` (trade_route, gated to first establishment of a body-pair lane —
-verified NOT to duplicate on repeat traffic). None of `ai_decisions`, `agency_events`,
-`trade_routes`, or `body_activity_visibility` changed at all.
-
-### Two judgment calls flagged rather than silently picked
-
-`checkpoint_record` carries no timestamp of its own (by design, and changing its shape now has a
-ripple cost the item said to avoid); resolving one against a body's dated history lines is not a
-clean 1:1 pairing in every case (a body that already terminated earlier can record a checkpoint
-with no dated line at its stage at all; Green can resolve two checkpoints against up to three
-Green-tagged lines with no code-level tag distinguishing which belongs to which). Took the
-simplest defensible rule — the stage's LAST dated line at or before it — documented inline and
-filed as **NR-029** rather than replicating `planetology.cpp`'s branch logic a second place it
-could drift from. Separately, a newly-established trade route is a two-body event but
-`world_history_entry` carries one `body` tag (the settled shape); tagged the destination body and
-named both endpoints in the narration text, filed as **NR-030** since a body-scoped filter over
-the log would miss the entry for the untagged source body specifically.
-
-### The worktree was a stale base, twice over in one session
-
-This worktree's HEAD sat at the merge-base with `main`, 24 commits behind — missing BL-217
-(`checkpoint_record`/`planetology_state.checkpoints`), which this item hard-depends on, plus
-BL-166/168, BL-170 (rivers), and a backlog/doc sweep. Stashed the in-progress edits, fast-forwarded
-to `main` (clean; only `app.cpp` auto-merged), popped the stash back (also clean) — no manual
-conflict resolution needed. `cmake -S . -B build` then hit the same FetchContent/TLS block a prior
-session already named (BL-217's own NR-028): confirmed by direct reproduction rather than assumed.
-Fell back to hand-compiled `cl` per the documented contingency — the new
-`tools/verify/history_log_harness.cpp` (27/27 PASS, built over the real generated world, mirroring
-`history_ladder_harness`'s style rather than hand-fabricating log entries), two added checks in
-`determinism_harness.cpp` (25/25 PASS), and a seven-harness regression sweep across every touched
-file (`corp_ai_harness`, `ai_skill_harness`, `trade_routes_harness`, `commercial_fog_harness`,
-`supply_advance`, `econ_stability`, `blackboard_harness` — all green, 0 failures). Also found
-`tools/verify/README.md`'s hand-written world-superset recipes are one file short of linking since
-BL-170 landed (`hard_coded_world.cpp` now needs `river_generation.cpp`); documented as a TU-ripple
-note rather than silently patched around. Filed **NR-031** — the full `ProjectIo` GUI target and
-whole-suite `ctest` are owed from a network-enabled session (app.cpp's new include/call was only
-verified by inspection, since no headless harness touches it).
-
-### Docs
-
-`docs/ai/AI_OPPONENT.md` gains § 8a recording the log's final shape (the struct, the topic enum,
-the four sources, the magic+version header). `docs/generation/GENERATION_LEDGER.md` gains a
-section explaining why it stays a separate mechanism from the log — disposable/tuning-scoped
-breadcrumbs vs. durable/narrative-scoped history, same instinct, incompatible lifetimes.
-
-**Backlog: BL-208 lands complete.** Review queue carries 3 new entries (NR-029/030/031, all open).
-
----
-
----
-
----
-
-## Session — the design-owed sweep: thirty items settled, and three recovered from a merge (2026-08-02)
-
-**Runtime.** ~2h. Full (Design depth verb across the whole design-owed set; no code, no authority-doc
-edits — settlements land in `backlog.json` and stop there).
-
-**The ask.** "Let's work through the design-owed items... prioritise items in sprint 1 > 2 > 3... if
-items are marked as deferred, or they await later items, just promote them now. We want to prepare
-for a batch delivery of tons of the latest design work."
-
-### The ordering was ambiguous, and asking cost less than guessing
-
-`SPRINTS.md` has **two entries numbered Sprint 2**, and only ~8 of the then-28 design-owed items map
-onto any named sprint. Put the real state up with the three readings and let Ben pick: **version
-goal**. That gave a clean 28-item order and took one question.
-
-### Three items had been silently deleted
-
-Ordering the set surfaced that **BL-217/218/219 did not exist** — the id sequence jumped 216 → 220 —
-while `SPRINTS.md` § Sprint 2 and BL-210's own design prose both name them as BL-210's decomposition.
-Traced the file's history: filed at `18c86c0` (2026-07-29), present through `8542e4b`, absent from
-`eaa0d23` ("wip before Sprint3 merge") onward. No commit message mentions retiring them.
-
-This is the **stale-base worktree revert** pattern for the second time. Recovered all three verbatim
-from `8542e4b`, +76 lines, lint clean (NR-021 — which also flags that a merge dropping three
-consecutive rows is unlikely to have dropped exactly three; a full row-level audit is *not* done).
-
-### The real finding: items were waiting on each other, not on design
-
-Roughly a third of the set settled by **redistribution** rather than new design. Settling one item
-dissolved the next:
-
-- **BL-263** (markets never disappear, they go dormant) → **BL-131** stops being "player-driven market
-  destruction" and becomes player-induced dormancy; its hard catchment question evaporates. 4 → 2.
-- **BL-155 / BL-158 / BL-218** → **BL-054** loses three of its four parts. Tax and the licence gate are
-  laws; sentiment is BL-158; fragmentation folded into BL-218. 5 → 3.
-- **BL-157** (a unit is positioned by *tile id*) → **BL-189**'s data half needs no schema change at all.
-- **BL-217/218/219** → **BL-210** becomes a pure umbrella with a three-part closing condition. 5 → 2.
-- **BL-262** (capital standing feeds credit terms) → **BL-225**'s "credit access" needs no new channel.
-
-Two items were **stale bookkeeping, not open design**: BL-087's status claimed an owed set remained
-two lines above the section resolving it, and BL-098's method had been settled since 2026-07-05.
-
-### Three calls worth Ben's eye
-
-- **NR-022** — BL-262 (scoring): all six open calls answered as one interlocking package, because they
-  are not independent. Recorded for ratification, not adopted silently.
-- **NR-024** — BL-155 surfaced a contradiction: BL-171 confirmed **Tax** as a player lever, but every
-  law in the ten-law list is an instrument of public authority and the player is a *corporation*.
-  Settled that laws are enacted by nations and the player is a law **subject** until BL-094.
-- **NR-025** — BL-223's "three-doc" Era disagreement is **four-way**; its table omits BL-087's reframe,
-  which is newer and governs. With it there is no contradiction — a *past* averted rupture and a
-  *future* seeded one, doing different jobs. **CONCEPT.md:51 is right and survives unamended**, which
-  reverses the item's own owed action.
-
-### Left open on purpose
-
-**BL-229** (building selection) is the only remaining design-owed item, and deliberately so — it
-carries Ben's written "do not guess the layout, Ben designs this one". Q5 and sequencing settled;
-Q1–Q4 restated against measured column widths (135 / 254 / 135 px at the 1280×720 floor, 260 px band)
-so they can be answered against numbers rather than prose (NR-023).
-
-**Backlog: 61 designed, 1 design-owed.** Review queue carries 6 open entries.
-
----
-
----
-
----
-
-## Session — the disclosure spine: one fold idiom, and the surfaces stop inventing their own (2026-08-01)
-
-**Runtime.** ~2h. Full (Batch Delivery — three items, main-session-serial by design; two design
-calls put to Ben with measurements, one taken alone and recorded; one defect filed).
-
-**The ask.** "Are there further items we can batch deliver?" — then, from the four candidate
-groupings offered, **the disclosure spine**: BL-214 (drill-through idiom) → BL-247 (chart question
-log) → BL-248 (corporation dashboard roll-ups).
-
-### No fan-out, and that was the call
-
-A dependency chain, not a fan-out. BL-214's shared control is the thing the other two *call*, and
-BL-214/BL-247 share four files — worktree agents would have collided on `generation_charts.cpp` and
-`selection_panel.cpp` for no wall-clock gain. BL-214's own design had already reached the same
-conclusion about its sibling BL-215 and said so.
-
-### The design was superseded, and the supersession had a hole
-
-BL-214 was designed around a three-level Glance/Read/Study stepper, then superseded on 2026-07-31
-by Ben's binary fold model after he reviewed four live HTML exemplars. The binary note says
-*"folded (one line, the only default for every surface)"*.
-
-Applied literally that breaks the Selection band, and the superseded design had already said why:
-**a fixed-rect container cannot shrink.** The band is a derived 260 px
-(`minimap_height + chrome_margin`), so folding its metric card to one line spends ~220 px on
-emptiness — the exact objection the three-level design raised against "Glance everywhere", which
-the binary note never revisited. Reported the measurements and asked rather than guessed
-(Rule 0b). **Ben: the band opens expanded-in-place**; its chevron means *give this the whole
-screen*, and folded-by-default governs scrolling containers, where a fold buys real room back.
-Second call: **the wizard folds per chain stage** — round 1's four gates now read as
-`System all passed` / `Accretion Lost here: Pallas` / `Air Lost here: Cinder, Selene` /
-`Engine all passed` on one screen, which is the chain finally legible rather than a scroll.
-
-### The state model fell out of the change rather than being imposed
-
-Because expanded is a full-screen **overlay**, only one thing can be expanded at a time. So the
-state is a single `(surface, key)` target, not the superseded design's per-surface remembered
-level — and "fold" is never ambiguous because there is exactly one thing to fold. The remembered
-level was load-bearing for an in-place stepper and is meaningless for a mode switch.
-
-**One decision taken alone, and recorded rather than slipped in:** the overlay **joins the Esc
-ladder**, one rung below the subject drills. BL-214's Decision 10 explicitly kept depth *off* the
-ladder — but it reasoned about an in-place stepper, where a level is not a dismissal. A
-full-screen mode with no keyboard exit is a defect, not a principle.
-
-### What the captures changed
-
-The first run was not a pass. Two real defects only visible by looking: the overlay's
-`SetNextWindowBgAlpha(0.97f)` scrim let the entire shell read through it — a deliberate mode
-switch looking like a ghost drawn over the game — and zero-inset content sat jammed in the
-top-left corner of a 1280 px screen. Fixed to an opaque background and a 36×28 inset. The band's
-expanded chart was also drawing two 580 px ribbons; capped, because `draw_bars` pins columns at
-34 px and extra height was buying size, not legibility.
-
-The question log reserves its **measured** height (`CalcTextSize` at the wrap width) before
-opening its fixed-size, scrollbar-less chart row — so this item does not create the fitting defect
-BL-215 is queued to audit.
-
-### Ben's catch: a stable golden of the wrong picture
-
-Mid-session Ben pointed out that a capture can fail because the screenshot is taken **before the
-frame has fully rendered**. Tested rather than assumed, and he was right about the new captures:
-`verify.capture` composites exactly **one** frame, while ImGui settles auto-layout over the next
-frame or two — a child's content region, a table's column widths and a fresh window's scroll state
-are all provisional on the frame they first appear. **Four of the ten fold captures moved once
-given settle frames**, most visibly the History Tiles table, which only reads across the full
-screen after settling.
-
-The insidious part is that the unsettled frame is *deterministic*: it blesses cleanly and re-passes
-at 0.0000% forever. A stable golden of the wrong picture is worse than a flaky one, because nothing
-ever flags it.
-
-Fixed as a **reusable asset rather than three script edits**: `shot(name, frames)` in
-`scripts/verify/lib.lua` (auto-loaded, so every future check gets it) settles before capturing,
-with the reasoning in the comment so it is not dropped as noise. All 23 goldens re-blessed settled.
-
-The same hypothesis does **not** explain the pre-existing suite failures — `chat_panel` still
-differs 40.9% with eight settle frames, and its golden shows *21 nations* against today's *20*,
-plus an entirely different starting corporation. That is world generation, which is why BL-259
-stands.
-
-### Retired, not added
-
-The History Chain's per-stage `CollapsingHeader` is gone. It was that surface's own private
-disclosure idiom — the fourth one this item exists to kill — and "open" there always meant
-"scroll", because four stages of charts have never fitted a 380 px column. The all-corporations
-balance table at nav slot 1 is gone too (`corporation_panel.{hpp,cpp}` deleted): it was a
-cross-corp comparison surface, not "the player corporation at a glance", and the Economy panel's
-Corps view already carries it.
-
-### The verify harness grew, because the idiom was otherwise unverifiable
-
-`verify.fold(surface, key)`, `verify.rollup_drill(row)` and `verify.why_note(on)` — without them
-every capture would show the resting state and the whole item would be untestable. `why_note` uses
-a **sentinel** (`why_note_first`) claimed by the first log drawn, because a Lua script cannot
-compute an ImGui id: they are stack-dependent and exist only mid-frame.
-
-### Filed, not absorbed
-
-The full `scripts/verify` sweep fails golden diff on most checks — including many this batch never
-touched. The diff images settle it: the differing pixels are **world content** (terrain colour,
-generated corporation names, balances, nation names in comms), not layout. The goldens were
-blessed 2026-07-30; `src/world/` moved on 07-31 (BL-233 re-priced conquest from the graded terrain
-field and reshaped the political map) and 08-01. BL-252 re-established the *headless* bands per
-toolchain; the visual suite was never re-established after the world moved, so the cut gate's
-visual half has been quietly false for two days.
-
-Mass-blessing it inside this commit would have buried a pre-existing regression in an unrelated
-change. **Filed as BL-259** (v0.1.0 — it closes a hole in a cut gate), including the missing
-discipline that would stop it recurring: a `src/world/` change that moves generated content owes a
-visual re-bless in the *same* commit, the way a headless band change already does.
-
-**Left open.** BL-259. The Trade roll-up reads `0 lanes` because the generated world seeds every
-market on the single tiled body — the open design question BL-254 deliberately did not settle, now
-visible on a player-facing surface.
-
----
-
----
-
----
-
-## Session — the last four v0.1.0 items, and the goldens finally have one truth value (2026-08-01)
-
-**Runtime.** ~2h. Full (Batch Delivery — three worktree sub-agents, one item delivered in the main
-session, one cold review pass, two items filed from Ben's new policy, two defects filed from
-verification).
-
-**The ask.** Bring PR #28 local, understand what it sets up, then run a multi-agent session on it.
-PR #28 closed the terrain/landform strand and built the three audit instruments, leaving exactly
-four open `version_goal: v0.1.0` items. Those were the session.
-
-### Split
-
-BL-162 (tile construction ledger, reopened), BL-254 (convoy data-creep) and BL-255 (build type +
-timeouts) went to worktree agents; **BL-252 (goldens) stayed in the main session because it needed
-Windows**, and Windows is where the goldens were blessed. BL-162 went to one agent rather than two
-despite having three separable parts, because all three land in `selection_panel.cpp` — splitting
-would have bought parallelism and paid for it at the merge.
-
-### BL-252 — the item asked "which cause?", and the answer was "both"
-
-The item named two candidates and said to distinguish them before re-blessing anything. Doing so
-took three runs:
-
-1. **Windows at the same commit failed 5 assertions** — on the platform its own bands were blessed
-   on. That alone kills the pure-platform-divergence hypothesis. `git log 8542e4b..HEAD -- src/world/`
-   named the cause precisely: the bands were authored in the commit that *added* the harness, and
-   **BL-203 (Corp AI stage B)**, BL-221 and BL-233 all landed after. The AI was being scored against
-   goldens set for a different AI. So: stale, and explained.
-2. **Linux/GCC at the same commit** gave seed 0 = 395,143 against Windows' 206,245, and seed 4 =
-   182,746 against 392,148. So cross-platform divergence is real *as well*, and large.
-3. **MSVC /O2 vs MSVC Debug** — byte-identical on all five seeds. That removed the confound and
-   pinned the cause to the toolchain rather than the optimisation level. Worth the extra build; it
-   is the difference between a diagnosis and a guess.
-
-Widening the bands was then rejected **on measurement**, not assumption: one band holding both
-platforms spans ~±100% and detects nothing. Ben chose pinned-per-toolchain for headless and
-Windows-authoritative for visual — deliberately different answers, because pixel output depends on
-font rasterisation and driver as well as compiler. Both platforms now `ALL PASS`.
-
-**A defect in my own work, caught by the review:** the `#error` guarding a third toolchain did not
-catch Clang, which defines `__GNUC__`. A `clang++` build would have silently inherited GCC's bands —
-the exact outcome the comment beside it claimed was prevented.
-
-### What the instruments found, which is the point of having them
-
-- **BL-254** closed its own vacuous plateaus and then found a *second* cause of the blind spot the
-  filed item never mentioned: the generated world seeds all six markets on the single tiled body, so
-  it holds no inter-body market pair and **cannot record a trade route however long it runs**.
-  Whether non-home bodies should have markets at campaign start is now an open design question.
-- **BL-258 filed** from the integrating run: `econ_stability`'s absolute 1 ms bound fails on Windows
-  because that tree is deliberately Debug. R5 passes with 19× headroom and every growth-shape
-  assertion holds, so the fix is to gate the one absolute assertion on an optimised build and *say
-  so loudly* — following the data-creep instrument's precedent of reporting a meaningless check as
-  skipped rather than passing it. Explicitly not widening the bound, which would gut it in Release.
-
-### Two stale-base incidents, both self-reported
-
-Two of the three agents were cut from `origin/main`, which predated the batch — one lacked
-`data_creep_harness.cpp` entirely, the other lacked BL-255 itself and re-filed it, producing a
-duplicate id that `backlog_lint` caught on merge. Both agents *noticed and said so*, which is what
-made reconciliation cheap. The BL-255 agent's honest "I could not measure these three harnesses"
-caveat was replaced post-merge with real integrated numbers.
-
-### The review barrier earned its place again
-
-A cold `verifier-review` over the integrated diff returned **GO COMPILE** — it verified the moved
-estimator is token-for-token identical, all 13 `construct_building` call sites are arity-correct,
-and the recipe index really is the global registry id. Everything it *did* find was judgement, not
-compilation: the Clang hole above; a `cl` recipe in the new harness that would `LNK2019`; a
-`verify.ledger_build` hook that silently substituted steel for a typo'd recipe name, so a broken
-script would report green while proving nothing about the seam it exists to test; and two
-requirement rows justified by evidence that could not have been produced (R7 cited
-`building_component.recipe` as "already serialised" — there is no flat-binary path in `src/` at
-all; and R7 listed a visual leg that this very item staled by construction).
-
-### Goldens: the number meant something different than assumed
-
-The four owed re-blesses were inspected before blessing. `tile_build_ledger_land_select`, which has
-**no ledger open**, diffed 21.69% against the with-ledger capture's 22.04% — so only ~0.35% was
-BL-162's row change and ~21.7% was whole-canvas world-generation drift from BL-221/BL-233. Same
-root cause as the stale bands, one layer down. All four now pass at 0.0000%.
-
-### Filed from Ben's new policy
-
-**BL-256** (rotating globe on the generation screen) and **BL-257** (generated body names). Both
-carry a crux that would have bitten during implementation: the wizard preview runs the *planetology*
-chain only, so there is no height field for a globe to sample (hence two fidelity tiers); and
-several sites — `hard_coded_world.cpp:256` plus three harnesses — use a body's **display name** as
-an identity test, so randomising names without first moving identity onto the entity id breaks them
-silently.
+**BL-787 (doc summary headers)** — every authority doc named in `CLAUDE.md` § 3 now opens with a
+header block. Ben chose the **index of questions** form over a précis and over questions-plus-stance:
+it lists the questions a doc settles and never the answers, so it survives a design change that
+alters one. 71 docs, five parallel slices. `ACTIONS.md` is regenerated whole, so its header lives in
+`render_actions.js`'s preamble instead.
+
+**BL-789 (standing rules split)** — `io-standing-rules.md` went **230 lines to 133**. The
+AI-behaviour grant register — BL-079 through the rival-network grant, 110 lines of dated precedent —
+moved verbatim into `AI_OPPONENT.md` § 11, diffed line-for-line with all 20 ids accounted for. The
+*gate* stayed, and was sharpened rather than summarised: a new widening is raised, never assumed.
+That was the item's whole risk — moving the history must not make the next widening cheaper to take.
+
+**BL-788** gave `--grep`/`--touches` a one-line-per-item default (33,072 bytes → 2,294 on one sweep,
+`--full` byte-identical). **BL-790** added `doc_owner.js`, which answers "which doc owns this file"
+from what work actually cited. **BL-791** put the fan-out-as-compression paragraph in `DELIVERY.md`.
+
+### What it found — the part worth keeping
+
+**The union does not union.** `archive_store.js` globs `backlog-design-*.json` only. It sees **138
+items; the archive directory holds 762.** The 624 it misses — 420 of them `complete`, 590 carrying
+the `files[]` array `--touches` reads — sit in `backlog-complete-*`, `backlog-cancelled-*` and
+`backlog-purged-*`, which predate `archive_landed.js` and use an `items` array instead of a `records`
+object. On `MARKETS.md` alone, 35 invisible items. **BL-792**, priority A.
+
+**And `--grep` throws away what it does find.** It matches across the union, then drops terminal
+items in the default view: `--grep market` prints "nothing matched" while `--grep market --all`
+returns 11 landed items. `DELIVERY.md` makes `--grep` the first step before authoring an item
+precisely to catch duplicate work, and it is blind to exactly that case. **BL-793**, priority A.
+
+Both fail the same way — a confident, silent NO — and both were surfaced by delivering something
+else. The session's opening answer needed its correction: the split is sound, the union is the right
+design, and the union as implemented has been answering wrong.
+
+**Six doc-truth defects, from writing one-line boundaries.** `PRODUCTION` and `POPULATION` each name
+the *other* as the workforce authority and both restate the derivation. `MARKETS` holds 70 lines of
+procurement; `CONTRACTS`, the doc named for it, is 113 lines total. `TILE_GENERATION` holds province
+rules the new headers now point away from — orphaned authority, which is worse than duplicated.
+`HISTORY` holds an ancient-naval rule `MILITARY_HISTORY` owns. Four UI subjects have no single owner,
+including `LAYOUT`'s 170-line drill-through system. **BL-794, BL-795, BL-796.** Fixed in place:
+`NATION_GENERATION` § Pass 7 carried "(RULED, not yet built)" in a heading — a state claim in an
+authority doc, forbidden outright.
+
+None of these are visible while each doc is read alone. Stating a boundary in one line is what
+exposes that it was never stated.
+
+### Method note
+
+BL-791 demonstrated by the sprint that filed it: five slices read the entire ~650K corpus and the
+main session paid for none of it. Every report came back as boundaries and findings, not excerpts.
 
 ### Verification
 
-Linux/Release **35/35**. Windows **35/36** (the one failure is BL-258). Build clean, warning-clean in
-every file touched. `backlog_lint`: 0 fails, 2 warnings, both pre-existing. Visual: the four
-tile-build-ledger goldens re-blessed and passing; `tile_build_ledger_survives` confirms two
-consecutive builds from one ledger, with "Construction started." visible for the first time.
+No compile — no `src/` change in the sprint. `backlog_lint`: **0 fails** throughout (warnings
+pre-existing). `next_id.js`: BL-797. All five agent branches merged in the main session, one conflict
+in `DELIVERY.md` resolved by keeping both bullets. `render_sprints`, `render_actions` and
+`devlog_index` re-run. `archive_landed` evicted the five closed items plus four already-terminal rows
+that had been sitting in the hot file, all verified to rebuild byte-exact; the hot file holds 31 open
+items.
+
+### Block 2 — the batch, and what four failed reviews bought
+
+**Mode:** two Workflow runs — 20 agents, then 10. No compile: the only `src/` edits in the whole
+batch are comment pointers repointed at moved sections.
+
+Five lanes, each built from a settled instruction. **Four failed cold review**, and none of the four
+on style:
+
+- **tools** traded the false negative for a false positive. Widening the union admitted 204 cold
+  rows whose `status` field *lies* — the 2026-08 sweeps froze each row at its pre-purge status, so a
+  culled item still reads `designed`. `--grep market --open` returned 18 rows with **zero** on the
+  hot worklist. It also shipped a DELIVERY.md bullet and a `--help` line promising a behaviour its
+  own code did not have. The rule that fixed it: **a cold row's state comes from the file it is
+  archived in**, normalised once at the union so no caller can be fooled.
+- **generation** deleted the *accurate* half of a doubled claim. PROVINCES was left asserting the
+  one-domain invariant is "structural rather than checked" while
+  `province_partition_harness.cpp:203` checks it as P2b. One false statement where there had been
+  two, one of them true — the specific failure mode of consolidating a boundary.
+- **ui** claimed to have grepped for dangling citations and had not (TOOLTIP still cited a moved
+  CANVASES section), and asserted an answer in SELECTION.md on a question the same agent had told
+  the judge was Ben's.
+- **proposes** switched PEOPLE.md and EVENTS.md to `Proposes:` on a half-read sentence. Both carry
+  `## Settled — Ben's rulings, 2026-08-22`, and the disclaimer they were switched on is qualified:
+  *"except where § Settled records one."* **That half-read was mine** — it is the premise I gave Ben
+  when I asked the question. The variant itself stands, on nine genuine research and exploration
+  docs.
+
+The **second** review earned its keep too: it caught a fabricated `(Ben, 2026-09-07)` attribution on
+the cold-row rule. That rule was mine, off the review's own measurement. In this repo a dated Ben tag
+is load-bearing provenance, and it would have hardened an agent's design call into a settled human
+ruling.
+
+**The design panel changed an answer.** Two independent proposals per boundary — one arguing from
+CLAUDE.md's router, one licensed to say the router is wrong — split workforce differently from the
+way the backlog item suggested. A builder reading the item alone would have built the wrong split
+confidently.
+
+### What the completeness critic proved about scope
+
+The three boundary lanes were scoped off defects a header sweep *happened* to notice. The critic
+built the `Confused with:` graph properly — **72 docs, 59 mutual pairs, 89 one-way edges** — and
+found three overlaps no lane would have reached: LOGISTICS and SUPPLY both holding the travel-time
+model under the same ruling date (**BL-797**); the navigation model and per-rung lens table each
+asserted **three** times (**BL-798**); and CREEDS/NATION_GENERATION, which survived every sweep
+because it is a *one-way* edge (**BL-799**).
+
+BL-798 is the lesson worth keeping. BL-796 deleted copy two of the lens table on entirely correct
+grounds and left copies three and four, which were outside its write set. **A correct rule applied
+to a partial scope leaves the corpus more inconsistent than it found it.** That is what **BL-801**
+(the header graph checker) exists to prevent, and it is why the tool comes before the next boundary
+sweep rather than after it.
+
+### Verification, block 2
+
+Union **138 → 757** items. `--grep market` **0 → 101** matches; `--touches MARKETS.md` **1 → 29**.
+Non-terminal over the union is 36, and that set *is* the hot set. `next_id` BL-806, never lower.
+`backlog_lint` 0 fails throughout. `doc_owner`, `backlog_view` and `status.ps1` all unchanged or
+better. 72 docs carry a header; `docs/ui/DRILL_THROUGH.md` exists with its CLAUDE.md § 3 row. All
+five fix branches merged with no conflicts.
+
+### Block 3 — the checker, and the sweep it scoped
+
+**Mode:** three Workflow runs — 3 agents, then 3, then 15. Still no application compile: the only
+`src/` edits are comment pointers and one harness correction.
+
+**BL-801 (header graph checker) came first, deliberately.** Three boundary lanes in block 2 had been
+scoped off defects a header sweep *happened* to notice, and sweeping again by hand would repeat that.
+`tools/session/header_graph.js` now checks four things: dangling citations (fails the run), the
+header graph (prints), router coverage both directions, and state-independence (fails).
+
+**It failed both its cold reviews on the first cut, and the graph half was badly wrong.**
+`demarkup()` stripped underscores along with markdown emphasis, so `NATION_GENERATION.md` resolved
+to nothing and **no doc with an underscore in its filename could ever be an edge target** — about a
+third of the corpus. The consequence is the one that matters: **the defect it was built to catch
+(BL-799, a one-way edge) was absent from its output entirely.** It measured 195 edges against a true
+264. The resolver half carried a *false pass* — a one-token anchor certifying a citation to a
+heading that does not exist — plus two citation shapes it never swept at all.
+
+After repair, an independent parser agrees **edge for edge**: 264 edges, 83 mutual pairs, 98 one-way,
+72 headers, set difference zero both ways. The dangling class went 2.7% false-positive → **0%**,
+audited at 80 of 80 rows. It ships with 27 self-test assertions, each pinned by a mutation test.
+
+First measurement of the corpus: **1119 citations — 729 OK, 310 prefix, 83 dangling.** The dangling
+cluster by *rename*, not by file, and one cluster was ours: five references named
+`io-standing-rules § the player-corp exception`, which BL-789 had moved that morning without
+sweeping. Filed as **BL-807**.
+
+### The sweep — and the item that repeated itself
+
+Five lanes; three passed, two failed.
+
+**BL-798 failed in exactly the way it was filed to fix.** It consolidated copies two and three of
+the pan/zoom claim and left a verbatim **fourth** at `MINIMAP.md:301`, outside its write set — and
+its completeness evidence was *false* when the reviewer re-ran it. Widening the write set and
+requiring the search be pasted in full, empty results included, is what fixed it. `"primary slot"`
+now appears once in the corpus.
+
+**BL-799 failed twice, identically**, and was finished in the main session by reading the code site
+by site. Both agents wrote the tidy universal rule; the truth has an exception the corpus had
+already recorded elsewhere — `make_corp_name` pairs a tongue-inheriting identifier with one of
+twelve **English structural type words**. When two independent attempts fail the same way, the
+brief is wrong, not the agent.
+
+**BL-804 corrected the harness’s MEASUREMENT, and left it red.** P9c asks about seed strength, and
+`build_province_partition` skips `province_anchor` centres when gathering seeds — those are founded
+*after* the partition ships, so their size owes nothing to their scale, and the row was pooling 1,011
+of them. On the corrected measurement **P9c still fails** (s1: 458 @ 7.51 · s4: 1 @ 3.00), and so does
+A1. Rebuilt and rerun in the main session to confirm: **42 PASS, 2 FAIL, exit 1.** Neither was
+weakened to pass, and the surviving question is sharper than the one BL-804 answered — a monotone
+claim over four buckets decided by a single scale-4 sample may not be answerable as written. **BL-809**.
+
+### The defect the docs were hiding
+
+**BL-808**, priority A. `history_sim.cpp:1564` names a sim-founded region `src.name + " Reach"` — an
+English literal in a name that ships, against the standing rule that every generated name is
+sci-fi/fantasy.
+
+**The project fixed this exact defect once already.** `settlement.cpp:272` carries the post-mortem in
+its own words — *"'MelethWorirUlael Reach' put two naming systems side by side in one string, which
+reads as a bug rather than a style"* — and BL-348 coined the quarter word from the tongue. The second
+pass was never swept. It surfaced because a doc claim was too broad: **the tidy rule was wrong
+because the code was wrong.**
+
+### The pre-push audit, and what it caught
+
+Three cold auditors over the finished state — corpus coherence, doc-versus-code truth, and whether
+the RECORD is honest — then an adjudicator that verified each blocker itself before accepting it.
+Two blockers were raised; one survived.
+
+**NR-794 was minted twice, and the second mint was mine.** A prior session used it for a
+naval-composition ruling and cited it at three source sites (`unit_roster.hpp:283`,
+`unit_roster.cpp:211`, `history_sim.cpp:201`) — and **never filed it**. So nothing in the review
+store could see the id was taken. This session minted NR-794 for the border-band question, and for
+a few hours three code comments resolved to a ruling about lens chrome: a visible gap converted
+into a confident wrong answer, which is the exact failure class these 61 commits spent the day
+removing. Renumbered to **NR-797**, with the collision recorded on that entry. **BL-811** widens
+`next_id.js`, which guards BL ids and nothing else — and the guard must scan the *tree*, not the
+store, because this id was cited in code and never filed.
+
+**The second blocker did not survive, and the adjudication is worth keeping.** Six docs derive
+km-per-tile from a 312-column grid the code retired at BL-424 (`home_grid_width = 261`), so the
+constant is ~20% wrong. Real — but the session did not cause it: BL-797 deleted the duplicate in
+SUPPLY, taking the corpus from seven false copies to six, and four of the five survivors were never
+touched. Filed as **BL-810**, with the aggravating detail that the re-authored line now cites
+`body_km_per_tile` beside the wrong number, so a false constant reads as code-verified.
+
+The auditors also confirmed the load-bearing claim by the right method: today's checker run against
+an extracted base tree, diffing the *misses by citing site* rather than by count. **4 added, 4
+removed — zero citations broken by this session**, and three of the four additions are BL-807's own
+prose quoting the broken forms it exists to fix.
+
+### Verification, block 3
+
+Dangling **83 → 81** across the whole sweep: five lanes moved prose between docs and created no net
+dangling citation. `header_graph --self-test` 27/27. `backlog_lint` 0 fails throughout. `next_id`
+monotonic. Nine items closed and evicted, all verified to rebuild byte-exact; the hot file holds 28.
+`docs/development/design/` deleted after three independent checks, `--doc GLOBAL_STYLE_SHEET` now
+resolving where two files had shared the basename.
 
 ### Open for Ben
 
-- The ledger caption says "50% staffing", but `workforce_auto` defaults on for the player's corp and
-  auto-solves the dial on the first tick — realised extraction measured **2× the estimate**. Honest
-  for the moment it is shown; should the caption say it is a floor?
-- The header reads `NET +3.2k / qtr` while the ledger reads `/ tick`. GLOSSARY defines **Tick** and
-  does not define "qtr". Pre-existing and outside BL-162's scope, but it is a standing-rule
-  violation sitting two inches from a figure that gets it right.
-- Sub-tick paybacks print `payback ~0 ticks`, which reads as "free" rather than "immediate".
+- **BL-792 and BL-793 landed in block 2**, so a bare `--touches` or `--grep` negative is evidence
+  again. It was not, for the whole life of this session before that point — worth knowing when
+  reading anything filed earlier today.
+- `--sprint` does not exist as a flag; unknown flags are ignored silently and the tool returns
+  everything. Minor next to the two above, and not chased.
+- `PEOPLE.md` and `EVENTS.md` are proposal-stage but their headers say **Settles:** like every other
+  doc. A `Proposes:` variant would be more honest; I did not invent one without your say.
+- `research/ERA1_TECH_LANDSCAPE.md` and `TECH_EFFECTS.md` route readers to `economy/RESEARCH.md`,
+  which is a stub. Correct routing, empty destination.
 
 ---
 
 ---
+
+## 2026-09-06 (sprint 32b closes) — The world changes, and the instruments learn to see it
+
+**Mode:** Design (one elicitation form, eight calls) → Full batch delivery in three waves → two cold
+reviews → live check → close.
+**Runtime:** one long session; ~40 harness builds, three play builds, 10 sub-agents in worktrees,
+two cold adversarial reviews.
+
+Sprint 32b closed with **eleven items delivered** across three waves; **32c opened** for the
+remaining 28. The distinction from 32a is the whole point: 32a delivered instruments and moved no
+world on purpose; 32b moved every world four separate times and kept the causes attributable.
+
+### The design pass that set the scope
+
+Ben answered a market-work elicitation form settling **eight open calls**. Five became authority-doc
+text rather than commit messages: *no price, no draw* in PRODUCTION.md; phase 6's three-term
+objective in GENERATION_STRATEGY.md; pass 3 rewritten to SELECT a landscape rather than settle one;
+protection DERIVED at handoff in NATIONS.md; `trade_goods_misc` joining the endemic basket with its
+asymmetry cost stated in MARKETS.md. BL-751 was cancelled superseded with its parts named on BL-770
+and BL-772, so nothing went with it.
+
+Later, ruling on a paleo measurement, Ben added the steer that outlives the item: **richness is
+absorbed by the per-province infrastructure score, never clamped at generation** (PROVINCES.md
+§ Richness is absorbed here). Ground is a fact about the world; what a corporation can *do* with it
+is gated behind roads it has to build.
+
+### The result that decides the most
+
+**BL-770 slice 1 returned a negative result, and it was the right question to ask.** Five candidates
+whose fixtures differed by 20 corporations and 41 buildings scored *identically to the last digit* —
+every term read tiles, markets and population, and `market_saturation.cpp` contains neither
+"corporation" nor "building". Slice 2 added the roster-aware term (actual against potential
+completeness) and the same five candidates now spread **3.2e-01**. The search itself is still
+unbuilt, which is why BL-772 stayed blocked rather than shipping an unsettled opening position.
+
+### Four things that went wrong, kept because they will recur
+
+1. **Two agents bumped `save_game_version` 4 → 5 independently**, each correct alone. Merged, the
+   stream carried both and was neither one's v5 — two layouts under one version number, each
+   readable only by the build that wrote it. Resolved to 6; the wave ended at 8. Thereafter: exactly
+   one item per wave may bump it.
+2. **Three save-format changes landed unasserted**, because no worktree agent can build
+   `save_envelope_roundtrip` (it links imgui). Each time the integrating session wrote the assertion
+   and ran the differential. That is the builder gap's standing cost, now recorded in the harness.
+3. **The cold review caught a regression shipped as an improvement.** BL-767's Invest ground-pull
+   made industrialisation *worse* — 8/16 against 14/16 at the value that measures best — and the
+   item's own diagnosis ("the ceiling is in the selection rule, not the price") was falsified by
+   measurement. Underneath it was a real bug: a capped domain kept its pull, but the investment it
+   won did nothing.
+4. **Three builder fixes, and my first two verifications were run where the bug could not appear.**
+   Deps-cache resolution, `JSON.stringify` quoting, MSYS export ordering — each "fixed" and each
+   still broken for worktree agents until tested *from* a worktree.
+
+### Measurement over argument
+
+The pattern that worked, repeatedly. BL-783 tested its causal claim as a controlled **experiment** —
+sack 59 regions in a copy and re-materialise: sacked lose 73.3% of their cities, controls 2.4% —
+rather than resting on the one razed region the seed happened to produce. BL-765 asserted "the
+fossils read the past" by generating the same body twice with the drift record withheld. BL-768
+measured both its constants off a bimodal distribution instead of choosing round numbers. BL-750
+traced its flat tariff table to an upstream furnace count rather than tuning the banding.
+
+And the peat re-examination **overturned** a change: RESOURCES.md authors peat as a pair on scrub,
+BL-765 had narrowed it to marsh on a reading of prose, and 58% of the world's peat went with it.
+Restored, and measured back to 7930 against a 7792 baseline.
+
+### The live check, run at the close rather than owed forward
+
+BL-754's budget line **verified on screen**. BL-768's roads render, but an ancient road is
+indistinguishable by eye from a national one, so the headless differential is the stronger evidence.
+**Coastal ownership could not be checked at all** (NR-791): the hover card reports terrain, clicking
+water selects nothing, no lens colours by owner. That is a hole in BL-780's own done-when.
+
+Two measurements fell out of it: `build/` is Debug, so its 84.75 s generation must not be quoted
+against BL-761's Release figure; and the Debug warm start is **667,428 ms**, of which
+`run_economy_step` is 534,719 — BL-761's finding quantified, naming the same culprits.
+
+### And a bug the harnesses could not see
+
+Ben, looking at the live world: **one nation carries a complete road lattice** while its neighbours
+are sparse. The aggregate (+320 roaded tiles) was right and the per-nation distribution was wrong,
+and nothing reports per-nation road density. I had seen the same density, doubted it, checked a
+different region and moved on — an aggregate cannot see a distribution. **BL-784.**
+
+---
+
+---
+
+## 2026-09-06 (sprint 32a closes) — The arc runs, and four instruments could not see
+
+**Mode:** Design → Full (batch, then hand-built slices) → three design rulings → close.
+**Runtime:** one long session across several days; ~25 harness builds, one play build, 12 sub-agent
+launches of which **zero** succeeded.
+
+### What closed, and why here
+
+Sprint 32 opened with 8 items on "three passes of simulated history". Ben's eight-phase reorder
+added 12, the water-domain ruling added 5, and findings added the rest — **34 items, 5 delivered**.
+Closed as **32a** at a natural boundary rather than pushed on: everything delivered is one coherent
+thing (*the arc runs, and the instruments that measure it are honest*), and everything remaining
+moves the generated world, which wants its own before/after. 32b carries the other 29.
+
+### Delivered
+
+**BL-747 (two-span prehistory).** The Era −1 sim now runs at any epoch — the gate had refused
+anything above 1700, so the arc we build the product on had ancient borders and no simulated history
+behind them. Two spans on **one** invocation, because `era_minus_one.hpp` exists precisely to stop
+that call drifting across callers. `boundary_year` (INT64_MIN) and `span1_band_ceiling`
+(`industrial`) are inert at their defaults, which is what makes the 0 CE world byte-identical rather
+than hoped-identical. A 1960 world runs 1160 → 1560 → 1960.
+
+**BL-757 (the sweep measures generation's own era).** `history_sweep` printed "−4000 → 0" because it
+built default params; generation runs −400 → 0. So the harness that `HISTORY.md` and `COLLAPSE.md`
+both name as the place every Era −1 magnitude is argued was describing a run no world is built from.
+It now runs from `era_minus_one_fixture`, closing all six divergence axes, asserted per seed by a
+**self-checking** row: the report already carries generation's own counts, so a pinned 270/207/833
+would have rotted the first time the world legitimately changed.
+
+**BL-763 (continent time axis).** `drift_col`/`drift_row` were documented "per-epoch" with no epoch
+defined anywhere — the vector existed and nothing integrated it. Now 5 My over 20 epochs, with any
+past configuration derived rather than stored (`continent_state` is on the save envelope seam;
+twenty rasters per body would be ~2.5 MB for data that is a pure function of five floats per plate).
+
+**BL-771 (tick length).** Closed on its **audit**, not its code. The audit found the tick length was
+the wrong dial, Ben ruled the quarterly tick, and the parameter became unnecessary — so R1, R2 and
+R4 were **cancelled rather than deferred**, because a deferred row invites someone to build it later
+for a reason that has gone away.
+
+**BL-775 (saturation measure promoted).** Ben's phase 6 question turned out to be already answered
+by two computations the project verifies against daily — they were inside harness anonymous
+namespaces where `src/` could not link them. Now in `src/world/market_saturation.{hpp,cpp}`.
+
+### Three rulings, each of which changed the work rather than confirming it
+
+**The quarterly tick** (NR-786). It moved phase 6's *span*, not just BL-771: at 90-day ticks, 100
+ticks is 25 years rather than the 400 Ben's point 6 named.
+
+**The static saturation search.** Ben restated phase 6 narrowly — *"not a 100% accurate series of
+trades… nor what makes the most profit per tile"* — and that is not a simulation question at all.
+Saturation is a **static property** of a candidate roster against a fixed world. It dissolved the
+span question entirely: there is no span, because there is no clock.
+
+**The water domains.** Ben: *"Give coastal to owners, and sea provinces are unowned."* Better than
+what was filed, and the codebase was most of the way there — `province_kind` already partitions the
+three domains exclusively, ownership already derives from tiles, and the naval class already exists
+as three authored rows worth zero. It halved BL-756's destructiveness and dissolved BL-749.
+
+### The finding that matters most: four instruments that could not see their subject
+
+1. **`history_sweep` swept the struct default** rather than generation's run (BL-757).
+2. **`era_world_harness` was never run** while `world_determinism` was green — so a real regression
+   shipped inside a wave I had called verified. Found by the cold review, confirmed by hand: 12 pass,
+   1 fail, and only the 1960 clause moved (BL-758, left **red** for Ben).
+3. **The app never prints the generation budget** the item added — the line is inside an
+   `if (fixture)` branch and the app passes none, so every figure quoted is a harness figure.
+4. **`history_sweep.json` diffs on a wall-clock field**, so genuine drift hides in timing churn —
+   and the "it is stale" claim I had repeated turned out to be wrong on inspection.
+
+This is the BL-714 pattern recurring, and it recurs because **a green check is not evidence that it
+looked**.
+
+### Measure-first paid for itself twice, and both times the number inverted the item
+
+`sim_water_census`, three seeds of generation's own era:
+
+- **1105 of 3819 regions sit on water** — 29% — with 613 on open ocean. BL-756 had assumed the count
+  might be zero and its guard free; it would have deleted a third of every world.
+- **43% of adjacency edges cross sea.** BL-755 had assumed sea reach was absent. It is unpriced, not
+  absent, and every tuning constant in `history_sim_params` was fitted with it happening.
+
+Both items would have been built wrong from their own filed premise. Ben's water ruling then made
+the ~492 coastal regions *legitimate* and left only the 613 on open ocean to fix.
+
+### Two process lessons
+
+**A requirement written after the code describes the code, not the intent.** BL-775 said "promote
+both"; one half was promoted, the group was written describing that half, and lint, requirements and
+harnesses all went green on a half-delivered item. Caught only by re-reading the item.
+
+**Sub-agent capacity was unavailable for the entire session** — 12 launches, every one a 529 with
+zero tool calls. Every slice was hand-built, and the batch's **cross-slice review barrier never
+ran**. Recorded as a debt, not dropped. BL-774 compounds it: worktree agents cannot build the
+harness class that checks the byte-identity invariant.
+
+### Owed
+
+The review barrier; `continent_drift`, `sim_water_census` and the promoted measure are **ad hoc**
+until Ben names them in the verifier skill; BL-762's deposit split stays blocked on BL-765 because
+removing biological deposits before the Life phase exists would delete `agricultural_produce` and
+take the food chain with it.
+
+
+---
+
+---
+
+## 2026-09-03 (sprint 32 opens, wave 1) — The second span is free, and four instruments were pointing the wrong way
+
+**Mode:** Design → Full (merge repair, then one delivery wave). **Runtime:** one session; one
+7-agent subsystem map, one implementer in a worktree, one cold review; ~6 harness builds.
+
+### The design
+
+Ben's brief: gamify generation — duplicate the 400-year timelapse so a second pass produces
+post-Enlightenment industry, colonisation by major powers, and market conditions at game start.
+Settled as **three passes on two engines** and written into `GENERATION_STRATEGY.md` § Three
+passes of simulated history, `HISTORY.md` § The epoch and the run, `ERAS.md`, and
+`CORPORATION_GENERATION.md` § Pass 6. Two polity spans on the existing sim, then the warm start
+promoted to an economic settle. Market differentiation comes from three in-world forces with
+visible causes — tariffs from industrialisation timing, distance on the real network, colonial
+ties as preferred sellers — and a seed-sweep scoreboard reads the SPREAD, never a per-world value.
+
+### The merge, which needed three repairs
+
+The branch was cut before 2026-09-02 and collided on all three shared numbering spaces. Main had
+minted **BL-746** (upkeep starvation cliff) while this branch filed BL-746 (two-span prehistory);
+**sprint 31 closed** mid-session and sprint 33 opened; and the sprint number itself moved twice —
+renumbered to 34 by reading `next_up`, then corrected back to **32** by Ben, who reads 32 as a gap
+to fill rather than a number to skip. `next_up` is corrected so the next session does not re-derive
+34. Resolution took main's stores whole and re-applied this branch's additions on top, so nothing
+of the other session's was displaced. Memory `io-backlog-id-collision-on-stale-branch` records the
+tell: `next_id.js` reported its own scan INCOMPLETE and was believed anyway.
+
+### Built — BL-747 (two-span prehistory) and BL-754 (generation budget)
+
+**One invocation, not two.** `era_minus_one.hpp` exists because this exact call has drifted across
+callers on six axes with a seventh going uncounted, so a second `run_history_sim` call was ruled
+out at design time. The spans live inside the single existing call: `history_sim_params` gains
+`boundary_year` (default `INT64_MIN`) and `span1_band_ceiling` (default `industrial`), and
+`sim_band_ceiling(params, y)` is one derivation read at BOTH roster sites — the works table off
+materials capacity, the unit table through a new `build_stack` ceiling argument. The gate drops its
+epoch clause and asks `prehistory_years > 0` alone; the epoch now decides only whether there is a
+second span.
+
+**Both new fields are inert at their defaults**, which is what makes the ancient arc byte-identical
+rather than hoped-identical: no year is before `INT64_MIN`, and a clamp to `industrial` is the
+identity. Adding a candidate to the scorer would have moved the argmax even where it never won; an
+inert clamp cannot.
+
+**Save format:** `world_params` is serialised, so `industrial_years` is a mid-record insertion and
+`save_game_version` goes 3 → 4. **Existing `.iosave` files are rejected** — that file has no
+upgrade path by design, refusal being its whole compatibility story.
+
+### Verified — in the main session, not on the agent's report
+
+`world_determinism` ALL PASS. The three 0 CE digests are unmoved — `039EE9880739CDF6`,
+`B0EBBA249B3DDABB`, `DE55600457797638` — with the era report still years=400 battles=270
+conquests=207 foundings=833 on seed A. The 1960 arc runs **1160 → 1560 → 1960**, two tick bands,
+span-1 ceiling medieval, years=800 battles=1323 conquests=1128 foundings=506, digest
+`DB86651B9A596F7B` identical across two builds. Three new reported rows (R4.1–R4.3) assert only
+that both spans ran, that the pass did something, and that it is deterministic — no magnitude pinned.
+
+**A defect found while reviewing the merge, fixed in the main session:**
+`era_minus_one_has_industrial_span` tested only the epoch, so `industrial_years = 0` on a 1960 arc
+would have put the boundary AT the epoch and capped the whole run at medieval — the exact opposite
+of what that field's own doc-comment promises. It now tests `industrial_years > 0` too.
+
+### The answer to Ben's question, which was the point of the wave
+
+*"I am interested to see if this can be done cheaply."* **Yes, and the second span is free.**
+
+| run | total | pre-settle | settlement | era-1 | post-era |
+|---|---|---|---|---|---|
+| 0 CE, 400 y | 8200 ms | 443 | 4 | **323** | 7428 |
+| 0 CE, no era | 6661 ms | 455 | 3 | 0 | 6202 |
+| 1960, two-span 800 y | 7996 ms | 465 | 2 | **197** | 7331 |
+
+800 simulated years at 1960 cost **less** than 400 at 0 CE, and the whole 1960 world builds faster
+than the ancient one. Cost tracks the region table the sim grows, not the years it walks — at 1960
+the settlement pass has already founded most regions, so the sim founds 506 where the ancient arc
+founds 833. `COLLAPSE.md` § The 4000-year problem already said cost tracks the province table; this
+is that sentence measured.
+
+**And the era pass costs four times its own wall clock.** Era on versus off at 0 CE is a ~1.5 s
+difference of which only 323 ms is the sim; the rest is every pass after it working over the 833
+regions the era founded. A budget taken off the era's own timer is wrong by 4×, and the
+affordability rungs in `COLLAPSE.md` are aimed at the 323 ms rather than the 1.2 s. **No rung is
+re-filed**, per BL-754's own rule: re-file the one a measurement points at, when it does.
+
+### Four instruments that were pointing the wrong way
+
+The wave's most valuable output was not the feature. Scoping the sea-leg item against the code
+inverted its premise, and measuring the baseline caught two more:
+
+- **BL-755** — region adjacency is Chebyshev radius 9 and **water-blind**, so short overseas
+  campaigns are already legal and FREE, and every tuning constant in `history_sim_params` was
+  measured with that happening. Sea reach is unpriced, not absent.
+- **BL-756** — the Settle verb applies **no terrain test**, so a region can be founded on ocean,
+  where `terrain_combat` returns 0 defence. Silently undefendable, and nothing reports it. Also:
+  `region::port_q` counts lakes and is inherited-and-decayed rather than re-surveyed, so it is
+  wetness, not sea access — any harbour gate keyed on it gates on the wrong thing.
+- **BL-757** — `history_sweep` prints "16 seeds, -4000 -> 0" because it constructs bare default
+  params instead of deriving through `era_minus_one_sim_params`. Generation runs -400 -> 0 on one
+  band. So the harness both `HISTORY.md` and `COLLAPSE.md` name as the place every Era -1 magnitude
+  is argued describes a run no world is built from — BL-462's defect, unclosed, in the one harness
+  whose whole subject is the era. Its banner now says which params it runs, and `--epoch` derives
+  through the real helper.
+- **Zero works raised across all 16 seeds**, reproduced in all three modes. The cause is the
+  **argmax, not the gates**: gates are met comfortably, but `work_score_q` lands in the low tens
+  while `build_work` is scored LAST against a `best_score` already set by campaign and settle. So
+  the roster is not inert, but **BL-748's band unlock has nothing to unlock** until `build_work` can
+  win a round. Read from code, not yet measured.
+- A fifth, same class: every harness calls generation with `works = nullptr` while the app passes
+  the real registry, so **the shipped game scores five verbs and every harness scores four**.
+
+`history_conquest_gap` R3 fails on all 8 seeds and **was already failing** — confirmed by building
+the harness from unmodified base sources in a scratch tree, which emits the identical table. The pin
+is stale, not broken by this change; `history_sweep.json` is stale the same way. Neither was
+re-blessed, because re-blessing inside this commit would bury the signal.
+
+### Left open, deliberately
+
+BL-749 (sea legs) is held out of wave 1: its premise is inverted by BL-755/BL-756 and five design
+calls on it are open (NR-785). BL-751 (economic settle) is gated on sprint 33's growth half — sprint
+31 made the field solvent, but valued production still falls, and a settle over a shrinking field
+culls toward a smaller economy rather than a steady one. **NR-783** asks whether the span boundary
+should be derived from the first furnace rather than authored at epoch − 400; **NR-784** records the
+call taken to keep the ancient arc's band ladder uncapped, and asks whether it should be capped at
+all — a 400 BCE polity can currently reach the gunpowder band and nobody has measured whether it does.
+
+---
+
+---
+
+## 2026-09-02 (sprint 31 closes, sprint 33 opens) — A field that can pay, and the one that must grow
+
+**Mode:** the whole arc in one session — Design → Full → measure → rule → fix → measure — closed on
+Ben's call. **Runtime:** one long session; ~10 full builds, ~40 harness builds, ~20 lapse runs, one
+doc-sweep agent, no worktree agents.
+
+### What the session did, in order
+
+1. Merged sprint 29's ground bake to main and pushed.
+2. Ben's brief for the market: *every recipe, at base price, makes a greater profit than marginal
+   cost*. Built the instrument first (`recipe_margin`), and its first table was the finding: 41 of
+   44 priced recipes failed.
+3. Three rulings by form (reading A, processing rate 16, extraction fixed costs cut) → the retune,
+   the consequences absorbed (unit wages ×2.776, three harnesses re-aimed, two CMake targets that
+   never linked, an era-band header split), the docs re-priced.
+4. Four more rulings (one table with the ancient chain at depth one; the constants and the anchor
+   route rule ratified; two design-red harness rows re-expressed).
+5. Ben: *track balance for every company*. The lapse gained phase-attributed balance deltas and a
+   debt table; two differential runs named the drains — construction materials at the ceiling,
+   and the tick-20 supply-factor cliff on an unmet power draw.
+6. NR-782 (a)+(b) approved: the supply floor and the no-wire rule. The cliff is gone.
+
+### The session's number
+
+Standard industrial lapse, 80 warm / 120 measured, session-start tables against the engine now:
+
+| quarter 81 → 200 | baseline s0 | baseline s1 | now s0 | now s1 |
+|---|---|---|---|---|
+| operating-positive corps at end | 4 of 37 | 0 of 44 | 46 of 61 | 31 of 55 |
+| corps in debt at end | 7 of 37 | 12 of 44 | 6 of 61 | 4 of 55 |
+| median operating net / qtr at end | −3.0 | −3.0 | +16.9 | +1.7 |
+| median balance at end | 1,022 | 908 | 4,424 | 3,797 |
+| active buildings at end | 9 | 4 | 140 | 85 |
+| valued production 81 → 200 | 1,091 → 181 | 1,245 → 685 | 20,761 → 4,364 | 5,775 → 3,531 |
+| interest share of net loss at end | 84% | 82% | 5% | 70% |
+
+**Success on the solvency half; not yet on growth.** Valued production still falls across the
+thirty years, from a level ten to twenty times the old one; the field runs at a mean supply factor
+of ~0.57 for want of power; 42 of the 57 remaining debt entries are processors converting at a loss.
+
+### Closed, filed, archived
+
+BL-744 (recipe margin anchor) closed with BL-740; sprint 31 closed with its retro; **sprint 33**
+opened on the growth half — BL-746 stage 2 (generation bootstrap) first, then BL-745, BL-738,
+BL-726, BL-725 — with a done-when of production holding or growing over the run, a majority
+operating-positive, mean supply factor above 0.8, interest under a quarter of net loss. NR-775..782
+ruled and archived; the review queue is empty. Requirements groups archived. `NEXT_SESSION.md`
+is superseded by sprint 33's plan.
+
+---
+
+---
+
+## 2026-09-02 (BL-744 stage 2) — The tables clear the anchor, and the field still falls
+
+**Mode:** Full. **Runtime:** the same session as the opening, after Ben's three rulings via
+the form (reading A, processing base_rate 16, extraction fixed costs cut); ~6 full builds,
+~25 harness builds, 5 lapse runs.
+
+### Built
+
+**The retune.** Both producer base_rates doubled (40:16, the 2.5:1 ratio economy.lua's own note
+demands); extraction maintenance 5 → 2, wage 8 → 4; processing maintenance 10 → 2 (NR-779);
+25 goods re-priced off their cheapest in-band route at k = 1 with alternates at k = 0 plus the
+floor half (NR-780); **base prices era-banded** — `base_price_ancient` in world_gen.lua, a
+`base_price_for_epoch` accessor, markets seeded from the band's table (NR-778); five recipes
+re-costed; regolith 0.6 → 1.0. `recipe_margin` ALL PASS in both bands and registered with
+ctest (script-rooted). BL-740 closed with it.
+
+**Consequences absorbed.** Ordnance 43 → 140.8 broke Ben's military value anchor (19/19 rows
+out of band), so unit wages and hire costs moved ×2.776 (NR-781's sibling, recorded on the
+table); `value_anchor` R6 re-aimed from "one common markup" to the anchor rule; `upkeep_harness`
+U1 reads the authored prices instead of a mirror; `spawn_solvency` and `upkeep_harness` CMake
+targets gained the config TU they always needed; the era-band enum moved to `era_band.hpp`
+after the first cut put the accessor in a Lua-linked TU and every Lua-free harness failed to
+link. `haulage_measure`: the ceiling bound relaxed 14.07 → 8.84 (cheapest good now 1.0), so
+MARKETS.md's derivation clears again; RESOURCES.md and PRODUCTION.md price tables rewritten.
+
+### Verified
+
+Release-path battery green: value_anchor, era_roster, price_band, throughput_field_census,
+building_upkeep, unit_march, condition_set, world_determinism, spectator_determinism,
+upkeep_harness, demand_census, haulage_measure. Deliberately red: chain_depth's named-list
+guard (unchanged). Red for design reasons, left standing for Ben (NR-781): tier_margin R2
+(mining 28.2 vs refining 24.9 per building-tick) and spawn_solvency R3 (seated 3.1× the field
+per holding). `ctest -j6` is unusable here — 60 s Debug timeouts on every world-building
+harness are contention, not verdicts — and `nmake all` stops at battle_engagement_harness,
+which has not compiled since the mercenary teardown (BL-731 gains the note).
+
+### Addendum, same session — the review queue ruled, and the ancient chain gets shorter
+
+Ben ruled the four open entries via the form. **NR-778 overturned:** one price table, and the
+ancient chain to steel shortened to depth one rather than banded prices. Applied as
+`steel_bloomery` (Bloomery Furnace: ore + timber → steel, appended so ids hold), the Smithy
+re-costed as the deeper alternate (0.4 blooms + 0.2 charcoal), the banded-price plumbing removed
+from config, seeding and world_gen.lua, and the single table re-derived at the larger of the two
+bands' needs — steel 16.1, machinery 61.0, alloys 85.0, consumer goods 61.0, ordnance 155.8,
+spacecraft components 310.0, construction capacity 6.6, ladder ~124×. `recipe_margin` ALL PASS
+in both bands against one table. **NR-779 and NR-780 ratified.** **NR-781:** `tier_margin` R2
+now compares net per unit of output between the tiers (the per-tick figures stay printed);
+`spawn_solvency` R3 holds the seated corp to the best rival's income per holding rather than
+3× the field mean. The stale 1.433× markup derivations in world_gen.lua's comments were swept.
+
+### Addendum, same session — every balance tracked, and the collapse has a name
+
+Ben: *"run a harness which tracks balance for every company"*. `campaign_lapse` now attributes
+every corp's balance delta per tick to the tick's phases — convoy legs, the agency batch
+(build, hire, buyout: capital), the seven budget flows, the nation step, convoy arrivals, exits —
+by snapshotting balances between phases (exact by construction, residual 0.000000, row C3), and
+logs each corp's produced value, active/idle/limited/unstaffed/exhausted/building/mothballed
+counts, labour and mean supply factor. `debt.csv` carries one row per debt entry with the
+trailing-4-tick flows and the dominant drain.
+
+**Industrial band, unwarmed, seeds 0/1: 129 of 129 debt entries dominated by expenditure**, and
+expenditure > income in every trailing window. Two differentials say what is in it:
+- Pool bids off (`reservation_mult` 0): no change. **Not the drain.**
+- Construction materials free: the first wave nearly vanishes (debtors at tick 20: 26 → 4,
+  median entry tick 22 → 34). **A processor costs 25 steel at 8–10× base while the scorer builds
+  through the boom.** BL-745 re-scoped to this, priority B.
+- **The cliff.** Between tick 20 and 21 active buildings fall 219 → 40 in one tick; unstaffed 0,
+  exhausted 0, labour unchanged. The mean supply factor decays from 1.0 to 0 and lands at tick 20:
+  `supply_decay_permille` 50 is 5%/tick, so a building whose power/timber/stone draw is never met
+  is dark exactly 20 ticks in — and power is a grid good most tiles cannot receive. **Industrial
+  goods-upkeep draws zeroed: no cliff, 207 active at tick 60, income ahead of inputs from tick
+  25, debtors 19 → 5.** The ancient band has no such draw and recovers on its own. BL-746 (upkeep
+  starvation cliff) filed at priority A; NR-782 asks which rule — a floor on the factor, no draw
+  where no wire reaches, or a generation bootstrap.
+
+### Addendum, same session — the lights go dim, not out
+
+Ben approved NR-782 (a) and (b). **The floor:** `supply_floor_permille = 500` in
+`economy.building_upkeep`, parsed and range-checked like its siblings; the decay stops there and a
+stranded factor is lifted to it. **No wire, no draw:** an unreached building's grid goods are struck
+from its basket before the shared draw, so it neither draws power it cannot receive nor weakens for
+want of it, while timber and stone still bind. `building_upkeep` R8/R9 pin both with differentials
+(floor 500 → 500 over 41 ticks, floor 250 → 250, lift from 120; unreached + on-grid stays 1000,
+off-grid decays to 750, timber alone to 950). PRODUCTION.md § A shortfall scales output carries the
+rule. **Re-measured:** no building reaches factor 0 at any tick; active buildings 224 → 221 over
+ticks 20–60 on seed 0 (was 219 → 2), 178 → 137 on seed 1; income at tick 60 13.4k / 6.8k (was
+132 / 2.9k); debtors 11 of 86 / 6 of 73 (was 22 of 66 / 13 of 58). The ancient band is byte-identical.
+What remains: the field's mean supply factor sits at ~0.57 — most buildings run at the floor
+because power still does not arrive (BL-746 stage 2, the generation bootstrap, NR-782 (c) held) —
+and 42 of the 57 remaining debt entries are loss-converting processors, which is BL-745's ground.
+
+### The finding — the anchor is necessary and was never sufficient
+
+`campaign_lapse --epoch 1960`, seeds 0 and 1: valued production ~0 at every measured tick,
+buildings active 1 of 22 reporting. The unwarmed 40-tick trace says why: 237 → 263 active
+buildings and 13–23k/tick through tick 12, then expenditure at 1.5–2.5× income from tick 4
+(inputs bought at the band's ceiling — processed goods ceiled in every market), interest to
+1k/tick, exits from tick 20, survivors idled by their own agency from tick 25. Maintenance and
+wages are now small; the drain is purchases. The ancient band takes the same wave and
+**recovers** (66 active, +1.9k/tick, one debtor at tick 40). The anchor is evaluated at base;
+the sim runs at the ceiling. **BL-745 (processor input bid cap)** carries the next lever: a
+processor's input bid capped by its recipe's live output value, the M1 identity at the tick.
+
+---
+
+---
+
+## 2026-09-02 (sprint 31 opens) — Every recipe priced at base, and most of them lose
+
+**Mode:** Design → Light build (one harness, one data table) → sprint bookkeeping. **Runtime:**
+one session; sprint 29's branch merged and pushed first (the ground bake + sprint 30 wave 1).
+
+Ben's brief: a robust market where every player makes a steady profit, and *"the simplest way to
+do this is to ensure that all recipes (at base price) make a greater profit than marginal
+costs"* — the obvious part the demand work walked past. Agreed, with two qualifications now in
+`PRODUCTION.md` § The recipe margin anchor: base is the middle of a band, so the rule has a second
+half at the price floor (BL-740's form, whole roster); and the anchor is necessary, not sufficient
+— the 2026-09-01 ledger's structural −755/qtr and the year-30 debt spiral are separate levers.
+
+### Built
+
+**BL-744 stage 1 — `tools/verify/recipe_margin`.** Loads the three authored tables through a live
+Lua state (NEEDS_LUA), prices every processing recipe and every `k_extractable` target in both
+bands, asserts M1 (margin ≥ k × marginal cost at base) and M2 (fixed cost covered at the floor at
+typical staffing), R0 non-vacuity, R5 unpriced inputs, R6 differential red-proof. Knobs in
+`economy.recipe_margin_anchor` (k = 1.0, Ben's sentence verbatim; W = 0.5, generation's seeded
+staffing). Not `add_test`'ed until the tables clear it. CMake target declared.
+
+### The finding — the opening table of sprint 31
+
+| band | priced recipes | M1 red | any positive margin | clear 2× | M2 red | extraction M1 / M2 red (of 18) |
+|---|---|---|---|---|---|---|
+| ancient | 19 | 18 | 9 | 0 | 18 | 1 / 16 |
+| industrial | 25 (+2 propellant, exempt) | 23 | 16 | 0 | 23 | 1 / 16 |
+
+The shape: the mid-chain is authored at zero or negative value-add **before wages** — steel 8 from
+7.0 of inputs, refined_copper 7.5 from 6.0, silicon 5 from 4, food_rations 6 from 6, clean_water 3
+from 3, consumer_goods 12 from 14, steel_from_blooms 8 from 22 — and the wage per batch
+(12 / 8 = 1.50) eats what is left. Only glass (ancient), medical_supplies and
+spacecraft_components_heavy (industrial) clear k = 1. Extraction clears M1 everywhere but regolith
+and fails M2 on 16 of 18: at the floor a mine at W = 0.5 earns 2.5 × price per tick against 9 of
+wages + maintenance. Steel's authored margin was already recorded as positive in `tier_margin` R7's
+comment (7.0 in, 8.0 out) — true before wages, false after.
+
+### Filed
+
+BL-744 (recipe margin anchor) — the retune is stage 2; BL-740 (maintenance floor anchor) folded
+into the same instrument and re-sprinted. NR-775 (the two delegated constants), NR-776 (retune
+direction: rates and costs first, input quantities, prices last — Ben's call). Requirements group
+`recipe-margin-anchor` R1 complete, R2–R3 pending.
+
+### Sprints
+
+On Ben's instruction every prior sprint is archived: 21 and 26 (were "complete", now `closed`),
+25 and 28 (`superseded`, never opened), 27, 29 and 30 (`closed` with retros). **Sprint 31 opened** —
+long-term market viability, every recipe pays at base — with the done-when on `recipe_margin`
+R1–R4 green in both bands and `campaign_lapse` on the industrial band operating-positive.
+
+---
+
+---
+
+## 2026-09-02 (sprint 30 opens) — The ground gets its edges back, and the land tilts
+
+**Mode:** Full, batch (BL-736 + BL-737), committed as one intertwined change on Ben's
+call — he paused the pre-commit review fleet and took the improvement as-is, noting *"I
+expect we will want a different approach later on"* (the 3D milestone stays the likely
+destination; everything here — brushes, stamps, the tilt seam — carries into it).
+
+**BL-736 (ground sharpness pass).** Diagnosis first: texel:pixel is ~0.85–1.0 at every
+rung, so "still a general blur" was edge content, not resolution — the new ground HUD
+line (tier, texel/px, chunks; the texel renderer's polygon count) makes that measurable.
+The bake became an apron orchestrator (A=6, post passes can't seam at chunk edges):
+cover-boundary + shoreline INK (1 px, follows the warped organic edge for free),
+UNSHARP mask at ≥ 40 px/r (tag-gated, kernel-reach checked so the survey mask stays
+byte-exact), grade haze halves / contrast rises with resolution. The v7 forest preview
+reads like a hand-inked map.
+
+**BL-737 (stepped tilt).** The reference mock's feature, taken: rungs 3/4 view the land
+at 22.5°/45°, axonometric, tilt a pure function of zoom, plain canvas only. The camera
+is ONE vertex-range squash about the canvas centre plus one inverse on the cursor —
+every existing hit test unchanged; the tilted rungs bake OBLIQUE tiers (tier keyed
+ppr+tilt): height displaces rows into real hill silhouettes (double-gather resolve,
+masked re-resolve locks so peaks truncate at the survey mask), and trees STAND — trunk,
+upright canopy pre-stretched 1/cos(tilt), shadow left on the ground plane.
+ground_bake_check grew to 17 checks (P9: oblique determinism + wrap); live on the
+Release build: click/hover/step all correct at the tilted rungs.
+
+**Caveat recorded:** the 21-agent review fleet over this diff was stopped before its
+verdicts on Ben's instruction — this batch, unlike waves 1–2, shipped without the
+adversarial pass. The next session should treat the tilt/apron seams as unreviewed.
+
+---
+
+---
+
+## 2026-09-01 (BL-735, wave 2) — The ground sharpens, steps, and stops stalling
+
+**Mode:** Full. **Runtime:** same evening as the BL-732 delivery; Ben judged the first bake
+live and ruled: not smooth enough, too blurred (approximate C-F's 3D read with STEPPED zoom —
+2.5D), borders way too strong (muted palette, 1-tile glow).
+
+### Built
+
+**Stepped zoom + tiers.** Planetary zoom is a fixed ×2 ladder (`planetary_zoom_stepped`,
+kMinZoom × 2^k, five rungs — kMinZoom×16 ≈ kMaxZoom, so the ladder spans the old continuous
+range exactly); wheel and `=`/`-` step it, upper rungs stay continuous, verify `set_zoom`
+stays free-form so scripted framings hold. Each rung pairs a bake tier {far 6, 12, 24, 48,
+96 px/r} — never magnified more than ~7%, minification capped at 2:1. ACTIONS zoom entries
+updated.
+
+**Resolution-adaptive bake.** The bake's softness was canonical-scale (1.4 tiles ≈ 70 px of
+blur at the close tiers): past the 24 px tier the interpolation weight EXPONENT steepens
+(coverage radius can't drop below one tile; crispness comes from the falloff), detail/noise
+amplitudes lift, a fine grain octave and a warm/cool colour mottle join. Diagnosed via a
+temporary tier/chunk print — the tier pipeline was correct; the mist was bake content.
+
+**Threaded bake.** All baking moved to a worker thread against immutable source snapshots
+(generation-guarded, self-contained jobs, LRU-capped tiers, far-hash once per source
+generation); the render thread hashes, enqueues, uploads, publishes. `--verify` stays fully
+synchronous. Until the far page lands after a body switch, the vector fallback carries the
+frame — a visual pop traded for zero render-thread stalls.
+
+**Muted borders (the BL-734 partial).** Band collapses to the single frontier ring at 0.35
+alpha; wash AND stroke draw the nation colour pulled 0.55 toward its own luma (the corridor
+hover label keeps full identity). PLANETARY.md's falloff table rewritten with the ruling.
+
+**Release staged for play.** The roughness Ben felt was partly the Debug build staged at the
+granted path — the Release play build now sits there instead.
+
+### Checks
+
+ground_bake_check 10/10 unchanged; ground_bake.lua regrown to per-rung captures (every tier,
+the 12 px rung included after review) with `frames(2)` settling the request latency. A
+21-agent adversarial review over the integrated diff (4 dimensions → per-finding refuters)
+confirmed 14 findings, 3 refuted; the critical family — a generation bump or failed texture
+allocation orphaning an in-flight bake with its `queued` flag stuck, bricking chunks or
+darkening the far page until a body switch — was fixed by clearing pending flags
+unconditionally in upload, re-arming the far hash on an orphaned drop, gating source refresh
+on an in-flight counter, flooring eviction at 2× the wanted set, raising tier headroom to
+1.2× (0.93 sent every rung one tier high), and accumulating fractional wheel deltas to whole
+notches. Doc fleet-catches fixed the ~7% magnification overclaim (fit-derived hex sizes; the
+top rung's large-window bound is now stated), ACTIONS' stale expected_output, R4's
+unprovable promise, and BL-734's stale remaining-work line.
+
+---
+
+---
+
+## 2026-09-01 (BL-732 delivery) — The ground bakes, and it looks like a planet
+
+**Mode:** Full. **Runtime:** one session; one cold-configure + full Debug build in the fresh
+worktree, ~8 incremental builds, ~4 verify runs, one live computer-use pass. **Requirements:**
+`ground-bake-renderer` R1–R4 all complete.
+
+The procedural-first half of BL-732 (ground bake renderer): the Planetary canvas ground now
+draws from CPU-baked painterly chunk textures on the plain canvas, with the classic vector
+path surviving under every lens and wherever a chunk is not yet baked.
+
+### Built
+
+`src/ui/terrain_palette.{hpp,cpp}` (pure palette extracted from hex_render, byte-identical
+delegation, compile-time layout guard); `src/ui/ground_bake.{hpp,cpp}` (pure bake: class-
+separated tile interpolation, two-octave **domain warp** for organic coastlines, fractal-
+detail **hillshade** low-octave-gradient, period-snapped noise lattices, separable near-future
+grade); `src/core/ground_layer.{hpp,cpp}` (SDL chunk cache: synchronous far page, budgeted
+512 px chunks against the canvas's ground_request, content-hash invalidation); canvas
+integration (chunk quads under everything, per-tile fill/texture skip via `on_bake`, washes
+re-expressed as translucent overlays, no-grid rule live); `tools/verify/ground_bake_check`
+(10/10 + six param-variant preview PNGs per run); `scripts/verify/ground_bake.lua` (7
+captures incl. a bare pair via the new verify-only `set_border_band` toggle).
+
+### Look iterations (the useful failures)
+
+Round 1: blend radius 1.55 → mush. Round 2: radius 1.15 → hex mosaic (per-tile jitter is the
+mosaic dial). Round 3: fractal gradient at full frequency → speckle (gradient must read the
+LOW octave only, half-cell central differences). Round 4: single-octave warp translates hex
+corners without breaking them; big warp swirls texture → two-octave warp for the boundary,
+detail/grain sampled UNWARPED. End state genuinely reads in the C-F family.
+
+### The BL-734 evidence this produced
+
+Over muted graded ground the analytic chrome inverts its old contrast relationship: the
+national border band (hex-scalloped, full-strength, on every coastline) is now the loudest
+mark on the map, and fog steps read hex-crisp over organic ground. Captured in the
+wide/play vs bare pairs — the layer-contract ruling now has its exhibits.
+
+### Notes
+
+Debug-build chunk bake can jank the first seconds after a body switch (CPU bake, 2
+chunks/frame budget; far page covers meanwhile) — a future threaded bake if it matters.
+The computer-use grant resolved to a pruned worktree's exe path (the standing trap); fixed
+by staging this build at the granted path — the Start-menu ProjectIo shortcut now runs
+this build. story_check's 55 fails and the ACTIONS/NEEDS_REVIEW mirror staleness predate
+this session and were left untouched.
+
+---
+
+---
+
+## 2026-09-01 (sprint 29 opens) — The ground gets a mechanism
+
+**Mode:** Design (research + authority docs, no code). **Runtime:** one short session, parallel
+worktree while sprint 28 runs.
+
+The brief: can the canvas move to much more detailed rendering — a tile renderer, the planet
+canvas view? Research first, authority docs after, questions to Ben as they arose.
+
+### Researched
+
+`docs/research/CANVAS_RENDERING.md`: the option ladder (richer vector / textured hex atlas /
+baked terrain chunks / SDL3 GPU pipeline), the finding that tiles already carry everything a
+detailed renderer eats (continuous `height` from BL-517, river edges with flow, graded cover),
+and that the current 2D backend supports textures, render targets and textured meshes unused.
+The advisor's pick was baked chunks; Ben ruled otherwise, which is what the ladder was for.
+
+### Ruled (Ben, the design form)
+
+Authored **hex-tile atlas** on the current backend; scope the **Planetary tile grid** only;
+**authored raster assets** from reference images (coming later); **ambient animation** in scope
+(flipbook); layer contract **held for the reference images**.
+
+### Landed
+
+`docs/ui/RENDERING.md` (new authority: mechanism, manifest + vector fallback-by-coverage,
+variant hash, transition fringes, verify-pinned flipbook clock, far page at the 7 px pivot,
+asset policy); TECH_FOUNDATIONS amended (the "not a prototype concern" sentence overturned,
+decision-log row added); PLANETARY.md pointer; CLAUDE.md router row. Items: BL-732 (hex tile
+atlas renderer, buildable against a placeholder atlas), BL-733 (tile art asset pipeline) and
+BL-734 (ground/chrome layer contract) — the latter two in review.json, blocked on the reference
+images. Sprint 29 opened in sprints.json.
+
+### Round 2 — the reference images arrive (same day)
+
+Ben pointed at `Ui-Development:docs/ui/design/renders/map/` — a whole style workstream
+(owner: Joe, `GLOBAL_STYLE_SHEET.md`) with two judged rounds. The images falsified the
+morning's atlas ruling: the direction is grid-free continuous terrain, oblique camera,
+installations as real geometry. Second form ruled: **C-F ratified** (painterly relief +
+near-future grade); mechanism **switched to baked chunks** (hillshade + authored biome
+brushes); **no on-ground grid** (selection/hover hex only, amber); **installations as
+rendered geometry, glyphs retire from the canvas**; camera **staged** — 2D bake now,
+oblique end-state (2.5D vs 3D, trade-offs in the research note § The end-state choice)
+as a future milestone; design docs **merged to main** and registered in the router.
+
+RENDERING.md rewritten to the baked-chunk mechanism; TECH_FOUNDATIONS re-amended;
+style sheet gains the Planetary-map sub-track with the ratification; BL-732 →
+GROUND_BAKE_RENDERER, BL-733 → BIOME_BRUSH_ART_PIPELINE (unblocked), BL-734 re-scoped
+to the surviving channels (both review.json blocks resolved).
+
+### Open
+
+it4 supporting frames and glyph round 5 remain with Joe; the 2.5D-vs-3D end-state call
+is Ben's, parked until the staged bake is real.
+
+---
+
+---
+
+## 2026-09-01 (success-lever session) — The two buyers come back, and the sweeps get their design
+
+**Mode:** Design → Full (two worktree agents) → integration. **Runtime:** one session; one full
+build; ~10 harness builds. Sub-agents: two economy-dev builders + two cold reviewers.
+
+The brief: design tests that inform each tuning lever for player success (target: 0 research
+points, a functioning economy, influence around spawn, measured as GDP and net-income trend), with
+a working spectator mode and time-lapses. A 12-agent corpus sweep produced the lever inventory;
+Ben then ordered the two missing buyers built first.
+
+### Built
+
+**BL-644 (state channel).** The tenth budget line `space_programme`: whole-or-nothing lumps of
+spacecraft_components + propellant, priced at the supplier's market (base_price fallback),
+conservation-exact, consumed on settlement. Save v22→23. Cold review found no correctness defect;
+integration added the missing coverage — R7k pricing twin, R7l rogue-claim claw-back (the claim
+vector is wire-reachable), and R8, an end-to-end `run_nation_step` row red-proved by severing the
+wiring. `nation_budget_harness` 49→62/62.
+
+**BL-647 (endemic luxury).** `inject_endemic_demand`: wealth-scaled (treasury + positive domiciled
+balances), nation-flavoured by a pure seeded hash (a real FNV diffusion defect caught by the
+harness's own asymmetry row, fixed with fmix64), the four luxuries into `k_extractable`. 29/29,
+every row mutation-proved. Census after: luxuries carry demand and price 3.4–4.0× base in band;
+rivals extract and sell into the pull end to end.
+
+**Integration.** demand_census gains the two channels honestly (END market bid; `st` paid pool
+draw on its own line), endemic + state/pl columns; chain_depth gains both injectors — the
+names-no-pass list shrinks 8→3, all owned; `read_resource_map` rejects NaN/negative weights.
+
+### Filed
+
+BL-723 (campaign lapse instrument) + BL-724…729 (the sweep battery: spawn distribution, price
+levers, debt dynamics, scarcity geography, demand composition, interactions), BL-730
+(trade_goods_misc buyer), BL-731 (nation_scorer_harness rot). NR-774 carries the four
+definitional calls (GDP := valued production; influence := market share + footprint + routes;
+band := industrial 1960; proxy := corp AI with stated brackets) for ratification.
+
+### Found, not fixed
+
+The ceiling derivation has drifted: `haulage_measure` now demands ceil > 14.07 at the binding
+case against the authored 10.0 (p90 haul 5.65 vs the 1.67 the 10.0 was derived from). Trade is
+healthy (1,481 dispatches vs the 1055 baseline) — but the worst-tail pair is unservable at any
+scarcity. Sweep 2 (BL-725) owns re-deriving it. chain_depth's named-list guard stays
+deliberately red on tools / rigging / trade_goods_misc.
+
+### Open calls
+
+NR-774 (the four definitions); the player-corp supplier exclusion under spectate (BL-644's
+delegated call — the BL-409 no-subject reading says it should lift); lump sizes 25/50 first-cut.
+
+### Addendum, same session — the operating-loss block: two land, one waits, one teaches
+
+Ben ruled on the six proposed operating-loss methods: infrastructure channel **in full**;
+building upkeep **yes** ("Building should have upkeep too"); extraction throttle-on-floored-price
+**REJECTED** — *"we should see players penalised for overinvesting in mining, and we should see
+the market decide what is profitable. Eventually a deposit runs out, and so it is up to a player
+to pace their consumption"* — a dated narrowing worth remembering: no price-triggered supply
+throttle, ever; the market's verdict and deposit depletion are the pacing mechanisms. Idle-floor
+trim and the maintenance anchor agreed; firm exit pending his read of the re-explanation.
+
+**Landed:** BL-643 (network upkeep, the BL-644 template, 72/72 red-proved) and BL-739 (idle floor
+to data, 0.30 → 0.15, all seven call sites). **Found:** the state channels' wallet is missing —
+one nation in 43 holds any treasury (BL-741), and state purchases read pools auto-surplus already
+swept (BL-742). **Taught:** BL-738's stage-1 repair rates ran a full campaign cell and made the
+field WORSE (extraction operating net −6.75 → −31.29; cost side without the income side), so they
+were withdrawn with their measurement written at the table and BL-738 now requires BL-741/742.
+The clean positive: stone off the floor, 0.42× → 1.38× base — the price signal works; the money
+loop behind it is what is missing. BL-740 (maintenance anchor) waits for its measured table —
+BL-739 just moved its baseline.
+
+### Addendum, same session — NR-774 ruled, and the demand curves split the bands
+
+Ben ruled the four calls via the form (GDP = valued production; influence = share + footprint +
+routes; **band = industrial 1960 only**; proxy = corp AI, brackets stated) and held the
+sprint-31 spawn-intelligence idea. The full demand curves then ran on both bands (2 seeds per
+cell, pop ×0.5 → ×4):
+
+- **Ancient**: a real, noisy climb — −6.9/qtr at ×0.5 to **+2.4/qtr at ×2**, with an optimum
+  near ×2 (×2.5 falls back to −6.5: past the optimum, extra demand hits price ceilings and
+  raises everyone's input costs). Two-seed cells are noise-prone (×1.25 is an outlier).
+- **Industrial (the ruled band): demand scaling does NOT fix it.** Mean operating net wobbles
+  −7.3 → −4.5 with no monotone trend, op-positive corps 0–2 of ~37 at every level, and valued
+  production collapses (×0.13–0.29) as exits cull nearly half the field. The industrial band's
+  binding constraint is structural — the ceiled mid-chain (machinery/electronics), the missing
+  endpoint channels, and exit thresholds tuned on ancient numbers — not the demand level.
+
+The programme consequence: for the ruled band, the next lever is mid-chain supply and endpoint
+structure (and a band-sensitive exit threshold), with the demand knob shelved until those land.
+
+### Addendum, same session — firm exit lands, and the first sweeps speak
+
+**BL-743 built and verified** (7/7, conservation and exemption rows red-proved): insolvency
+finally has a consequence, the CANCEL/DROP half shared with the buyout so the two ends of a
+corporation cannot drift, the player exempt absolutely.
+
+**The first sweep rounds ran** — 36 cells plus 3 industrial spot cells — and one instrument
+lesson came with them: `world_params::epoch_year` defaults to **0**, so every lapse run to this
+point measured the **ancient band**, not NR-774's declared 1960 start; the manifest now names its
+band. The findings, band-labelled:
+
+- **Demand composition dominates** (sweep 5): pop demand_scale ×2 flips the ancient field to
+  **mean operating PROFIT (+2.36/qtr)** — the first operating-positive field ever measured.
+  The bg knob is inert in-band (the stopgap is industrial-only), and on the industrial spot
+  cells bg×2 makes things *worse* (more demand for ceiled mid-chain goods).
+- **Abundance barely differentiates** (sweep 1): sparse/lean/standard within ±1.2/qtr of each
+  other — in a demand-bound economy, more deposits do not help.
+- **Exits work**: end-of-run debtor counts fall ~57 → ~20; the industrial band's ~45% cull rate
+  says the thresholds are band-sensitive — an exit-threshold sweep axis is owed.
+- **The field culls but does not regrow** (valued production ×0.67–0.73): the growth half of
+  "profitable and growing" now hinges on the AI's build tempo and the demand level.
+
+### Addendum, same session — the money loop closes a turn, and the diagnosis lands
+
+Ben asked why the after-fixes lapse still slides into debt: taxes or wages, or the market? The
+field ledger exonerated both suspects — levies are 0.07% of drains, wages 13% — and named the
+real pair: **maintenance is 80% of every credit leaving the field**, and the market mints only
+1,485/qtr of external income against 2,241/qtr of drains: a structural −755/qtr the field must
+lose collectively, whoever wins individually.
+
+**Built on his ruling (firm exit yes; BL-741/742 first):** BL-741 — every nation levies its own
+jurisdiction (one seeded author had left 42 treasuries empty); BL-742 — state purchases fall back
+to market inventory when pools are swept (the measured industrial case), each channel keeping its
+own shape, self-capped at the line share, settling as the documented unbacked-market debit.
+BL-738's repair rates re-landed as stage 2. BL-743 (firm exit) filed fresh — the old BL-657/658
+rows no longer exist in any store.
+
+**The three-cell table** (baseline / after-fixes / round-two): extraction operating net −6.75 /
+−31.29 / **−20.83**; subsidies 0.0 / 0.7 / **61.1/qtr**; treasuries 167 / 99 / **8,280**. The
+circulation works — and exposed the next sink: **nations hoard ~68/qtr** because most budget
+lines still have no consumer. That calibration belongs to the sweeps (BL-728/BL-729), the
+spend-side breadth, and BL-743's exits — not to another ad-hoc rate change.
+
+### Addendum, same session — BL-723 lands and the first film ships
+
+The campaign-lapse instrument built, T0-verified (every validity row mutation-proved red), and
+run: seed 0, shipped spawn, 120 measured quarters in 23 s. **The first baseline is the finding.**
+Valued production grows only ×1.05 over 30 years; corps in debt climb 24 → 57 of 89; convoy
+traffic thins 85 → 28; at year 30 interest is ~96% of the field's summed net loss — the debt
+spiral, not operations, is the drag. Every top climber is a processing corp; extraction and trade
+corps bleed. No runaway leader (top share 6.6%). The 33-frame time-lapse (one Corporation-lens
+frame per game-year, whole-continent framing) delivered as a GIF. Sweep priorities this reorders:
+debt dynamics (BL-726) and the insolvency-exit design look more load-bearing than prices; the
+extraction-vs-processing margin gap wants sweep 2's eye on the levy and the band.
+
+---
+
+---
+
+## 2026-09-01 (later) — The review queue drained, and the quadratic finally went
+
+**Mode:** Design → Full → Corpus. **Sprint 27: still open.**
+**Runtime:** continuation of the same session. Two integrating builds.
+
+Ben answered five open calls and then made a sixth, larger one: *"Really we are relying on the fact
+there is a review queue too much. Use judgment on things that seem obvious in hindsight, and close
+all the remaining items - then archive."*
+
+### The five rulings
+
+**BL-417 taken (NR-769, option A).** The build score is `net / capex` — return on capital per tick —
+at all three curve sites, including the road, which is priced *under* the build curve by
+construction and would have outscored the site it exists to reach by two orders had it stayed
+quadratic. What settled it was that two independent fixes hit the same wall one level down: BL-712
+put Power Generation and Construction in front of the scorer for the first time and the scorer
+refused them anyway; BL-711 gave the same shape from the other side with peat. `AI_OPPONENT.md`'s
+own rule condemns an absolute contest in as many words, and `net²/capex` was one — the rule applied
+to everything except the score.
+
+Measured before reshaping: 15,549 candidates, quadratic median 13.54 / max 1884, linear median
+0.106 / max 2.81. That puts builds in the same band as survey and hire, which is an incomparability
+the quadratic was masking rather than resolving. **No fudge scale was added** to restore the old
+ordering — that would be taking the change and cancelling it.
+
+**`spectator_determinism`'s byte-identity row retired (NR-752).** It asserted world-content
+stability, which is not what the harness is for; it had been re-blessed ten times and not one of
+those moves was a spectator-mode fact. The provenance log is kept as the *argument* for the
+retirement. The harness is ALL PASS for the first time in weeks with both real invariants intact.
+
+**BL-713 scheduled after sprint 27** (NR-762), **BL-642's centre growth gated** (NR-773, Ben taking
+the deeper option over the recommendation), and **NR-763 answered** — deeper chains, after the
+demand channels.
+
+### The probe that came back dead
+
+NR-763's recommended first move was to vary `max_logistics_reach` and re-read the completeness
+spread. `demand_census` gained a `--reach` flag for it, and the sweep 24 → 4 removes **40% of every
+market's reachable ground** — market 48711 loses 51% of its in-reach tiles — and **not one market's
+completeness moves**, on either band, to four decimal places. The raws a market needs are all in its
+inner catchment; the ground a tighter budget removes carries duplicates. Geography cannot bite
+because there is nothing distinctive at the edge to lose. That leaves the saturation structural.
+
+### The drain
+
+**117 open → 0.** The finding that matters is *why* there were 117: most entries named **work**, not
+a judgement. The queue had become a shadow backlog, and a backlog nobody reads is not a record.
+
+Ten items now carry the real content — **BL-713** (harnesses build the app's world; 48 of 51 skip
+the app-start tail, 22 of those run the AI in an unsurveyed world), **BL-714** (instruments that
+cannot see their subject), **BL-715** (the save seam past the world), **BL-716** (the tech tree is
+inert and its gate ids are wrong), **BL-717** (designed but silent), **BL-718** (the name column is
+one character — a class, not three instances), **BL-719** (shell defects), **BL-720** (the seeder
+cannot see processing demand), **BL-721** (paid for outcomes has no mechanism), **BL-722** (the
+live-click debt). Every one of the 125 entries is archived with a resolution saying where it went.
+
+`CLAUDE.md` Rule 0c gained the discipline that keeps it drained: a call only Ben can make goes in
+the queue; work goes in the backlog; a fact worth remembering goes in the comment next to the code.
+
+### One red, fixed rather than papered over
+
+`decision_trace_harness` T2's anti-vacuity guard went red under the linear score: the calmer scorer
+stopped overflowing the 256-entry ring (269 → 207 pushed). The guard was right and the tick count
+was the problem — 269 against 256 is five percent of headroom, and the decision rate is a property
+of the **scorer**, not of that file. Re-measured (2400/207, 3600/267, 4800/327, 6000/387), re-sized
+to 6000 for 51% headroom, with a `--ticks` flag so the next scorer change re-measures instead of
+guessing.
+
+---
+
+## 2026-09-01 — Sprint 27 block 2: two scale-blind selections, and two instruments that were lying
+
+**Mode:** Full (Batch Delivery). **Sprint 27: still open — the channels remain.**
+**Runtime:** one session, main-session only, no worktree agents. Two integrating builds.
+
+Five commits. Four backlog items and the sprint's own measuring instrument.
+
+**BL-710 — save_roundtrip compiles again.** It had not since `cc88997c`, and two save-version bumps
+landed inside that window (v21 power, v22 construction), both appending to the format, neither
+verified by the harness whose whole job is that. Six regions removed by deletion, not repair. The v6
+and v7 refusal rows stay: what they assert is the version contract, which the tear-out did not
+touch. Green at v22, 63 PASS / 0 FAIL, both dead bumps carried.
+
+**BL-712 — the scorer chooses between categories.** Two argmax loops, not the one the item named.
+The build candidate took a site's highest-margin recipe, so power at net 3.98 could never out-rank
+price-ceiled electronics at net 290 and no rival ever built a plant. Now a best per `recipe::group`.
+The recipe margin-chase carried the same defect plus two of its own: it used the browse index as an
+absolute recipe id, and it proposed cross-group switches **that the seam has refused since
+2026-08-16** — Ben's own BL-434 retraction. One proposal per building per evaluation, so the refused
+proposal starved the legal within-group switch. That is the sharper finding, and it is now a doc
+section: *a scorer that proposes what its seam forbids cannot tell a refusal from an absence.*
+
+**BL-709 verified, and deliberately left open.** Three of four requirement rows land. R1 does not:
+on the ancient band `construction_capacity` is produced **0.0** over 80 warm ticks with two yards
+standing and both inputs on the shelf; on the industrial band both yards are gone by tick 80. The
+linter's false-open warning said *a partial slice can land under an item that is legitimately still
+open*, and that turned out to be the right reading rather than a formality.
+
+**BL-711 — every resource reaches the scorer.** `rank_extraction_sites` kept a global top-8 over
+deposit × affinity × demand; deposit magnitudes span three orders, so all eight rows were iron_ore
+and clay, peat, sand, hides and fibre were never *candidates*, anywhere, in any world. Now a
+per-resource top-K. **Coal goes from zero mines in any world ever to 25** — the chain NR-766 named,
+feeding the industrial band's largest recipe. This is BL-440's own trap one altitude up, which is
+why the rule now lives in `AI_OPPONENT.md` rather than in that item's comment.
+
+### The two instruments
+
+Both were found by accident, and both had been reporting confidently.
+
+`demand_census` never called `init_survey_states`. Every body stayed hidden,
+`rank_extraction_sites` gates on survey visibility, and **the corp AI built zero extraction sites in
+every census ever run.** It surfaced because BL-711 came back byte-identical there while the probe
+showed coal going 0 → 25. One line, matching `ai_skill_harness`'s own note from the previous
+session — same class, same day, same answer. It moves every reading the file produces, so the three
+runs are recorded side by side to keep the instrument effect and the item effect separable:
+coal 0.0 → 0.0 → 632.7, clay 0.0 → 0.0 → 349.1, hides 0.0 → 0.0 → 353.9, buildings 335 → 419 → 440.
+
+`ai_skill_harness` — **the sprint's stated success criterion** — is structurally blind to a
+per-category change: three recipes in its hand-built registry, `group` set on none, so all three
+fall to the default. BL-712 returned byte-identical numbers before and after, and that identity is
+the proof rather than a null result (NR-771).
+
+### Decisions taken, and what is Ben's
+
+Taken: the census survey fix (NR-772 — an in-repo precedent from the previous session, reversible in
+one line); confining the recipe chase to its own group (aligning the scorer with a ruling Ben had
+already made at the seam, not a new rule).
+
+His: **NR-769 is the one that matters.** BL-712's fix works — `Power Generation` and `Construction`
+went from zero build candidates to 168 and 430 — and they still never win, because `net²/capex` is
+itself an absolute contest. § Selection must be scale-free condemns that curve in as many words;
+§ Scoring says its retention is BL-417, his call. BL-711 left the same fingerprint independently:
+peat reaches the scorer, both slots placeable, still no site. Also NR-770 (the yards), NR-771/772/762
+(the blind instruments), NR-773 (BL-642's fork), NR-767/768.
+
+Nothing was re-blessed. `spectator_determinism` R2 moved further from its already-150-commit-stale
+golden and is reported with both hashes; `ai_skill_harness` stays at 25 known-red band failures.
+That harness moved and **not for the better on aggregate** — three seeds better, two worse — which
+is the sprint's own thesis as a number: rivals now reach the whole resource field, and reaching more
+of a world with almost no demand means building more into debt. The channels are the answer to that,
+and they are what is left.

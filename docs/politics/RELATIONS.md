@@ -1,5 +1,15 @@
 # Project Io — Relations
 
+> **Settles:** which quantity answers which question — how A *feels* about B (sentiment, derived) ·
+> what A has *declared* toward B (stance) · how an actor is rated at large (reputation) · who is
+> refused trade outright (embargo) · what a surface reads back as standing · how a nation reads a
+> corporation · which of these may become hostility and which may never do so on its own · what
+> each one gates.
+> **Not here:** what hostility permits militarily — interdiction, engagement, the march queue
+> (MILITARY) · what a nation holds and may enact (NATIONS) · how a rival *scores* a stance
+> (AI_OPPONENT).
+> **Confused with:** politics/NATIONS.md, military/MILITARY.md, ai/AI_OPPONENT.md.
+
 **How actors in Io feel about, rate, and gate each other.** This document owns the whole relational
 layer, and its first job is to say **which quantity answers which question** — because the code
 carries several, and three of them share overlapping names.
@@ -131,6 +141,47 @@ subject), holding two floats per row. Four properties, all load-bearing:
 | `embargo_imposed` | the subject refused to deal with the observer at all |
 | `lobbied_against` | the subject spent to move a nation against the observer — BL-539's political grain |
 | `force_used` | force was used against the observer's interest — the sharpest input, and still only an input |
+| `historical_grudge` | an Era −1 grudge, seeded once at world setup — see § Where a grudge lands |
+
+### Where a grudge lands
+
+The Era −1 sim records a **directed, sparse, decaying grudge** between polities, raised by named
+events that each carry a place and a date (`docs/lore/HISTORY.md`; the record's own rules live at
+`history_sim_state::grudges`). It is a **record, never a decision input**: no Era −1 scorer reads
+one, because a grudge inside an actor is an agent term rather than an in-world force.
+
+It becomes consequential here instead. At world setup, once the political map exists, every
+grudge is converted into **seeded nation→nation sentiment** — the row this doc's table above has
+always named as its destination. Five rules settle what that means:
+
+1. **Direction is preserved.** The **aggrieved** polity's successor nation is the **observer**;
+   the resented polity's is the subject. A resents B is not B resents A, which is why both
+   quantities are directed.
+2. **The sign is negative, and Access takes the larger share.** A grudge is what one people will
+   not *let* another do, more than what it will not believe — so the hit lands mostly on Access,
+   with a smaller share on Trust. The two decay independently afterwards, so a later contract can
+   mend Trust without reopening the border.
+3. **The magnitude is a fraction of a full grudge**, `score / grudge_cap`, clamped. Monotone by
+   construction: a bitterer history opens worse.
+4. **A polity with no successor nation is dropped, never redirected.** The mapping is not 1:1 —
+   realms below the size floor are absorbed — and attaching an orphaned quarrel to whoever now
+   holds the ground would be id arithmetic standing in for a successor concept the generation
+   layer deliberately does not have. A quarrel with no heir is over. Two polities that folded into
+   one nation likewise seed nothing: a nation has no sentiment about itself.
+5. **It seeds, it does not overwrite.** The write goes through the ordinary event fold, so it
+   accumulates and everything computed later by conduct moves the same row from wherever
+   generation left it.
+
+**The seeded value is traceable to its cause.** Each seeded row carries the largest contributing
+event — what was done, in which region, in which year — so the opening sentiment between two
+nations can be read back to the war that produced it rather than presented as a bare number. That
+is the condition on which an inherited grudge is admissible at all.
+
+**A seeded grudge FADES, and that is correct (Ben, 2026-09-16, NR-829).** `historical_grudge` takes no exemption from the authored trust decay, so a nine-tick half-life (§ economy.sentiment, NR-568) puts an opening grudge of −8.8 under −1 within roughly three campaign years. Ben ruled that shape correct rather than defective: **a starting condition should fade, because a history the player did not live through should not bind them forever.** The grudge is what the world hands the player on the first tick, not a standing fact they must play around for a campaign. It decays like any other sentiment because, once the campaign opens, conduct is what moves a relationship.
+
+**What that ruling does NOT weaken, and the distinction was being blurred here until 2026-09-16.** `docs/generation/CIVILISATION.md` § What the dark age must leave asks that who colonises whom not be a fresh roll. That requirement is discharged **inside generation**, by `pass_one_output::grudges` being carried across the span boundary and read by the Exploration and Digitisation spans while they run — not by this row. Campaign sentiment is seeded once, at the END of generation, for the player's opening map; it is a consequence of the quarrel, never the mechanism that carried it. A decay on the campaign row therefore says nothing about whether the dark age's quarrels shaped the colonial map, because by then they already have.
+
+*Owned by BL-898 (grudges must bite).*
 
 ### The authored numbers
 
@@ -150,6 +201,12 @@ procurement rates** (`seed_procurement_sentiment`, `recipe_registry.hpp`: `reput
 1.0, `reputation_on_cancel` −2.0 on Trust) and may be overridden by `economy.sentiment.factors`.
 Every other factor's weight is authored at zero — each is a named seat for its emitter, and a
 factor whose emitter has nothing to say moves nothing.
+
+**`historical_grudge` is the one factor with no Lua row, and that is its definition rather than a
+gap.** It fires exactly once, at world setup, before the first tick, and nothing in the campaign
+raises it again. Generation runs with no Lua state, so its weight lives beside the conversion that
+uses it (`grudge_sentiment_params`) rather than in `economy.sentiment.factors`, where there would
+be nothing at runtime for it to weigh.
 
 The table crosses the serialisation seam in full: `write_sentiment` / `read_sentiment` for the
 substrate's own stream, and the per-pair record in the world snapshot. The procurement stream
@@ -339,7 +396,7 @@ the factors that move it. Its emitters are the first writers into the Access dim
 **Related authorities.** [`NATIONS.md`](NATIONS.md) (the nation as an actor, and its read of a
 corp), `docs/military/MILITARY.md` (what hostility permits militarily),
 `docs/ui/DISCOVERY.md` (BL-068, the competitor-visibility rule both stance and standing obey),
-`docs/economy/MARKETS.md` (§ Procurement, where reputation is spent),
+`docs/economy/CONTRACTS.md` (§ Procurement — the buy side, where reputation is spent),
 `docs/ai/AI_OPPONENT.md` (the scorer that declares).
 
 **Owning items.** BL-545 (sentiment substrate) is the spine; BL-546 (reputation migration) is the

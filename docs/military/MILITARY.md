@@ -1,5 +1,15 @@
 # Project Io — Military
 
+> **Settles:** how force works in the campaign — what resolves a campaign battle · how terrain
+> defends and attrits · what a unit is and which domains it may traverse · where units are raised
+> and on what roster · how a march is queued and what turns stance plus position into a fight ·
+> what standing force costs each tick · why economic reach is military reach.
+> **Not here:** how force works inside the Era −1 sim — its own resolver, band ladder, naval and
+> forage rules (MILITARY_HISTORY, a generation doc) · how a rival *decides* to use force
+> (AI_OPPONENT) · what hostility and friendship *are* as quantities (RELATIONS) · what a nation
+> may declare or hold (NATIONS).
+> **Confused with:** generation/MILITARY_HISTORY.md, politics/RELATIONS.md, ai/AI_OPPONENT.md.
+
 The military layer is **how force works**, as opposed to how a rival *decides* to use it — that
 stays in [`docs/ai/AI_OPPONENT.md`](../ai/AI_OPPONENT.md). Its parts are: two battle resolvers
 and the calibration they share; a terrain model; a unit that is a group token on a tile; a muster
@@ -14,7 +24,7 @@ permits *militarily*: interdiction, engagement, and the march queue.
 
 ---
 
-## The two resolvers
+## The two resolvers, and the two documents
 
 There are **two** battle resolvers, and the split is deliberate. Ben ruled it 2026-08-13,
 overturning BL-315's (armed house conflict spine) own earlier engine-parity strand.
@@ -23,81 +33,33 @@ They answer different questions. `resolve_battle` answers "region beats region, 
 one scored evaluation, because the Era −1 sim runs millions of those. `resolve_campaign_battle`
 answers "two forces in a province, over a short span, with a player who may pull out".
 
-**What is shared is the calibration, not the resolver.** The roster is single-sourced, and every
-campaign round scores its powers by calling `resolve_battle` and reading the two power numbers
-out. The campaign path adds round structure, a seeded swing and withdrawal on top.
+**Since 2026-09-06 the two resolvers also have two documents.** `resolve_battle` and everything
+else the Era −1 sim does with force — the band ladder, naval, sea legs, the forage simplification
+— moved to [`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md). **This
+document owns the campaign-era model: what the player meets.**
 
-### `resolve_battle` — nation scale
+Ben's reason for the split is worth carrying, because it is a rule about doc scope and not just
+filing. The sim's rules *"apply specifically to generation, and more specifically to ancient
+history"* — they are the cheapest things that produce a believable past, and stating them here
+made them read as claims about the game. One of them was actively false as a general claim.
 
-`src/world/combat.{hpp,cpp}` (BL-272, unit/doctrine combat model). A pure function of its inputs:
-matchup × doctrine × terrain × supply × season. No RNG, no world reads, no hidden state.
+**What is shared is the calibration, not the resolver.** The roster is single-sourced — two gate
+paths, one table (§ The roster) — and every campaign round scores its powers by calling
+`resolve_battle` and reading the two power numbers out. The campaign path adds round structure, a
+seeded swing and withdrawal on top.
 
-Its callers are `src/world/history_sim.cpp` — the Era −1 history sim (BL-271, Era −1 sandbox) —
-and, per round, `campaign_battle.cpp`. The campaign layer never calls it directly;
-`tools/verify/combat_harness.cpp` calls it to assert.
+### `resolve_battle` — nation scale — MOVED
 
-Arithmetic is **integers in per-mille throughout** (1000 = neutral). Battle outcomes move borders
-in the sandbox, so no float decides who wins.
+**It lives in [`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md)**
+§ The resolver, together with everything else the Era −1 sim does with force (Ben, 2026-09-06).
+That document is a **generation** doc: the sim is a pass that builds a world, and its rules are
+the simplifications that make two thousand years of history cheap enough to generate — not claims
+about how war works in Io.
 
-**Inputs.** Two `std::vector<army_stack_entry>`, two `doctrine_row`s, a terrain triple
-(`terrain_substrate` + `terrain_cover` + `cover_density`) plus a `terrain_landform`, a `season`,
-and two supply values 0..1000 (clamped). Nothing is rejected — an empty or all-naval stack
-resolves rather than erroring.
-
-> **The degenerate case that follows from "nothing is rejected", and what guards it.** Naval
-> entries score EXACTLY zero, and the victory test is a strict `>`. So a fight where BOTH sides
-> are empty or all-naval resolves as a **defender victory with 400/200 per-mille losses** —
-> casualties inflicted on forces that scored no power at all, in a shape indistinguishable from
-> a real outcome. The engagement trigger opens a battle on stance and position alone and never
-> inspects unit class, so nothing downstream would catch it; `battle_system.cpp`'s
-> `stack_can_fight` screens both stacks before opening. Unreachable with a land-only roster,
-> and guarded rather than left to be found by the first naval row.
-
-An **`army_stack_entry`** is one unit type's contribution, already reduced to numbers:
-`{type_id, cls, count, type_power_mod}`. It is deliberately **not** a lookup key into a roster
-table — the engine scores whatever stack it is handed and does not know which era it is refereeing.
-`type_id` is carried for the caller's bookkeeping and never interpreted.
-
-**Unit classes** are five and coarse: infantry, cavalry, ranged, siege, naval. Base power per unit
-is 100 / 130 / 90 / 150 / 0.
-
-**Naval is strategic-only.** A naval entry contributes zero power *and* zero weight to the matchup
-average. Naval rows exist in the roster and naval entries are accepted; naval presence is strategic
-tagging, and there is no tactical naval resolution.
-
-The **class matchup matrix** is a rock-paper-scissors core: infantry beats ranged, ranged beats
-cavalry, cavalry beats infantry. Siege is uniformly weak in the open field, because there is no
-fortification — no held position to reduce — to give it its real job.
-
-Both sides are looked up — `matchup(attacker, defender)` for the attacker's own power,
-`matchup(defender, attacker)` for the defender's. Each is a count-weighted average over the
-opposing composition, with a single division at the end.
-
-A **`doctrine_row`** is pure modifier data: `frontal_bonus`, `flank_fragility`, `mountain_penalty`,
-`stance`. Adding a doctrine is adding a value of this struct; it never touches `resolve_battle`.
-
-`flank_fragility` is modelled as an intrinsic weakness of the formation, not conditioned on the
-opponent actually flanking — a stated first-cut simplification. `mountain_penalty` fires only on
-`terrain_landform::mountain`.
-
-`siege_stance` (`field` / `assault` / `invest`) is carried on the row so a siege is a doctrine
-choice rather than a separate code path. `resolve_battle` does not read it — the field is
-declared for the fortification model and unconsumed until one exists.
-
-**Terrain and supply.** `terrain_defence` multiplies the **defender only**. `terrain_attrition`
-costs **both**, scaled ×1.5 in winter (no other season is distinguished), and mitigated by supply:
-1000 cancels attrition entirely, 0 takes the full hit.
-
-**Tie-break: the defender wins an exact tie.** Holding ground is the default outcome of an
-inconclusive engagement, and it is called out explicitly rather than left to comparison order.
-
-**Outputs** (`battle_outcome`): result, both final powers, both loss fractions, and
-`decisiveness` = `(winner − loser) / winner × 1000`. Losses are **per-mille of each side's own
-committed count**, not absolute numbers — `resolve_battle` never mutates a stack, so spending them
-is the caller's job.
-
-Loss shape: the loser takes `400 + 0.6 × decisiveness`, the winner `200 − 0.2 × decisiveness`,
-both clamped to 0..1000.
+**What still matters here**, because the campaign path depends on it: `resolve_battle` is a pure
+integer function of matchup × doctrine × terrain × supply × season, and **every campaign round
+scores its powers by calling it** and reading the two power numbers out. The calibration is
+shared; the resolver is not this document's.
 
 ### `resolve_campaign_battle` — campaign scale
 
@@ -308,6 +270,55 @@ cycles unit → building → tile on repeat clicks of the same tile.
 
 ---
 
+## Domains and traversal (Ben, 2026-09-06)
+
+**A unit type declares which domains it can cross.** That one variable replaces the flat rule that
+units are land-bound, and it is what makes water a place rather than a wall.
+
+| Domain | Land classes | Coastal/naval classes |
+|---|---|---|
+| `land` | Yes | No |
+| `coastal_water` | **Only where OWNED** (`docs/generation/PROVINCES.md` § Who owns water) | Yes |
+| `open_ocean` | No | Yes |
+
+**Land units crossing owned coastal water is the deliberate middle case.** A shoreline your polity
+holds is a shallow, bridged, causewayed thing — the road layer already reasons this way, treating a
+short crossing with no open ocean in it as a strait rather than a sea. Making the crossing depend on
+*ownership* rather than on distance gives it a cause the player can read: you can walk your own
+shore, not someone else's.
+
+**Campaign-era naval is UNMODELLED, and that is a scope statement rather than a gap
+(Ben, 2026-09-06).** Naval rows carry real power in the Era −1 sim — that is where Ben's ruling
+was aimed (*"we can also use coastal units in the ancient sim"*) and
+[`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md) § Naval owns it. In the
+campaign, nothing has yet asked for a fleet, and a model with no consumer is a model nobody has
+tested. The domain table above still holds: it says which classes *may* be where, and the
+campaign simply does not raise the classes that may be at sea.
+
+**Overseas supply WORKS, and there is no starvation model here.** Historically nations supplied
+overseas expeditions perfectly well; that is most of what a navy is for. The Era −1 sim applies a
+shore-adjacency forage **simplification** because it needs overseas reach to cost *something* and
+cannot afford a logistics model — it is a stand-in, labelled as one in its own document, and it
+does not describe the campaign.
+
+**Water gives 0 defence, and that part is general.** There is nothing to stand behind at sea. It
+is the *forage* half of the same table that is an ancient-sim question, which is why the rule
+lives in that sim's caller and `terrain_combat`'s table is left alone — **both resolvers read that
+table**, so a rule true of only one of them can never be expressed in it.
+
+**A coastal province holds a port, and nothing else (Ben, 2026-09-06).** Buildings refuse water
+outright today; the exception is the port and it is the only one. The reasoning is the same one
+that makes coastal water ownable at all — a shore you hold is a place you can build a thing that
+faces the sea, and a port is precisely that thing. Every other building type wants ground, workers
+and a deposit, and none of the three is on the water.
+
+**What that does NOT open.** A port on water is still gated by the ordinary placement seam
+(`placement_rules::can_place`) and still needs its tile owned; it is not a way to claim water by
+building on it, because ownership is derived from the shore and never from an installation
+(`docs/generation/PROVINCES.md` § Who owns water). Whether a water port differs from a land port
+in what it *does* is `docs/economy/LOGISTICS.md`'s question, not this document's.
+
+
 ## The muster interface
 
 `building_type::military_base = 6` is the single economy → military interface. It is where units
@@ -448,9 +459,18 @@ directly.
 (`scripts/economy.lua`), keyed by the roster row's `cls`. Spent per tick against the per-tile
 traversal-cost weight (`logistics::tile_traversal_cost`, the same plains=1.0/mountain=2.0 table
 road placement discounts), with fractional remainder banked in `order.progress` across ticks.
-Defaults: infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 (there is no naval movement
-model — `combat.hpp`'s own "strategic-only presence"). A composite unit (BL-472, formations) reads
-its **slowest** component's class entry.
+Defaults: infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 — **and the zero is a
+consequence of § Domains and traversal, not a claim that fleets cannot move.** The campaign
+raises no naval units, so the campaign march model has nothing to move; the sim that does field
+them is [`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md), and it does not
+march, it resolves. A composite unit (BL-472, formations)
+reads its **slowest** component's class entry.
+
+**Traversal cost over water is uniform.** `logistics::tile_traversal_cost` prices land by
+landform, and water has no landform to price — so a sea leg costs the same per tile wherever it
+runs, and distance alone sets its length. The thing that varies over water is *legality*, not
+cost (§ Domains and traversal), which is the cheaper model to reason about and the one that
+cannot be tuned into meaninglessness.
 
 **Visit order — NR-344, "war flips the queue".** At peace, convoys claim the network first:
 `advance_convoys` runs in the sim loop *before* `run_economy_step` is called (`main.cpp`/`app.cpp`),
@@ -740,7 +760,12 @@ Headless harnesses under `tools/verify/`, run with the `verifier-headless` skill
 expected side, the exact-tie defender tie-break, and losses bounded as fractions. R3: doctrine is
 pure modifier data — the same phalanx wins on open ground and loses in mountain. R4: naval
 contributes zero power without crashing or branching, and the harness compiles against
-`combat.hpp` + `components.hpp` alone.
+`combat.hpp` + `components.hpp` alone — **R4 inverts with the water model**: what it must now
+assert is that a naval entry contributes REAL power, that an all-naval stack resolves without
+dividing by zero, and that the matrix row previously marked *unused* is exercised. The subject it
+asserts over is
+[`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md) § The resolver, since
+`resolve_battle` is that document's.
 
 **`campaign_battle_harness.cpp`** — `resolve_campaign_battle`. C1: replay determinism including the
 per-round trace, stepping matching the scripted wrapper, and the seed genuinely folding from the

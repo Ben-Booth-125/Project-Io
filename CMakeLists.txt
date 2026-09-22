@@ -558,6 +558,28 @@ target_link_libraries(pregame_balance_harness PRIVATE io_world_obj lua54)
 target_compile_features(pregame_balance_harness PRIVATE cxx_std_20)
 target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# ground_bake_check (BL-732) additionally compiles the two PURE ui TUs the
+# ground bake lives in — ui/ground_bake.cpp + ui/terrain_palette.cpp are
+# SDL/ImGui/Lua-free by design (docs/ui/RENDERING.md § Verification), which is
+# the whole reason a headless harness can exercise the bake at all. Declared by
+# hand because the generic batch below compiles only the harness TU beside
+# io_world_obj; the include dirs mirror the batch's (harness_params.hpp pulls
+# sol headers even in Lua-free harnesses).
+add_executable(ground_bake_check
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/ground_bake_check.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/ground_bake.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/terrain_palette.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/png_writer.cpp"
+)
+target_include_directories(ground_bake_check PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+    "${lua_src_SOURCE_DIR}")
+target_link_libraries(ground_bake_check PRIVATE io_world_obj)
+target_compile_features(ground_bake_check PRIVATE cxx_std_20)
+target_compile_options(ground_bake_check PRIVATE ${IO_WARNING_FLAGS})
+
 # spawn_solvency (BL-635) is the fourth Lua-linked harness, and the reason is
 # stated in its own header: it asserts a MAGNITUDE, not a relation. Every other
 # economy harness restates scripts/economy.lua as C++ constants because the
@@ -569,6 +591,11 @@ target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
 add_executable(spawn_solvency
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/spawn_solvency.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    # world_gen_config.cpp: the harness PARSES scripts/world_gen.lua into a
+    # world_gen_config (its R0 row, the 2026-08-26 lesson) and so links
+    # load_from_lua - without this TU the target does not link, which under
+    # `nmake all` stops every target after it and reads as a suite of
+    # "Not Run" (found 2026-09-02, BL-744).
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
 )
@@ -579,6 +606,47 @@ target_include_directories(spawn_solvency PRIVATE
 target_link_libraries(spawn_solvency PRIVATE io_world_obj lua54)
 target_compile_features(spawn_solvency PRIVATE cxx_std_20)
 target_compile_options(spawn_solvency PRIVATE ${IO_WARNING_FLAGS})
+
+# landscape_score_harness (BL-770 slice 1) is the same shape as spawn_solvency
+# above and is hand-declared for the same reason: it constructs a lua_state,
+# calls recipe_registry::load_from_lua, and PARSES scripts/world_gen.lua into a
+# world_gen_config through harness_params.hpp's parsed_gen_config. All three of
+# those TUs are excluded from io_world_obj, so the generic foreach below would
+# emit a target that does not link - which under `nmake all` stops every target
+# after it and reads as a suite of "Not Run" (the BL-744 failure, and the one
+# that made main unbuildable for weeks before that).
+add_executable(landscape_score_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/landscape_score_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(landscape_score_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(landscape_score_harness PRIVATE io_world_obj lua54)
+target_compile_features(landscape_score_harness PRIVATE cxx_std_20)
+target_compile_options(landscape_score_harness PRIVATE ${IO_WARNING_FLAGS})
+
+# landscape_search_harness (BL-770 slice 3) — same shape and same reason as
+# landscape_score_harness directly above: a live lua_state, load_from_lua, and
+# parsed_gen_config, all three of whose TUs are excluded from io_world_obj.
+# Hand-declared so the generic foreach below does not emit a target that fails
+# to link and stops every target after it under `nmake all`.
+add_executable(landscape_search_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/landscape_search_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(landscape_search_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(landscape_search_harness PRIVATE io_world_obj lua54)
+target_compile_features(landscape_search_harness PRIVATE cxx_std_20)
+target_compile_options(landscape_search_harness PRIVATE ${IO_WARNING_FLAGS})
 
 # persona_counsel_harness (BL-207) needs a live sol2/Lua state too — it loads
 # the real scripts/personas/*.lua packs through src/scripting/persona_pack.cpp.
@@ -711,15 +779,38 @@ target_link_libraries(tier_margin PRIVATE io_world_obj lua54)
 target_compile_features(tier_margin PRIVATE cxx_std_20)
 target_compile_options(tier_margin PRIVATE ${IO_WARNING_FLAGS})
 
+# recipe_margin (BL-744, 2026-09-02) — live-Lua because it is the AUTHORED
+# tables it audits: does every recipe, in both bands, clear its marginal cost
+# at base price (M1) and its fixed cost at the price floor (M2)? No world is
+# built; it is pure arithmetic over recipes.lua / economy.lua / world_gen.lua.
+# The glob below registers it with ctest like every other harness; it loads
+# the scripts by relative path, so it is in IO_TEST_SCRIPT_ROOTED_HARNESSES.
+add_executable(recipe_margin
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/recipe_margin.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+)
+target_include_directories(recipe_margin PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(recipe_margin PRIVATE io_world_obj lua54)
+target_compile_features(recipe_margin PRIVATE cxx_std_20)
+target_compile_options(recipe_margin PRIVATE ${IO_WARNING_FLAGS})
+
 # haulage_measure (BL-442 step 2, 2026-08-17) — live-Lua for the same reason as
 # tier_margin: it measures the per-unit haulage the supply layer ACTUALLY charges
 # between adjacent markets, which is the authored logistics cost table times the
 # terrain-weighted A* cost in the real generated world. It exists so the widened
 # price ceiling is a derived number rather than a guess, and so it can be
-# re-derived later rather than trusted.
+# re-derived later rather than trusted. works_registry.cpp since BL-1006: the
+# --far-trade reading generates the app's world, and works.lua is an input to it.
 add_executable(haulage_measure
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/haulage_measure.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
 )
@@ -786,7 +877,9 @@ target_compile_options(throughput_field_census PRIVATE ${IO_WARNING_FLAGS})
 # into a world_gen_config, because the C++ fallback prices ten resources against
 # that table's forty-two and a sweep run on the fallback measures a world where a
 # third of the roster cannot be sold at all. So recipe_registry.cpp and
-# world_gen_config.cpp both come back.
+# world_gen_config.cpp both come back. (contract_template.cpp used to come back
+# with them for run_nation_step's empty template registry; the mercenary contract
+# was torn out in cc88997c and took that TU with it.)
 add_executable(acquisition_viability
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/acquisition_viability.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
@@ -801,6 +894,35 @@ target_include_directories(acquisition_viability PRIVATE
 target_link_libraries(acquisition_viability PRIVATE io_world_obj lua54)
 target_compile_features(acquisition_viability PRIVATE cxx_std_20)
 target_compile_options(acquisition_viability PRIVATE ${IO_WARNING_FLAGS})
+
+# demand_census (BL-649) is a FOURTH Lua-linked harness and was never declared
+# as one. It is the instrument Sprint 21 names for its own measurement - "per
+# resource, per band, who actually wants it" - and it calls lua_state,
+# recipe_registry::load_from_lua and world_gen_config::load_from_lua directly,
+# so the generic glob below (io_world_obj alone) leaves six unresolved externals
+# at link. It has therefore never built from a clean tree, and the failure is
+# invisible unless someone asks for this target by name: the glob loop declares
+# it and ctest registers it, and it dies only when linked.
+#
+# Found 2026-08-31 while trying to confirm WHY every AI corp in ai_skill_harness
+# ends five figures under water - i.e. the one question the harness exists to
+# answer could not be asked with the tool built to answer it.
+#
+# Same shape and same reason as acquisition_viability immediately above.
+add_executable(demand_census
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/demand_census.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(demand_census PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(demand_census PRIVATE io_world_obj lua54)
+target_compile_features(demand_census PRIVATE cxx_std_20)
+target_compile_options(demand_census PRIVATE ${IO_WARNING_FLAGS})
 
 # province_capacity_probe (2026-08-20) — live-Lua for exactly substrate_census's
 # reason above: it measures the world AFTER generate_background_firms, so every
@@ -893,6 +1015,9 @@ target_compile_options(price_band_harness PRIVATE ${IO_WARNING_FLAGS})
 add_executable(upkeep_harness
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/upkeep_harness.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    # world_gen_config.cpp: U1 prices the value anchor against the AUTHORED
+    # base_price table (BL-744) instead of a mirrored pair of constants.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
 )
 target_include_directories(upkeep_harness PRIVATE
@@ -947,6 +1072,10 @@ target_link_libraries(battle_engagement_harness PRIVATE io_world_obj)
 target_compile_features(battle_engagement_harness PRIVATE cxx_std_20)
 target_compile_options(battle_engagement_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# contract_dispatch_harness (BL-577) is GONE. It exercised contract_dispatch_line
+# for the mercenary contract, which was torn out in cc88997c (NR-731) — the
+# harness source went with it and only this hand-declaration was left behind,
+# which is what made main unbuildable from that commit until 2026-08-31.
 
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 
@@ -1048,6 +1177,14 @@ set(IO_TEST_LONG_HARNESSES
     # is a Timeout, which reads as infrastructure noise rather than as a harness
     # that has never verified anything.
     sea_leg_census
+    # water_ownership_census added 2026-09-06 (sprint 32c lane D). Builds four
+    # prehistory-off worlds and walks every tile of each, to assert the BL-776/
+    # BL-777 claim that coastal water and lakes are territory and the open ocean
+    # is not. ~40 s at /O2 over four worlds; tiered LONG rather than measured in
+    # Debug, on the NR-259 lesson the sea_leg_census entry above records -- the
+    # cost of guessing the tier wrong is a Timeout, which reads as noise rather
+    # than as a check that has never verified anything.
+    water_ownership_census
 )
 
 # EXCLUDED FROM THE ROUTINE GATE - labelled `sweep`. TWO REASONS live here, and
@@ -1067,6 +1204,19 @@ set(IO_TEST_LONG_HARNESSES
 set(IO_TEST_SWEEP_HARNESSES
     history_sim_harness
     history_sweep
+    # CATEGORY (1), added 2026-09-16 (BL-982): a full shipped world plus the
+    # landscape search per curated seed, sixteen of them. Reports, never gates.
+    digitisation_sim_harness
+
+    # CATEGORY (1), added 2026-09-08 with BL-825. history_span_cost prices the
+    # Era -1 span: it builds a world per seed and then re-runs the era at 400 /
+    # 1000 / 2000 / 4000 years plus a step_years sweep, so its runtime is the
+    # measurement rather than an overhead to trim. Minutes per seed on Release,
+    # and it asserts only that its re-run IS generation's era — nothing timed is
+    # ever asserted, because a wall clock differs on every machine. The generic
+    # glob above already declares the target; this only keeps it out of the 60 s
+    # gate. Run it by name when the span or the clock is in question.
+    history_span_cost
 
     # CATEGORY (1), added 2026-08-13. seed_sweep_probe generates a full world PER
     # SEED across a spread, to catch a seed-dependent generation failure — the
@@ -1177,6 +1327,10 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # the comment at the foreach below already warns about, found twice more.
     price_band_harness
     tier_margin
+    # ADDED 2026-09-02 (BL-744). Loads all three economy scripts by relative path
+    # and FATALs on an empty recipe set, so from build/ it would fail loudly
+    # rather than vacuously - but the failure would read as a broken harness.
+    recipe_margin
     # ADDED 2026-08-18 (NEW-10). Loads recipes/economy/world_gen/works by relative
     # path and FATALs on an empty recipe set rather than measuring a world the
     # game never builds — but only if it is looking at the real scripts/.
@@ -1202,6 +1356,10 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # ones — run from build/ it would measure a default registry and report a
     # spawn nobody plays.
     spawn_solvency
+    # ADDED 2026-09-16 (BL-982). Loads world_gen/works/recipes/economy and
+    # docs/generation/seed_library.json by relative path; from build/ it finds
+    # no seed library and FATALs.
+    digitisation_sim_harness
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})

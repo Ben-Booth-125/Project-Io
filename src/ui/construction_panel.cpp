@@ -120,7 +120,8 @@ float estimated_quarterly_construction_cost(const world& w, const recipe_registr
 
         const entity_id body = (w.tiles.count(b.tile) != 0) ? w.tiles.at(b.tile).body : null_entity;
         const float mean_hab = (body != null_entity) ? body_mean_habitability(w, body) : 1.0f;
-        const building_opex opex = compute_building_opex(b, reg.economics(b.type), 1.0f, mean_hab);
+        const building_opex opex = compute_building_opex(b, reg.economics(b.type), 1.0f, mean_hab,
+                                                         reg.idle_maintenance_floor());
         total += opex.maintenance + opex.wages;
     }
     return total;

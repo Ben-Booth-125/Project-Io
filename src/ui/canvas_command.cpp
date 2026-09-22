@@ -1,5 +1,6 @@
 #include "canvas_command.hpp"
 
+#include "body_surface_canvas.hpp" // planetary_zoom_stepped (the x2 ladder)
 #include "view_nav.hpp"
 
 #include <algorithm>
@@ -118,8 +119,20 @@ void apply_canvas_command(const world& w, ui_state& ui, canvas_command cmd)
         case canvas_command::pan_up:    *current_rung(ui).pan_y += pan_step; break;
         case canvas_command::pan_down:  *current_rung(ui).pan_y -= pan_step; break;
 
-        case canvas_command::zoom_in:  *current_rung(ui).zoom *= zoom_step; break;
-        case canvas_command::zoom_out: *current_rung(ui).zoom /= zoom_step; break;
+        // The Planetary rung steps the x2 ladder (Ben, 2026-09-01) so keyboard
+        // zoom matches the wheel; the upper rungs keep the continuous factor.
+        case canvas_command::zoom_in:
+            if (ui.primary_level == canvas_level::planetary)
+                ui.planetary_zoom = planetary_zoom_stepped(ui.planetary_zoom, +1);
+            else
+                *current_rung(ui).zoom *= zoom_step;
+            break;
+        case canvas_command::zoom_out:
+            if (ui.primary_level == canvas_level::planetary)
+                ui.planetary_zoom = planetary_zoom_stepped(ui.planetary_zoom, -1);
+            else
+                *current_rung(ui).zoom /= zoom_step;
+            break;
 
         case canvas_command::lens_next:
             ui.overlay = static_cast<overlay_mode>(

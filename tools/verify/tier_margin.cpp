@@ -74,9 +74,11 @@ struct tier_acc
     long   samples = 0;   ///< building-ticks with a profit row.
     long   earning = 0;   ///< building-ticks with revenue > 0.
     double capex   = 0.0; ///< build_cost, for payback.
+    double units   = 0.0; ///< output units credited, from the report rows (BL-744, R2).
 
     double net()      const { return revenue - input_cost - maintenance - wages; }
     double per_tick() const { return samples ? net() / static_cast<double>(samples) : 0.0; }
+    double per_unit() const { return units > 0.0 ? net() / units : 0.0; }
 };
 
 /// The default-recipe pass is a REAL STAGE of startup, not a harness convenience:
@@ -298,6 +300,12 @@ int main(int argc, char** argv)
             // produced them.
             for (const building_report& br : report.buildings)
             {
+                // R2's denominator (BL-744): output units per tier, off the same
+                // rows the profit estimate valued.
+                if (br.type == building_type::extraction_site)
+                    extraction.units += br.output_quantity;
+                else if (br.type == building_type::processing_facility)
+                    processing.units += br.output_quantity;
                 if (br.type != building_type::processing_facility)
                     continue;
                 ++proc_ticks;
@@ -590,16 +598,25 @@ int main(int argc, char** argv)
     // --- R2: the assertion BL-436 closes on ----------------------------------
     //
     // Stated as the DESIGN's own claim rather than as a tuning target: refining
-    // is the value-add step, so a processing facility should out-earn the
-    // extraction site whose output it consumes. This row is expected to FAIL on
-    // the day it is written — that failure is the item — and to pass when BL-436
-    // lands. It is deliberately a comparison between the two tiers and not a
-    // magic number, so it stays meaningful as prices are retuned.
-    std::printf("\nR2 — refining pays better than mining (the design's claim)\n");
-    std::printf("      extraction net/tick  %8.2f\n", extraction.per_tick());
-    std::printf("      processing net/tick  %8.2f\n", processing.per_tick());
-    check(processing.per_tick() > extraction.per_tick(),
-          "a processing facility out-earns an extraction site per tick");
+    // is the value-add step, so a unit of refined output should carry more net
+    // than a unit of mined output. This row was written as a per-BUILDING-TICK
+    // comparison and expected to FAIL on the day (that failure was BL-436's
+    // item). RE-WORDED 2026-09-02 (Ben, ruling on NR-781) to PER UNIT OF OUTPUT:
+    // under the recipe margin anchor (BL-744) a processor earns profit equal
+    // to its marginal cost while a mine at an untouched raw price and a doubled
+    // base_rate earns 24x its own, so per building-tick mining now out-earns
+    // refining (28.2 vs 24.9) - and RESOURCES.md's ladder claim was always
+    // about the value of a unit as it climbs the tiers, not about which
+    // building type is the better cash machine. Both figures are printed.
+    std::printf("\nR2 — refining adds more value per unit than mining (the design's claim)\n");
+    std::printf("      extraction net/tick  %8.2f   net/unit %8.4f  (%.0f units)\n",
+                extraction.per_tick(), extraction.per_unit(), extraction.units);
+    std::printf("      processing net/tick  %8.2f   net/unit %8.4f  (%.0f units)\n",
+                processing.per_tick(), processing.per_unit(), processing.units);
+    check(processing.units > 0.0 && extraction.units > 0.0,
+          "both tiers credited output units (R2's denominator is non-vacuous)");
+    check(processing.per_unit() > extraction.per_unit(),
+          "a unit of processed output carries more net than a unit of mined output");
 
     std::printf("\n=== %s (%d failure%s) ===\n",
                 g_failures == 0 ? "ALL PASS" : "FAILURES",

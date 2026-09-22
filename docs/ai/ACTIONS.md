@@ -1,5 +1,13 @@
 # Project Io — the action dictionary
 
+> **Settles:** which controls exist at all · what pressing one does and what it
+> needs first · which of them a rival may issue as a `corp_verb` and which are
+> view-only · what arguments a press takes · how an AI player names an action.
+> **Not here:** how the surface holding a control looks or behaves (the `ui/` docs)
+> · what a rival *chooses* to press and why (AI_OPPONENT) · what the underlying
+> system does with the press (the system's own doc).
+> **Confused with:** ai/AI_OPPONENT.md, ui/LAYOUT.md, ui/SELECTION.md.
+
 Every control in the game: what pressing it does, and why you would. Readable
 mirror of [`ACTIONS.json`](ACTIONS.json), which is canonical — the JSON is the
 machine-consumable half an AI player reads (BL-270). Pair it with the corp
@@ -16,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*156 entries — 27 gameplay · 26 canvas · 15 lens · 55 ledger · 33 chrome.*
+*157 entries — 27 gameplay · 26 canvas · 15 lens · 54 ledger · 35 chrome.*
 
 ---
 
@@ -759,11 +767,11 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ### `canvas.select` — The primary canvas (Solar, Circumplanetary, or Planetary rung — whichever fills the window).
 
-**Press.** Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a TILE or marker on the Planetary surface. A LIVE BATTLE OUTRANKS ALL OF THEM (BL-469): if a fight stands in the clicked tile's province, the click selects the battle. UNDER A LENS THIS ALL CHANGES (BL-664, Ben 2026-08-28). A lens collapses selection to ONE TIER: the press resolves to the active lens's structure or to NOTHING, markers take no part ('markers do not outrank lenses'), and there is no repeat-click cycle. Corporation resolves the owner's tile group on this body, Company the same for a background firm, Resource the deposit, Market and Scarcity the catchment, Continent the plate. Population, Industry and Throughput draw a value field with no structure grain and are INERT — a press does nothing and clears the Selection band to resting, as does a press on any ground the active lens has no answer for (unowned ground under Corporation, a tile without the selected resource under Resource). The national border band is outside the rule and stays clickable under every lens (canvas.border_band_select). Everything above this sentence describes the canvas with NO lens active.
+**Press.** Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a TILE or marker on the Planetary surface. A LIVE BATTLE OUTRANKS ALL OF THEM (BL-469): if a fight stands in the clicked tile's province, the click selects the battle. UNDER A LENS THIS ALL CHANGES (BL-664, Ben 2026-08-28). A lens collapses selection to ONE TIER: the press resolves to the active lens's structure or to NOTHING, markers take no part ('markers do not outrank lenses'), and there is no repeat-click cycle. Corporation resolves the owner's tile group on this body, Company the same for a background firm, Resource the deposit, Market and Scarcity the catchment, Continent the plate. Population, Industry and Throughput draw a value field with no structure grain and are INERT — a press does nothing and clears the Selection band to resting, as does a press on any ground the active lens has no answer for (unowned ground under Corporation, a tile without the selected resource under Resource). The national border band is NOT an exception: it is suppressed while any lens is up (Ben, 2026-08-28, reaffirmed 2026-09-07), and its hit corridor goes with it - the corridor is built in the same pass as the stroke, and a border that is invisible but still clickable is worse than either state. Everything above this sentence describes the canvas with NO lens active.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `target` | `entity` | The entity under the cursor. WITH NO LENS ACTIVE, overlapping candidates resolve to one entity: the stack UNIT > building > market > TILE > body is walked most-specific first (BL-575 put the unit marker ahead of the building marker — a unit standing on a built tile must be reachable on the FIRST click), and nearest-to-cursor (entity id breaking ties) picks a single stable winner. The ground itself resolves to the TILE, which carries its province as a set of sections in the Selection element (BL-598 dissolved the separate province rung: a rung of its own selected the same ground twice). A unit marker is drawn once per (province, owner) GROUP at the province's anchor tile — the group's lowest-id unit is what a click on it resolves to. UNDER A LENS none of this stack applies; see the press field. |
+| `target` | `entity` | The entity under the cursor. WITH NO LENS ACTIVE, overlapping candidates resolve to one entity: the stack UNIT > building > market > TILE > body is walked most-specific first (BL-575 put the unit marker ahead of the building marker — a unit standing on a built tile must be reachable on the FIRST click), and nearest-to-cursor (entity id breaking ties) picks a single stable winner. The ground itself resolves to the TILE, which carries its province as a set of sections in the Selection element (BL-598 dissolved the separate province rung: a rung of its own selected the same ground twice). A unit marker is drawn once per (province, owner) GROUP at the province's anchor tile — the group's lowest-id unit is what a click on it resolves to. WATER IS GROUND FOR THIS PURPOSE (BL-785): a press on coastal water, a lake or open ocean resolves to that TILE like any other, and the Selection band's centre column answers OWNER and DOMAIN rather than the five ground sections — the owning nation on owned water, and the word 'Unowned' on water no nation holds (open ocean is unowned structurally). No deposit, workforce, population or building reading is offered there, because those questions are about ground. UNDER A LENS none of this stack applies; see the press field. |
 
 **Valid when:**
 - The app is in-game (not the main menu or New World wizard).
@@ -815,36 +823,19 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Preview the planned research structure. Do not select this expecting to act — it is a mock, not a system.
 
-### `canvas.tech_tree_navigate` — The F9 tech-tree constellation canvas (src/ui/tech_tree_panel.cpp, draw_constellation). A full-canvas takeover bounded to ui::canvas_rect(); it is chrome-less by decision (BL-310 round 4), so it carries no zoom slider or scale bar of its own — this is the only way to move around it.
-
-**Press.** Middle-mouse drag to pan. Scroll wheel to zoom.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `pan` | `mouse delta (screen px)` | Middle-drag moves the web under the cursor, matching the zoom-ladder canvases' idiom rather than left-drag (Ben, 2026-08-06). |
-| `zoom` | `wheel notches` | Each notch scales by 1.1, clamped to [0.35, 3.0]. |
-
-**Valid when:**
-- The tech-tree takeover is open (ui_state::show_tech_tree) and the cursor is over its canvas.
-- The selected era view has authored gate quests — the Era 2 placeholder has no constellation to navigate.
-
-**Expected output.** Pan and zoom of the radial constellation only. Zoom is CURSOR-ANCHORED (2026-09-01): the canvas point under the pointer stays fixed, so scrolling magnifies whatever node is hovered rather than the middle of the canvas — the same behaviour the planetary canvas has. At the clamp bounds the scale stops and the view holds still rather than drifting. On-canvas text is tied to the zoom: below 0.55 no node title, quest name or exclusion mark draws at all, and between 0.55 and 1.0 they shrink and fade together, so a zoomed-out constellation is shapes only. Nothing about the world, the selection, the rung or the sim changes; the camera is not shared with any other canvas.
-
-**Reason to select.** To read a dense era. The Era 1 web is far denser than it looks at rest, and at default zoom its always-on titles overlap. Zoom in on the region you care about — labels stay screen-sized, so magnifying separates them. An agent needing tech identity should read the registry rather than navigate here; this moves a camera and reports nothing.
-
 ### `canvas.zoom_keys` — Keyboard.
 
 **Press.** Press = (or +) to zoom in, - to zoom out.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `direction` | `enum: in | out` | = / + zooms in one step; - zooms out one step. |
+| `direction` | `enum: in | out` | = / + zooms in one step; - zooms out one step. On the PLANETARY rung a step is one rung of the fixed x2 zoom ladder (matching the wheel; Ben, 2026-09-01); on the other rungs it is the continuous x1.1 factor. |
 
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
 - The current rung is not at its zoom bound in that direction.
 
-**Expected output.** The current rung's zoom factor steps in or out, clamped to the same per-rung bounds the wheel and slider share. Unlike the wheel there is no cursor anchor to aim — the view scales in place. No selection, rung, lens, or speed change. On the Planetary surface, zoom also gates the terrain-texture pass (BL-520): the substrate grain and cover pattern draw only above 14 px of drawn hex circumradius and reach full strength at 22 px, so zooming out fades the ground texture away before BL-269's coarse-fill threshold (7 px) is reached. Nothing about the tile's identity changes with it — the terrain colour, the relief shading, the survey mask and the fog wash are colour, not geometry, and survive to the whole-grid view.
+**Expected output.** The view zooms about the canvas centre. On the Planetary rung a press lands on the next rung of the fixed x2 ladder (same ladder as the wheel; the baked ground swaps to that rung's texture tier; the top two rungs tilt the land 22.5 / 45 degrees on the plain canvas); on the other rungs it is a continuous x1.1 change. No selection or lens state changes.
 
 **Reason to select.** Zoom without the mouse — the keyboard leg of the pan/zoom pair for keyboard-only driving.
 
@@ -870,18 +861,18 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `direction` | `enum: in | out` | Wheel-up zooms in, wheel-down zooms out, one increment per notch. |
+| `direction` | `enum: in | out` | Wheel-up zooms in, wheel-down zooms out, one increment per notch. On the PLANETARY rung a notch steps a fixed x2 zoom ladder (5 rungs spanning the old continuous range; Ben, 2026-09-01) so each level pairs with a ground-bake texture tier; the Solar and Circumplanetary rungs stay continuous (x1.1 per notch). |
 
 **Valid when:**
 - The app is in-game.
 - The pointer is over the primary canvas, not the minimap inset or an ImGui panel.
 - The current rung is not already at its zoom bound in that direction (zoom is clamped per rung).
 
-**Expected output.** The current rung's zoom factor changes, anchored at the cursor: the point under the pointer stays put while the view scales around it. Per-rung state; the zoom slider (where present) moves to reflect the new factor. No selection, rung, pan-recentre, lens, or speed change. On the Planetary surface, zoom also gates the terrain-texture pass (BL-520): the substrate grain and cover pattern draw only above 14 px of drawn hex circumradius and reach full strength at 22 px, so zooming out fades the ground texture away before BL-269's coarse-fill threshold (7 px) is reached. Nothing about the tile's identity changes with it — the terrain colour, the relief shading, the survey mask and the fog wash are colour, not geometry, and survive to the whole-grid view.
+**Expected output.** The view zooms about the cursor (the point under the mouse stays fixed). On the Planetary rung the zoom lands on the next rung of the fixed x2 ladder and the baked ground swaps to that rung's texture tier (briefly softer while the tier's chunks arrive, then crisp). The top two rungs additionally TILT the land (22.5 / 45 degrees, plain canvas only; a lens stays flat); fractional wheel deltas accumulate and a rung fires per whole notch, at most one rung per frame. On the Solar and Circumplanetary rungs zoom is continuous (x1.1 per notch). No selection or lens state changes.
 
 **Reason to select.** Move closer to or further from a specific spot — cursor anchoring means you aim the zoom at the thing you are interested in.
 
-### `canvas.border_band_select` — The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths.
+### `canvas.border_band_select` — The national border band on the Planetary canvas — plain-canvas chrome, not a lens, and suppressed while any lens is up. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths.
 
 **Press.** Single left-click inside the band, on the boundary between two territories (or between a territory and unclaimed ground).
 
@@ -894,6 +885,23 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The NATION is selected — `selection_kind` becomes `nation` and the Selection element shows its card, which is the route to a nation's ledger. The province mirror clears, as it does for every entity selection. Hovering the corridor names the nation at the cursor immediately, well short of the hover card's dwell delay, so the target is readable before the click commits.
 
 **Reason to select.** This is the ONLY route to a nation. It replaced the Country lens, which used to own it: under that lens a hovered tile resolved to its owning nation. Ben, 2026-08-24 — 'National borders should not diffuse together, instead they should borders extending their colour inwards. With this, we can drop the nation lens' and, on what replaces the route, 'click the border itself'. The border is what carries the nation on screen now, so it is the thing that opens it.
+
+### `canvas.tech_tree_navigate` — The F9 tech-tree constellation canvas (src/ui/tech_tree_panel.cpp, draw_constellation). A full-canvas takeover bounded to ui::canvas_rect(); it is chrome-less by decision (BL-310 round 4), so it carries no zoom slider or scale bar of its own — this is the only way to move around it.
+
+**Press.** Middle-mouse drag to pan. Scroll wheel to zoom.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `pan` | `mouse delta (screen px)` | Middle-drag moves the web under the cursor, matching the zoom-ladder canvases' idiom rather than left-drag (Ben, 2026-08-06). |
+| `zoom` | `wheel notches` | Each notch scales by 1.1, clamped to [0.35, 3.0]. |
+
+**Valid when:**
+- The tech-tree takeover is open (ui_state::show_tech_tree) and the cursor is over its canvas.
+- The selected era view has authored gate quests — the Era 2 placeholder has no constellation to navigate.
+
+**Expected output.** Pan and zoom of the radial constellation only. Zoom is CURSOR-ANCHORED (2026-09-01): the canvas point under the pointer stays fixed, so scrolling magnifies whatever node is hovered rather than the middle of the canvas — the same behaviour the planetary canvas has. At the clamp bounds the scale stops and the view holds still rather than drifting. On-canvas text is tied to the zoom: below 0.55 no node title, quest name or exclusion mark draws at all, and between 0.55 and 1.0 they shrink and fade together, so a zoomed-out constellation is shapes only. Nothing about the world, the selection, the rung or the sim changes; the camera is not shared with any other canvas.
+
+**Reason to select.** To read a dense era. The Era 1 web is far denser than it looks at rest, and at default zoom its always-on titles overlap. Zoom in on the region you care about — labels stay screen-sized, so magnifying separates them. An agent needing tech identity should read the registry rather than navigate here; this moves a camera and reports nothing.
 
 ---
 
@@ -1114,21 +1122,6 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ## Ledgers & panels — opening and steering the information surfaces
 
-### `ledger.tech_tree_style_preview` — The 'Style preview' checkbox at the foot of the Tech Tree fold-out ledger in the shell nav column (src/ui/tech_tree_panel.cpp, draw_tech_tree_menu). The F9 constellation canvas is chrome-less by decision (BL-310 round 4), so every control for that surface lives in this ledger.
-
-**Press.** Open the Tech Tree ledger from the nav rail (or press F9), then click the 'Style preview' checkbox below the four era rows.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `enabled` | `bool` | On (the default) draws FICTIONAL node states; off draws the four real authored gates. |
-
-**Valid when:**
-- The Tech Tree ledger is open (ui_state::show_tech_tree).
-
-**Expected output.** Toggles ui_state::tech_tree_preview_states. ON (default): every node in the F9 constellation takes a fictional EARNED / LOCKED / no-gate state derived from its ring and an FNV-1a hash of its tech id, so the settled amber-EARNED / cyan-LOCKED palette is visible. OFF: node state is read from the world as BL-344 intended — only four of 150 techs have an authored gate (tech_gate.cpp), so nearly every node renders as the recessive dim-grey 'no gate authored' state. Purely presentational either way: it reads no world state and writes none, the simulation cannot observe it, and it is deterministic frame to frame and across runs. Every hover card drawn under the preview says the state is fictional.
-
-**Reason to select.** Only to judge how this surface LOOKS. An agent reading tech state must turn the preview OFF, or read w.has_tech directly — under the preview the panel's colours and hover cards report invented states, and will happily show a tech as EARNED that the corporation does not hold. It changes nothing an agent can act on.
-
 ### `ledger.nav_acquisitions` — Nav rail, slot 5 (Acquisitions icon - two outlined squares with an arrow driven from the small one into the large one)
 
 **Press.** Click the paired-squares glyph in the left icon rail, above the Market Ledger
@@ -1331,24 +1324,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Generation Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it explains why the surface generated as it did, split into Body (histograms, thresholds, profile echo) and Tile (the per-tile derivation breadcrumb) views. Opening or switching body REGENERATES that body's per-pass record from the recorded tile-pass inputs - a deterministic replay costing one tile pass, cached while the body stays the subject. Nothing it shows is stored on the world or in the save.
+**Expected output.** Toggles the Generation Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it explains why the body generated as it did: ONE FLAT PANEL of six collapsing sections over tables - Profile, Thresholds, Latitude bands, and the Substrate / Cover / Landform distributions - behind a Body combo (Ben, 2026-08-30). There is no tab strip and no per-tile view: each section header toggles its own section, and the rail slot is the only press that closes the surface. Every distribution names its denominator in its header, and they do not all share one - Substrate and Cover are taken over the whole grid, ocean included; Landform over land alone, since water carries no landform (Ben, 2026-08-30). Opening or switching body REGENERATES that body's per-pass record from the recorded tile-pass inputs - a deterministic replay costing one tile pass, cached while the body stays the subject. Nothing it shows is stored on the world or in the save. A Body/Tile tab strip and a Tile view (the per-tile derivation breadcrumb) were retired 2026-08-30 with the reshaping; a press on either no longer exists.
 
-**Reason to select.** A DEVELOPER TUNING surface, not a play read: it answers why a tile or a whole body came out as it did. An AI player has no strategic use for it - the deposits and terrain it would act on are already on the tile.
-
-### `ledger.generation_view_tab` — Generation Ledger, view tab strip
-
-**Press.** Click the 'Body' or 'Tile' tab button
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `view` | `enum` | 'Body' (composition/landform histograms, ocean threshold, latitude bands, profile echo) or 'Tile' (the five-pass derivation breadcrumb for the selected tile) |
-
-**Valid when:**
-- Generation Ledger is open
-
-**Expected output.** Switches the view. Re-clicking the currently-active tab closes the whole Generation Ledger (toggle rule); switching tabs is an ordinary view change. The Tile view reads the shared selection: with no tile selected, or a tile on another body, it says so rather than showing a stale breadcrumb.
-
-**Reason to select.** Body answers 'what shape did this generation come out, and which input made it that shape?'; Tile answers 'why is THIS tile what it is?'
+**Reason to select.** A DEVELOPER TUNING surface, not a play read: it answers why a whole body came out the shape it did, and which input made it that shape. An AI player has no strategic use for it - the deposits and terrain it would act on are already on the tile.
 
 ### `ledger.generation_body_selector` — Generation Ledger, 'Body' combo
 
@@ -1854,6 +1832,21 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 
 **Reason to select.** The route from a building found on the MAP to its operating controls. The card's centre presents data and never holds levers, so this is how a map selection reaches them.
 
+### `ledger.tech_tree_style_preview` — The 'Style preview' checkbox at the foot of the Tech Tree fold-out ledger in the shell nav column (src/ui/tech_tree_panel.cpp, draw_tech_tree_menu). The F9 constellation canvas is chrome-less by decision (BL-310 round 4), so every control for that surface lives in this ledger.
+
+**Press.** Open the Tech Tree ledger from the nav rail (or press F9), then click the 'Style preview' checkbox below the four era rows.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `enabled` | `bool` | On (the default) draws FICTIONAL node states; off draws the four real authored gates. |
+
+**Valid when:**
+- The Tech Tree ledger is open (ui_state::show_tech_tree).
+
+**Expected output.** Toggles ui_state::tech_tree_preview_states. ON (default): every node in the F9 constellation takes a fictional EARNED / LOCKED / no-gate state derived from its ring and an FNV-1a hash of its tech id, so the settled amber-EARNED / cyan-LOCKED palette is visible. OFF: node state is read from the world as BL-344 intended — only four of 150 techs have an authored gate (tech_gate.cpp), so nearly every node renders as the recessive dim-grey 'no gate authored' state. Purely presentational either way: it reads no world state and writes none, the simulation cannot observe it, and it is deterministic frame to frame and across runs. Every hover card drawn under the preview says the state is fictional.
+
+**Reason to select.** Only to judge how this surface LOOKS. An agent reading tech state must turn the preview OFF, or read w.has_tech directly — under the preview the panel's colours and hover cards report invented states, and will happily show a tech as EARNED that the corporation does not hold. It changes nothing an agent can act on.
+
 ---
 
 ## Chrome — startup, the system menu, settings, F-keys
@@ -2266,4 +2259,31 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 **Expected output.** Opens straight into the saved campaign, skipping the main menu, the New World wizard, and the world generation plus pre-game warm start that follow them (~30-45 s). A failed load falls through to the main menu with the reason printed, rather than exiting — a missing file must not look like a crash.
 
 **Reason to select.** Resume a campaign directly, or open a fixed world for a capture run without paying generation on every launch — the reason the save format exists (BL-536).
+
+### `chrome.spectate_cli` — Command line. The ONLY route into spectator mode for a human — before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do.
+
+**Press.** Launch with `ProjectIo --spectate`. Composes with --autostart-play, --autostart-windowed, --autostart, --load and --host-agent.
+
+**Valid when:**
+- Set at launch only. There is no in-game control that enters or leaves spectate — see expected_output.
+
+**Expected output.** Opens the session with NOBODY SEATED (AI_OPPONENT.md § 10i): corp_ai_params::spectating is true for every economy tick, so the scored-utility layer evaluates the corp at world::player_entity on the same staggered cadence as every rival, and that field degrades to a camera and ledger anchor carrying no ownership meaning. The watcher sees a full field of seven-plus corporations all playing flat out. Also unlocks the spectate-only God view checkbox in the system menu (chrome.sysmenu_god_view), which is rendered only while this flag is set. ENTRY AT START AND ONLY AT START: § 10i removes the standing prohibition's SUBJECT rather than excepting the rule, which is a property of the whole session — a mid-run flip would change, halfway through, which corps the scorer may legally act on, so no control clears it. Off by default: an unspectated session is unchanged, which tools/verify/spectator_determinism.cpp asserts as its load-bearing property.
+
+**Reason to select.** To WATCH the AI play rather than play against it — see what strategies the scored-utility layer actually produces, and whether coalitions brake a runaway leader (AI_OPPONENT.md § Where restraint comes from), which is a question no seated session can answer because a seated corp is excluded from the scorer.
+
+### `chrome.epoch_cli` — Command line. The only route to a start other than the default 0 CE one — the 1960s branch was live in world_params but reachable solely by editing a source default (BL-705).
+
+**Press.** Launch with `ProjectIo --epoch <year>`. Composes with --autostart-play, --autostart-windowed, --autostart, --spectate and --host-agent.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `year` | `int` | undefined |
+
+**Valid when:**
+- Applies to a NEW world only. --load carries the save's own epoch, which overrides this flag.
+- Does NOT reach --verify, --verify-all or --serve: those dispatch above the parse and their goldens are all taken against the default world.
+
+**Expected output.** Sets world_params::epoch_year for every world this process generates. Below 1700 takes the antiquity branch and runs the Era −1 prehistory sim; at or above it the prehistory is skipped and era_band_for_epoch puts the recipe registry on the industrial band. 1960 is the industrial start (docs/economy/ERAS.md § Where the ladder starts); 0 is the default 0 CE ancient start. Both are supported and produce materially different worlds — measured at 1960: 40 nations / 104 corps / 9 markets, against 0 CE: 43 / 88 / 14. The UI calendar follows it: ui::fmt::campaign_epoch_year() is published from the live world_params, so a 1960 campaign renders 1960-based dates and a 0 CE campaign renders 0 CE ones. That is display only and never enters `world` — the serialised history datum (::history_datum_year) is a separate fixed constant and does not move with the epoch.
+
+**Reason to select.** To play or watch the era whose catastrophe is nuclear war (docs/economy/ERAS.md § The point of an Era) rather than the 0 CE ancient start. Ben, 2026-08-31: "we will be working on the 1960s start."
 

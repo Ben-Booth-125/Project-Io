@@ -1,5 +1,14 @@
 # Project Io — Menus (Navigation Pane)
 
+> **Settles:** what the navigation rail is, how many slots it holds, and what
+> separates a player slot from the developer tail · what a slot's press does and how
+> a ledger closes · what state a ledger starts in · where a new surface is appended
+> and what would justify inserting it instead · which ledgers exist and in what
+> order · what the application menu offers for session and display.
+> **Not here:** each ledger's own design (ledgers/*) · where the rail and column
+> sit (LAYOUT) · the Selection band, which has no rail slot (SELECTION).
+> **Confused with:** LAYOUT.md, ledgers/README.md, SELECTION.md.
+
 The **navigation pane** is a fixed, full-height **icon rail** pinned to the left edge of the shell (below the profile, `nav_pane_width` 56 px). It is the home for the game's menus and ledgers. See `LAYOUT.md` for placement.
 
 ---
@@ -127,9 +136,9 @@ Notes on the mapping:
   the shell column (`src/ui/corporation_dashboard.{hpp,cpp}`). The card **rests as one verdict
   line** (`±X/qtr, balance Y`) **over its chart** — a two-column graph, earnings against the
   quarter's expenses stacked by flow, with the net beneath it. `›` gives it the canvas
-  (BL-214, drill-through; `LAYOUT.md` § Drill-through); there is no expand-in-place control,
+  (BL-214, drill-through; `DRILL_THROUGH.md`); there is no expand-in-place control,
   because the card already shows its content at rest. There is no chart question log on the card
-  (NR-018; see `LAYOUT.md` § The chart question log).
+  (NR-018; see `DRILL_THROUGH.md` § No chart question log).
 
   **Three cards went, and where their questions went** (Ben, 2026-08-29): **Production** and
   **Workforce** are answered by the **Construction ledger's Buildings tab**, which holds the

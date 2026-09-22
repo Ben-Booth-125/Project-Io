@@ -28,7 +28,11 @@ const REQUIREMENTS = 'docs/development/req/requirements.json';
 const BACKLOG_MD = 'docs/development/BACKLOG.md';
 
 // Terminal statuses — an item in one of these has landed; its bookkeeping must be closed.
-const TERMINAL = new Set(['complete', 'shipped']);
+// Every use of this set in this file asks the same question — "is this still open
+// work?" — so it is CLOSED, not delivered-only: a cancelled item is off the worklist
+// and must not be linted as though someone were about to build it. Delivery
+// STATISTICS are status.ps1's job and keep the narrower TERMINAL.
+const TERMINAL = A.CLOSED;
 // authority_doc values that are process docs, not subject authorities. A landed item
 // pointing here usually means the design was never propagated to its real home doc.
 // Allowlist: items whose authority genuinely is a process doc (umbrella indexes).
@@ -73,6 +77,20 @@ if (!backlog || !reqs) {
   }
   for (const it of backlog.items || []) {
     if (!/^BL-\d+$/.test(it.id || '')) fail(`malformed id "${it.id}" (short_name ${it.short_name || '?'}) — ids must match BL-\\d+.`);
+  }
+  // A hot id that is ALSO in the cold store is the eviction's own failure mode
+  // (archive_landed.js, 2026-09-01): the row was copied out and not removed, or
+  // restored and not un-archived. Two rows for one id, in two files, with the query
+  // layer preferring the hot one — so the cold copy silently rots. Not a duplicate
+  // WITHIN the file, so the scan above cannot see it.
+  // WHOLE ROWS only, not landedIds(): every landed item has a prose record from the
+  // earlier archive_designs pass, and an item that is open again after being complete
+  // legitimately keeps that prose. Only a duplicated ROW is the fault.
+  const cold = new Set(A.landedItems(A.ROOT).map((i) => i.id));
+  for (const it of backlog.items || []) {
+    if (cold.has(it.id) && !A.CLOSED.has(it.status)) {
+      fail(`${it.id} (${it.short_name || '?'}) is OPEN in backlog.json but also holds a whole row in the cold store — a restore that did not clear the cold copy. Re-run: node tools/session/archive_landed.js --restore, then re-evict.`);
+    }
   }
 }
 
@@ -308,6 +326,14 @@ function checkStatusDrift() {
     // check's own negative test caught on its first run.
     if (Array.isArray(item.superseded_by) && item.superseded_by.length) continue;
 
+    // A CANCELLED item is the same shape as a superseded one and is exempt for the
+    // same reason: it is closed without ever having been built, so the files it
+    // names were never going to be written and their absence is the expected
+    // outcome, not a false-complete. Without this the 2026-09-01 cancellation pass
+    // turned every unbuilt item into a warning — the check firing hardest exactly
+    // where it has nothing to say.
+    if (A.CANCELLED.has(item.status)) continue;
+
     const named = (item.files || []).filter((f) => typeof f === 'string')
       .flatMap(expand).filter(isSource);
     if (!named.length) continue;
@@ -393,7 +419,11 @@ function checkVersionInversion() {
     const m = String(v || '').match(/^v(\d+)\.(\d+)\.(\d+)$/);
     return m ? (+m[1] * 10000 + +m[2] * 100 + +m[3]) : null;
   };
-  const byId = new Map(backlog.items.map((i) => [i.id, i]));
+  // Union the cold store: most `requires` targets are LANDED, and since
+  // archive_landed.js evicted their rows a hot-only index resolves them to undefined
+  // — which this loop treats as "no dependency" and skips. The check would have gone
+  // quietly vacuous rather than failing, which is the worse of the two.
+  const byId = new Map(A.allItems(backlog, A.ROOT).map((i) => [i.id, i]));
   for (const item of backlog.items) {
     if (TERMINAL.has(item.status) || item.parked) continue;
     const mine = ORD(item.version_goal);

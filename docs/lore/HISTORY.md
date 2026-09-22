@@ -1,5 +1,16 @@
 # Kepler — Historical Foundations
 
+> **Settles:** which stages the institutional ladder runs through, and what each one
+> unlocks · to which epoch the run plays, and in how many spans · how the ladder pass and
+> settlement interleave · what drives the Era −1 sim · what the works roster is, what a row
+> does, and where its effect lands · why the campaign world ends up market-based and
+> non-hegemonic.
+> **Not here:** how an empire falls, what its successors inherit, and how the fall is told
+> (../generation/CIVILISATION) · how a battle in that sim is settled, what domain a region carries, and what
+> that gates (../generation/MILITARY_HISTORY) · what precedes the civilisation gate
+> (../generation/PLANETOLOGY) · what a pantheon is (CREEDS).
+> **Confused with:** ../generation/CIVILISATION.md, ../generation/MILITARY_HISTORY.md, ../generation/NATION_GENERATION.md.
+
 Why the campaign world is market-based and non-hegemonic, told as a stage ladder the
 generation stack hangs dated history lines off. Companion to `../generation/PLANETOLOGY.md`
 (which ends at the civilisation gate) and `../generation/NATION_GENERATION.md` /
@@ -7,12 +18,31 @@ generation stack hangs dated history lines off. Companion to `../generation/PLAN
 
 ## The epoch and the run
 
-**The campaign epoch is 0 CE** (Ben, 2026-08-12; the refocus to the ancient era, NR-177). The
-ladder runs up to an ancient start, not an industrial one. Stages 0–4 — agrarian surplus, the
-enforceable promise, fragmentation-with-connectivity, capital disciplines the sovereign, the
-energy transition — are pre-industrial in mechanism and sit inside the pre-epoch run. The old
-Stages 5 and 6 (the rupture and saturation) lie past the epoch entirely and are DLC-era material
-alongside the parked space arc; what replaces them is § Stage 5 below.
+**The ladder runs to whichever epoch the arc sets** — 0 CE for the ancient arc (Ben, 2026-08-12;
+NR-177) and 1960 for the industrial one (Ben, 2026-08-31). Stages 0–3 — agrarian surplus, the
+enforceable promise, fragmentation-with-connectivity, capital disciplines the sovereign — are
+pre-industrial in mechanism and sit inside the pre-epoch run on both arcs. Stage 4, the energy
+transition, sits inside the run only on an industrial epoch. The old Stages 5 and 6 (the rupture
+and saturation) lie past both epochs and are DLC-era material alongside the parked space arc; what
+replaces them is § Stage 5 below.
+
+**The run is two spans on one engine (Ben, 2026-09-03).** The sim plays the polities forward in
+an **ancient pass** — Classical and Medieval bands, ending at a **boundary year** — and, where the
+epoch lies past that boundary, an **industrial pass** from the boundary to the epoch with the
+Gunpowder and Industrial bands unlocked and sea legs open to Campaign and Settle. The first pass
+determines ancient borders and cultural doctrines; the second determines the extent of
+colonisation by the majors, who industrialised and when, and each polity's tariff posture. The
+**The industrial arc's calendar is stated, not derived (Ben, 2026-09-08).** The ancient pass runs
+**4000 years and ends at 1200 CE**; the industrial pass runs **1560 → 1960**. The 1200 → 1560 gap is
+a deliberate **coast** — the ancient pass ends in a stable dark age, and a span defined by little
+changing is the one span not worth stepping — so the world arrives at 1560 holding what 1200 left
+it, with only its self-moving accumulators (assimilation, grudge decay) advanced across. That
+supersedes the 400-year default for this arc: the boundary defaults to 400 years before the epoch
+elsewhere, and a boundary derived from the first furnace is the open alternative. Nothing resets between the spans — the region table, works and strain carry
+across — and on an ancient epoch the boundary falls past the stop year, so there is one span, as
+today. A third, economic pass follows the political map and is not this document's: it is the
+settle in `../generation/GENERATION_STRATEGY.md` § Three passes of simulated history, and it is
+the pass that produces market conditions at game start.
 
 The pre-epoch history is **produced by a running simulation, not narrated over a finished map.**
 The one-shot passes (`history_ladder`, `creeds`, `settlement`) found the cradles, the cultures and
@@ -24,7 +54,7 @@ globalisation event — do not run; the sim produces that history live.
 
 **The span is a parameter, and the derivation lives in one place.** `era_minus_one.cpp` derives
 `history_sim_params` from `world_params`: `start_year = epoch_year − prehistory_years`,
-`stop_year = epoch_year`, and the tick bands. `prehistory_years` is a **scope knob, not a tuning
+`stop_year = epoch_year`, the boundary year between the two spans, and the tick bands. `prehistory_years` is a **scope knob, not a tuning
 dial** — set to 0 it skips the pass entirely, which is how harnesses that do not test the era
 avoid paying for it. Every harness derives its parameters through the same helpers, so no check
 measures a different run from the one that generates a world (BL-462).
@@ -34,9 +64,9 @@ tick) pairs whose struct default is Ben's (2026-08-12) — 100 → 50 → 20 →
 years, with boundaries chosen so resolution concentrates near the epoch, 136 decision rounds
 against 4000 on a flat tick. Generation's configuration flattens it to **one 4-year band
 over `prehistory_years = 400`** — 100 rounds. The 4000-year ladder is the target (Ben, 2026-08-20:
-the 400-year band is a placeholder, and the four allegories of `COLLAPSE.md` need the long run to
-chain); making it affordable is BL-494 (four-thousand-year ladder) and `COLLAPSE.md` § The
-4000-year problem. A settle-dominated run is the intended shape (NR-205, ruled 2026-08-12), at
+the 400-year band is a placeholder, and the long arcs need the long run to chain); making it
+affordable is `../generation/CIVILISATION.md` § The long run is paid for by the table, not the
+fighting. A settle-dominated run is the intended shape (NR-205, ruled 2026-08-12), at
 either span.
 
 ## Purpose
@@ -52,9 +82,8 @@ The campaign premise makes three big historical claims:
    `terrain_resistance`, `src/world/terrain_combat.cpp`).
 3. **Corporations as first-class actors.** An immortal legal fiction can own, trade, and expand
    across borders — and nations tolerate it. The *mechanism* — the enforceable promise, the
-   charter — is settled. The *player* is not a free-floating corporation: the live seat is a
-   mercenary company (`docs/CONCEPT.md`), and the rupture is **averted, not past** (Ben,
-   2026-07-30, BL-223). Do not read any "why the player is a corporation" framing as settled.
+   charter — is settled. The *player* is a corporation that holds a seat (`docs/CONCEPT.md`, Ben
+   2026-09-17, NR-885), and the rupture is **averted, not past** (Ben, 2026-07-30, BL-223).
 
 None of these are natural defaults. Each is the residue of specific historical stages. This
 document names those stages, states the causal lesson each one carries, and marks the hooks
@@ -148,13 +177,44 @@ ore accessibility on owned tiles let the history pass *name* which nation indust
 purely from tile data. Each seed gets its own Britain.
 History line: `"YYYY: {nation} lights the first coke furnaces of the {region} basin."`
 
-**How it is closed.** `run_settlement` scores each region's ancient fuel endowment against the
-world's own mean, gates industrialisation on *above-average* fuel, and
-`derive_national_character` names the three earliest furnaces once nations exist. The creed sits
-on top of the endowment rather than beside it — a people who raised a forge god did so because
-their cradle held ore (`CREEDS.md`), so that god's regions light up earlier. Endowment, not
-virtue, in both directions. Under an ancient epoch the furnace date is past the stop year, and
-the industrial clock the sim *does* run is the capacity ladder (§ The works roster).
+**How it is closed — two halves, in two passes.** The **gate** is `run_settlement`'s: it scores
+each region's ancient fuel endowment against the world's own mean, admits only *above-average*
+fuel, and derives the **lag** that ground imposes — how long a furnace takes to raise there once
+somebody can pay for one at all. The creed sits on top of the endowment rather than beside it — a
+people who raised a forge god did so because their cradle held ore (`CREEDS.md`), so that god's
+regions light up earlier. Endowment, not virtue, in both directions.
+
+The **date** is the sim's. **The furnace is an event inside the run, not a date fixed before it
+starts** — on an industrial epoch the second span is *where* industrialisation happens, so
+pre-resolving the year in the settlement pass answers the question before the pass that should
+answer it has run. A region lights in the year its owning polity's **materials capacity crosses
+the Industrial rung** of the capacity ladder, plus its own lag. The rung is read through the same
+span ceiling the works table and the unit roster read, so no polity lights a furnace at a band it
+could not build at, and on a two-span run no furnace can precede the boundary year.
+
+Everything downstream reads the result rather than the schedule: `derive_national_character` names
+the three earliest furnaces once nations exist, and the world's median furnace year — BL-219's
+early/late corporate pivot — is computed at the end of the run, the first moment the answer
+exists. Regions the run *founds* recompute the gate from their own ground and inherit the rest of
+their parent's lag: good land begets good land, never better than its parent.
+
+**A polity that never climbs never lights, and that is a legitimate world.** The crossing is
+reached by playing — a people that spends its rounds fighting does not reach the rung — so
+"nobody industrialised" is an outcome the ladder can produce, not a gap for a later pass to fill
+in. `history_sweep` reports the distribution.
+
+Under an ancient epoch none of this fires: the gate never runs below 1700, so no region carries a
+lag and no furnace lights. The industrial clock the sim *does* run there is the capacity ladder
+itself (§ The works roster).
+
+**A polity's investment follows its ground.** The ladder's seven domains are a *profile*, not a
+level: the Invest verb weighs how far a domain has fallen behind against what the polity's own
+holdings argue for — farm to agriculture, ore to materials, energy to energy, port to transport,
+and nothing to institutions, military or medicine, which no endowment window measures. This is
+Stage 4's hook read one stage earlier, and it is what makes the Industrial rung reachable at all:
+a rule that only ever raised the lowest domain levelled all seven in lockstep, so crossing in
+materials meant dragging six other ladders up with it. Magnitudes are `history_sweep`'s to argue,
+as every magnitude in this layer is.
 
 ### Stage 5 — The averted rupture
 
@@ -166,11 +226,12 @@ campaign opens under the *threat* of the catastrophe, not its residue, and the s
 economics survive on their own merits only as a restatement of `GENERATION_STRATEGY.md`.
 
 The replacement — the bloc structure the threat produces, the diplomacy origin, the seizure cost
-of Stage 3, and the reconciliation of where the rupture sits across `docs/CONCEPT.md` (the Era 0
+of Stage 3, and the reconciliation of where the rupture sits across `docs/CONCEPT.md` (the Era 1
 exit) and `docs/research/ERA1_TECH_LANDSCAPE.md` (a visible countdown) — is **owned by BL-223
-(averted rupture, diplomacy origin)**. `COLLAPSE.md` supplies the mechanism the pre-epoch version
-of the same idea runs on: strain, culminations, and the reach-fed slow strain that BL-510 makes
-Stage 5's parameterisation rather than a second system. The compact thesis's closing corollary
+(averted rupture, diplomacy origin)**. `../generation/CIVILISATION.md` § How an empire actually falls
+supplies the mechanism the pre-epoch version of the same idea runs on: network failure — a realm
+that can no longer reach itself secedes — so Stage 5 is a parameterisation of reach rather than a
+second system. The compact thesis's closing corollary
 ("learned this one catastrophe earlier than Earth did") is BL-223's to restate.
 
 ---
@@ -201,8 +262,9 @@ more densely and lets smaller nations survive the merge. Asserted, not assumed �
 assertions. We will simulate war to narrow down the count if needed. Just let naturally different
 cultures emerge here."* `world_audit`'s R1 asserts the ladder's construction guarantee (the
 derived floor can never fall below half the base) rather than a literal, and R3's ceiling is a
-runaway guard rather than a target. Consolidation is the war stages' job — the creeds' tribal
-marches and the Era −1 sim — never a dial.
+runaway guard rather than a target. Consolidation is never a dial: it comes from how far a people
+spread (`../generation/COLONISATION.md` § Fragmentation comes from contact) and from the Era −1
+sim's wars. The creeds' tribal marches were the third source and are retired (Ben, 2026-09-09).
 
 **The cradle score.** `agrarian_score` scores cradles from arable terrain, landform,
 habitability, coastal access and the biosphere's generated `endemics`. It marks where river
@@ -227,11 +289,13 @@ sequenced between the creeds and the political map; verified by
 
 ```
 run_history_ladder            ->  cradles, fragmentation
-run_creeds / tribal conflict  ->  one pantheon per cradle; welding
+run_creeds                    ->  one pantheon per cradle
+run_colonisation              ->  people spread; contact sets fragmentation
 run_settlement                ->  REGIONS: culture, ancient endowment, furnaces
 run_history_sim               ->  the polities play forward to the epoch
-generate_nations                  seeded on the region anchors
+generate_nations                  seeded on the region anchors, FOLDED BY POLITY
 derive_national_character     ->  the three axes, as outputs
+seed_national_tariffs         ->  the tariff posture, as an enacted law
 generate_corporations         ->  focus from the corp's home region
 ```
 
@@ -240,8 +304,10 @@ nation is a *territory*; neither can say "these particular fields, under these p
 sitting on this particular ore". The region can, which is why belief, endowment and industrial
 timing all hang off it and why corporate focus reads straight out of it without a new mechanism.
 
-**Pantheons are mapped, not re-rolled.** A region inherits its nearest cradle's culture, so the
-distribution of gods across the map is a record of who walked where. That mapping then feeds back
+**Pantheons are mapped, not re-rolled.** A region inherits the culture of the stream that
+reached it — [`../generation/COLONISATION.md`](../generation/COLONISATION.md) § Culture arrives
+by route owns the rule, superseding the nearest-cradle assignment stated here before 2026-09-09 —
+so the distribution of gods across the map is a record of who walked where. That mapping feeds back
 into the material history: a forge god only exists where the cradle window held ore, so "the
 forge god's country industrialises early" is not flavour laid over the data — it is the same fact
 read twice, one stage apart.
@@ -255,10 +321,32 @@ into Pass 1 and the growth machinery is reused untouched. The size variance emer
 people settled instead of being dialled in — the cheap alternative (keep Voronoi, narrate over it)
 is the lying-figure problem: prose asserting a settlement history the territory does not reflect.
 
+**And the political map is the sim's, not a second carve of it.** `nation_params::seed_polities`
+carries the polity that held each region at the epoch, and the anchors of one polity fold into one
+nation. That is the difference between a campaign whose borders were *grown out of* where people
+settled and one that inherits *the empires the history actually built*: an empire that took nine
+regions arrives as one realm holding nine regions' ground, not as nine neighbours. The carve is
+still untouched — where the line between two of a realm's OWN regions falls is a geometric question
+the history never asked — so what changed is which cells fly one flag.
+
+Territory can therefore be **non-contiguous**, and that is the record rather than a defect: a
+polity that conquered across a neighbour holds ground on both sides of it.
+
+**A city state is a polity that reached the epoch holding one region with a city standing on it.**
+It survives the size floor that would otherwise absorb it, because absorbing it is exactly the
+detail the History phase is there to keep — one may be a citizen of a city as well as of a realm.
+It never annexes: a city state that swallowed its neighbours would stop being one.
+
 **The political axes are outputs.** `derive_national_character` sets expansionism from the
 border-contest integral, economic focus from the resource class of the regions settled during
 industrialisation, and ideology from industrialisation timing against neighbours, overwriting
 the seeded Pass 4 draw, which remains the fallback for a body with no settlement.
+
+**And so is the tariff posture.** A polity carries a protection scalar off that same
+industrialisation-timing axis, and a nation above the floor opens with an enacted import tariff.
+`../politics/NATIONS.md` § 4 Tariffs owns the derivation; what belongs here is only that it is
+read at the handoff and never chosen in a round — a polity does not spend a decision on
+protectionism.
 
 **The record is destructible, and the hole is visible.** A won war plants the victor's pantheon
 on the regions taken and erases the lines naming them, leaving a dated lacuna with a count of
@@ -270,8 +358,9 @@ religion or diplomacy layer needs to describe a grievance.
 revolution — `resolve_historical_ruptures`) are a second checkpoint class, drawing through
 `resolve_checkpoint` with eligibility as a filter and never a weight (BL-217's mechanism, reused
 unchanged). They are bounded to the six most-contested nations, so their count is a property of
-the design rather than of the map size. Under an ancient epoch the sim's culminations
-(`COLLAPSE.md`) are the ruptures.
+the design rather than of the map size. Under an ancient epoch the sim's own breaks — secession
+(`../generation/CIVILISATION.md` § How an empire actually falls) and schism (`CREEDS.md` § The
+schism verb) — are the ruptures.
 
 **Calibration is the sweep's, not the harness's.** A green harness means the pass is
 self-consistent, deterministic and wired into the political map — *not* that its dates or
@@ -294,9 +383,15 @@ Consolidate, and Build Work — priced in one shared currency (the round each co
 by a deterministic scored-utility layer under the 2026-08-18 nation grant: pure, seeded,
 replayable, never a planner. Its objective weights (`w_farm`, `w_ore`, `w_port`, …) live in
 `history_sim_params`. Breadth costs: a polity is charged supply for every region held past
-`free_holdings` (`holdings_burden_q`, the burden of breadth), and the strain that burden feeds,
-how it resolves, and the strategies that play it are `COLLAPSE.md`'s. Region demography
+`free_holdings` (`holdings_burden_q`, the burden of breadth), and how a realm fails — network
+failure, secession, schism — is `../generation/CIVILISATION.md`'s (§ How an empire actually falls);
+the strategy roster once drawn against it is a mechanism reference, `../research/COLLAPSE_ROSTER.md`. Region demography
 (BL-273), era-keyed unit rosters (BL-274) and the sweep (BL-275) are its siblings.
+
+Two of those verbs are gated by the ground's domain — where a Settle may found, and what a
+Campaign may cross. [`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md)
+§ Regions carry a domain owns both, together with the coastal rows that carry a stack over
+water.
 
 The registry of works below is a **parameter, not a global**: `run_history_sim` takes
 `const works_registry*`, null meaning works disabled. The app passes its startup-loaded table; a
@@ -364,7 +459,7 @@ own choice. BL-224's non-hegemony stays emergent.
 | `manpower_mod` | `manpower_ceiling(population, mod)`, read by `replenish_manpower` — so every caller gets the effect without being told works exist. |
 | `reach_mod` | Two places: the **staging hub's** own works discount the terrain-weighted term of `supply_here` (scorer) and `supply_raw` (execution) — the two must agree, or a polity decides on one supply figure and fights on another — and the polity's **mean** reach relieves the burden of breadth. Mean, not total, so conquest alone cannot make an empire count itself as well-roaded. |
 | `defence_mod` | Readiness on the defender's stack, which `roster_stack` turns into an additive per-mille offset on `type_power_mod` — the same channel cohesion uses, and for the reason `combat.hpp` gives: the engine scores whatever stack it is handed and knows nothing about walls. Also visible to the **scorer**, so a polity does not walk into a bastion it could not see. A Bastion Fort at +640 is worth ~+64 against row power values of 90–380: it tilts a fight, never decides one. |
-| `industrial_mod` | The polity's mean industrial investment accelerates Invest's progress up the capacity ladder. The sim's industrial clock is that ladder — Stage 4's furnace date is `run_settlement`'s and is fixed before the loop starts — so the pull-forward is expressed against the mechanism that runs. |
+| `industrial_mod` | The polity's mean industrial investment accelerates its climb up the **materials** ladder, and only that one — the rung whose crossing lights the furnace (§ Stage 4). So the pull-forward is expressed against the crossing, in the one domain it belongs to: a Blast Works shortens the road to a furnace, it does not make a polity better at medicine. |
 
 ### The verb
 
@@ -409,6 +504,14 @@ put at plausible magnitudes so works land in the same band as the other verbs. `
 carries the roster on every run and reports works raised per world; whether the frontier stall
 moves from ceiling to decision is a question for that sweep's numbers.
 
+**Being "in the same band" is a relation, so it moves when a neighbour moves.** Re-pricing another
+verb re-prices this one by omission, and the amortisation horizon is the dial that says so. What
+no dial fixes is the **scale mismatch** underneath: Invest's score is proportional to the whole
+polity's holdings while a work's local term is proportional to ONE region, so the gap widens with
+every region a polity takes and the verb loses by more the larger the empire gets. That is why a
+sweep can report zero works raised across a whole seed spread while every mechanism check on the
+roster stays green — a measured state, and a shape question rather than a magnitude one.
+
 ---
 
 ## The compact thesis
@@ -427,8 +530,8 @@ to state.
 - Does Kepler get a nuclear-equivalent deterrence ceiling explicitly, or is the threat's memory
   alone the ceiling? (Affects Era 1+ conflict design.)
 - How much of this ladder surfaces to the player — a codex, generated history lines only, or
-  ambient flavour in quest text? `COLLAPSE.md`'s ruling that the story surfaces in the history
-  tab, quietly, answers the pre-epoch half.
+  ambient flavour in quest text? `../generation/CIVILISATION.md` § How a fall is told rules that the story surfaces in the
+  history tab, quietly, which answers the pre-epoch half.
 - Does the Charter Age line name the player company's home-nation legal tradition? The Charter
   Act names the charter cradle's nation; whether the player's company is bound to it depends on
   the player-identity question `docs/CONCEPT.md` owns.

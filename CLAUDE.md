@@ -53,6 +53,10 @@ Read for **traversal**: find the doc that owns the question and read that one. T
 ~650K tokens (`node tools/doc_weight.js`); reading it all is not an instruction anyone can
 follow. Where a store has a query tool, use the tool, never load the file.
 
+Starting at the **code** rather than the subject? `node tools/session/doc_owner.js <path>` names the
+owning doc(s) for a source file, ranked by how often work on it cited each — the inverse of
+`backlog_query.js --touches`, derived from the backlog, and honest about a path nothing owns.
+
 ### Game — what it is
 | Doc | Owns |
 |---|---|
@@ -62,20 +66,21 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | `docs/META_LAYER.md` | The predicate/effect substrate every rule is built from: `condition_set`, `modifier_set`. Read before adding any rule family. |
 | `docs/PEOPLE.md` | Named individuals holding roles — a person exists only where a role gates something. |
 | `docs/EVENTS.md` | Things that happen *to* the player; seeded uncertainty on the meta layer. |
+| `docs/CLIMATE.md` | The living commons: strain, per-body state, hazard/habitability, the Era boundary's cause. |
 | `docs/MANUAL.md` | The player-facing manual. |
 
 ### Economy
 | Doc | Owns |
 |---|---|
 | `docs/economy/RESOURCES.md` | The resource list, tiers, terrain affinity, era split. |
-| `docs/economy/PRODUCTION.md` | Buildings, recipes, placement, workforce, stockpile flow. |
+| `docs/economy/PRODUCTION.md` | Buildings, recipes, placement, labour demand and shortfall, stockpile flow. |
 | `docs/economy/MARKETS.md` | Market centres, clearing, price resolution, the order book. |
 | `docs/economy/FINANCE.md` | The money loop: income, expenditure, maintenance, wages, interest, debt. |
-| `docs/economy/CONTRACTS.md` | Promises between named parties: procurement and the mercenary contract — the income loop. |
+| `docs/economy/CONTRACTS.md` | Promises between named parties: procurement, the buy side. |
 | `docs/economy/LOGISTICS.md` | The network: traversal cost, reach, roads, scale/travel time, interdiction, Logistic Points. *Logistics is the road.* |
 | `docs/economy/SUPPLY.md` | The flow: convoys — cargo, dispatch, cost, arrival. *Supply is the traffic.* |
 | `docs/economy/TILES.md` | Two-axis terrain, deposit profiles, amenity tiles. |
-| `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability. |
+| `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability, labour supply and contention. |
 | `docs/economy/ERAS.md` | The era ladder and the gate into space. |
 | `docs/economy/RESEARCH.md` | Research points and technology unlocks (stub). |
 | `docs/economy/SPACE_ASSETS.md` | Off-body assets (stub). |
@@ -83,7 +88,7 @@ follow. Where a store has a query tool, use the tool, never load the file.
 ### Military, politics, relations
 | Doc | Owns |
 |---|---|
-| `docs/military/MILITARY.md` | How force works: two resolvers, units, muster, terrain, march, battles, upkeep, one reach field. |
+| `docs/military/MILITARY.md` | How force works **in the campaign** — what the player meets: `resolve_campaign_battle`, units, muster, terrain, march, battles, upkeep, one reach field. The Era −1 half is `generation/MILITARY_HISTORY.md`. |
 | `docs/politics/NATIONS.md` | The nation as actor: territory, treasury, law, lobbying, the national budget. |
 | `docs/politics/RELATIONS.md` | Sentiment (derived), stance (declared), reputation, embargo, standing — which quantity answers which question. |
 
@@ -94,30 +99,39 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | `docs/generation/PLANETOLOGY.md` | Body-level atmosphere, chemistry, biosphere history. |
 | `docs/generation/CONTINENTS.md` | Plates, drift, `height_bias`, the Continent lens. |
 | `docs/generation/TILE_GENERATION.md` | The six-pass tile pipeline. |
+| `docs/generation/COLONISATION.md` | **How humanity spreads before it fights** — the opening span of the ancient pass: the domestication package, the migration stream, culture by route. A *diffusion*, with no actor and no infrastructure. `MILITARY_HISTORY.md` is its violent sibling. |
+| `docs/generation/CIVILISATION.md` | **How city states become empires** — the phase after migration: sparse settlements, materials spent on action, which creeds raise armies, what a civilisation is as distinct from a creed, and culture relations as the engine of conquest. Carries the DATA CONTRACT the Culture phase must satisfy. `COLONISATION.md` is its peaceful sibling. |
+| `docs/generation/EXPLORATION.md` | **The exploration age, 1200 → 1660** — the phase after Empires: capital as a per-polity treasury, treaties with a term, colonies as subjects with an overlord link, ports/navies/armies that decay, cultural preference for goods. Why conflict moves off the home coast. |
+| `docs/generation/DIGITISATION.md` | **1660 → 1960 — a PLACEHOLDER.** Owns only the boundary: which subjects are Digitisation's (companies, prices, tariffs) rather than Exploration's. |
+| `docs/generation/trees/TREES.md` → `COLONISATION_TREE.md`, `EMPIRE_TREE.md`, `EXPLORATION_TREE.md`, `INDUSTRY_TREE.md` | **The four pre-game technology trees** — one grammar (minor/major/milestone, the spire, the five adjacency rules, forks, diffusion by kind, the scorer shape) and one doc + one JSON store per tree. `tree_lint.js` holds doc and store together. **Query the stores; never hand-edit one without re-running the lint.** |
 | `docs/generation/PROVINCES.md` | The spatial unit of consequence: partition rules, three domains, walk order. |
 | `docs/generation/NATION_GENERATION.md` | Territory placement, resource profile, character, naming. |
 | `docs/generation/CORPORATION_GENERATION.md` | Nation assignment, focus, starting assets, finances. |
 | `docs/generation/GENERATION_LEDGER.md` | The why-did-this-tile-generate surface. |
+| `docs/generation/seed_library.json` | Sixteen curated worlds and what each one is for — a seed is the save. **Query it:** `node tools/session/seed_library.js [--for <tag>] [--seed N] [--check]`. |
+| `docs/generation/MILITARY_HISTORY.md` | **How force works inside the Era −1 sim** — `resolve_battle`, the band ladder, naval, the forage simplification, sea legs. A *generation* doc: its rules are what make a history cheap to generate, not claims about the game. `military/MILITARY.md` is its campaign-era sibling. |
 | `docs/lore/HISTORY.md` | The institutional ladder that drives the Era −1 sim. |
-| `docs/lore/COLLAPSE.md` | Polity strategies and culminating events for Era −1. |
 | `docs/lore/CREEDS.md` | Pantheons per cradle-culture, generated tongues. |
 
 ### AI & tech
 | Doc | Owns |
 |---|---|
-| `docs/ai/AI_OPPONENT.md` | The whole AI direction: scored-utility rivals, the word interface, the local-model goal, the no-cloud invariant, the MCP server. |
-| `docs/ai/ACTIONS.json` → `ACTIONS.md` | The action dictionary — every control as press/args/preconditions. Query with `tools/session/actions_query.js`; never hand-edit the mirror. **Any control change updates its entry.** |
+| `docs/ai/AI_OPPONENT.md` | The whole AI direction: scored-utility rivals, the word interface, the local-model goal, the no-cloud invariant, the MCP server. **§ 11 is the grant register** — every dated exception to the AI-behaviour prohibition; read it before touching `corp_ai.cpp`. |
+| `docs/ai/ACTIONS.json` → `ACTIONS.md` | The action dictionary — every control as press/args/preconditions. Query with `tools/session/actions_query.js`; never hand-edit the mirror. **Any control change updates its entry** — except the pre-game wizard, which is out of scope (Ben, 2026-09-09). |
 | `docs/ai/STRATEGIES.md` | The meta, authored ahead of the game — research, not authority. |
 | `docs/ai/LANGUAGE_POLICY_FEASIBILITY.md` | Research note: does a language-driven opponent compress and run locally. |
 | `docs/tech/TECH_FOUNDATIONS.md` | Settled technical decisions and the prototype scope/exclusions. Read before any code or architecture suggestion. |
 | `docs/multiplayer/MULTIPLAYER_PRINCIPLES.md` | Which settled decisions keep multiplayer cheap later. Non-binding. |
-| `docs/research/*.md` | Research scaffolding (tech effects, ancient ladder, Era 1 landscape). Not authority. |
+| `docs/research/*.md` | Research scaffolding (tech effects, ancient ladder, Era 1 landscape, the retired collapse roster, the retired colonial era). Not authority. |
 
 ### UI
 | Doc | Owns |
 |---|---|
 | `docs/ui/LAYOUT.md` | The application shell — how regions are arranged around the canvases. |
+| `docs/ui/DRILL_THROUGH.md` | The disclosure idiom every dense surface obeys — folded, expanded in place, full canvas. |
 | `docs/ui/CANVASES.md` → `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md`, `MINIMAP.md` | The zoom-ladder canvases and the minimap chrome. |
+| `docs/ui/RENDERING.md` | Canvas ground rendering: the baked-chunk mechanism, C-F direction, grid rule, installations-as-geometry, animation, LOD. |
+| `docs/ui/design/GLOBAL_STYLE_SHEET.md` | The visual-language exploration (owner: Joe) — style verdicts, palette, render iterations in `design/renders/`. Settled values promote into the authority docs. |
 | `docs/ui/SELECTION.md` | The Selection element; the Active/Focus/Selection click model. |
 | `docs/ui/TOOLTIP.md` | The shared hover-card primitive. |
 | `docs/ui/LENSES.md` | The map-lens system and roster. |
@@ -134,10 +148,10 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | Store | Owns | Tool |
 |---|---|---|
 | `docs/development/DELIVERY.md` | The method: lifecycle, design state, depth verbs, batch, worktrees. Read before Full mode. | — |
-| `docs/development/DEVELOPMENT_PRACTICES.md` | Harness testing (no unit framework), naming, doc standards, release cutting. | — |
+| `docs/development/DEVELOPMENT_PRACTICES.md` | Harness testing (no unit framework), naming, doc standards, release cutting, the doc header. | `header_graph.js` (`--dangling --graph --coverage --state --doc --strict --json`); dangling citations and state-dependent headers fail, the boundary graph prints |
 | `docs/development/ROADMAP.md` | Milestone sequence through v1.0.0. The only place that says *when*. | — |
-| `docs/development/backlog.json` | Open work: metadata + work prose. ~1.2 MB — **query, never load.** | `backlog_query.js` (`--status --priority --version --touches --grep --full`), `backlog_view.js`, `next_id.js`, `backlog_lint.js` |
-| `docs/development/archive/backlog-design-*.json` | Landed items' prose (design, summary, completion). Amend landed prose **here**. | `archive_designs.js` |
+| `docs/development/backlog.json` | **Open work only** — closed items, delivered or cancelled, are not here at all. **Query, never load.** | `backlog_query.js` (`--status --priority --version --touches --grep --full`), `backlog_view.js`, `next_id.js`, `backlog_lint.js` |
+| `docs/development/archive/backlog-design-*.json` | Closed items **whole** — row and prose. Amend anything closed **here**. The query tools union it automatically, so `--touches` still answers "is this built?", and `--status cancelled` finds work that was closed unbuilt. **A cold row takes its state from the FILE it sits in, not its own `status` field** — the 2026-08 sweeps froze theirs mid-flight — so the purge reads `purged` and is distinct from `cancelled`. | `archive_landed.js` (rows, `--restore`), `archive_designs.js` (prose) |
 | `docs/development/REFINED.md` | The active worklist — promoted tasks. Empty between work blocks. | — |
 | `docs/development/req/requirements.json` | Requirements and their verification record. | `requirements_query.js`, `archive_requirements.js` |
 | `docs/development/NEEDS_REVIEW.json` → `.md` | Ben's review queue: questions, decisions taken on his behalf, observations, novelty flags. Write **as things arise**, not at close. Resolved entries go cold in `archive/needs-review-<quarter>.json`. | `render_needs_review.js`, `archive_reviews.js` |
@@ -158,8 +172,13 @@ follow. Where a store has a query tool, use the tool, never load the file.
   commit)* before acting; no clarifying questions first.
 - **Rule 0b — ambiguous measurements.** Report the exact current numbers with units, then ask.
   Open the live app whenever asking Ben to weigh in on visuals.
-- **Rule 0c — log as you go.** Anything wanting Ben's judgement goes into `NEEDS_REVIEW.json`
-  *when it arises*. The closing message points at the log; it does not reproduce it.
+- **Rule 0c — log as you go, and only what needs a JUDGEMENT.** Anything wanting Ben's judgement goes
+  into `NEEDS_REVIEW.json` *when it arises*. The closing message points at the log; it does not
+  reproduce it. **The queue is not a backlog and not a notebook (Ben, 2026-09-01).** It reached 117
+  open entries and was drained in one pass; most of them were work, and work belongs in
+  `backlog.json`. Before filing, ask which of three things it is: a CALL only Ben can make → the
+  queue; WORK somebody must do → a backlog item; a fact worth remembering → the comment or doc next
+  to the code. An observation with no reader is not a record, it is a queue nobody finishes.
 - **Novelty flag.** If no doc owns the task or it would quietly grow scope, file a
   `kind: "novel-work"` entry and continue.
 - **Timestamp every new item**; newest-dated wins on conflict.

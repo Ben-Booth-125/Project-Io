@@ -14,6 +14,11 @@
 //        pools: goods in pools unlock a gated row and are drained by exactly
 //        the hire cost (ascending body id); a corp without them is refused;
 //        an ungated row hires with no resource debit.
+//   R7 — the composite standing index (BL-700): every component is read, the
+//        composite is NOT the bank balance (two corps at equal cash rank
+//        unequal), the weights are data, and the answer is bit-identical when
+//        `world::units` is rebuilt in the opposite insertion order and when a
+//        whole-field snapshot is taken backwards instead of forwards.
 //   R6 — the budget-claim producer (BL-537 / Sprint N3 T5): a survey foregone
 //        at the solvency gate becomes ONE earmarked `public_exploration` claim
 //        on the corp's home nation for the FULL survey cost of the top-scoring
@@ -36,6 +41,10 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
+#include <cmath>
+#include <utility>
+#include <vector>
 #include <string>
 
 namespace {
@@ -754,6 +763,276 @@ int main()
                   s.w.bodies.at(near).survey.phase == survey_phase::in_transit,
                   "BL-537 R6: a rival that could afford its survey dispatches it and "
                   "files no claim - the gate, not the wish, is the trigger");
+        }
+    }
+
+    // =====================================================================
+    // R7 — the composite standing index (BL-700, AI_OPPONENT.md § "Standing")
+    // =====================================================================
+    // The index is what a coalition scores against, so the properties asserted
+    // here are the ones a consumer is entitled to rely on: every component is
+    // actually read, the composite is NOT the bank balance, the weights are
+    // data, and the answer does not depend on container layout or on the corp
+    // iteration order the scorer walks in.
+    {
+        const recipe_registry reg = make_registry();
+
+        // A corp with all three components live: cash, a building, held stock,
+        // research and a fielded unit. Built on the ordinary scene so the
+        // building and market are the same ones the rest of this harness uses.
+        auto staged = [&](float cash) {
+            scene s = make_scene(cash);
+            s.w.corporations.at(s.ai_corp).science = 8.0f;
+            stockpile_component pool;
+            pool.quantities[ri(resource_type::iron_ore)] = 30.0f;
+            s.w.corp_body_pools[{s.ai_corp, s.body}] = pool;
+            const entity_id u = s.w.create_entity();
+            unit_component uc{};
+            uc.position               = s.t_rich;
+            uc.owner                  = s.ai_corp;
+            uc.count                  = 50;
+            uc.type                   = 0; // Levy Spear — quality 1000 permille
+            uc.supply_factor_permille = 1000;
+            s.w.units[u] = uc;
+            return s;
+        };
+
+        {
+            scene s = staged(1000.0f);
+            const standing_index si = corp_standing_index(s.w, reg, s.ai_corp);
+
+            // Economic = balance (1000) + book value (one extraction site at
+            // build_cost 100) + stock (30 iron ore at the market's price 4).
+            const float economic = si.component[static_cast<std::size_t>(standing_component::economic)];
+            check(std::fabs(economic - (1000.0f + 100.0f + 120.0f)) < 0.01f,
+                  "BL-700 R7: the economic component is cash + book value + stock at market");
+
+            const float research = si.component[static_cast<std::size_t>(standing_component::research)];
+            check(std::fabs(research - 8.0f) < 1e-4f,
+                  "BL-700 R7: the research component reads the corp's science accumulator");
+
+            // 50 heads x quality 1.0 x full supply, in the x100 fixed point.
+            const float military = si.component[static_cast<std::size_t>(standing_component::military)];
+            check(std::fabs(military - 5000.0f) < 0.5f,
+                  "BL-700 R7: the military component sums unit_strength over fielded units");
+
+            // The total is the weighted sum and nothing else — recomputed here
+            // from the params so the weights stay auditable from outside.
+            const corp_ai_params p{};
+            float expect = 0.0f;
+            for (std::size_t i = 0; i < standing_component_count; ++i)
+                expect += si.component[i] * p.standing_weights[i];
+            check(std::fabs(si.total - expect) < 0.01f,
+                  "BL-700 R7: the total is exactly the weighted sum of the components");
+
+            // An unknown corp measures zero everywhere and does not throw.
+            const standing_index none = corp_standing_index(s.w, reg, 999999u);
+            bool all_zero = (none.total == 0.0f);
+            for (std::size_t i = 0; i < standing_component_count; ++i)
+                if (none.component[i] != 0.0f) all_zero = false;
+            check(all_zero, "BL-700 R7: an unknown corp stands at zero on every component");
+        }
+
+        // WHY NOT BALANCE ALONE. Two corps at the SAME cash, one of which has
+        // spent nothing and one of which holds research and an army: balance
+        // ranks them equal, the composite does not. This is the item's own
+        // stated reason for existing, asserted as behaviour.
+        {
+            scene s = staged(1000.0f);
+            const standing_index armed = corp_standing_index(s.w, reg, s.ai_corp);
+            scene bare_s = make_scene(1000.0f);
+            const standing_index bare = corp_standing_index(bare_s.w, reg, bare_s.ai_corp);
+            check(s.w.corporations.at(s.ai_corp).balance ==
+                      bare_s.w.corporations.at(bare_s.ai_corp).balance,
+                  "BL-700 R7: the probe is not vacuous - both corps hold the same cash");
+            check(armed.total > bare.total,
+                  "BL-700 R7: equal balances rank UNEQUAL - the composite is not the bank balance");
+        }
+
+        // WEIGHTS ARE DATA. Zeroing a component's weight removes exactly that
+        // component's contribution and touches no other.
+        {
+            scene s = staged(1000.0f);
+            corp_ai_params p{};
+            const standing_index full = corp_standing_index(s.w, reg, s.ai_corp, p);
+            const float mil_term =
+                full.component[static_cast<std::size_t>(standing_component::military)] *
+                p.standing_weights[static_cast<std::size_t>(standing_component::military)];
+            p.standing_weights[static_cast<std::size_t>(standing_component::military)] = 0.0f;
+            const standing_index nomil = corp_standing_index(s.w, reg, s.ai_corp, p);
+            check(std::fabs((full.total - nomil.total) - mil_term) < 0.01f,
+                  "BL-700 R7: a component's weight is a data change - zeroing it removes "
+                  "exactly that component's term");
+        }
+
+        // DETERMINISM 1 — INVARIANT TO CONTAINER LAYOUT. `world::units` is an
+        // unordered_map, so its walk order follows hash layout and insertion
+        // history. Re-inserting the same units in the opposite order must not
+        // move the answer by a single bit; a float accumulator over that walk
+        // would, because float addition is not associative. This is the check
+        // that would catch that regression, and it asserts BIT equality rather
+        // than a tolerance, because a tolerance would hide it.
+        {
+            scene s = staged(1000.0f);
+            // A second and third unit, so re-ordering has something to reorder.
+            for (int k = 0; k < 2; ++k)
+            {
+                const entity_id u = s.w.create_entity();
+                unit_component uc{};
+                uc.position               = s.t_rich;
+                uc.owner                  = s.ai_corp;
+                uc.count                  = 37 + k * 11;
+                uc.type                   = static_cast<uint16_t>(k + 1);
+                uc.supply_factor_permille = 900 - k * 130;
+                s.w.units[u] = uc;
+            }
+            const standing_index a = corp_standing_index(s.w, reg, s.ai_corp);
+
+            std::vector<std::pair<entity_id, unit_component>> saved(s.w.units.begin(),
+                                                                    s.w.units.end());
+            std::sort(saved.begin(), saved.end(),
+                      [](const auto& l, const auto& r) { return l.first > r.first; });
+            s.w.units.clear();
+            for (const auto& [uid, uc] : saved)
+                s.w.units[uid] = uc;
+            const standing_index b = corp_standing_index(s.w, reg, s.ai_corp);
+
+            check(std::memcmp(&a, &b, sizeof(standing_index)) == 0,
+                  "BL-700 R7: standing is BIT-identical when w.units is rebuilt in the "
+                  "opposite insertion order (no float sum over an unordered container)");
+        }
+
+        // DETERMINISM 2 — THE READ POINT. The index must not depend on the
+        // order corps are asked in: `run_corp_strategic_step` walks corps in
+        // sorted id order and mutates as it goes, so a consumer must snapshot
+        // the whole field at the tick boundary. Asserted by taking the snapshot
+        // forwards and backwards over the corp set and requiring bit equality —
+        // if reading one corp's standing could ever perturb another's, this is
+        // the row that fails.
+        {
+            scene s = staged(1000.0f);
+            std::vector<entity_id> ids;
+            for (const auto& [id, cc] : s.w.corporations) ids.push_back(id);
+            std::sort(ids.begin(), ids.end());
+
+            std::vector<standing_index> forward;
+            for (const entity_id id : ids)
+                forward.push_back(corp_standing_index(s.w, reg, id));
+
+            std::vector<standing_index> backward(ids.size());
+            for (std::size_t i = ids.size(); i-- > 0;)
+                backward[i] = corp_standing_index(s.w, reg, ids[i]);
+
+            bool same = (forward.size() == backward.size());
+            for (std::size_t i = 0; same && i < forward.size(); ++i)
+                if (std::memcmp(&forward[i], &backward[i], sizeof(standing_index)) != 0)
+                    same = false;
+            check(same,
+                  "BL-700 R7: a whole-field snapshot is identical taken forwards or "
+                  "backwards - the read is pure and order-independent");
+        }
+    }
+
+    // =====================================================================
+    // R8 — a dial TUNES; it does not repurpose (BL-712,
+    //      AI_OPPONENT.md § "Selection must be scale-free")
+    // =====================================================================
+    // The recipe margin-chase used to run an unrestricted argmax over ABSOLUTE
+    // per-batch margin. Margins in the shipped roster span three orders, so that
+    // argmax landed on an out-of-group recipe nearly every time — and
+    // try_switch_recipe has REFUSED a cross-group switch outright since
+    // 2026-08-16 (Ben's BL-434 retraction). So the chase spent its one proposal
+    // per building on a command that could not apply, and starved the legal
+    // within-group switch that would have.
+    //
+    // ROW 2 IS THE LOAD-BEARING ONE, and that is worth stating because row 1 is
+    // weaker than it looks: the seam refuses the cross-group switch anyway, so
+    // row 1 passes with or without the scorer's guard. It is kept as the
+    // statement of the property. Row 2 is what actually goes red before the fix
+    // — verified by removing the guard and re-running, 2026-09-01 — because the
+    // refused proposal crowds out the sibling that would have been taken.
+    {
+        // Two groups. "Alpha" holds the incumbent and a strictly better
+        // sibling; "Beta" holds one recipe worth ~100x either of them.
+        auto staged_registry = [&]() {
+            recipe_registry reg = make_registry();
+            building_economics pe;
+            pe.base_rate            = 1.0f;
+            pe.maintenance          = 0.0f;
+            pe.base_wage            = 0.0f;
+            pe.build_cost           = 100.0f;
+            pe.build_duration_ticks = 2.0f;
+            reg.set_economics(building_type::processing_facility, pe);
+
+            recipe a_lo;
+            a_lo.name  = "alpha_low";
+            a_lo.group = "Alpha";
+            a_lo.inputs [ri(resource_type::iron_ore)] = 1.0f;
+            a_lo.outputs[ri(resource_type::steel)]    = 1.0f;
+            recipe a_hi = a_lo;
+            a_hi.name  = "alpha_high";
+            a_hi.outputs[ri(resource_type::steel)] = 3.0f;   // same group, fatter
+            recipe b_rich;
+            b_rich.name  = "beta_rich";
+            b_rich.group = "Beta";
+            b_rich.inputs [ri(resource_type::iron_ore)]  = 1.0f;
+            b_rich.outputs[ri(resource_type::machinery)] = 5.0f; // priced 100x
+
+            reg.add_recipe(a_lo);
+            reg.add_recipe(a_hi);
+            reg.add_recipe(b_rich);
+            return reg;
+        };
+
+        // The facility sits on the AI corp's own tile, complete and off
+        // cooldown, holding a full input pool so both routes are runnable.
+        auto staged_scene = [&](const recipe_registry& reg, const char* incumbent) {
+            scene s = make_scene(5000.0f);
+            market_component& mc = s.w.markets.at(s.market);
+            mc.base_price[ri(resource_type::steel)]     = 10.0f;
+            mc.base_price[ri(resource_type::machinery)] = 1000.0f;
+            mc.price = mc.base_price;
+
+            const entity_id t = make_tile(s.w, s.body, 1, 1, terrain_substrate::rocky, 0.0f);
+            const entity_id f = s.w.create_entity();
+            building_component b{};
+            b.tile               = t;
+            b.type               = building_type::processing_facility;
+            b.workforce_assigned = 1.0f;
+            b.workforce_auto     = false;
+            b.target_resource    = resource_type::steel;
+            b.recipe             = reg.recipe_id(incumbent);
+            s.w.buildings[f] = b;
+            s.w.corporations.at(s.ai_corp).assets.push_back(f);
+
+            stockpile_component pool;
+            pool.quantities[ri(resource_type::iron_ore)] = 10000.0f;
+            s.w.corp_body_pools[{s.ai_corp, s.body}] = pool;
+            return std::make_pair(std::move(s), f);
+        };
+
+        // Walk enough evaluations that the chase, if it were going to fire,
+        // has had its cooldown windows — one refusal on one tick proves little.
+        auto settle = [&](scene& s, const recipe_registry& reg) {
+            for (int t = 1; t <= 12; ++t)
+            {
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t);
+            }
+        };
+
+        {
+            const recipe_registry reg = staged_registry();
+            auto  st = staged_scene(reg, "alpha_low");
+            scene s  = std::move(st.first);
+            settle(s, reg);
+            const uint16_t held = s.w.buildings.at(st.second).recipe;
+            check(held != reg.recipe_id("beta_rich"),
+                  "BL-712 R8: a facility is NEVER dragged across groups by a fatter "
+                  "absolute margin - becoming a different facility is a build decision");
+            check(held == reg.recipe_id("alpha_high"),
+                  "BL-712 R8: and the chase still WORKS - the better sibling inside "
+                  "its own group is taken, so the row above is not vacuous");
         }
     }
 

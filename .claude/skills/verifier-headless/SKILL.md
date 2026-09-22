@@ -32,8 +32,10 @@ in `tools/verify/README.md`.
   rolling 40-quarter retention drops the oldest first, `book_value` is the registry's
   flat `build_cost` (historical cost — deliberately NOT the press's charge, which adds
   a market-priced materials term), the returns round-trip the save (version named
-  symbolically, never as a literal), and the pre-game warm start's 80 ticks produce
-  byte-identical records across two runs. Build via `build_harness.js`.
+  symbolically, never as a literal), and the settle's 12 ticks (`app::validation_ticks`)
+  produce byte-identical records across two runs. R6 then runs the same generated world
+  on past the retention — the harness's own choice — so the cap and the trimmed window
+  bite on a real world. Build via `build_harness.js`.
 - **`demand_census`** — BL-649, requirement group `demand-census` R1–R4: per resource and per era
   band, the total modelled demand and **which passes inject it**, with every one of MARKETS.md's
   eight channels either represented or explicitly reported ABSENT — an absent channel being the most
@@ -83,7 +85,12 @@ in `tools/verify/README.md`.
   `any` basket applies in both arcs, a banded one only in its own), and a **zero
   entry is skipped exactly as an absent one** — down to creating no pool that did not
   already exist, which is the property the inertness rests on. R6: two independently
-  built worlds run 12 contended ticks to identical supply factors and pools. Build
+  built worlds run 12 contended ticks to identical supply factors and pools. R8
+  (BL-746, 2026-09-02): the decay stops at the authored **floor** — 41 unmet ticks at
+  floor 500 leave 500, a met draw recovers from it, floor 250 lands at 250, a stranded
+  factor is lifted to the floor. R9 (BL-746): **no wire, no draw** — an unreached
+  building drawing a grid good stays at 1000, the same good off the grid decays 5 × 50,
+  and timber in the same basket still binds on the unreached tile. Build
   via `build_harness.bat`. The two rows it deliberately does NOT carry: bit-identity
   at zero rates is a **byte-compare** of `econ_harness` / `econ_bankruptcy` /
   `econ_stability` across the change, and the Industry channel reading PRESENT is
@@ -118,6 +125,24 @@ in `tools/verify/README.md`.
   **Re-run it whenever the logistics cost table, the map scale, or `base_price`
   changes**, and re-derive the ceiling in `scripts/economy.lua` from what it prints.
   Live-Lua, hand-declared in `CMakeLists.txt`, runs from the repo root.
+  **`--far-trade` is the far trade reading (BL-1006)** — the gate reading for per-market
+  pools (BL-1003), sea legs (BL-1004) and trade that reaches for price (BL-995). The
+  default sections count DISPATCHES; this follows every convoy from dispatch to its first
+  clear after arrival, on the app's world (Lua gen config + works, era from `--epoch`,
+  default 1960, full pre-history unless `--fast`, the landscape-search winner, the 12
+  validation ticks, spectated), in two windows of four quarterly dispatches: the first year
+  of play and the year after `--years N`. It prints (a) volume delivered AND sold at its
+  destination where that is not the source pool's clearing market, (b) the share of (a)
+  whose destination is not the seller's nearest reachable market (priced by
+  `price_convoy_leg`), (c) per good the destination-minus-home price gap at dispatch and
+  at arrival beside the haul paid per unit, and a same-body line that says why it reads
+  zero under (corp, body) pools. Sales are read from the exchange record, cargo-first (an
+  upper bound). Report-only; guards are non-vacuity only (parsed config, a dispatch and a
+  delivery per window, no exchange-ring overflow). Build:
+  `bash tools/verify/build_lua_harness.sh haulage_measure`; run
+  `./build_gen/verify/haulage_measure.exe --far-trade [--seeds N] [--first-seed S]
+  [--years N] [--epoch Y] [--tail N] [--fast]` from the repo root. Output is
+  byte-identical run to run apart from the landscape search's own `ms` lines.
 - **`price_band_harness`** — the price band as data (BL-442 step 1). The band
   `[0.25×, 4×]` around `base_price` is read by **two** call sites — `resolve_price`
   (`market_clearing.cpp`, the real clearing clamp) and `wf_target_price`
@@ -277,6 +302,55 @@ in `tools/verify/README.md`.
   broken: the econ-step stub was zeroed the same tick, never priced). Links the SDL/Lua-free
   world superset (glob minus `recipe_registry`/`tech_tree`). CMake target
   `population_demand_harness`.
+- **`endemic_demand_harness`** — BL-647 endemic luxury demand (2026-09-01): the Endemic trade
+  channel end to end. `inject_endemic_demand` pulls a wealth-scaled, nation-flavoured luxury
+  basket (tobacco/spices/coffee/furs) into nation-anchored markets — wealth gates the pull
+  exactly (E1: treasury + positive domiciled balances × `wealth_scale` × basket; a broke nation
+  injects nothing; a debtor corp contributes zero); character asymmetry is real (E2: two nations
+  crave measurably different baskets off the pure seeded preference hash); two same-fixture runs
+  deposit `==`-identical floats (E3); all four luxuries pass `is_extractable` + `can_place` on a
+  deposit tile while a bare tile still refuses (E4 — the BL-586 slice-2 gap closed); the shared
+  tranche survives both era bands and a banded row masks (E5); on the generated world the demand
+  survives `clear_markets` into priced state (E6). Every row mutation-proved red at authoring.
+  Links the world superset. Build via `node tools/verify/build_harness.js endemic_demand_harness`.
+- **`recipe_margin`** — BL-744, the recipe margin anchor at AUTHORING TIME (2026-09-02). Ben's
+  sentence — *"all recipes (at base price) make a greater profit than marginal costs"* — as
+  arithmetic over the three authored tables (`recipes.lua`, `economy.lua`, `world_gen.lua`'s
+  `base_price`), for every processing recipe and every `k_extractable` target in BOTH era bands; no
+  world is built. Two halves (PRODUCTION.md § The recipe margin anchor): M1 margin ≥ k × marginal
+  cost at base (k = `economy.recipe_margin_anchor.profit_over_marginal`); M2 fixed cost covered at
+  the price floor at `typical_workforce`. Prints the per-row table and the roster's count at
+  k′ = 0 / 0.5 / 1 / 2; unpriced-output recipes exempt and named; an unpriced input fails (R5); R0
+  non-vacuity (priced-resource count printed — 10 means the fallback table); R6 differential
+  red-proof of the evaluator. **R1–R4 are the anchor** — red on 41 of 44 priced recipes the day
+  it was written, green after the sprint-31 retune (per-band prices, the anchor route rule, the
+  cost cuts); registered with ctest, script-rooted. NEEDS_LUA: build with
+  `cmd //c tools\verify\build_lua_harness.bat recipe_margin`, run `./build_gen/verify/recipe_margin.exe`
+  from the repo root.
+- **`campaign_lapse`** — BL-723, the spectated-campaign measurement instrument (2026-09-01): one
+  spectated campaign under one parameter set becomes per-tick CSVs
+  (`build_gen/verify/lapse/<tag>/` — corps, markets, world, manifest) for the sweep battery
+  BL-724…BL-729. Valued production is NR-774's GDP definition; parameter overrides take the
+  `--reach` pattern (post-load, manifest-echoed). `--t0` is the validity battery — A/A
+  byte-identity, differential knob proof, zero-observation-fails, wall-clock ceiling — every row
+  mutation-proved red at authoring. Lua-linked class: build via
+  `cmd //c tools\verify\build_lua_harness.bat campaign_lapse`. The visual half is
+  `scripts/verify/campaign_lapse.lua` (capture-only, no goldens). **Debt instrumentation
+  (BL-745/BL-746, 2026-09-02):** `corps.csv` also carries each corp's balance delta attributed
+  by tick phase (convoys / agency / budget / nation / arrivals / exits — exact by construction,
+  row C3 asserts a zero residual), its produced value, active / idle / limited / unstaffed /
+  exhausted / building / mothballed counts, labour and mean supply factor; `debt.csv` has one
+  row per corp that ENTERED debt in the window with its trailing-4-tick flows and the dominant
+  drain, summarised as a histogram at the end of the run. Run it with no lead-in
+  (`--settle 0 --ticks 60`; `--warm` is the same flag) to see where debt begins — the default
+  lead-in is the game's 12-tick settle, and its ticks are unlogged.
+- **`firm_exit_harness`** — BL-743 firm exit (2026-09-01): the insolvency wind-up. F1/F1b the
+  trigger fires and the estate liquidates (building demolished, unit disbanded, pool lands WHOLE
+  in market inventory — the conservation law); F2 the player is exempt absolutely; F3 a short
+  streak or one solvent quarter survives; F4 the re-walk (no store the dissolution table names
+  still holds the erased id); F5 inert defaults touch nothing; F6 determinism. F1b and F2
+  mutation-proved red at authoring. Fixture-only; build via
+  `cmd //c tools\verify\build_lua_harness.bat firm_exit_harness`.
 - **`ai_skill_harness`** — AI skill-regression instrument (BL-204,
   docs/ai/AI_OPPONENT.md § 3): freezes a 5-seed benchmark set (`world_params.seed`
   0-4, spanning the generator's body/terrain/market diversity), runs 300 ticks of
@@ -388,8 +462,9 @@ in `tools/verify/README.md`.
 
   **R1 — no orphan resources, EITHER direction.** Every `resource_type` must be obtainable (a recipe
   produces it, a deposit yields it, or it is an endemic good — the second deposit route, off
-  `planetology::endemics` in `tile_generation.cpp`, which is *not* in `k_extractable` and whose
-  omission makes all four endemics read as orphans) and wanted (a recipe consumes it, or a named
+  `planetology::endemics` in `tile_generation.cpp`; since BL-647 the four endemic luxuries are
+  ALSO in `k_extractable`, so extraction can target them and the older "not in `k_extractable`"
+  reading of this row is stale) and wanted (a recipe consumes it, or a named
   actor does via an **explicit** exemption table, so an orphan cannot hide as an assumed terminal).
   **Shipped RED on eight resources when this row was authored, which was the check working** — five
   of them (grain, fodder, salt, transport_capacity, bullion) were orphaned in both directions and were
@@ -446,8 +521,8 @@ in `tools/verify/README.md`.
   this check for free. **18 named buildings carry an override, 0 offenders** as of 2026-08-24.
 - **`player_seed_sweep`** — Which seeds hand the PLAYER a corp worth playing? A live-Lua sweep (real
   `scripts/recipes.lua` + `economy.lua`, real economy ticks) that generates one world per seed and
-  reports, per seed, the player corp's buildings by type, its opening and post-warm-start balance,
-  and whether it ever dipped negative. `player_seed_sweep.exe [seed_count] [warm_ticks]`.
+  reports, per seed, the player corp's buildings by type, its opening and post-settle balance,
+  and whether it ever dipped negative. `player_seed_sweep.exe [seed_count] [settle_ticks]`.
 
   **A REPORTING tool, not a gate** — it exits 0 unless generation actually threw (that being
   `seed_sweep_probe`'s job). It deliberately does not filter seeds, resample, or carry a whitelist:
@@ -529,6 +604,43 @@ in `tools/verify/README.md`.
   population centre*, was written, measured and **fails at 64%**; it is deliberately non-gating and
   is the acceptance test for BL-463 (settlement count is seed-invariant).
 
+- **`continent_drift`** — The plate time axis (BL-763). Asserts that plate motion integrates over
+  the drift history rather than being read off the present landform, so a tile can be asked where
+  it was as well as where it is.
+
+- **`sim_water_census`** — **The instrument the whole water model is judged against.** Reports, per
+  seed, regions on water / on sea / on open ocean, the stored `region_domain` field against the
+  substrate, and the share of the sim's adjacency edges that cross sea. W1–W2 are the non-vacuity
+  gates (every seed generated and ran its era; edges were actually examined); the substantive rows
+  are that the stored domain disagrees with the substrate in **zero** cases, and that **no region
+  anchors on open ocean**. Run it either side of any change to the carve, the partition, or unit
+  traversal — the before/after pair is what a digest re-bless is described against
+  (`DELIVERY.md` § The digest re-bless is one act per WAVE).
+
+- **`market_saturation`** (the promoted saturation measure, BL-775) — `measure_completeness`
+  (terminals closed / terminals total, per market) and the recipe-margin computation, promoted out
+  of a harness anonymous namespace into `src/world/` so generation and the check share **one**
+  implementation. That sharing is the point: two callers on one implementation is what stops a
+  check measuring something different from the code it is checking.
+
+- **`deposit_origin`** — **The only thing asserting the resource-origin split holds** (BL-762). The
+  Body phase places geological deposits and the Life phase places biological ones; this asserts the
+  Body phase places **no** biological deposit. Nothing else can see that invariant.
+
+- **`survey_endowment_harness`** — **The first harness on `survey_endowment`** (BL-966), the
+  per-region farm/ore/energy read that drives cradle placement, region class and corporate focus.
+  On the reference seed's homeworld: determinism, ordering (the richest window by an independent
+  tile read outscores the barrenest, and the shipped `region::*_q` agree), the endowment-zero rule
+  on a body with the channel at 0.0, and a non-flat per-region spread (IQR above a measured floor).
+
+- **`landscape_score_harness`** — **The only thing that can tell whether phase 6 has anything to
+  search on** (BL-770). Scores candidate landscapes on the four terms of
+  `GENERATION_STRATEGY.md` § What the objective is made of and reports the **relative range** of
+  each across candidates. Carries a **positive control** — the same objective over three different
+  worlds — without which a flat result is indistinguishable from a broken scorer. Its first run
+  returned exactly that negative result (every term flat over five rosters, the control moving
+  1.0), which is what identified the missing roster-aware term.
+
 - **`battle_engagement_harness`** — The engagement trigger and the per-tick battle step (BL-467,
   Sprint C3, 2026-08-21). **45 checks** — 26 for the trigger and the step, plus B12b–B14f for the two surfaces (BL-468/BL-469, same day). **B1 is the row that could not have been written before the
   item**: it stands two hostile forces in one province and runs `run_economy_step` — the REAL tick
@@ -588,6 +700,43 @@ in `tools/verify/README.md`.
   harness is deliberately Lua-free — so if the Lua moves, these must move with it or the census
   silently measures the old economy. S4 asserts the census is identical across two generations of one
   seed; S0–S3 report and assert nothing about the finding.
+
+- **`colonisation_harness`** — the colonisation span's mechanisms (BL-846/847/848/850, sprint 37).
+  Takes an optional seed count (`colonisation_harness 3`), default 3.
+
+  **It asserts SHAPE and never a magnitude**, because `COLONISATION.md` puts every magnitude in
+  this layer — the boundary year, the predation coefficient, the tiles-per-year rate — in
+  `history_sweep`'s hands and explicitly not in a harness's. Nine cases: the walk is deterministic
+  (C1); nothing arrives after the boundary (C2); **culture arrives by ROUTE and the god map is not
+  reproducible by a Voronoi of cradles** (C3, the one this file exists for); ground no package suits
+  is crossed but never farmable (C4); breadth spreads rather than clustering (C5); crossing is a
+  floored union (C6); predation decays logarithmically and never reaches zero (C7); a sack re-wilds
+  the ground (C8); the field's size is bounded and stated (C9).
+
+  **C2–C4 and C6–C8 run on SYNTHETIC maps, deliberately.** A generated world cannot isolate "the
+  long way round by the coast beat the short way over the mountains" — it either happens to contain
+  that case or it does not, and a check that cannot aim is not a check. C3's map is one mountain
+  wall and one coastal corridor, built so the target tile is six tiles NEARER the cradle that does
+  not get it. C5 and C9 then run against real generated worlds, where a spread and a size are the
+  only things that mean anything.
+
+  **Two things it has already caught, both of which look like tuning and were not.** C7 found the
+  predation decay saturating at 1,024 heads, so across every population the game actually has it
+  was a CONSTANT wearing a decay's name — a coefficient sized without reference to the range it
+  would meet. C3a found its own map to be a wrapped-Chebyshev TIE, so the proximity half of the
+  route claim was asserting nothing while reading green.
+
+- **`digitisation_sim_harness`** — the thirteen readings `DIGITISATION.md` § What the phase is
+  judged on names (BL-982), over the curated seeds read from `docs/generation/seed_library.json`,
+  as a SPREAD and never a per-world verdict. **Lua builder** (`bash tools/verify/build_lua_harness.sh
+  digitisation_sim_harness`); run from the repo root; `--limit N` or `--seeds a,b,c` for a short
+  run. Each world is generated at shipped parity (world_gen/works/recipes/economy, era band from the
+  epoch, `apply_shipped_landscape`); the 12-tick validation run is not mirrored and the face says so.
+  **Report only.** Every reading prints MEASURED, PARTIAL or n/a — an n/a names the missing
+  mechanism and prints the count that proves its absence, and a PROXY line is labelled as not the
+  reading. Until the 1660 -> 1960 span exists, "at 1960" reads the world generation hands play
+  today: the 1660 Exploration handoff plus world setup and the searched landscape. Slow: a full world
+  and a landscape search per seed.
 
 - **`history_conquest_gap`** — WHY the Era −1 sim fights and never conquers (BL-384), measured on
   **the era generation actually runs** (BL-462, 2026-08-23). Takes an optional sweep width:
@@ -831,6 +980,21 @@ in `tools/verify/README.md`.
   invisible to a value assertion:
   `g++ -std=c++20 -O0 -g -fsanitize=address,undefined -Isrc tools/verify/nation_scorer_harness.cpp ...`.
 
+- **`stockpile_budget_check`** — Does a region's industry stock reach its campaign centres the way
+  DIGITISATION.md Part III says? (BL-1042, stockpile to budget; named here with Ben's permission,
+  2026-09-19.) `build_stockpile_budget` splits each region's points over its carved centres by slot
+  key, largest remainder, ties to the lower rank, and books every point it cannot place under a
+  reason (`carve_dropped`, `razed`, the residual `no_carved_centre`, `rejected`).
+  **Part 1 (default)** runs the builder on hand-built carve slots and checks each centre's share
+  against hand-worked values: 481/240/120 with a dropped slot's 160 unspent, an exact tie going to
+  the lower rank, anchors and coverage foundings getting nothing, a stock with points but both carve
+  lists empty rejected whole. It was confirmed by mutation — forcing an even split fails 1.1, 1.2
+  and 1.10. **Part 2 (`--r8 --seed N`)** builds a span-on world twice and compares the NON-EMPTY
+  budgets and carve indices; it is opt-in because it builds a real world, and the CTest glob gives
+  every harness 60 s. Build with `bash tools/verify/build_lua_harness.sh stockpile_budget_check`.
+  With the span off every shipped world's stock is empty, so the 16-seed `player_seed_sweep
+  --digest-check` proves nothing about the split — this harness is what does.
+
 ## Running the whole suite (CTest — BL-104)
 
 As of BL-104 every `tools/verify/*.cpp` is a registered CTest test, so the whole logic tier runs
@@ -850,8 +1014,14 @@ only when building outside the CMake tree.
 0. **No configured build tree? Use the one-line builder** (Ben, 2026-08-23, ruling on NR-392):
 
    ```
-   node tools/verify/build_harness.js <name> [--run] [--debug]
+   node tools/verify/build_harness.js <name> [--run] [--debug] [--clean]
    ```
+
+   **The world set is cached (BL-960, 2026-09-15).** The 62 world TUs compile once per
+   configuration into `build_gen/verify/_world/<release|debug>/` (about 22 s cold) and every
+   harness links the cached objects (about 5 s). A TU recompiles only when its source or any
+   header under `src/` is newer than its object, or when the flags change; `--clean` drops the
+   cache. Objects are linked directly, never archived, so every world TU still reaches the link.
 
    This is the path for a **worktree agent**, a **fresh clone**, or any session whose network
    policy refuses FetchContent — `cmake -B build` pulls SDL3, Lua, sol2 and ImGui from

@@ -195,7 +195,10 @@ enum class injector
     none = 0,                   ///< The claim names no pass this registry knows.
     population_demand,
     background_demand,
+    endemic_demand,             ///< BL-647: inject_endemic_demand's wealth-scaled luxury pull.
+    state_purchase,             ///< BL-644: the space_programme line's lump purchase-and-consume.
     unit_upkeep_draw,
+    building_upkeep_draw,       ///< BL-708: run_building_upkeep's per-type, era-banded goods draw.
     construction_material_draw,
     launch_draw,
 };
@@ -207,7 +210,10 @@ const char* injector_label(injector i)
         case injector::none:                       return "(names no pass)";
         case injector::population_demand:          return "inject_population_demand";
         case injector::background_demand:          return "inject_background_demand";
+        case injector::endemic_demand:             return "inject_endemic_demand";
+        case injector::state_purchase:             return "space_programme lump purchase";
         case injector::unit_upkeep_draw:           return "run_unit_upkeep goods draw";
+        case injector::building_upkeep_draw:       return "run_building_upkeep goods draw";
         case injector::construction_material_draw: return "construction material draw";
         case injector::launch_draw:                return "commit_convoy launch draw";
     }
@@ -219,6 +225,7 @@ const char* injector_label(injector i)
 /// what each entry moves is still computed, never authored.
 constexpr injector k_injectors[] = {
     injector::population_demand, injector::background_demand,
+    injector::endemic_demand,    injector::state_purchase,
     injector::unit_upkeep_draw,  injector::construction_material_draw,
     injector::launch_draw,
 };
@@ -240,8 +247,55 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
             return reg.population_demand_basket()[r] > 0.0f;
         case injector::background_demand:
             return reg.background_demand_basket()[r] > 0.0f;
+        // BL-647: the era-resolved endemic fold — the exact vector
+        // inject_endemic_demand multiplies by, same discipline as the two
+        // basket cases above.
+        case injector::endemic_demand:
+            return reg.endemic_demand_basket()[r] > 0.0f;
+        // BL-644: the space programme's authored lumps — the exact floats
+        // derive_space_programme_claims gates on. A pool draw, not a market
+        // bid: the "never on the open market" rule is the design's own.
+        case injector::state_purchase:
+        {
+            const space_programme_params& sp = reg.space_programme();
+            if (r == static_cast<std::size_t>(resource_type::spacecraft_components))
+                return std::isfinite(sp.components_lump) && sp.components_lump > 0.0f;
+            if (r == static_cast<std::size_t>(resource_type::propellant))
+                return std::isfinite(sp.propellant_lump) && sp.propellant_lump > 0.0f;
+            return false;
+        }
         case injector::unit_upkeep_draw:
             return reg.military().upkeep.goods_per_head[r] > 0.0f;
+        // BL-708. Resolved through `building_upkeep_goods` — the SAME free
+        // function the live pass and the census both compose the bands with —
+        // so the probe reads what the pass reads.
+        //
+        // ACROSS EVERY BAND AND EVERY BUILDING TYPE, deliberately, because that
+        // is the question R1 asks: "does a real pass draw this good ANYWHERE",
+        // not "does it draw it in the band this probe registry happens to
+        // carry". The two basket cases above read the same way — `ceramics` is
+        // authored only in the ancient household tranche and substantiates here
+        // regardless of the probe's band — so scanning one band would make this
+        // row stricter than its neighbours for no reason. Whether producer and
+        // consumer meet IN THE SAME band is R1b's question, and R1b asks it
+        // separately with a banded registry.
+        //
+        // The contract this keeps: zero the Lua rate and the row goes red by
+        // name. Narrow the rate to a band and it stays green here, and R1b is
+        // what would speak if that band could not also make the good.
+        case injector::building_upkeep_draw:
+        {
+            for (std::size_t b = 0; b < era_band_count; ++b)
+                for (int t = 0; t < static_cast<int>(building_type_count); ++t)
+                {
+                    const auto basket = building_upkeep_goods(
+                        reg.building_upkeep(), static_cast<building_type>(t),
+                        static_cast<era_band>(b));
+                    if (basket[r] > 0.0f)
+                        return true;
+                }
+            return false;
+        }
         case injector::launch_draw:
             return launch_draw_per_convoy()[r] > 0.0f;
         case injector::construction_material_draw:
@@ -254,6 +308,17 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
             // carrying a BAND sees only that band's buildings. Under the default
             // `any` band every type is available, so R1 and R4's own probes are
             // unchanged; R1b, which sets a band, gets the truth instead.
+            // BL-709: the construction SECTOR's own per-project draw. It is a
+            // real part of this pass — `run_construction` adds
+            // `capacity_per_build_tick` to the same per-tick need row it builds
+            // from the material baskets below — but it is not expressible AS a
+            // basket row, because it applies to every building under
+            // construction whatever its type or recipe. Read from the dial the
+            // pass itself reads, so zeroing the dial turns the claim red by name
+            // rather than leaving this branch asserting a draw that stopped.
+            if (r == static_cast<std::size_t>(resource_type::construction_capacity)
+                && reg.construction().capacity_per_build_tick > 0.0f)
+                return true;
             for (int t = 1; t <= 9; ++t) // building_type 1..9; `none` (0) has no economics
             {
                 const building_type bt = static_cast<building_type>(t);
@@ -316,6 +381,34 @@ const exemption k_actor_consumed[] = {
     { resource_type::ordnance, injector::unit_upkeep_draw,
       "BL-454 unit upkeep draw (per-tick, per unit)" },
 
+    // BL-708. Power is produced by the two generation recipes and consumed by
+    // NO recipe, so it reads as terminal — but it is not an orphan, and this row
+    // says which pass buys it rather than leaving that to a comment. The claim
+    // resolves through `building_upkeep_goods`, so zeroing the Lua rate turns
+    // this row red by name rather than letting it quietly become a lie — the
+    // same contract ordnance's row above carries. The rate is authored on the
+    // industrial band alone (there is no ancient power analogue by design);
+    // R1b is the check that asks whether producer and consumer meet in one
+    // band, and it does so with a banded registry rather than this one.
+    { resource_type::power, injector::building_upkeep_draw,
+      "BL-708 building upkeep draw (per-tick, per building; industrial band only)" },
+
+    // BL-709. Construction capacity is produced by the five era-banded
+    // construction methods and consumed by NO recipe, so it reads terminal here
+    // exactly as power does — and, exactly as power does, it names the pass that
+    // buys it rather than leaving that to a comment. TWO passes buy it, and the
+    // pass named is the one that actually fires: `run_construction`'s per-project
+    // draw. A per-building MAINTENANCE draw was authored first and measured — it
+    // collapsed the ancient band's operating firms 198 of 328 -> 33 of 317 on a
+    // cold start no rate could soften — so `economy.building_upkeep.goods` ships
+    // that rate at zero and would leave this row a lie. Resolving through
+    // `economy.construction.capacity_per_build_tick` means zeroing THAT dial
+    // turns this row red BY NAME, the same contract ordnance's and power's rows
+    // carry.
+    { resource_type::construction_capacity, injector::construction_material_draw,
+      "BL-709 run_construction's per-project draw (economy.construction."
+      "capacity_per_build_tick) — every site under construction, both bands" },
+
     // BL-640, and the three rows this item exists to move. They sat in the
     // no-pass half below claiming a "mercantile demand" that never existed; the
     // era-banded household basket is a real weight in economy.population_demand's
@@ -336,20 +429,22 @@ const exemption k_actor_consumed[] = {
     // actionable — moving a good onto a fake recipe consumer to quiet the row
     // would destroy the only record of what is owed. MARKETS.md § Demand
     // channels carries the owning item for each channel.
-    { resource_type::spacecraft_components, injector::none,
-      "BL-350 procurement contracts (terminal object) - but procurement is a "
-      "resource-agnostic transfer between two corps' pools, and nothing consumes "
-      "what it delivers; the Space-programme budget line (BL-644) owns the first real buyer" },
-    { resource_type::tobacco, injector::none,
-      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
-    { resource_type::spices, injector::none,
-      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
-    { resource_type::coffee, injector::none,
-      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
-    { resource_type::furs, injector::none,
-      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
+    { resource_type::spacecraft_components, injector::state_purchase,
+      "the space_programme budget line (BL-644) - a nation's whole-or-nothing lump, "
+      "bought at the supplier's market price and CONSUMED on settlement; the first "
+      "buyer that is not a resource-agnostic transfer" },
+    { resource_type::tobacco, injector::endemic_demand,
+      "the endemic luxury basket (BL-647) - wealth-scaled, nation-flavoured household pull" },
+    { resource_type::spices, injector::endemic_demand,
+      "the endemic luxury basket (BL-647) - wealth-scaled, nation-flavoured household pull" },
+    { resource_type::coffee, injector::endemic_demand,
+      "the endemic luxury basket (BL-647) - wealth-scaled, nation-flavoured household pull" },
+    { resource_type::furs, injector::endemic_demand,
+      "the endemic luxury basket (BL-647) - wealth-scaled, nation-flavoured household pull" },
     { resource_type::trade_goods_misc, injector::none,
-      "mercantile demand, endemic-luxury placeholder - endemic luxury demand (BL-647) owns the buyer" },
+      "mercantile demand - BL-647 shipped exactly the four goods its design names and "
+      "deliberately left this one out; the buyer is unowned, BL-730 (trade_goods_misc "
+      "buyer) carries finding it one" },
     { resource_type::tools, injector::none,
       "mercantile demand for now; a construction-material draw (BL-590) when it lands" },
     { resource_type::rigging, injector::none,
@@ -640,7 +735,19 @@ int main()
             "trade_goods", "glass", "tannery", "weaver",               // Artisan Goods
             "ceramics_kiln", "stonemason", "sawmill",                  // Construction Materials
             "iron_blooms", "steel_from_blooms", "ordnance_from_blooms",// Metal Foundry
+            // BL-744 (2026-09-02, Ben overturning NR-778) — the Bloomery Furnace,
+            // the ancient band's depth-one route to steel (ore + timber). Raw
+            // inputs, no tech lock, so it opens at tick 0 and must: it is the
+            // route the recipe margin anchor prices ancient steel off. 18 -> 19.
+            "steel_bloomery",
             "shipwright",                                              // Advanced Fabrication
+            // BL-709 (2026-08-31) — the two ANCIENT construction methods. Both
+            // open at tick 0 and must: capacity is not cargo, so a region with
+            // no yard cannot import its way to one, and a start that cannot
+            // build a yard cannot build. Neither carries a tech lock and both
+            // draw goods the ancient band already makes, so nothing else could
+            // close them. 16 -> 18.
+            "timber_frame_construction", "stone_and_brick_construction",
             // "toolmaker" is DELIBERATELY NOT here — see the note above: it is
             // the one ancient recipe still closed at tick 0, and by TECH now.
         };
@@ -771,15 +878,11 @@ int main()
         for (const resource_type e : placement_rules::k_extractable)
             extractable[static_cast<std::size_t>(e)] = true;
 
-        // The SECOND obtainability route, and it is not k_extractable. Endemic
-        // goods (BL-191) are deposited by tile_generation.cpp's C->D pass off a
-        // body's `planetology::endemics`, which ADDS a deposit rather than
-        // scaling one — so they never appear in the extractable table. The
-        // eligible set is the terrain switch at tile_generation.cpp:1401.
-        // Without this, all four read as orphans and the row cries wolf.
-        for (const resource_type e : { resource_type::tobacco, resource_type::spices,
-                                       resource_type::coffee,  resource_type::furs })
-            extractable[static_cast<std::size_t>(e)] = true;
+        // The endemic goods used to need a manual union here: BL-191's C->D
+        // pass deposits them off `planetology::endemics`, and they were not in
+        // k_extractable, so they read as orphans without it. Since BL-647 they
+        // ARE in k_extractable (extraction can target what the channel buys),
+        // so the loop above already carries them and the union is gone.
 
         // THE CENSUS the registry makes possible, printed before the verdict so a
         // green row is never silent about what is holding it up. Ascending
@@ -918,10 +1021,10 @@ int main()
         //     medical_supplies) LEAVE the ancient red list, because the basket
         //     that wanted them is now banded industrial. Their k_known_gaps rows
         //     went with them - see below.
-        //   * spacecraft_components leaves it too, for a DIFFERENT and less
-        //     comfortable reason: no pass in the registry moves it in either
-        //     band. Its R1 row stays red and says so; this row simply stops
-        //     double-counting a want that does not exist.
+        //   * spacecraft_components is back in the wanted set since BL-644: the
+        //     space programme's lump purchase moves it in both bands, so its
+        //     ancient half is a tracked k_known_gaps row (the launch-draw
+        //     shape below), not a silence and not a strand.
         //   * Every pass that is NOT era-gated still reports band-independently,
         //     which is the honest reading of the current code: the unit-upkeep
         //     draw and the launch draw fire in both arcs, so propellant is still
@@ -964,6 +1067,10 @@ int main()
         // industrial) route.
         static const known_gap k_known_gaps[] = {
             { resource_type::propellant, era_band::ancient, "NR-355: the per-convoy launch draw is not era-gated; no ancient producer exists" },
+            { resource_type::spacecraft_components, era_band::ancient,
+              "BL-644: the space programme's lump want is not era-gated (the same shape as the "
+              "launch draw above); no ancient producer exists, no ancient pool ever holds a lump, "
+              "so the derivation never fires there - a want that cannot fill, tracked not stranded" },
         };
         auto known_gap_tracked = [&](std::size_t r, era_band band) {
             for (const known_gap& g : k_known_gaps)
@@ -1066,6 +1173,18 @@ int main()
                 case resource_type::coal:   return 0.5f;
                 case resource_type::clay:   return 1.2f;
                 case resource_type::sand:   return 1.0f;
+                // BL-709: steel and stone are TABLED because this comparison now
+                // has to judge a pair that trades an EXPENSIVE input against
+                // CHEAP BULK — the steel frame against reinforced concrete. Under
+                // the neutral 1.0 default a unit of steel and a unit of stone
+                // cost the same, so the bulk-heavy basket always reads dearer and
+                // the check fires on a difference that does not exist: at the
+                // roster's own prices (world_gen.lua) the two baskets cost 8.00
+                // each, deliberately and to the digit. Flat across both regimes,
+                // because the cheap/dear axis of this table is FUEL and neither
+                // of these is one.
+                case resource_type::steel:  return 8.0f;
+                case resource_type::stone:  return 1.0f;
                 default:                    return 1.0f; // untabled input: neutral
             }
         };
@@ -1077,6 +1196,8 @@ int main()
                 case resource_type::coal:   return 2.5f;
                 case resource_type::clay:   return 1.2f;
                 case resource_type::sand:   return 1.0f;
+                case resource_type::steel:  return 8.0f; // BL-709, see the cheap table
+                case resource_type::stone:  return 1.0f; // BL-709, see the cheap table
                 default:                    return 1.0f; // untabled input: neutral
             }
         };

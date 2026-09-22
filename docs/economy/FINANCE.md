@@ -1,5 +1,12 @@
 # Corporate Finance
 
+> **Settles:** what moves a corporation's balance each tick, and in which order · which costs
+> recur, in credits and in goods · what a quarterly return reports and who may read it · what
+> becomes of a firm that is bought, dissolved, or cannot pay.
+> **Not here:** what a good sells for and how that clears (MARKETS) · what a building yields for
+> its cost (PRODUCTION) · what a nation does with the money it levies (../politics/NATIONS.md).
+> **Confused with:** MARKETS.md, PRODUCTION.md, ../politics/NATIONS.md.
+
 The money loop: how a corporation's balance moves each economy tick, where the costs come
 from, and which surfaces read it. The authority for the *market* half of the cash flows is
 `docs/economy/MARKETS.md`; the authority for the law object behind the levy is
@@ -131,13 +138,21 @@ per-building profitability estimate (`building_profit.hpp`, BL-074 building
 profitability) both call it, so they cannot drift. The wage/maintenance split is
 BL-049 (wage/maintenance split).
 
-- **Material maintenance** — a fixed 30 % floor of the building's maintenance constant,
-  charged even when decommissioned.
+- **Material maintenance** — the **idle floor**, `economy.thresholds.idle_maintenance_floor`
+  (`scripts/economy.lua`, reached in code as `recipe_registry::idle_maintenance_floor`): the
+  fraction of the building's maintenance constant charged even at workforce 0 or decommissioned.
+  It is an **authored parameter, not a constant** — BL-739 (idle floor to data) owns the move out
+  of code, and the loader rejects a value outside [0, 1] rather than clamping it. Every call site
+  passes the registry's value into `compute_building_opex`, which takes it undefaulted so a new
+  one cannot fall back to a stale copy. Non-zero deliberately: holding land is never free.
 - **Labour maintenance** — the remainder, scaled by `workforce_target` (0–200 %,
-  `wt_scalar` clamped [0, 2]); zero when decommissioned.
-- **Wages** — `workforce_assigned × contention_scalar × base_wage × wt_scalar × hab`.
-  `contention_scalar` is the (corp, body) labour throttle from the economy step — a
-  building pays for the labour it actually used, not its target. `hab` is the body's
+  `wt_scalar` clamped [0, 2]); zero when decommissioned, and floored at zero rather than going
+  negative where `wt_scalar` falls below the idle floor — there the floor already covers more
+  than the scaled total, and maintenance is the floor alone.
+- **Wages** — `workforce_assigned × contention_scalar × base_wage × (1 + wage_bid) × wt_scalar
+  × hab`. `contention_scalar` is the building's own grant from the wage-competition allocation
+  (BL-614, wage competition), not a uniform pool throttle — a building pays for the labour it
+  actually won, not the labour it requested, and at the rate it offered. `hab` is the body's
   mean population-centre habitability, clamped [0.1, 2.0] (`body_mean_habitability`).
 
 Maintenance and wage constants per building type load from the recipe registry
@@ -174,12 +189,16 @@ A negative balance compounds once per tick by `k_debt_interest_per_quarter` (**0
 1.5 %/qtr, ≈ 6.1 %/yr; was 0.02 until Ben's ruling of 2026-08-26). Non-negative balances are
 never charged.
 
-**The rate is set against what compounding does over the PRE-GAME, not over a quarter.** The warm
-start runs 80 quarters before the player is seated, so the rate is applied eighty times to whatever
-deficit a corp is carrying: at 0.02 that is ×4.9, at 0.015 it is ×3.3. Measured 2026-08-26, nine of
-twelve seeded corps had gone underwater and interest was then **43–60 % of their entire loss**,
-against an operating gap of only −24 to −40 cr/qtr — so the debt was mostly the compounding, not
-the trading. Ben's framing for the cut: *"it's not fun to see an inevitable loss."* Paired with a
+**The rate is set against what compounding does over the PRE-GAME, not over a quarter.** The
+ruling was measured under the eighty-quarter warm start of the time: the rate was applied eighty
+times to whatever deficit a corp carried — at 0.02 that is ×4.9, at 0.015 it is ×3.3 — and on
+2026-08-26 nine of twelve seeded corps had gone underwater with interest then **43–60 % of their
+entire loss**, against an operating gap of only −24 to −40 cr/qtr, so the debt was mostly the
+compounding, not the trading. The pre-game is now the winner's twelve-tick validation run
+(`ERAS.md` § The opening position; BL-978, warm start retired), so the rate compounds twelve
+times before the seat (×1.20 at 0.015) and the pre-game spiral that motivated the cut is far
+shallower; the rate is the same constant either way. Ben's framing for
+the cut: *"it's not fun to see an inevitable loss."* Paired with a
 non-zero opening capital (`corporation_params::base_capital`, 400), which is the buffer that stops
 a survivable bad quarter starting the spiral at all. The constant is the single
 source of truth: the live loop and the `econ_bankruptcy` harness read the same value.
@@ -423,6 +442,40 @@ existing candidate list" — which is a sentence a reader cannot distinguish fro
 shipped code, and at least one did not. A doc says what is true of the **design**; whether a piece
 is built is a backlog fact (`.claude/rules/io-standing-rules.md` § Terms & docs). Where a design
 paragraph names the file it will live in, the conditional is what keeps the two readings apart.
+
+## Firm exit — insolvency has a consequence
+
+A corporation (never the player's) whose last N **filed** quarters all closed below an authored
+balance floor is **wound up**: dissolution without an heir. Exit is the market's own supply
+discipline — a failed producer leaving is what clears a glut without anyone touching a price —
+and it is what makes bankruptcy a real verdict rather than a status. Design: BL-743 (firm exit);
+Ben's ruling, 2026-09-01.
+
+The trigger reads the quarterly returns (§ The quarterly return) — already persistent, already
+deterministic — so the pass carries no state of its own. Both thresholds are authored
+(`economy.firm_exit`: `balance_floor`, `consecutive_quarters`, capped at the 40-quarter
+retention); unauthored values disable the pass outright. One solvent quarter inside the window
+resets the sentence.
+
+**Disposition follows the dissolution table (§ Dissolution), read down the no-heir column:**
+
+| Outcome | What it applies to |
+|---|---|
+| **LIQUIDATE** | Holdings (demolished through the ordinary verb), units (disbanded), pools and in-flight cargo — dumped to the local / destination market's **real inventory**, honouring the conservation law (inventory gains what pools lose). A body with no market loses the goods; stated, not hidden. |
+| **DIE** | The balance (the debt is written off — the creditor was the void) and the filed returns, with the actor. |
+| **CANCEL** | Open orders, quotes, live battles — and, unlike the buyout, accepted contracts on **either** side: nobody is left to deliver or receive, and what was already paid stays paid. |
+| **DROP** | Stance, sentiment, embargo conditions, techs, modifiers, trade-route rows, workforce overrides. |
+| **KEEP** | History — never rewritten. |
+
+The CANCEL/DROP half is **shared code** with the buyout's `dissolve_into`
+(`src/world/corp_command.cpp`), so the two ends of a corporation cannot drift. **The player's
+corp is exempt absolutely, spectate included** — the never-erase-the-seat ruling (Ben,
+2026-08-26, NR-670), and mechanically `world::player_entity` is the camera/ledger anchor. The
+player's own failure stays *Stagnation as loss* (`docs/CONCEPT.md`): progressive, never an
+erasure.
+
+Check: `tools/verify/firm_exit_harness.cpp` — including the re-walk row (no store the
+dissolution table names still holds an erased id) and the inertness row.
 
 ## Surfaces
 

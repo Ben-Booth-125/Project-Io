@@ -47,6 +47,11 @@ screenshots/
 # Build and harness logs
 *.log
 
+# Decision-trace output (BL-704). An observation artifact, never a reference:
+# decision_trace_harness writes its own, and IO_DECISION_TRACE=<path> can drop
+# one anywhere a run happens to start.
+*.jsonl
+
 # Compiled artifacts
 *.exe
 *.pdb

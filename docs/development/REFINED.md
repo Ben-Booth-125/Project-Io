@@ -1,24 +1,56 @@
-# Project Io — REFINED (active worklist)
+# REFINED — active worklist
 
-*Empty between work blocks.*
+## Drained 2026-09-16
 
-**Sprint 23 (UI visibility, batch 2: selection & hover) CLOSED 2026-08-28 — goal
-met.** Twelve items across three waves; every planned item landed and both
-carried review-queue entries (NR-697, NR-698) were answered and pruned. The
-retro is in `archive/sprints-*.json`.
+Three finished blocks were cleared at the session close; each one's record lives in the
+DEVLOG entry for its session, its requirement group, and the archived backlog rows.
 
-Both owed items were addressed at the close. `NR-701` became `BL-673` (per-lens
-hover cards, landed); `NR-706` folded into `BL-636` (the standing live-click
-debt), where it keeps its relevance without sitting in a transient queue — the
-Company destination still needs one live press in a world that actually has a
-background firm on the home body.
+- **Sprint 41 — Exploration trade** (COMPLETE 2026-09-14). Nine items; world shape authorised
+  at Alarm 525. Plan and collision map in `cacd27dc`.
+- **Post-sprint-40 review block** (opened 2026-09-13). Its last open task was the lapse pace
+  control, which landed 2026-09-16 at 30 s / 1 m / 1 m 30 s after Ben watched the first cut.
+- **Sprint 42 wave 0** (COMPLETE 2026-09-15). Instruments and gates; re-blessed on NR-875.
+- **Sprint 42 wave 1** (COMPLETE 2026-09-16). Sixteen items; re-blessed on NR-877 the same day.
+- **Backlog wave A** (CLOSED 2026-09-16). Twelve lanes, sixteen items: twelve delivered, four archived unmerged; re-blessed in 32e04a19. Waves B-D never ran -- Ben stopped at wave A and archived the rest. Record in the DEVLOG entry of the same date.
+- **Sprint 44 — the corporate web's plumbing** (CLOSED 2026-09-18). BL-1030..1033 delivered; the retro is archived with the sprint; NR-889 carries the cost readings.
 
-**Sprint 24 (UI visibility, batch 3: ledgers) is OPEN.** It starts with four
-things already filed against its own surfaces, all found by batch 2 pressing
-them: `NR-704` (the two corporation flags are named the wrong way round),
-`NR-705` (the corporations table clips every firm's name to one character),
-`NR-708` (no envelope field has save round-trip coverage), and the three
-declared placeholders batch 2 left behind — the Company ledger, the History
-ledger's Tectonics view, and the deposit/plate Selection cards.
+## Sprint 45 — industrialisation makes the web real (opened 2026-09-18)
 
-**Open work with no promoted tasks:** `node tools/session/backlog_query.js --table`.
+Three waves. Every world-mover lands behind a switch and turns on together in BL-1044, so the sprint
+spends one re-bless. Memory caps concurrency (15.5 GB; a sweep holds ~2.9 GB): lanes run their own
+harnesses one at a time and never `player_seed_sweep`; the main session runs the 16-seed
+`--digest-check` on the integrated tree after each merge. Requirement groups:
+`world-copy-ticks-exact`, `span-boundary-resume`, `resume-road-tier`, `industry-tree-wired`,
+`charter-spend-rules`; later waves get theirs when promoted.
+
+**Wave 0 — neutral, parallel worktrees**
+
+- [x] **BL-1034 (world copies diverge)** — DELIVERED 2026-09-18: merged d61b6ae8, cold-reviewed, --digest-check 16/16 on 26c8ec6e. files: src/world/faithful_unordered_map.hpp (new), world.hpp, province.hpp, tools/verify/world_copy_determinism.cpp (new), world_digest.hpp (new).
+  provides: a faithful world copy; the reproduction harness. consumes: harness_params.hpp's app-order build and settle (landed).
+- [x] **BL-1036 (span boundary resume)** then **BL-1037 (resume road tier)** — DELIVERED 2026-09-18: merged 614a02e5, follow-ups 58193812, --digest-check 16/16. BL-1036 R6 partial (BL-1049). Lane A, generation-dev. files: src/world/history_sim.hpp/.cpp, era_minus_one.cpp, tools/verify/digitisation_sim_harness.cpp.
+  provides: resume_dated_objects, consolidation_year, near_home_cutoff_year, resume_seeds_corridor_tier (off), the fidelity mode. consumes: exploration_output (landed).
+- [x] **BL-1038 (Industry tree wired)** — DELIVERED 2026-09-18: merged 29b74f69, fix round 191c212b, --digest-check 16/16. Lane B, generation-dev. files: src/world/industry_tree_data.hpp (generated), history_sim.hpp/.cpp, tools/session/tree_lint.js, tools/verify/exploration_sim_harness.cpp. Shares history_sim.* with lane A in disjoint regions; the main session resolves the merge.
+  provides: industry_tree_enabled (off), industry_open_year, the Industry mask triple and fold, the urban-mass rate, the fork-reachability lint. consumes: the amended industry_tree.json (this cut).
+- [x] **BL-1039 (charter spend rules)** — DELIVERED 2026-09-19: timed rows on a quiet machine (runs.bl1039_sqrt), ceiling 120 (NR-902), --digest-check 16/16 and empty/zero/refused 3/3 on be5b3d72 (chain 11). files: src/world/charter_budget.hpp, corporation_generation.cpp, budget_system.hpp, tools/verify/player_seed_sweep.cpp, harness_params.hpp, charter_cost_sweep.json.
+  provides: the sqrt cap rule, density_ceiling reason (filling goods in turn), per-good tallies; the unspent-points capital rule was built and reverted (NR-895). consumes: charter_budget / charter_spend_params (landed, BL-1032).
+
+**Wave 1 — the span and Beat 1, still behind switches**
+
+- [x] **BL-1040 (Digitisation span)** — DELIVERED 2026-09-19: merged 70923856, cold-reviewed, --digest-check 16/16 on 849a358d (chain 8). files: era_minus_one.*, hard_coded_world.*, world_gen_config.hpp, history_sim.hpp, src/ui/startup_screens.cpp, digitisation_sim_harness.cpp, exploration_sweep.cpp.
+- [x] **BL-1051 (span open survey)** — DELIVERED 2026-09-19: merged 44545123, cold-reviewed, --digest-check 16/16 on 849a358d (chain 8). Every region surveyed for fuel and forest at the span open; ground_forest and furnace_lit read from it (NR-891, NR-892). files: settlement.hpp/.cpp, hard_coded_world.cpp, history_sim.*, exploration_sim_harness.cpp, digitisation_sim_harness.cpp.
+- [x] **BL-1041 (industry points)** — DELIVERED 2026-09-19: merged f8137b8d, fix round 849a358d, --digest-check 16/16 (chain 8), readings 8 and 9 on 849a358d. files: settlement.hpp, history_sim.*, hard_coded_world.cpp, digitisation_sim_harness.cpp.
+- [x] **BL-1053 (setup reads span close)** — DELIVERED 2026-09-19: merged 9725ee79, --digest-check 16/16 (chain 8), cold review clean (two low findings in BL-1058). When the span runs, world setup reads the 1960 close (treasuries, grudges, roads, junction markets); plus the BL-1040 review's harness and validator tightening and the loading-bar count. Must land before BL-1043. files: hard_coded_world.cpp, nation_generation.cpp, history_sim.*, app.cpp, startup_screens.cpp, digitisation_sim_harness.cpp.
+- [x] **BL-1056 (points size-neutral)** — DELIVERED 2026-09-19: merged acc81398, fix round 2867cdaa, --digest-check 16/16 (chain 9). The resulting Fuel Doctrine split (coke 142 / charcoal 373) is NR-899, Ben's call before BL-1043 measures. files: history_sim.*, settlement.hpp, digitisation_sim_harness.cpp, exploration_sim_harness.cpp.
+- [x] **BL-1059 (top-third bar)** — DELIVERED 2026-09-19: three rounds (NR-900, NR-904 in the build), --digest-check 16/16 on be5b3d72 (chain 11). files: history_sim.*, settlement.*, digitisation_sim_harness.cpp, exploration_sim_harness.cpp.
+- [x] **BL-1042 (stockpile to budget)** — DELIVERED 2026-09-19: merged c9431b0b, fix round 587b5657 (NR-901), --digest-check 16/16, stockpile accounts close on 0/28/46 (chain 11).
+- [x] **BL-1060 (charter spend hardening)** — DELIVERED 2026-09-20: four rounds (NR-902, NR-903, NR-905, NR-906), --digest-check 16/16 and the budget modes 3/3 on 9a39152a (chain 12). Round 3's review caught a refusal that would have switched the charter web off on a data tune.
+
+**Wave 2 — measure, then Ben's calls**
+
+- [ ] **BL-1043 (real-stockpile charter sweep)** — STAGE 1 IN (2026-09-21): 16 seeds x 3 firm prices in three parallel shards, folded as runs.real_stockpile_bl1043_a/_b/_c; R1, R2 and R4 complete. It found that no fixed price holds the seat menu (NR-907, ruled: the price is a share of the world's stockpile), so stage 2 sweeps BL-1064's divisor instead. Owed: stage 2, the serial timing pass (R3), the province-cap reading, the remaining calls (R5), R6 and R7.
+- [ ] **BL-1064 (derived charter price)** — Ben 2026-09-21 (NR-907): a charter's price is the world's own stockpile divided by a constant, fixed at build; the specialist keeps its price in firm charters. Built before BL-1043 stage 2, which reads the divisor. files: stockpile_budget.*, charter_budget.hpp, player_seed_sweep.cpp, stockpile_budget_check.cpp.
+
+**Wave 3 — ship**
+
+- [ ] **BL-1050 (order-dependent reads)** — BUILT and VERIFIED on branch worktree-agent-ab112b1821025f551 (2026-09-20): seven readers ordered, fix round 3c9c5792 after a cold review; --copy-by snapshot 16/16 PASS (4166 s); the 16-seed --digest-check on the branch fails on D_settle and D_seat ONLY, never D_search or D_land, so the re-bless is tick-only (NR-894). R1-R6 complete; R7 (the re-pin) is BL-1044's. MERGED ONLY WITH BL-1044.
+- [ ] **BL-1044 (Beat 1 ships)** — waits on BL-1037, BL-1043, BL-1050 and Ben's rulings. The one re-bless, the 1960 readings, the cold review.

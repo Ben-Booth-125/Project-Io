@@ -39,6 +39,7 @@
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/unit_roster.hpp"
+#include "world/world_gen_config.hpp"
 #include "world/world.hpp"
 
 #include <cmath>
@@ -49,6 +50,15 @@
 #include <vector>
 
 namespace {
+
+// BL-654: both upkeep passes now take an `economy_report&` — the shortfall bid
+// they place on the market lands in its `wants` / `purchases` / `upkeep_wants`
+// registers. Nothing in THIS harness reads those registers, and nothing here can
+// write to them either: `price_band_params::reservation_mult` defaults to 0 and
+// these fixtures hand-build their registry, so the bid path is off and the draw
+// is pool-only exactly as it was before BL-654. One shared scratch report keeps
+// that visible rather than scattering a fresh local at every call site.
+economy_report g_upkeep_report;
 
 int g_pass = 0, g_fail = 0;
 
@@ -221,7 +231,7 @@ scenario_result run_scenario(const recipe_registry& reg)
     f.w.pool_for(corp_in_met, f.body).quantities[ordnance_idx()]  = 1000.0f;
     f.w.pool_for(corp_out_met, f.body).quantities[ordnance_idx()] = 1000.0f;
 
-    unit_upkeep_tick tick = run_unit_upkeep(f.w, reg);
+    unit_upkeep_tick tick = run_unit_upkeep(f.w, reg, g_upkeep_report);
 
     scenario_result r;
     r.supply_in_reach_met     = f.w.units.at(u_in_met).supply_factor_permille;
@@ -243,6 +253,14 @@ int main()
         lua_state lua;
         lua.load("scripts/recipes.lua");
         lua.load("scripts/economy.lua");
+        // BL-744 (2026-09-02): the anchor is priced against the AUTHORED table,
+        // read from world_gen.lua rather than mirrored here - the mirror
+        // (ordnance 43.0, food_rations 6.0) went stale the day the recipe
+        // margin anchor re-priced both, and this row failed for the mirror's
+        // reason rather than the content's.
+        lua.load("scripts/world_gen.lua");
+        world_gen_config gen_cfg;
+        gen_cfg.load_from_lua(lua);
         recipe_registry reg;
         reg.load_from_lua(lua);
 
@@ -255,11 +273,13 @@ int main()
         check(up.goods_per_head[static_cast<std::size_t>(resource_type::food_rations)] > 0.0f,
               "U1 food_rations draw is non-zero");
 
-        // BL-543's value anchor, priced against the authored base_price
-        // constants (world_gen.lua: ordnance 43.0, food_rations 6.0) —
-        // Sigma(goods_per_head[r] x base_price[r]) ~= 2 x credits_per_head.
-        const float ordnance_base_price     = 43.0f;
-        const float food_rations_base_price = 6.0f;
+        // BL-543's value anchor, priced against the authored base_price table
+        // (world_gen.lua, parsed above; the industrial table, which is the
+        // shared one) — Sigma(goods_per_head[r] x base_price[r]) ~= 2 x
+        // credits_per_head.
+        const float ordnance_base_price     = gen_cfg.kepler_base_price[ordnance_idx()];
+        const float food_rations_base_price =
+            gen_cfg.kepler_base_price[static_cast<std::size_t>(resource_type::food_rations)];
         const float goods_value =
             up.goods_per_head[ordnance_idx()] * ordnance_base_price +
             up.goods_per_head[static_cast<std::size_t>(resource_type::food_rations)] * food_rations_base_price;
@@ -302,7 +322,7 @@ int main()
         const entity_id corp = add_corp(f.w);
         const entity_id u    = add_unit(f.w, corp, at(f, 2, 0), 10, 560);
         f.w.pool_for(corp, f.body).quantities[ordnance_idx()] = 1000.0f;
-        run_unit_upkeep(f.w, reg);
+        run_unit_upkeep(f.w, reg, g_upkeep_report);
         check(f.w.units.at(u).supply_factor_permille == 620,
               "U6 recovery continues on a second in-supply tick (560 -> 620)");
     }

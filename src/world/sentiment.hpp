@@ -220,11 +220,27 @@ enum class sentiment_factor_kind : uint8_t
     /// CONTRACTS.md names failure as the hardest reputation move a mercenary
     /// can make.
     contract_failed = 10,
+
+    /// AN ERA -1 GRUDGE, SEEDED AT WORLD SETUP (BL-898) — `RELATIONS.md`
+    /// § What each quantity was before, the row "Era -1 grudges, with nowhere
+    /// to live | seeded nation->nation sentiment". The observer is the
+    /// aggrieved polity's successor nation, the subject the resented one's.
+    ///
+    /// THE ONE FACTOR WITH NO RUNTIME EMITTER, and that is its definition
+    /// rather than a gap: it fires exactly once, in
+    /// `grudge_sentiment.cpp`, before the first tick, and nothing in the
+    /// campaign ever raises it again. It is therefore also the one factor whose
+    /// weight is NOT authored in `scripts/economy.lua` — generation runs with
+    /// no Lua state, so the weight lives on `grudge_sentiment_params` beside
+    /// the conversion that uses it. Leaving this row at zero in
+    /// `economy.sentiment.factors` is correct: there is nothing at runtime for
+    /// it to weigh.
+    historical_grudge = 11,
 };
 
 /// Number of rows in `sentiment_factor_kind`. Grows when a value is appended;
 /// it is the array bound the fold indexes with, so the two cannot drift apart.
-inline constexpr std::size_t sentiment_factor_count = 11;
+inline constexpr std::size_t sentiment_factor_count = 12;
 
 /// The AUTHORING NAME of each kind, INDEXED BY the kind — the key
 /// `scripts/economy.lua`'s `sentiment.factors` table uses for that row.
@@ -246,6 +262,7 @@ inline constexpr const char* sentiment_factor_names[sentiment_factor_count] = {
     "lobbied_against",
     "force_used",
     "contract_failed",
+    "historical_grudge",
 };
 
 /// The AUTHORED weight of one kind of conduct: how far a single occurrence moves

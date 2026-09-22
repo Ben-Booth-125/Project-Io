@@ -1,10 +1,22 @@
 # Project Io — Circumplanetary Screen
 
+> **Settles:** what the middle rung shows and which body it anchors on · how the
+> anchor is resolved when the selection is a moon rather than a planet · whether a
+> moonless planet still has this view · how local positions map to the screen ·
+> which reference a distance on this rung is measured from · what this rung's
+> default framing is.
+> **Not here:** the ladder, the click model, the descend and ascend rules, the
+> shared view controls and the shared state (CANVASES) · which lenses draw at which
+> rung (LENSES) · the rungs either side (SOLAR, PLANETARY) · the inset's chrome
+> (MINIMAP).
+> **Confused with:** SOLAR.md, CANVASES.md, MINIMAP.md, LENSES.md.
+
 The Circumplanetary screen is the **middle rung** of the canvas ladder: a
 top-down view of a single planet and the space immediately around it — its
 moons, and stations and local traffic as overlays. It sits between the Solar
 screen (the whole system) and the Planetary screen (one body's surface). See
-[CANVASES.md](CANVASES.md) for the layout rules shared across the three canvases.
+[CANVASES.md](CANVASES.md) for the layout rules, view controls and click model
+shared across the three canvases.
 
 ---
 
@@ -12,9 +24,10 @@ screen (the whole system) and the Planetary screen (one body's surface). See
 
 The **anchor** planet sits at the centre. Its moons orbit it at positions
 derived from their `orbital_radius_au` and live `orbital_angle_rad`, with an
-orbital ring per moon. The anchor and its moons are labelled. The selected body
-(`active_body`) carries a selection outline — so when the player descended from
-the Solar screen by clicking a moon, that moon is highlighted here.
+orbital ring per moon. The anchor and its moons are labelled. The **selected**
+body carries the highlight — `selected_entity`, not the `active_body` anchor, so
+a moon the player picked out on the rung above stays marked here while the view
+frames its parent.
 
 A planet with **no moons** is still a valid circumplanetary view: the planet sits
 alone at the centre. The rung is the deliberate stepping stone between picking a
@@ -55,9 +68,9 @@ name). If `active_body` is unknown, the canvas shows a "No body selected" notice
 | Moon | Filled circle at its orbital position. Colour `(148, 145, 140)` grey (the shared moon style). |
 | Orbital rings | Thin circle at each moon's `orbital_radius_au` from the anchor. Colour `(38, 42, 52)` — structural only. |
 | Body label | Anchor and moon names in the small default font, below each circle. White. |
-| Selection indicator | Unfilled circle around `active_body`, 3 px larger than its radius. White. When a moon overlaps the anchor under the cursor, **only one** highlights — the nearest centre wins (anchor on an exact tie); a hit-test pass resolves the single hovered body before drawing, matching the Solar canvas. |
+| Selection indicator | Unfilled circle around `selected_entity`, 3 px larger than its radius, through the shared highlight convention (`src/ui/highlight.hpp`). White. When a moon overlaps the anchor under the cursor, **only one** highlights — the nearest centre wins (anchor on an exact tie); a hit-test pass resolves the single hovered body before drawing, matching the Solar canvas. |
 | Hover tooltip | Body name, type string, and orbital radius (from the anchor for moons). |
-| Scale bar + zoom slider | Bottom-centre overlay (primary view only), identical to the Solar canvas's — the shared `ui::draw_scale_zoom_overlay` (`src/ui/canvas_scale.hpp`). The zoom slider runs **right = zoomed in, left = zoomed out**. |
+| Scale bar + zoom slider | The shared bottom-centre overlay (primary view only; CANVASES.md § Shared view controls), the same helper the Solar canvas uses. |
 
 Moon orbital radii are **not** true scale — real moon distances would render on
 top of the planet — they use a visible offset, consistent with how moons are
@@ -86,28 +99,38 @@ moon_screen_pos.y = canvas_centre.y - sin(orbital_angle_rad) * orbital_radius_au
 ```
 
 The y-axis is negated so angle 0 is to the right and angles increase
-counter-clockwise, matching the Solar screen's orientation. Pan and zoom apply on
-top of this when the canvas is primary; the minimap always shows the default
-framing.
+counter-clockwise, matching the Solar screen's orientation. Pan and zoom compose
+on top of this framing (CANVASES.md § Shared view controls).
 
 ---
 
 ## Interaction
 
-- **Hover** a body circle: show tooltip.
-- **Single-click a body — select.** Sets `selected_entity` and fills the Selection band; the rung does not change. The selection ring is keyed on `selected_entity`, not `active_body`.
-- **Double-click a body — descend (zoom in).** Sets `active_body` and drills the primary down to that body's **Planetary** surface. (Shared click model — see `docs/ui/SELECTION.md`.)
-- **Click the Circumplanetary minimap — ascend.** When the Circumplanetary screen is the minimap (i.e. the Planetary screen is primary), any click promotes it to primary.
-- **Pan and zoom (primary view only).** Middle mouse button pans; scroll wheel zooms, anchored at the cursor. A bottom-centre **scale bar + zoom slider** (shared with the Solar canvas) sets the same factor — dragging **right zooms in**. Element sizes stay fixed; only the framing scales. View state (`circum_zoom`, `circum_pan_x/y`) lives in `ui_state`. The minimap always renders the default framing.
-- Input is only processed for the canvas the mouse is over; an ImGui panel under the cursor takes precedence.
+The click model, the descend and ascend rules, the shared view controls and input
+precedence are settled once for the whole ladder in [CANVASES.md](CANVASES.md)
+§ Navigation — the zoom ladder; `circumplanetary_canvas.cpp` is this rung's half
+of them. What is particular to this rung:
+
+- **Hover** a body circle: tooltip with the body's name, type, and — for a moon —
+  its orbital radius measured from the anchor, not from the star (§ Visual
+  elements).
+- **A press with no anchor has nothing to act on.** When `active_body` is unknown
+  the canvas shows a "No body selected" notice instead of a view (§ The anchor).
+- **Default framing** fits the anchor's moons — `max_moon_au` about the anchor
+  with a small floor, so a **moonless** planet still frames sensibly rather than
+  dividing by nothing (§ Coordinate mapping). This rung's pan/zoom lives in
+  `circum_zoom` and `circum_pan_x/y` (`ui_state`).
 
 ---
 
-## Overlays on this rung
+## What is deferred on this rung
 
-| Overlay | Design |
-|---|---|
-| Convoys in transit | The Supply lens draws a per-body **convoy-count badge** on this rung (LENSES.md § Supply); moving convoy entities are not drawn here. |
-| Market prices | The Market lens's **per-body price strip** (LENSES.md § Market). |
-| Stations and orbital infrastructure | Post-prototype. |
-| True-scale or selectable orbit framing | Post-prototype. |
+**Lenses are not a Circumplanetary question.** [LENSES.md](LENSES.md) § Rung
+applicability holds the whole Lens × rung table, this rung's column included, and
+it is not restated here — a column copied into a rung doc drifts from the table it
+was copied out of.
+
+**Stations and orbital infrastructure** are post-prototype. So is a **true-scale
+or selectable orbit framing**: moon radii here use a visible offset rather than
+their real distances (§ Visual elements), and until the local view carries objects
+worth measuring against, true scale would cost legibility and buy nothing.

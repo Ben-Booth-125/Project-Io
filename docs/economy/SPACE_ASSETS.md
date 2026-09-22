@@ -1,5 +1,11 @@
 # Project Io — Space Assets
 
+> **Settles:** what makes an asset a space asset rather than a building · which classes the space
+> arc is expected to hold. A stub: it fixes the distinction, not the system.
+> **Not here:** fixed surface installations and their recipes (PRODUCTION) · when the space arc
+> opens and what gates it (ERAS) · which resources space makes reachable (RESOURCES).
+> **Confused with:** PRODUCTION.md, ERAS.md.
+
 **Space assets** are the player's deployable presence beyond the planetary surface —
 distinct from **buildings**, which are fixed surface installations on a body's tile grid.
 Where a building is placed on a tile and draws on local terrain, workforce, and adjacency,

@@ -114,12 +114,21 @@ inline constexpr resource_type k_extractable[] = {
     // cover-based mechanic as agricultural_produce) both get real recipe
     // consumers this change (Tannery, Weaver) — registered here so an
     // extraction_site can actually target them, following BL-429 slice 2's
-    // own peat precedent rather than repeating its gap. NOTE: the four
-    // PRE-EXISTING endemic goods (tobacco, spices, coffee, furs) still carry
-    // that same gap — deposited by the same C -> D pass but never added here
-    // — left unfixed as out of this item's scope; see BL-586 slice 2's report.
+    // own peat precedent rather than repeating its gap.
     resource_type::hides,
     resource_type::fibre,
+    // BL-647 (endemic luxury demand): the four PRE-EXISTING endemic goods,
+    // deposited by the same C -> D pass since BL-191 but never added here —
+    // the gap BL-586 slice 2 recorded and left. They join in the same change
+    // that gives them a buyer (inject_endemic_demand, market_clearing.cpp):
+    // a luxury basket naming four goods nothing can mine is a channel that
+    // cannot clear. No placement_rules.cpp change needed — can_place, the
+    // build-mode target picker and the presentation table are generic over
+    // this list (BL-323 S1's own observation).
+    resource_type::tobacco,
+    resource_type::spices,
+    resource_type::coffee,
+    resource_type::furs,
 };
 
 /// True if the given substrate is WATER OF ANY KIND — ocean, coast or lake.

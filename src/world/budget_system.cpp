@@ -14,6 +14,9 @@ float body_mean_habitability(const world& w, entity_id body)
 {
     // Mirrors the accumulation apply_budget's batch used, filtered to one body, so
     // the estimate and the live budget loop read an identical mean (bit-for-bit).
+    // ORDER-DEPENDENT: a float sum in `population_centres` iteration order. That
+    // order is why a world copy must keep it (BL-1034, faithful_unordered_map.hpp):
+    // a reordered copy moved this mean two ULP on seed 28 and every wage with it.
     float sum = 0.0f;
     int   count = 0;
     for (const auto& [cid, pcc] : w.population_centres)
@@ -35,20 +38,22 @@ float body_mean_habitability(const world& w, entity_id body)
 building_opex compute_building_opex(const building_component& b,
                                     const building_economics& e,
                                     float contention_scalar,
-                                    float mean_hab)
+                                    float mean_hab,
+                                    float idle_floor)
 {
     // Labour/material cost split (BL-049).
-    // Material cost: fixed 30 % overhead, charged even when decommissioned.
+    // Material cost: the authored idle floor (BL-739 — was a hard-coded 30%),
+    // charged even when decommissioned.
     // Labour cost: scales with workforce_target; zero when decommissioned.
     const float wt_scalar     = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
-    const float material_cost = e.maintenance * 0.3f;
+    const float material_cost = e.maintenance * idle_floor;
     const float labour_cost   = b.decommissioned ? 0.0f
                                 : e.maintenance * wt_scalar - material_cost;
     const float hab           = std::clamp(mean_hab, 0.1f, 2.0f);
 
     building_opex o;
-    // Guard against negative labour_cost when wt_scalar < 0.3 (the material floor
-    // already covers more than the scaled total in that edge case).
+    // Guard against negative labour_cost when wt_scalar < idle_floor (the
+    // material floor already covers more than the scaled total in that edge case).
     o.maintenance = material_cost + std::max(0.0f, labour_cost);
     // BL-614: wages are paid AT THE OFFERED RATE — base_wage × (1 + wage_bid) —
     // on the labour actually allocated. A zero bid multiplies by exactly 1.0f,
@@ -195,7 +200,8 @@ void apply_budget(world& w,
             // loop and the per-building profitability estimate never diverge. Kept
             // in the same subtract-then-subtract order as the pre-extraction code,
             // so the deterministic balance is bit-identical.
-            const building_opex opex = compute_building_opex(b, e, scalar, mean_hab_of(body));
+            const building_opex opex = compute_building_opex(b, e, scalar, mean_hab_of(body),
+                                                             reg.idle_maintenance_floor());
             bud.maintenance += opex.maintenance;
             delta           -= opex.maintenance;
             bud.wages       += opex.wages;

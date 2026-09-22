@@ -50,6 +50,70 @@ void inject_population_demand(world& w, const recipe_registry& reg);
 /// @param w World; market demand arrays are mutated in place.
 void inject_background_demand(world& w, const recipe_registry& reg);
 
+/// BL-647: inject endemic-luxury demand into nation-anchored markets — the
+/// Endemic trade channel (docs/economy/MARKETS.md § Demand channels; the design
+/// is docs/economy/RESOURCES.md § Mercantile). A pure demand-side pull for the
+/// endemic goods (tobacco, spices, coffee, furs) that scales with a nation's
+/// WEALTH rather than its headcount — so it rewards a player who has made
+/// somewhere rich — flavoured per (nation, good) by a seeded, campaign-fixed
+/// preference weight so different nations crave different luxuries and the
+/// trade route is directional by construction: extract where it grows, sell
+/// where the money is.
+///
+/// Wealth is the nation's treasury plus the summed positive balances of the
+/// corporations domiciled in it, split evenly across the markets anchored in
+/// the nation's territory (tile_to_nation over market_component::centre_tile)
+/// so a nation's total pull is independent of how many markets BL-096 carved
+/// it into. A market with no owning nation — an off-world outpost — receives
+/// nothing here; the home body's luxury shortfall reaches outposts through
+/// inject_interbody_demand like every other unmet want.
+///
+/// Same price-elastic shape as the two injectors above (deliberately not a
+/// second elasticity model). Called from clear_markets after them, before
+/// inject_interbody_demand. Deterministic — no RNG at tick time: the
+/// preference weight is a pure hash of the nation's generated identity, and
+/// the per-nation wealth sum accumulates over sorted corp ids. Tunables in
+/// `scripts/economy.lua` § `endemic_demand`; wealth_scale defaults 0 so a
+/// hand-built registry injects nothing.
+///
+/// @param w World; market demand arrays are mutated in place.
+void inject_endemic_demand(world& w, const recipe_registry& reg);
+
+/// BL-652 — one basket entry the injectors CANNOT price, named.
+struct unpriced_basket_entry
+{
+    resource_type resource;
+    /// Which basket names it: "household" (`economy.population_demand`) or
+    /// "background" (`economy.background_demand`). A literal, never owned.
+    const char*   channel;
+};
+
+/// BL-652: every (channel, resource) pair that a demand basket NAMES with a
+/// positive weight and that NO market in @p w carries a base price for.
+///
+/// WHY IT IS A NAMED SURFACE AND NOT A SILENT `continue`. Both injectors skip
+/// such an entry — "untradeable, no base price to anchor the elasticity curve"
+/// — and that skip is invisible from the outside: a basket that is authored but
+/// unpriced looks exactly like a channel nobody ever wrote. Two separate bugs
+/// hid behind that silence on one day in August 2026. The demand census read as
+/// having no background demand at all, and `spawn_solvency` measured a whole
+/// spawn diagnosis in a world where background demand did not exist. NEITHER
+/// FAILED. Both quietly answered a question about a different world.
+///
+/// The combination is always either a missing script (`world_gen.lua`, which
+/// carries `kepler_market.base_price`, was not loaded) or an authoring error (a
+/// basket names a resource the price table does not), and it is never intended.
+/// So callers should treat a non-empty result as a fault: the app reports it on
+/// startup, and `tools/verify/demand_census.cpp` FAILS on it.
+///
+/// One entry per (channel, resource) — the FIRST occurrence, not one per market
+/// or per population centre, which would bury the finding in thousands of rows.
+/// Deterministic: channel order then resource-index order, and the price probe
+/// over `w.markets` is a pure OR, so the unordered map's layout cannot reach the
+/// result.
+std::vector<unpriced_basket_entry> unpriced_basket_entries(const world& w,
+                                                           const recipe_registry& reg);
+
 /// BL-263: if @p body carries no market yet, create one — the spontaneous
 /// market emergence trigger fires the tick a body's FIRST building completes
 /// (any corporation; investment, not presence). No-op if the body already has a

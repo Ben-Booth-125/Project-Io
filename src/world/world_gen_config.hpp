@@ -41,6 +41,92 @@ struct endemic_pricing_params
 /// the pre-BL-236 hard-coded generation exactly.
 struct world_gen_config
 {
+    /// STOP GENERATION ONCE THE ANCIENT ERA HAS RUN, leaving the world
+    /// half-built and the REPORT complete (Ben, 2026-09-09).
+    ///
+    /// WHAT IT IS FOR. The wizard's history round wants one thing from
+    /// generation — the recorded Era -1 time-lapse — and the only entry point
+    /// that produces it is `make_hard_coded_world`. Calling that ran all
+    /// thirteen stages: the era is stage 8, and stages 9-12 (borders, roads,
+    /// companies, finishing) were computed and thrown away. Measured, that is
+    /// 10,805 ms of 11,316 — about 95% of the round's wait spent on passes it
+    /// discards, and it is why the round visibly hung on "Laying roads".
+    ///
+    /// WHY A KNOB RATHER THAN A SECOND ENTRY POINT. A second function that
+    /// "just runs the early passes" is a second construction of the
+    /// invocation, which is precisely the drift `era_minus_one.hpp` exists to
+    /// stop — six divergent axes, found the hard way by BL-462, and a seventh
+    /// caller found again by NR-733. There is still exactly ONE path through
+    /// generation; this only says where to stop walking it.
+    ///
+    /// THE WORLD IS NOT USABLE WHEN THIS IS SET, and that is the whole contract.
+    /// No nations, no roads, no corporations, no markets. A caller that sets it
+    /// wants `generation_report` and must discard the `world`. Nothing in the
+    /// campaign path may ever set it.
+    ///
+    /// Default false: every existing caller builds a whole world, exactly as
+    /// before. Authored nowhere in Lua — this is a call-site scope knob, not a
+    /// balance value, and it is the one field here that is not.
+    bool stop_after_ancient_era = false;
+
+    /// STOP GENERATION ONCE THE EXPLORATION SPAN HAS RUN, before borders,
+    /// roads and companies are built (BL-946) -- the Exploration round's own
+    /// sibling to `stop_after_ancient_era` above, same contract, one round
+    /// later. Also gates the Exploration span ITSELF off whenever
+    /// `stop_after_ancient_era` is set, so the Empires round's own launch
+    /// (which stops right after the ancient era) never pays for a span it
+    /// will discard.
+    ///
+    /// THE WORLD IS NOT USABLE WHEN THIS IS SET, for the same reason
+    /// `stop_after_ancient_era` is not.
+    ///
+    /// Default false: every existing caller is unaffected.
+    ///
+    /// BL-1040: IT ALSO STOPS BEFORE THE DIGITISATION SPAN. The span sits
+    /// between the Exploration fold and population centres, which is ahead of
+    /// this knob's own return, so the call site gates the span on this knob
+    /// directly -- the Exploration round's launch, `exploration_sweep` and the
+    /// seed-library fingerprints never pay for a span they would discard, and
+    /// never read a world it moved.
+    bool stop_after_exploration = false;
+
+    /// STOP GENERATION ONCE THE DIGITISATION SPAN HAS RUN (BL-1040), before
+    /// borders, roads and companies are built -- the next rung of the ladder
+    /// `stop_after_exploration` sits on, same contract, one span later. A
+    /// caller that wants the 1960 close (a harness reading
+    /// `era_minus_one_fixture::digitisation_handoff`, the wizard's Digitisation
+    /// round once it plays a record) stops here rather than paying for world
+    /// setup it discards.
+    ///
+    /// When the span does not run (`world_params::digitisation_span_enabled`
+    /// off, or Exploration did not run) this stops at the same point
+    /// `stop_after_exploration` does, on the world as generation left it.
+    ///
+    /// THE WORLD IS NOT USABLE WHEN THIS IS SET, for the same reason
+    /// `stop_after_ancient_era` is not.
+    ///
+    /// Default false: every existing caller is unaffected.
+    bool stop_after_digitisation = false;
+
+    /// STOP GENERATION ONCE THE MIGRATION HAS RUN, before the Empires round's
+    /// history sim ever starts (BL-871).
+    ///
+    /// WHAT IT IS FOR. The wizard's round 3 (Culture) wants the migration's own
+    /// record — colonisation's founding walk, 2400 BCE to wherever it
+    /// terminates — and NOT the Empires round's conquest history that used to
+    /// be fused into the same run. Mutually exclusive with
+    /// `stop_after_ancient_era` in practice: a caller wants one stop point or
+    /// the other, never both, though nothing here enforces that (the earlier
+    /// check wins if both are set).
+    ///
+    /// THE WORLD IS NOT USABLE WHEN THIS IS SET, for the same reason
+    /// `stop_after_ancient_era` is not: `run_history_sim` has not run at all,
+    /// so no region founded after `sim_start_year` exists yet, there are no
+    /// polities, and nothing downstream may be built from it.
+    ///
+    /// Default false: every existing caller is unaffected.
+    bool stop_after_migration = false;
+
     /// Deposit-density multiplier per abundance_level (sparse/lean/standard),
     /// authored under `world_gen.deposit_scalar`. Indexed by abundance_level.
     std::array<float, 3> deposit_scalar = { 0.40f, 0.65f, 1.00f };
@@ -63,6 +149,13 @@ struct world_gen_config
         a[static_cast<std::size_t>(resource_type::trade_goods_misc)]   = 15.0f;
         return a;
     }();
+
+    // ONE base-price table for both era bands (Ben, 2026-09-02, overturning
+    // NR-778). A per-band override was tried when the ancient bloom chain priced
+    // its own steel at 113; the ruling was to shorten that chain to depth 1
+    // instead (recipes.lua's Bloomery) so one table clears the recipe margin
+    // anchor in both bands. A good's price is the larger of the two bands'
+    // anchor-route needs; recipe_margin checks both against this one table.
 
     market_carving_params  market_carving{};
     endemic_pricing_params endemic{};

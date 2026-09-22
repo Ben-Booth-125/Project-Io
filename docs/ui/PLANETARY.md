@@ -1,5 +1,16 @@
 # Project Io — Planetary Screen
 
+> **Settles:** what the surface rung communicates above the ground · how a building
+> marker reads, and a tile carrying several · at what grain the surface is drawn and
+> selected · how a national border reads without two neighbours blending into a
+> third, and what pressing it selects · which channels carry composition and
+> landform, and which tiles suppress them · which layers draw in what order and what
+> degrades at far zoom · how a press and a hover land on the hex grid.
+> **Not here:** how the ground itself is rendered (RENDERING) · the ladder and the
+> shared state (CANVASES) · what an overlay shows (LENSES) · what a click then
+> offers (SELECTION).
+> **Confused with:** RENDERING.md, LENSES.md, CANVASES.md.
+
 The Planetary screen is the tile-grid view of the selected body's surface — the **bottom rung** of the canvas ladder, and the rung play opens on (the corporation's home planet — the app itself opens on the main menu first, see [STARTUP.md](STARTUP.md)). See [CANVASES.md](CANVASES.md) for layout rules shared across the three canvases (the zoom ladder, context minimap, region sizing, shared selection state, implementation approach).
 
 Because it is the bottom rung, the Planetary screen is **only ever primary** — it is never shown in the minimap. Reaching it is a descend click on the Circumplanetary screen; leaving it is a click on the minimap (which shows the Circumplanetary view) to ascend.
@@ -20,6 +31,14 @@ This canvas communicates:
 ---
 
 ## Tile grid
+
+> **The ground's render mechanism is owned by [RENDERING.md](RENDERING.md)** — baked
+> painterly chunks, the C-F art direction, the no-grid rule, installations as rendered
+> geometry, animation and LOD. This doc owns the analytic channels above the ground;
+> which of them survive, retire or restyle over painterly ground is owned by BL-734
+> (ground/chrome layer contract), and until that settles every channel below keeps its
+> current spec — except where RENDERING.md's rulings already retire it (the on-ground
+> grid, the building/settlement canvas glyphs).
 
 **Shape:** Pointy-top hexagons in odd-r offset coordinates. Odd rows are shifted right by half a column. Grid axes: columns (x) run left-to-right, rows (y) run top-to-bottom.
 
@@ -43,9 +62,7 @@ A tile's character has **three axes** ([TILES.md](../economy/TILES.md)):
 - **Landform** — the tile's physical shape. Seven values (`terrain_landform`): plains,
   highland, mountain, canyon, valley, crater, rift. Landform renders on its **own
   channels** — a subtle relief tint (`ui::landform_relief`) plus stroke-only glyphs for
-  the dramatic set, inked by luminance (`ui::contrast_ink`) — never in the hue. The full
-  render spec is [CANVASES.md](CANVASES.md) § Terrain channels, shared
-  with the Selection band's neighbourhood view via `hex_render`.
+  the dramatic set, inked by luminance (`ui::contrast_ink`) — never in the hue.
 
 Substrate and cover **share** the hex's hue: `ui::terrain_colour` (`src/ui/hex_render.{hpp,cpp}`)
 is the single colour source of truth, and it blends the substrate's own colour toward a
@@ -55,6 +72,64 @@ below necessary rather than decorative — two different tiles can arrive at the
 Ocean and landmass are derived from the **Continents/Drift tectonic-plate pass**
 (`docs/generation/CONTINENTS.md`; the Continent lens renders the plates). Ocean fraction is
 an outcome of the plate pass and the body's hydrological state, not a flood-fill target.
+
+### Terrain channels — composition and landform
+
+The three axes render on **two channels** (BL-231, landform channels; BL-232,
+bridged runs). Both are **always-on chrome**, not an `overlay_mode`: terrain
+identity is not something the player opts into, and landform's
+movement-cost multiplier applies whether or not a lens is active.
+
+| Axis | Channel | Source |
+|---|---|---|
+| **Composition** (substrate + cover) | **Hue** — the flat hex fill | `ui::terrain_colour` |
+| **Landform** (its physical shape) | **Relief tint** + **glyph** | `ui::landform_relief`, `ui::icons::landform` |
+
+**Why two channels rather than one.** Lens tints composite over the terrain hue at
+0.6–0.80 alpha, so a second signal carried *in that hue* is obliterated exactly when a
+lens is on. This is the rule the Continent lens's plate boundaries established and it
+applies here unchanged: the relief is composited **after** every lens branch, and the
+glyphs are drawn over the finished fill in a contrasting ink (`ui::contrast_ink`, picked
+by the fill's luminance so it reads over the whole palette).
+
+**Why the landform channel splits in two.** The measured mix (`world_audit` § S3) decided
+it. Plains and valley alone are ~95 % of land tiles, while every dramatic landform is
+≤ 1.5 %:
+
+- **Common ground — relief tint.** Plains is the untouched baseline; elevated ground lifts
+  toward a warm highlight and sunken ground toward a cool shadow, on a small signed
+  ordinal scale (mountain highest → canyon lowest). Deliberately subtle: it must read as
+  light on terrain, never as a change of composition.
+- **Dramatic landforms — glyph.** Mountain, canyon, crater and rift each draw a stroke-only
+  silhouette ([ICONS.md](ICONS.md) § Landform). These are the ≤ 1.5 % set whose movement cost
+  is ×1.3 or worse, so an invisible surprise there is expensive. A glyph on *every* tile
+  would be far denser than any other glyph family and would fight the building silhouette
+  for the hex centre.
+
+**Contiguous runs are bridged.** A run of the same linear landform draws as **one**
+spanning marker rather than the same glyph repeated per tile — mountain as a chain of peaks, rift
+as one continuous fissure, canyon as paired rims — reusing the road span/symmetry idiom (each
+tile draws its own half of the shared edge, so halves meet at the midpoint with no cross-tile state
+and the survey fog clips cleanly). A lone tile keeps its centred glyph, the role the road's centre
+cap plays. Crater never spans. Contiguity was measured before the render was designed
+(`world_audit` § S4): 71% of mountain and 81% of rift tiles have such a neighbour, so bridging
+fires on the majority — while **no** tile in the system has all four neighbours, which is why there
+is no "filled interior" case.
+
+**The glyphs are named where the player looks.** Every tile hover card states
+`composition · landform` and, on the plain canvas, the landform's movement cost — a glyph
+vocabulary learnable only by clicking each tile through to the Selection panel is not learnable.
+Plains stays unnamed: it is the untouched baseline in both channels.
+
+**Suppression rules.** The glyph is skipped on a **built** tile (which already carries an
+enlarged silhouette plus a corp emblem tag, and whose cost is already spent — elevation
+matters when *siting*) and under the **Population/Opportunity** lenses (which claim the hex
+centre for their own value mark). The relief tint is likewise skipped on a built
+tile, whose hex is swapped wholesale for its owner plate as an identity signal.
+
+Both channels also render in the Selection band's zoomed tile-neighbourhood view, which is
+why they live in `hex_render` rather than in the canvas — one implementation, so the two
+surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
 
 ---
 
@@ -71,9 +146,9 @@ an outcome of the plate pass and the body's hydrological state, not a flood-fill
 | Hover card | The shared glance-then-stick hover card ([TOOLTIP.md](TOOLTIP.md)), content **lens-keyed** (`src/ui/hover_content.cpp`). A tile's default variant: `substrate · landform` header (plains unnamed), habitability, and the landform's movement-cost multiplier when not plains. Under the Resource lens: the selected resource's deposit richness; under Population: habitability + workforce cap. Buildings and market centres carry their own variants (rival buildings show type + owner only — the competitor-visibility rule, [DISCOVERY.md](DISCOVERY.md)). |
 | Body label | Canvas title bar shows the selected body name, type, and grid dimensions. As the Planetary screen is always primary (full size), the title is always shown. A **survey-status suffix** follows it: `UNSURVEYED`, `Survey en route`, or `Surveying k/N` — nothing once surveyed. |
 | Survey region mask | On a body whose survey is incomplete, tiles in **unrevealed regions** render as a flat dark "locked" fill `(12, 14, 20)` with no lens tint, borders, markers, selection outline, or hit-testing; revealed regions render normally. Regions reveal in deterministic raster (row-major) order as the survey scans ([DISCOVERY.md](DISCOVERY.md)). A fully surveyed body (the home planet, or a completed survey) shows everything. |
-| Settlement markers | Always-on civic chrome, not lens-gated: **every** generated population centre draws, and its **form follows the zoom** — the LOD ladder (BL-625, settlement tier glyphs). Far zoom (hex radius ≤ 7 px, the canvas's coarse-fill pivot): only scale ≥ 3 centres carry the tier skyline (`ui::icons::settlement`); everything smaller is a dim civic **density dot**, so a settled region reads as settled without glyph soup. Mid zoom (7–14 px): towns (scale 2) join the skylines. Close zoom (≥ 14 px, the texture pivot): every centre is a skyline, and **razed** centres (BL-624) surface as the ruin mark (`ui::icons::settlement_razed`) — a ruin is a tile-scale fact. Only **City+** centres (scale ≥ 4) carry a name label. Colour is **civic-neutral** (`palette::settlement`) under every lens — tier is carried by the glyph, and ownership is carried by the national border band, not by a settlement's colour. |
+| Settlement markers | Always-on civic chrome, not lens-gated: **every** generated population centre draws, and its **form follows the zoom** — the LOD ladder (BL-625, settlement tier glyphs). Far zoom (hex radius ≤ 7 px, the canvas's coarse-fill pivot): only scale ≥ 3 centres carry the tier skyline (`ui::icons::settlement`); everything smaller is a dim civic **density dot**, so a settled region reads as settled without glyph soup. Mid zoom (7–14 px): towns (scale 2) join the skylines. Close zoom (≥ 14 px, the texture pivot): every centre is a skyline, and **razed** centres (BL-624) surface as the ruin mark (`ui::icons::settlement_razed`) — a ruin is a tile-scale fact. Only **City+** centres (scale ≥ 4) carry a name label. Colour is **civic-neutral** (`palette::settlement`) under every lens — tier is carried by the glyph, and ownership is never carried by a settlement's colour. On the plain canvas ownership is read from the national border band; under a lens the band is suppressed, so ownership is not on the canvas at all and is read from the Selection panel. |
 | Home-cluster ring + HQ star | Always-on player-presence chrome on `home_body` only: a translucent ring (player-identity colour) encloses the player's holdings cluster on that body ("my region"), and an `ui::icons::hq` star marks the building nearest the cluster centroid ("my origin"). Composes with, does not duplicate, the per-tile ownership outline. |
-| National border band | **Always-on** political chrome (like roads, not a lens): a nation's identity colour sits at its frontier and falls off inwards over three tiles, and clicking the band selects the nation. See § The national border band below. |
+| National border band | **Plain-canvas** political chrome, **suppressed while any lens is up** (Ben, 2026-08-28, reaffirmed 2026-09-07): a nation's identity colour sits at its frontier and falls off inwards over three tiles, and clicking the band selects the nation. Unlike roads, it is not always-on — a lens asks one question, and a national wash competes with the answer. See § The national border band below. |
 | Rivers | Directed river lines drawn along tile edges with downstream chevrons, so a basin reads as flowing rather than as a static blue band. Terrain drawing, not a lens; always on. |
 
 ---
@@ -264,7 +339,7 @@ Only **Industry** carries a genuinely computed per-province reduction; the rest 
 with a reason, or lenses that paint no fill. That is deliberate: the province is the *selection*
 grain under every lens, but it is the *render* grain only where the field is continuous.
 
-**Country has no row because it is not a lens.** The national read is the border band below —
+**Country has no row because it is not a lens.** The national read is the border band below, which draws on the plain canvas only —
 always-on chrome, composited per tile *after* the blend has run. That siting is what retires the
 question the row used to answer: a nation's colour never enters the blended fill, so the mean of two
 nation colours — a third nation's colour — cannot be reached.
@@ -293,10 +368,19 @@ the card's contents — are in [SELECTION.md](SELECTION.md) § The province elem
 
 **A nation reads as a bordered region, not as a tinted field.** Its identity colour
 (`palette::nation_colour`) lives at the boundary and falls off inwards; the middle of a territory
-stays plain. That is what makes the read affordable **always-on**, under every lens and on the plain
-canvas — a full-territory tint would own the ground the terrain, the texture and the active lens
-need, and a band does not. Roads are the precedent: drawn always, because they are context rather
-than a mode the player enters.
+stays plain. That is what makes the read affordable at all — a full-territory tint would own the
+ground the terrain and the texture need, and a band does not.
+
+**The band draws on the plain canvas only, and is suppressed while any lens is up** (Ben,
+2026-08-28, reaffirmed 2026-09-07). Affordability is why the band is a band; it is not a licence to
+draw it under a lens. A lens asks one question, and nation ownership is a second political answer
+competing with it — so nation context is absent from a lens *by construction*, not merely absent
+from its fill. Roads are therefore **not** the precedent: a road is terrain a lens reads over.
+
+A consequence worth stating, because it removes a question rather than answering it: the band's
+click corridor cannot contend with a lens's own structure for a press, because the two are never on
+screen together. Under a lens, a click that misses every marker falls through to the province as it
+always did.
 
 Ben, 2026-08-24: *"National borders should not diffuse together, instead they should borders
 extending their colour inwards. With this, we can drop the nation lens."*
@@ -338,15 +422,19 @@ honest:
 
 | Depth | Wash opacity | Reads as |
 |---|---|---|
-| 0 (on the frontier) | 0.50 | The edge itself, under the coloured rule |
-| 1 | 0.26 | The colour reaching inwards |
-| 2 | 0.11 | The last trace before plain ground |
-| 3+ | none | Terrain, texture and the active lens, untouched |
+| 0 (on the frontier) | 0.35 | The single frontier ring, under the coloured rule |
+| 1+ | none | Terrain, texture and the active lens, untouched |
 
-`k_border_band_tiles` = 3. At the **coarse-fill LOD** (`draw_r ≤ 7 px`) the band collapses to
-depth 0 alone: at the whole-grid view a single ring still draws the political outline, which is the
-whole read at that zoom, and relaxing three rings over every hex on the body is the one place the
-pass could cost real frame time.
+`k_border_band_tiles` = 1, and the band colour is **muted** — the nation identity colour
+pulled toward its own luma by `k_border_mute` (0.55) and sat down slightly, wash and stroke
+alike (the border-corridor hover label keeps the full identity colour: a label must be read,
+not weighed). Ben, 2026-09-01, judging the first baked painterly ground: the three-ring
+falloff and full-strength colour were tuned against flat saturated hexes, and over the muted
+C-F bake the band inverted its contrast relationship with the ground — it became the loudest
+mark on the map. *"Nation borders are way too strong. We should use a muted colour palette,
+and we should also make it a 1 tile glow."* The inward-falloff mechanism above remains the
+design (the depth relaxation still runs, and widening the ring is one constant) — what the
+ruling sets is its extent and its volume.
 
 The band is gated on `revealed`, like the survey mask itself: a border drawn through the survey
 mask would leak the political shape of ground the player has not paid to survey
@@ -355,7 +443,8 @@ mask would leak the political shape of ground the player has not paid to survey
 ### Clicking the border selects the nation
 
 **The band is a selection target, and it is the route the Country lens used to own.** With the lens
-retired ([LENSES.md](LENSES.md) § Structure-grain selection), the border is what carries a nation
+retired ([LENSES.md](LENSES.md) § The Country lens has retired — national borders are chrome), the
+border is what carries a nation
 on screen — so the border is what opens it. Ben's ruling of 2026-08-24, on where the nation ledger
 is reached: *"click the border itself."*
 
@@ -383,7 +472,7 @@ Beyond the base grid and the chrome in the table above, the draw pass
 (`body_surface_canvas.cpp`) composites, in broad order:
 
 - **Terrain channels** — substrate/cover hue + landform relief tint and glyph/spans.
-  Spec: [CANVASES.md](CANVASES.md) § Terrain channels.
+  Spec: § Terrain channels — composition and landform, above.
 - **Lens tints** — the lenses keyed on `ui_state::overlay`
   ([LENSES.md](LENSES.md)); relief composites *after* the lens tint so landform
   survives a saturated overlay.
@@ -594,10 +683,15 @@ for i in 0..5:
 ## Interaction
 
 - **Hover** a tile: show the hover card. Hit-tested by distance to hex centre (< circumradius).
-- **Single-click** the surface: markers are hit-tested first, in the order **building → market → unit** (`body_surface_canvas.cpp`), so buildings, markets and units stay independently selectable. A click that misses every marker but lands in a **national border corridor** selects that nation (§ The national border band). Otherwise it selects the **province** (§ Province grain above) rather than the tile; the tile is one press away in the province card. Clicks do not change the view rung — the Planetary screen is the bottom of the ladder.
+- **Single-click** the surface: markers are hit-tested first, in the order **building → market → unit** (`body_surface_canvas.cpp`), so buildings, markets and units stay independently selectable. On the plain canvas, a click that misses every marker but lands in a **national border corridor** selects that nation (§ The national border band); under a lens the corridor does not exist, because it is built in the same pass as the stroke. Otherwise it selects the **province** (§ Province grain above) rather than the tile; the tile is one press away in the province card. Clicks do not change the view rung — the Planetary screen is the bottom of the ladder.
 - **Ascend:** clicking the minimap (which shows the Circumplanetary view) promotes it to primary.
 - **Middle mouse button drag:** pan. Horizontal panning is unbounded — the grid is a cylinder, so panning past the east or west edge wraps seamlessly to the opposite side. Each tile is drawn (and hit-tested) at every horizontal offset that falls within the canvas, so there is no visible seam and the column under the cursor is always correct.
-- **Scroll wheel:** zoom, anchored at the cursor position.
+- **Scroll wheel:** zoom, anchored at the cursor position — **stepped**, one ×2 ladder
+  rung per notch (Ben, 2026-09-01; [RENDERING.md](RENDERING.md) § Level of detail owns the
+  ladder and its bake-tier pairing). The `=`/`-` keys step the same ladder. The top two
+  rungs additionally **tilt the land** (22.5°/45°, plain canvas only — RENDERING.md
+  § The stepped tilt); interaction is unchanged under the tilt, with hit-testing
+  through the camera's inverse.
 
 The wrap seam has **no marker**: the wrap is seamless by construction and a seam indicator would
 draw attention to a boundary that does not exist for the player.

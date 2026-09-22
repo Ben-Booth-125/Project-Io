@@ -4,6 +4,8 @@
 #include "corp_command.hpp"
 #include "entity.hpp"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <iosfwd>
 #include <string>
@@ -22,12 +24,73 @@ struct economy_report;
 // construction: sorted iteration, lowest-id tie-breaks, and the only
 // "randomness" is a per-corp hash used as a fixed personality jitter.
 
+// ---------------------------------------------------------------------------
+// Standing — what a corporation's position is measured in (BL-700)
+// ---------------------------------------------------------------------------
+// AI_OPPONENT.md § "Standing — what the margin is measured in". Ben, 2026-08-31:
+// a corporation's standing is "an aggregate of net worth, research, military
+// strength… maybe others too".
+//
+// Balance alone is the wrong measure and would misread the game constantly — a
+// corp that has just spent its treasury on a smelter is not behind, and a corp
+// hoarding cash while its rivals arm is not ahead. Everything in the codebase
+// measures balance today; this is the one quantity that does not.
+//
+// NOT `standing.hpp`'s `corp_standing`, and the two are worth telling apart
+// because the word is overloaded. That one is a DISCLOSURE-GATED PROFILE for
+// the Corporations panel — reach, capital, market share, each shown or withheld
+// by the observed firm's own filing status. This one is a single scalar the
+// scorer compares corps by, computed from full world state with no visibility
+// filter at all, and it is deliberately NOT player-facing: a coalition scores
+// against it, and what the player may READ about a rival is that other type's
+// question. Hence `standing_index` rather than a second `corp_standing`.
+
+/// The components of the composite standing index.
+///
+/// APPEND-ONLY, and that is the point of the enum rather than three named
+/// fields: Ben's wording left the list deliberately open, so a FOURTH COMPONENT
+/// MUST BE AN ADDITION, NOT A REWRITE. Adding one is four edits and no
+/// restructuring — an enumerator here (appended, never inserted), one more
+/// initialiser in `corp_ai_params::standing_weights`, one `case` in
+/// `corp_ai.cpp`'s measurement switch, and a label in
+/// `standing_component_name`. Nothing sums the components by hand: the weighted
+/// total is a loop over this enum, so no arithmetic anywhere has to change.
+enum class standing_component : uint8_t
+{
+    economic = 0, ///< Net worth: cash + the assessed value of buildings and held stock.
+    research,     ///< The corp's accumulated `science` (reached, never spent).
+    military,     ///< Summed `unit_strength` over the corp's fielded units.
+};
+
+/// One past the highest component — the count every array here is sized by.
+/// Bound to the append-only rule above: appending a component moves this with it.
+inline constexpr std::size_t standing_component_count =
+    static_cast<std::size_t>(standing_component::military) + 1;
+
+/// Canonical prose label for a component ("economic", "research", "military").
+const char* standing_component_name(standing_component c);
+
 /// Tunables for the stage-A scorer. Defaults are the accepted-design values;
 /// a harness may tighten them to force behaviour into few ticks.
 struct corp_ai_params
 {
     int   cadence_k       = 4;     ///< Corp c evaluates when tick % k == index(c) % k.
-    int   top_m_sites     = 8;     ///< Build-site pre-filter width (bounded enumeration).
+    /// BL-711: build-site pre-filter width, PER RESOURCE - not a global cap.
+    ///
+    /// It was `top_m_sites = 8`, a global top-M over deposit x affinity x
+    /// demand_weight. Deposit magnitudes span three orders, so all 8 rows came
+    /// back iron_ore and clay, peat, sand, hides and fibre were never candidates
+    /// anywhere, for any corp, in any world (AI_OPPONENT.md - Selection must be
+    /// scale-free). Per-resource, every extractable reaches the scorer and the
+    /// scorer decides, which is what the scorer is for.
+    ///
+    /// 2 rather than 1 deliberately: one site per resource is a single point of
+    /// failure against the placement and glut vetoes downstream, so a resource
+    /// whose best tile is unbuildable would silently lose its whole category
+    /// again - the same second-chance argument as BL-712's per-group build
+    /// candidates. Upper bound on the returned list is K x extractables, ~36
+    /// today against the old flat 8. 0 disables enumeration entirely.
+    int   top_k_sites_per_resource = 2;
     /// BL-440: how hard an UNMET RECIPE INPUT pulls a site's suitability up.
     ///
     /// A tile offers every extractable deposit it carries as a candidate target,
@@ -115,6 +178,84 @@ struct corp_ai_params
     /// ticks for "one clearing pass". 1 by default.
     int forecast_clearing_ticks = 1;
 
+    // --- Standing (BL-700). WEIGHTS ARE DATA, SO TUNING IS A DATA CHANGE ------
+    //
+    // Indexed by `standing_component`, and the array (rather than three named
+    // floats) is what keeps a fourth component an addition: one more
+    // initialiser here and the weighted sum in corp_ai.cpp picks it up
+    // untouched.
+    //
+    // EVERY WEIGHT IS "CREDITS PER UNIT OF THIS COMPONENT", so the composite is
+    // denominated in credits and stays legible: a corp's standing reads as a
+    // sum of money it holds, money it has spent reaching a research level, and
+    // money it has spent putting an army in the field. Three components in
+    // three unrelated units cannot be added without SOME conversion, and a
+    // conversion nobody can state is a magic number; this one anyone can check.
+    //
+    // The defaults below are DERIVED FIRST CUTS, not tuned values — each is an
+    // anchor read off the shipped `scripts/economy.lua`, and each is stated so
+    // it can be argued with. None has been calibrated against play; the
+    // coalition layer that scores against this composite is the thing that will
+    // want them revisited.
+    std::array<float, standing_component_count> standing_weights = {
+        // ECONOMIC — 1.0. Net worth is already in credits; it is the unit the
+        // other two convert INTO, so this weight is 1 by definition and moving
+        // it is really a rescaling of the other two.
+        1.0f,
+        // RESEARCH — 25 credits per science point. A research_institute
+        // produces exactly 1.0 science per econ tick
+        // (`economy.military.science_per_research_institute_tick`) and costs
+        // 15 maintenance + 10 wages per tick to run, so 25 credits is what a
+        // science point costs to make. Marginal production cost, not a market
+        // price: `science` has no market slot at all, by design — it is
+        // stockpiled, market-invisible and never decays.
+        25.0f,
+        // MILITARY — 1.35 credits per point of `unit_strength`. The anchor is
+        // the SUSTAINED cost of a fielded regiment over its service life, not
+        // its one-off raise price: `unit_upkeep` pays `credits_per_head` (0.15)
+        // x `hire_batch_manpower` (50) = 7.5 credits of wages per tick, and
+        // `value_anchor.cpp` asserts the goods half of the same vector at
+        // ~2 x wage — so keeping one regiment in the field costs ~22.5 credits
+        // a tick, all in. Over a 300-tick campaign that is ~6,750 credits
+        // against the 5,000 `unit_strength` a fully-supplied Levy Spear stands
+        // at, and 6750/5000 = 1.35.
+        //
+        // THE HORIZON IS THE REAL TUNABLE HERE, and it was chosen by
+        // measurement rather than taste. A hundred ticks gives 0.45, and 0.45
+        // was measured to reorder the field on NO seed — because corps come out
+        // bimodal at 3 regiments or 0, so adjacent pairs usually carry the same
+        // military term and no weight on a uniform component can separate them.
+        // At 1.35 the composite starts disagreeing with cash: a corp holding
+        // three regiments and slightly negative cash outranks one holding no
+        // army and slightly positive cash, which is § Standing's own stated
+        // intent — *"a corp hoarding cash while its rivals arm is not ahead"*.
+        //
+        // IT WAS 0.02, the RAISE cost (a Levy Spear at 40 credits for 5,000
+        // strength, a Rifle Regiment at 230 for 6,900, and 0.02 between them),
+        // and the block that carried it flagged its own defect rather than
+        // hiding it: *"this prices an army at what it cost to raise, which is
+        // not what it is worth to the corp holding it... military barely
+        // registers today. That is a tuning question for whoever scores
+        // coalitions against this."* BL-699 (rival coalitions) is that scorer,
+        // so the question came due.
+        //
+        // WHAT MADE IT DUE, measured rather than argued (BL-697's margin read,
+        // `ai_skill_harness`, five seeds): research read 0.0 on all 35
+        // corp-rows and military was quantised to {0, 5000, 10000, 15000},
+        // weighting to at most 300 credits against economic values spanning
+        // +/-250,000. The composite REORDERED THE FIELD AGAINST NET WORTH IN
+        // NO SEED — so a coalition scoring against it would have been scoring
+        // against cash with extra steps, which is the failure AI_OPPONENT.md
+        // § Standing exists to prevent and calls "hardest to notice because it
+        // still looks like diplomacy". Ben's ruling, 2026-09-01: raise it until
+        // a fielded army can visibly change who leads.
+        //
+        // STILL A COST ANCHOR, not a combat valuation, because the world
+        // prices no such thing yet. What changed is WHICH cost: what holding
+        // an army commits a corp to, rather than what buying it took.
+        1.35f,
+    };
+
     /// Projected supply/demand ratio at which a build's score starts to taper
     /// (>1.0 = the forecast expects the market to be adequately served) and
     /// the ratio at which it is vetoed outright (a hard glut). Linear taper
@@ -122,6 +263,55 @@ struct corp_ai_params
     float glut_taper_ratio = 1.0f;
     float glut_veto_ratio  = 2.0f;
 };
+
+/// One corporation's standing, component by component plus the weighted total.
+///
+/// The components are kept ALONGSIDE the total rather than collapsed into it,
+/// and that is not convenience: a coalition that forms against a leader has to
+/// be able to say WHY it formed, and "ahead on military" is a different
+/// statement from "ahead on net worth" even when the totals match. It is also
+/// what makes the weights auditable — a reader can recompute the total.
+struct standing_index
+{
+    /// Raw, UNWEIGHTED component values, indexed by `standing_component`.
+    /// Economic is in credits, research in science points, military in
+    /// `unit_strength` (the x100 fixed point).
+    std::array<float, standing_component_count> component{};
+
+    /// Sum of `component[i] * p.standing_weights[i]`, in credits.
+    float total = 0.0f;
+};
+
+/// The composite standing of `corp` (BL-700) — AI_OPPONENT.md § "Standing".
+/// An unknown corp stands at zero on every component; this never throws.
+///
+/// READ POINT — BINDING, and the reason this is a free function over a const
+/// world rather than something the scorer computes inline.
+///
+/// Standing must be read at the ECON-TICK BOUNDARY: after `apply_budget` has
+/// written the closing balances and `clear_markets` has resolved the prices
+/// that value held stock, and BEFORE any corp's strategic evaluation mutates
+/// the world. `run_corp_strategic_step` walks corps in SORTED ID ORDER and
+/// applies each one's commands as it goes, so a standing read from inside that
+/// walk would answer differently for the first corp than for the last — the
+/// evaluation cadence would silently become the tiebreak of every comparison
+/// built on it, which is exactly the class of thing that makes a deterministic
+/// simulation replay differently for a reason nobody can see. A consumer that
+/// needs the whole field's standings must therefore SNAPSHOT them once at the
+/// boundary and score against the snapshot; it must never call this per corp
+/// from inside the walk.
+///
+/// DETERMINISTIC BY CONSTRUCTION, in three separate places:
+///   * cash and building value walk `corporation_component::assets`, a vector
+///     in authored order;
+///   * held stock walks `world::corp_body_pools`, a std::map, so key-ordered;
+///   * the military term accumulates `unit_strength` as an INTEGER over
+///     `world::units`, which is an unordered_map — a float accumulator there
+///     would make the sum depend on hash layout, since float addition is not
+///     associative. This is the same guard `condition_set.cpp`'s
+///     `military_strength` subject applies, for the same reason.
+standing_index corp_standing_index(const world& w, const recipe_registry& reg,
+                                  entity_id corp, const corp_ai_params& p = {});
 
 // ---------------------------------------------------------------------------
 // Stage B — strategy, priority buckets, predictive spending (BL-203,

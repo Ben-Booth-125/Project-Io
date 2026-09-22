@@ -468,6 +468,21 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         return leg;
     if (ri >= resource_count)
         return leg;
+    // BL-708 — A GRID GOOD IS NEVER CARGO (docs/economy/PRODUCTION.md § Power;
+    // docs/economy/LOGISTICS.md § 3a). Power has a price and clears like any
+    // other good, but transmission IS the road network, at a flat one-tick
+    // latency: there is no convoy to load, no tonnage to haul and no leg to
+    // price. It is the roster's first good whose MOVEMENT and MARKET are
+    // separate questions, and only the movement is special.
+    //
+    // Refused HERE, at the one shared seam, rather than at each of the callers:
+    // `dispatch_convoys`' shortfall scan, the player's `dispatch_convoy` verb
+    // and the rival scorer's directed dispatch (BL-600) all price through this
+    // function, so one non-viable leg closes all three and no fourth path can
+    // open later without meeting it. A non-viable leg is the same answer an
+    // unroutable lane already gives, so every caller already handles it.
+    if (reg.grid_goods().grid(ri))
+        return leg;
     // A non-finite quantity would make every comparison below meaningless and
     // the cost NaN; refuse it here so both callers refuse it identically.
     if (!std::isfinite(qty) || !(qty > 0.0f))

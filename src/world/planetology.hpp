@@ -265,14 +265,28 @@ bool resolve_checkpoint(chain_stage stage_id, uint32_t seed, uint32_t stage_tag,
     return false;
 }
 
-/// The calendar year the campaign opens in — 1 January 1960 (ERAS.md § Era 0),
-/// and the zero point every `history_event` counts backwards from.
+/// The fixed reference year every `history_event::years_before_epoch` counts
+/// backwards from. A datum, NOT the campaign's start year.
 ///
-/// `ui::fmt::campaign_epoch_year` (src/ui/format.hpp) is the same year for the
-/// tick calendar; the two must agree, and tile_inspector.cpp static_asserts it
-/// where both are in scope. It is duplicated rather than shared because the
-/// world layer cannot include a UI header.
-constexpr int64_t campaign_epoch_year = 1960;
+/// RENAMED 2026-08-31 (BL-705), from `campaign_epoch_year`. Under that name it
+/// looked like a second copy of the campaign epoch, and `tile_inspector.cpp`
+/// static_asserted it equal to `ui::fmt::campaign_epoch_year` — which pinned
+/// the tick calendar to 1960 even though `world_params::epoch_year` had
+/// defaulted to 0 since the ancient refocus (NR-177). Two different quantities
+/// wearing one name is what kept that wrong.
+///
+/// It is deliberately a CONSTANT and must stay one: `years_before_epoch` is a
+/// stored, serialised field, so the datum it is measured against cannot move
+/// with the campaign's start year without invalidating every save and golden.
+/// Nothing is lost by fixing it — `format_history_date` renders recorded
+/// history as an absolute calendar year (`history_datum_year - y`), which is
+/// correct at any epoch, and the "N years ago" branch it takes above 10 kyr is
+/// the geological before-present convention, whose datum is fixed by design.
+///
+/// The campaign's own start year is `world_params::epoch_year`
+/// (world/hard_coded_world.hpp); the tick calendar reads it via
+/// `ui::fmt::campaign_epoch_year()`.
+constexpr int64_t history_datum_year = 1960;
 
 /// Convert deep time in billions of years to the stored representation.
 ///
@@ -290,7 +304,7 @@ constexpr int64_t years_from_gya(float gya)
 /// stored representation. The historical ladder's entry point.
 constexpr int64_t years_from_calendar_year(int64_t year)
 {
-    return campaign_epoch_year - year;
+    return history_datum_year - year;
 }
 
 /// One dated line of a body's history. `event` is the left column (what
@@ -552,6 +566,21 @@ struct planetology_state
     bool  mobile_lid          = false;///< Plate tectonics — gates porphyry copper.
     bool  core_exposed        = false;
 
+    /// THE THERMAL HISTORY, one value per drift epoch (BL-961). `[k]` is the
+    /// thermal budget as it stood `k` drift epochs before the present, on the
+    /// same clock the drift record keeps (`continent_epoch_years`, 5 My), so
+    /// the vector is `continent_drift_epochs + 1` long: the present at `[0]` —
+    /// bit-identical to `theta`, which is what lets a consumer treat the two as
+    /// one number — then one entry per epoch out to the record's stated depth.
+    /// DERIVED, NOT ROLLED: the same reconstruction the chain's own gates use
+    /// (`theta_at` — the radiogenic term re-evaluated at the age, the tidal term
+    /// carried across unscaled), consuming no RNG, so adding it moved no stream.
+    /// Over the 100 My the record spans the radiogenic term moves by about a
+    /// percent, and the series says so honestly rather than inventing a swing;
+    /// its consumer is the Life phase's palaeo pre-pass, which reads the
+    /// subsidence the coal and oil epochs actually had instead of today's.
+    std::vector<float> thermal_series;
+
     /// The DERIVED solar parameters. This is the narrow waist: Planetology's
     /// minimum viable output is that these six stop being hand-authored literals
     /// in make_hard_coded_world().
@@ -628,6 +657,35 @@ struct world_preferences
 
     // --- Round C: Inheritance ---
     lean drawdown = lean::any; ///< barely touched / worked / stripped
+
+    /// HOW TURBULENT THE ERA -1 HISTORY IS (BL-839; Ben, 2026-09-08: "we are
+    /// really looking to encourage historical turbulence as a parameter -- so
+    /// that players can roll for worlds which have fewer countries at this
+    /// step, or more countries at this step"). Taken on the wizard's EMPIRES
+    /// round, which is the pass it leans.
+    ///
+    /// `low` is calm, `mid` ordinary, `high` turbulent, and the default is
+    /// `mid` rather than `any` -- which is the one place this axis departs from
+    /// its eight neighbours above, deliberately. `any` means "sample the whole
+    /// viable range" for a planetology preference because those name a VALUE
+    /// drawn from a distribution; this one names a FORCE, and there is no
+    /// distribution of forces to sample. A read of `any` is therefore treated
+    /// as `mid` (`era_minus_one.cpp`), so a save or a fixture that never set
+    /// this field runs the ordinary world it always ran.
+    ///
+    /// OWED, ON THE NEXT FORMAT BUMP (was BL-1015): `any` is REPRESENTABLE on
+    /// this axis and MEANS NOTHING here, and save format 12 carries it. Give
+    /// the axis its own three-value type with its own bound and serialiser
+    /// when something else next moves `world_save.cpp` — not worth a bump of
+    /// its own. The round-trip check must pin to a literal, so a writer and a
+    /// reader that both omit the field cannot round-trip clean.
+    ///
+    /// IT TARGETS NO COUNT AND MUST NEVER ACQUIRE ONE. See
+    /// `../world/history_sim.hpp` sec THE HISTORICAL TURBULENCE LEAN for what
+    /// it actually moves and why counting polities is the one thing forbidden
+    /// to it (`../../docs/generation/GENERATION_STRATEGY.md` sec Asymmetry is
+    /// the deliverable).
+    lean history_turbulence = lean::mid;
 
     /// Per-round reroll counter. Bumping one re-draws that round (and everything
     /// downstream of it) without disturbing the rounds already committed above it.

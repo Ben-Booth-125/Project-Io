@@ -1,6 +1,7 @@
 #pragma once
 
 #include "entity.hpp"
+#include "faithful_unordered_map.hpp" // tile_province (BL-1034: a copied world ticks as its source)
 
 #include <cstddef>
 #include <cstdint>
@@ -38,10 +39,15 @@
 // are exclusive by construction — a tile's substrate names exactly one — so the
 // claim is structural rather than checked.
 //
-// NOTHING CAN BE IN A SEA PROVINCE YET, and that is expected: units are
-// land-bound (march_unit refuses a water destination outright), buildings refuse
-// water, and a sea province sustains zero of them. They are addressable empty
-// space, built without inventing the naval model that will eventually fill them.
+// WHAT MAY BE IN A SEA PROVINCE IS A DOMAIN QUESTION (BL-778). This read
+// "nothing can be in a sea province yet... units are land-bound (march_unit
+// refuses a water destination outright)". march_unit now asks the unit TYPE
+// which domains it may cross (docs/military/MILITARY.md § Domains and
+// traversal): a land row may enter coastal water its own polity owns, a naval
+// row may hold water outright, and open ocean is closed to everything else.
+// Buildings still refuse water — the port is the named exception and is not
+// built yet — so a sea province remains largely empty in the campaign, because
+// the campaign raises no naval rows, not because water is a wall.
 //
 // The province is deliberately NOT the region: no name, no owner, no culture,
 // no economy. It exists because BL-467 (battle state) needs an engagement
@@ -74,7 +80,7 @@
 //
 // THE PARTITION IS PART OF WORLD GENERATION AND VERSIONS WITH IT. It is never
 // patched in place: a change to the algorithm re-rolls every battle in every
-// world. Authority: docs/generation/TILE_GENERATION.md § Province partition,
+// world. Authority: docs/generation/PROVINCES.md § The partition,
 // docs/GLOSSARY.md (the spatial vocabulary) and BL-515.
 // ---------------------------------------------------------------------------
 
@@ -185,7 +191,7 @@ inline constexpr std::size_t k_sea_province_max_tiles = 80;
 /// running into the ceiling instead of meeting its neighbours, the measured mean
 /// falls away from that prediction and provinces pile up on the cap exactly.
 /// The sweep (6 seeds, `province_partition_harness` section W) is in
-/// docs/generation/TILE_GENERATION.md § Provinces over water; at d = 8 one
+/// docs/generation/PROVINCES.md § Three domains, never mixed; at d = 8 one
 /// province in nine sits exactly on 80 and the mean has already broken from its
 /// prediction, while at d = 7 the measured mean still MATCHES the lattice —
 /// which is the evidence that terrain and spacing set the size, not the cap.
@@ -374,7 +380,7 @@ struct province_partition
 
     /// Land tile -> owning province id. Derived from `provinces` (rebuilt on
     /// read, never serialised separately) — every land tile appears exactly once.
-    std::unordered_map<entity_id, uint32_t> tile_province;
+    faithful_unordered_map<entity_id, uint32_t> tile_province;
 
     /// Owning province id for @p tile, or 0 when the tile is off-body or
     /// otherwise unpartitioned. WATER IS NO LONGER ONE OF THOSE CASES (BL-516):
@@ -410,13 +416,23 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///
 /// Pure in everything but its inputs: the result is a function of (@p seed, each
 /// body's grid dimensions, its land mask, its tiles' height / river edges, its
-/// nation assignment, and its non-anchor population centres) alone — the
-/// PRE-ROAD world (BL-623, provinces before roads: road_level is deliberately
-/// not an input, so a recompute on a world whose roads have since been stamped
-/// reproduces the partition exactly). NO RNG STREAM IS CONSUMED — every
-/// draw is a stateless fold from @p seed, the campaign_battle identity idiom, so
-/// the partition can never perturb another generation pass's draws no matter
-/// where it is called.
+/// nation assignment, its non-anchor population centres, and `w.tile_settled`)
+/// alone — the PRE-ROAD world (BL-623, provinces before roads: road_level is
+/// deliberately not an input, so a recompute on a world whose roads have since
+/// been stamped reproduces the partition exactly). NO RNG STREAM IS CONSUMED —
+/// every draw is a stateless fold from @p seed, the campaign_battle identity
+/// idiom, so the partition can never perturb another generation pass's draws no
+/// matter where it is called.
+///
+/// THE SETTLED CELLS ARE A HARD INPUT TOO (BL-849; docs/generation/PROVINCES.md
+/// § The settled cells are a binding input), the same way the nation assignment
+/// already is: on LAND, a region is locked to `w.tile_settled`'s verdict on its
+/// seed tile exactly as it is locked to the seed's nation — a province anchored
+/// on settled ground claims only settled ground, and ground the colonisation
+/// span never reached partitions into its own hinterland, never blending into a
+/// settled neighbour's shape. Colonisation still only SEEDS the partition; this
+/// pass still DRAWS it — the lock changes which tiles a region MAY claim, not
+/// who claims first or how the cost model prices an edge.
 ///
 /// Two passes (BL-515's settled algorithm):
 ///

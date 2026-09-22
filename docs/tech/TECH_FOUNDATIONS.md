@@ -1,5 +1,15 @@
 # Project Io — Technical Foundations
 
+> **Settles:** what the prototype is and is not, and what therefore counts as in scope · which
+> engine, language and libraries are fixed · how the world is stored and the loop is ticked · which
+> rendering approach and view structure the UI rests on · which technical decisions were taken
+> and on what rationale.
+> **Not here:** when work happens and in what milestone order (ROADMAP) · the method by which work
+> is delivered and verified (DELIVERY, DEVELOPMENT_PRACTICES) · how the canvases actually draw the
+> ground (ui/RENDERING) · which properties would keep multiplayer cheap later
+> (MULTIPLAYER_PRINCIPLES, non-binding).
+> **Confused with:** development/ROADMAP.md, ui/RENDERING.md, multiplayer/MULTIPLAYER_PRINCIPLES.md.
+
 This document captures the decisions that must be in place before development begins. It is divided into three categories: **Direction** (scope and design intent), **Engine** (core technology and architecture), and **UI** (rendering approach and view structure). Where the rationale for a decision is non-obvious, it is stated briefly.
 
 ---
@@ -91,6 +101,14 @@ Real-time pacing is a speed multiplier (1×–5×, non-linear; 0 pauses). At 1×
 
 **What a save contains.** Three buckets: every authoritative container on `world` (including the entity-allocator cursor, or a load would re-issue live ids); the derived caches, which are *rebuilt* rather than written (`clear_derived_state`); and the app envelope — the sim clock, `world_params`, the `generation_report` in full, the per-tick histories and a narrow view slice. `world/*` stays SDL- and UI-free, so the headless harness (`tools/verify/save_roundtrip.cpp`) exercises the world half alone. `corp_modifiers` looks derived and is not: its stored order is the cross-tick earn order, and `modified_scalar` folds `add` against `multiply`, which do not commute, so a re-fold from `earned_techs` returns a different number. It is serialised directly (NR-510).
 
+**A loaded world replays byte for byte, and so does a copy (Ben, 2026-09-18, NR-894).** A world
+saved and loaded, or copied, ticks exactly as the original would have. A load re-inserts each
+unordered store in id order, and another standard library lays a store out differently, so a store's
+iteration order is never part of the state: no read may let it reach arithmetic, a tie-break or an
+output order, and a reader that needs an order walks sorted ids. World copies also keep their
+source's order (`faithful_unordered_map`), which makes a copy that would diverge fail loudly
+instead of silently.
+
 ### Tile and body data model
 All tiles for a body are **resident in memory simultaneously**. For the prototype — generated but bounded bodies and tile counts — this is the correct approach. Tile data is pure C++ structs packed into a contiguous array per body, accessed by coordinate index in O(1) with no query overhead.
 
@@ -158,7 +176,7 @@ goldens render identically across machines.
 *Rendering approach and view structure. Per-view detail is deferred to the UI document.*
 
 ### Rendering dimension
-The game renders in **2D**. No 3D terrain, unit models, or depth-based rendering is required. Detailed surface visualisation is not a prototype concern.
+The game renders in **2D**. No 3D terrain, unit models, or depth-based rendering is in the prototype. Detailed surface visualisation **is** in scope for the Planetary canvas (Ben, 2026-09-01, the sprint-29 design forms — overturning this section's earlier exclusion): the ground renders as **baked painterly terrain chunks** (hillshade from the height field + authored biome brushes, C-F art direction) on the existing 2D renderer, with ambient overlay animation. Authority: `docs/ui/RENDERING.md`. The staged end-state — a tilting oblique camera with terrain and structures as true geometry — is a **flagged future milestone** (2.5D pre-render vs SDL3 GPU 3D, undecided; `docs/research/CANVAS_RENDERING.md` § The end-state choice), not prototype scope; the SDL3 GPU API remains the door held open for it.
 
 ### Main views
 The main game window has two primary views:
@@ -196,6 +214,7 @@ This means ImGui panel code should be written clearly, not cleverly. It is refer
 | Military | Two resolvers — `resolve_battle` for the Era −1 sim, `resolve_campaign_battle` for `run_battles` in the economy tick — over one terrain model; muster building, hire verb, ordnance good, unit upkeep (authored rates 0.0), stance and the unit march seam. Authority: `docs/military/MILITARY.md` |
 | Tile memory | All tiles resident; flat binary structs; no per-tile Lua |
 | UI (prototype) | Dear ImGui |
+| Ground rendering | Baked painterly terrain chunks on the 2D renderer (Planetary rung only; C-F direction; no on-ground hex grid; installations as rendered geometry; overlay animation; vector bake as fallback by coverage). Authority: `docs/ui/RENDERING.md` |
 | UI (production) | Lua-driven retained layer — deferred to UI document |
 | Serialisation | Flat binary, field by field, magic + version per stream, mismatch rejected; SQLite deferred until world scale requires it |
 | Agent interface | **Out-of-process only.** `ProjectIo --serve` speaks a line protocol on stdio; `tools/mcp/` wraps it as an MCP server (Node, tooling tier). The engine ships no HTTP client, no API key, no cloud dependency. Authority: `docs/ai/AI_OPPONENT.md` § 10 |

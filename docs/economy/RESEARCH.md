@@ -1,5 +1,13 @@
 # Project Io — Research
 
+> **Settles:** what produces research points and where such a building may stand · what research
+> consumes besides credits · which questions about the technology system are deliberately still
+> open. A stub: it fixes the concept, not the system.
+> **Not here:** what an unlock does to a recipe or a building (PRODUCTION) · what opens an Era,
+> and what a capstone technology does instead (ERAS) · which centre may host a university
+> (POPULATION).
+> **Confused with:** ERAS.md, PRODUCTION.md, POPULATION.md.
+
 > **Stub authority doc** (Ben, 2026-08-25: *"Write a stub authority doc for RESEARCH.md now, it
 > can be something we will develop in the future, but it helps to have the concept in writing."*)
 > This is the concept in writing; the full system is a design session of its own (BL-619,
@@ -50,5 +58,8 @@ settled ahead of it.
   trades.
 - The tech graph: `scripts/tech_tree.lua` holds ~150 nodes of deliberately inert data with one
   resolving gate — whether that data becomes this system's graph or is replaced is undecided.
+- The pre-game layer is not this system: generation's three technology trees, and where research
+  comes from before there is a university, are `../generation/trees/TREES.md`. Where the campaign's
+  RP economy meets the capacity vector those trees hand over at 1960 is open here.
 - The relationship between corp research and nation research, and whether a nation's budget
   (`docs/politics/NATIONS.md`) can fund it.

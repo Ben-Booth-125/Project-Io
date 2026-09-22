@@ -29,13 +29,16 @@ using line_claims = std::array<std::vector<gathered_claim>, priority_count>;
 /// takes. Validated as the value that lands in the destination: a
 /// `public_exploration` credit is dispatched through `dispatch_survey(body)`,
 /// which returns `invalid` for a body `w.bodies` does not hold — so the claim
-/// is refused here, before any demand is counted on it. Slice 2's
-/// `contracted_force` adds its own branch.
+/// is refused here, before any demand is counted on it. A `space_programme`
+/// credit (BL-644) is settled against a (supplier, body) pool, so its subject
+/// is a body under the same existence check. Slice 2's `contracted_force`
+/// adds its own branch.
 bool subject_exists(const world& w, budget_priority line, entity_id subject)
 {
     switch (line)
     {
         case budget_priority::public_exploration:
+        case budget_priority::space_programme:
             return w.bodies.find(subject) != w.bodies.end();
         default:
             return false; // no other line takes a subject today
@@ -79,7 +82,7 @@ void run_national_budget(world& w,
     //
     // THE LINE CHECK IS NOT DEFENSIVE PADDING. `budget_priority` has a `uint8_t`
     // underlying type, so every one of 0..255 is a valid VALUE of the enum while
-    // only 0..8 is a valid INDEX into a `priority_count`-long array. Without the
+    // only 0..9 is a valid INDEX into a `priority_count`-long array. Without the
     // check the gather loop writes out of bounds on any claim carrying a line it
     // did not author — AddressSanitizer confirmed the write (Sprint N1 adversarial
     // pass, 2026-08-22). Claims are producer-supplied and BL-538's consumers are

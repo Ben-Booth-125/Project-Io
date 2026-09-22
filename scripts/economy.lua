@@ -20,6 +20,28 @@ economy = {
     thresholds = {
         t_full = 1.0,
         t_idle = 0.2,
+        -- BL-739: the idle-maintenance floor - the fraction of a building's
+        -- maintenance constant charged even at workforce 0 or decommissioned.
+        -- Was a hard-coded 0.30 (BL-049); measured at ~61% of the residual
+        -- spawn deficit (material_floor, BL-635 diagnosis), trimmed to 0.15 on
+        -- Ben's 2026-09-01 ruling. Non-zero deliberately: holding land is
+        -- never free. The C++ default stays 0.30 so an unloaded registry runs
+        -- the pre-BL-739 arithmetic.
+        idle_maintenance_floor = 0.15,
+    },
+
+    -- BL-743 (Ben, 2026-09-01: "Yes to firm exit") — the insolvency wind-up.
+    -- A corporation (never the player's) whose last N FILED quarters all
+    -- closed below the floor is wound up: holdings demolished, pools and
+    -- in-flight cargo dumped to market inventory (the conservation law),
+    -- units disbanded, orders/quotes/battles cancelled, opinions dropped,
+    -- the debt written off with the actor. Measured motivation: 57-59 of 89
+    -- corps ended 30 years underwater and every one kept operating - exit is
+    -- the market's own supply discipline. First-cut thresholds: three years
+    -- of deep insolvency; the sweep battery owns tuning them.
+    firm_exit = {
+        balance_floor        = -2000.0,
+        consecutive_quarters = 12,
     },
 
     -- Per building_type constants.
@@ -60,9 +82,20 @@ economy = {
             -- inflated income — so every AI corp went bankrupt. Both producer
             -- base_rates scale x10 TOGETHER, restoring a workable scale without
             -- reopening the ratio: 200:80 is the same 2.5:1 as 20:8.
-            base_rate   = 20.0,
-            maintenance = 5.0,
-            base_wage   = 8.0,
+            --
+            -- BL-744 (Ben, 2026-09-02, the recipe margin anchor): both producer
+            -- base_rates DOUBLE together (40:16 is still 2.5:1), and extraction's
+            -- fixed costs come down so the floor half of the anchor holds - at
+            -- the price floor a site at typical staffing must still pay its
+            -- wages and maintenance (PRODUCTION.md § The recipe margin anchor,
+            -- M2). Ben's chosen lever was the fixed costs, not the raw prices:
+            -- maintenance 5 -> 2, wage 8 -> 4. The rate doubling is what makes
+            -- those numbers clear stone at 1.0 (5 x price at the floor against
+            -- 4.5 of costs) without touching a raw price; it also halves the
+            -- wage per unit. tools/verify/recipe_margin R3/R4 are the check.
+            base_rate   = 40.0,
+            maintenance = 2.0,
+            base_wage   = 4.0,
             build_cost  = 100.0,
             build_duration_ticks = 2.0,
             resource_costs = { steel = 20.0 },
@@ -138,8 +171,16 @@ economy = {
             },
         },
         processing_facility = {
-            base_rate   = 8.0,
-            maintenance = 10.0,
+            -- BL-744 (Ben, 2026-09-02): base_rate 8 -> 16 (ruled), halving the
+            -- wage per batch to 0.75 so it stops eating the whole authored
+            -- margin; maintenance 10 -> 2 on the same lever Ben chose for
+            -- extraction (NR-779) - at 10 the floor half of the anchor was
+            -- pricing every cheap good off the factory's lights rather than its
+            -- inputs (clean_water 3 -> 11.9 with it, 7.6 without). The
+            -- 2026-09-01 ledger named maintenance as 80% of every credit
+            -- leaving the field. recipe_margin R1/R2 are the check.
+            base_rate   = 16.0,
+            maintenance = 2.0,
             base_wage   = 12.0,
             build_cost  = 200.0,
             build_duration_ticks = 3.0,
@@ -405,38 +446,195 @@ economy = {
     -- idles it. The shortfall rule worked exactly as designed — it was fed a
     -- good nobody makes.
     --
-    -- AND WHY NOBODY MAKES THEM IS THE SAME LOOP, from the other end. This
-    -- draw is a POOL draw (FINANCE.md's own shape, copied from
-    -- run_unit_upkeep) and never reaches `market_component::demand`. So
-    -- wanting tools does not RAISE THE PRICE of tools, no rival ever scores
-    -- building a Toolmaker, and the supply that would meet the draw is never
-    -- induced. Tools and planks were on the census's "produced in-band, NO
-    -- market sink" list before this item, and a pool-only draw leaves them
-    -- there. Whether the Industry channel should also register a market WANT
-    -- — as run_construction and run_processing both do, and as MARKETS.md
-    -- § Demand channels arguably requires of a demand channel — is Ben's
-    -- call, not this file's.
+    -- AND WHY NOBODY MAKES THEM WAS THE SAME LOOP, from the other end. The
+    -- draw was a POOL draw (FINANCE.md's own shape, copied from
+    -- run_unit_upkeep) and never reached `market_component::demand`. So
+    -- wanting tools did not RAISE THE PRICE of tools, no rival ever scored
+    -- building a Toolmaker, and the supply that would meet the draw was never
+    -- induced. Tools and planks sat on the census's "produced in-band, NO
+    -- market sink" list for exactly that reason.
     --
-    -- SO WHAT LANDS. The shape, inert, with its ordering, its shortfall rule
+    -- BL-654 CLOSED THAT HALF (Ben's call, 2026-08-26, as the note above said
+    -- it had to be). The draw is no longer pool-only: the pool is drawn first
+    -- and the SHORTFALL IS BID on the local market and paid for, up to
+    -- price_band.reservation_mult x base_price, above which the building
+    -- declines to buy and the shortfall rule weakens it instead. One rule for
+    -- every goods draw — run_unit_upkeep takes the identical path, not a
+    -- second one. Wanting tools now prices tools.
+    --
+    -- THE RATES BELOW STILL SHIP AT ZERO, deliberately, and turning them on is
+    -- a separate data change with its own measurement. BL-654 closed the
+    -- PRICING half of the loop; the SUPPLY half — an ancient band that
+    -- actually makes tools — has to follow the price signal before the draw
+    -- can be met, and that takes ticks the harness has to be allowed to run.
+    -- The shape is inert until then, with its ordering, its shortfall rule
     -- and its era bands all built and verified (tools/verify/building_upkeep).
-    -- Switching it on is a data change the moment either half of the loop is
-    -- closed: an ancient band that actually makes tools, or an Industry draw
-    -- that prices what it wants.
     -- ===================================================================
     building_upkeep = {
         supply_decay_permille    = 50,   -- the ONE subtraction, per tick, on an unmet draw
         supply_recovery_permille = 100,  -- regained per tick while the draw is met
+        -- BL-746 (Ben, 2026-09-02, NR-782 (a)): the FLOOR. An unmet draw dims a
+        -- building to half its nominal output and no further - PRODUCTION.md's
+        -- "the lights go dim, not out", which at floor 0 the decay did not
+        -- honour: every industrial building the power grid could not reach went
+        -- dark exactly 20 ticks in (1000/50), 219 -> 40 active in one tick,
+        -- measured on the campaign_lapse debt instrument. With the draws zeroed
+        -- the same field was solvent and growing. Paired with the no-wire rule
+        -- (economy_system.cpp § run_building_upkeep): a grid good is not drawn
+        -- at all where the network does not reach.
+        supply_floor_permille    = 500,
 
+        -- BL-708 (2026-08-31) — POWER IS THE FIRST NON-ZERO ENTRY IN THIS TABLE,
+        -- and the reason it can be is the reason PRODUCTION.md § Power gives:
+        -- "Power is the first entry in that basket the world will actually make,
+        -- because making it is profitable." The tools/machinery rates above sit
+        -- at zero because the goods they name are produced 0.0 in band, so every
+        -- draw went unmet and the firms collapsed 227 -> 19 (BL-641). Power has
+        -- two authored generation recipes with a positive margin, so the draw
+        -- induces the supply that answers it instead of starving against it.
+        --
+        -- THE SHORTFALL RULE IS UNCHANGED AND IS THE WHOLE SAFETY ARGUMENT: a
+        -- building short of power SCALES ITS OUTPUT DOWN
+        -- (`building_supply_scalar`), it is never idled. A firm on reduced
+        -- output keeps bidding for fuel, and the generation that answers it gets
+        -- built. Idling it would kill the buyer that induces the supply — which
+        -- is precisely the mistake BL-641 measured.
+        --
+        -- INDUSTRIAL ONLY. The ancient rows stay at zero: there is no ancient
+        -- power analogue by design, so the 0 CE band is arithmetically untouched
+        -- by this item.
+        --
+        -- SIZING, first cut. 156 of 317 industrial-band buildings are eligible
+        -- to draw, so ~0.3 each is roughly 50 power/tick demanded band-wide,
+        -- against a single plant's output of order tens per tick — a handful of
+        -- plants covers the map, which is the margin the induction needs. A
+        -- processor draws more than a mine because it runs machinery rather than
+        -- pumps, the same ordering the machinery/electronics rows above assume.
+        -- NR-600's first-cut-then-tune idiom: the SHAPE is the deliverable, the
+        -- numbers are for playtest.
+        --
+        -- BL-709 (2026-08-31) - CONSTRUCTION CAPACITY joins this table AT ZERO,
+        -- and the zero is the item's central measured finding rather than an
+        -- oversight.
+        --
+        -- The obvious shape for "construction is a rate" is a per-building
+        -- maintenance draw right here: every standing firm buys a trickle of
+        -- crews and plant, which is continuous, economy-scaled with the building
+        -- stock, and era-banded - MARKETS.md properties 1 and 2 in one row. It
+        -- was authored, and MEASURED, and it collapsed operating firms 198 of
+        -- 328 -> 33 of 317 on the ancient band. Cutting the rate five-fold moved
+        -- it to 38 of 315. A CLIFF, NOT A CURVE.
+        --
+        -- So it is not a magnitude problem and no rate here is safe: a
+        -- brand-new UNIVERSAL draw is unmet on tick 1 in every market at once,
+        -- supply_factor decays before any yard's output can reach a shelf, and
+        -- the reflex tier decommissions the firm while the market is still
+        -- catching up. BL-641's collapse arriving through the COLD START rather
+        -- than through the rate, and the same reason tools/planks/machinery
+        -- above still sit at zero.
+        --
+        -- The sector's live consumer is therefore the BUILD PROJECT alone
+        -- (economy.construction.capacity_per_build_tick), which is a draw that
+        -- arrives with the thing that causes it instead of switching on across
+        -- the whole world at once. This row is left authored at 0.0 so that
+        -- turning maintenance construction on later is a data change - and so
+        -- that the number it would need is measured, not guessed, when someone
+        -- has provisioned the yards to answer it.
+        -- BL-738 (Ben, 2026-09-01: "Building should have upkeep too") — STAGE 1
+        -- LANDED, MEASURED, AND WITHDRAWN THE SAME DAY, and the measurement is
+        -- the record. Repair timber/stone rates (0.05/0.05 extraction,
+        -- 0.08/0.08 processing, industrial band) were the met-on-day-1
+        -- widening; a full campaign_lapse cell (seed 0, 120 measured quarters,
+        -- tag after-fixes) against the baseline measured: extraction operating
+        -- net -6.75 -> -31.29 cr/qtr, operating-positive corps 29 -> 16,
+        -- valued production x1.05 -> x0.91. The COST side of the channel
+        -- arrived; the INCOME side cannot yet — the state channels that would
+        -- pay material suppliers are throttled by BL-741 (one nation in 43
+        -- holds any treasury) and BL-742 (state purchases read pools that
+        -- auto-surplus already swept to market). One clean positive stands:
+        -- stone lifted off the floor (0.42x -> 1.38x base, floored markets
+        -- 5 -> 2 of 9) — the price signal works; the money loop behind it is
+        -- what is missing. STAGE 2 (same day): BL-741 (every nation levies its
+        -- own jurisdiction) and BL-742 (state purchases fall back to market
+        -- inventory) landed, so the income loop the withdrawal waited for
+        -- exists — the rates return, same first-cut values, re-measured by the
+        -- round-two campaign_lapse cell.
         goods = {
             extraction_site = {
-                ancient    = { tools = 0.0, planks = 0.0 },      -- derived 0.07 / 0.15
-                industrial = { machinery = 0.0 },                -- derived 0.11
+                ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.07 / 0.15; capacity BL-709
+                industrial = { machinery = 0.0, power = 0.25, timber = 0.05, stone = 0.05, construction_capacity = 0.0 },  -- derived 0.11; power BL-708; repair BL-738 stage 2; capacity BL-709
             },
             processing_facility = {
-                ancient    = { tools = 0.0, planks = 0.0 },      -- derived 0.14 / 0.30
-                industrial = { machinery = 0.0, electronics = 0.0 }, -- derived 0.15 / 0.06
+                ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.14 / 0.30; capacity BL-709
+                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, timber = 0.08, stone = 0.08, construction_capacity = 0.0 }, -- derived 0.15 / 0.06; power BL-708; repair BL-738 stage 2; capacity BL-709
             },
         },
+    },
+
+    -- ===================================================================
+    -- BL-708 (2026-08-31) — GRID GOODS.
+    -- docs/economy/PRODUCTION.md § Power; docs/economy/LOGISTICS.md § 3a.
+    -- ===================================================================
+    --
+    -- The two properties that separate a grid good from every other good in the
+    -- roster, authored as DATA so no logic anywhere has to ask "is this power?".
+    -- An absent table means no good is a grid good and no store is capped, which
+    -- is the pre-BL-708 behaviour exactly.
+    --
+    -- `transmitted = true` says the good rides the ROAD NETWORK instead of a
+    -- convoy. Two consequences, both already wired:
+    --   * NEVER CARGO — price_convoy_leg refuses a leg for it, so auto-dispatch,
+    --     the player's dispatch_convoy verb and the rival scorer's directed
+    --     dispatch are all closed by one refusal at the one shared seam.
+    --   * CONNECTION-GATED — it only moves to or from a tile the network
+    --     reaches, and "reaches" is tile_reach_cost read as a BOOLEAN: finite
+    --     connected, infinity not. No second graph; the multi-source Dijkstra
+    --     the reach field already computes answers it. Latency is a flat ONE
+    --     TICK regardless of distance, which is the tick the draw runs on, so
+    --     there is nothing here to author for it.
+    -- Gating BOTH the draw and the listing is what makes power's price REGIONAL
+    -- BY CONSTRUCTION without any rule naming a region.
+    --
+    -- `stockpile_ceiling` is power's one genuinely novel property: its store is
+    -- capped, so "a generator running into a full store is producing nothing
+    -- anyone will ever buy". Applied where output accrues, per (corp, body) —
+    -- the grain the pool is held at — so it is a statement about a corp's
+    -- storage on a body, not about one plant's tank.
+    --
+    -- 400 is ~8 ticks of one plant's output against a band-wide demand of ~50 a
+    -- tick: generous enough that a plant serving a live region never throttles,
+    -- tight enough that a plant with no buyers in reach stops within a few ticks
+    -- instead of banking an unsellable mountain. First cut; retune by playtest.
+    grid_goods = {
+        power = { transmitted = true, stockpile_ceiling = 400.0 },
+
+        -- BL-709 (2026-08-31) - CONSTRUCTION CAPACITY is a grid good for
+        -- reasons that read differently from power's but land on exactly the
+        -- same two rules, which is the argument for the table existing at all:
+        -- no logic anywhere asks "is this power?" or "is this capacity?".
+        --
+        --   * NEVER CARGO - capacity is crews, cranes and plant, not tonnage.
+        --     There is nothing to load. `price_convoy_leg` refuses the leg, so
+        --     auto-dispatch, the player's verb and the rival scorer's directed
+        --     dispatch are all closed at the one shared seam.
+        --   * CONNECTION-GATED - a yard serves ground its network reaches and
+        --     no further, which is the same reach field
+        --     `economy.construction.max_logistics_reach` already gates
+        --     PLACEMENT on. So it should rarely bite: any legally-placed
+        --     building is within 24 cost of an anchor, hence reachable at all,
+        --     hence connected. Where it does bite it says something true - you
+        --     cannot build off the road network - and it says it as a scaled
+        --     output, never an idled firm.
+        --
+        -- THE CEILING IS THE LOAD-BEARING ONE HERE, more than it was for power.
+        -- Capacity is a RATE: an idle yard's unsold crew-hours lapse, they do
+        -- not bank. Without a ceiling a yard with no buyers would accumulate an
+        -- unsellable mountain forever and the sector would stop being a rate at
+        -- all. 150 is roughly a week of one yard's output against a band-wide
+        -- draw of ~15-25 a tick: generous enough that a yard serving a live
+        -- region never throttles, tight enough that a yard with no buyers in
+        -- reach stops within a few ticks. First cut; retune by playtest.
+        construction_capacity = { transmitted = true, stockpile_ceiling = 150.0 },
     },
 
     -- BL-455 (2026-08-17) removed `military_points_per_base_tick` from here with
@@ -456,8 +654,8 @@ economy = {
         -- (power 380) costs 230. First-cut authored constants; retune by
         -- playtest. Standing-force UPKEEP is deliberately absent — flagged to
         -- BL-377's contract loop, not decided here.
-        hire_base_cost      = 40.0,
-        hire_cost_per_power = 0.5,
+        hire_base_cost      = 120.0, -- BL-744 / NR-781: x2.776 with the head wage (was 40.0)
+        hire_cost_per_power = 1.4,   -- same factor (was 0.5)
 
         -- BL-454: standing-force UPKEEP — what it costs to KEEP a unit, as
         -- against hire_* above, which is what it costs to raise one. Before
@@ -597,8 +795,19 @@ economy = {
             -- BL-635: every figure in this table is its pre-2026-08-26 value
             -- x 0.025. The old values are kept in the trailing comments so the
             -- rescale is one readable multiplication rather than a rewrite.
-            credits_per_head           = 0.15,   -- flat wage per head per tick (was 6.0)
-            credits_per_head_per_power = 0.0001, -- wage scaled by the roster row's power_mod (was 0.004; bounded <= 0.00012, see derivation above)
+            -- BL-744 (NR-781, 2026-09-02): the recipe margin anchor repriced
+            -- ordnance 43 -> 140.8 and food_rations 6 -> 13.6, so the goods
+            -- half of a head's upkeep is 0.8328 cr/tick and the identity above
+            -- solves the wage at 0.4164 (the draw is kept - it is the military
+            -- terminal's demand - and the money side follows the price level).
+            -- The per-power term is re-bounded the same way the derivation
+            -- above bounds it: wage(420) <= 0.8328 x 0.667 = 0.5555 gives
+            -- credits_per_head_per_power <= 0.000331; 0.00028 is chosen with
+            -- headroom. hire_base_cost / hire_cost_per_power move by the same
+            -- x2.776 so "a year's keep < a fresh hire" (4 x 50 x 0.4164 = 83.3
+            -- < 120) still holds in consistent units.
+            credits_per_head           = 0.4164,  -- flat wage per head per tick (was 0.15; 6.0 before BL-635)
+            credits_per_head_per_power = 0.00028, -- wage scaled by the roster row's power_mod (was 0.0001; bounded <= 0.000331, seederivation above)
 
             -- The goods half of the vector, per head per tick. ORDNANCE is the
             -- good (BL-457 added it as the roster's first terminal MILITARY
@@ -701,6 +910,49 @@ economy = {
         volume_discount_max           = 0.15,
         volume_discount_half_quantity = 100.0,
         offbody_freight_fraction      = 0.05,
+    },
+
+    -- BL-644: the space_programme budget line's purchase lumps — government
+    -- satellite launches, the tenth budget line and space goods' first real
+    -- buyer. A nation with weight on the line buys these quantities from a
+    -- named supplier's pool at the supplier market's own price (procurement's
+    -- basis — never an order on the open market), and the goods are CONSUMED:
+    -- the satellite launched. Each lump is whole-or-nothing (NATIONS.md: state
+    -- demand arrives in LUMPS), so these sizes set how much treasury a nation
+    -- banks before a purchase fires — bigger lumps, rarer and louder state
+    -- demand. First-cut figures sized against the recipe scale (both goods are
+    -- produced ~1.0/tick per plant) and spacecraft_components' ~1.44 base
+    -- price; retune by playtest. The loader rejects a non-finite or negative
+    -- value by key; an absent key (or table) keeps the zero default, which
+    -- derives no purchase at all.
+    space_programme = {
+        components_lump = 25.0, -- spacecraft_components per purchase
+        propellant_lump = 50.0, -- propellant per purchase
+    },
+
+    -- BL-643: network upkeep — the logistics_maintenance budget line's
+    -- consumer and the Infrastructure demand channel (MARKETS.md). Each tick a
+    -- nation's road/hub network bills stone and timber at these rates
+    -- (per road tile by level; per active port / inland hub), bought from a
+    -- named supplier's pool at the supplier market's own price and CONSUMED —
+    -- the repairs go into the roadbed. UNLIKE space_programme the claim is
+    -- pro-rata (upkeep is continuous, not lumpy): a share short of the bill
+    -- buys the funded fraction, so an over-authored rate degrades to "spend
+    -- the whole logistics share" and can never overdraw a treasury. First-cut
+    -- figures aimed at the measured stone glut (floored in 6 of 9 markets,
+    -- 2026-09-01) — a mid-size nation at ~200 road tiles bills tens of units
+    -- per quarter; retune by playtest against demand_census. The loader
+    -- rejects a non-finite or negative value by key; an absent key (or table)
+    -- keeps the zero default, which derives no draw at all.
+    network_upkeep = {
+        stone_track    = 0.05,  -- stone per Track tile per quarter
+        stone_road     = 0.15,  -- ...per Road tile
+        stone_highway  = 0.40,  -- ...per Highway tile
+        timber_track   = 0.025, -- timber per Track tile per quarter
+        timber_road    = 0.075, -- ...per Road tile
+        timber_highway = 0.20,  -- ...per Highway tile
+        stone_hub      = 5.0,   -- stone per active port / inland hub per quarter
+        timber_hub     = 2.5,   -- timber per active port / inland hub per quarter
     },
 
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each
@@ -1008,6 +1260,49 @@ economy = {
         demand_scale      = 1.00,
     },
 
+    -- BL-647 (2026-09-01): ENDEMIC LUXURY DEMAND — the Endemic trade channel
+    -- (docs/economy/MARKETS.md § Demand channels; the goods are
+    -- docs/economy/RESOURCES.md § Mercantile). Tobacco, spices, coffee and furs
+    -- were on the roster, extractable, priced — and wanted by nothing at all.
+    -- This is the buyer they were authored for: a household pull that scales
+    -- with a nation's WEALTH (treasury + positive corp balances domiciled
+    -- there) rather than its headcount, flavoured per (nation, good) by a
+    -- seeded campaign-fixed preference so different nations crave different
+    -- luxuries. The asymmetry is the design, not a detail: it makes the trade
+    -- route directional by construction — extract where it grows, sell where
+    -- the money is. Read by inject_endemic_demand (market_clearing.cpp),
+    -- called from clear_markets beside the two baskets above.
+    --
+    -- The basket lives in the SHARED tranche: luxuries are deposits, band-
+    -- independent by construction (the same argument that puts
+    -- agricultural_produce and water in population_demand's shared tranche) —
+    -- the fur and spice trade is period in 0 CE and persists in 1960. A world
+    -- only carries the luxuries its biosphere rolled (2-3 of the four); an
+    -- absent one is priced nowhere and its weight is inert on that world.
+    --
+    -- WEIGHTS: spices and coffee lead — RESOURCES.md prices spices as the
+    -- highest value-to-mass good of the set and coffee as the scarcest/widest-
+    -- margin, so their craving weight matches their authored character; tobacco
+    -- and furs are the bulkier, broader habits. wealth_scale converts credits
+    -- of national wealth into demand units per basket-weight point: measured
+    -- on the generated fallback-priced world (endemic_demand_harness E6,
+    -- 2026-09-01), national wealth is a few thousand credits per nation, so
+    -- 0.01 puts a wealthy nation's per-luxury pull in the single-digit units —
+    -- visible beside a household staple line, nowhere near dominating it.
+    endemic_demand = {
+        demand_basket = {
+            tobacco = 0.20,
+            spices  = 0.30,
+            coffee  = 0.30,
+            furs    = 0.20,
+        },
+        demand_elasticity = 0.80, -- the population basket's elasticity shape, reused
+        elasticity_min    = 0.30,
+        elasticity_max    = 2.50,
+        wealth_scale      = 0.01, -- credits of national wealth -> demand units
+        preference_spread = 0.90, -- craving in [0.1, 1.9): near-ignore to near-double
+    },
+
     -- BL-442 (2026-08-17): THE price band. A market price is anchored to its
     -- rarity-derived base_price and pushed by the tick's supply/demand ratio
     -- (damped sqrt elasticity), then clamped to this band and eased toward it by
@@ -1047,9 +1342,102 @@ economy = {
     -- the direction Sprint 19's falling numbers are already complaining about — and
     -- it would be an authored guess sitting next to a derived number, which is the
     -- exact confusion step 1 existed to remove.
+    -- ===================================================================
+    -- BL-654: THE BUYER'S RESERVATION CEILING lives in THIS family.
+    --
+    -- Ben's ruling, 2026-08-26: "Buy on the market, but at a threshold,
+    -- buying is not allowed. This goes hand in hand with maximum and minimum
+    -- prices for goods." It sits beside floor_mult / ceil_mult and not in
+    -- upkeep because it is a statement about what a good is worth PAYING, not
+    -- about who is buying — one number per world, read by every goods draw.
+    --
+    -- It is the exact mirror of the seller's floor_price (BL-386): both sides
+    -- may decline a trade, neither may dictate one.
+    --
+    -- MEASURED, NOT GUESSED. tools/verify/demand_census.cpp R3 reports the
+    -- mean resolved price as a multiple of base, per resource, per band, over
+    -- every market that prices it. Seed 0, 80-tick warm start, shipped spawn:
+    --
+    --   LOWER BOUND — it must ADMIT what the live draws actually buy. The only
+    --   goods draw live at shipped rates is unit upkeep, and its dearest good
+    --   is food_rations: 7.788x base in the ancient band (14 markets, ceiled in
+    --   8) and 8.629x in the industrial (9 markets, ceiled in 5). A ceiling
+    --   below 8.63 declines the food draw in the band where it is dearest, so
+    --   every unit's draw goes unmet — which is exactly the mechanism that took
+    --   operating firms 227 -> 19 when BL-641 turned building upkeep on. The
+    --   bound is the INDUSTRIAL figure, not the ancient one.
+    --
+    --   UPPER BOUND — it must DECLINE the cap. A resource pegged at ceil_mult
+    --   is a generation-calibration signal (MARKETS.md § Price resolution),
+    --   not a legitimate purchase, and a reservation equal to the cap declines
+    --   nothing at all: the rule would be inert the day it landed.
+    --
+    --     8.63  <  reservation_mult  <  10.0   ->  9.0
+    --
+    -- WHAT 9.0 ACTUALLY REFUSES, measured on the same run. Ancient: ceramics
+    -- (9.240x, ceiled in 12 of 14) and leather (9.968x, 13 of 14). Industrial:
+    -- consumer_goods (9.082x), silicon (9.377x), alloys (9.666x), ree_alloy
+    -- (9.867x) and electronics (9.986x). Every one of those is among its
+    -- band's most-ceiled rows — the goods nothing in the world makes — and all
+    -- 21 other priced goods are admitted. That is the rule doing its job: a
+    -- starving building does not bid a good to its cap chasing a shortfall no
+    -- amount of credits can fix.
+    --
+    -- A CONSEQUENCE WORTH EXPECTING, not a defect: a good that nobody supplies
+    -- OSCILLATES around this ceiling. Demand with zero supply resolves to
+    -- base x ceil_mult, which is above the reservation, so the next tick's draw
+    -- declines and the EMA pulls the price back down until it bids again. The
+    -- price settles near reservation_mult — high enough that a rival scoring
+    -- the building which supplies it can see the gap, which is the whole point.
+    --
+    -- RE-DERIVE RATHER THAN TRUST. Re-run demand_census and read the R3 table
+    -- whenever base_price, ceil_mult, or either upkeep basket changes — all
+    -- three move the two bounds above.
+    -- ===================================================================
     price_band = {
-        floor_mult = 0.25, -- lowest a price may fall, x base_price
-        ceil_mult  = 10.0, -- highest a price may rise, x base_price (derived; see above)
+        floor_mult       = 0.25, -- lowest a price may fall, x base_price
+        ceil_mult        = 10.0, -- highest a price may rise, x base_price (derived; see above)
+        reservation_mult = 9.0,  -- BL-654: a goods draw declines to buy above this (derived; see above)
+    },
+
+    -- ===================================================================
+    -- BL-744 (Ben, 2026-09-02) — THE RECIPE MARGIN ANCHOR.
+    -- docs/economy/PRODUCTION.md § The recipe margin anchor.
+    -- ===================================================================
+    --
+    -- "The simplest way to do this is to ensure that all recipes (at base
+    -- price) make a greater profit than marginal costs." Two halves, both read
+    -- by tools/verify/recipe_margin at AUTHORING TIME against the three tables
+    -- (recipes.lua, this file, world_gen.lua's base_price) — never against live
+    -- resolved prices, which is BL-740's discipline applied to the whole roster:
+    --
+    --   M1  margin at base  >=  profit_over_marginal x marginal cost, per batch,
+    --       marginal cost = inputs at base + base_wage / base_rate.
+    --   M2  at the price FLOOR (price_band.floor_mult), a building staffed at
+    --       typical_workforce still covers maintenance + goods upkeep + wages.
+    --
+    -- profit_over_marginal = 1.0 is Ben's sentence verbatim: profit at least
+    -- equal to marginal cost, i.e. revenue at least twice it. It is DATA so the
+    -- bar can move with a measurement rather than a re-edit of the harness;
+    -- the harness prints the roster's count at 0 / 0.5 / 1 / 2 beside it.
+    -- typical_workforce = 0.5 is what corporation_generation.cpp seeds every
+    -- generated building with (default_workforce_assigned) — the staffing the
+    -- world actually opens at, not a best case.
+    --
+    -- THE ANCHOR ROUTE AND THE ALTERNATES (NR-780, 2026-09-02). A good with
+    -- several in-band routes is priced off its CHEAPEST route (lowest marginal
+    -- cost per unit of primary output): that route must clear
+    -- profit_over_marginal. Every other route must clear
+    -- alternate_profit_over_marginal - 0.0 means "profitable at base", no
+    -- more - and the floor half (M2) regardless, because the lights do not
+    -- care which recipe is running. Demanding k = 1.0 of every route at ONE
+    -- price would force every route to the same input cost, which erases the
+    -- point of alternate methods (PRODUCTION.md § Alternate production
+    -- methods): the easier route is meant to be easier.
+    recipe_margin_anchor = {
+        profit_over_marginal           = 1.0,
+        alternate_profit_over_marginal = 0.0,
+        typical_workforce              = 0.5,
     },
 
     -- BL-263 (2026-08-11): spontaneous market emergence — a market appears the
@@ -1101,6 +1489,63 @@ economy = {
         site_time_reach_scale    = 1.0,
         site_time_stack_discount = 0.15,
         site_time_stack_min      = 0.5,
+
+        -- BL-709 (2026-08-31) - WHAT A LIVE PROJECT DRAWS FROM THE SECTOR.
+        -- docs/economy/PRODUCTION.md § Construction as a rate: "Building
+        -- projects consume that capacity."
+        --
+        -- Units of `construction_capacity` a site under construction wants per
+        -- FULL-RATE tick, on top of its material basket. It joins the SAME
+        -- `rate` minimum every material already joins in `run_construction`, so
+        -- a market with no capacity on the shelf stretches or pauses a build
+        -- exactly as a market with no steel does - one rule, not a second one -
+        -- and a paused build registers the want, which prices capacity and
+        -- induces the yard. That loop is the whole of MARKETS.md property 3.
+        --
+        -- 0.5 is deliberately modest for a first cut. A 20-tick build consumes
+        -- 10 capacity end to end, about 30 credits at the 3.0 base - real
+        -- against the flat build_cost but not so large that the sector becomes
+        -- the binding constraint on every build in the world before it has been
+        -- played. ZERO DISABLES IT ENTIRELY, which is the pre-BL-709 behaviour
+        -- and the default a hand-built harness registry gets.
+        capacity_per_build_tick  = 0.5,
+
+        -- BL-709 - WHAT THE PRE-GAME SEEDER PROVISIONS, per standing building on
+        -- a body. Units of `construction_capacity` per tick. NOTHING IN THE TICK
+        -- READS THIS: it is a generation-time sizing target only, and that
+        -- separation is the item's central measured finding.
+        --
+        -- The obvious thing to reach for was BL-708's shape - author capacity as
+        -- an ordinary per-building UPKEEP draw in economy.building_upkeep.goods
+        -- above, and let the seeder's existing gap machinery provision for it.
+        -- MEASURED, it collapsed operating firms 198 of 328 -> 33 of 317 on the
+        -- ancient band, and cutting the rate five-fold barely moved it (38 of
+        -- 315). A CLIFF, NOT A CURVE, so it is not a magnitude problem: a
+        -- brand-new universal draw is unmet on tick 1 in every market,
+        -- supply_factor decays before any yard's output can reach a shelf, and
+        -- the reflex tier decommissions the firm while the market is still
+        -- catching up. The BL-641 collapse arriving through the COLD START
+        -- rather than through the rate.
+        --
+        -- So the sector's live consumer is the build project alone
+        -- (capacity_per_build_tick above), and this dial is how generation puts
+        -- the yards there to serve it. Generation provisions the sector; the
+        -- market decides everything downstream of it.
+        --
+        -- SIZED AGAINST WHAT BUILDS ACTUALLY DRAW, not against a guess. The
+        -- census reads 24 ancient and 9 industrial sites under construction at
+        -- the census tick, so at capacity_per_build_tick = 0.5 the real
+        -- consumption is ~12 and ~4.5 capacity a tick. Against standing stocks
+        -- of ~330 and ~405 buildings that is ~0.036 and ~0.011 per building;
+        -- 0.04 covers both with a little headroom.
+        --
+        -- LARGER TARGETS WERE TRIED AND ARE WORSE, which is why this is small.
+        -- 0.30 per building (a ~10x over-provision) was measured: it did NOT
+        -- buy the ancient band a working sector - capacity production stayed at
+        -- 0.0 - and it cost the industrial band its firms, 72 -> 9, by spending
+        -- firm slots on yards instead of on the goods a body actually eats.
+        -- First cut; retune by playtest.
+        seed_capacity_per_building = 0.04,
     },
 }
 

@@ -69,17 +69,38 @@ std::string percent(double fraction, int decimals = 0);
 /// The calendar is the natural completion of sim_loop's tentative constants:
 /// 30-day months, 3-month quarters, and (defined here) 4 quarters to a year —
 /// a 360-day year. The 12 thirty-day months map to Jan–Dec, and the campaign
-/// epoch is set so day 0 falls on the first day of 1960.
+/// epoch is `world_params::epoch_year` — day 0 falls on the first day of it.
 struct calendar_date
 {
-    int year;    ///< Calendar year; the campaign epoch is 1960 (see campaign_epoch_year).
+    int year;    ///< Calendar year; the campaign epoch is whatever the live world was generated at (see campaign_epoch_year()).
     int month;   ///< 1-12 (Jan–Dec).
     int day;     ///< 1-30.
     int quarter; ///< 1-4 (the in-year quarter, derived from the month).
 };
 
-/// The calendar year day 0 falls in. The campaign opens on January 1st 1960.
-constexpr int campaign_epoch_year = 1960;
+/// The calendar year day 0 falls in — i.e. the year the campaign opens on
+/// January 1st of.
+///
+/// THIS IS A VALUE, NOT A CONSTANT (BL-705). It was `constexpr int = 1960` up
+/// to 2026-08-31, which was simply wrong: `world_params::epoch_year` has
+/// defaulted to 0 since the ancient refocus (NR-177), and no UI site read it —
+/// so a 0 CE campaign rendered 1960-based dates on every clock in the shell.
+/// Both starts are supported (`docs/economy/ERAS.md` § Where the ladder starts),
+/// so a constant is wrong for one of them whichever value it holds.
+///
+/// The app publishes the live world's epoch through `set_campaign_epoch_year`
+/// at the two points `app::m_active_world_params` is assigned — after
+/// `setup_world` (a new campaign) and after a save loads. Display only: it
+/// never enters `world`, never reaches the serialisation seam, and no
+/// simulation value is derived from it, so it carries no determinism weight.
+///
+/// Before the first world exists the value is `world_params{}.epoch_year`, so a
+/// menu-only session reads the same year a default campaign would.
+int campaign_epoch_year();
+
+/// Publish the live world's `world_params::epoch_year` to the tick calendar.
+/// Called by the app; nothing else should.
+void set_campaign_epoch_year(int year);
 
 /// Render a day-of-month as an English ordinal string ("1st", "2nd", "3rd",
 /// "4th", ..., "21st", "22nd", "23rd", "24th", ...), following the standard
@@ -98,7 +119,7 @@ std::string ordinal_day(int day);
 const char* month_abbrev(int month);
 
 /// Decompose an absolute in-game day count (sim_loop::day_tick) into a calendar
-/// date. Day 0 is January 1st 1960, Q1.
+/// date. Day 0 is January 1st of `campaign_epoch_year()`, Q1.
 ///
 /// @param day_tick In-game days elapsed since the campaign start.
 /// @return         The corresponding calendar date.

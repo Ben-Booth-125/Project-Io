@@ -41,12 +41,15 @@ drain) — plus `ws2_32` on Windows. Still SDL/Lua/ImGui-free; it proves the liv
 seam's two contracts headless (socket schedule ≡ in-process schedule by `state_hash`, transcript
 replays to the same hash; out-of-domain commands rejected whole with the hash untouched).
 
-**`build_gen_harness.bat <name>`** (repo root) is the CMake-free route for any world-superset
-harness: it derives its TU list by globbing `src\world\*.cpp` minus the four sol2/Lua TUs, exactly
-as `io_world_obj` does, so unlike the hand-written `cl` recipes below it **cannot drift stale**.
-Output lands in `build_gen\verify\<name>.exe` with the compiler log beside it. Use it when a
-worktree has no configured `build\` tree and a full CMake configure (SDL + Lua FetchContent) is not
-worth paying for one harness.
+**`node tools/verify/build_harness.js <name> [--run] [--debug] [--clean]`** is the CMake-free
+route for any world-superset harness: it derives its TU list by globbing `src\world\*.cpp` minus
+the sol2/Lua TUs, exactly as `io_world_obj` does, so unlike the hand-written `cl` recipes below it
+**cannot drift stale**. The world set compiles **once per configuration** into
+`build_gen\verify\_world\<release|debug>\` and every harness links the cached objects (BL-960); a
+TU recompiles only when its source or a header under `src\` is newer, and `--clean` drops the
+cache. Output lands in `build_gen\verify\<name>.exe`. Use it when a worktree has no configured
+`build\` tree and a full CMake configure (SDL + Lua FetchContent) is not worth paying for one
+harness. (`build_gen_harness.bat`, which this replaced, no longer exists.)
 
 `road_reach_census` (Sprint B2) is the road-network reach instrument: it counts, over the 8-seed
 census set, how many nations end generation with **no roaded tile in their territory**, splits that
@@ -763,7 +766,7 @@ Links the world superset; CMake target via the generic glob.
 
 ```
 cmake --build build --target unit_march_harness   # from a vcvars shell
-build_gen_harness.bat unit_march_harness          # or the CMake-free route
+node tools/verify/build_harness.js unit_march_harness   # or the CMake-free route
 ctest --test-dir build -R unit_march_harness
 ```
 
@@ -891,6 +894,61 @@ cmake --build build --target save_envelope_roundtrip   # from a vcvars shell
 ctest --test-dir build -R "exchange_record_harness|save_envelope_roundtrip"
 ```
 
+## `endemic_demand_harness` — the Endemic trade channel end to end (BL-647)
+
+The eighth demand channel of MARKETS.md § Demand channels: `inject_endemic_demand` pulls a
+wealth-scaled, nation-flavoured luxury basket (tobacco/spices/coffee/furs) into nation-anchored
+markets each clearing tick. Six row families, all mutation-proved red at authoring: E1 wealth
+gates the pull exactly (treasury + positive domiciled corp balances × `wealth_scale` × basket; a
+broke nation injects nothing, a debtor corp contributes zero, a two-market nation splits with a
+carve-invariant total); E2 character asymmetry is real (two nations crave measurably different
+baskets off the pure seeded preference hash); E3 determinism (`==`-identical floats across two
+same-fixture runs); E4 the BL-586 slice-2 placement gap is closed (`is_extractable` +
+`can_place` accept a luxury deposit tile, a bare tile still refuses); E5 the shared tranche
+survives both era bands and a banded row masks; E6 on the generated world the injected demand
+survives `clear_markets` into priced state.
+
+```
+node tools/verify/build_harness.js endemic_demand_harness --run
+```
+
+## `campaign_lapse` — the spectated-campaign measurement instrument (BL-723)
+
+The sweep battery's engine (BL-724…BL-729). Runs one spectated campaign — nobody seated, every
+corp scorer-driven — under one parameter set and writes per-tick CSVs to
+`build_gen/verify/lapse/<tag>/`: `corps.csv` (the seven budget flows + net + balance + holdings +
+footprint tiles + market share, per corp per tick), `markets.csv` (price/base/supply/demand/
+shortfall per priced good per market), `world.csv` (valued production — NR-774's GDP definition —
+exchange revenue, convoys, active/idle buildings, corps in debt, stance pairs, treasuries, state
+purchases), plus a manifest stating every parameter, override and proxy bracket. Overrides
+(`--pop-scale`, `--bg-scale`) take the `--reach` pattern: applied after `load_from_lua`, echoed
+in the manifest, authored Lua untouched. `--t0` runs the validity battery instead: A/A
+byte-identity, a differential knob proof, zero-observation-fails, and a wall-clock ceiling — all
+mutation-proved red at authoring. Visual half: `scripts/verify/campaign_lapse.lua` (capture-only,
+no goldens — one Corporation-lens frame per game-year, stitched to a time-lapse outside the
+engine).
+
+```
+cmd //c tools\verify\build_lua_harness.bat campaign_lapse
+./build_gen/verify/campaign_lapse.exe --t0
+./build_gen/verify/campaign_lapse.exe --tag baseline-s0
+./build_gen/verify/campaign_lapse.exe --epoch 1960 --seed 0 --warm 0 --ticks 60 --tag debt-ind-s0
+```
+
+**Debt instrumentation (BL-745 / BL-746, 2026-09-02).** `corps.csv` carries, per corp per tick,
+the balance delta attributed by tick phase — `convoys` (legs debited at dispatch), `agency` (the
+corp AI batch: build cost and materials, hires, buyouts — capital, in no filed flow), `budget`
+(the seven flows), `nation`, `arrivals`, `exits`, and `delta` = their sum, which is exactly
+balance(t) − balance(t−1); row C3 asserts the residual is zero. Beside them: `produced_value`
+(NR-774's GDP definition per owner), `bldg_active/idle/limited/unstaffed/exhausted/building/
+mothballed`, `labour` and `supply_factor_mean` / `bldg_supply_zero` (BL-641's output scalar).
+`debt.csv` has one row per corp that entered debt in the window: tick, focus, holdings by type,
+the trailing-4-tick flows, and the dominant drain; the run ends with a histogram of dominant
+drains and the median entry tick. Run it with no lead-in (`--settle 0`; `--warm 0` is the same flag) to see
+where debt begins — the default lead-in is the game's 12-tick settle (`app::validation_ticks`), and its
+ticks are unlogged, so a wave that starts inside them is not in the CSVs. Compare tags with the aggregator pattern in
+`docs/development/DEVLOG.md` (2026-09-02, "every balance tracked").
+
 ## Build note (2026-08-30): the glob loop carries the sol2 + Lua INCLUDE paths
 
 Since b668434c (the v0.1.21 cut), `tools/verify/harness_params.hpp` — the shared
@@ -909,3 +967,104 @@ it survived a release cut. The glob loop now puts the sol2 and Lua **include** p
 harness; a path costs a TU that does not use it nothing, and putting them on all of them beats a
 hand-kept list the next shared header would fall off. **Linking** Lua stays opt-in — a harness
 that constructs a `lua_state` is still hand-declared with `lua54`.
+
+## `recipe_margin` — every recipe at base price (BL-744, sprint 31)
+
+Authoring-time arithmetic over `scripts/recipes.lua`, `scripts/economy.lua` and
+`scripts/world_gen.lua`'s `base_price`, for every processing recipe and every `k_extractable`
+target in both era bands. No world is built. Two halves per row (PRODUCTION.md § The recipe
+margin anchor): **M1** margin ≥ k × marginal cost at base; **M2** fixed cost covered at the price
+floor at typical staffing. R0 non-vacuity, R5 every input priced, R6 differential red-proof;
+R1–R4 are the anchor itself: they went red on 41 of 44 priced recipes the day the harness was
+written, and the sprint-31 retune (per-band prices, the anchor route rule, the cost cuts) turned
+them green. Registered with ctest, script-rooted.
+
+Needs a live Lua state (it reads the authored tables, not a mirror):
+
+```
+cmd //c tools\verify\build_lua_harness.bat recipe_margin
+./build_gen/verify/recipe_margin.exe          # from the repo root
+```
+
+or the CMake target `recipe_margin` (declared by hand, `lua54` linked). The two knobs live in
+`economy.recipe_margin_anchor` (`profit_over_marginal` on the anchor route,
+`alternate_profit_over_marginal` on every other route, `typical_workforce`); the harness prints
+them and the roster's count at k′ = 0 / 0.5 / 1 / 2 so the bar can move on a measurement.
+
+---
+
+## landscape_score_harness — BL-770 slice 1, does the phase 6 objective discriminate?
+
+Scores candidate landscapes with `src/world/landscape_score.{hpp,cpp}` and reports whether the
+three ruled terms (chain completeness, supply:demand balance, and the spread rewarded for
+unevenness) can tell candidate rosters apart at all. It is built to be able to **fail**: a flat
+result is the deliverable, not a bug.
+
+It carries two controls, and both are load-bearing. **R2.0** asserts the candidate fixtures
+genuinely differ (corp and building counts) before anything is read into their scores matching —
+otherwise "the objective is flat" is indistinguishable from "there was only ever one roster".
+**Section B** scores different worlds, so "flat" can be told from "the scorer returns a constant".
+
+```
+bash tools/verify/build_lua_harness.sh landscape_score_harness
+./build_gen/verify/landscape_score_harness.exe
+```
+
+Result as of 2026-09-06: the objective **does not** discriminate between rosters (every term at
+relative range 0.000e+00 while the fixture moves 149→169 corps), because every term reads tiles,
+markets and population and none reads a roster. A roster-aware term is owed.
+
+---
+
+## deposit_origin — BL-762, the Body phase places no biological deposit
+
+Runs the shipped planetology → continents → tile pipeline over a few seeds, keeps the
+`generation_record`, and reads what each of Pass 6's two phases actually placed. The classification
+itself is guaranteed by a `static_assert` in `components.hpp` (a switch with no `default` over every
+resource); this harness checks the **behaviour** that classification exists for.
+
+D1 asserts no biological resource reaches the Body phase, D2 that no geological one reaches the Life
+phase, D3 that nothing lands on a tile neither phase placed, and D4 that a manufactured good is
+placed by neither. **D5 is the row that keeps the others honest**: an all-zero record satisfies D1
+and D2 perfectly and proves nothing, so both halves must be non-empty. It also prints the per-resource
+placement table, which is the readable form of the split.
+
+```
+node tools/verify/build_harness.js deposit_origin --run
+./build_gen/verify/deposit_origin.exe [seeds]      # default 4
+```
+
+D6 is the crossing of the seam: the same body generated with the drift record withheld must place
+coal and petroleum **elsewhere** (presence moves). **D6b** (BL-961) is its interior twin: with the
+drift record kept and only Planetology's `thermal_series` withheld, the fossil **magnitudes** must
+differ while presence does not — the series moves by about a percent over the record's depth and
+the check is sized to that honestly rather than to a swing the physics does not give. D7/D8 hold
+the world to still feeding and fuelling itself after the split.
+
+## continent_drift — BL-763/BL-764, the drift time axis and the Lagrangian frame
+
+C-rows check the drift clock: a stated epoch length and depth, and `continent_snapshot_at`
+reconstructing any past plate configuration purely. **C1 is load-bearing** — epoch 0 must reproduce
+`continent_state::plate_id` bit-identically, or every deeper epoch is fiction.
+
+P-rows check the frame of reference: a tile as a material point on its plate, asked where it was and
+what climate it sat in. **P1 is the same kind of row as C1** — at epoch 0 the position, band and
+moisture cell must be exactly the present ones, which is what guarantees nothing downstream moves.
+P2 is the consistency that makes the two one model: a tile's offset from its plate's seed is constant,
+so ground rides its plate rather than sliding across a reshuffling partition.
+
+```
+node tools/verify/build_harness.js continent_drift --run
+```
+
+## Which builder?
+
+Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:
+
+```
+node tools/verify/build_harness.js <name>        # SDL/Lua-free world superset
+bash tools/verify/build_lua_harness.sh <name>    # needs a live Lua state (22 of 139)
+cmake --build build --target <name>              # includes core/save_game.hpp (links imgui)
+```
+
+A harness failing on `sol/sol.hpp` or `LNK2019` is the **wrong builder, not broken code**.

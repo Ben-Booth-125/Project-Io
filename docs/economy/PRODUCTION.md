@@ -1,5 +1,14 @@
 # Project Io — Production
 
+> **Settles:** what a building is and what a recipe consumes and yields · how extraction and
+> processing throughput are shaped · how much labour a building demands and what a shortfall
+> does to its output · how construction and power are paid for · what a fresh corporation can
+> build on day one.
+> **Not here:** what a good is and what it is worth (RESOURCES) · where the labour comes from
+> and how it is contended for (POPULATION) · what a building costs the balance each tick
+> (FINANCE) · where the output goes to be sold (MARKETS).
+> **Confused with:** RESOURCES.md, POPULATION.md, FINANCE.md.
+
 Production converts tile resource deposits into tradeable goods through two stages: **extraction**, which harvests raw materials from tiles, and **processing**, which refines or manufactures higher-tier goods from those inputs. Workforce shapes throughput at both stages.
 
 See **`docs/economy/RESOURCES.md`** for the full resource list, tier definitions, and prototype subset. The market model production sells into — clearing, price resolution, the order book — is **`docs/economy/MARKETS.md`**. The network goods move over — reach, roads, travel time, throughput — is **`docs/economy/LOGISTICS.md`**.
@@ -248,7 +257,7 @@ The two routes are `propellant_atmospheric` and `propellant_electrolysis` (BL-30
 Liquid oxygen has no `resource_type`: it is folded into each recipe, because nothing outside the
 Chemical Plant would ever hold it.
 
-On a body with an atmosphere, liquid oxygen is produced in Era 0 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 0 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world; closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 1 logistical problem.
+On a body with an atmosphere, liquid oxygen is produced in Era 1 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 1 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world; closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
 
 #### Electronics Lab
 
@@ -273,9 +282,9 @@ belong here rather than there:
   off a starting corp's tick-one menu is the availability of its inputs, not a refusal.
 - It is `machinery`'s **second** consumer, after the heavy spacecraft route below. A single
   consumer is one revert away from orphaning a good.
-- Its `base_price` (43.0) is **derived** from this tier's own markup ratio, not authored — the
-  derivation and the numbers are in RESOURCES.md, and it should be re-derived rather than
-  re-guessed if either input's price moves.
+- Its `base_price` (155.8) is **derived**, not authored — what its cheapest route needs under
+  § The recipe margin anchor, the larger of the two bands' needs — and it should be
+  re-derived rather than re-guessed if either input's price moves.
 
 There is **no industrial ancient-arc shortcut here** — the deliberate omission stands. The
 ancient arc reaches ordnance through the **Smithy** (§ The ancient chain), because unit upkeep
@@ -301,14 +310,14 @@ Two further routes exist to give `regolith` and `platinum_group_metals` consumer
 are deliberately **poor value per unit** — they are about reaching a *place*, not about
 efficiency.
 
-At authored prices the three industrial steel routes clear, per unit of steel: iron-nickel **2.0**,
-Smelter **1.0**, in-situ **0.8**. That ordering is the design, and it is why the regolith ratio and
-regolith's `base_price` (0.6) cannot be tuned independently of each other — see the note on the
-recipe in `scripts/recipes.lua`.
+At authored prices the three industrial steel routes clear over inputs, per unit of steel:
+iron-nickel **7.6**, Smelter **6.6**, in-situ **5.1**. That ordering is the design, and it is why
+the regolith ratio and regolith's `base_price` (1.0) cannot be tuned independently of each other —
+see the note on the recipe in `scripts/recipes.lua`.
 
 | Inputs | Output | Era | Why it exists |
 |--------|--------|-----|---------------|
-| Regolith ×12 | Steel | 1 | In-situ reduction on an airless body. Twelve regolith per steel against the Smelter's two iron ore: regolith is on every tile of every airless body, so the point is that you can build **from where you are**. |
+| Regolith ×8.5 | Steel | 1 | In-situ reduction on an airless body. Eight and a half regolith per steel against the Smelter's two iron ore: regolith is on every tile of every airless body, so the point is that you can build **from where you are**. |
 | Platinum group metals ×0.5 | Electronics | 1 | Contact-grade/catalytic route. At base price 40 this is a premium alternative to the silicon + copper + REE chain, not a cheap bypass of it. |
 
 #### Food Processor
@@ -321,7 +330,7 @@ recipe in `scripts/recipes.lua`.
 
 | Inputs | Output | Era |
 |--------|--------|-----|
-| Water ×1.5 + steel ×0.5 | Agricultural produce | 0 |
+| Water ×1.5 + steel ×0.5 | Agricultural produce ×5 | 0 |
 
 A processing_facility recipe (`hydroponics_bay`, BL-166) that produces `agricultural_produce`
 from refined inputs instead of a terrain deposit — no "energy" resource exists in the roster, so
@@ -331,6 +340,62 @@ the opposite way from the Farm:** only valid where the terrestrial Farm deposit 
 (`resource_deposit[agricultural_produce] == 0`), keyed off the processing_facility's target
 resource in `placement_rules::can_place` (mirror image of the extraction deposit check;
 `deposit_present` is the rejection reason on Farm-viable terrain).
+
+---
+
+## The recipe margin anchor (Ben, 2026-09-02)
+
+**Every recipe pays at base price.** Ben's sentence: *"the simplest way to do this is to ensure
+that all recipes (at base price) make a greater profit than marginal costs."* A recipe that cannot
+clear its own marginal cost at base price is unprofitable **by authoring** — no demand channel,
+band or scorer can rescue it — so this is the anchor every other economy lever sits on. It is a
+statement about the three authored tables (`scripts/recipes.lua`, `scripts/economy.lua`,
+`scripts/world_gen.lua`'s `base_price`), checked at **authoring time** and never against live
+resolved prices, which is BL-740's (maintenance floor anchor) discipline applied to the whole roster.
+
+**Two halves, because base is the middle of a band and not the price.** Resolved prices run from
+`floor_mult` to `ceil_mult` of base (`MARKETS.md` § Price resolution), so a recipe positive at base
+can still lose under glut.
+
+- **M1 — marginal, at base.** Per batch (per unit for extraction):
+  `revenue − marginal_cost ≥ k × marginal_cost`, where `marginal_cost` = inputs at base + wage per
+  batch, and wage per batch = `base_wage / base_rate` (output and wages both scale linearly with the
+  assigned workforce, so the per-batch figure is staffing-independent at habitability 1). `k` is
+  `economy.recipe_margin_anchor.profit_over_marginal`; `k = 1.0` is the sentence verbatim — profit at
+  least equal to marginal cost, revenue at least twice it.
+- **M2 — fixed cost at the floor.** Per tick at `typical_workforce` (the staffing generation seeds a
+  building with): `(revenue − inputs) × floor_mult × batches − wages − maintenance − goods upkeep ≥ 0`.
+  Inputs and outputs both at the floor, since a glut market has everything cheap. Maintenance is the
+  authored constant at workforce target 100; goods upkeep is the band's per-type basket valued at
+  base. This is BL-740's anchor stated once for extraction and processing alike.
+
+**The anchor route.** A good with several in-band routes is priced off its **cheapest** — the
+lowest marginal cost per unit of primary output — and that route must clear `profit_over_marginal`.
+Every other route clears `alternate_profit_over_marginal` instead (`0` = profitable at base), and
+the floor half regardless. A recipe whose primary output is an extractable raw is always an
+alternate: extraction is that good's cheapest route.
+
+**One price table for both bands.** A good's price is the larger of the two bands' anchor-route
+needs, and the bands are kept compatible by keeping their routes to a shared good at comparable
+depth: the ancient chain reaches steel in one step (the Bloomery Furnace, ore and timber), so its
+anchor sits beside the Smelter's rather than three doubling stages above it. A per-band price
+table was considered and rejected (Ben, 2026-09-02).
+
+**What is exempt, and says so.** A recipe whose every output is unpriced (propellant — consumed by
+the Launchpad, never sold) has no market margin to anchor and is listed, not failed. An **unpriced
+input** is a defect, not an exemption: the good cannot be bought at any price.
+
+**Retune order.** Green is reached from costs and rates first (the per-batch wage and maintenance
+share move every row at once), then input quantities where a recipe is authored at zero or negative
+value-add, and base prices **last** — each tier's price is the next tier's input cost, so lifting
+prices compounds up the chain, widens the ladder `RESOURCES.md` rests on, and moves the derived
+`ceil_mult` (re-derive it with `haulage_measure` after any change to the cheapest base price). Each
+band carries its own price table; a retune must clear both.
+
+**What the anchor does not claim.** It is necessary, not sufficient. A roster that pays at base can
+still lose collectively when the money entering the field is less than what leaves it (`FINANCE.md`
+owns the loop); the anchor is the precondition for that measurement meaning anything. The check is
+`tools/verify/recipe_margin`; the owner is BL-744 (recipe margin anchor).
 
 ---
 
@@ -407,7 +472,7 @@ not per AU — the pad is the thing being fuelled. An unfuelled pad is exactly a
 all. A convoy exporting propellant itself cannot burn the cargo it carries; the gate subtracts
 the cargo first. Propellant is deliberately **left out of the market's base-price table**, so it
 is made and burned within a corp's own pool rather than traded. See **`docs/economy/ERAS.md`**
-for the Era 0→1 transition.
+for the Era 1→2 transition.
 
 *Save-format note.* Appending a `resource_type` value renumbers nothing but changes the length of
 every per-resource array; every such array is sized off `resource_count`, so the append costs a
@@ -415,43 +480,17 @@ version bump and no per-array edit (BL-107, save-format header).
 
 ---
 
-## Workforce model
+## Labour demand and the shortfall
 
-The per-`(corp, body)` pool model, as `run_economy_step` in `src/world/economy_system.cpp` and
-`compute_building_opex` in `src/world/budget_system.cpp` implement it; the design rationale is
-POPULATION.md § Workforce model.
-
-**Supply** derives from the body's population centres (BL-042, workforce supply derivation):
-each centre contributes labour by scale — `labour_by_scale` = 1 / 3 / 10 / 30 / 100 units for
-scale 1–5. A corp's share of that body supply is its share of the building count there; a body
-with no centres falls back to the authored `world::workforce_supply` figure (default 3.0).
+The pool this demand draws on — how much labour a body's centres yield, who wins it when it is
+scarce, and what it is paid — is [`POPULATION.md`](POPULATION.md) § Workforce model.
 
 **Demand** is the sum of `workforce_assigned` over the corp's producing buildings on the body
 (extraction and processing only; ports and hubs demand no labour), capped by the body's
 habitability cap `min(1, mean_hab / 0.6)` (BL-041, habitability gates workforce).
 
-**Contention** clears by **wage competition** (BL-614, wage competition; the ruling and its
-rationale are POPULATION.md § Contention). Uncontended (`demand ≤ supply`), every building is
-staffed at request. Contended, scarce labour allocates **per building** — offered wage
-descending, building id ascending on a tie, each building granted up to its demand until the
-pool is spent — so the marginal building runs partial and those below it idle, superseding the
-old uniform proportional scalar. The offered wage is `base_wage × (1 + wage_bid)`
-(`building_component.wage_bid`, a per-building premium fraction — the first-cut dial, data-only,
-no UI yet; NR-629 flags the shape for overturn). The pool aggregate `min(1, supply/demand)`
-survives in `economy_report.workforce_contention` as the report figure; the per-building grant
-is `economy_report.building_labour`. A recipe's **qualified** requirement (§ POPULATION.md
-§ Qualification, BL-613) clears against its national pool by the same rule, before the ordinary
-pool; a building's factor is the product of the two grants. Every grant is then multiplied by
-`workforce_efficiency(hab)` (`src/world/workforce.hpp`, BL-069 workforce efficiency): full
-labour at habitability ≥ 0.6, ramping linearly to 0.5× at 0. Effective workforce =
-`workforce_assigned × grant`.
-
-**Cost** follows the wage/maintenance split (`compute_building_opex`, BL-049): maintenance
-carries a fixed **30 % material floor** charged even when decommissioned, plus a labour
-remainder scaled by the workforce target (zero when decommissioned); wages are
-`workforce_assigned × grant × base_wage × (1 + wage_bid) × wt_scalar × hab` — paid **at the
-offered rate** on the labour actually allocated, not the request (BL-614): a building that
-outbid its siblings pays the premium it offered. `docs/economy/FINANCE.md` owns the money side.
+What a building's labour and maintenance cost the balance each tick is
+[`FINANCE.md`](FINANCE.md) § Building operating cost.
 
 `workforce_assigned` itself is an authored constant set at placement (0.5 for producing types,
 0 for passive infrastructure) and is never player-edited. The **player lever is
@@ -471,7 +510,27 @@ The target is the *heuristic*, not a hard goal: a manual tier chosen in the buil
 
 ## Stockpile and output flow
 
-Extraction and processing outputs accrue into a shared stockpile pool held per `(corporation, body)` (a world-level map, not the per-building `stockpile_component`, which the economy does not use). At the economy tick boundary:
+Extraction and processing outputs accrue into a shared stockpile pool held per **`(corporation, market)`** (a world-level map, not the per-building `stockpile_component`, which the economy does not use). At the economy tick boundary:
+
+**POOLS ARE PER MARKET, NOT PER BODY (Ben, 2026-09-15).** A building's output enters the pool of
+the market whose catchment holds the building's tile (`market_for_tile`), and its inputs draw from
+that same pool and that market's inventory. A corporation with works in two catchments on one body
+therefore holds two pools, and moving goods between them is a haul.
+
+**Why, and what it fixed.** Keyed per body, a convoy between two markets on the same body debited
+and credited one pool: the corp paid the haul, waited the travel time, and sold the goods back at
+its home market. Every same-body market-to-market haul was a cost with no effect, and a seller
+could not reach a better-priced market on its own continent at any price. A pool at the market
+makes the delivery real — an arrived convoy credits the destination market's pool, and the
+ordinary auto-surplus sells it *there* (`SUPPLY.md` § Convoy entity).
+
+**What it costs, stated.** A firm whose works straddle a catchment line no longer feeds a
+processor from a mine in the neighbouring catchment for free; it hauls, or it buys. Generation
+anchors a firm's holdings within about a tile of its home region, so most firms sit in one
+catchment, but the landscape search must now score a straddling roster as the logistics problem it
+is. Labour pools stay per `(corp, body)` (`POPULATION.md` § The labour pool) — people commute
+within a body; goods do not teleport within one. A body with no market yet keeps one body-level
+pool until its first building completes and spawns one. The pool key is save-format state.
 
 1. **Supply** is the goods each corporation lists for sale — its surplus above what its own processors will consume that tick (auto-surplus), plus its standing sell orders.
 2. **Demand** is what processing buildings and construction sites set out to buy this tick (the *want*, net of the corp's own pool — MARKETS.md § Want and fill), plus population and background demand.
@@ -479,7 +538,211 @@ Extraction and processing outputs accrue into a shared stockpile pool held per `
 
 ---
 
-## Construction pacing
+## A shortfall scales output; it never idles (Ben, 2026-08-31)
+
+**Any upkeep draw a building cannot meet reduces what that building produces. It does not switch the
+building off.** This holds for every goods draw — materials, power, whatever a later channel adds —
+and it is a rule about the *economy*, not about any one channel.
+
+The reason is a loop, and it is why the rule is absolute rather than a default. A building idled for
+want of an input stops buying that input. It was a **buyer**, and the price it was willing to pay is
+the signal that would have called forth the supply. Idle it and the signal disappears, so the supply
+is never built, so the draw stays unmet, so the next building idles too. A new universal draw is
+unmet everywhere at once on the tick it is introduced, which turns that loop into a cliff rather
+than a slope — and halving the rate only delays it, because the cause is structural rather than one
+of magnitude.
+
+A building on reduced output keeps bidding. That is the whole difference: it stays a participant in
+the market that has to supply it.
+
+**Dim, never dark (Ben, 2026-09-02).** The reduction has a floor: an unmet draw decays a building's
+supply factor by the authored step per tick down to `supply_floor_permille` and no further, so the
+worst-supplied building still runs at that fraction of nominal. A decay without a floor is an idle
+with a delay — every building whose draw is never met goes dark exactly `1000 / decay` ticks in,
+together, which is the cliff this rule exists to prevent. **And no wire, no draw:** a grid good
+(`LOGISTICS.md` § 3a) is drawn only where the road network reaches the building's tile. Where it
+does not, the good cannot arrive, so the building neither draws it nor weakens for want of it; the
+ordinary goods in its basket still draw and still bind. Owner: BL-746 (upkeep starvation cliff).
+
+**And no price, no draw (Ben, 2026-09-06).** A building draws a grid good only once its **catchment
+market has priced it** — that is, only once the market this building clears against has ever
+resolved a real price for that good, rather than carrying the untouched authored default. Before
+that moment the good has no supplier the building could have bought from, so a draw against it is
+not scarcity being expressed, it is a bill for a market that does not exist yet.
+
+This is the third rung of the same rule, and it exists for the same reason as the other two: it is
+what lets a supply industry **come into being at all**. A universal draw switched on at tick 0
+prices out the generation buildings that would have met it — a generator short of power throttles
+itself — so the draw suppresses its own supply and the shortfall is structural rather than
+transient. Gating on the priced market makes the draw arrive *behind* the industry instead of ahead
+of it.
+
+**The failure mode is that this silences the scarcity rather than resolving it**, and it is not
+distinguishable from success by the supply factor alone. A grid good that is never priced anywhere
+is never drawn anywhere, and the field then reads healthy for the reason a field with no economy
+reads healthy. So the pair is read together: the **supply factor** and the **price of the grid
+good**. A supply factor climbing while the good stays unpriced is the fix hiding the problem; a
+supply factor climbing while the good carries a real, moving price is the industry having been
+allowed to form.
+
+**The corollary for authoring:** a channel's rates may ship at zero while its shape ships complete.
+A draw for a good the world does not yet make is not a channel that needs tuning down — it is a
+channel whose supply has not been induced yet, and the honest response is to ship it inert and turn
+it on when the good exists.
+
+---
+
+## Power (Ben, 2026-08-31)
+
+**Power is not a traded good and not a per-body pool. It is a grid.** Ben's ruling:
+
+> *"Power travels via road infrastructure, although it is different from a convoy, it has a 1 qtr
+> travel time or weight. So if there is a connection from a power source to the player's HQ, they
+> will be able to use the power on the next tick. Power can be stockpiled, but not infinitely."*
+
+### What it is
+
+A **generation building** converts fuel into power. Every building that needs power **buys** it, and
+the purchase is its upkeep draw. Ben, 2026-08-31, settling this:
+
+> *"I believe we need to distribute power across all industry. This means that it has to be a bought
+> good when it is taken as upkeep. Therefore corporations can buy power from each other, and
+> background companies can produce power with a profit."*
+
+So power is:
+
+- **A bought good.** It has a price, it clears on the market, and a short building **bids for it** —
+  exactly the shape § Settled: a short pool BUYS gives every goods draw. Power upkeep is the first
+  channel built on that rule rather than an exception to it.
+- **Never cargo.** It has a price but no convoy: transmission is the road network itself
+  (`docs/economy/LOGISTICS.md` § 3a), so it is the first good whose **movement and market are
+  separate questions**.
+- **Connection-gated.** A buyer can only match a seller its network reaches. That is what keeps
+  power a *regional* price rather than a world one, and it is the whole reason a road matters twice.
+- **Stockpiled, with a ceiling.** Unlike every other good, its store is capped. A generator running
+  into a full store is producing nothing anyone will ever buy — a real decision rather than an
+  accounting detail.
+
+**Generation is a business, not a cost centre.** Background firms build power plants and run them at
+a profit, which is the point: it gives the world a firm type with a reason to exist, and it means
+power supply is induced by price the way every other good's is.
+
+### Why this closes the fuel chain at BOTH ends
+
+`coal` and `petroleum` are on the census's *extractable, no market sink* list — petroleum produced
+6169.9 against demand **0.000** in the industrial band. Power gives them an endpoint, and because
+power is bought rather than self-supplied, **both links of the chain bid on the market**:
+
+    fuel  --(bought by the generator)-->  power  --(bought by every building)-->  consumed
+
+The generator's fuel purchase is an ordinary processing input. The building's power purchase is an
+upkeep bid. Neither is a pool draw, so neither severs the chain — which is MARKETS.md property 3
+satisfied twice over, and property 4's *derived demand propagates through links that bid* working
+exactly as designed.
+
+**An earlier draft of this section had power NOT traded** — generated by a corp for its own connected
+buildings. Ben overturned it the same day, and the reason is the one that matters: as private
+infrastructure, power demand is bounded by each corp's own generation, which is a small closed loop.
+As a bought good, **every building on the map is a buyer**, which is the economy-scaled sink the
+census says is missing. It also fixes the harsher consequence of the private reading, where a corp
+with no fuel access was simply stuck; now it buys power from someone who has fuel, which is trade.
+
+### It trades internationally, and that is not a detail
+
+**Power crosses borders** (Ben, 2026-08-31). The road network does not stop at a national boundary,
+so neither does the grid: a generator in one nation sells to a building in another wherever the
+network connects them.
+
+**The machinery already exists.** MARKETS.md § Tariffs resolves a market to a jurisdiction through
+`market_component::centre_tile` and `world::tile_to_nation`, and charges the enacted import duty on
+any matched trade whose buyer is domiciled outside it. Cross-border power is an ordinary
+cross-border sale. Nothing new is needed to make a nation earn from the power flowing through it.
+
+**And it reaches the Era's catastrophe, which is the strongest thing about it.**
+`docs/economy/ERAS.md` § The point of an Era makes Era 1 a test the player is trying to pass, scored
+on **Alarm**, and its own danger table names the answer in the economic dimension: *"keep
+cross-border routes live; trade interdependence is the cheapest Alarm suppressant in the game"* —
+with **Autarkic Substitution** listed as the herring that looks like resilience and cuts the ties
+holding Alarm down.
+
+International power is that interdependence in its most legible form. A nation whose lights depend
+on a neighbour's generation is a nation with a reason not to escalate, and severing that tie — by
+autarky, by tariff, or by interdiction (`LOGISTICS.md` § 7) — is a visible, causal step toward the
+rupture. That is a system feeding **Trade and Conflict at once**, which is the test
+`docs/SYSTEMS.md` sets every system, and very few pass on both.
+
+### Power is what makes the Industry channel viable
+
+MARKETS.md's Industry channel ships its rates at **zero**, because the goods it drew — tools, planks
+— are *produced 0.0* in band, so every draw went unmet and the firms it drew from collapsed 227 → 19.
+Power is the first entry in that basket the world will actually make, because making it is
+profitable. Turning Industry on for power is therefore a different proposition from turning it on for
+tools, and this is the order to do it in.
+
+### The shortfall rule, and the lesson it inherits
+
+A building short of power **scales its output down**; it is not idled. This is not a preference, it
+is the BL-641 lesson applied before the fact: an upkeep draw that idles a firm kills the buyer that
+would have induced the supply, and the measured result was operating firms collapsing **227 → 19**.
+A firm that survives on reduced output keeps bidding for fuel, and the generation that answers it
+gets built.
+
+### Band
+
+**Industrial band only** (Ben, 2026-08-31). The ancient band gets no power analogue: `charcoal`
+already carries real household demand there and is not an orphan, so a second design against a band
+the prototype does not open on would be work without a reading behind it.
+
+---
+
+## Construction as a rate (Ben, 2026-08-31)
+
+**Construction becomes a sector with a throughput, not a per-building lump sum.** A **construction
+building** exists, runs a **production method**, draws that method's goods as upkeep, and produces
+construction capacity. Building projects consume that capacity.
+
+Ben's reason, and it is the strongest argument for the change:
+
+> *"This makes it easy to start with some construction of a certain method, and gives us an initial
+> demand for those construction goods."*
+
+### The channel it fixes
+
+Construction demand in the industrial band measures **0.000**, because `run_construction` fires only
+where something is actively building. It is episodic: nothing under construction, no demand. A sector
+makes it **continuous and economy-scaled** — capacity exists, draws its inputs every tick, and grows
+with the world. That is MARKETS.md property 1 satisfied by construction rather than asserted of it.
+
+And because generation can **seed construction capacity**, the demand for its inputs is non-zero from
+tick 0, in every market that has any. That is MARKETS.md property 5's *"every chain terminates in
+every market"* delivered by the generator rather than by authoring a basket.
+
+### The methods
+
+Five, era-banded exactly as recipes are (property 2):
+
+| Method | Band | Draws |
+|---|---|---|
+| Timber frame | ancient | timber, planks |
+| Stone and brick | ancient | stone, dressed stone, clay |
+| Iron frame | industrial | iron, timber |
+| Steel frame | industrial | steel |
+| Reinforced concrete | industrial | steel, stone, sand |
+
+Exact baskets and rates are a balance question and are **measured against the census**, never
+guessed. The ladder deliberately spans both bands, so the ancient band gains continuous construction
+demand too — it currently measures 56.3, better than industrial's zero and still episodic.
+
+### What it touches, and the debt it must clear
+
+This is a structural change, not an additive one: it reaches `construct_building`, placement, the
+build door, and **the AI scorer's capex model**.
+
+**NR-592 gets fixed here, on Ben's call.** `corp_ai.cpp` never prices `resource_build_cost` when
+scoring a build — a candidate scores on cash alone, and the seam refuses it at apply time if the
+materials are absent. Under a lump-sum model that is a missed opportunity. Under a **shared capacity
+pool it becomes a correctness problem**, because capacity is contended: a scorer that cannot see it
+will propose builds the pool cannot serve, every evaluation, for as long as the pool is short.
 
 Construction is a **market-gated, pay-as-you-build** process, not an instant purchase (BL-095,
 construction pacing). Placing a building gates only on affordability (the corp must be able to
@@ -553,11 +816,12 @@ every one of them is priced and consumed, per the admission rule.
 
 | Recipe | Inputs → output | Depth |
 |---|---|---|
-| Charcoal Burner | 3 timber → 1 charcoal | 1 |
+| Charcoal Burner | 1.5 timber → 1 charcoal | 1 |
 | Peat Kiln | 2 peat → 1 charcoal | 1 |
-| Coking Kiln | 1.5 timber + 0.1 iron blooms → 1 charcoal | 3\* |
+| Coking Kiln | 0.8 timber + 0.05 iron blooms → 1 charcoal | 3\* |
 | Bloomery | 2 iron ore + 1 charcoal → 1 iron blooms | 2 |
-| Smithy | 2 iron blooms + 1 charcoal → 1 steel | 3 |
+| Bloomery Furnace | 2 iron ore + 1.5 timber → 1 steel | 1 |
+| Smithy | 0.4 iron blooms + 0.2 charcoal → 1 steel | 3 |
 | Smithy | 2 iron blooms + 1 charcoal → 1 **ordnance** | 3 |
 | Potter & Weaver | 2 clay + 1 timber → 1 trade goods | 1 |
 | Glassworks | 2 sand → 1 trade goods | 1 |
@@ -734,7 +998,7 @@ game start."* The opposite is now the design (Ben, 2026-08-29): a corp may run *
 tech permits**, so the start gate is a **tech** question and nothing else.
 
 A fresh ancient corp — no tech earned, no buildings, no balance — sees **sixteen** of the ancient
-band's seventeen processing recipes open on tick one:
+band's nineteen processing recipes open on tick one:
 
 | Group | Open at tick 0 | Why |
 |---|---|---|
@@ -742,7 +1006,7 @@ band's seventeen processing recipes open on tick one:
 | Food Processing | Food Rations, Miller | The any-band/ancient pair, both open. |
 | Artisan Goods | Potter & Weaver, Glassworks, Tannery, Weaver | An early corp may sell trade goods without earning anything first. |
 | Construction Materials | Potter's Kiln, Stonemason, Sawmill | BL-586's slice-1 buildings — foundational, not earned content. |
-| Metal Foundry | Bloomery, and the Smithy's two routes (steel, ordnance) | Open. The chain is limited by charcoal supply and by whether blooms find a buyer — a market fact, not a refusal. |
+| Metal Foundry | Bloomery Furnace (ore + timber → steel, the band's depth-one route), Bloomery, and the Smithy's two routes (steel, ordnance) | Open. The Furnace needs only raws; the bloom chain is limited by charcoal supply and by whether blooms find a buyer — a market fact, not a refusal. |
 | Advanced Fabrication | Shipwright | Open, and shut in practice by its own inputs: it draws `planks` and `cloth`, and the shipped ancient world produces no planks. |
 | **The one closure** | *(Toolmaker — tech)* | `E0-EC-01` "Tool-and-Die Practice" gates the Toolmaker on owning a processing facility and a Cr 500 surplus. A fresh corp meets neither. |
 
@@ -790,7 +1054,7 @@ because no research reaches it), and the Selection panel's build door filters on
 `building_available` so the door does not offer what the gate would refuse. Guard:
 `tools/verify/era_roster.cpp`.
 
-The band is **not** ERAS.md's Era 0 / Era 1 — that axis is per-corp progression *within* the
+The band is **not** ERAS.md's Era 1 / Era 2 — that axis is per-corp progression *within* the
 industrial arc, gated on space access. The untagged (`any`) processing recipes shared by both
 arcs are `food_rations` and `refined_copper`; everything else is banded.
 

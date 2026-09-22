@@ -1,5 +1,11 @@
 # Project Io — Phantom Features
 
+> **Proposes:** what makes a piece of design a phantom · which kinds of undocumented design there
+> are · how a phantom is measured and found · which design session a given gap points at.
+> **Not here:** any phantom's actual design (the subject's authority doc) · the work to close one
+> (the backlog, through its query tools).
+> **Confused with:** SYSTEMS.md, DELIVERY.md.
+
 > **Status: scan output, 2026-08-22. Not authority, and not work.** Written from Ben's ask:
 > *"we have a lot of game design that hasn't been given proper space and attention in
 > documentation — do a scan for these phantom features."* Every row below is a pointer to a
@@ -292,6 +298,9 @@ same session. Two things changed that this file should record.
 **Class 3 shrank by its largest dependant.** `docs/lore/COLLAPSE.md` is **authority** now, its
 banner withdrawn — nineteen open items pointed at a document telling them it settles nothing
 (NR-511). The five sibling scaffolding docs keep their banners until their own work lands.
+*(Later, Ben 2026-09-15: that document was folded into `../generation/CIVILISATION.md` and its
+roster retired to `../research/COLLAPSE_ROSTER.md` as a mechanism reference — `BL-1001 (COLLAPSE
+doc folded and retired)`. The rows above naming `docs/lore/COLLAPSE.md` are the scan as it stood.)*
 
 **Class 5 lost its detector problem.** The status-drift check Ben ruled for (NR-514) is in
 `backlog_lint` and mutation-tested: re-introduce the BL-377 defect and it names the item and its
