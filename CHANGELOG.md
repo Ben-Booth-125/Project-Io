@@ -12,6 +12,105 @@ release.
 
 ## [Unreleased]
 
+## [0.1.24] — 2026-09-18
+
+*The pre-campaign history stops being one ancient pass and becomes an arc the player inherits.
+Across sprints 27 to 44, city states become empires over a real 400 BCE → 1200 CE, an Exploration
+age runs 1200 → 1660 with treasuries, treaties, colonies and fleets, and goods begin to cross water
+for reasons the simulation can state. The ground learned to look like a planet in the same span.
+**But the release's subject is what the instruments found once they were pointed properly** — that a
+whole sprint's figures described a world the player never gets, that nothing in the scorer reads its
+own purse, and that polities meet and never bind. Each is recorded here rather than quietly fixed.*
+
+### Added
+
+- **The Exploration age, 1200 → 1660** — a new phase with its own authority doc
+  (`docs/generation/EXPLORATION.md`). Fifteen items over six waves: capital as a per-polity
+  treasury, treaties with a term, colonies as subjects with an overlord link, ports/navies/armies
+  that decay, deterrence, creed-weighted strategy, and cultural preference for goods. The span runs
+  on the shared engine rather than a second one.
+- **Trade inside the Exploration round.** Trade is a want met by throughput, opened only by the
+  trade-access clause; trade value counts toward a binding, which is the only thing that lets a
+  distant pair bind; flow income replaces the flat market income; and spend is a scored allocation
+  inside upkeep rather than a new verb. **Displacement — conflict pointed outward rather than at the
+  neighbour — moved from a median 0.08 to 1.33 across sixteen seeds**, past the harness's own bar
+  for the first time, at 710 flows with every flow on a clause.
+- **The four pre-game technology trees** — Colonisation, Empire, Exploration and Industry — under
+  one grammar: minor/major/milestone, the spire, five adjacency rules, forks, diffusion by kind, one
+  scorer shape. A doc and a JSON store each, held together by `tree_lint.js`. The Empire tree is
+  wired into the sim, and every node of the two wired trees now does something through one generic
+  apply.
+- **The ground bake renderer.** The planetary canvas bakes chunks and reads as terrain rather than a
+  grid: stepped zoom approximating a 3D read at 2.5D, with brushes, stamps, a tilt seam and a muted
+  border palette — judged live and re-cut twice on the verdict that the first bake was too blurred
+  and its borders far too strong.
+- **Sixteen curated worlds** (`docs/generation/seed_library.json`), each recorded with what it is
+  for and queryable rather than loadable. A seed is the save.
+- **The 1960 baseline and the corporate web's plumbing.** The span's cost to 1960 measured at a
+  median 1.7–1.9 s a seed in Release — less than the 460 years before it — the charter budget seam
+  landed off by default and pinned, and a world pin that can finally see a building's tile: four FNV
+  digests a seed, tamper-tested against a changed search seed and a validation run one tick short.
+
+### Changed
+
+- **A build is scored by return on capital**, and the quadratic is gone. Every resource now reaches
+  the scorer — coal is mined for the first time — construction becomes a sector with a throughput
+  and a method, and power becomes a bought upkeep draw on the road network.
+- **The Empires phase runs its real span.** Pass 1's stop year decoupled from the epoch, so
+  400 BCE → 1200 CE runs in full rather than the 400-year slice it had been silently running.
+  With it: sparse settlements carrying seats and hinterland pointers, ancient roads that cheapen
+  where they are walked, materials spent on action, culture opposition that *permits* conquest
+  rather than forbidding it, civilisations coined from mixing, and centres that grow only where the
+  road network can still feed and rule them.
+- **The tile pipeline splits at the Body/Life boundary**, so the Life half re-runs over a cached
+  record — the 120-seed census re-runs in 13% of the time.
+- **Nations open with the money their history banked**, and the warm start is retired in favour of
+  the landscape search's own twelve-tick validation run.
+- **The backlog holds open work only.** Forty-nine landed rows left for the archive and four readers
+  followed them; the query tools union hot and cold, so `--touches` still answers *is this built?*.
+  The review queue went from 117 open to 0 — and most of what was in it turned out to be work, which
+  belongs in the backlog and now lives there.
+
+### Fixed
+
+- **The muster disbanded paid standing armies every year.** A treasury-funded army was meaningless
+  for a whole sprint before this was found.
+- **The empire tree's root node was permanently unlockable**: every child naming the root as a
+  prerequisite fed a *needs a neighbour held* requirement back onto the root itself. Zero nodes
+  bought at any span before the fix, 8–51 after.
+- An integer truncation zeroed campaign material cost under 250 raised heads.
+- Two directional inversions against `CIVILISATION.md`'s stated design — opposition's discount ran
+  backwards, and a fixture compared against the wrong baseline.
+- `demand_census` surveyed nothing, so the corp AI built zero mines in it.
+
+### Removed
+
+- `COLLAPSE.md` and its roster, retired to `docs/research/` rather than left asserting a mechanism
+  the game no longer has.
+
+### Measured, and left open
+
+- **The sweeps and the app generated different worlds.** `history_sweep` built from
+  `world_gen_config`'s struct defaults while the app loads the Lua config: seed 0 fought **6,479
+  battles in the sweep and 9,928 in the game**. Every figure sprint 42 argued from was internally
+  consistent and described a world nobody plays. Repaired the session after — recorded because the
+  sprint's conclusions had already been read.
+- **Nothing in the scorer reads the purse.** With the saturation caps gone the median polity ends
+  the span with a treasury of 211 against 1.26M before, and 14% of polity-rounds cannot pay their
+  army bill. At a tenth of the rate the median still collapses, so it is structural: the caps were
+  hiding a 600x spread.
+- **Polities meet and never bind** — 1,250 first contacts by 1660, **0 of 492 new pairs** holding
+  non-aggression, and 43 new contacts in the three centuries after. Four of six held seeds have no
+  frontier at all, because the first crossing almost never happens.
+- **The alarm is a seal, not a deterrent** — about 89% of near-home reads sit at the ceiling and
+  over 99% of near-home campaigns are treaty-blocked, so the deterrence weight tuned in sprint 41
+  acts as a flat constant.
+- **A copied world does not tick byte for byte as its original.** Latent today, since the landscape
+  search copies a world but never ticks the copy, and the first item of the sprint that follows this
+  release.
+- `history_sim_harness` stands at its two-failure baseline and `story_check` at two dead US-016
+  traces. Both are known, and neither is papered over.
+
 ## [0.1.23] — 2026-08-30
 
 *Sprint 24b closes the ledger pass: the six surfaces batch 3 never read. It reviewed all six,
@@ -1032,7 +1131,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.23...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.24...HEAD
+[0.1.24]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.23...v0.1.24
 [0.1.23]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.22...v0.1.23
 [0.1.22]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.21...v0.1.22
 [0.1.21]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.20...v0.1.21
