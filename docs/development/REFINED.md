@@ -86,24 +86,25 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
   - C6 NR-909: the search-less paths on a span world (below).
 
   *Step 1 — integrate (on main, committed in increments; `git merge-tree` shows the merge CLEAN).*
-  - T1 merge BL-1050 (3c9c5792). Its eight files are untouched on main since the merge-base
+  Requirement group `beat-one-ships` (R1-R11, 2026-09-22). Step 2 is R8, Gate 2 is R9-R11.
+  - [ ] T1 (R1) merge BL-1050 (3c9c5792). Its eight files are untouched on main since the merge-base
     1dc8332b, so no conflict. It moves the legacy world's D_settle and D_seat only (NR-894).
-  - T2 flip `digitisation_span_enabled` (hard_coded_world.hpp:181) and `resume_seeds_corridor_tier`
+  - [ ] T2 (R2) flip `digitisation_span_enabled` (hard_coded_world.hpp:181) and `resume_seeds_corridor_tier`
     (history_sim.hpp:1962; the struct default, which also covers Exploration's resume) on by default;
     rewrite both "OFF BY DEFAULT" comments and era_minus_one.cpp:470.
-  - T3 pin C1, C2, C4, C5 in stockpile_budget.hpp and drop PROVISIONAL.
-  - T4 C3's ruling, and the invariant stated where it binds: print it on the seat line
+  - [ ] T3 (R3) pin C1, C2, C4, C5 in stockpile_budget.hpp and drop PROVISIONAL.
+  - [ ] T4 (R4) C3's ruling, and the invariant stated where it binds: print it on the seat line
     (app.cpp:970) and count it per seed in player_seed_sweep.
-  - T5 C6: verify_api.cpp:529, main.cpp:148 and main.cpp:258 call `generate_background_firms`
+  - [ ] T5 (R5) C6: verify_api.cpp:529, main.cpp:148 and main.cpp:258 call `generate_background_firms`
     directly and only warn when the stockpile is non-empty — once T2 lands, EVERY `--verify`,
     `--serve` and headless world is a span world whose budget they ignore.
-  - T6 harness re-points: exploration_sim_harness.cpp:812 (R6.6 reads the 1660 grudges; setup reads
+  - [ ] T6 (R6) harness re-points: exploration_sim_harness.cpp:812 (R6.6 reads the 1660 grudges; setup reads
     the 1960 close with the span on, BL-1053); haulage_measure run with `--epoch 0` (its default is
     1960, :178); player_seed_sweep's pins gain an ARC field — legacy rows keep BL-1031's D_search
     and D_land and take BL-1050's D_settle/D_seat under NR-894, recorded old -> new; the shipped
     rows are new; `--digest-check` checks the arc it builds, and a legacy mode keeps the span-off
     pins a live check.
-  - T7 the rulings into DIGITISATION.md § 1 and CORPORATION_GENERATION.md; nothing else in a doc.
+  - [ ] T7 (R7) the rulings into DIGITISATION.md § 1 and CORPORATION_GENERATION.md; nothing else in a doc.
 
   *Step 2 — measure (Release, serial, keep-awake; roughly 5-6 h of machine time).*
   world_determinism old -> new (A/A records); stockpile_budget_check --r8; charter_refusal_probe;

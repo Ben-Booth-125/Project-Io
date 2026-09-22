@@ -6939,6 +6939,147 @@
      "result_metric": "code-reviewer (cold), two rounds. Round 1: the core held (span-off identity, rejection order and accounting, the app/harness mirror, the parser, the merge tool, every hand-worked number); five low findings fixed — a fixed-price row printed a derived price it never charged, an all-razed empty budget carried a price, a pairs run's JSON header named the unread m list, refused rows counted as seats in the SEAT MENU close, two stale DIGITISATION.md lines. Round 2: all five fixes hold; one label nit (DERIVED/FIXED inferred from price equality) fixed. Its advisory stands for Ben: stage 1's rows near stock/price 650 opened 1, 8, 3 and 8 seats, so concentration keeps a spread the derived price does not remove."
     }
    ]
+  },
+  {
+   "brief": "beat-one-ships",
+   "title": "BL-1044 - Beat 1 ships: the span and the charter budget on by default at epoch 0, prices pinned, one re-bless, one cold review",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1044 - sprint 45 (2026-09-22; integration plan in REFINED.md, rulings NR-908/909/910)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: git merge",
+      "headless: world_copy_determinism --copy-by snapshot (main session)"
+     ],
+     "requirement": "BL-1050 (order-independent reads) is merged into main unchanged (3c9c5792), and its owed --copy-by snapshot reproduction passes 16/16 on the integrated tree.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: hard_coded_world.hpp, history_sim.hpp, era_minus_one.cpp",
+      "headless: digitisation_sim_harness"
+     ],
+     "requirement": "The Digitisation span and BL-1037's corridor tier run ON by default at epoch 0 (the struct defaults, which also cover Exploration's resume); both 'OFF BY DEFAULT' comments and era_minus_one.cpp's are rewritten to say what is true now. The tier reaches both resumed spans through a world_params switch (default on, NOT on the save seam, on the footing of exploration_sim_enabled), so an instrument can still build the pre-BL-1044 world the BL-1031 pins were taken on. Harness guards that asserted the tier OFF are re-pointed to the shipped default.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: stockpile_budget.hpp",
+      "headless: stockpile_budget_check --r8"
+     ],
+     "requirement": "The ruled pins land where the budget is built, PROVISIONAL dropped from each: k_stockpile_specialist_firm_charters 2, k_stockpile_price_divisor 580, the per-province cap 2, the square root's base c = 8. Each cites NR-910 and the arithmetic it was read off (the seat curve at m = 2: median 9.5 seats at 580, none falling back; spread 2 to 73 accepted).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: landscape_search.cpp, charter_budget.hpp, app.cpp",
+      "headless: player_seed_sweep (the invariant count)",
+      "headless: stockpile_budget_check"
+     ],
+     "requirement": "THE NO-SPECIALIST WORLD (NR-910): a budget on which no centre a nation owns affords a specialist falls back to the no-budget world exactly as a refused spend does — decided from the budget, on the world as the apply receives it, before anything is chartered; the search runs as with no budget, and the report says so under its own reason. The one-is_player invariant (world.hpp) is stated where it binds: printed on the app's seat line and counted per seed by player_seed_sweep, which FAILS a row that seats other than exactly one. A world that affords a specialist but places none (the walk's residual) is reported, not patched.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "code: verify_api.cpp, main.cpp",
+      "headless: ProjectIo --headless on a span world"
+     ],
+     "requirement": "NR-909: --verify, --serve and the headless run spend a NON-EMPTY stockpile budget on the search's seed candidate, as the harness's unsearched apply does; an EMPTY (or rejected) budget lays today's web byte for byte. The three 'this never fires' guards are replaced by the spend.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "code: exploration_sim_harness.cpp, player_seed_sweep.cpp",
+      "headless: exploration_sim_harness",
+      "headless: player_seed_sweep --digest-check --arc legacy"
+     ],
+     "requirement": "Harness re-points: exploration_sim_harness R6.6/R6.7 read the tables setup actually consumed with the span on (the 1960 close, BL-1053); player_seed_sweep's pins gain an ARC — the legacy arc (span off, tier off) keeps BL-1031's D_search and D_land and checks them live; the shipped arc is what --digest and --digest-check build by default and gets its own rows; haulage_measure is run at --epoch 0.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "code: DIGITISATION.md, CORPORATION_GENERATION.md"
+     ],
+     "requirement": "The rulings are in DIGITISATION.md § 1 and CORPORATION_GENERATION.md § Pass 1 and nowhere else; no doc gains a build-status line. A span world's save carries what it needs, or the code says why it need not (BL-1040).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R8",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "headless: stockpile_budget_check --r8",
+      "headless: charter_refusal_probe",
+      "headless: player_seed_sweep --digest / --digest-check",
+      "headless: exploration_sweep + seed_library.js --check",
+      "headless: history_sim_harness, exploration_sim_harness, digitisation_sim_harness",
+      "headless: haulage_measure --epoch 0",
+      "headless: story_check",
+      "headless: ctest"
+     ],
+     "requirement": "THE MEASUREMENT (Release, serial, keep-awake, quiet machine): world_determinism old -> new (A/A records); stockpile_budget_check --r8; charter_refusal_probe; player_seed_sweep --digest then --digest-check on the shipped arc, and the legacy arc's check; exploration_sweep then seed_library.js --check (fingerprints move ONLY through BL-1037's tier); history_sim_harness (its 2-failure baseline), exploration_sim_harness, digitisation_sim_harness; haulage_measure --epoch 0 against 1055/802; story_check (2 pre-existing US-016 failures); setup cost per seed in Release and the Debug app; the nation treasury credit rate against its two stated scales (BL-1053 (1)); ctest (world-building rows against the 60 s default).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R9",
+     "status": "pending",
+     "verification": [
+      "review: Ben (the re-bless authorised against the shape)",
+      "code: player_seed_sweep.cpp pins, seed_library.json"
+     ],
+     "requirement": "THE RE-BLESS: Ben authorises it against R8's shape before anything is re-pinned. Then the shipped arc's pins are taken, the legacy rows' D_settle/D_seat move to BL-1050's values (old -> new recorded, NR-894), seed_library is blessed, and nothing else is re-pinned.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R10",
+     "status": "pending",
+     "verification": [
+      "headless: the 1960 readings per library seed"
+     ],
+     "requirement": "THE DONE-WHEN READINGS at 1960 on the shipped world, per library seed: density follows cities (rho(firms, urban) against rho(firms, goods), the BL-1029 baseline 0.431 vs 0.460 on its upper-median convention) and industrialisation (points unevenly held, the fuel reading visible).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R11",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review of the sprint's integrated diff (no authoring context), with a fix round budgeted; the reviewer reports from the diff and names confirming runs rather than running sweeps. It also closes BL-1043 R7.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
