@@ -127,6 +127,27 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
   now that setup takes 21 -> 51 s on seed 28; the visual verify suite if C6 routes verify through
   the budget.
 
-  *Gate 2 — Ben authorises the re-bless against that shape; the pins land; the cold review of the
-  sprint's integrated diff (a fix round budgeted); BL-1050 and BL-1044 close; then sprint 45's retro
-  and the sprint 46 cut.*
+  *Step 2 RAN 2026-09-22 (5 h 20, serial, keep-awake).* Every determinism check held
+  (world_determinism A/A twice; world_copy_determinism --copy-by snapshot 16/16; --fidelity and
+  --resume-tier 16/16; the legacy arc kept D_search/D_land on 16/16 and moved D_settle/D_seat on
+  16/16, NR-894's shape). haulage 2035 dispatches / 1627 market-to-market against the 1055/802
+  floor. history_sim (2), story_check (2 US-016) and era_world (R5, BL-1010) sat at their known
+  baselines; world_determinism R3.7, era_world R1/R7 and the digitisation modes were stale checks,
+  re-pointed. FOUR FINDINGS went to Ben as NR-911 to NR-914.
+
+  *Gate 2 — RULED 2026-09-22 (Ben, two forms). NR-911 the residual is reported and counted; NR-912
+  the treasury rate stands and § Pass 7 is restated from the shipped world; NR-914 the divisor is
+  re-pinned to the shipped world's nine-seat value, 650 (580 was its tier-off reading); NR-913
+  pooling was built and measured (region/market/nation lift rho(firms, urban) 0.139 -> 0.186-0.211,
+  the 120 ceiling binds, seats move) and NOT shipped — the web ships unpooled, the done-when is
+  restated as taken-and-reported, density becomes the sprint 46 draft DENSITY_FOLLOWS_CITIES, and
+  the pool stays an off-by-default switch. THE RE-BLESS is authorised and taken: the shipped arc's
+  16 pins at 650:2 (every row one player, none fell back), the legacy rows' D_settle/D_seat moved
+  (old -> new in the DEVLOG), the seed library blessed (6 of 16; the tier-off control reproduced all
+  16, so the tier is the only mover). TWO COLD-REVIEW ROUNDS: eight findings, all fixed — the
+  heaviest, the launch view framed world-gen's player whom the search replaces (latent since
+  BL-977, on every world here).*
+
+  *OWED before BL-1050 and BL-1044 close: the 650:2 live-play cost row (the tick against legacy and
+  setup cost per seed), the ctest suite, the visual suite, and the requirement rows' results. Then
+  sprint 45's retro and the sprint 46 cut.*
