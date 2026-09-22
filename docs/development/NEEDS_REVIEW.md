@@ -24,13 +24,27 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*18 entries — 0 open, 18 resolved.*
+*19 entries — 1 open, 18 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-915 — CALL: the live tick at the pinned 650:2 is fine at the median and heavy in the tail — three of sixteen worlds run 2.5-6x their legacy selves
+*question · raised 2026-09-22 · from BL-1044 re-bless (player_seed_sweep --charter-cost --budget stockpile --price-pairs 650:2, 16 library seeds, Release, serial, quiet machine, 7669 s), main session, 2026-09-22.*
+
+NR-908 gave the divisor to live-play cost, and the pin was set on the median: at 650:2 the shipped world's live tick is a median x0.78 of the same seed's legacy world (4.5 s against 5.4 s), inside the band stage 2 read (x0.43 / x0.91 / x1.70 at 325 / 650 / 1300 with the tier off). The TAIL is not: seed 41 ticks 30.9 s against its legacy 5.3 s (x5.79), seed 31 25.5 s against 6.2 s (x4.12), seed 28 12.8 s against 4.1 s (x3.13); the other thirteen run x0.36 to x1.51. It is not a small-denominator artefact — those are absolute seconds per live tick, and 31 s a tick is heavy for play. The heavy worlds are the ones the seat menu opens widest (seed 41 seats 65 specialists, seed 31 seats 31, against a library median of 8.5), so the cost follows the specialists the budget charters rather than the background firms (seed 41 holds 56 firms, fewer than the median world's 65). Generation cost moved too: the budget row's generation is a median 53.3 s against the legacy row's 42.5 s (max 93 s), about 26% dearer.
+
+**Why it matters.** The divisor is pinned and the world is re-blessed on it. If a 31-second tick is not playable, the knob that fixes it is the same divisor (or a seat cap), and moving it costs another re-bless.
+
+- A: accept the tail — the anchor is a median, the spread is the world talking (as NR-910 accepted the seat spread), and a heavy world is a rich world.
+- B: re-tune the divisor against the TAIL rather than the median (a smaller divisor buys fewer charters everywhere, and moves the seat menu off its anchor).
+- C: leave the divisor and bound what the tail costs — a per-world seat cap, or a per-body ceiling on specialists as the density ceiling bounds firms.
+- D: measure first: what in the tick the specialists cost (the run phase-splits it: convoys dominate the val ticks), then rule.
+
+> **Recommendation:** D then C. The phase split is already in the run, and the cost tracks specialists rather than firms, so a seat-side bound is the knob that does not disturb the anchor or the density ruling. A is defensible if 30 s a tick is acceptable on the richest worlds; B moves the seat menu the re-bless just pinned.
+
+*Files: `src/world/stockpile_budget.hpp`, `docs/generation/DIGITISATION.md`, `tools/verify/player_seed_sweep.cpp`*
 
 ---
 

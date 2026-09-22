@@ -6954,40 +6954,40 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: git merge",
       "headless: world_copy_determinism --copy-by snapshot (main session)"
      ],
      "requirement": "BL-1050 (order-independent reads) is merged into main unchanged (3c9c5792), and its owed --copy-by snapshot reproduction passes 16/16 on the integrated tree.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "BL-1050 merged unchanged at 6fddf614 (git merge-tree clean; its eight files untouched on main since the merge-base). world_copy_determinism --seeds all --copy-by snapshot on the integrated tree: 16 of 16 PASS, 0 fail (5383 s, 2026-09-22); its settle digests equal the sweep's D_settle per seed."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: hard_coded_world.hpp, history_sim.hpp, era_minus_one.cpp",
       "headless: digitisation_sim_harness"
      ],
      "requirement": "The Digitisation span and BL-1037's corridor tier run ON by default at epoch 0 (the struct defaults, which also cover Exploration's resume); both 'OFF BY DEFAULT' comments and era_minus_one.cpp's are rewritten to say what is true now. The tier reaches both resumed spans through a world_params switch (default on, NOT on the save seam, on the footing of exploration_sim_enabled), so an instrument can still build the pre-BL-1044 world the BL-1031 pins were taken on. Harness guards that asserted the tier OFF are re-pointed to the shipped default.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "digitisation_span_enabled and resume_seeds_corridor_tier default true; world_params::resume_seeds_corridor_tier (not saved, on the footing of exploration_sim_enabled) reaches Exploration's params and so the Digitisation span's; harness_params gains world_arc/arc_params. Comments rewritten (hard_coded_world.hpp/.cpp, history_sim.hpp/.cpp, era_minus_one.*). EVIDENCE: --fidelity gate 3 (the shipped span IS the resume) 16/16 and --resume-tier 16/16 with the tier on; the span-params gate now checks the switch is the world's; player_seed_sweep --digest-check --arc legacy 16/16 PASS, so the legacy arc is the pre-BL-1044 world exactly."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: stockpile_budget.hpp",
       "headless: stockpile_budget_check --r8"
      ],
      "requirement": "The ruled pins land where the budget is built, PROVISIONAL dropped from each: k_stockpile_specialist_firm_charters 2, k_stockpile_price_divisor 650 (NR-914: the nine-seat rule read on the shipped world; 580 was its tier-off reading), the per-province cap 2, the square root's base c = 8. Each cites NR-910 and the arithmetic it was read off (the seat curve at m = 2: the shipped curve: median 9 at 650, none falling back; spread 4 to 98 accepted).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "k_stockpile_specialist_firm_charters 2, k_stockpile_price_divisor 650, the per-province cap 2 (corporation_generation.cpp) and k_stockpile_per_resource_firm_cap 8, PROVISIONAL dropped from each, each citing NR-910 (and NR-914 for the number). 650 is the rule read on the SHIPPED world: the fine seat curve (stockpile_budget_check --seat-curve, m = 2, 16 seeds) reads median 7.5 / 7.5 / 8 / 8.5 / 8.5 / 9 / 13.5 at d = 600-660 by 10, none opening zero, spread 4 to 98. stockpile_budget_check ALL PASS including --r8 at 650 (the derived price 37,935 = the stock over 650, identical across two builds)."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: landscape_search.cpp, charter_budget.hpp, app.cpp",
       "headless: player_seed_sweep (the invariant count)",
@@ -6995,22 +6995,22 @@
      ],
      "requirement": "THE NO-SPECIALIST WORLD (NR-910): a budget on which no centre a nation owns affords a specialist falls back to the no-budget world exactly as a refused spend does — decided from the budget, on the world as the apply receives it, before anything is chartered; the search runs as with no budget, and the report says so under its own reason. The one-is_player invariant (world.hpp) is stated where it binds: printed on the app's seat line and counted per seed by player_seed_sweep, which FAILS a row that seats other than exactly one. A world that affords a specialist but places none (the walk's residual) is reported, not patched.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "charter_budget_affords_specialist decides the fallback from the budget on the world as it arrives, in search_landscape and apply_landscape_candidate alike; charter_fallback_report books every point as the new reason no_specialist, fell_back set and refused clear. charter_refusal_probe section 4: the predicate (five cases, including a centre on a tile no nation owns), and the fallback world equal to the no-budget world BY SNAPSHOT DIGEST (8d195ebcfd082dfe both ways, 24 corporations each) with nothing spent. The invariant: printed on app.cpp's seat line, counted per seed by player_seed_sweep (unbalanced on any row that seats other than one) and guard S7 — 16/16 shipped digest rows seated exactly one player, none fell back, and --guard 12 S1-S7 ALL PASS (S7: 0/12 break it). The walk's residual is reported, not patched (NR-911; DIGITISATION.md § 1)."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: verify_api.cpp, main.cpp",
       "headless: ProjectIo --headless on a span world"
      ],
      "requirement": "NR-909: --verify, --serve and the headless run spend a NON-EMPTY stockpile budget on the search's seed candidate, as the harness's unsearched apply does; an EMPTY (or rejected) budget lays today's web byte for byte. The three 'this never fires' guards are replaced by the spend.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "spend_stockpile_on_seed_candidate (stockpile_budget.*) spends a non-empty budget on the seed candidate (placement seed world_seed ^ 0x8A21F00D, the config's corporation count, tier 1 — app::start_new_game_prelude's own, mirrored by shipped_search_params) through apply_landscape_candidate's budget overload, then the second recipe pass; an empty or rejected budget lays the old generate_background_firms call byte for byte and says so when rejected. RUN LIVE on the span world (Debug, 2026-09-22): --verify corporation_lens exit 0, 2,367,386 points spent, 8 specialists and 33 firms, six captures, 0 golden failures; --serve exit 0, 3,484,506 points, 19 and 45; --export-blackboard all --ticks 1 exit 0 (340 s), same, 64 blackboards written. The verify capture shows the seated player and its own HQ tile selected (the re-framing, cold review finding 5)."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: exploration_sim_harness.cpp, player_seed_sweep.cpp",
       "headless: exploration_sim_harness",
@@ -7018,21 +7018,21 @@
      ],
      "requirement": "Harness re-points: exploration_sim_harness R6.6/R6.7 read the tables setup actually consumed with the span on (the 1960 close, BL-1053); player_seed_sweep's pins gain an ARC — the legacy arc (span off, tier off) keeps BL-1031's D_search and D_land and checks them live; the shipped arc is what --digest and --digest-check build by default and gets its own rows; haulage_measure is run at --epoch 0.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "player_seed_sweep --arc shipped|legacy: the BL-1031 table is the legacy arc's, k_shipped_digest_pins the shipped arc's; every seam mode (empty/zero/synthetic/refused) is refused on the shipped arc and runs the legacy one; the sweep prints the arc and counts players per row. exploration_sim_harness R6.6/R6.7 bind the LAST close and R6.6b/R6.7b prove it is not the 1660 one (ALL PASS with the span on). era_world_harness R1b/R1/R7 read the last close (ALL PASS but R5, the BL-1010 baseline). digitisation_sim_harness: the 1660 and --continued modes switch the span off explicitly, --fidelity and --resume-tier carry the captured tier (16/16 each). exploration_sweep --arc legacy added as the control. haulage_measure run at --epoch 0 (far trade, 0 failures) beside its default mode: 2035 dispatches, 1627 market-to-market, against the 1055/802 baseline."
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: DIGITISATION.md, CORPORATION_GENERATION.md"
      ],
      "requirement": "The rulings are in DIGITISATION.md § 1 and CORPORATION_GENERATION.md § Pass 1 and nowhere else; no doc gains a build-status line. A span world's save carries what it needs, or the code says why it need not (BL-1040).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "DIGITISATION.md § 1 and CORPORATION_GENERATION.md § Pass 1 already carried NR-909/NR-910 (0b2e42f4); BL-1044 added NR-911's residual to both, NR-914's number and its provenance to § 1, and NR-912's restated scales to NATION_GENERATION.md § Pass 7. No doc gained a build-status line. The span switch stays off the save seam, and hard_coded_world.hpp says why a loaded span world needs nothing from it."
     },
     {
      "id": "R8",
-     "status": "pending",
+     "status": "partial",
      "verification": [
       "headless: world_determinism",
       "headless: stockpile_budget_check --r8",
@@ -7046,38 +7046,38 @@
      ],
      "requirement": "THE MEASUREMENT (Release, serial, keep-awake, quiet machine): world_determinism old -> new (A/A records); stockpile_budget_check --r8; charter_refusal_probe; player_seed_sweep --digest then --digest-check on the shipped arc, and the legacy arc's check; exploration_sweep then seed_library.js --check (fingerprints move ONLY through BL-1037's tier); history_sim_harness (its 2-failure baseline), exploration_sim_harness, digitisation_sim_harness; haulage_measure --epoch 0 against 1055/802; story_check (2 pre-existing US-016 failures); setup cost per seed in Release and the Debug app; the nation treasury credit rate against its two stated scales (BL-1053 (1)); ctest (world-building rows against the 60 s default).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "RAN 2026-09-22, Release, serial, keep-awake (Step 2, 5 h 20, plus the re-bless runs). world_determinism A/A twice, ALL PASS at 650 (digests seedA/on 099530C9B7A211D7 -> 2DEF01474BF28DA5, seedB/on 3C348D569EEF30EB -> 9F8A8039817B0135; seedA/off and the 1960 arc unchanged). stockpile_budget_check --r8 ALL PASS; charter_refusal_probe ALL PASS; world_copy_determinism 16/16; --digest then --digest-check 16/16 on the shipped arc and 16/16 on the legacy arc; exploration_sweep + seed_library --check (6 of 16 moved) with the --arc legacy control reproducing all 16, so the tier is the only mover; history_sim_harness at its 2-failure baseline (R3a2/R3a3), exploration_sim_harness ALL PASS, digitisation_sim_harness readings + --fidelity 16/16 + --resume-tier 16/16; haulage_measure 2035/1627 and --far-trade --epoch 0 with 0 failures; story_check at its 2 US-016 failures. LIVE-PLAY COST at 650:2 (16 seeds, 7669 s): live tick a median x0.78 of the same seed's legacy world (4.5 s against 5.4 s), but a heavy tail — seeds 41, 31, 28 at x5.79, x4.12, x3.13 (30.9 s, 25.5 s, 12.8 s a tick) — raised as NR-915. SETUP COST per seed (Release): generation a median 53.3 s on the budget row against 42.5 s on the legacy row, max 93 s; in Debug a whole verify run is 376 s and the headless run 340 s. Treasury credit read against § Pass 7's scales (NR-912). OWED: the ctest suite and the visual suite (queued overnight, logs in the scratchpad's overnight/)."
     },
     {
      "id": "R9",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: Ben (the re-bless authorised against the shape)",
       "code: player_seed_sweep.cpp pins, seed_library.json"
      ],
      "requirement": "THE RE-BLESS: Ben authorises it against R8's shape before anything is re-pinned. Then the shipped arc's pins are taken, the legacy rows' D_settle/D_seat move to BL-1050's values (old -> new recorded, NR-894), seed_library is blessed, and nothing else is re-pinned.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Ben authorised the re-bless at Gate 2 (2026-09-22, the first form) against Step 2's shape, and the pins land as authorised: k_shipped_digest_pins, the 16 library worlds at 650:2 from --digest (3383 s, every row one player, none fell back), re-checked 16/16 by --digest-check; the legacy rows' D_settle/D_seat moved to BL-1050's values (NR-894) with D_search/D_land untouched and old -> new recorded in the DEVLOG, re-checked 16/16; seed_library blessed (6 of 16 moved) and seed_library_sweep.json / exploration_sweep.json regenerated. Nothing else was re-pinned: exploration_sim_harness R3b holds its 2026-09-14 counters with the tier on."
     },
     {
      "id": "R10",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: the 1960 readings per library seed"
      ],
      "requirement": "THE READINGS at 1960 on the shipped world, per library seed, TAKEN AND REPORTED (restated, Ben 2026-09-22, NR-913 — not gated; the density knob is the sprint 46 item DENSITY_FOLLOWS_CITIES): density follows cities (rho(firms, urban) against rho(firms, goods), the BL-1029 baseline 0.431 vs 0.460) and industrialisation (points unevenly held, the fuel reading visible).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "TAKEN AND REPORTED (restated by NR-913, not gated). Density follows cities on the shipped world at 650:2, 16 seeds: rho(firms, urban) median 0.139 against rho(firms, goods) 0.167, urban ahead on 5 of 16 worlds, against BL-1029's legacy 0.431 / 0.460 — the web holds a median 65 firms over 148-538 markets because a firm costs 1/650 of the whole stock and ~85% of every stock goes unspent. Pooling measured (region 0.186/0.195, market 0.211/0.204, nation 0.156/0.213; the 120 ceiling binds and seats move) and not shipped. Industrialisation: points unevenly held (Gini over regions 0.539-0.841, median 0.741; over polities median 0.651), the largest region holding a median 2.9% of a world's points, the Fuel Doctrine split visible (coke 241 / charcoal 272 / neither 341 living polities; ground_fuel pulls coke 537 against charcoal 159 per mille)."
     },
     {
      "id": "R11",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review of the sprint's integrated diff (no authoring context), with a fix round budgeted; the reviewer reports from the diff and names confirming runs rather than running sweeps. It also closes BL-1043 R7.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "code-reviewer (cold, no authoring context), two rounds, no build or run. Round 1: no correctness hole in the shipped world/* path, six findings — the cost mode failed every fell-back row, exploration R3b took the tier from the struct default, the search-less paths were silent on a rejected budget, pooling could overflow the walk's int32 books, the launch view framed world-gen's player whom the search replaces (latent since BL-977, on every world under BL-1044), two stale comments. All six fixed (66d7876e). Round 2: all six hold; two residuals — a re-frame had to reset first (the NR-911 residual world would keep the removed player's frame) and the pin provenance cited a DEVLOG entry that did not exist yet — both fixed (31793063). It also closes BL-1043 R7: the cost mode measures the real builder at the stated matrix, and no pinned path moved that should not have."
     }
    ]
   }
