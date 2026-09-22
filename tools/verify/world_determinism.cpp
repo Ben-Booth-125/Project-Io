@@ -684,10 +684,32 @@ int main()
                     static_cast<long long>(rep_a2.prehistory_conquests),
                     static_cast<long long>(rep_a2.prehistory_foundings));
 
-    // 3.7 — BL-1042: the span is off here, so the stockpile is empty and the
-    //       charter budget the new-game path would pass is today's world.
-    check(stockpile_empty(w_a1) && stockpile_empty(w_b) && stockpile_empty(w_off),
-          "R3.7 Digitisation span OFF -> the stockpile is empty (no point, empty budget) (BL-1042)");
+    // 3.7 — BL-1042, RE-POINTED BY BL-1044: the Digitisation span runs by
+    //       default, so the two shipped worlds here carry a stockpile — points,
+    //       a non-empty budget, a derived price, every point accounted — and
+    //       it is the same stockpile on two same-seed builds. The prehistory-
+    //       OFF world runs no span, so its stockpile is empty (the pre-budget
+    //       world). A span-OFF world with the prehistory on is the LEGACY arc,
+    //       and player_seed_sweep --arc legacy fails any such row whose
+    //       stockpile holds a point.
+    {
+        const stockpile_budget s_a1 = build_stockpile_budget(w_a1);
+        const stockpile_budget s_a2 = build_stockpile_budget(w_a2);
+        const stockpile_budget s_b  = build_stockpile_budget(w_b);
+        const auto live = [](const stockpile_budget& s) {
+            return s.points_total > 0 && !s.budget.empty() && !s.rejected && s.balanced()
+                && s.firm_price_points > 0;
+        };
+        std::printf("     stockpile seedA/on %lld points, price %d | seedB/on %lld points, price %d\n",
+                    static_cast<long long>(s_a1.points_total), static_cast<int>(s_a1.firm_price_points),
+                    static_cast<long long>(s_b.points_total), static_cast<int>(s_b.firm_price_points));
+        check(live(s_a1) && live(s_b) && stockpile_empty(w_off),
+              "R3.7 the span runs by default: seeds A and B carry a non-empty, balanced, priced "
+              "stockpile; prehistory OFF carries none (BL-1042, BL-1044)");
+        check(s_a1.points_total == s_a2.points_total && s_a1.budget.points() == s_a2.budget.points()
+                  && s_a1.firm_price_points == s_a2.firm_price_points,
+              "R3.7 the stockpile budget is identical across two same-seed builds (BL-1044)");
+    }
     check(!w_a1.gen_carve_centres.empty() && w_a1.gen_carve_centres == w_a2.gen_carve_centres,
           "R3.7 the carve index is populated and identical across two same-seed builds (BL-1042)");
 
