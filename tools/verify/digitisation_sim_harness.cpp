@@ -2433,9 +2433,14 @@ int main(int argc, char** argv)
             wp.digitisation_span_enabled = true;
             wp.digitisation_stop_year    = through_year;
         }
-        else if (continued_mode)
+        else
         {
-            wp.exploration_stop_year = through_year; // BL-1029: never epoch_year.
+            // BL-1044: the span runs BY DEFAULT now, so a run that reads the
+            // 1660 close (or BL-1029's continued call) switches it off
+            // explicitly — the default no longer does.
+            wp.digitisation_span_enabled = false;
+            if (continued_mode)
+                wp.exploration_stop_year = through_year; // BL-1029: never epoch_year.
         }
 
         std::fprintf(stderr, "[digitisation] seed %u generating\n", seed);
@@ -3393,9 +3398,10 @@ int main(int argc, char** argv)
                     "search winner (the 12-tick validation run is not mirrored). A comparison for the span, never the\n"
                     "phase's reading. Each line names its surface and year.\n\n", T, T);
     else
-        std::printf("WHAT 'AT 1960' READS HERE: nothing ran past 1660 (--through 1660). The world play opens on\n"
-                    "is the 1660 Exploration close plus world setup and the applied landscape search winner (the\n"
-                    "12-tick validation run is not mirrored). Run with --through 1960 for the Digitisation span.\n\n");
+        std::printf("WHAT 'AT 1960' READS HERE: nothing ran past 1660 (--through 1660): the Digitisation span is\n"
+                    "switched OFF for this run, so the world is the 1660 Exploration close plus world setup and the\n"
+                    "applied landscape search winner (the 12-tick validation run is not mirrored). NOT the world play\n"
+                    "opens on since BL-1044, which runs the span: run with --through 1960 for that.\n\n");
 
     // ---- 1 ------------------------------------------------------------------
     {

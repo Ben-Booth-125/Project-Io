@@ -24,13 +24,26 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*14 entries — 0 open, 14 resolved.*
+*15 entries — 1 open, 14 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-911 — CALL: the no-specialist residual — a budget that affords a specialist but places none leaves no player
+*question · raised 2026-09-22 · from Building BL-1044 (Beat 1 ships), T4, main session, 2026-09-22, reading charter_web_from_budget against NR-910's fallback.*
+
+NR-910 rules the no-specialist world falls back to the no-budget world, 'decided from the budget before anything is chartered'. BL-1044 builds exactly that: the search and the apply ask charter_budget_affords_specialist (a centre on a nation's tile whose points cover the specialist) and lay the no-budget world when none does. But affording is not placing. A centre that affords a specialist and finds no ground in either window charters none (corporation_generation.cpp, the walk's 'no ground in either window' branch). If every affording centre does so, the walk ends with no specialist, nobody is picked, spawn_seat finds nobody (spawn_seat.cpp:118), and the world has no player. That cannot be decided before the walk: a poorer centre's specialist competes for ground with richer centres' firms. It is not hypothetical in kind: the seat curve (centres affording, off the budget) matched the charted seats on 74 of 80 stage 2 rows, so on 6 rows placement differed from affording. Whether it ever reaches zero on the library at 580:2 (minimum 2 affording) is what BL-1044's measurement counts.
+
+**Why it matters.** The app would start a campaign with no player corporation. BL-1044 states the invariant where it binds (world.hpp), prints the count on the app's seat line and fails a player_seed_sweep row (and guard S7) that seats other than one, so the case is loud, never silent. What the world should do then is a design call.
+
+- A: extend the fallback past the walk — lay the budget world on a copy, and if it charters no specialist lay the no-budget world instead. Exact, but it is decided AFTER chartering, which the ruling's wording excludes, and costs a world copy per apply.
+- B: seat the richest affording centre's specialist on a relaxed rung (a third anchor rung, nation-wide) when the walk would otherwise end with none. Keeps the budget world; adds the nation-wide scatter § 1 forbids for every other charter.
+- C: leave it reported and counted, and act only if BL-1044's measurement (or any later library run) ever shows it: the invariant is loud today.
+
+> **Recommendation:** C now, with A as the fix if it is ever measured. A is the only option that keeps both the ruling's outcome (the no-budget world) and § 1's placement rule; its cost matters only if the case occurs.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/landscape_search.cpp`, `src/world/world.hpp`, `docs/generation/DIGITISATION.md`*
 
 ---
 

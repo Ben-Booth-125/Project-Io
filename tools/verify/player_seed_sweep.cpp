@@ -1534,7 +1534,7 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                 check ? "--digest-check" : "--digest", seeds.size(), k_settle_ticks);
     std::printf("BL-1032. --charter-budget %s%s\n", charter_mode_name(mode),
                 mode == charter_mode::none ? " (the shipped path: the world's own stockpile "
-                                             "budget, empty with the span off)"
+                                             "budget — empty only where the span is off)"
                 : mode == charter_mode::synthetic
                     ? " — SYNTHETIC TEST INPUT; its digests are EXPECTED to differ from the pins"
                 : mode == charter_mode::refused

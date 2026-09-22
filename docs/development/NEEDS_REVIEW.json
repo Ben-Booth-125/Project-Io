@@ -351,6 +351,29 @@
     "src/world/stockpile_budget.hpp"
    ],
    "resolution": "RULED (Ben, 2026-09-21, the charter pin form), all as recommended: a specialist costs TWO firm charters and the divisor is the one at which the median library world opens nine seats at two (near 580, read off the seat curve); the seat spread is accepted — the anchor is a median; a world whose budget opens no specialist falls back to the no-budget world, as a refused spend does; the per-province cap stays at 2; the sqrt base is 8. Written into DIGITISATION.md § 1 and CORPORATION_GENERATION.md § Pass 1; BL-1044 pins them. PINNED (seat curve at m = 2, 16 seeds, 2026-09-21): divisor 580 — median 6.5 / 7 / 8 / 9.5 / 12.5 seats at d = 520 / 540 / 560 / 580 / 600, and 580 is the smallest divisor measured at which no library world falls back (seed 37: 0 at 560, 2 at 580); spread 2 to 73 at 580:2."
+  },
+  {
+   "id": "NR-911",
+   "title": "CALL: the no-specialist residual — a budget that affords a specialist but places none leaves no player",
+   "raised": "2026-09-22",
+   "kind": "question",
+   "status": "open",
+   "source": "Building BL-1044 (Beat 1 ships), T4, main session, 2026-09-22, reading charter_web_from_budget against NR-910's fallback.",
+   "what": "NR-910 rules the no-specialist world falls back to the no-budget world, 'decided from the budget before anything is chartered'. BL-1044 builds exactly that: the search and the apply ask charter_budget_affords_specialist (a centre on a nation's tile whose points cover the specialist) and lay the no-budget world when none does. But affording is not placing. A centre that affords a specialist and finds no ground in either window charters none (corporation_generation.cpp, the walk's 'no ground in either window' branch). If every affording centre does so, the walk ends with no specialist, nobody is picked, spawn_seat finds nobody (spawn_seat.cpp:118), and the world has no player. That cannot be decided before the walk: a poorer centre's specialist competes for ground with richer centres' firms. It is not hypothetical in kind: the seat curve (centres affording, off the budget) matched the charted seats on 74 of 80 stage 2 rows, so on 6 rows placement differed from affording. Whether it ever reaches zero on the library at 580:2 (minimum 2 affording) is what BL-1044's measurement counts.",
+   "why_it_matters": "The app would start a campaign with no player corporation. BL-1044 states the invariant where it binds (world.hpp), prints the count on the app's seat line and fails a player_seed_sweep row (and guard S7) that seats other than one, so the case is loud, never silent. What the world should do then is a design call.",
+   "options": [
+    "A: extend the fallback past the walk — lay the budget world on a copy, and if it charters no specialist lay the no-budget world instead. Exact, but it is decided AFTER chartering, which the ruling's wording excludes, and costs a world copy per apply.",
+    "B: seat the richest affording centre's specialist on a relaxed rung (a third anchor rung, nation-wide) when the walk would otherwise end with none. Keeps the budget world; adds the nation-wide scatter § 1 forbids for every other charter.",
+    "C: leave it reported and counted, and act only if BL-1044's measurement (or any later library run) ever shows it: the invariant is loud today."
+   ],
+   "recommendation": "C now, with A as the fix if it is ever measured. A is the only option that keeps both the ruling's outcome (the no-budget world) and § 1's placement rule; its cost matters only if the case occurs.",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "src/world/landscape_search.cpp",
+    "src/world/world.hpp",
+    "docs/generation/DIGITISATION.md"
+   ],
+   "resolution": null
   }
  ]
 }
