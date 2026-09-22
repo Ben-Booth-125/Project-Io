@@ -562,6 +562,14 @@ inline const char* charter_spend_refusal(const charter_budget& b, const charter_
         return "window_radius must be >= 0";
     if (static_cast<int>(s.pool) > static_cast<int>(charter_pool::nation))
         return "pool is not a known charter_pool";
+    // NR-913: a pooled centre's firm budget can reach the budget's whole total,
+    // and the walk books a centre's points in int32 — so a pooled spend whose
+    // total passes int32 is refused rather than overflowed (BL-1044 cold review,
+    // finding 4). Unpooled, a centre's budget is its own int32 entry.
+    if (s.pool != charter_pool::none
+        && b.total() > static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max()))
+        return "a pooled spend needs the budget's total within int32 (a pooled centre can "
+               "receive all of it)";
     // BL-1039 — the caps: the budget path's own numbers, no shipped default,
     // refused where read and <= 0, refused where set and unread.
     if (s.max_firms_per_body <= 0)

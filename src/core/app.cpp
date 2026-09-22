@@ -932,6 +932,72 @@ void app::draw_building_carve()
 //
 // Authority: CORPORATION_GENERATION.md § The spawn shortlist, and the seat.
 
+/// The launch view (see setup_world): the opening frame and the first selection,
+/// both read off the PLAYER'S corporation. Called by setup_world, and again once
+/// the player is final — after the seat (seat_player) and after the search-less
+/// verify path's spend — because the landscape search and the charter budget
+/// REPLACE world-gen's roster (BL-977, BL-1042): framed only at setup, the view
+/// opened on ground a removed corporation had held (BL-1044 cold review, finding 5).
+void app::frame_launch_view()
+{
+    // Frame the opening view on the player's holdings so "where am I" is answered
+    // the moment the surface appears, rather than dropping the player onto the whole
+    // surface with their few tiles lost in it. Centre on the centroid of the player
+    // corp's buildings that sit on the start body and zoom in to a regional framing;
+    // if the player has no building there, keep the default whole-surface view.
+    // Consumed by body_surface_canvas on its next draw; a later focus_on_surface
+    // (deliberate navigation) cancels it via planetary_center_pending.
+    {
+        const auto pit = m_world.corporations.find(m_world.player_entity);
+        if (pit != m_world.corporations.end())
+        {
+            long long sum_col = 0, sum_row = 0;
+            int n = 0;
+            for (entity_id bld_id : pit->second.assets)
+            {
+                const auto bit = m_world.buildings.find(bld_id);
+                if (bit == m_world.buildings.end())
+                    continue;
+                const auto tit = m_world.tiles.find(bit->second.tile);
+                if (tit == m_world.tiles.end() || tit->second.body != m_launch_body)
+                    continue;
+                sum_col += tit->second.grid_x;
+                sum_row += tit->second.grid_y;
+                ++n;
+            }
+            if (n > 0)
+            {
+                m_ui.planetary_center_col     = static_cast<int>(sum_col / n);
+                m_ui.planetary_center_row     = static_cast<int>(sum_row / n);
+                m_ui.planetary_center_pending = true;
+                m_ui.planetary_zoom           = 11.0f;
+            }
+        }
+    }
+
+    // BL-174 strand 2 — a legible first move. The launch view framed who and where
+    // but suggested nothing to DO, and the Selection band is not drawn at all with
+    // nothing selected, so there was no surface on which to suggest anything.
+    // Seeding the selection to the HQ's tile gives the band something to show at
+    // launch: the player's own ground, with Construct primed on it (see
+    // draw_tile_selection). Derived entirely from world state — no tutorial flag,
+    // no timer, nothing persisted, and nothing that can go stale or lie.
+    {
+        const auto pit = m_world.corporations.find(m_world.player_entity);
+        if (pit != m_world.corporations.end())
+        {
+            const auto hq = m_world.buildings.find(pit->second.hq_building);
+            if (hq != m_world.buildings.end())
+            {
+                const auto tit = m_world.tiles.find(hq->second.tile);
+                if (tit != m_world.tiles.end() && tit->second.body == m_launch_body)
+                    m_ui.selected_entity = hq->second.tile;
+            }
+        }
+    }
+
+}
+
 void app::seat_player()
 {
     // BL-1020: the floor and the rank read phase 6's static score of the winner,
@@ -991,6 +1057,9 @@ void app::seat_player()
                         static_cast<double>(c.balance), static_cast<double>(c.trailing_net),
                         c.quarters_read);
     std::fflush(stdout);
+
+    // The player is final now: frame the launch view on THEIR holdings.
+    frame_launch_view();
 }
 
 void app::start_new_game_prelude()
@@ -1514,61 +1583,9 @@ void app::setup_world(world_params params)
     // Routed through the shared focus helper rather than poking ui_state.
     ui::focus_on_surface(m_world, m_ui, start_body);
 
-    // Frame the opening view on the player's holdings so "where am I" is answered
-    // the moment the surface appears, rather than dropping the player onto the whole
-    // surface with their few tiles lost in it. Centre on the centroid of the player
-    // corp's buildings that sit on the start body and zoom in to a regional framing;
-    // if the player has no building there, keep the default whole-surface view.
-    // Consumed by body_surface_canvas on its next draw; a later focus_on_surface
-    // (deliberate navigation) cancels it via planetary_center_pending.
-    {
-        const auto pit = m_world.corporations.find(m_world.player_entity);
-        if (pit != m_world.corporations.end())
-        {
-            long long sum_col = 0, sum_row = 0;
-            int n = 0;
-            for (entity_id bld_id : pit->second.assets)
-            {
-                const auto bit = m_world.buildings.find(bld_id);
-                if (bit == m_world.buildings.end())
-                    continue;
-                const auto tit = m_world.tiles.find(bit->second.tile);
-                if (tit == m_world.tiles.end() || tit->second.body != start_body)
-                    continue;
-                sum_col += tit->second.grid_x;
-                sum_row += tit->second.grid_y;
-                ++n;
-            }
-            if (n > 0)
-            {
-                m_ui.planetary_center_col     = static_cast<int>(sum_col / n);
-                m_ui.planetary_center_row     = static_cast<int>(sum_row / n);
-                m_ui.planetary_center_pending = true;
-                m_ui.planetary_zoom           = 11.0f;
-            }
-        }
-    }
-
-    // BL-174 strand 2 — a legible first move. The launch view framed who and where
-    // but suggested nothing to DO, and the Selection band is not drawn at all with
-    // nothing selected, so there was no surface on which to suggest anything.
-    // Seeding the selection to the HQ's tile gives the band something to show at
-    // launch: the player's own ground, with Construct primed on it (see
-    // draw_tile_selection). Derived entirely from world state — no tutorial flag,
-    // no timer, nothing persisted, and nothing that can go stale or lie.
-    {
-        const auto pit = m_world.corporations.find(m_world.player_entity);
-        if (pit != m_world.corporations.end())
-        {
-            const auto hq = m_world.buildings.find(pit->second.hq_building);
-            if (hq != m_world.buildings.end())
-            {
-                const auto tit = m_world.tiles.find(hq->second.tile);
-                if (tit != m_world.tiles.end() && tit->second.body == start_body)
-                    m_ui.selected_entity = hq->second.tile;
-            }
-        }
-    }
+    // The launch view: framed on the player's holdings, the HQ's tile selected.
+    m_launch_body = start_body;
+    frame_launch_view();
 
     // Open on plain terrain — no lens imposed at campaign start. A click only ever
     // updates the Selection element; it never re-skins the canvas, so the canvas

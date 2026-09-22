@@ -2151,8 +2151,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // WHAT NOW HOLDS (BL-1037): the resume is that reader. With
     // `history_sim_params::resume_seeds_corridor_tier` on, a resumed span seeds
     // this edge's live count from `tier`, so the rung bought here survives the
-    // span boundary; off -- the default until the sprint 45 re-bless (BL-1044)
-    // turns it on -- the next span reopens it at the rung its walks earn.
+    // span boundary (on by default since BL-1044); off -- the legacy arc -- the
+    // next span reopens it at the rung its walks earn.
     // `uses` itself stays traffic either way: it counts walks, never rungs.
     const auto try_upgrade_corridor = [&](int a, int b, int payer_seat) -> bool {
         if (a < 0 || b < 0 || a == b) return false;
@@ -6647,7 +6647,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // the Industry exception): no rim gate, so a landlocked
                     // realm Exploration's coast-bound rim would exclude for good
                     // is only ever BEHIND here. With the switch off (every
-                    // shipped path, until BL-1044's re-bless) this block is
+                    // span but the Digitisation span's own) this block is
                     // skipped whole and no Industry field is read or written.
                     //
                     // The readings below are the Industry scorer's ONLY: the

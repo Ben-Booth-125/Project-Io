@@ -482,6 +482,12 @@ int main()
             ep.city_states_by_population_threshold = true;
             ep.settle_requires_razed_ground         = true;
             ep.w_want_q                             = w_want_q; // BL-953; 0 = the pre-change span
+            // BL-1044 (cold review, finding 2): the corridor tier as generation
+            // sets it — on since BL-1044 — named here rather than taken from the
+            // struct default. R3b's counters were pinned with it off; on this
+            // seed they hold exactly with it on (exploration_sim_harness ALL
+            // PASS, 2026-09-22): no Empires corridor here reopens off its rung.
+            ep.resume_seeds_corridor_tier = exploration_sim_params(world_params{}).resume_seeds_corridor_tier;
             ep.resume_polities  = &p1.polities;
             ep.resume_grudges   = &p1.grudges;
             ep.resume_contacts  = &p1.contacts;

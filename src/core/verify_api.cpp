@@ -526,8 +526,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     const seed_candidate_spend scs = spend_stockpile_on_seed_candidate(
         m_world, m_registry, m_active_world_params.seed, m_worldgen_cfg.corporation_count);
     if (!scs.spent)
+    {
+        if (scs.stockpile.rejected)
+            std::printf("[stockpile_budget] run_verify: the stockpile budget was REJECTED (%s); "
+                        "the pre-budget web is laid\n", scs.stockpile.rejection.c_str());
         generate_background_firms(m_world, m_registry, /*seed=*/0x8A21F00Du);
+    }
     else
+    {
+        // The spend replaced world-gen's roster: frame on the player it seated.
+        frame_launch_view();
         std::printf("[stockpile_budget] run_verify: %lld points spent on the seed candidate "
                     "(%zu specialists, %zu firms)%s\n",
                     static_cast<long long>(scs.report.points_spent),
@@ -535,6 +543,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                     scs.report.refused     ? " — spend REFUSED, the no-budget world"
                     : scs.report.fell_back ? " — no specialist affordable, the no-budget world (NR-910)"
                                            : "");
+    }
 
     m_sim_loop.set_speed(0);
 

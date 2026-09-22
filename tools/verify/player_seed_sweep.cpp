@@ -644,34 +644,67 @@ struct world_digest_pin
 //
 // NEVER RE-PINNED by the change a pin exists to check (BL-1032, the charter
 // budget seam). A row that fails is reported with its digest and its cause.
+//
+// D_settle AND D_seat RE-PINNED 2026-09-22 by BL-1044's re-bless (Ben authorised
+// it at Gate 2): BL-1050's order-independent reads move the legacy world's
+// ticks and nothing before them (NR-894) — the 16-seed --digest-check --arc
+// legacy held D_search and D_land on every row and moved D_settle and D_seat on
+// every row. Taken from that run on the integrated tree (a build of 49a6deb1,
+// same toolchain; nothing after it reaches a span-off world) and re-checked on
+// the tree the shipped pins were taken on; the old values are recorded in the
+// DEVLOG entry of that day.
+// D_search and D_land are the 2026-09-17 values, untouched.
 const std::vector<world_digest_pin> k_world_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-    { 46u, 0xE0620F5777CB3637ull, 0x326DFD72ED01E15Dull, 0x05B4865F46884E7Cull, 0x496E75B156DC9208ull },
-    { 28u, 0xA99FFD1314AFDD65ull, 0x7271F0D606D576C8ull, 0x265C48A23E313B1Aull, 0xAA35460CE5894594ull },
-    { 11u, 0x1F277B425CC6D6F5ull, 0x6D66DCD90344A565ull, 0x2E8907B0BBE768E7ull, 0x82A858E16FE9CA69ull },
-    { 31u, 0x4DCC349DEBD4278Dull, 0x568DBED7FCAB0473ull, 0x4AEB84A2E62A4536ull, 0xB58F31B1D2761E4Dull },
-    { 40u, 0xACCB76968FC11F44ull, 0x350CE11A11C2EF16ull, 0x4987C80D094C8DAEull, 0x2B509E9C965DD8BFull },
-    { 12u, 0x9171B81F5F1DB6CEull, 0x14FC25A425F1D81Eull, 0xFC9F8D4246024A2Full, 0x81E9BB11AB34278Bull },
-    { 37u, 0xE55EBAB721B6A6E6ull, 0xF38B46012662363Cull, 0xF175EAB9B7F2BF41ull, 0x94B3B7C1A92369E5ull },
-    { 13u, 0x8B45E33F6171F121ull, 0xBEBED327CE2A955Cull, 0x72797C2C57E94EB1ull, 0x0D38309D62D10FE3ull },
-    { 41u, 0x19A91514D3C43BCAull, 0x8DFD164F25D5150Bull, 0xC0EDD8B3B38193C6ull, 0x9CB3AC1F2EC21D7Full },
-    { 43u, 0xCB2F7D3D81A8A0C1ull, 0x53BB483612EFB3CDull, 0x557E96CF9F2BA372ull, 0x03D4B5D542CB228Bull },
-    { 32u, 0x6D64F3AD914488BDull, 0x4EDBFF18370691B6ull, 0xAE3347D83E077849ull, 0xFD384DA6A173808Full },
-    { 10u, 0xF8244965F92A0FF1ull, 0x809C8D803DF19C14ull, 0x8EA4043497A22AB7ull, 0x59D340FE15B12642ull },
-    { 25u, 0x63A5BE80FB7DF06Aull, 0x84A597D8EBE7EDFFull, 0xFEFD82C8BCDD4D22ull, 0x2F145BF320CFB58Bull },
-    { 38u, 0x4C17AE81C065C5F2ull, 0xAA0F18A56767FC70ull, 0x73239E8FE1A24AA3ull, 0x90D2AC55FC74A8D3ull },
-    {  9u, 0x0E9AD780ACBB9B84ull, 0x7C85420229BFEE4Dull, 0x23DBD6FA7E7D5955ull, 0xA2B82933E77D219Aull },
-    {  0u, 0x893B6977B1E9DC1Full, 0x1A24D230FDDF2C7Eull, 0xA392EFF987F374E2ull, 0x8BBEAB8453901456ull },
+    { 46u, 0xE0620F5777CB3637ull, 0x326DFD72ED01E15Dull, 0x01B28F9955D0EC29ull, 0x51AF24CE2939B4D0ull },
+    { 28u, 0xA99FFD1314AFDD65ull, 0x7271F0D606D576C8ull, 0x4D338B0202264D5Cull, 0x2C463C3DD4724685ull },
+    { 11u, 0x1F277B425CC6D6F5ull, 0x6D66DCD90344A565ull, 0x4C97C1C842D23C3Bull, 0x66427046BACBC06Cull },
+    { 31u, 0x4DCC349DEBD4278Dull, 0x568DBED7FCAB0473ull, 0x2D4BD68AE2B9E70Bull, 0x15694B8A93C3CD06ull },
+    { 40u, 0xACCB76968FC11F44ull, 0x350CE11A11C2EF16ull, 0xF336C089F6EEBFEBull, 0xD7275BB13B29AB2Dull },
+    { 12u, 0x9171B81F5F1DB6CEull, 0x14FC25A425F1D81Eull, 0x111F81D5AFEEA576ull, 0x602E807556398990ull },
+    { 37u, 0xE55EBAB721B6A6E6ull, 0xF38B46012662363Cull, 0x928B123846974CAAull, 0xCEA516E07DFF3356ull },
+    { 13u, 0x8B45E33F6171F121ull, 0xBEBED327CE2A955Cull, 0xBC9A8253728E77CCull, 0x13D563007848185Cull },
+    { 41u, 0x19A91514D3C43BCAull, 0x8DFD164F25D5150Bull, 0x9D7DBA35957885A1ull, 0x2676C5DC78EEAF10ull },
+    { 43u, 0xCB2F7D3D81A8A0C1ull, 0x53BB483612EFB3CDull, 0xE4D38BA322A56963ull, 0x0D441274814EE0CDull },
+    { 32u, 0x6D64F3AD914488BDull, 0x4EDBFF18370691B6ull, 0x953F9A92426452FFull, 0x4FC2A8BD099DD3ABull },
+    { 10u, 0xF8244965F92A0FF1ull, 0x809C8D803DF19C14ull, 0x2F69415005705C94ull, 0x50DF22739DFC7D73ull },
+    { 25u, 0x63A5BE80FB7DF06Aull, 0x84A597D8EBE7EDFFull, 0x22C20B2D79B86944ull, 0xA2046D98550FBDACull },
+    { 38u, 0x4C17AE81C065C5F2ull, 0xAA0F18A56767FC70ull, 0x87EE17644608DB65ull, 0x9FD043C8BB29D902ull },
+    {  9u, 0x0E9AD780ACBB9B84ull, 0x7C85420229BFEE4Dull, 0x9D8F22AD82E026E7ull, 0xFBDBDC152D43D4AEull },
+    {  0u, 0x893B6977B1E9DC1Full, 0x1A24D230FDDF2C7Eull, 0xAF3BDD5524ED9FF3ull, 0x08F13299905A405Aull },
 };
 
 // THE SHIPPED ARC'S PINS (BL-1044) — the same sixteen library worlds on the
 // world the player is handed since BL-1044: the Digitisation span and BL-1037's
 // tier on, the charter web bought from the world's own stockpile at the ruled
-// prices (NR-910). EMPTY until Ben authorises the re-bless against BL-1044's
-// measurement; taken by `--digest` on the shipped arc, pasted here with their
-// provenance. Until then `--digest-check` on the shipped arc fails every row as
-// unpinned — a missing contract, said out loud.
+// prices (divisor 650, two firm charters a specialist; NR-910, NR-914).
+//
+// PROVENANCE. Taken 2026-09-22 by `player_seed_sweep --digest` (shipped arc,
+// the library seeds, 3383 s), re-bless authorised by Ben at BL-1044's Gate 2,
+// on a build of 9810fc62 (src/ as of the 650 pin). Every row seated exactly one
+// player and none fell back. TOOLCHAIN as the legacy table's: MSVC cl
+// 14.44.35207, Windows SDK 10.0.26100.0, Release /O2 /MD /DNDEBUG via
+// `bash tools/verify/build_lua_harness.sh player_seed_sweep`.
+//
+// NEVER RE-PINNED by the change a pin exists to check, as the legacy table.
 const std::vector<world_digest_pin> k_shipped_digest_pins = {
+    //  seed  D_search               D_land                 D_settle               D_seat
+    { 46u, 0x34B0DBD0962DCC08ull, 0x6AF97712EFB7B27Cull, 0x27882A7239EFF44Eull, 0xB5E0AB9360F592D8ull },
+    { 28u, 0xE460EA9D22FB1BB2ull, 0x885D026D4E8A4790ull, 0xDA53FC483AFA2676ull, 0xAB5232995643A9E0ull },
+    { 11u, 0xF93FE23934C92CE3ull, 0xE862173A54B2499Full, 0x47558C8330FFD946ull, 0x9F309A2316FACE6Bull },
+    { 31u, 0x979900E26BAE8916ull, 0xA4199F3C1658A812ull, 0x39E48B78A4ED3A53ull, 0xC23DBD891EB81272ull },
+    { 40u, 0x3963C3B5CFA8D056ull, 0x9AED43DFA02BB855ull, 0x89E5EAE8EB0AB995ull, 0x42AB2DE4839A6067ull },
+    { 12u, 0xA745437FA9EBFA21ull, 0xE6E34BD8CB8711F1ull, 0x1DCA581C2A97436Eull, 0xBB426132E8B19DB3ull },
+    { 37u, 0x46B0F3FC99C7B762ull, 0x7C6934D44D08D210ull, 0xE24B97E713FFE246ull, 0xE66DBE0DE6DC6C95ull },
+    { 13u, 0x53F29DFB1BF8D9A7ull, 0x033767ED1CA47BB7ull, 0x126521D92E48FD0Aull, 0xFE1B2CA6CFCC03EFull },
+    { 41u, 0x662A6DEFB8143BA1ull, 0x51A67CB5F18DF708ull, 0x6E2A5DE3B391A88Dull, 0xEC2110AE8FE4A41Eull },
+    { 43u, 0x4D0A7D9CE087FD61ull, 0x0EC25FDE87B157E9ull, 0xE5C169734A8B5F8Aull, 0x4B7396D052A7BF5Full },
+    { 32u, 0x0893318979000103ull, 0x208CC08E95567315ull, 0x1511B42294AD65FBull, 0xC540FE814C4002F3ull },
+    { 10u, 0xE05CE7F0F04058E6ull, 0xFF445EC68059BB1Dull, 0x68EB1FBA68DD1020ull, 0xF84BA30FA0FCDF82ull },
+    { 25u, 0x4D56278DB292E0A5ull, 0x538E3805EF21B449ull, 0xF5528F5D75DE10ADull, 0xDAA7CA5899611D3Cull },
+    { 38u, 0x3B5A385B3A236527ull, 0x0CAB7DB9F623AFDEull, 0x7D0EFD8569F74C36ull, 0xE81FC4A28BBCA157ull },
+    {  9u, 0x03DA06E9D80DC0A5ull, 0x921DBBCB9C451B6Bull, 0x663BB44CC737E7AAull, 0xB1D37669AA16EAAAull },
+    {  0u, 0x36967D8EB4B9D363ull, 0x338CC4E185E4E82Aull, 0x2A8DC72A6FCA305Bull, 0xFA11C3BE51897F5Full },
 };
 
 const std::vector<world_digest_pin>& digest_pins(world_arc arc)
@@ -2616,10 +2649,12 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         measure_charter_spill(w, report, spend.window_radius, row.spec_spill, row.firm_spill);
 
         // BL-1039: the rules, checked NOW — as the landscape lands (a refused
-        // row has no records).
+        // row has no records, and nor has a row that FELL BACK: NR-910 laid the
+        // no-budget world there, so there are no budget bodies to check — cold
+        // review of BL-1044, finding 1).
         row.bodies             = report.bodies;
         row.budget_specialists = report.specialists;
-        if (!report.refused)
+        if (!report.refused && !report.fell_back)
             row.rule_check = check_charter_rules(w, bud, report, spend);
         // BL-1043's own readings, taken while this world is alive: the point
         // account, the opening capital, the extracted good, the density reading.

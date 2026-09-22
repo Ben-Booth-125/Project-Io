@@ -144,8 +144,13 @@ int run_serve(int ticks, long long as_corp, bool as_any)
     const seed_candidate_spend scs = spend_stockpile_on_seed_candidate(
         w, reg, /*world_seed=*/0u, world_gen_config{}.corporation_count);
     if (!scs.spent)
+    {
+        if (scs.stockpile.rejected)
+            std::fprintf(stderr, "[stockpile_budget] run_serve: the stockpile budget was REJECTED "
+                                 "(%s); the pre-budget web is laid\n", scs.stockpile.rejection.c_str());
         // BL-365: real background corporations, generated now that reg is loaded.
         generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+    }
     else
         std::fprintf(stderr, "[stockpile_budget] run_serve: %lld points spent on the seed candidate "
                              "(%zu specialists, %zu firms)%s\n",
@@ -262,8 +267,13 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     const seed_candidate_spend scs = spend_stockpile_on_seed_candidate(
         w, reg, /*world_seed=*/0u, world_gen_config{}.corporation_count);
     if (!scs.spent)
+    {
+        if (scs.stockpile.rejected)
+            std::fprintf(stderr, "[stockpile_budget] headless run: the stockpile budget was REJECTED "
+                                 "(%s); the pre-budget web is laid\n", scs.stockpile.rejection.c_str());
         // BL-365: real background corporations, generated now that reg is loaded.
         generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+    }
     else
         std::fprintf(stderr, "[stockpile_budget] headless run: %lld points spent on the seed candidate "
                              "(%zu specialists, %zu firms)%s\n",

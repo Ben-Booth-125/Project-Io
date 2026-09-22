@@ -719,6 +719,8 @@ private:
     /// empty after a `--load` (a saved campaign carries its seat in `world`).
     spawn_seat_result m_seat_result;
     void seat_player();                ///< Draw the seat and re-point the player-scoped caches.
+    void frame_launch_view();          ///< Frame the opening view and selection on the player's holdings.
+    entity_id m_launch_body = null_entity; ///< The body the launch view opens on (setup_world).
 
     /// Phase 6's static score of the WINNING landscape, kept from the search to
     /// the seat (BL-1020, the seat floor reads the static score): the shortlist
