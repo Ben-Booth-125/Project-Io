@@ -299,6 +299,17 @@ struct world
     /// generate_corporations() after nation generation; empty until that call
     /// is made. Exactly one entry will have corporation_component::is_player == true,
     /// and world::player_entity will equal that entry's key.
+    ///
+    /// THE ONE-is_player INVARIANT, and the one path that can break it. On a
+    /// charter-budget world the spend picks the player among the specialists it
+    /// charters. A budget no centre can buy a specialist with falls back to the
+    /// no-budget world, which seats from its own roster (NR-910), so the
+    /// invariant holds there. The walk's RESIDUAL does not: a centre that
+    /// afforded a specialist and found no ground for one leaves a world with no
+    /// specialist, the spawn seat finds nobody to seat, and no entry is the
+    /// player. That case is reported, never patched: the app prints the count
+    /// on its seat line and player_seed_sweep fails a row that seats other
+    /// than exactly one.
     faithful_unordered_map<entity_id, corporation_component> corporations;
 
     /// The Era -1 settlement record the SPECIALIST roster pass reads (BL-977):

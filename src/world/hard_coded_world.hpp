@@ -168,23 +168,40 @@ struct world_params
     /// inside the block that ran Exploration, so the predicate is structural
     /// rather than a second reading of the same conditions.
     ///
-    /// OFF BY DEFAULT, and it stays off until BL-1044's re-bless turns it on:
-    /// the span rewrites `region::nation`, population and treasury to the 1960
-    /// map before population centres are placed, so every generation golden
-    /// and every post-generation reading would move with it. With it off, a
-    /// world is byte-identical to one built before this field existed.
+    /// ON BY DEFAULT (Ben, 2026-09-18, sprint 45 elicitation: "the span runs
+    /// on by default at epoch 0"; turned on by BL-1044's re-bless). The span
+    /// rewrites `region::nation`, population and treasury to the 1960 map
+    /// before population centres are placed, and its industry stockpile is
+    /// the charter budget the new-game path spends (`build_stockpile_budget`).
+    /// Off, a world is byte-identical to one built before this field existed:
+    /// the pre-BL-1044 world, which instruments still build as the LEGACY arc
+    /// (with `resume_seeds_corridor_tier` below off too) to keep the BL-1031
+    /// pins a live check.
     ///
     /// NOT ON THE SAVE SEAM, on exactly the footing of `exploration_sim_enabled`
     /// and `exploration_stop_year` above: `w_world_params` writes neither of
     /// those, and a scope knob that decides which history generation plays is
-    /// not a property a loaded campaign re-reads.
-    bool digitisation_span_enabled = false;
+    /// not a property a loaded campaign re-reads. A loaded span world needs
+    /// nothing from it: generation has run, and what it left (the nations, the
+    /// centres, the chartered web) is world state the save already carries.
+    bool digitisation_span_enabled = true;
 
     /// The calendar year the Digitisation span closes: the campaign epoch the
     /// span grows the world to (DIGITISATION.md: "1660 -> 1960 CE, 300
     /// years"). A field on the same footing as `exploration_stop_year`, for a
     /// harness that wants to bind a shorter span.
     int64_t         digitisation_stop_year = 1960;
+
+    /// BL-1037 — a resumed span's corridors reopen at the RUNG they were
+    /// bought to, not the rung their walks earn (`history_sim_params::
+    /// resume_seeds_corridor_tier` says why). ON BY DEFAULT with BL-1044's
+    /// re-bless. Copied into BOTH resumed spans' params — Exploration's
+    /// (`exploration_sim_params`) and so the Digitisation span's, which is
+    /// built on it; the Empires round resumes no corridors. A field here, not
+    /// only the struct default, so an instrument can build the LEGACY arc
+    /// (span off, this off): the world the BL-1031 pins were taken on.
+    /// NOT ON THE SAVE SEAM, on the footing of `digitisation_span_enabled`.
+    bool resume_seeds_corridor_tier = true;
 
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a

@@ -256,6 +256,19 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
         return;
     }
 
+    // THE NO-SPECIALIST WORLD (Ben, 2026-09-21, NR-910) falls back exactly as a
+    // refused spend does: decided here, from the budget, before anything is
+    // chartered, and laid as the legacy overload verbatim — so the player is
+    // seated from the no-budget world's own roster. Not a refusal: the report
+    // says it fell back, every point unspent as `no_specialist`.
+    if (!charter_budget_affords_specialist(w, *budget, spend))
+    {
+        apply_landscape_candidate(w, reg, c, regenerate_specialists);
+        if (report != nullptr)
+            *report = charter_fallback_report(*budget);
+        return;
+    }
+
     // --- a BUDGET WORLD ------------------------------------------------------
     // The road tier, copied from the legacy body rather than shared with it —
     // a shared helper is a refactor of the legacy path, and the legacy path's
@@ -321,7 +334,25 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
                     static_cast<long long>(p_in.budget->total()), p_in.budget->points().size(),
                     refusal);
     }
-    const landscape_search_params& p = (refusal != nullptr) ? refused_params : p_in;
+    // NR-910 — THE NO-SPECIALIST WORLD, the same route: a non-empty budget on
+    // which no centre a nation owns affords a specialist runs the no-budget
+    // search, decided on the base world before any candidate charters, exactly
+    // as the apply decides it (`apply_landscape_candidate`'s budget overload).
+    const bool fell_back = refusal == nullptr && p_in.budget != nullptr && !p_in.budget->empty()
+                        && !charter_budget_affords_specialist(base, *p_in.budget, p_in.spend);
+    if (fell_back)
+    {
+        refused_params         = p_in;
+        refused_params.budget  = nullptr;
+        out.charter_fell_back  = true;
+        // Unconditional, as the refusal's line is: the world a player is handed
+        // changed branch, and that is never silent.
+        std::printf("[landscape_search] charter budget opens NO specialist (%lld points over %zu "
+                    "centres, specialist %lld); running the no-budget search (NR-910)\n",
+                    static_cast<long long>(p_in.budget->total()), p_in.budget->points().size(),
+                    static_cast<long long>(p_in.spend.specialist_price_points()));
+    }
+    const landscape_search_params& p = (refusal != nullptr || fell_back) ? refused_params : p_in;
 
     // BL-1032. A BUDGET WORLD skips the roster axis (the budget decides the
     // roster). A null, empty or refused budget is not a budget world, and

@@ -134,18 +134,26 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
 
-    // BL-1042 — THE CHARTER BUDGET, STATED. This path does not search, so it has
-    // no seam to spend one at. Its world is built with the Digitisation span
-    // OFF (make_hard_coded_world()'s default params), so the stockpile
-    // budget app::start_new_game_prelude would pass is EMPTY — and an empty
-    // budget IS the legacy call below, byte for byte. The guard says so out
-    // loud if that ever stops being true.
-    if (const stockpile_budget sb = build_stockpile_budget(w); !sb.budget.empty() || sb.rejected)
-        std::fprintf(stderr, "[stockpile_budget] run_serve: a search-less path lays the legacy web and "
-                             "ignores a %lld-point stockpile budget\n",
-                     static_cast<long long>(sb.points_total));
-    // BL-365: real background corporations, generated now that reg is loaded.
-    generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+    // BL-1044 — THE CHARTER BUDGET, SPENT ON THE SEED CANDIDATE (Ben,
+    // 2026-09-21, NR-909). This path does not search. The Digitisation span
+    // runs by default (make_hard_coded_world()'s default params, seed 0), so
+    // its world carries a stockpile budget, and a non-empty one is spent as the
+    // harness's unsearched apply spends it — the search's seed candidate. An
+    // EMPTY budget (a world the span did not run on, or a rejected one) lays
+    // exactly the BL-365 call below, byte for byte.
+    const seed_candidate_spend scs = spend_stockpile_on_seed_candidate(
+        w, reg, /*world_seed=*/0u, world_gen_config{}.corporation_count);
+    if (!scs.spent)
+        // BL-365: real background corporations, generated now that reg is loaded.
+        generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+    else
+        std::fprintf(stderr, "[stockpile_budget] run_serve: %lld points spent on the seed candidate "
+                             "(%zu specialists, %zu firms)%s\n",
+                     static_cast<long long>(scs.report.points_spent),
+                     scs.report.specialists.size(), scs.report.firms.size(),
+                     scs.report.refused     ? " — spend REFUSED, the no-budget world"
+                     : scs.report.fell_back ? " — no specialist affordable, the no-budget world (NR-910)"
+                                            : "");
 
     // BL-387: the session actor, resolved after world construction so the
     // default can be the player corp. Only meaningful when !as_any; a pinned
@@ -244,18 +252,26 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
 
-    // BL-1042 — THE CHARTER BUDGET, STATED. This path does not search, so it has
-    // no seam to spend one at. Its world is built with the Digitisation span
-    // OFF (make_hard_coded_world()'s default params), so the stockpile
-    // budget app::start_new_game_prelude would pass is EMPTY — and an empty
-    // budget IS the legacy call below, byte for byte. The guard says so out
-    // loud if that ever stops being true.
-    if (const stockpile_budget sb = build_stockpile_budget(w); !sb.budget.empty() || sb.rejected)
-        std::fprintf(stderr, "[stockpile_budget] headless run: a search-less path lays the legacy web and "
-                             "ignores a %lld-point stockpile budget\n",
-                     static_cast<long long>(sb.points_total));
-    // BL-365: real background corporations, generated now that reg is loaded.
-    generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+    // BL-1044 — THE CHARTER BUDGET, SPENT ON THE SEED CANDIDATE (Ben,
+    // 2026-09-21, NR-909). This path does not search. The Digitisation span
+    // runs by default (make_hard_coded_world()'s default params, seed 0), so
+    // its world carries a stockpile budget, and a non-empty one is spent as the
+    // harness's unsearched apply spends it — the search's seed candidate. An
+    // EMPTY budget (a world the span did not run on, or a rejected one) lays
+    // exactly the BL-365 call below, byte for byte.
+    const seed_candidate_spend scs = spend_stockpile_on_seed_candidate(
+        w, reg, /*world_seed=*/0u, world_gen_config{}.corporation_count);
+    if (!scs.spent)
+        // BL-365: real background corporations, generated now that reg is loaded.
+        generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+    else
+        std::fprintf(stderr, "[stockpile_budget] headless run: %lld points spent on the seed candidate "
+                             "(%zu specialists, %zu firms)%s\n",
+                     static_cast<long long>(scs.report.points_spent),
+                     scs.report.specialists.size(), scs.report.firms.size(),
+                     scs.report.refused     ? " — spend REFUSED, the no-budget world"
+                     : scs.report.fell_back ? " — no specialist affordable, the no-budget world (NR-910)"
+                                            : "");
 
     for (int t = 1; t <= ticks; ++t)
     {

@@ -409,6 +409,13 @@ history_sim_params exploration_sim_params(const world_params& params)
     hp.city_states_by_population_threshold = true;
     hp.settle_requires_razed_ground         = true;
 
+    // BL-1037 — a resumed corridor reopens at the rung it was bought to. This
+    // span resumes the Empires round's record at 1200, and the Digitisation
+    // span, built on these params, resumes this one's at 1660; both take it
+    // from `world_params` (on by default, BL-1044) so the legacy arc can
+    // switch it off.
+    hp.resume_seeds_corridor_tier = params.resume_seeds_corridor_tier;
+
     return hp;
 }
 
@@ -467,8 +474,8 @@ history_sim_params digitisation_sim_params(const world_params& params)
     hp.industry_survey_inherits_at_founding = true; // DEFAULT A
     hp.industry_fuel_gate_reads_survey      = true; // DEFAULT B
 
-    // `resume_seeds_corridor_tier` (BL-1037) keeps its struct default, OFF:
-    // it moves every resumed span, and BL-1044 turns it on with the re-bless.
+    // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
+    // `exploration_sim_params` from `world_params` (on by default, BL-1044).
     return hp;
 }
 

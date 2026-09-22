@@ -967,11 +967,21 @@ void app::seat_player()
     if (const auto cit = m_world.corporations.find(m_seat_result.seated);
         cit != m_world.corporations.end())
         name = cit->second.name.c_str();
-    std::printf("[start_new_game] seat: %s — shortlist %d of %d specialists%s\n",
-                name, m_seat_result.shortlist_size, m_seat_result.specialist_count,
+    // THE ONE-is_player INVARIANT (world.hpp), stated where it binds (BL-1044):
+    // counted, not assumed. The one path that can break it — a charter walk
+    // whose affording centres all failed to place a specialist — is said out
+    // loud here and never patched.
+    int players = 0;
+    for (const auto& kv : m_world.corporations)
+        if (kv.second.is_player)
+            ++players;
+    std::printf("[start_new_game] seat: %s — shortlist %d of %d specialists; is_player on %d "
+                "corporation(s)%s%s\n",
+                name, m_seat_result.shortlist_size, m_seat_result.specialist_count, players,
                 m_seat_result.floor_unmet
                     ? "   <-- VIABILITY FLOOR UNMET (no seat on scored ground; lowest id seated)"
-                    : "");
+                    : "",
+                players != 1 ? "   <-- ONE-is_player INVARIANT BROKEN (world.hpp)" : "");
     for (const spawn_seat_candidate& c : m_seat_result.candidates)
         if (c.corp == m_seat_result.seated)
             std::printf("[start_new_game] seat card: landscape %.4f (%d of %d holdings on "
@@ -1065,15 +1075,17 @@ void app::start_new_game_prelude()
         // stockpile (Beat 1, DIGITISATION.md Part III), split over the carved
         // centres by `build_stockpile_budget` and charged at
         // `stockpile_charter_spend` — its firm price DERIVED from the world's
-        // whole stockpile (BL-1064, NR-907), its other provisional constants
-        // named in stockpile_budget.hpp; BL-1044 pins them. ONE budget and ONE spend
+        // whole stockpile (BL-1064, NR-907), its other constants named and
+        // ruled in stockpile_budget.hpp (NR-910). ONE budget and ONE spend
         // reach BOTH `sp` AND the winner's apply below — or the search would
         // score one world and the app lay another — and the budget is a local
         // of this block, so it outlives the search and the apply both.
         //
-        // WITH THE DIGITISATION SPAN OFF (the shipped default) no region holds
-        // a point, the budget is EMPTY, the search is today's search, and the
-        // apply's legacy branch runs first: nothing moves. MIRRORED by
+        // The span runs by default (BL-1044), so this is a budget world. A
+        // budget no centre can buy a specialist with falls back to the
+        // no-budget world in both the search and the apply (NR-910). On a world
+        // the span did not run on no region holds a point, the budget is EMPTY,
+        // and the apply's legacy branch runs first. MIRRORED by
         // tools/verify/harness_params.hpp `apply_shipped_landscape` — change
         // both, and review the two diffs against each other (BL-1031's pins see
         // world/* only, through the mirror).
@@ -1118,7 +1130,10 @@ void app::start_new_game_prelude()
                         price,
                         static_cast<long long>(charter_report.points_spent),
                         static_cast<long long>(charter_report.points_budgeted),
-                        charter_report.refused ? " (spend REFUSED)" : "");
+                        charter_report.refused     ? " (spend REFUSED)"
+                        : charter_report.fell_back ? " (NO SPECIALIST affordable: the no-budget "
+                                                     "world, NR-910)"
+                                                   : "");
         }
         // Kept for the seat (BL-1020): the shortlist gates and ranks on this
         // static score, read at each specialist's holdings, after the settle.

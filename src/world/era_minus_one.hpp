@@ -168,8 +168,8 @@ uint32_t exploration_sim_seed(const world_params& params);
 /// Both 1200 anchors (`consolidation_year`, `near_home_cutoff_year`) are
 /// Exploration's, unchanged: consolidation happens once and a pair met after
 /// 1200 stays far however late a span opens (Ben, 2026-09-18). BL-1037's
-/// `resume_seeds_corridor_tier` keeps its default (off); BL-1044 turns it on
-/// with the re-bless.
+/// `resume_seeds_corridor_tier` is Exploration's, from `world_params` (on by
+/// default since BL-1044).
 history_sim_params digitisation_sim_params(const world_params& params);
 
 /// The seed generation hands the Digitisation span: its own constant, own

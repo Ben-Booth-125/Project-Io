@@ -197,7 +197,10 @@ int remove_specialist_roster(world& w);
 ///    it), `no_gap`, `body_cap`, `density_ceiling`, `remainder` — never
 ///    scattered. The report carries each body's rule and its firms per good.
 ///  * The player is a seeded pick among the budget's specialists; with none,
-///    nobody is picked and the report says `no_specialists`.
+///    nobody is picked and the report says `no_specialists`. On the shipped
+///    seam a budget no centre can buy a specialist with never gets here (NR-910,
+///    `charter_budget_affords_specialist`); a walk that charters none anyway is
+///    the residual, reported and not patched.
 ///
 /// RNG: a fresh std::mt19937 per centre per role, seeded through a keyed
 /// `checkpoint_rng` draw on salts no other generation stream uses, so one
@@ -232,6 +235,26 @@ std::vector<entity_id> charter_web_from_budget(world& w,
 const char* charter_spend_world_refusal(const world& w, const recipe_registry& reg,
                                         const charter_budget& budget,
                                         const charter_spend_params& spend);
+
+/// NR-910 — THE NO-SPECIALIST WORLD, decided BEFORE ANYTHING IS CHARTERED (Ben,
+/// 2026-09-21: "a world whose budget opens no specialist falls back to the world
+/// it would have built with no budget, exactly as a refused spend does, decided
+/// from the budget before anything is chartered"). True when some budgeted
+/// centre stands on a tile a nation owns and its points cover the specialist's
+/// price (`spend.specialist_price_points()`) — the walk's own test for chartering
+/// one, on the walk's own resolution of the centre. False for an empty budget.
+///
+/// READ-ONLY. It reads the centre tiles, their ownership and the nations, none
+/// of which the budget apply moves before the walk (the road tier and the roster
+/// removal touch neither), so the answer on the world as `apply_landscape_candidate`
+/// and `search_landscape` receive it is the answer the walk would reach.
+///
+/// It decides AFFORDING, not PLACING: a centre that affords a specialist and
+/// finds no ground in either window charters none, and a world where every
+/// affording centre does so is the walk's residual (`charter_spend_report::
+/// no_specialists` with neither `refused` nor `fell_back`).
+bool charter_budget_affords_specialist(const world& w, const charter_budget& budget,
+                                       const charter_spend_params& spend);
 
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631)

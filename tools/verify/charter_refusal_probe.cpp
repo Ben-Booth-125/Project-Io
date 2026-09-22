@@ -42,15 +42,25 @@
 //        body no more than it; a yard's place comes off the ceiling first; and
 //        a ceiling too small for the turn and its yards is refused;
 //      * a good only the walk's own firms made short is `late_shortfall`.
+//  4. THE NO-SPECIALIST WORLD (BL-1044; Ben, 2026-09-21, NR-910), on the same
+//     hand-built world: `charter_budget_affords_specialist` answers the walk's own
+//     test (a centre on a nation's tile whose points cover the specialist), and
+//     `apply_landscape_candidate`'s budget overload, given a budget no centre can
+//     buy a specialist with, FALLS BACK before anything is chartered — the world
+//     it leaves is the no-budget world's, byte for byte (the snapshot digest),
+//     and the report says so: not refused, nothing spent, every point unspent as
+//     `no_specialist`.
 //
 // Run:   bash tools/verify/build_lua_harness.sh charter_refusal_probe
 //        (or node tools/verify/build_harness.js charter_refusal_probe — it needs no Lua)
 //        ./build_gen/verify/charter_refusal_probe.exe
 // Exit:  0 every case as expected, 1 otherwise.
 
+#include "world_digest.hpp"   // world_state_digest: the fallback world IS the no-budget one
 #include "world/charter_budget.hpp"
 #include "world/components.hpp"
 #include "world/corporation_generation.hpp"
+#include "world/landscape_search.hpp"  // apply_landscape_candidate's budget overload (NR-910)
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
 #include "world/world.hpp"
@@ -213,10 +223,14 @@ struct reading
     int body_firms() const { return rep.bodies.empty() ? 0 : static_cast<int>(rep.bodies.front().firms); }
 };
 
-reading run(const config& cfg)
+/// The hand-built world @p cfg describes, its registry filled into @p reg; the
+/// budget's centres land in @p points and @p centres (as the config lists them).
+/// Deterministic: two builds of one config are the same world, id for id.
+std::unique_ptr<world> build(const config& cfg, recipe_registry& reg,
+                             std::map<entity_id, std::int32_t>& points,
+                             std::vector<entity_id>& centres)
 {
     auto w = std::make_unique<world>();
-    recipe_registry reg;
 
     const entity_id body = w->create_entity();
     {
@@ -261,8 +275,6 @@ reading run(const config& cfg)
         }
     w->nations[nation] = nc;
 
-    reading out;
-    std::map<entity_id, std::int32_t> points;
     for (const centre_spec& cs : cfg.centres)
     {
         const entity_id id = w->create_entity();
@@ -271,7 +283,7 @@ reading run(const config& cfg)
         w->population_centres[id]     = pc;
         w->population_centre_tile[id] = at.at({ cs.x, cs.y });
         points[id] = cs.points;
-        out.centres.push_back(id);
+        centres.push_back(id);
     }
 
     // G is the basket: the households want every good in it. A good with a
@@ -318,6 +330,16 @@ reading run(const config& cfg)
                 [static_cast<std::size_t>(era_band::any)][k_late] = 1.0f;
         reg.set_building_upkeep(up);
     }
+
+    return w;
+}
+
+reading run(const config& cfg)
+{
+    recipe_registry reg;
+    reading out;
+    std::map<entity_id, std::int32_t> points;
+    auto w = build(cfg, reg, points, out.centres);
 
     // Firm 1 point; a specialist no centre here can afford (1000 charters).
     charter_spend_params s;
@@ -884,6 +906,99 @@ int main()
         expect_true("late: power is not in G", power_outside_g);
         expect_true("late: the 2 points left are late_shortfall, not no_gap",
                     r.u(why_t::late_shortfall) == 2 && r.u(why_t::no_gap) == 0 && r.balanced);
+    }
+
+    // --- 4. THE NO-SPECIALIST WORLD (BL-1044, NR-910) --------------------------
+    std::printf("\ncharter_refusal_probe — the no-specialist world falls back (NR-910)\n");
+    {
+        // Two centres, 8 and 5 points; firm price 1 point, so a specialist of m
+        // charters costs m points. The default ground and basket (the turn's).
+        turn::config cfg;
+        cfg.centres = { turn::centre_spec{ turn::k_cx, turn::k_cy, 8 },
+                        turn::centre_spec{ turn::k_cx + 3, turn::k_cy, 5 } };
+        const auto spend_at = [&](std::int32_t m) {
+            charter_spend_params s;
+            s.firm_price_points        = 1;
+            s.specialist_firm_charters = m;
+            s.window_radius            = cfg.radius;
+            s.province_cap             = true;
+            s.resource_cap_rule        = charter_cap_rule::sqrt_capital;
+            s.per_resource_firm_cap    = cfg.c;
+            s.max_firms_per_body       = 200;
+            s.density_ceiling          = cfg.ceiling;
+            return s;
+        };
+
+        // (a) the predicate: the walk's own test, on the walk's own resolution.
+        {
+            recipe_registry reg;
+            std::map<entity_id, std::int32_t> points;
+            std::vector<entity_id> centres;
+            auto w = turn::build(cfg, reg, points, centres);
+            const charter_budget budget(points);
+            expect_true("affords: m 9 — neither centre (8, 5) affords a specialist",
+                        !charter_budget_affords_specialist(*w, budget, spend_at(9)));
+            expect_true("affords: m 8 — the 8-point centre affords one (points == price)",
+                        charter_budget_affords_specialist(*w, budget, spend_at(8)));
+            expect_true("affords: an empty budget affords nothing",
+                        !charter_budget_affords_specialist(*w, charter_budget{}, spend_at(1)));
+            // The walk charters nothing where no nation owns the centre's tile,
+            // so the predicate must not count such a centre.
+            w->tile_to_nation.erase(w->population_centre_tile.at(centres[0]));
+            expect_true("affords: m 8 — the only affording centre on a tile no nation owns does not count",
+                        !charter_budget_affords_specialist(*w, budget, spend_at(8)));
+            expect_true("affords: m 5 — the other centre, on a nation's tile, still does",
+                        charter_budget_affords_specialist(*w, budget, spend_at(5)));
+        }
+
+        // (b) the apply: a budget no centre can buy a specialist with lays the
+        // no-budget world, byte for byte, and reports the fallback.
+        {
+            recipe_registry reg_a, reg_b;
+            std::map<entity_id, std::int32_t> points_a, points_b;
+            std::vector<entity_id> centres_a, centres_b;
+            auto wa = turn::build(cfg, reg_a, points_a, centres_a);
+            auto wb = turn::build(cfg, reg_b, points_b, centres_b);
+            const charter_budget budget(points_a);
+            landscape_candidate cand;
+            cand.placement_seed = 1060u;
+            // The budget overload with no specialist affordable (m 9) ...
+            charter_spend_report rep;
+            rep.points_spent = -1;   // proves the report was written
+            apply_landscape_candidate(*wa, reg_a, cand, /*regenerate_specialists=*/false,
+                                      &budget, spend_at(9), &rep);
+            // ... against the legacy overload, the world with no budget at all.
+            apply_landscape_candidate(*wb, reg_b, cand, /*regenerate_specialists=*/false);
+            const std::uint64_t da = world_state_digest(*wa);
+            const std::uint64_t db = world_state_digest(*wb);
+            std::printf("    fallback world %016llx, no-budget world %016llx; corporations %zu / %zu\n",
+                        static_cast<unsigned long long>(da), static_cast<unsigned long long>(db),
+                        wa->corporations.size(), wb->corporations.size());
+            expect_true("fallback: the world is the no-budget world, byte for byte (snapshot digest)",
+                        da == db && wa->corporations.size() == wb->corporations.size());
+            long long by_reason = 0, other_reasons = 0;
+            for (const charter_unspent& u : rep.unspent)
+                (u.reason == charter_unspent_reason::no_specialist ? by_reason : other_reasons) += u.points;
+            expect_true("fallback: the report says it FELL BACK, is not a refusal, and seats nobody",
+                        rep.fell_back && !rep.refused && rep.no_specialists
+                        && rep.player == null_entity && rep.charters.empty());
+            expect_true("fallback: nothing spent; every point unspent as no_specialist (13 = 8 + 5)",
+                        rep.points_spent == 0 && rep.points_budgeted == 13 && rep.points_unspent == 13
+                        && by_reason == 13 && other_reasons == 0);
+
+            // And a budget that DOES afford one (m 8) is a budget world: the
+            // walk runs, and the 8-point centre charters its specialist.
+            recipe_registry reg_c;
+            std::map<entity_id, std::int32_t> points_c;
+            std::vector<entity_id> centres_c;
+            auto wc = turn::build(cfg, reg_c, points_c, centres_c);
+            charter_spend_report rep_c;
+            apply_landscape_candidate(*wc, reg_c, cand, /*regenerate_specialists=*/false,
+                                      &budget, spend_at(8), &rep_c);
+            expect_true("no fallback at m 8: the walk ran and chartered the affordable specialist",
+                        !rep_c.fell_back && !rep_c.refused && rep_c.specialists.size() == 1
+                        && rep_c.player == rep_c.specialists.front());
+        }
     }
 
     std::printf("\n%s (%d failing)\n", g_fail == 0 ? "ALL PASS" : "FAILED", g_fail);

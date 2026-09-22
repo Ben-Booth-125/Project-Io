@@ -18,7 +18,8 @@
 // ONE builder: `build_stockpile_budget` (stockpile_budget.hpp, BL-1042), which
 // the new-game path (app::start_new_game_prelude, mirrored by
 // tools/verify/harness_params.hpp) passes to the search and the winner's apply.
-// With the Digitisation span off that budget is empty, which is today's world.
+// The span runs by default (BL-1044); with it off that budget is empty, which is
+// the pre-budget world.
 // The prices it is charged at are named there, never defaulted here.
 // ---------------------------------------------------------------------------
 
@@ -347,6 +348,10 @@ enum class charter_unspent_reason : std::uint8_t
                           ///< from those stops in spend order. It says the share went
                           ///< unfilled — not that no centre had ground for it (one might
                           ///< have, and run out of points first).
+    no_specialist    = 10, ///< THE NO-SPECIALIST WORLD (Ben, 2026-09-21, NR-910): no budgeted
+                           ///< centre on a nation's tile affords a specialist, so the shipped
+                           ///< seam lays the no-budget world instead (`charter_fallback_report`);
+                           ///< nothing chartered. Booked by the seam, never by the walk.
 };
 
 inline const char* charter_unspent_reason_name(charter_unspent_reason r)
@@ -363,11 +368,12 @@ inline const char* charter_unspent_reason_name(charter_unspent_reason r)
     case charter_unspent_reason::density_ceiling:  return "density_ceiling";
     case charter_unspent_reason::late_shortfall:   return "late_shortfall";
     case charter_unspent_reason::share_unplaced:   return "share_unplaced";
+    case charter_unspent_reason::no_specialist:    return "no_specialist";
     }
     return "?";
 }
 
-constexpr int charter_unspent_reason_count = 10;
+constexpr int charter_unspent_reason_count = 11;
 
 /// Which anchor rung a charter landed on. There is no third rung: a charter that
 /// finds no ground in either is UNSPENT, never scattered nation-wide.
@@ -458,6 +464,13 @@ struct charter_spend_report
     bool        refused = false;
     std::string refusal;
 
+    /// THE NO-SPECIALIST WORLD (Ben, 2026-09-21, NR-910): set when the shipped
+    /// seam found no budgeted centre on a nation's tile affording a specialist
+    /// (`charter_budget_affords_specialist`) and laid the no-budget world, as it
+    /// does for a refusal. Never set with `refused`; nothing here was chartered
+    /// and every point is unspent as `no_specialist` (`charter_fallback_report`).
+    bool        fell_back = false;
+
     std::vector<entity_id>       specialists;  ///< ascending id
     std::vector<entity_id>       firms;        ///< ascending id
     std::vector<charter_record>  charters;     ///< ascending corp id
@@ -465,8 +478,11 @@ struct charter_spend_report
 
     /// The seeded pick among budget specialists, or null.
     entity_id player = null_entity;
-    /// No centre chartered a specialist, so nobody was picked — and nothing
-    /// forces one (Ben, 2026-09-17: decided at sprint 45).
+    /// Nobody was picked by the spend: it was refused, it fell back, or the
+    /// walk chartered no specialist. On the shipped seam the first two lay the
+    /// no-budget world, which seats from its own roster (NR-910). The third is
+    /// the walk's RESIDUAL — a centre afforded a specialist but none found
+    /// ground — and leaves the world with no player; nothing here patches it.
     bool no_specialists = false;
 
     std::int64_t points_budgeted = 0;
@@ -573,6 +589,24 @@ inline charter_spend_report charter_refused_report(const charter_budget& b, cons
     rep.points_budgeted = b.total();
     for (const auto& [centre, pts] : b.points())
         rep.unspent.push_back({ centre, charter_unspent_reason::refused, pts });
+    rep.points_unspent  = rep.points_budgeted;
+    return rep;
+}
+
+/// The report the NO-SPECIALIST WORLD leaves (Ben, 2026-09-21, NR-910): the
+/// shipped seam laid the no-budget world, so nothing was chartered, nobody was
+/// picked by the spend, and every point is unspent as `no_specialist`. It is
+/// not a refusal — the spend's params and the world were sound — so `refused`
+/// stays clear. Reads the budget only: the fallback is decided before any world
+/// is touched.
+inline charter_spend_report charter_fallback_report(const charter_budget& b)
+{
+    charter_spend_report rep;
+    rep.fell_back       = true;
+    rep.no_specialists  = true;
+    rep.points_budgeted = b.total();
+    for (const auto& [centre, pts] : b.points())
+        rep.unspent.push_back({ centre, charter_unspent_reason::no_specialist, pts });
     rep.points_unspent  = rep.points_budgeted;
     return rep;
 }

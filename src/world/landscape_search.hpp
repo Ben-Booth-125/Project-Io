@@ -150,9 +150,9 @@ struct landscape_search_params
 
     /// BL-1032 — the per-centre CHARTER BUDGET, or none. NONE BY DEFAULT here;
     /// the shipped new-game path (app::start_new_game_prelude, BL-1042) passes
-    /// the world's own stockpile budget (`build_stockpile_budget`), which is
-    /// EMPTY while the Digitisation span is off — so the shipped search is
-    /// today's search until the span runs.
+    /// the world's own stockpile budget (`build_stockpile_budget`), which the
+    /// Digitisation span fills (on by default since BL-1044) and which is EMPTY
+    /// on a world the span did not run on — the pre-budget search.
     ///
     /// Null or EMPTY (an all-zero budget is the same state — charter_budget
     /// drops entries <= 0) is today's search, byte for byte: every axis
@@ -169,7 +169,10 @@ struct landscape_search_params
     /// are refused (`charter_spend_refusal`) is NOT a budget world: the refusal
     /// is checked before anything else, the search runs exactly as with no
     /// budget, prints REFUSED with the reason, and sets
-    /// `landscape_search_result::charter_refused`.
+    /// `landscape_search_result::charter_refused`. Nor is a non-empty budget on
+    /// which no centre a nation owns affords a specialist (NR-910,
+    /// `charter_budget_affords_specialist`): it falls back the same way, prints
+    /// that it opens no specialist, and sets `charter_fell_back`.
     ///
     /// Read-only and shared across the scoring threads; the pointee must
     /// outlive the search.
@@ -217,6 +220,12 @@ struct landscape_search_result
     /// field above is what it is on a world with no budget.
     bool        charter_refused = false;
     std::string charter_refusal;
+
+    /// NR-910. Set when a NON-EMPTY budget that was not refused opens no
+    /// specialist (`charter_budget_affords_specialist` false on the base world):
+    /// the no-specialist world falls back as a refusal does, so the search is
+    /// exactly the no-budget search. Never set with `charter_refused`.
+    bool        charter_fell_back = false;
 };
 
 /// Lay a candidate onto @p w, which must be a copy of the phase-4 base world.
@@ -239,6 +248,10 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
 ///     checked before any mutation) -> the 4-argument overload above, verbatim,
 ///     exactly as with no budget; @p report receives `charter_refused_report`.
 ///     No roster is removed and nothing is chartered.
+///   * @p budget non-empty and not refused, but NO CENTRE A NATION OWNS AFFORDS
+///     A SPECIALIST (`charter_budget_affords_specialist`, NR-910) -> the same:
+///     the 4-argument overload verbatim, decided before any mutation; @p report
+///     receives `charter_fallback_report`.
 ///   * otherwise -> the road tier and the recipe pass as above, then
 ///     `remove_specialist_roster` and `charter_web_from_budget` from the
 ///     candidate's placement seed and `world::gen_settlement`, in place of
@@ -246,9 +259,9 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
 ///     charters the whole web, so @p regenerate_specialists is not read on
 ///     this branch.
 ///
-/// @p report, when non-null, receives the spend's report on the budget branch
-/// and the refusal report on a refused budget, and is left untouched on the
-/// null-or-empty branch.
+/// @p report, when non-null, receives the spend's report on the budget branch,
+/// the refusal report on a refused budget and the fallback report on a
+/// no-specialist one, and is left untouched on the null-or-empty branch.
 void apply_landscape_candidate(world& w, const recipe_registry& reg,
                                const landscape_candidate& c,
                                bool regenerate_specialists,

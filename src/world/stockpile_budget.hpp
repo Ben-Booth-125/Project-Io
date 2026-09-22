@@ -34,10 +34,10 @@
 // whole stockpile over `k_stockpile_price_divisor`, derived here once and carried
 // on the budget, so the spend charges every world the same SHARE of itself.
 //
-// WITH THE DIGITISATION SPAN OFF (the shipped default) no region holds a point,
-// the budget is EMPTY, and an empty budget is today's world byte for byte
-// (`apply_landscape_candidate`'s legacy branch runs first). That is the whole
-// of the shipped behaviour until BL-1044 turns the span on.
+// WITH THE DIGITISATION SPAN OFF (the legacy arc; it runs by default since
+// BL-1044) no region holds a point, the budget is EMPTY, and an empty budget is
+// the pre-budget world byte for byte (`apply_landscape_candidate`'s legacy
+// branch runs first).
 //
 // NOTHING HERE IS PERSISTENT: a pure function of a generated world, built at
 // new-game and spent there. No save field, no Lua key.
@@ -169,8 +169,7 @@ inline constexpr std::int64_t stockpile_region_keys_max = 1LL << 32;
 
 /// The divisor a world's whole stockpile is split by into the price of ONE firm
 /// charter (Ben, 2026-09-21, NR-907: "a charter's price is the world's whole
-/// industry stockpile divided by a constant"; DIGITISATION.md § 1). PROVISIONAL:
-/// BL-1044 pins it off BL-1043 stage 2.
+/// industry stockpile divided by a constant"; DIGITISATION.md § 1).
 ///
 /// TWO KNOBS, TWO JOBS (Ben, 2026-09-21, NR-908; DIGITISATION.md § 1).
 /// A centre affords a specialist when its points cover
@@ -180,15 +179,20 @@ inline constexpr std::int64_t stockpile_region_keys_max = 1LL << 32;
 /// charters a world's stock buys — its density, and so its tick — and is the
 /// knob set against LIVE-PLAY COST.
 ///
-/// WHERE 650 COMES FROM (stage 1, runs.real_stockpile_bl1043_a/_b/_c, 16 seeds x
-/// firm price 10000/20000/40000 x 4 firm charters a specialist): a world's seats
-/// run close to 0.056 x its stock / the specialist's price (the median of
-/// seats x firm price / stock over the 48 rows is 0.01395, at 4 charters), so
-/// under a derived price the seats are about 0.056 x this / the charters, and
-/// the anchor's 9 seats is a ratio near 160 — 650 at 4 charters. A LARGER ratio
-/// is a CHEAPER seat and MORE seats. Stage 2 reads the density at that ratio
-/// along the divisor.
-inline constexpr std::int64_t k_stockpile_price_divisor = 650;
+/// PINNED AT 580 (Ben, 2026-09-21, NR-910). With the specialist at two firm
+/// charters (below), 580 is the divisor at which the median library world opens
+/// the seat-menu anchor's nine seats. Read off the seat curve
+/// (`stockpile_budget_check --seat-curve`, 16 library seeds, m = 2): median
+/// 6.5 / 7 / 8 / 9.5 / 12.5 seats at d = 520 / 540 / 560 / 580 / 600, and 580 is
+/// the smallest divisor measured at which no library world opens none (seed 37:
+/// 0 at 560, 2 at 580). A LARGER ratio d/m is a CHEAPER seat and MORE seats.
+/// The spread is ACCEPTED, not capped — 2 to 73 seats across the library at
+/// 580:2: the anchor is a median, and a world with many near-equal cities crosses
+/// the price together. Live-play cost: the divisor alone sets the tick (BL-1043
+/// stage 2: x0.43 / x0.91 / x1.70 the legacy world at 325:2 / 650:4 / 1300:8),
+/// so 580 runs near x0.8 the legacy tick by interpolation; BL-1044's measurement
+/// reads it on the shipped world.
+inline constexpr std::int64_t k_stockpile_price_divisor = 580;
 static_assert(k_stockpile_price_divisor > 0, "the price divisor must be > 0");
 
 /// Build the charter budget from @p w's stockpile, its firm price derived by
@@ -216,23 +220,27 @@ stockpile_budget build_stockpile_budget(const std::vector<region>*            re
 
 // --- THE SPEND ---------------------------------------------------------------
 //
-// PROVISIONAL NAMED CONSTANTS, SET HERE AND NOT IN charter_budget.hpp (whose
-// prices have no shipped default by design). BL-1044 sets them against live-play
-// cost and the seat menu (DIGITISATION.md § 1: the specialist's price "anchored
-// to the seat menu"; the square root's constants and the density ceiling "read
-// off the cost table"). The density ceiling is the one already ruled (NR-902,
-// below). The FIRM price is not a constant at all: it is derived from the
-// world's own stockpile by `k_stockpile_price_divisor` (above, NR-907). They
-// are read only when the budget is non-empty, which needs the Digitisation span
-// on; with it off (the shipped default) no price is read.
+// THE SHIPPED SPEND'S NAMED CONSTANTS, SET HERE AND NOT IN charter_budget.hpp
+// (whose prices have no shipped default by design). Every one is RULED
+// (DIGITISATION.md § 1): the specialist's price anchored to the seat menu and the
+// square root's base (Ben, 2026-09-21, NR-910), the density ceiling (NR-902).
+// The FIRM price is not a constant at all: it is derived from the world's own
+// stockpile by `k_stockpile_price_divisor` (above, NR-907). They are read only
+// when the budget is non-empty — a world the Digitisation span ran on; with the
+// span off no price is read.
 
-/// Firm charters one specialist costs. PROVISIONAL (BL-1044); the synthetic
-/// budget's 4, the only reading the seat has been measured at. A specialist's
-/// price is this many DERIVED firm prices (BL-1039's structure, NR-907), and
-/// this is the knob anchored to the SEAT MENU (Ben, 2026-09-18 and 2026-09-21):
-/// with the divisor above, it sets the share of the stock a seat costs.
-inline constexpr std::int32_t k_stockpile_specialist_firm_charters = 4;
-/// The per-good cap's floor and base c (Pass 6's 8, the legacy anchor).
+/// Firm charters one specialist costs: TWO (Ben, 2026-09-21, NR-910). A
+/// specialist's price is this many DERIVED firm prices (BL-1039's structure,
+/// NR-907), and this is the knob anchored to the SEAT MENU (Ben, 2026-09-18 and
+/// 2026-09-21, NR-908): with the divisor above, it sets the share of the stock a
+/// seat costs, and the seats turn on the ratio d/m alone. Whole charters are too
+/// coarse to land the anchor on their own — at the divisor that runs the legacy
+/// tick, three open a median of about four seats and two about thirteen — so the
+/// divisor takes the last step (above).
+inline constexpr std::int32_t k_stockpile_specialist_firm_charters = 2;
+/// The per-good cap's floor and the square root's base c: 8, Pass 6's legacy
+/// per-good cap (Ben, 2026-09-21, NR-910), so a body at the legacy firm spend
+/// keeps the legacy cap (`charter_sqrt_per_good_cap`: cap(B_ref) == c).
 inline constexpr std::int32_t k_stockpile_per_resource_firm_cap = 8;
 /// The anti-runaway guard per body (Pass 6's 200).
 inline constexpr std::int32_t k_stockpile_max_firms_per_body = 200;
@@ -250,3 +258,32 @@ inline constexpr std::int32_t k_stockpile_density_ceiling = 120;
 /// On an empty or rejected budget the price is 0 — never read, since an empty
 /// budget takes the legacy branch before any spend param is.
 charter_spend_params stockpile_charter_spend(const stockpile_budget& sb);
+
+// --- THE SEARCH-LESS PATHS (BL-1044, NR-909) ----------------------------------
+
+class recipe_registry;
+
+/// What `spend_stockpile_on_seed_candidate` did, for the caller's one line.
+struct seed_candidate_spend
+{
+    stockpile_budget     stockpile;   ///< the world's own budget, as built
+    charter_spend_report report;      ///< the apply's report; untouched when not spent
+    bool                 spent = false;
+};
+
+/// NR-909 (Ben, 2026-09-21): --verify, --serve and the headless run never
+/// search, and once the Digitisation span runs by default their worlds carry a
+/// stockpile budget. Where the budget is NON-EMPTY this spends it as the
+/// harness's unsearched apply does (`apply_shipped_landscape` with search =
+/// false): the search's SEED CANDIDATE — placement seed `world_seed ^
+/// 0x8A21F00D` (app.cpp's search seed), @p corporation_count, road tier 1 —
+/// laid by `apply_landscape_candidate`'s budget overload at
+/// `stockpile_charter_spend`, then the second recipe pass. So a refused or
+/// no-specialist budget falls back inside world/* exactly as the app's does.
+///
+/// Where the budget is EMPTY (the span did not run, or the budget was
+/// rejected) it touches NOTHING and returns `spent = false`: the caller lays
+/// its own pre-budget web, byte for byte, as it did before this existed.
+seed_candidate_spend spend_stockpile_on_seed_candidate(world& w, const recipe_registry& reg,
+                                                       std::uint32_t world_seed,
+                                                       int corporation_count);

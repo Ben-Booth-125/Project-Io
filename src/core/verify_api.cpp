@@ -516,17 +516,25 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // condition reads real recipe outputs. The seed fold matches the interactive
     // path so the verified world is the world the player would get. NOT warmed up —
     // run_verify stays deterministically cold, as its own comment below says.
-    // BL-1042 — THE CHARTER BUDGET, STATED. This path does not search, so it has
-    // no seam to spend one at. Its world is built with the Digitisation span
-    // OFF (fresh_world_params() leaves it at its default), so the stockpile
-    // budget app::start_new_game_prelude would pass is EMPTY — and an empty
-    // budget IS the legacy call below, byte for byte. The guard says so out
-    // loud if that ever stops being true.
-    if (const stockpile_budget sb = build_stockpile_budget(m_world); !sb.budget.empty() || sb.rejected)
-        std::fprintf(stderr, "[stockpile_budget] run_verify: a search-less path lays the legacy web and "
-                             "ignores a %lld-point stockpile budget\n",
-                     static_cast<long long>(sb.points_total));
-    generate_background_firms(m_world, m_registry, /*seed=*/0x8A21F00Du);
+    // BL-1044 — THE CHARTER BUDGET, SPENT ON THE SEED CANDIDATE (Ben,
+    // 2026-09-21, NR-909). This path does not search. The Digitisation span
+    // runs by default, so its world carries a stockpile budget, and a non-empty
+    // one is spent as the harness's unsearched apply spends it — the search's
+    // seed candidate, the budget world minus the search. An EMPTY budget (a
+    // world the span did not run on, or a rejected one) lays exactly the call
+    // below, byte for byte.
+    const seed_candidate_spend scs = spend_stockpile_on_seed_candidate(
+        m_world, m_registry, m_active_world_params.seed, m_worldgen_cfg.corporation_count);
+    if (!scs.spent)
+        generate_background_firms(m_world, m_registry, /*seed=*/0x8A21F00Du);
+    else
+        std::printf("[stockpile_budget] run_verify: %lld points spent on the seed candidate "
+                    "(%zu specialists, %zu firms)%s\n",
+                    static_cast<long long>(scs.report.points_spent),
+                    scs.report.specialists.size(), scs.report.firms.size(),
+                    scs.report.refused     ? " — spend REFUSED, the no-budget world"
+                    : scs.report.fell_back ? " — no specialist affordable, the no-budget world (NR-910)"
+                                           : "");
 
     m_sim_loop.set_speed(0);
 

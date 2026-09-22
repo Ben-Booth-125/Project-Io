@@ -1,6 +1,8 @@
 #include "stockpile_budget.hpp"
 
 #include "history_sim.hpp"   // industry_points_ceiling
+#include "corporation_generation.hpp"  // assign_default_recipes (NR-909's seed-candidate spend)
+#include "landscape_search.hpp"        // apply_landscape_candidate (NR-909)
 #include "settlement.hpp"
 #include "world.hpp"
 
@@ -268,4 +270,32 @@ charter_spend_params stockpile_charter_spend(const stockpile_budget& sb)
     s.max_firms_per_body       = k_stockpile_max_firms_per_body;
     s.density_ceiling          = k_stockpile_density_ceiling;
     return s;
+}
+
+seed_candidate_spend spend_stockpile_on_seed_candidate(world& w, const recipe_registry& reg,
+                                                       std::uint32_t world_seed,
+                                                       int corporation_count)
+{
+    seed_candidate_spend out;
+    out.stockpile = build_stockpile_budget(w);
+    if (out.stockpile.budget.empty())
+        return out;   // the caller's own pre-budget web, untouched
+
+    // The seed candidate, keyed exactly as app::start_new_game_prelude keys the
+    // search it starts (sp.start = { count, world_seed ^ 0x8A21F00D, tier 1 })
+    // and as tools/verify/harness_params.hpp `shipped_search_params` mirrors it.
+    landscape_candidate c;
+    c.corporation_count = corporation_count;
+    c.placement_seed    = world_seed ^ 0x8A21F00Du;
+
+    // The harness's unsearched apply, verbatim: the recipe pass, the apply's
+    // budget overload (whose refusal and NR-910 fallback run inside it), and the
+    // second recipe pass a chartered processor needs.
+    const charter_spend_params spend = stockpile_charter_spend(out.stockpile);
+    assign_default_recipes(w, reg);
+    apply_landscape_candidate(w, reg, c, /*regenerate_specialists=*/true,
+                              &out.stockpile.budget, spend, &out.report);
+    assign_default_recipes(w, reg);
+    out.spent = true;
+    return out;
 }

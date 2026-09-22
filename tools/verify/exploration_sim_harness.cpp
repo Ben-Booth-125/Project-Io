@@ -793,9 +793,16 @@ int main()
         }
         std::printf("      handoff trade_flows=%zu\n", eo.trade_flows.size());
 
-        // R6.6/R6.7: world setup consumed the handoff's own tables, and they
-        // are the 1660 set -- not the 1200 pass-one set, which on this seed
-        // differs (so an equality with the handoff cannot be a 1200 read).
+        // R6.6/R6.7: world setup consumed the LAST close's own tables -- not
+        // the 1200 pass-one set, which on this seed differs (so an equality
+        // with the close cannot be a 1200 read). RE-POINTED by BL-1044: the
+        // Digitisation span runs by default, so the last close is its 1960
+        // value (`digitisation_handoff`, which setup reads since BL-1053) and
+        // the 1660 handoff only where the span did not run -- the binding the
+        // fixture's own capture documents (era_minus_one.hpp, setup_grudges).
+        const exploration_output& last_close = fixture.digitisation_ran
+            ? static_cast<const exploration_output&>(fixture.digitisation_handoff) : eo;
+        const char* last_close_name = fixture.digitisation_ran ? "1960 Digitisation" : "1660 Exploration";
         const auto grudges_same = [](const std::vector<grudge>& x, const std::vector<grudge>& y) {
             if (x.size() != y.size()) return false;
             for (std::size_t i = 0; i < x.size(); ++i)
@@ -809,12 +816,32 @@ int main()
                 if (x[i].a != y[i].a || x[i].b != y[i].b || x[i].uses != y[i].uses) return false;
             return true;
         };
-        check(grudges_same(fixture.setup_grudges, eo.grudges)
+        std::printf("      setup reads the %s close (digitisation_ran=%d)\n", last_close_name,
+                    fixture.digitisation_ran ? 1 : 0);
+        check(grudges_same(fixture.setup_grudges, last_close.grudges)
            && !grudges_same(fixture.setup_grudges, fixture.pre_exploration_grudges),
-              "R6.6  sentiment was seeded from the 1660 handoff's grudge table, not the 1200 one");
-        check(corridors_same(fixture.setup_corridors, eo.surviving_corridors)
+              "R6.6  sentiment was seeded from the last close's grudge table (1960 with the span "
+              "on), not the 1200 one");
+        check(corridors_same(fixture.setup_corridors, last_close.surviving_corridors)
            && !corridors_same(fixture.setup_corridors, fixture.pre_exploration_corridors),
-              "R6.7  roads were stamped from the 1660 handoff's surviving network, not the 1200 one");
+              "R6.7  roads were stamped from the last close's surviving network (1960 with the "
+              "span on), not the 1200 one");
+        // And with the span on, not the 1660 one either -- where the two closes
+        // differ on this seed (REPORTED when they coincide: equality with both
+        // then proves nothing either way).
+        if (fixture.digitisation_ran)
+        {
+            if (!grudges_same(eo.grudges, last_close.grudges))
+                check(!grudges_same(fixture.setup_grudges, eo.grudges),
+                      "R6.6b with the span on, sentiment was not seeded from the 1660 grudge table");
+            else
+                std::printf("      R6.6b not asked: the 1660 and 1960 grudge tables coincide on this seed\n");
+            if (!corridors_same(eo.surviving_corridors, last_close.surviving_corridors))
+                check(!corridors_same(fixture.setup_corridors, eo.surviving_corridors),
+                      "R6.7b with the span on, roads were not stamped from the 1660 network");
+            else
+                std::printf("      R6.7b not asked: the 1660 and 1960 networks coincide on this seed\n");
+        }
 
         // REPORTED, not gated: how far 1660 moved from 1200 on this seed.
         const auto pair_in = [](const std::vector<grudge>& v, int f, int t) {

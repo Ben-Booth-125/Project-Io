@@ -41,7 +41,9 @@
 //      .\build\player_seed_sweep.exe --guard --seeds 46,17,11 [--reproduce N] [--fast]
 //      .\build\player_seed_sweep.exe --digest       [--seeds 46,17,11]   (BL-1031)
 //      .\build\player_seed_sweep.exe --digest-check [--seeds 46,17,11]   (BL-1031)
-//      ... --digest / --digest-check [--charter-budget none|empty|zero|synthetic|refused|stockpile]
+//      ... --digest / --digest-check [--arc shipped|legacy]                 (BL-1044: the shipped
+//                                     world, or the pre-BL-1044 one the BL-1031 pins name)
+//                                    [--charter-budget none|empty|zero|synthetic|refused|stockpile]
 //                                    [--charter-scale X]                    (BL-1032)
 //                                    [--resource-cap on|off]                (BL-1039: the two
 //                                     legacy cap rules on a synthetic budget, for their digests)
@@ -368,6 +370,9 @@ struct seat_row
 {
     uint32_t  seed          = 0;
     bool      threw         = false;
+    /// BL-1044: corporations carrying is_player after the seat (world.hpp's
+    /// invariant: exactly one).
+    int       players       = 0;
     entity_id seated        = null_entity;
     bool      seated_is_specialist = false;
     bool      floor_unmet   = false;
@@ -581,14 +586,18 @@ void digest_at_seat(const app_start_world& out, const spawn_seat_result& res, wo
 spawn_seat_result build_and_seat(lua_state& lua, uint32_t seed, bool fast,
                                  app_start_world& out, world_digests* dig = nullptr,
                                  const harness_charter_input& charter = {},
-                                 bool digitisation_span = false)
+                                 world_arc arc = world_arc::shipped, bool force_span = false)
 {
-    world_params p = fast ? no_prehistory() : world_params{};
+    // BL-1044: the ARC names the world (harness_params.hpp): the shipped one,
+    // `world_params{}`'s own since the span and the tier run by default, or the
+    // legacy one the BL-1031 pins were taken on (span off, tier off).
+    world_params p = fast ? no_prehistory(arc_params(arc)) : arc_params(arc);
     p.seed = seed;
-    // BL-1042: `--charter-budget stockpile` runs the Digitisation span, so the
-    // shipped path's own stockpile budget has points in it. Off otherwise —
-    // the shipped default, and the world every pin was taken on.
-    p.digitisation_span_enabled = digitisation_span;
+    // BL-1042: `--charter-budget stockpile` runs the Digitisation span on
+    // whatever arc, so the shipped path's own stockpile budget has points in it
+    // (on the legacy arc: span on, tier off — the world BL-1042/BL-1064 measured).
+    if (force_span)
+        p.digitisation_span_enabled = true;
     // app::begin_new_game + app::start_new_game_prelude: config and works, the
     // world, setup_world's writes, load_economy with its era band, the
     // landscape-search WINNER (not the seed candidate — BL-979) and the second
@@ -616,8 +625,12 @@ struct world_digest_pin
     std::uint64_t search, land, settle, seat;
 };
 
-// THE PINS — the sixteen seed-library worlds (docs/generation/seed_library.json,
-// `node tools/session/seed_library.js --seed-list`), in library order.
+// THE LEGACY ARC'S PINS (BL-1044) — the sixteen seed-library worlds
+// (docs/generation/seed_library.json, `node tools/session/seed_library.js
+// --seed-list`), in library order, on the world BL-1031 pinned: the span off and
+// the corridor tier off (`world_arc::legacy`). They are NEVER OVERWRITTEN by the
+// shipped arc (Ben, 2026-09-18); `--arc legacy` keeps them a live check. The
+// shipped arc's rows are `k_shipped_digest_pins` below.
 //
 // PROVENANCE. Taken 2026-09-17 by `player_seed_sweep --digest --seeds
 // 46,28,11,31,40,12,37,13,41,43,32,10,25,38,9,0` (2638 s), built on commit
@@ -650,6 +663,21 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
     {  9u, 0x0E9AD780ACBB9B84ull, 0x7C85420229BFEE4Dull, 0x23DBD6FA7E7D5955ull, 0xA2B82933E77D219Aull },
     {  0u, 0x893B6977B1E9DC1Full, 0x1A24D230FDDF2C7Eull, 0xA392EFF987F374E2ull, 0x8BBEAB8453901456ull },
 };
+
+// THE SHIPPED ARC'S PINS (BL-1044) — the same sixteen library worlds on the
+// world the player is handed since BL-1044: the Digitisation span and BL-1037's
+// tier on, the charter web bought from the world's own stockpile at the ruled
+// prices (NR-910). EMPTY until Ben authorises the re-bless against BL-1044's
+// measurement; taken by `--digest` on the shipped arc, pasted here with their
+// provenance. Until then `--digest-check` on the shipped arc fails every row as
+// unpinned — a missing contract, said out loud.
+const std::vector<world_digest_pin> k_shipped_digest_pins = {
+};
+
+const std::vector<world_digest_pin>& digest_pins(world_arc arc)
+{
+    return arc == world_arc::legacy ? k_world_digest_pins : k_shipped_digest_pins;
+}
 
 // --- BL-1032: the charter-budget seam, driven through the digest modes -------
 //
@@ -1160,11 +1188,12 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
                     search.charter_refused ? "SET (unexpected)" : "clear");
         return;
     }
-    if (mode == charter_mode::stockpile)
+    // `none` reaches here only on the shipped arc, where it IS the stockpile world.
+    if (mode == charter_mode::stockpile || mode == charter_mode::none)
         std::printf("      charter budget stockpile — the Digitisation stockpile (BL-1042): %lld "
                     "points over %zu carved centres; firm price %d, specialist %d firm charters "
                     "(= %lld points), window radius %d, province cap %s, cap rule %s (per-good cap "
-                    "%d, density ceiling %d, guard %d) — PROVISIONAL prices (BL-1044)\n",
+                    "%d, density ceiling %d, guard %d) — the prices ruled (NR-910)\n",
                     static_cast<long long>(budget.total()), budget.points().size(),
                     spend.firm_price_points, spend.specialist_firm_charters,
                     static_cast<long long>(spend.specialist_price_points()), spend.window_radius,
@@ -1215,13 +1244,18 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
     // BOTH halves of a refusal, read separately: the search's flag and the
     // apply's report. Either missing is a finding.
     std::printf("      search: %s%s%s (%d evaluations, %zu path steps)\n",
-                search.charter_refused ? "REFUSED — " : "budget world, roster axis skipped",
+                search.charter_refused     ? "REFUSED — "
+                : search.charter_fell_back ? "NO SPECIALIST affordable (NR-910)"
+                                           : "budget world, roster axis skipped",
                 search.charter_refused ? search.charter_refusal.c_str() : "",
-                search.charter_refused ? "; the no-budget search ran" : "",
+                (search.charter_refused || search.charter_fell_back) ? "; the no-budget search ran" : "",
                 search.evaluations, search.path.size());
     if (rep.refused)
         std::printf("      apply: REFUSED — %s; the legacy calls ran, nothing chartered\n",
                     rep.refusal.c_str());
+    else if (rep.fell_back)
+        std::printf("      apply: FELL BACK — no centre a nation owns affords a specialist (NR-910); "
+                    "the legacy calls ran, nothing chartered\n");
     else
         std::printf("      apply: spent (not refused)\n");
 
@@ -1405,6 +1439,10 @@ std::string stockpile_account_text(const world& w, const stockpile_budget& sb,
         text_appendf(out, "; REJECTED: %s", sb.rejection.c_str());
     else if (!sb.budget.empty())   // BL-1064: the price CHARGED, and where it came from
     {
+        if (rep.fell_back)
+            text_appendf(out, "; NO SPECIALIST affordable: the no-budget world (NR-910)");
+        else if (rep.refused)
+            text_appendf(out, "; spend REFUSED: %s", rep.refusal.c_str());
         if (derived)
             text_appendf(out, "; charged firm price %d, DERIVED (the stock / %lld = %d)",
                          static_cast<int>(charged_firm_price),
@@ -1488,8 +1526,9 @@ void print_stockpile_account(const world& w, const stockpile_budget& sb,
 
 int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                charter_mode mode = charter_mode::none, double charter_scale = 1.0,
-               bool resource_cap = true)
+               bool resource_cap = true, world_arc arc = world_arc::shipped)
 {
+    const std::vector<world_digest_pin>& pins = digest_pins(arc);
     std::printf("player_seed_sweep %s — %zu seeds, the shipped spawn built, settled (%d ticks) "
                 "and seated in app order (BL-1030)\n",
                 check ? "--digest-check" : "--digest", seeds.size(), k_settle_ticks);
@@ -1505,15 +1544,22 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                     ? " — the Digitisation span ON and the shipped path's own stockpile budget "
                       "(BL-1042); its digests are EXPECTED to differ from the pins"
                     : " (an empty budget reaches the seam; the digests must equal the pins)");
+    std::printf("BL-1044. --arc %s: %s\n", world_arc_name(arc),
+                arc == world_arc::legacy
+                    ? "the pre-BL-1044 world (span off, tier off) BL-1031 pinned; its pins are never "
+                      "overwritten"
+                    : "the world the player is handed (the span and the tier on, the stockpile's "
+                      "charter web at the ruled prices)");
     std::printf("BL-1031. FNV-1a 64: D_search the walk; D_land the snapshot as the landscape "
                 "lands; D_settle the snapshot + state_hash after the validation run; D_seat the "
-                "seat + the snapshot after it.\n");
+                "seat + the snapshot after it. Every row also counts the corporations carrying "
+                "is_player after the seat; other than exactly one FAILS the row (world.hpp).\n");
     if (check)
-        std::printf("Checked against %zu pinned rows in this source. A differing row FAILS and "
-                    "names its digest; it is never re-pinned by the change that moved it.\n",
-                    k_world_digest_pins.size());
+        std::printf("Checked against the %s arc's %zu pinned rows in this source. A differing row "
+                    "FAILS and names its digest; it is never re-pinned by the change that moved it.\n",
+                    world_arc_name(arc), pins.size());
     std::printf("\nseed  D_search          D_land            D_settle          D_seat            "
-                "snapshot MB land/settle/seat%s\n", check ? "  verdict" : "");
+                "snapshot MB land/settle/seat  players%s\n", check ? "  verdict" : "");
     std::fflush(stdout);
 
     int failed = 0, threw = 0, passed = 0, unbalanced_rows = 0;
@@ -1543,7 +1589,7 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                 // process exactly as the none row is, and freed before the budget
                 // world is built.
                 const auto legacy = std::make_unique<app_start_world>();
-                world_params lp{};
+                world_params lp = arc_params(arc);
                 lp.seed = seed;
                 build_app_start_world(lua, lp, *legacy);
                 legacy_specialists = legacy->land.specialists.size();
@@ -1572,8 +1618,8 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
             // the mirror builds the stockpile's; every mode takes the report.
             charter.report = &report;
             start = std::make_unique<app_start_world>();
-            build_and_seat(lua, seed, /*fast=*/false, *start, &got[i], charter,
-                           /*digitisation_span=*/mode == charter_mode::stockpile);
+            build_and_seat(lua, seed, /*fast=*/false, *start, &got[i], charter, arc,
+                           /*force_span=*/mode == charter_mode::stockpile);
             if (start->land.stockpile_path)
                 budget = start->land.stockpile.budget;   // the budget the shipped path passed
             ok[i] = true;
@@ -1607,24 +1653,44 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
         if (start->land.stockpile_path)
         {
             unbalanced += stockpile_account_failure(start->land.stockpile, report);
-            if (mode == charter_mode::none && start->land.stockpile.points_total != 0)
+            if (mode == charter_mode::none && arc == world_arc::legacy
+                && start->land.stockpile.points_total != 0)
                 unbalanced += " the span is off but the stockpile holds points;";
-            if (mode == charter_mode::stockpile && budget.empty())
-                unbalanced += " the span is on but the stockpile budget is EMPTY (R7 needs a "
-                              "non-empty budget);";
+            if ((mode == charter_mode::stockpile
+                 || (mode == charter_mode::none && arc == world_arc::shipped))
+                && budget.empty())
+                unbalanced += " the span is on but the stockpile budget is EMPTY (a span world "
+                              "needs a non-empty budget);";
+        }
+        // BL-1044 — THE ONE-is_player INVARIANT (world.hpp), counted after the
+        // seat. Other than exactly one fails the row in both modes.
+        int players = 0;
+        for (const auto& kv : start->w.corporations)
+            if (kv.second.is_player)
+                ++players;
+        std::printf("  players %d%s", players,
+                    report.fell_back ? "  FELL BACK (no specialist affordable: the no-budget world, NR-910)"
+                    : report.refused ? "  spend REFUSED" : "");
+        if (players != 1)
+        {
+            char buf[96];
+            std::snprintf(buf, sizeof buf, " ONE-is_player INVARIANT BROKEN (%d players);", players);
+            unbalanced += buf;
         }
         if (!unbalanced.empty())
             ++unbalanced_rows;
         if (check)
         {
             const world_digest_pin* pin = nullptr;
-            for (const world_digest_pin& p : k_world_digest_pins)
+            for (const world_digest_pin& p : pins)
                 if (p.seed == seed)
                     pin = &p;
             if (pin == nullptr)
             {
                 ++failed;
-                std::printf("  FAIL no pinned row for this seed\n");
+                std::printf("  FAIL no pinned row for this seed on the %s arc%s\n", world_arc_name(arc),
+                            pins.empty() ? " (its pin table is empty: take it with --digest once the "
+                                           "re-bless is authorised)" : "");
             }
             else
             {
@@ -1649,11 +1715,12 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                                          || !report.charters.empty();
                 if (mode == charter_mode::refused && !(search_refused && report.refused))
                     diffs += " REFUSAL-FLAG (the search or the apply did not report the refusal)";
-                // BL-1042 fix round: `none` too — every pinned world is span
-                // off, so the shipped path's stockpile budget is empty there
-                // and must raise no flag and write no report either.
+                // BL-1042 fix round: `none` too ON THE LEGACY ARC — its worlds
+                // are span off, so the shipped path's stockpile budget is empty
+                // there and must raise no flag and write no report either. On
+                // the shipped arc `none` IS the stockpile world, and reports.
                 if ((mode == charter_mode::empty || mode == charter_mode::zero
-                     || mode == charter_mode::none)
+                     || (mode == charter_mode::none && arc == world_arc::legacy))
                     && (search_refused || report_written))
                     diffs += " EMPTY-FLAG (an empty budget raised the refusal or wrote a report)";
                 if (!unbalanced.empty())
@@ -1677,7 +1744,7 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
         if (start->land.stockpile_path)
             print_stockpile_account(start->w, start->land.stockpile, report,
                                     start->land.stockpile_spend.firm_price_points);
-        if (mode != charter_mode::none)
+        if (mode != charter_mode::none || arc == world_arc::shipped)
             print_charter_report(start->w, mode, budget,
                                  start->land.stockpile_path ? start->land.stockpile_spend : charter.spend,
                                  report, start->land.search,
@@ -1703,13 +1770,13 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
     // Coverage (cold review, 2026-09-17): a run over a subset of the pinned seeds
     // is a quick check, not the proof. Only full coverage prints PASS and exits 0.
     std::size_t covered = 0;
-    for (const world_digest_pin& p : k_world_digest_pins)
+    for (const world_digest_pin& p : pins)
         for (uint32_t s : seeds)
             if (s == p.seed) { ++covered; break; }
     const bool clean   = failed == 0 && threw == 0 && passed > 0;
-    const bool full    = covered == k_world_digest_pins.size();
-    std::printf("\n%d/%zu rows PASS, %d FAIL, %d threw; %zu of %zu pinned seeds checked\n%s\n",
-                passed, seeds.size(), failed, threw, covered, k_world_digest_pins.size(),
+    const bool full    = !pins.empty() && covered == pins.size();
+    std::printf("\n%d/%zu rows PASS, %d FAIL, %d threw; %zu of %zu pinned seeds checked (%s arc)\n%s\n",
+                passed, seeds.size(), failed, threw, covered, pins.size(), world_arc_name(arc),
                 !clean ? "DIGEST CHECK FAILED"
                        : full ? "DIGEST CHECK PASS"
                               : "DIGEST CHECK PARTIAL - the rows checked pass, but pinned seeds were left out");
@@ -2045,6 +2112,9 @@ struct cost_row
     bool        balanced = true;
     std::string balance_fail;   ///< every broken clause (charter_balance_failure); empty = balanced
     bool        refused  = false;
+    /// NR-910: the budget opened no specialist, so the no-budget world was laid
+    /// (its specialists are the legacy roster, not seats the budget opened).
+    bool        fell_back = false;
     std::array<long long, charter_unspent_reason_count> unspent_by_reason{};
     int         budget_centres = 0;
     int         richest_centre_points = 0;
@@ -2437,11 +2507,15 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
     // The row's own world, from generation — never a copy (see the section note).
     auto run = std::make_unique<app_start_world>();
     {
-        world_params p{};
+        // BL-1044: a span row is the SHIPPED arc (the span and the tier on, as
+        // the player's world); every other row the LEGACY arc (span off, tier
+        // off), so the none row stays the world the pins name. BL-1043's
+        // recorded stage 1 and 2 rows ran the span with the tier OFF; a span
+        // row run after BL-1044 runs it on.
+        world_params p = arc_params(cfg.span ? world_arc::shipped : world_arc::legacy);
         p.seed = seed;
         // BL-1043: the Digitisation span at EPOCH 0 — never epoch_year 1960, the
-        // superseded arc with Exploration off. Off on every other row.
-        p.digitisation_span_enabled = cfg.span;
+        // superseded arc with Exploration off.
         const auto g0 = clk::now();
         build_app_base_world(lua, p, *run);
         row.base_ms = std::chrono::duration<double, std::milli>(clk::now() - g0).count();
@@ -2511,6 +2585,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
             row.specialist_price_points = static_cast<long long>(spend.specialist_price_points());
         }
         row.refused         = report.refused;
+        row.fell_back       = report.fell_back;
         row.points_budgeted = report.points_budgeted;
         row.points_spent    = report.points_spent;
         row.points_unspent  = report.points_unspent;
@@ -2973,12 +3048,12 @@ void write_cost_json(const std::string& path, const cost_options& opt,
             {
                 std::fprintf(f, ",\n          \"budget\": { \"points_budgeted\": %lld, \"points_spent\": %lld, "
                                 "\"points_unspent\": %lld, \"balanced\": %s, \"balance_fail\": \"%s\", "
-                                "\"refused\": %s, "
+                                "\"refused\": %s, \"fell_back\": %s, "
                                 "\"centres\": %d, \"richest_centre_points\": %d, "
                                 "\"centres_affording_specialist\": %d, \"unspent_by_reason\": {",
                              r.points_budgeted, r.points_spent, r.points_unspent, b(r.balanced),
                              json_escape(r.balance_fail).c_str(),
-                             b(r.refused), r.budget_centres, r.richest_centre_points,
+                             b(r.refused), b(r.fell_back), r.budget_centres, r.richest_centre_points,
                              r.centres_affording_specialist);
                 for (int i = 0; i < charter_unspent_reason_count; ++i)
                     std::fprintf(f, "%s\"%s\": %lld", i ? ", " : " ",
@@ -3232,7 +3307,8 @@ void print_cost_table_header(const cost_options& opt)
                     "with density | shortlist, trailing net over it, negative share | evalsDue = "
                     "strategic evals due per live tick (count), NOT a cost. ceil = unspent as "
                     "density_ceiling; late = late_shortfall, refsd = refused, share = "
-                    "share_unplaced — the ten reason columns sum to the row's unspent total. Under "
+                    "share_unplaced, nospec = no_specialist (NR-910) — the eleven reason columns sum "
+                    "to the row's unspent total. Under "
                     "each stockpile row: the rule line, one line per body (B on firms, G, B_ref, "
                     "per-good cap, firms PER GOOD, the turn's spread), the at-land checks, the "
                     "seat, then the stockpile's OWN point account (carve_dropped is the "
@@ -3240,10 +3316,10 @@ void print_cost_table_header(const cost_options& opt)
                     "opening capital, the chartered good against the extracted one, the "
                     "density-follows-cities reading and the tick ratio with its phase split.\n",
                     prices.c_str(), ms.c_str());
-        std::printf("  %-52s %7s %3s %8s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
+        std::printf("  %-52s %7s %3s %8s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
                     "%11s | %9s | %5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
                     "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window",
-                    "body", "ceil", "remain", "nonat", "late", "refsd", "share", "anyS", "natSh",
+                    "body", "ceil", "remain", "nonat", "late", "refsd", "share", "nospec", "anyS", "natSh",
                     "hold in/out", "corps/bg", "evals", "seed_ms", "prop_ms", "val med/mean",
                     "live med/mean", "short", "trail8 min/med/max", "neg%", "evalsDue");
         return;
@@ -3272,17 +3348,18 @@ void print_cost_table_header(const cost_options& opt)
                 "(count) — NOT a cost: BL-398 bounds counsel's export and evaluation to the one "
                 "open-channel corporation per tick, so only its sort and channel walk follow density. "
                 "BL-1039: ceil = unspent as density_ceiling; BL-1060: late = late_shortfall, refsd = "
-                "refused, share = share_unplaced (NR-905) — the ten reason columns sum to the row's "
-                "unspent total; under each budget row, the rule line "
+                "refused, share = share_unplaced (NR-905), nospec = no_specialist (NR-910) — the "
+                "eleven reason columns sum to the row's unspent total; under each budget row, the "
+                "rule line "
                 "(per-good cap rule and fill order, ceiling, guard), one line per body (B on firms, "
                 "G, B_ref, per-good cap, firms per good, and under sqrt the turn's spread) and the "
                 "at-land checks, and on every full row the seated corporation's balance and solvent "
                 "flag\n",
                 static_cast<int>(spend.firm_price_points), ladder.c_str());
-    std::printf("  %-52s %3s %3s %4s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
+    std::printf("  %-52s %3s %3s %4s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
                 "%11s | %9s | %5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
                 "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window", "body",
-                "ceil", "remain", "nonat", "late", "refsd", "share", "anyS", "natSh", "hold in/out",
+                "ceil", "remain", "nonat", "late", "refsd", "share", "nospec", "anyS", "natSh", "hold in/out",
                 "corps/bg", "evals",
                 "seed_ms", "prop_ms", "val med/mean", "live med/mean", "short", "trail8 min/med/max",
                 "neg%", "evalsDue");
@@ -3347,17 +3424,17 @@ void print_cost_row(const cost_row& r, bool wide = false)
     std::snprintf(corps, sizeof corps, "%d/%d", r.at_land.corps, r.at_land.background);
     // EVERY reason has a column, so the row sums to its unspent total; a reason
     // appended to the enum must add its column here.
-    static_assert(charter_unspent_reason_count == 10, "a charter_unspent_reason has no cost-table column");
+    static_assert(charter_unspent_reason_count == 11, "a charter_unspent_reason has no cost-table column");
     std::printf(price_fmt, r.label.c_str(), fp, sfc, spts);
     std::printf(" %4zu %5zu | %6lld %6lld %6lld %6lld %6lld %6lld %6lld %6lld %6lld "
-                "%6lld | %4s %5.2f | %11s | %9s | %5d %7.0f %7.0f",
+                "%6lld %6lld | %4s %5.2f | %11s | %9s | %5d %7.0f %7.0f",
                 r.specialists, r.firms,
                 u(charter_unspent_reason::no_gap), u(charter_unspent_reason::province_cap),
                 u(charter_unspent_reason::window_exhausted), u(charter_unspent_reason::body_cap),
                 u(charter_unspent_reason::density_ceiling),
                 u(charter_unspent_reason::remainder), u(charter_unspent_reason::no_nation),
                 u(charter_unspent_reason::late_shortfall), u(charter_unspent_reason::refused),
-                u(charter_unspent_reason::share_unplaced),
+                u(charter_unspent_reason::share_unplaced), u(charter_unspent_reason::no_specialist),
                 r.any_specialist ? "yes" : "NO", r.largest_nation_share, hold, corps,
                 r.evaluations, r.seed_eval_ms, r.proposal_mean_ms);
     if (r.build_only)
@@ -3771,7 +3848,7 @@ void run_stockpile_seed(lua_state& lua, uint32_t seed, const cost_options& opt, 
                                         pf > 0 ? row.stock_to_centres / pf : 0LL);
                         }
                         ++f.stockpile_rows;
-                        if (!row.threw && !row.any_specialist)
+                        if (!row.threw && (!row.any_specialist || row.fell_back))
                         {
                             ++f.rows_without_specialist;
                             if (std::find(f.seeds_without_specialist.begin(),
@@ -4239,7 +4316,7 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
                 legacy.push_back(static_cast<double>(cs.legacy_specialists));
         std::vector<std::string> order;
         std::map<std::string, std::vector<double>> seats, price;
-        std::map<std::string, int> refused;
+        std::map<std::string, int> refused, fell_back;
         for (const cost_seed& cs : results)
             for (const cost_row& r : cs.rows)
             {
@@ -4256,7 +4333,11 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
                 }
                 if (seats.find(r.label) == seats.end() && refused.find(r.label) == refused.end())
                     order.push_back(r.label);
-                seats[r.label].push_back(static_cast<double>(r.specialists));
+                // NR-910: a row that FELL BACK laid the legacy web too, but its
+                // budget opened no seat — so it reads as 0 seats, and is counted.
+                if (r.fell_back)
+                    ++fell_back[r.label];
+                seats[r.label].push_back(r.fell_back ? 0.0 : static_cast<double>(r.specialists));
                 price[r.label].push_back(static_cast<double>(r.firm_price_points));
             }
         if (!legacy.empty())
@@ -4267,10 +4348,13 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
         for (const std::string& label : order)
         {
             const int n_refused = refused.count(label) ? refused[label] : 0;
-            char tail[96] = "";
+            const int n_fell    = fell_back.count(label) ? fell_back[label] : 0;
+            std::string tail_s;
             if (n_refused > 0)
-                std::snprintf(tail, sizeof tail, "; %d REFUSED row(s) excluded (legacy web laid)",
-                              n_refused);
+                tail_s += "; " + std::to_string(n_refused) + " REFUSED row(s) excluded (legacy web laid)";
+            if (n_fell > 0)
+                tail_s += "; " + std::to_string(n_fell) + " row(s) FELL BACK, read as 0 seats (NR-910)";
+            const char* tail = tail_s.c_str();
             if (seats.find(label) == seats.end())
             {
                 std::printf("  %-52s no seat reading%s\n", label.c_str(), tail);
@@ -4328,6 +4412,9 @@ int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
             const auto start = std::make_unique<app_start_world>();
             const spawn_seat_result res = build_and_seat(lua, r.seed, fast, *start);
             const world& w = start->w;
+            for (const auto& kv : w.corporations)
+                if (kv.second.is_player)
+                    ++r.players;
 
             r.seated      = res.seated;
             r.floor_unmet = res.floor_unmet;
@@ -4424,6 +4511,9 @@ int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
                         r.floor_unmet ? "UNMET" : "-",
                         seat_name.c_str(),
                         (r.reproduce_checked && !r.reproduced) ? "   <-- NOT REPRODUCED" : "");
+        if (!r.threw && r.players != 1)
+            std::printf("      <-- ONE-is_player INVARIANT BROKEN: %d corporations carry is_player "
+                        "(world.hpp)\n", r.players);
         std::fflush(stdout);
         rows.push_back(r);
     }
@@ -4432,7 +4522,7 @@ int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
     int done = 0, with_proc = 0, near_pop = 0, both = 0, neither = 0;
     int drawn = 0, drawn_proc = 0, drawn_pop = 0;
     int unmet = 0, non_specialist = 0, unseated = 0, threw = 0;
-    int not_reproduced = 0, reproduce_checked = 0;
+    int not_reproduced = 0, reproduce_checked = 0, invariant_broken = 0;
     int total_short = 0, total_short_proc = 0, total_short_pop = 0, total_spec = 0;
     int total_short_insolvent = 0, total_short_trail_neg = 0, empty_shortlist = 0;
     int total_retired = 0, empty_retired = 0;
@@ -4442,6 +4532,7 @@ int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
     {
         if (r.threw) { ++threw; continue; }
         ++done;
+        if (r.players != 1) ++invariant_broken;
         total_spec  += r.specialists;
         total_short += r.shortlisted;
         total_short_proc += r.shortlisted_with_proc;
@@ -4527,8 +4618,12 @@ int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
                 "  (54.2%%) — i.e. a processor %.1f%% of the time, against %.1f%% here.\n",
                 100.0 - 54.2, pct(with_proc, done));
 
+    std::printf("  the ONE-is_player invariant broken on %d/%d seeds%s\n", invariant_broken, done,
+                invariant_broken ? "   (world.hpp: the charter walk's residual; reported, never patched)"
+                                 : "");
+
     if (!assert_mode)
-        return threw ? 1 : 0;
+        return (threw || invariant_broken) ? 1 : 0;
 
     // --- the guard ----------------------------------------------------------
     auto row = [](const char* id, bool ok, const char* what) {
@@ -4580,6 +4675,14 @@ int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
                   empty_shortlist, done, total_short, total_spec);
     all &= row("S6", done > 0 && empty_shortlist == 0, buf);
 
+    // S7 — BL-1044. The one-is_player invariant (world.hpp), stated where it
+    // binds: a charter walk whose affording centres all found no ground leaves
+    // a world with no player, and nothing patches it — this row notices.
+    std::snprintf(buf, sizeof buf,
+                  "exactly ONE corporation carries is_player after the seat, on every seed "
+                  "(%d/%d seeds break it)", invariant_broken, done);
+    all &= row("S7", done > 0 && invariant_broken == 0, buf);
+
     std::printf("\n%s\n", all ? "ALL PASS" : "FAILURES ABOVE");
     return all ? 0 : 1;
 }
@@ -4610,7 +4713,8 @@ int main(int argc, char** argv)
                     "       %s --guard [seed_count] [--fast] (assert what the seat holds)\n"
                     "       %s --digest       [--seeds a,b,c]  (print the BL-1031 world digests)\n"
                     "       %s --digest-check [--seeds a,b,c]  (fail on any row differing from the pin)\n"
-                    "           both digest modes: [--charter-budget none|empty|zero|synthetic|refused|stockpile] [--charter-scale X]\n"
+                    "           both digest modes: [--arc shipped|legacy] (BL-1044; none defaults to shipped, every other mode is legacy)\n"
+                    "                              [--charter-budget none|empty|zero|synthetic|refused|stockpile] [--charter-scale X]\n"
                     "       %s --charter-cost [--seeds a,b,c] [--budget-scales 1,2,4] [--resource-cap on|off|both]\n"
                     "                         [--province-cap on|off|both] [--specialist-prices 4,8]\n"
                     "                         [--ladder-scales 2|all] [--no-extra] [--no-forced]\n"
@@ -4696,12 +4800,27 @@ int main(int argc, char** argv)
             return 2;
         }
         // BL-1032: `--charter-budget none|empty|zero|synthetic|refused|stockpile`, `--charter-scale X`.
+        // BL-1044: `--arc shipped|legacy`.
         charter_mode mode  = charter_mode::none;
         double       scale = 1.0;
         bool         rcap  = true;
+        bool         arc_given = false;
+        world_arc    arc   = world_arc::shipped;
         for (int a = 2; a < argc; ++a)
         {
             const std::string arg = argv[a];
+            if (arg == "--arc")
+            {
+                const std::string v = (a + 1 < argc) ? argv[++a] : "";
+                if (v != "shipped" && v != "legacy")
+                {
+                    std::printf("--arc: needs shipped|legacy\n");
+                    return 2;
+                }
+                arc       = v == "legacy" ? world_arc::legacy : world_arc::shipped;
+                arc_given = true;
+                continue;
+            }
             if (arg == "--resource-cap")
             {
                 if (a + 1 >= argc || (std::string(argv[a + 1]) != "on"
@@ -4748,7 +4867,22 @@ int main(int argc, char** argv)
                 }
             }
         }
-        return run_digest(seeds, lua, check_mode, mode, scale, rcap);
+        // BL-1044 — THE ARC. `none` checks the world the player is handed (the
+        // shipped arc) unless told otherwise. Every other mode hands the seam a
+        // budget of its own and is checked against the LEGACY pins, so it runs
+        // the legacy arc — on the shipped arc an instrument budget would replace
+        // the stockpile and build a world nobody pins.
+        if (mode != charter_mode::none)
+        {
+            if (arc_given && arc == world_arc::shipped)
+            {
+                std::printf("--charter-budget %s checks the budget seam against the LEGACY pins: "
+                            "run it with --arc legacy (or omit --arc)\n", charter_mode_name(mode));
+                return 2;
+            }
+            arc = world_arc::legacy;
+        }
+        return run_digest(seeds, lua, check_mode, mode, scale, rcap, arc);
     }
 
     // BL-1033 cost mode. The shipped spawn only, like the digest modes, and for

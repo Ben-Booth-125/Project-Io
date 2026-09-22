@@ -1350,7 +1350,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // Exploration ran (Ben, 2026-09-18) -- never on an epoch test
                 // of its own; on the superseded arc (epoch >= 1700) Exploration
                 // is off and this never opens. Its own gates are the switch
-                // (default off until BL-1044) and `stop_after_exploration`,
+                // (on by default since BL-1044) and `stop_after_exploration`,
                 // which must stop BEFORE this span: that knob's own return
                 // sits below population centres, past this call, so it is
                 // read here -- the Exploration round's launch, exploration_

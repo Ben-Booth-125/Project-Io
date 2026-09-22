@@ -28,6 +28,40 @@ inline world_params no_prehistory(world_params p = {})
 }
 
 // ---------------------------------------------------------------------------
+// The two arcs (BL-1044)
+// ---------------------------------------------------------------------------
+// BL-1044 turned the Digitisation span and BL-1037's corridor tier ON by
+// default, so `world_params{}` is the SHIPPED world: the 1960 close, and the
+// charter web the world's own stockpile buys. The world before it — span off,
+// tier off — is the LEGACY arc: the world BL-1031's digest pins were taken on,
+// kept buildable so those pins stay a live check rather than a record (Ben,
+// 2026-09-18: "the BL-1031 pins stay as legacy rows and are never overwritten").
+// A harness names its arc here instead of flipping the two switches itself, so
+// "legacy" means one world everywhere.
+enum class world_arc
+{
+    shipped, ///< `world_params{}`'s own: the span and the tier on (BL-1044)
+    legacy,  ///< the pre-BL-1044 world: the span off, the tier off
+};
+
+inline const char* world_arc_name(world_arc a)
+{
+    return a == world_arc::legacy ? "legacy" : "shipped";
+}
+
+/// @p p (default `world_params{}`) on @p a's arc. The shipped arc changes
+/// nothing; the legacy arc switches the span and the tier off.
+inline world_params arc_params(world_arc a, world_params p = {})
+{
+    if (a == world_arc::legacy)
+    {
+        p.digitisation_span_enabled  = false;
+        p.resume_seeds_corridor_tier = false;
+    }
+    return p;
+}
+
+// ---------------------------------------------------------------------------
 // Shared generation-config helper (2026-08-26, NR-686's sibling defect)
 // ---------------------------------------------------------------------------
 // `make_hard_coded_world`'s `gen_cfg` parameter defaults to the C++ fallback,
@@ -101,9 +135,10 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 /// builds the world's own stockpile budget (`build_stockpile_budget`, charged at
 /// `stockpile_charter_spend`) and passes it to BOTH the search and the winner's
 /// apply, and `apply_shipped_landscape` does exactly that when this is null.
-/// With the Digitisation span off (the shipped default) that budget is EMPTY,
-/// and an empty budget is today's world byte for byte. A non-null budget (even
-/// an empty one) is an instrument's own, and REPLACES the stockpile.
+/// The Digitisation span runs by default (BL-1044), so that budget is the
+/// world's own; on a world the span did not run on (the legacy arc) it is EMPTY,
+/// and an empty budget is the pre-budget world byte for byte. A non-null budget
+/// (even an empty one) is an instrument's own, and REPLACES the stockpile.
 struct harness_charter_input
 {
     const charter_budget* budget = nullptr;
@@ -205,8 +240,10 @@ inline shipped_landscape apply_shipped_landscape(
     // world's own stockpile (`build_stockpile_budget`) at the stockpile spend,
     // unless an instrument handed in a budget of its own. ONE budget and ONE
     // spend reach BOTH the search and the winner's apply below, and the budget
-    // lives in `out` so it outlives the search. With the span off the stockpile
-    // is empty, the search is today's, and the apply's legacy branch runs first.
+    // lives in `out` so it outlives the search. With the span off (the legacy
+    // arc) the stockpile is empty, the search is the pre-budget one, and the
+    // apply's legacy branch runs first; a budget that opens no specialist falls
+    // back the same way inside world/* (NR-910).
     const charter_budget* budget = charter.budget;
     charter_spend_params  spend  = charter.spend;
     if (budget == nullptr)

@@ -114,6 +114,8 @@
 // ---------------------------------------------------------------------------
 
 #include "harness_params.hpp" // apply_shipped_landscape, print_shipped_landscape
+
+#include <optional>
 #include "world/stockpile_budget.hpp" // BL-1042: the budget reading [1] was laid from
 
 #include "scripting/lua_state.hpp"
@@ -566,11 +568,13 @@ struct seed_row
     int64_t sp_unspent[stockpile_unspent_reason_count] = {};
     bool    sp_rejected    = false;
     bool    ch_refused     = false;  ///< the spend params were refused
+    bool    ch_fell_back   = false;  ///< NR-910: no centre afforded a specialist, the no-budget world
     int64_t ch_spent       = 0;
     int64_t ch_unspent     = 0;
     int     ch_specialists = 0;
     int     ch_firms       = 0;
-    /// "budget", "legacy (empty budget)", "REJECTED", "spend REFUSED".
+    /// "budget", "legacy (empty budget)", "REJECTED", "spend REFUSED",
+    /// "no specialist (fell back)" (NR-910).
     const char* budget_world = "legacy (empty budget)";
 
     // --- Reading 1: density follows cities (campaign world) -----------------
@@ -956,7 +960,8 @@ history_sim_params span_params(const history_sim_params& ep, int64_t start, int6
 /// @p span_forces (BL-1040), the Digitisation span's Industry switch and open
 /// year ride along -- inert before the open year, so the run is Exploration's
 /// own until then and plays the span's forces after it.
-run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture, bool tier_seed = false,
+run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture,
+                  std::optional<bool> tier_seed = std::nullopt,
                   const history_sim_params* span_forces = nullptr)
 {
     history_sim_params hp = span_params(fx.exploration_params, fx.exploration_params.start_year, stop);
@@ -965,7 +970,10 @@ run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture
     hp.resume_contacts  = &fx.pre_exploration_contacts;
     hp.resume_corridors = &fx.pre_exploration_corridors;
     hp.capture_year     = capture;
-    hp.resume_seeds_corridor_tier = tier_seed; // BL-1037; off unless --resume-tier asks
+    // BL-1037: unset keeps the captured Exploration params' own switch — the
+    // run generation made (on by default since BL-1044); --resume-tier sets it.
+    if (tier_seed.has_value())
+        hp.resume_seeds_corridor_tier = *tier_seed;
     if (span_forces != nullptr)
     {
         hp.industry_tree_enabled = span_forces->industry_tree_enabled;
@@ -993,7 +1001,9 @@ struct resume_spec
     const std::vector<history_corridor>* record  = nullptr; ///< `resume_corridors`
     const std::vector<history_corridor>* live    = nullptr; ///< `resume_live_roads` (oracle) or null
     uint32_t                             seed    = 0;
-    bool                                 tier_seed = false; ///< BL-1037's `resume_seeds_corridor_tier`
+    /// BL-1037's `resume_seeds_corridor_tier`. Unset keeps @p base's own — the
+    /// captured span's switch (on by default since BL-1044); --resume-tier sets it.
+    std::optional<bool>                  tier_seed;
 };
 
 /// R: a second call opened on the handoff struct @p H at its own stop year,
@@ -1015,7 +1025,8 @@ run_out resume(const era_minus_one_fixture& fx, const exploration_output& H, con
     hp.resume_civilisations    = &H.civilisations;
     hp.resume_universal_creeds = &H.universal_creeds;
     hp.capture_year            = capture;
-    hp.resume_seeds_corridor_tier = s.tier_seed;
+    if (s.tier_seed.has_value())
+        hp.resume_seeds_corridor_tier = *s.tier_seed;
     run_out r;
     r.ss.regions = *s.regions;
     r.cs.cultures = H.cultures; // "rebuild creed_state from cultures": the sim reads nothing else of it.
@@ -1231,7 +1242,9 @@ std::vector<std::string> span_params_issues(const history_sim_params& dp, const 
     need(!ep.industry_points_enabled && !ep.industry_survey_inherits_at_founding
              && !ep.industry_fuel_gate_reads_survey,
          "industry points or a ruled survey default (A, B) is on in Exploration's own span");
-    need(!dp.resume_seeds_corridor_tier, "BL-1037's switch is on");
+    need(dp.resume_seeds_corridor_tier == wp.resume_seeds_corridor_tier
+             && ep.resume_seeds_corridor_tier == wp.resume_seeds_corridor_tier,
+         "BL-1037's switch is not the world's (world_params, on by default since BL-1044)");
     need(dseed == digitisation_sim_seed(wp) && dseed != eseed, "the span's seed is not its own fold");
 
     // BL-1053: EVERY EMPIRES-ONLY SETTING IS OFF. The two base checks above
@@ -1414,8 +1427,8 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
 
         // ---- C: the continued run, carrying the span's forces from 1660 -------
         std::fprintf(stderr, "[fidelity] seed %u continued runs\n", seed);
-        const run_out c_one  = continued(fx, one, open, false, &dp);
-        const run_out c_1960 = continued(fx, stop, INT64_MIN, false, &dp);
+        const run_out c_one  = continued(fx, one, open, std::nullopt, &dp);
+        const run_out c_1960 = continued(fx, stop, INT64_MIN, std::nullopt, &dp);
         const history_sim_capture& C = c_one.hs.capture;
 
         // ---- Gate 1: the real resume's opening, and its one round ------------
@@ -1977,7 +1990,7 @@ int run_resume_tier(const std::vector<uint32_t>& seeds, const world_gen_config& 
 
     std::printf("=== digitisation_sim_harness --resume-tier (BL-1037) - a resumed corridor reopens at its rung ===\n");
     std::printf("switch: history_sim_params::resume_seeds_corridor_tier. 1200 = Exploration's own open (Empires\n"
-                "record); 1660 = a resume from the handoff to 1960 (OFF: the shipped handoff; ON: one folded off an\n"
+                "record); 1660 = a resume from the handoff to 1960 (OFF: generation's handoff, the tier off; ON: one folded off an\n"
                 "ON Exploration span). rows = record rows seeded; changed = bought,demoted / refused,promoted;\n"
                 "below/above = opening rung against the record's tier; re-crossed = a rung bought or walked twice\n"
                 "(post roads in brackets); post = the span's own post-road purchases.\n\n");
@@ -1991,6 +2004,13 @@ int run_resume_tier(const std::vector<uint32_t>& seeds, const world_gen_config& 
         std::fprintf(stderr, "[resume-tier] seed %u generating\n", seed);
         world_params wp{};
         wp.seed = seed;
+        // THE OFF WORLD, EXPLICIT (BL-1044): this mode compares BL-1037's switch
+        // off against on, reading generation's own handoff as the OFF side. The
+        // switch runs on by default now, so generation is asked for the world
+        // this mode was written against: the tier off, and the span off (it
+        // reads only Exploration and the 1660 -> 1960 resume it runs itself).
+        wp.resume_seeds_corridor_tier = false;
+        wp.digitisation_span_enabled  = false;
         generation_report     rep;
         era_minus_one_fixture fx;
         (void)make_hard_coded_world(wp, &rep, cfg, /*progress=*/nullptr, &works, &fx);
@@ -2025,6 +2045,7 @@ int run_resume_tier(const std::vector<uint32_t>& seeds, const world_gen_config& 
         off_spec.regions = &H.regions;
         off_spec.record  = &H.surviving_corridors;
         off_spec.seed    = fx.exploration_seed;
+        off_spec.tier_seed = false;
         const boundary_tiers b1660_off =
             measure_boundary(ep, H.surviving_corridors, resume(fx, H, off_spec, 1960, H.stop_year, ep).hs);
         resume_spec on_spec;
@@ -2436,6 +2457,7 @@ int main(int argc, char** argv)
         const char* budget_world = sp.rejected                  ? "REJECTED"
                                  : sp.budget.empty()            ? "legacy (empty budget)"
                                  : charter_rep.refused          ? "spend REFUSED"
+                                 : charter_rep.fell_back        ? "no specialist (fell back)"
                                                                 : "budget";
         {
             long long ch_unspent = 0;
@@ -2494,6 +2516,7 @@ int main(int argc, char** argv)
             row.sp_unspent[k] = sp.unspent[static_cast<std::size_t>(k)];
         row.sp_rejected    = sp.rejected;
         row.ch_refused     = charter_rep.refused;
+        row.ch_fell_back   = charter_rep.fell_back;
         row.ch_spent       = charter_rep.points_spent;
         for (const charter_unspent& u : charter_rep.unspent) row.ch_unspent += u.points;
         row.ch_specialists = static_cast<int>(charter_rep.specialists.size());
@@ -3378,26 +3401,29 @@ int main(int argc, char** argv)
     {
         // BL-1042: the firms are laid by the applied landscape search FROM THE
         // WORLD'S OWN STOCKPILE BUDGET (apply_shipped_landscape, as the app).
-        // With the span off that budget is empty and the web is today's legacy
-        // one; with it on, a world is a budget world only when its budget is
-        // non-empty, accepted and priced. Say which, per world, so a rejected or
-        // empty budget cannot pass for a real one.
-        std::size_t budget_worlds = 0, legacy_worlds = 0, rejected_worlds = 0, refused_worlds = 0;
+        // With the span off that budget is empty and the web is the pre-budget
+        // legacy one; with it on (the default since BL-1044), a world is a
+        // budget world only when its budget is non-empty, accepted, priced and
+        // opens a specialist. Say which, per world, so a rejected, empty or
+        // fallen-back budget cannot pass for a real one.
+        std::size_t budget_worlds = 0, legacy_worlds = 0, rejected_worlds = 0, refused_worlds = 0,
+                    fell_back_worlds = 0;
         for (const seed_row& r : rows)
         {
             const std::string bw = r.budget_world;
             if (bw == "budget") ++budget_worlds;
             else if (bw == "REJECTED") ++rejected_worlds;
             else if (bw == "spend REFUSED") ++refused_worlds;
+            else if (bw == "no specialist (fell back)") ++fell_back_worlds;
             else ++legacy_worlds;
         }
         std::printf("[ 1] Density follows cities - MEASURED on the campaign world built on the %lld close. Firms are\n"
                     "     laid by the applied landscape search from the world's own STOCKPILE charter budget\n"
-                    "     (BL-1042; PROVISIONAL prices, BL-1044): %zu of %zu worlds are BUDGET worlds, %zu legacy (empty\n"
-                    "     budget - no stock, e.g. the span off: the firms are today's web, not the budget's cause),\n"
-                    "     %zu REJECTED, %zu spend REFUSED (both fall back to the legacy web). Per-world accounts are the\n"
-                    "     CHARTER BUDGET lines above.\n", T, budget_worlds, rows.size(), legacy_worlds,
-                    rejected_worlds, refused_worlds);
+                    "     (BL-1042; prices ruled, NR-910): %zu of %zu worlds are BUDGET worlds, %zu legacy (empty\n"
+                    "     budget - no stock, e.g. the span off: the firms are the pre-budget web, not the budget's\n"
+                    "     cause), %zu REJECTED, %zu spend REFUSED, %zu NO SPECIALIST (all three fall back to the legacy\n"
+                    "     web). Per-world accounts are the CHARTER BUDGET lines above.\n", T, budget_worlds, rows.size(),
+                    legacy_worlds, rejected_worlds, refused_worlds, fell_back_worlds);
         std::printf("     firm = a corporation with >= 1 installation clearing against the market (market_for_tile);\n"
                     "     urban population = non-razed centres routed there; good count = distinct goods deposited\n"
                     "     on the catchment's tiles. Spearman rho across one world's markets:\n");
@@ -3937,10 +3963,10 @@ int main(int argc, char** argv)
                     std::fprintf(f, "%s\"%s\": %lld", k ? ", " : "",
                                  stockpile_unspent_reason_name(static_cast<stockpile_unspent_reason>(k)),
                                  (long long)r.sp_unspent[k]);
-                std::fprintf(f, "}, \"charter_refused\": %s, \"charter_spent\": %lld, \"charter_unspent\": %lld, "
-                                "\"charter_specialists\": %d, \"charter_firms\": %d,\n",
-                             r.ch_refused ? "true" : "false", (long long)r.ch_spent, (long long)r.ch_unspent,
-                             r.ch_specialists, r.ch_firms);
+                std::fprintf(f, "}, \"charter_refused\": %s, \"charter_fell_back\": %s, \"charter_spent\": %lld, "
+                                "\"charter_unspent\": %lld, \"charter_specialists\": %d, \"charter_firms\": %d,\n",
+                             r.ch_refused ? "true" : "false", r.ch_fell_back ? "true" : "false",
+                             (long long)r.ch_spent, (long long)r.ch_unspent, r.ch_specialists, r.ch_firms);
                 std::fprintf(f, "   \"markets\": %d, \"markets_urban\": %d, \"corps_on_body\": %d, ",
                              r.markets, r.markets_urban, r.corps_on_body);
                 put_rho("rho_firms_urban", r.rho_firms_urban, ", ");

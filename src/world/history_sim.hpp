@@ -1957,9 +1957,11 @@ struct history_sim_params
     /// close, and the rung above a post road is priced from where the road
     /// really stands.
     ///
-    /// It moves every resumed span, Exploration's included, so it stays off
-    /// until the sprint 45 re-bless turns it on (BL-1044).
-    bool resume_seeds_corridor_tier = false;
+    /// It moves every resumed span, Exploration's included. ON BY DEFAULT
+    /// (BL-1044, the sprint 45 re-bless). Generation takes it from
+    /// `world_params::resume_seeds_corridor_tier` (`exploration_sim_params`);
+    /// this default is what a caller building its own params gets.
+    bool resume_seeds_corridor_tier = true;
 
     /// THE TWO 1200 ANCHORS, EXPLICIT (DIGITISATION.md: "Consolidation and the
     /// near-home cutoff stay anchored at 1200"). Before this item both were

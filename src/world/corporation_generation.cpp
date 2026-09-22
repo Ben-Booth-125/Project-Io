@@ -2623,9 +2623,10 @@ constexpr uint32_t k_charter_salt_player       = 0x2E97A3F1u;
 // exactly as they are for every world without a budget.
 //
 // The per-province cap is the one number still held here. It is the budget
-// path's own constant, NOT a copy that tracks Pass 6's: DIGITISATION.md § 1
-// (PROPOSED, 2026-09-18, not overturned) keeps it at 2 on a budget world until
-// real budgets show whether they concentrate, and it moves only on that reading.
+// path's own constant, NOT a copy that tracks Pass 6's. RULED at 2 on a budget
+// world (Ben, 2026-09-21, NR-910; DIGITISATION.md § 1), read on real budgets:
+// BL-1043 stage 2 found it binding on 7 of 16 library worlds at 650:4, up to
+// 24.6% of one world's budget, and the ruling keeps it there.
 constexpr int k_charter_per_province_firm_cap = 2;
 
 /// A fresh std::mt19937 for one (centre, role): a KEYED draw, the checkpoint
@@ -3161,6 +3162,26 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
                    "the goods could not each keep a share of it (NR-905)";
     }
     return nullptr;
+}
+
+bool charter_budget_affords_specialist(const world& w, const charter_budget& budget,
+                                       const charter_spend_params& spend)
+{
+    const int64_t specialist_price = spend.specialist_price_points();
+    for (const auto& [centre_id, pts] : budget.points())
+    {
+        if (static_cast<int64_t>(pts) < specialist_price)
+            continue;
+        // The walk's own resolution: the centre's tile, and the nation owning
+        // it (a centre without one charters nothing).
+        const auto tile_it = w.population_centre_tile.find(centre_id);
+        if (tile_it == w.population_centre_tile.end() || w.tiles.count(tile_it->second) == 0)
+            continue;
+        const auto own = w.tile_to_nation.find(tile_it->second);
+        if (own != w.tile_to_nation.end() && w.nations.count(own->second) != 0)
+            return true;
+    }
+    return false;
 }
 
 std::vector<entity_id> charter_web_from_budget(world& w,
@@ -3949,8 +3970,12 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     }
 
     // --- the player: a seeded pick among the budget's specialists ------------
-    // With none, nobody is picked and nothing forces one (Ben, 2026-09-17:
-    // the no-specialist world is sprint 45's call).
+    // With none, nobody is picked and nothing forces one. The no-specialist
+    // world (Ben, 2026-09-21, NR-910) never reaches here on the shipped seam:
+    // `apply_landscape_candidate` lays the no-budget world when no centre
+    // affords a specialist. What can still arrive is the RESIDUAL — a centre
+    // afforded one and no specialist found ground — and it is reported here
+    // (`no_specialists`) and counted by the instruments, never patched.
     std::sort(rep.specialists.begin(), rep.specialists.end());
     std::sort(rep.firms.begin(), rep.firms.end());
     std::sort(rep.charters.begin(), rep.charters.end(),
