@@ -278,15 +278,17 @@ against live-play cost. Each knob has one job; a divisor tuned to the seat menu 
 with no knob at all.
 
 **SETTLED (Ben, 2026-09-21, NR-910): the pins.** A specialist costs **two** firm charters. The
-charter count moves in whole charters, which is too coarse to land the anchor on its own — at the
-divisor that runs the legacy world's tick, three charters open a median of about four seats and two
-open about thirteen — so the divisor takes the last step, inside the band live-play cost allows: it
-is the divisor at which the median library world, at two charters, opens the anchor's nine seats:
-580 on the library, where the median world opens nine or ten and none falls back, at about 0.8 of
-the legacy world's tick. **The seat spread is accepted:** the anchor is a
-median, and a world with many cities near the line offers more seats than one whose capital
-towers over the rest — at the pinned price the library runs from two seats to seventy-three.
-That is the world talking, not a menu to be capped. **A world whose budget opens no specialist falls
+charter count moves in whole charters, which is too coarse to land the anchor on its own, so the
+divisor takes the last step, inside the band live-play cost allows: it is **the divisor at which
+the median library world, at two charters, opens the anchor's nine seats**. The rule is read on the
+world that ships (Ben, 2026-09-22, NR-914): **650**, the first divisor at which the median library
+world opens nine and none opens none, at about 0.91 of the legacy world's tick. (Read on a world
+without BL-1037's corridor tier the same rule gave 580; the tier moves every stockpile.) The step
+past it is steep — at 660 the median jumps to thirteen and a half, as a world of near-equal cities
+crosses the price together. **The seat spread is accepted:** the anchor is a median, and a world
+with many cities near the line offers more seats than one whose capital towers over the rest — at
+the pinned price the library runs from four seats to ninety-eight. That is the world talking, not a
+menu to be capped. **A world whose budget opens no specialist falls
 back to the world it would have built with no budget**, exactly as a refused spend does, decided
 from the budget before anything is chartered; above a ratio of about 325 no library world opens
 none. Affording is not placing: a centre that affords a specialist and finds no ground for one

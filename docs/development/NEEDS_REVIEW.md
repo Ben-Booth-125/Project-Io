@@ -334,7 +334,7 @@ NR-910 ruled the RULE — the divisor at which the median library world opens th
 
 > **Recommendation:** A: the ruling is the anchor, and 580 was its reading on a world that no longer ships. The tick at ~640 sits between stage 2's x0.43 (325) and x0.91 (650), inside the band. Take the number off the fine curve (affording, as NR-910 did), and note the placement loss beside it rather than chasing it with the divisor.
 
-> **RESOLVED.** RULED (Ben, 2026-09-22, the Gate 2 form): A — apply the ruled rule to the shipped world: re-pin the divisor to the value the fine seat curve (affording, m = 2, 16 library seeds) gives for a median of nine. The number is pinned by BL-1044 and written into DIGITISATION.md § 1.
+> **RESOLVED.** RULED (Ben, 2026-09-22, the Gate 2 form): A — apply the ruled rule to the shipped world: re-pin the divisor to the value the fine seat curve (affording, m = 2, 16 library seeds) gives for a median of nine. The number is pinned by BL-1044 and written into DIGITISATION.md § 1. PINNED 650 (2026-09-22): the fine shipped seat curve at m = 2 reads median 7.5 / 7.5 / 8 / 8.5 / 8.5 / 9 / 13.5 at d = 600-660 by 10; 650 is the first divisor at nine, none opens zero, spread 4 to 98; its tick near x0.91 legacy (stage 2).
 
 *Files: `src/world/stockpile_budget.hpp`, `docs/generation/DIGITISATION.md`, `tools/verify/stockpile_budget_check.cpp`*
 

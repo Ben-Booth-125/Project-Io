@@ -179,20 +179,23 @@ inline constexpr std::int64_t stockpile_region_keys_max = 1LL << 32;
 /// charters a world's stock buys — its density, and so its tick — and is the
 /// knob set against LIVE-PLAY COST.
 ///
-/// PINNED AT 580 (Ben, 2026-09-21, NR-910). With the specialist at two firm
-/// charters (below), 580 is the divisor at which the median library world opens
-/// the seat-menu anchor's nine seats. Read off the seat curve
-/// (`stockpile_budget_check --seat-curve`, 16 library seeds, m = 2): median
-/// 6.5 / 7 / 8 / 9.5 / 12.5 seats at d = 520 / 540 / 560 / 580 / 600, and 580 is
-/// the smallest divisor measured at which no library world opens none (seed 37:
-/// 0 at 560, 2 at 580). A LARGER ratio d/m is a CHEAPER seat and MORE seats.
-/// The spread is ACCEPTED, not capped — 2 to 73 seats across the library at
-/// 580:2: the anchor is a median, and a world with many near-equal cities crosses
-/// the price together. Live-play cost: the divisor alone sets the tick (BL-1043
-/// stage 2: x0.43 / x0.91 / x1.70 the legacy world at 325:2 / 650:4 / 1300:8),
-/// so 580 runs near x0.8 the legacy tick by interpolation; BL-1044's measurement
-/// reads it on the shipped world.
-inline constexpr std::int64_t k_stockpile_price_divisor = 580;
+/// PINNED AT 650. THE RULE is Ben's (2026-09-21, NR-910): with the specialist at
+/// two firm charters (below), the divisor at which the median library world opens
+/// the seat-menu anchor's nine seats. THE NUMBER is that rule read on the SHIPPED
+/// world (Ben, 2026-09-22, NR-914): 580 was its reading on a seat curve taken
+/// with BL-1037's corridor tier off, and turning the tier on moved every
+/// stockpile (on the shipped world 580:2 opens a median 6.5). The shipped seat
+/// curve (`stockpile_budget_check --seat-curve`, 16 library seeds, m = 2,
+/// centres affording a specialist): median 7.5 / 7.5 / 8 / 8.5 / 8.5 / 9 / 13.5
+/// at d = 600 / 610 / 620 / 630 / 640 / 650 / 660 — 650 is the first divisor at
+/// nine — and no library world opens none anywhere on it. A LARGER ratio d/m is
+/// a CHEAPER seat and MORE seats, and the step at 660 is steep (seed 12 goes 4 ->
+/// 52): worlds with many near-equal cities cross the price together. The spread
+/// is ACCEPTED, not capped (NR-910) — 4 to 98 seats across the library at 650:2:
+/// the anchor is a median. Live-play cost: the divisor alone sets the tick
+/// (BL-1043 stage 2: x0.43 / x0.91 / x1.70 the legacy world at 325 / 650 /
+/// 1300), so 650 runs near x0.91 the legacy tick.
+inline constexpr std::int64_t k_stockpile_price_divisor = 650;
 static_assert(k_stockpile_price_divisor > 0, "the price divisor must be > 0");
 
 /// Build the charter budget from @p w's stockpile, its firm price derived by
