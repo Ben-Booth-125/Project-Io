@@ -514,9 +514,9 @@ int main()
             }
         }
 
-        check(max_abs_err < 0.5, "R7a every nation's starting treasury is its folded polities' 1660 chest through the one per-mille");
+        check(max_abs_err < 0.5, "R7a every nation's starting treasury is its folded polities' chest at the last close (1960 with the span on) through the one per-mille");
         check(pairs > 0 && agree == pairs, "R7b a nation folded from a richer polity starts richer (every pair)");
-        check(richest_expected == richest_actual, "R7c the richest 1660 polity folds into the richest nation");
+        check(richest_expected == richest_actual, "R7c the richest polity at the last close folds into the richest nation");
         check(sorted.size() > 1 && sorted.back() > median && median > floor_v,
               "R7d treasuries spread: the median nation is off the floor and the top is above it");
         check(distinct_garrisons > 1, "R7e garrisons differentiate: more than one garrison size");

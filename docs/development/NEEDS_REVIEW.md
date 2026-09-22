@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*15 entries — 1 open, 14 resolved.*
+*17 entries — 3 open, 14 resolved.*
 
 ---
 
@@ -44,6 +44,37 @@ NR-910 rules the no-specialist world falls back to the no-budget world, 'decided
 > **Recommendation:** C now, with A as the fix if it is ever measured. A is the only option that keeps both the ruling's outcome (the no-budget world) and § 1's placement rule; its cost matters only if the case occurs.
 
 *Files: `src/world/corporation_generation.cpp`, `src/world/landscape_search.cpp`, `src/world/world.hpp`, `docs/generation/DIGITISATION.md`*
+
+### NR-912 — CALL: the treasury credit rate on the 1960 close — the median nation opens near zero, and Pass 7's two scales are stale
+*question · raised 2026-09-22 · from BL-1044 Step 2 (era_world_harness R7 on seed 0; digitisation_sim_harness's setup-diff line on 16 library seeds), main session, 2026-09-22 — the reading BL-1053 (1) left owed.*
+
+With the span on, a nation's opening treasury is its folded polities' chest at the 1960 close x 0.01 per mille (NATION_GENERATION.md § Pass 7). The 1960 chests total 0.62-0.91x the 1660 ones across the library (median ~0.84; seed 0: 2.74B against 3.27B material), as BL-1053 forecast. But the rate's own justification no longer holds on the reference seed, and did not hold at 1660 either: § Pass 7 says 0.01 per mille opens the median nation on ~100 credits (thirteen quarters of levy) and sums the 38 treasuries to ~15,300 with the richest on ~3,800. Measured on seed 0 today: the 38 sum to 31,691 credits, the richest opens on 5,420, and the MEDIAN nation opens on 0.41 — 22 of 38 nations hold under one credit, 14 hold 100 or more. The '~100 for the median' figure read the median POLITY chest (~10M), not the median nation's folded chest (~41k material).
+
+**Why it matters.** The rate is a stated conversion chosen against two scales; the scales are the reason for the number. As measured, most nations open broke and a handful hold a corporate field's cash between them, which is the opposite of 'a reserve, not a hoard' for the median realm. It is also a doc claim that is false today.
+
+- A: keep 0.01 per mille and restate § Pass 7's scales from the shipped world (the sum, the top realm, the median near zero): the skew is history's, and a broke majority is a legible opening.
+- B: keep the rate and give every folded nation a floor (e.g. one quarter's levy), so the median nation is not broke; the top is unchanged.
+- C: re-derive the rate against the median NATION on the shipped world (a larger rate lifts the median and multiplies the top with it).
+
+> **Recommendation:** A, with the restated numbers written into § Pass 7 by BL-1044 — the skew is the world talking, as the seat spread was (NR-910). B is the lever if a broke majority reads badly in play; C scales the hoard with the median and breaks the second scale.
+
+*Files: `docs/generation/NATION_GENERATION.md`, `src/world/nation_generation.hpp`, `tools/verify/era_world_harness.cpp`*
+
+### NR-913 — CALL: density does not follow cities on the shipped world — at 580:2 most centres cannot buy one firm, and ~79% of every stock goes unspent
+*question · raised 2026-09-22 · from BL-1044 Step 2 (digitisation_sim_harness --through 1960, reading 1, 16 library seeds; player_seed_sweep --digest on the shipped arc, the charter accounts), main session, 2026-09-22 — BL-1044's done-when reading.*
+
+BL-1044's done-when reading is 'density follows cities': firm count per market against the catchment's urban population, above its good count (BL-1029's baseline on the legacy web: rho 0.431 against 0.460). On the shipped world at the pins it does not: rho(firms, urban) median 0.138 (p25 0.095, p75 0.177), rho(firms, goods) median 0.167; urban beats goods on 5 of 16 worlds. The cause is in the charter accounts. A firm costs 1/580 of the WHOLE stock, but the stock is split over 5,579 to 15,240 carved centres, so most centres hold less than one firm's price: the median world spends 16.6% of its stock and leaves 78.8% unspent as `remainder` (seed 46: 97.4%, seed 25: 94.7%, seed 32: 56.4%). The web is bought by the few dozen richest centres — 7 to 92 firms a world, median 65, against the legacy web's 81 on every seed — so it cannot track cities across 148 to 538 markets. The cost mode's per-centre reading says the same (seed 46: rho -0.005 over 15,240 centres).
+
+**Why it matters.** It is the phase's own claim (DIGITISATION.md § 1: the budget is the stockpile, not headcount, so density following cities is MEANINGFUL) and BL-1044's done-when. The re-bless would pin a world whose charter web sits in its great cities and nowhere else. Tick cost and the seat menu are separate knobs (NR-908); this is where the points go.
+
+- A: accept — capital concentrates, and firms stand where it did; restate the done-when as 'density follows the richest cities' and re-bless.
+- B: pool what a centre cannot spend: a centre's remainder rolls up (to its region, or its nation's capital) and buys firms there, so the stock is spent rather than stranded; the seat menu is untouched (it reads a centre's own points).
+- C: price a firm off the centres, not the whole stock (e.g. the median centre's budget over a divisor), so a typical city can buy one; the specialist stays m x the whole-stock price. Density rises, and so does the tick — measured against NR-908's live-play band.
+- D: hold the re-bless and re-measure the done-when on a small sweep of B or C first.
+
+> **Recommendation:** D, measuring B first: it spends the stranded points without touching the price rulings (NR-907, NR-908, NR-910) or the seat menu, and its cost is one reading. A is legitimate if Ben reads 'cities' as 'the capitals', but it is a different phase claim than § 1 makes.
+
+*Files: `docs/generation/DIGITISATION.md`, `src/world/corporation_generation.cpp`, `src/world/stockpile_budget.hpp`, `tools/verify/digitisation_sim_harness.cpp`*
 
 ---
 
