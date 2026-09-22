@@ -89,6 +89,12 @@
 // its own section and written per seed as `held_cause` with the facts it
 // was read off (`held_cause_facts`, written for every ran seed).
 //
+//   --arc legacy  BL-1044: build the LEGACY arc — BL-1037's corridor tier OFF
+//                 (world_params::resume_seeds_corridor_tier), the world before
+//                 BL-1044 turned it on (the span never runs here either way).
+//                 A CONTROL: needs --out, so it never overwrites a checked-in
+//                 table. Against the table blessed before BL-1044 it proves the
+//                 fingerprints moved through the tier and nothing else.
 //   --w_want_q=N  BL-953 TUNING ONLY: re-runs the traced span with the want
 //                 lean at N instead of generation's own value. Readings 1, 2,
 //                 4-7 then describe the overridden run; the traced-vs-untraced
@@ -706,6 +712,7 @@ int main(int argc, char** argv)
     int64_t industry_open = 0;       // BL-1038: --industry-open; 0 = the switch stays off.
     bool want_override = false;
     int  want_override_q = 0;
+    bool legacy_arc = false;         // BL-1044: --arc legacy (the tier off)
     std::vector<std::pair<std::string, long long>> param_sets;
     for (int a = 1; a < argc; ++a)
     {
@@ -739,6 +746,13 @@ int main(int argc, char** argv)
         if (std::strcmp(argv[a], "--cost") == 0)
         {
             run_cost = true;
+            continue;
+        }
+        if (std::strcmp(argv[a], "--arc") == 0 && a + 1 < argc)
+        {
+            const std::string v = argv[++a];
+            if (v != "legacy" && v != "shipped") { std::printf("--arc needs shipped|legacy\n"); std::exit(2); }
+            legacy_arc = v == "legacy";
             continue;
         }
         if (std::strcmp(argv[a], "--industry-open") == 0 && a + 1 < argc)
@@ -785,6 +799,15 @@ int main(int argc, char** argv)
         std::printf("NOTE: --set %s=%lld overrides the traced re-run (tuning only).\n",
                     kv.first.c_str(), kv.second);
     if (!param_sets.empty()) { want_override = true; want_override_q = -1; }
+    if (legacy_arc)
+    {
+        if (out_path.empty())
+        {
+            std::printf("--arc legacy needs --out: it is a control, and must not overwrite a checked-in table\n");
+            std::exit(2);
+        }
+        std::printf("NOTE: --arc legacy — BL-1037's corridor tier OFF, the world before BL-1044.\n");
+    }
     if (want_override && want_override_q >= 0)
         std::printf("NOTE: --w_want_q=%d overrides the traced re-run's want lean (tuning only).\n",
                     want_override_q);
@@ -821,6 +844,8 @@ int main(int argc, char** argv)
         wp.seed = seed;
         wp.exploration_sim_enabled = true; // BL-937: the whole point of this sweep.
         wp.exploration_stop_year   = through_year; // BL-1027: 1660 unless --through.
+        if (legacy_arc)
+            wp.resume_seeds_corridor_tier = false;  // BL-1044: the pre-BL-1044 tier
 
         generation_report     rep;
         era_minus_one_fixture fx;
