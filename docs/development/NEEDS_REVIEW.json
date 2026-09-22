@@ -357,7 +357,7 @@
    "title": "CALL: the no-specialist residual — a budget that affords a specialist but places none leaves no player",
    "raised": "2026-09-22",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Building BL-1044 (Beat 1 ships), T4, main session, 2026-09-22, reading charter_web_from_budget against NR-910's fallback.",
    "what": "NR-910 rules the no-specialist world falls back to the no-budget world, 'decided from the budget before anything is chartered'. BL-1044 builds exactly that: the search and the apply ask charter_budget_affords_specialist (a centre on a nation's tile whose points cover the specialist) and lay the no-budget world when none does. But affording is not placing. A centre that affords a specialist and finds no ground in either window charters none (corporation_generation.cpp, the walk's 'no ground in either window' branch). If every affording centre does so, the walk ends with no specialist, nobody is picked, spawn_seat finds nobody (spawn_seat.cpp:118), and the world has no player. That cannot be decided before the walk: a poorer centre's specialist competes for ground with richer centres' firms. It is not hypothetical in kind: the seat curve (centres affording, off the budget) matched the charted seats on 74 of 80 stage 2 rows, so on 6 rows placement differed from affording. Whether it ever reaches zero on the library at 580:2 (minimum 2 affording) is what BL-1044's measurement counts.",
    "why_it_matters": "The app would start a campaign with no player corporation. BL-1044 states the invariant where it binds (world.hpp), prints the count on the app's seat line and fails a player_seed_sweep row (and guard S7) that seats other than one, so the case is loud, never silent. What the world should do then is a design call.",
@@ -373,14 +373,14 @@
     "src/world/world.hpp",
     "docs/generation/DIGITISATION.md"
    ],
-   "resolution": null
+   "resolution": "RULED (Ben, 2026-09-22, the Gate 2 form): C — reported and counted, fixed only if measured. No library world hit it in BL-1044 Step 2 (16 of 16 seat one player). Written into DIGITISATION.md § 1 and CORPORATION_GENERATION.md § Pass 1."
   },
   {
    "id": "NR-912",
    "title": "CALL: the treasury credit rate on the 1960 close — the median nation opens near zero, and Pass 7's two scales are stale",
    "raised": "2026-09-22",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1044 Step 2 (era_world_harness R7 on seed 0; digitisation_sim_harness's setup-diff line on 16 library seeds), main session, 2026-09-22 — the reading BL-1053 (1) left owed.",
    "what": "With the span on, a nation's opening treasury is its folded polities' chest at the 1960 close x 0.01 per mille (NATION_GENERATION.md § Pass 7). The 1960 chests total 0.62-0.91x the 1660 ones across the library (median ~0.84; seed 0: 2.74B against 3.27B material), as BL-1053 forecast. But the rate's own justification no longer holds on the reference seed, and did not hold at 1660 either: § Pass 7 says 0.01 per mille opens the median nation on ~100 credits (thirteen quarters of levy) and sums the 38 treasuries to ~15,300 with the richest on ~3,800. Measured on seed 0 today: the 38 sum to 31,691 credits, the richest opens on 5,420, and the MEDIAN nation opens on 0.41 — 22 of 38 nations hold under one credit, 14 hold 100 or more. The '~100 for the median' figure read the median POLITY chest (~10M), not the median nation's folded chest (~41k material).",
    "why_it_matters": "The rate is a stated conversion chosen against two scales; the scales are the reason for the number. As measured, most nations open broke and a handful hold a corporate field's cash between them, which is the opposite of 'a reserve, not a hoard' for the median realm. It is also a doc claim that is false today.",
@@ -395,7 +395,7 @@
     "src/world/nation_generation.hpp",
     "tools/verify/era_world_harness.cpp"
    ],
-   "resolution": null
+   "resolution": "RULED (Ben, 2026-09-22, the Gate 2 form): A — keep 0.01 per mille and restate Pass 7's scales from the shipped world. Written into NATION_GENERATION.md § Pass 7 (median nation 0.41 credits, 22 of 38 under one, 14 at 100+, sum 31,691, richest 5,420 on the reference seed)."
   },
   {
    "id": "NR-913",
@@ -419,14 +419,14 @@
     "src/world/stockpile_budget.hpp",
     "tools/verify/digitisation_sim_harness.cpp"
    ],
-   "resolution": null
+   "resolution": "INTERIM RULING (Ben, 2026-09-22, the Gate 2 form): D — hold the re-bless and measure pooling (option B) first. The adoption call follows the reading."
   },
   {
    "id": "NR-914",
    "title": "CALL: the pinned divisor opens a median 6.5 seats on the shipped world, not the anchor's 9 — the seat curve moved when the tier turned on",
    "raised": "2026-09-22",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1044 Step 2 (player_seed_sweep --digest on the shipped arc; stockpile_budget_check --seat-curve on the shipped world, 16 library seeds), main session, 2026-09-22.",
    "what": "NR-910 ruled the RULE — the divisor at which the median library world opens the anchor's nine seats at two firm charters — and read 580 off a seat curve taken with BL-1037's corridor tier OFF. BL-1044 turns the tier on, and the tier moves every stockpile (it changes Exploration's resume, and so the 1660 handoff the span opens on). On the shipped world at 580:2 the median library world affords 6.5 specialists and seats 6.5 (min 3, max 48; no world falls back, every world seats one player). The shipped curve at m = 2 (median centres affording): 450 4.0 | 500 5.0 | 540 5.5 | 580 6.5 | 620 8.0 | 660 13.5 | 700 14.5 | 800 17.5, none ever zero. So the anchor now sits between 620 and 660; a finer curve (600-660 by 10) is queued to name the number. The step is steep because worlds with many near-equal cities cross together (seed 12: 4 -> 52 between 620 and 660; seed 41: 7 -> 73 between 580 and 620). SEPARATELY, affording is not seating on the rich-city worlds: seeds 31, 40, 32, 38 and 9 afford 37 / 50 / 66 / 61 / 19 and seat 26 / 37 / 48 / 41 / 15 — a poorer centre's specialist finds its window taken by richer centres' firms (window_exhausted, up to 79 centres a world). The seat curve counts affording, so it overstates the menu where it is widest.",
    "why_it_matters": "The re-bless pins the shipped world's digests on whatever divisor ships. Re-pinning after would cost a second re-bless.",
@@ -441,7 +441,7 @@
     "docs/generation/DIGITISATION.md",
     "tools/verify/stockpile_budget_check.cpp"
    ],
-   "resolution": null
+   "resolution": "RULED (Ben, 2026-09-22, the Gate 2 form): A — apply the ruled rule to the shipped world: re-pin the divisor to the value the fine seat curve (affording, m = 2, 16 library seeds) gives for a median of nine. The number is pinned by BL-1044 and written into DIGITISATION.md § 1."
   }
  ]
 }

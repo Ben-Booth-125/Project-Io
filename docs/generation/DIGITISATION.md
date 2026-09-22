@@ -289,7 +289,11 @@ towers over the rest — at the pinned price the library runs from two seats to 
 That is the world talking, not a menu to be capped. **A world whose budget opens no specialist falls
 back to the world it would have built with no budget**, exactly as a refused spend does, decided
 from the budget before anything is chartered; above a ratio of about 325 no library world opens
-none. **The per-province cap stays at 2** on a budget world, and **the square root's base is 8**,
+none. Affording is not placing: a centre that affords a specialist and finds no ground for one
+charters none, so a world whose every affording centre does so opens with no player. **That residual
+is reported and counted, not patched (Ben, 2026-09-22, NR-911)** — the app says so on its seat
+line and the seat sweep fails such a world — and it is fixed only if a library world is ever
+measured there. **The per-province cap stays at 2** on a budget world, and **the square root's base is 8**,
 the legacy per-good cap, so a body at the legacy spend keeps the legacy cap.
 
 **SETTLED (Ben, 2026-09-18, wave 1 form, reversing the same morning's ruling): a budget

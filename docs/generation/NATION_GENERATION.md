@@ -393,23 +393,28 @@ credits. The conversion is a per-mille, and it is named here and nowhere else:
 
 that is, **0.01 per mille — one credit per 100,000 units of material**
 (`nation_params::treasury_credit_per_mille`). Chosen against two scales the campaign already has,
-measured on the reference seed:
+and **kept when the credit moved to the 1960 close (Ben, 2026-09-22, NR-912): the rate stands, and
+the skew below is the history's, not the rate's.** Measured on the reference seed's shipped world:
 
 - **The first quarter's budget.** Every nation's extraction levy (NATIONS.md § 3) is its whole
-  quarterly income at the open; on the reference seed the 38 levies sum to ~284 credits in quarter
-  one, ~7.5 credits per nation. The 1660 median polity chest is ~10 million material, so 0.01 ‰
-  opens the median nation on ~100 credits — about **thirteen quarters (three years) of its own
-  levy**, a reserve, not a hoard. Ten times more (0.1 ‰) would be thirty years of income.
-- **The corporate economy it faces.** Opening corporate cash on the reference seed is ~1,000
-  credits per firm, ~92,000 across the field. At 0.01 ‰ the 38 treasuries sum to ~15,300 credits
-  and the richest realm opens on ~3,800 — four firms' worth, a state that can fund a line or two
+  quarterly income at the open — ~7.5 credits a nation in quarter one when the rate was chosen. The
+  rate was first argued on the median POLITY chest (~10 million material, ~100 credits: thirteen
+  quarters of levy). But a nation opens on its OWN folded chest, and most realms fold small ones:
+  on the reference seed the **median nation opens on 0.41 credits**, 22 of the 38 on under one,
+  and 14 on 100 or more — thirteen quarters of levy and upward. So the reserve is held by the
+  realms that inherited empires' chests, and most realms open on their levy alone. Ten times the
+  rate (0.1 ‰) would lift that median to ~4 credits and multiply every hoard with it.
+- **The corporate economy it faces.** At 0.01 ‰ the reference seed's 38 treasuries sum to
+  **31,691 credits** and the richest realm opens on **5,420** — a state that can fund a line or two
   of its budget (NATIONS.md § 1) without becoming the economy's largest buyer on tick one. At
-  0.1 ‰ the treasuries alone would exceed every firm's cash combined.
+  0.1 ‰ the treasuries alone would sum to ~317,000, an order of magnitude past a corporate field's
+  opening cash.
 
 Garrison sizing (`seed_nation_garrisons`, MILITARY.md § Nation garrisons) reads the result and
-differentiates on it: the reference seed's poorest realms hold the 20-head floor, its median ~25,
-its richest the 200-head ceiling. The spread is log-heavy because the 1660 chests are — a
-consequence of the span's own endowment and trade income, not a distribution authored here.
+differentiates on it: the reference seed's poorest realms — the median among them — hold the
+20-head floor, its richest the 200-head ceiling. The spread is log-heavy because the chests at the
+close are — a consequence of the spans' own endowment and trade income, not a distribution
+authored here.
 
 **What this pass is not.** It is not a mint inside the campaign: it runs once, at world creation,
 as the fold of a stock the history already held, on the same footing as a corporation's opening
