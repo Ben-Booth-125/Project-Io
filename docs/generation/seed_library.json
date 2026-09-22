@@ -114,12 +114,12 @@
    },
    "fingerprint": {
     "empire_battles": 19204,
-    "expl_battles": 1934,
-    "flows": 82,
-    "treasury_median": 281,
-    "living_polities": 95
+    "expl_battles": 1850,
+    "flows": 84,
+    "treasury_median": 277,
+    "living_polities": 98
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-09-22"
   },
   {
    "seed": 31,
@@ -146,12 +146,12 @@
    },
    "fingerprint": {
     "empire_battles": 17842,
-    "expl_battles": 1875,
-    "flows": 94,
-    "treasury_median": 50397,
-    "living_polities": 77
+    "expl_battles": 1755,
+    "flows": 100,
+    "treasury_median": 312068,
+    "living_polities": 78
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-09-22"
   },
   {
    "seed": 40,
@@ -244,12 +244,12 @@
    },
    "fingerprint": {
     "empire_battles": 12181,
-    "expl_battles": 920,
-    "flows": 65,
-    "treasury_median": 164,
-    "living_polities": 65
+    "expl_battles": 950,
+    "flows": 72,
+    "treasury_median": 282,
+    "living_polities": 64
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-09-22"
   },
   {
    "seed": 13,
@@ -308,12 +308,12 @@
    },
    "fingerprint": {
     "empire_battles": 7329,
-    "expl_battles": 264,
+    "expl_battles": 161,
     "flows": 51,
     "treasury_median": 281,
     "living_polities": 45
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-09-22"
   },
   {
    "seed": 43,
@@ -406,12 +406,12 @@
    },
    "fingerprint": {
     "empire_battles": 11148,
-    "expl_battles": 461,
-    "flows": 58,
-    "treasury_median": 144250,
+    "expl_battles": 458,
+    "flows": 57,
+    "treasury_median": 361521,
     "living_polities": 58
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-09-22"
   },
   {
    "seed": 25,
@@ -439,12 +439,12 @@
    },
    "fingerprint": {
     "empire_battles": 18776,
-    "expl_battles": 629,
-    "flows": 75,
-    "treasury_median": 380,
-    "living_polities": 75
+    "expl_battles": 613,
+    "flows": 72,
+    "treasury_median": 477,
+    "living_polities": 73
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-09-22"
   },
   {
    "seed": 38,
