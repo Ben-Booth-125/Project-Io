@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*17 entries — 3 open, 14 resolved.*
+*18 entries — 4 open, 14 resolved.*
 
 ---
 
@@ -75,6 +75,21 @@ BL-1044's done-when reading is 'density follows cities': firm count per market a
 > **Recommendation:** D, measuring B first: it spends the stranded points without touching the price rulings (NR-907, NR-908, NR-910) or the seat menu, and its cost is one reading. A is legitimate if Ben reads 'cities' as 'the capitals', but it is a different phase claim than § 1 makes.
 
 *Files: `docs/generation/DIGITISATION.md`, `src/world/corporation_generation.cpp`, `src/world/stockpile_budget.hpp`, `tools/verify/digitisation_sim_harness.cpp`*
+
+### NR-914 — CALL: the pinned divisor opens a median 6.5 seats on the shipped world, not the anchor's 9 — the seat curve moved when the tier turned on
+*question · raised 2026-09-22 · from BL-1044 Step 2 (player_seed_sweep --digest on the shipped arc; stockpile_budget_check --seat-curve on the shipped world, 16 library seeds), main session, 2026-09-22.*
+
+NR-910 ruled the RULE — the divisor at which the median library world opens the anchor's nine seats at two firm charters — and read 580 off a seat curve taken with BL-1037's corridor tier OFF. BL-1044 turns the tier on, and the tier moves every stockpile (it changes Exploration's resume, and so the 1660 handoff the span opens on). On the shipped world at 580:2 the median library world affords 6.5 specialists and seats 6.5 (min 3, max 48; no world falls back, every world seats one player). The shipped curve at m = 2 (median centres affording): 450 4.0 | 500 5.0 | 540 5.5 | 580 6.5 | 620 8.0 | 660 13.5 | 700 14.5 | 800 17.5, none ever zero. So the anchor now sits between 620 and 660; a finer curve (600-660 by 10) is queued to name the number. The step is steep because worlds with many near-equal cities cross together (seed 12: 4 -> 52 between 620 and 660; seed 41: 7 -> 73 between 580 and 620). SEPARATELY, affording is not seating on the rich-city worlds: seeds 31, 40, 32, 38 and 9 afford 37 / 50 / 66 / 61 / 19 and seat 26 / 37 / 48 / 41 / 15 — a poorer centre's specialist finds its window taken by richer centres' firms (window_exhausted, up to 79 centres a world). The seat curve counts affording, so it overstates the menu where it is widest.
+
+**Why it matters.** The re-bless pins the shipped world's digests on whatever divisor ships. Re-pinning after would cost a second re-bless.
+
+- A: apply the ruled rule to the shipped world — re-pin the divisor to the value the fine curve gives for a median of nine at m = 2 (~630-650), measure its tick, then re-bless.
+- B: keep 580 — the seat menu is a median, 6.5 is near the anchor, and the tick is lower.
+- C: re-pin on SEATED rather than affording specialists (the digest run's count), which reads slightly higher divisors on the rich-city worlds.
+
+> **Recommendation:** A: the ruling is the anchor, and 580 was its reading on a world that no longer ships. The tick at ~640 sits between stage 2's x0.43 (325) and x0.91 (650), inside the band. Take the number off the fine curve (affording, as NR-910 did), and note the placement loss beside it rather than chasing it with the divisor.
+
+*Files: `src/world/stockpile_budget.hpp`, `docs/generation/DIGITISATION.md`, `tools/verify/stockpile_budget_check.cpp`*
 
 ---
 
