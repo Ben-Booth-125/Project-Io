@@ -7080,6 +7080,107 @@
      "result_metric": "code-reviewer (cold, no authoring context), two rounds, no build or run. Round 1: no correctness hole in the shipped world/* path, six findings — the cost mode failed every fell-back row, exploration R3b took the tier from the struct default, the search-less paths were silent on a rejected budget, pooling could overflow the walk's int32 books, the launch view framed world-gen's player whom the search replaces (latent since BL-977, on every world under BL-1044), two stale comments. All six fixed (66d7876e). Round 2: all six hold; two residuals — a re-frame had to reset first (the NR-911 residual world would keep the removed player's frame) and the pin provenance cited a DEVLOG entry that did not exist yet — both fixed (31793063). It also closes BL-1043 R7: the cost mode measures the real builder at the stated matrix, and no pinned path moved that should not have."
     }
    ]
+  },
+  {
+   "brief": "pools-per-market",
+   "title": "BL-1003 - Goods pools are keyed per (corp, market), so a build draws, bids and is supplied where it stands",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1003 - sprint 46 (restored 2026-09-23 on Ben's BL-1066 ruling)",
+   "batch": "sprint-46",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: world.hpp, economy_system.cpp",
+      "headless: pools_per_market (new)"
+     ],
+     "requirement": "The goods pool is keyed (corp, market): a building's output enters the pool of market_for_tile(its tile), and its inputs (processing, construction, upkeep) draw that pool and that market's inventory. A body with no market keeps ONE body-level pool, and the market that spawns there absorbs it whole. Labour pools stay (corp, body). The map is renamed so no caller can pass a body where a market is meant by accident.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: economy_system.hpp, market_clearing.cpp",
+      "headless: pools_per_market"
+     ],
+     "requirement": "Wants, purchases, upkeep_wants, auto-surplus and standing orders book at the market the draw or sale happens in. A build's want lands on its own tile's market (BL-1066's probe read demand 0.00 there). market_for_corp_on_body no longer routes any goods flow.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: supply_system.cpp",
+      "headless: pools_per_market",
+      "headless: convoy_command"
+     ],
+     "requirement": "A convoy debits its source market's pool and credits its destination market's pool, so a same-body haul sells at the destination price. The dispatcher sources from (corp, market) pools. A harness hauls a good between two markets on one body and reads the sale at the destination.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: every former corp_body_pools reader",
+      "code: grep"
+     ],
+     "requirement": "Every reader that wanted a body total (UI stockpile rows, header, corp_ai held stock, condition_set, unit-roster gate, acquisition transfer, network and space upkeep suppliers, verify_api) reads a named body-aggregate helper or a specific market by a stated rule. Generation seeds a corp's opening stock into its HQ tile's market pool. No pool is looked up by a body id where a market exists.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "code: world_save.cpp, world.cpp",
+      "headless: world_determinism",
+      "headless: world_copy_determinism"
+     ],
+     "requirement": "Save format: save_game_version moves and the pools round-trip (asserted); the state hash folds the new key in sorted order; world_determinism and world_copy_determinism are bit-identical run to run. Digests MOVE, and are reported old -> new, not re-pinned (the re-bless is Ben's).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: landscape search / player_seed_sweep --digest (one seed)"
+     ],
+     "requirement": "The cost stated in PRODUCTION.md is measured: how many generated firms straddle a catchment line, and whether the landscape search winner still validates.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "headless: BL-1066 probe (Release --verify)"
+     ],
+     "requirement": "The BL-1066 reading re-taken: a military base the player places in its home catchment, and one placed outside it, each read for steel want, arrivals and progress, beside the pre-change trace.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R8",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review of the merged change, fix round included, before the commit.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

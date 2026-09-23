@@ -155,3 +155,19 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
   *OWED before BL-1050 and BL-1044 close: the 650:2 live-play cost row (the tick against legacy and
   setup cost per seed), the ctest suite, the visual suite, and the requirement rows' results. Then
   sprint 45's retro and the sprint 46 cut.*
+
+## Sprint 46 — the generation reaches the game (opened 2026-09-23)
+
+BL-1066 (the player cannot build) opens it, and Ben's rulings on it (2026-09-23) put BL-1003
+(pools per market) first. The cut from `drafts/sprint-46-items.json` follows. Requirement groups:
+`pools-per-market`; BL-1066's gets written when BL-1003 has landed and capacity can be measured.
+
+- [ ] **BL-1003 (pools per market)** — economy-dev in a worktree; main session merges, verifies, cold-reviews. Digest mover: reported, not re-pinned.
+  - [ ] T1 rename the pool map; key (corp, market) with the body-level fallback and absorb-on-spawn (R1).
+  - [ ] T2 production, processing, construction and upkeep draw and deposit at the tile's market; wants, purchases, upkeep_wants key the market (R1, R2).
+  - [ ] T3 clearing: auto-surplus and standing orders per (corp, market); retire market_for_corp_on_body from goods flow (R2).
+  - [ ] T4 convoys: source and destination market pools; the dispatcher's source walk (R3).
+  - [ ] T5 every other reader: a body-aggregate helper or a stated market (R4).
+  - [ ] T6 save format, state hash, the new pools_per_market harness (R1-R3, R5).
+  - [ ] T7 main session: merge, build, world_determinism, the straddle count, the BL-1066 probe re-read, cold review (R5-R8).
+- [ ] **BL-1066 (the player cannot build)** — after BL-1003: price the site multiplier at placement (gate, Build door preview, rival scorer); construction capacity where the player stands (measure first); the fixture places near home and waits out the tech gate.
