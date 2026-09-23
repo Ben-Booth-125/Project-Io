@@ -71,8 +71,10 @@ question, not a memory one.
 - **Another session cut v0.1.24 mid-flight today** (d0d3fa72, 8421c3b4, 20:10). This checkout is
   shared: `git status` before committing, and commit in increments.
 - Keep-awake is a `.ps1` FILE run in the background; its log must say "held".
-- A `player_seed_sweep` peaks ~6 GB and the machine has ~7 GB free — one heavy run at a time, and
-  kill nothing without reading its command line first.
+- A `player_seed_sweep` peaks ~6 GB; the machine now holds three of those (see above). Kill nothing
+  without reading its command line first — and CHECK FOR ORPHANS before starting a suite: three
+  `--verify-all` processes from stopped chains ran beside each other for ten hours on 2026-09-22
+  and made both the ctest and the visual readings worthless.
 - The Release `build_gen` path compiles every world TU; the Debug CTest targets name their Lua TUs
   by hand, and one had gone dark that way since BL-1030 (fixed 2026-09-22, ee7ef3c3). A harness that
   passes under `build_lua_harness.sh` can still fail to LINK under ctest.
