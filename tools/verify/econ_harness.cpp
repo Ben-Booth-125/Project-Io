@@ -522,8 +522,9 @@ int main()
         { corporation_component cc; const entity_id bid = wm.create_entity();
           building_component bld{}; bld.tile = tile_b; wm.buildings[bid] = bld;
           cc.assets.push_back(bid); wm.corporations[corp_b] = cc; }
-        wm.pool_at(corp_a, pool_key_for_body(wm, b)).quantities[ri(resource_type::steel)] = 10.0f;
-        wm.pool_at(corp_b, pool_key_for_body(wm, b)).quantities[ri(resource_type::steel)] = 10.0f;
+        // BL-1003: each corp's stock sits in ITS building's catchment pool.
+        wm.pool_at(corp_a, pool_key_for_tile(wm, tile_a)).quantities[ri(resource_type::steel)] = 10.0f;
+        wm.pool_at(corp_b, pool_key_for_tile(wm, tile_b)).quantities[ri(resource_type::steel)] = 10.0f;
 
         economy_report empty;
         clear_markets(wm, reg, empty);

@@ -530,7 +530,9 @@ anchors a firm's holdings within about a tile of its home region, so most firms 
 catchment, but the landscape search must now score a straddling roster as the logistics problem it
 is. Labour pools stay per `(corp, body)` (`POPULATION.md` § The labour pool) — people commute
 within a body; goods do not teleport within one. A body with no market yet keeps one body-level
-pool until its first building completes and spawns one. The pool key is save-format state.
+pool until its first building completes and spawns one. Goods a corporation holds on a body but
+not at any building — its opening stock — sit in the pool of its HQ tile's market. The pool key is
+save-format state.
 
 1. **Supply** is the goods each corporation lists for sale — its surplus above what its own processors will consume that tick (auto-surplus), plus its standing sell orders.
 2. **Demand** is what processing buildings and construction sites set out to buy this tick (the *want*, net of the corp's own pool — MARKETS.md § Want and fill), plus population and background demand.
@@ -753,8 +755,9 @@ building under construction:
   demand** (competing with population and other builds, bidding the local price up) and pays
   the resolved price for them, plus the same fraction of the flat `build_cost`;
 - progresses at a **rate set by how much of that per-tick material need the local market can
-  supply** — read from, and drained from, the market's real stock (`market_component.inventory`,
-  MARKETS.md § Real market inventory): market supplies the full need → full speed; supplies part
+  supply** — read from, and drained from, the owner's own pool at the site's market first and then
+  the market's real stock (`market_component.inventory`, MARKETS.md § Real market inventory); only
+  what comes off the shelf is bid for and paid for: market supplies the full need → full speed; supplies part
   → **stretched** (up to `max_stretch ≈ 10×` the base duration); supplies less than
   `1/max_stretch` → **paused** until supply recovers.
 

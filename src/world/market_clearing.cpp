@@ -719,8 +719,7 @@ std::vector<unpriced_basket_entry> unpriced_basket_entries(const world& w,
 namespace {
 
 /// The lowest-id market on @p body, or `null_entity` if none — the same stable
-/// pick `supply_system.cpp`'s own `market_for_body` makes (duplicated rather
-/// than shared: that one lives in an anonymous namespace, internal linkage).
+/// pick `pool_key_for_body` makes for a body that has markets.
 entity_id market_for_body(const world& w, entity_id body)
 {
     entity_id best = null_entity;

@@ -405,18 +405,6 @@ bool tile_has_active_port(const world& w, entity_id tile)
     return false;
 }
 
-/// Find the market entity for a given body — the lowest-id one, so the pick is
-/// stable when a body hosts several markets (w.markets is an unordered_map; the
-/// first hit would inherit hash layout). Returns null_entity if none exists.
-entity_id market_for_body(const world& w, entity_id body)
-{
-    entity_id best = null_entity;
-    for (const auto& [mid, mc] : w.markets)
-        if (mc.body == body && (best == null_entity || mid < best))
-            best = mid;
-    return best;
-}
-
 /// Fraction in [0, cap] to discount an intra-body haul cost by — summed over the
 /// population-centre (scale-weighted) and hub (flat) tiles the path crosses, capped.
 /// Deterministic: a pure function of the path tiles and the node sets.

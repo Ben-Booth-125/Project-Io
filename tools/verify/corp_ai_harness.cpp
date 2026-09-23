@@ -496,19 +496,28 @@ int main()
         };
 
         // Goods in the live pools unlock the gated row, and the hire drains
-        // them across bodies in ascending id order (home before hidden) by
-        // exactly the flat axis cost (5, corp_command.cpp's hire_axis_cost).
+        // them across pools in ascending POOL-KEY order (BL-1003: a market id,
+        // or a body id on a market-less body — corp_command.cpp's
+        // debit_from_corp) by exactly the flat axis cost (5, hire_axis_cost).
         {
             scene s = make_scene(1000.0f);
             add_muster_base(s);
-            s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)]   = 3.0f;
-            s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.hidden)).quantities[ri(resource_type::steel)] = 4.0f;
+            const entity_id k_home   = pool_key_for_body(s.w, s.body);
+            const entity_id k_hidden = pool_key_for_body(s.w, s.hidden);
+            s.w.pool_at(s.ai_corp, k_home).quantities[ri(resource_type::steel)]   = 3.0f;
+            s.w.pool_at(s.ai_corp, k_hidden).quantities[ri(resource_type::steel)] = 4.0f;
             const auto r = hire(s, iron_foot);
             check(r == corp_command_result::applied && s.w.units.size() == 1,
                   "BL-352 R4: pooled goods make the gated row hireable through the seam");
-            check(s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] == 0.0f &&
-                  s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.hidden)).quantities[ri(resource_type::steel)] == 2.0f,
-                  "BL-352 R4: the debit drains pools in ascending body order by exactly the cost");
+            // The lower key drains first: 3 from home then 2 of hidden's 4, or
+            // all 4 of hidden then 1 of home's 3.
+            const float home_left   = s.w.pool_at(s.ai_corp, k_home).quantities[ri(resource_type::steel)];
+            const float hidden_left = s.w.pool_at(s.ai_corp, k_hidden).quantities[ri(resource_type::steel)];
+            const bool ordered = (k_home < k_hidden)
+                ? (home_left == 0.0f && hidden_left == 2.0f)
+                : (hidden_left == 0.0f && home_left == 2.0f);
+            check(ordered,
+                  "BL-352 R4: the debit drains pools in ascending pool-key order by exactly the cost");
         }
 
         // No goods anywhere: the gate refuses the row (availability re-check),
