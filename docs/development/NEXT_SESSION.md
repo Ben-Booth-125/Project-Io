@@ -58,6 +58,14 @@ move the divisor the re-bless just pinned.
   then DELETE the file. Every file:line in it predates BL-1042/BL-1044/BL-1050 and must be
   re-checked as each item is filed.
 
+## The machine changed (2026-09-23)
+
+Ben added RAM: **31.2 GB total, ~20 GB free** (it was 15.5 GB, with ~6-7 GB free and one
+`player_seed_sweep` peaking ~6 GB). 16 cores. So the old "one sweep at a time" rule is a MEMORY
+rule that no longer binds — two or three sweeps fit. It is still true that a TIMING row (the cost
+mode, a ctest timeout row) must not share the machine with another run, and that is a CPU-and-cache
+question, not a memory one.
+
 ## Standing hazards, still true
 
 - **Another session cut v0.1.24 mid-flight today** (d0d3fa72, 8421c3b4, 20:10). This checkout is
