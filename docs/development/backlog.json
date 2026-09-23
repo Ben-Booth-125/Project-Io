@@ -855,6 +855,29 @@
     "CMakeLists.txt"
    ],
    "design": "FOUND 2026-09-22 running BL-1044's owed ctest pass. `nmake all` stops at the first failing target, so the suite reads as \"Not Run\" rather than as a broken build, and the breakage hid.\n\nWHAT IS BROKEN. Every harness that builds its world in APP ORDER goes through tools/verify/harness_params.hpp, which includes scripting/lua_state.hpp and calls build_app_base_world — so it needs lua54 AND the Lua TUs the Lua-free world superset excludes (world_gen_config.cpp, works_registry.cpp, recipe_registry.cpp, tech_tree.cpp). The CMake targets name those by hand, one target at a time, and the ones written before harness_params spread do not. Measured tonight, building all 157 CTest targets by name: player_seed_sweep failed on LNK2019 world_gen_config::load_from_lua / works_registry::load_from_lua (fixed at ee7ef3c3, which restored the player_seed_sweep_guard row — the row that now carries the one-player invariant, S7); campaign_lapse, chain_conversion_probe, convoy_cargo_census and others fail on LNK2019 lua_close / luaL_unref, i.e. they do not link lua54 at all. battle_engagement_harness is a separate, older break (a torn-out mercenary symbol, 2026-08-30).\n\nTHE WORK. Take the failing list from the overnight build (scratchpad overnight3/build_failures.txt, or rebuild by name to regenerate it); for each, add lua54 and whichever Lua TUs it pulls, or move it onto a shared helper so the list stops being hand-kept — the hand-kept list is the defect, and DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds is what keeps growing it. Then run the suite and record which rows breach the 60 s default now that the span runs by default (BL-1044: the budget row's generation is a median 53.3 s in Release).\n\nDONE WHEN. Every CTest target builds by name, `ctest --test-dir build` runs every row rather than reporting Not Run, and the rows that legitimately exceed 60 s carry a raised timeout with the reason.\n\nTHE LIST, measured 2026-09-22 by building all 157 CTest test names (14 stops, three classes). (a) DOES NOT LINK LUA (LNK2019 lua_close / luaL_unref), 9: campaign_lapse, chain_conversion_probe, convoy_cargo_census, digitisation_sim_harness, exploration_sweep, history_sweep, material_floor, stockpile_budget_check, world_copy_determinism. (b) DOES NOT COMPILE against the current headers, 3: whole_firm_buyout and battle_engagement_harness read world::mercenary_contracts, retired by NR-885 on 2026-09-17; nation_scorer_harness fails on a missing type. Those are stale harnesses, not a link list — each is a decision to re-point or retire. (c) NOT A TARGET, 1: player_seed_sweep_guard is a ctest TEST name whose target is player_seed_sweep (fixed at ee7ef3c3); the build loop took test names, so a name that is not a target reads as a stop."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-23",
+   "author": "Claude (found running BL-1044's owed visual suite, 2026-09-23)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1066",
+   "short_name": "PLAYER_CANNOT_BUILD",
+   "category": "Economy",
+   "priority": "S",
+   "difficulty": 3,
+   "title": "The player's own construction does not complete on the shipped world: a military base sits unfinished for 100 ticks with 70,000 credits in hand",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/construction.cpp",
+    "src/world/corporation_generation.cpp",
+    "scripts/verify/lib.lua"
+   ],
+   "design": "FOUND 2026-09-23 running BL-1044's owed visual suite: 11 of the 12 script failures share one cause — scripts/verify/lib.lua's shared UI fixture (`raise_player_force`) cannot stage, because the player's military base never completes.\n\nMEASURED on the shipped verify world (Release, --verify, one script at a time, probes in the session scratchpad): the player corp opens on 460.7 credits with 4 buildings; `military_base` is `tech_locked` at tick 0 and PLACEABLE after 12 econ ticks (the gate opens with time); placed then, the base is NOT complete 100 ticks later, while the corp's balance climbs past 70,000. So it is not cash, not the tech gate and not the fixture's 40-tick bound: construction itself does not proceed. The two candidates are the ones BL-709 made construction depend on — CONSTRUCTION CAPACITY on the body (the charter web at the pinned 650:2 lays a median 65 firms over 148-538 markets, and the provisioning step charters yards only where a centre's turn reaches them) and the MATERIALS the build draws from the market.\n\nWHY IT MATTERS BEYOND THE HARNESS. The app's start path lays the same web the verify path now does (NR-909), so this is the world a player is handed: if construction cannot complete, the core loop's first move does not land. The fixture is the messenger, not the subject — and note its error text says 'never completed within 40 ticks', which reads as a slow build rather than a stalled one.\n\nTHE WORK. Read which of capacity or materials is empty at the stall (the construction ledger's own rows, or a probe on `body_construction_demand` / the yard provisioning in the charter walk); then either the web must charter a yard where the player stands, or construction must be able to source capacity across a market, or the opening corp must carry enough to build one. Whichever it is, the reading belongs beside NR-913's density finding: a sparse web is the common cause.\n\nDONE WHEN. On every library seed, the seated player can place AND complete a military base from its opening position within the fixture's bound, and scripts/verify/lib.lua stages on a pristine world (it also needs the tech gate's 12 ticks, which the fixture does not currently wait for)."
   }
  ]
 }
