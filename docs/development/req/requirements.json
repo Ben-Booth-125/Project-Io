@@ -6695,11 +6695,11 @@
    "difficulty": 3,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1043 - sprint 45 (2026-09-20)",
    "batch": "sprint-45",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-09-23",
+   "resolution": "BL-1043 delivered 2026-09-22: stage 1 and stage 2 measured on real stockpiles, the seat curve built as a budget-only instrument, every call ruled (NR-907, NR-908, NR-910) and the divisor re-read on the shipped world at BL-1044 (NR-914).",
    "rows": [
     {
      "id": "R1",
@@ -6765,13 +6765,13 @@
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds the sweep measures what it claims (the real builder, the stated matrix) and no pinned path moved.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "The sprint-wide cold review ran at BL-1044 (code-reviewer, no authoring context, two rounds, 2026-09-22): the cost mode measures the real builder at the stated matrix, and no pinned path moved that should not have. It found one defect in the mode itself — a row that FELL BACK to the no-budget world (NR-910) was still put through check_charter_rules, which has no bodies to check and failed the run — fixed at 66d7876e. Eight findings in all across the two rounds, all fixed."
     }
    ]
   },
@@ -6781,11 +6781,11 @@
    "difficulty": 3,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1050 - sprint 45 (2026-09-20)",
    "batch": "sprint-45",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-09-23",
+   "resolution": "BL-1050 delivered 2026-09-22: seven readers ordered, merged with BL-1044 (6fddf614), re-pinned tick-only under NR-894 and re-checked 16/16 on both arcs.",
    "rows": [
     {
      "id": "R1",
@@ -6851,14 +6851,14 @@
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep --digest-check (main session)",
       "headless: world_determinism"
      ],
      "requirement": "After BL-1044's integration: player_seed_sweep --digest-check 16/16 against the NEW pins, and world_determinism's digests recorded old -> new.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "RE-PINNED by BL-1044 with Ben's Gate 2 authorisation (2026-09-22): the legacy arc's D_settle and D_seat took BL-1050's values on all 16 library seeds, D_search and D_land untouched, old -> new recorded in the DEVLOG; player_seed_sweep --digest-check --arc legacy then passed 16/16 on the integrated tree, and world_copy_determinism --copy-by snapshot passed 16/16 (5383 s)."
     }
    ]
   },
