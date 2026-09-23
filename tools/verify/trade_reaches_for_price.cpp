@@ -7,29 +7,36 @@
 //     net(d) = price_d - haul_per_unit(src -> d)
 //     send to argmax_d net(d)  if  net(d) - price_src > margin x price_src
 //
-// and the quantity is min(surplus, q) less what the corp already has in
-// transit to d, with q = supply_d x ((price_d / landed)^2 - 1) — or d's unmet
-// demand when d has no supply. The buyer-side shortfall scan it replaced
-// never read a price.
+// The quantity is what d can absorb before its UNSMOOTHED target price
+// (price_target: base x sqrt(D / S), band-clamped) falls to the landed cost —
+// S* = D x (base / landed)^2, less last supply S — minus everything already
+// pending into d (every corp's convoys bound there, every corp's stock in d
+// above its reservation); a zero-supply d absorbs its unmet demand instead.
 //
 // Fixture: ONE body, a 64x4 plains grid (columns wrap, so 64 keeps F at
 // column 30 genuinely 30 tiles from A), three markets on row 0 —
 //     A (source) at column 0, N (near) at column 6, F (far) at column 30.
-// The corp's only goods sit in (corp, A). Iron is priced 10 at A.
+// Every market's iron base price is 10; A resolves at 10.
 //
-//   (a) FARTHER AND DEARER BEATS NEARER: N prices 15, F prices 30 — the good
-//       goes to F.
+//   (a) FARTHER AND DEARER BEATS NEARER: N resolves at 15, F at 30 — F.
 //   (b) THE MARGIN: a best net gain under margin x home price moves nothing;
-//       the same world with a smaller margin does move it (so the margin, not
-//       something else, is what held it).
-//   (c) THE QUANTITY: never more than q for a destination with supply; exactly
-//       the unmet demand for one with none; in-transit cargo to d is subtracted.
-//   (d) NO CHURN: several full ticks (dispatch, advance, credit, clear) — every
-//       convoy's destination net price beats its source's price at dispatch.
+//       a smaller margin does move it (so the margin is what held it).
+//   (c) THE QUANTITY: sized from the TARGET price, not the eased market price
+//       (the eased price lags and over-asks every tick); exactly the unmet
+//       demand for a zero-supply destination; cargo in transit — ANY corp's —
+//       and stock already in d are subtracted, so N sellers in one pass do not
+//       each fill the same gap; a filled best destination yields to the
+//       next-best that still beats home.
+//   (d) NO CHURN: several full ticks (advance, credit, dispatch, clear) — every
+//       convoy's destination net price beats its source price at dispatch, and
+//       every convoy leaves A (nothing delivered is re-exported).
 //   (e) A DELIVERY SELLS AT ITS DESTINATION: an exchange row at F, seller = the
 //       corp, for the cargo delivered.
 //   (f) THE RESERVATION: goods the corp's own processor in A needs are not
 //       shipped; only the surplus above it is.
+//   (g) NO RE-EXPORT: a cargo delivered this tick does not move again before
+//       its destination clears, even when prices elsewhere jump — the same
+//       stock DOES move once it is no longer this tick's delivery.
 //
 // The process exits non-zero if any assertion FAILs.
 
@@ -63,6 +70,7 @@ bool near_rel(float a, float b, float rel = 1e-4f)
 }
 
 constexpr std::size_t r_iron = static_cast<std::size_t>(resource_type::iron_ore);
+constexpr float       k_base = 10.0f;
 
 float pool_q(const world& w, entity_id corp, entity_id key, std::size_t r)
 {
@@ -98,11 +106,20 @@ entity_id add_market(scenario& s, int col, float iron_price)
     market_component m{};
     m.body        = s.body;
     m.centre_tile = tile_at(s.w, s.body, col, 0);
-    m.base_price[r_iron] = iron_price;
-    m.price = m.base_price;
+    m.base_price[r_iron] = k_base;
+    m.price[r_iron]      = iron_price;
     s.w.markets[id] = m;
     return id;
 }
+
+/// Last clear's book for iron at `m`, stated so the market's resolved price and
+/// its target agree (D = S x (price / base)^2) unless a row says otherwise.
+void set_book(scenario& s, entity_id m, float supply, float demand)
+{
+    s.w.markets.at(m).supply[r_iron] = supply;
+    s.w.markets.at(m).demand[r_iron] = demand;
+}
+float consistent_demand(float supply, float price) { return supply * (price / k_base) * (price / k_base); }
 
 // pools_per_market.cpp's scaffolding: one plains body, a player-flagged corp
 // (keeps the strategic scorer out — dispatch is one rule for every corp, so
@@ -157,6 +174,17 @@ scenario make_scenario(float price_n, float price_f)
     return s;
 }
 
+/// A second seller: a corp with no buildings, holding `qty` iron in (corp, A).
+entity_id add_seller(scenario& s, float qty)
+{
+    const entity_id c = s.w.create_entity();
+    corporation_component cc;
+    cc.balance = 100000.0f;
+    s.w.corporations[c] = cc;
+    s.w.pool_at(c, s.market_a).quantities[r_iron] = qty;
+    return c;
+}
+
 recipe_registry base_registry()
 {
     recipe_registry reg;
@@ -172,7 +200,7 @@ void dispatch(scenario& s, const recipe_registry& reg)
                      reg.logistics_cost(convoy_mode::space));
 }
 
-/// Per-unit haul from A to `dest`, priced by the SAME shared function the
+/// Per-unit haul from `src` to `dest`, priced by the SAME shared function the
 /// dispatcher uses (cost is linear in quantity).
 float haul_per_unit(scenario& s, const recipe_registry& reg, entity_id src, entity_id dest)
 {
@@ -182,13 +210,22 @@ float haul_per_unit(scenario& s, const recipe_registry& reg, entity_id src, enti
     return leg.viable ? leg.cost : -1.0f;
 }
 
-float cargo_to(const world& w, entity_id corp, entity_id dest)
+float cargo_to(const world& w, entity_id dest)
 {
     float q = 0.0f;
     for (const convoy_component& c : w.convoys)
-        if (c.corp == corp && c.dest_market == dest && c.cargo_resource == resource_type::iron_ore)
+        if (c.dest_market == dest && c.cargo_resource == resource_type::iron_ore)
             q += c.cargo_qty;
     return q;
+}
+
+int convoys_from(const world& w, entity_id src)
+{
+    int n = 0;
+    for (const convoy_component& c : w.convoys)
+        if (c.source_market == src)
+            ++n;
+    return n;
 }
 
 } // namespace
@@ -212,6 +249,9 @@ int main()
         const float hf = haul_per_unit(s, reg, s.market_a, s.market_f);
         std::printf("      haul/unit A->N %.4f, A->F %.4f\n", hn, hf);
         check(hn > 0.0f && hf > hn, "K.3 both legs are viable and F is the costlier haul");
+        check(price_target(k_base, 100.0f, 900.0f, reg.price_band().floor_mult,
+                           reg.price_band().ceil_mult) == 30.0f,
+              "K.4 price_target is the unsmoothed law: base 10, D/S = 9 -> 30");
     }
 
     // -----------------------------------------------------------------------
@@ -222,8 +262,8 @@ int main()
     entity_id a_corp = null_entity, a_f = null_entity;
     {
         scenario s = make_scenario(15.0f, 30.0f);
-        s.w.markets.at(s.market_n).supply[r_iron] = 100.0f;
-        s.w.markets.at(s.market_f).supply[r_iron] = 100.0f;
+        set_book(s, s.market_n, 100.0f, consistent_demand(100.0f, 15.0f));
+        set_book(s, s.market_f, 100.0f, consistent_demand(100.0f, 30.0f));
         s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 1000.0f;
 
         dispatch(s, reg_a);
@@ -235,18 +275,36 @@ int main()
         a_corp  = s.corp;
         a_f     = s.market_f;
 
-        // (c) the quantity against a destination with supply is q, exactly.
+        // (c) the quantity is the room below the target price: S* - S.
         const float haul   = haul_per_unit(s, reg_a, s.market_a, s.market_f);
         const float landed = 10.0f + haul;
-        const float q      = 100.0f * ((30.0f / landed) * (30.0f / landed) - 1.0f);
+        const float s_star = 900.0f * (k_base / landed) * (k_base / landed);
+        const float room   = s_star - 100.0f;
         const float sent   = s.w.convoys.empty() ? 0.0f : s.w.convoys[0].cargo_qty;
-        std::printf("      q = %.3f, sent = %.3f, pool left %.3f\n", q, sent,
+        std::printf("      S* - S = %.3f, sent = %.3f, pool left %.3f\n", room, sent,
                     pool_q(s.w, s.corp, s.market_a, r_iron));
-        check(sent <= q + 1e-2f && near_rel(sent, q),
-              "(c).1 the send to a destination with supply is q = supply x ((p_d/landed)^2 - 1), "
-              "never more");
+        check(sent <= room + 1e-2f && near_rel(sent, room),
+              "(c).1 the send is S* - S with S* = D x (base / landed)^2, never more");
         check(near(pool_q(s.w, s.corp, s.market_a, r_iron), 1000.0f - sent, 1e-2f),
               "(c).2 the source pool is debited exactly the cargo (the rest sells at home)");
+    }
+
+    // (c) OVERSEND: F's eased price still reads 30, but its book (D 400, S 100)
+    // targets 20. The send is sized from the target, not from the lagging 30.
+    {
+        const recipe_registry reg = base_registry();
+        scenario s = make_scenario(10.0f, 30.0f);
+        set_book(s, s.market_f, 100.0f, 400.0f);
+        s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 5000.0f;
+        dispatch(s, reg);
+        const float landed      = 10.0f + haul_per_unit(s, reg, s.market_a, s.market_f);
+        const float by_target   = 400.0f * (k_base / landed) * (k_base / landed) - 100.0f;
+        const float by_eased    = 100.0f * ((30.0f / landed) * (30.0f / landed) - 1.0f);
+        const float sent        = cargo_to(s.w, s.market_f);
+        std::printf("      sized by target %.3f, by eased price %.3f, sent %.3f\n", by_target,
+                    by_eased, sent);
+        check(near_rel(sent, by_target) && sent < by_eased,
+              "(c).1b the send is sized from the UNSMOOTHED target (20), not the eased price (30)");
     }
 
     // -----------------------------------------------------------------------
@@ -255,8 +313,8 @@ int main()
     {
         const recipe_registry reg = base_registry(); // margin 0.05: gate at 10.5 net
         scenario s = make_scenario(10.3f, 10.9f);
-        s.w.markets.at(s.market_n).supply[r_iron] = 100.0f;
-        s.w.markets.at(s.market_f).supply[r_iron] = 100.0f;
+        set_book(s, s.market_n, 100.0f, consistent_demand(100.0f, 10.3f));
+        set_book(s, s.market_f, 100.0f, consistent_demand(100.0f, 10.9f));
         s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 1000.0f;
         const float hf = haul_per_unit(s, reg, s.market_a, s.market_f);
         std::printf("      net F = %.4f vs home 10 (margin gate %.4f)\n", 10.9f - hf,
@@ -276,25 +334,23 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    // (c) zero-supply destination absorbs its unmet demand; in-transit subtracts
+    // (c) zero-supply destination absorbs its unmet demand; pending subtracts
     // -----------------------------------------------------------------------
     {
         const recipe_registry reg = base_registry();
-        scenario s = make_scenario(12.0f, 30.0f);
-        s.w.markets.at(s.market_n).supply[r_iron] = 100.0f;
-        s.w.markets.at(s.market_f).supply[r_iron] = 0.0f;
-        s.w.markets.at(s.market_f).demand[r_iron] = 50.0f;
+        scenario s = make_scenario(10.0f, 30.0f); // N at home's price: never a target
+        set_book(s, s.market_f, 0.0f, 50.0f);
         s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 1000.0f;
 
         dispatch(s, reg);
-        check(near(cargo_to(s.w, s.corp, s.market_f), 50.0f),
+        check(near(cargo_to(s.w, s.market_f), 50.0f),
               "(c).3 a destination with ZERO supply receives exactly its unmet demand (50)");
 
         // The convoy is still on the lane (nothing advanced it). Dispatch again:
         // the gap is already filled by cargo in transit, so nothing more goes.
         const std::size_t before = s.w.convoys.size();
         dispatch(s, reg);
-        check(s.w.convoys.size() == before && near(cargo_to(s.w, s.corp, s.market_f), 50.0f),
+        check(s.w.convoys.size() == before && near(cargo_to(s.w, s.market_f), 50.0f),
               "(c).4 with 50 already in transit to F, a second pass sends F nothing more");
 
         // Widen the gap to 80: the next pass sends only the 30 not yet in transit.
@@ -302,6 +358,51 @@ int main()
         dispatch(s, reg);
         check(s.w.convoys.size() == before + 1 && near(s.w.convoys.back().cargo_qty, 30.0f),
               "(c).5 demand 80 with 50 in transit: the pass sends the missing 30");
+
+        // A HELD convoy's cargo is still committed: it keeps counting.
+        s.w.convoys.front().held = true;
+        dispatch(s, reg);
+        check(s.w.convoys.size() == before + 1 && near(cargo_to(s.w, s.market_f), 80.0f),
+              "(c).5b a held convoy still counts as pending — nothing more goes to F");
+    }
+    {
+        // FLOOD: two sellers in A, one pass, one gap of 50 at F. Every corp's
+        // cargo bound for F counts, including what the first seller committed
+        // earlier in the same pass — so the second sends nothing.
+        const recipe_registry reg = base_registry();
+        scenario s = make_scenario(10.0f, 30.0f);
+        set_book(s, s.market_f, 0.0f, 50.0f);
+        s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 1000.0f;
+        add_seller(s, 1000.0f);
+        dispatch(s, reg);
+        check(s.w.convoys.size() == 1 && near(cargo_to(s.w, s.market_f), 50.0f),
+              "(c).6 two sellers, one pass, one gap of 50: 50 go in total, not 50 each");
+    }
+    {
+        // Stock already sitting in F (another corp's, above its reservation)
+        // lists at F's next clear: it is pending too.
+        const recipe_registry reg = base_registry();
+        scenario s = make_scenario(10.0f, 30.0f);
+        set_book(s, s.market_f, 0.0f, 50.0f);
+        s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 1000.0f;
+        const entity_id other = add_seller(s, 0.0f);
+        s.w.pool_at(other, s.market_f).quantities[r_iron] = 20.0f;
+        dispatch(s, reg);
+        check(near(cargo_to(s.w, s.market_f), 30.0f),
+              "(c).6b 20 of another corp's stock already in F: the send is the other 30");
+    }
+    {
+        // A filled best destination yields to the next-best that beats home.
+        const recipe_registry reg = base_registry();
+        scenario s = make_scenario(15.0f, 30.0f);
+        set_book(s, s.market_n, 100.0f, consistent_demand(100.0f, 15.0f));
+        set_book(s, s.market_f, 0.0f, 50.0f);
+        s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 1000.0f;
+        const entity_id other = add_seller(s, 0.0f);
+        s.w.pool_at(other, s.market_f).quantities[r_iron] = 50.0f; // F is already full
+        dispatch(s, reg);
+        check(s.w.convoys.size() == 1 && s.w.convoys[0].dest_market == s.market_n,
+              "(c).7 F (net best) has no room left, so the cargo goes to N (next best, beats home)");
     }
 
     // -----------------------------------------------------------------------
@@ -310,8 +411,8 @@ int main()
     {
         const recipe_registry reg = base_registry();
         scenario s = make_scenario(15.0f, 30.0f);
-        s.w.markets.at(s.market_n).supply[r_iron] = 100.0f;
-        s.w.markets.at(s.market_f).supply[r_iron] = 100.0f;
+        set_book(s, s.market_n, 100.0f, consistent_demand(100.0f, 15.0f));
+        set_book(s, s.market_f, 100.0f, consistent_demand(100.0f, 30.0f));
 
         std::set<std::uint32_t> seen;
         int  dispatched = 0, bad = 0, from_non_a = 0;
@@ -344,6 +445,11 @@ int main()
                 }
             }
             clear_markets(s.w, reg, economy_report{});
+            // No population lives in this fixture, so the clear sees no demand
+            // and prices fall. The demand a real market would carry is restated
+            // on the book dispatch reads (last clear's), so the loop keeps trading.
+            s.w.markets.at(s.market_n).demand[r_iron] = 225.0f;
+            s.w.markets.at(s.market_f).demand[r_iron] = 900.0f;
         }
         std::printf("      %d convoys over 40 ticks (%d from a pool other than A); "
                     "prices A %.3f N %.3f F %.3f\n",
@@ -353,6 +459,8 @@ int main()
         check(dispatched > 0, "(d).0 fixture: the loop dispatches at all");
         check(bad == 0,
               "(d).1 every convoy's destination net price beats its source price at dispatch");
+        check(from_non_a == 0,
+              "(d).2 every convoy leaves A — no delivered cargo is re-exported");
     }
 
     // -----------------------------------------------------------------------
@@ -392,7 +500,7 @@ int main()
         steel.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
         const std::uint16_t steel_id = reg.add_recipe(steel);
 
-        scenario s = make_scenario(12.0f, 30.0f);
+        scenario s = make_scenario(10.0f, 30.0f);
         const entity_id proc = s.w.create_entity();
         building_component pb{};
         pb.tile               = tile_at(s.w, s.body, 1, 0); // A's catchment
@@ -401,8 +509,7 @@ int main()
         pb.workforce_assigned = 1.0f;
         s.w.buildings[proc] = pb;
         s.w.corporations.at(s.corp).assets.push_back(proc);
-        s.w.markets.at(s.market_f).supply[r_iron] = 0.0f;
-        s.w.markets.at(s.market_f).demand[r_iron] = 1000.0f;
+        set_book(s, s.market_f, 0.0f, 1000.0f);
 
         const float reserve = processor_reservation(s.w, reg, s.corp, s.market_a)[r_iron];
         check(near(reserve, 40.0f), "(f).0 fixture: the processor reserves 40 iron in A");
@@ -416,6 +523,45 @@ int main()
         check(s.w.convoys.size() == 1 && near(s.w.convoys[0].cargo_qty, 60.0f) &&
                   near(pool_q(s.w, s.corp, s.market_a, r_iron), 40.0f),
               "(f).2 a pool of 100 ships only the 60 above the reservation; 40 stays for the processor");
+    }
+
+    // -----------------------------------------------------------------------
+    // (g) a delivery meets its destination's clear before it can move again
+    // -----------------------------------------------------------------------
+    {
+        const recipe_registry reg = base_registry();
+        scenario s = make_scenario(15.0f, 30.0f);
+        set_book(s, s.market_n, 100.0f, consistent_demand(100.0f, 15.0f));
+        set_book(s, s.market_f, 100.0f, consistent_demand(100.0f, 30.0f));
+        s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 1000.0f;
+        dispatch(s, reg);
+        check(s.w.convoys.size() == 1 && s.w.convoys[0].dest_market == s.market_f,
+              "(g).0 fixture: a cargo leaves A for F");
+        const float cargo = s.w.convoys.empty() ? 0.0f : s.w.convoys[0].cargo_qty;
+        for (int i = 0; i < 200 && !s.w.convoys.empty() && !s.w.convoys[0].arrived; ++i)
+            advance_convoys(s.w);
+        credit_arrived_convoys(s.w, 1); // it lands in (corp, F) THIS tick
+
+        // Perturb: N jumps to 35 with deep demand, so F -> N now clears the
+        // margin by a wide gap (F's home price is 30). Under the rule without
+        // the arrival guard, the fresh delivery would ship straight back out.
+        s.w.markets.at(s.market_n).price[r_iron] = 35.0f;
+        set_book(s, s.market_n, 100.0f, 100000.0f);
+        const float f_to_n = 35.0f - haul_per_unit(s, reg, s.market_f, s.market_n);
+        check(near(pool_q(s.w, s.corp, s.market_f, r_iron), cargo, 1e-2f) &&
+                  f_to_n - 30.0f > reg.dispatch_margin() * 30.0f,
+              "(g).1 fixture: the delivery sits in (corp, F) and F -> N now beats F's home price");
+        dispatch(s, reg);
+        check(convoys_from(s.w, s.market_f) == 0 &&
+                  near(pool_q(s.w, s.corp, s.market_f, r_iron), cargo, 1e-2f),
+              "(g).2 this tick's delivery does NOT move again before F clears");
+
+        // Control: the next tick (no arrivals — the transient record resets),
+        // the same stock is ordinary surplus and the same gap does move it.
+        credit_arrived_convoys(s.w, 2);
+        dispatch(s, reg);
+        check(convoys_from(s.w, s.market_f) == 1,
+              "(g).3 control: once it is no longer this tick's delivery, the same gap moves it");
     }
 
     std::printf("\n%s  (%d passed, %d failed)\n", g_fail == 0 ? "ALL PASS" : "FAILURES", g_pass,

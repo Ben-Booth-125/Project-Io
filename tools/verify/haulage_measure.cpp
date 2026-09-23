@@ -539,59 +539,19 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
         }
     };
 
-    // One econ tick in app::step_economy's order, spectating (nobody seated),
-    // with the reading's three looks placed at the seams where each fact exists.
+    // One econ tick in app::step_economy's order (BL-1066/BL-995: advance ->
+    // credit arrivals -> economy -> dispatch -> clear -> budget -> nation ->
+    // tech -> exits), spectating (nobody seated), with the reading's three
+    // looks placed at the seams where each fact exists.
     auto step = [&](int econ_tick, int day_tick, int window) {
         w.current_econ_tick = econ_tick;
         w.current_day_tick  = day_tick;
         lp_pool_map lp;
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space), &lp);
-        adopt_new(window);
         advance_convoys(w);
-        economy_report rep = run_economy_step(w, reg, /*spectating=*/true, &lp);
-        adopt_new(window); // the scorer's own dispatch_convoy verbs (BL-600)
 
-        const std::size_t rows_before = w.exchanges.total;
-        auto flows = clear_markets(w, reg, rep);
-        const std::size_t pushed = w.exchanges.total - rows_before;
-
-        // LOOK 1 — last tick's arrivals meet their first clear.
-        {
-            if (pushed > w.exchanges.size())
-                ++out.ring_overflows;
-            std::map<std::tuple<entity_id, entity_id, std::size_t>, double> sold_by;
-            const std::size_t n = std::min(pushed, w.exchanges.size());
-            for (std::size_t i = w.exchanges.size() - n; i < w.exchanges.size(); ++i)
-            {
-                const exchange_record& e = w.exchanges.oldest_first(i);
-                if (e.seller == null_entity)
-                    continue;
-                sold_by[{e.seller, e.market, static_cast<std::size_t>(e.resource)}] +=
-                    static_cast<double>(e.quantity);
-            }
-            for (cargo_track& t : tracks) // ascending id: the attribution order
-            {
-                if (t.fate != cargo_fate::awaiting_sale)
-                    continue;
-                t.sell_market = arrival_sell_market(w, t);
-                const auto it = sold_by.find({t.corp, t.sell_market, t.r});
-                if (it != sold_by.end())
-                {
-                    t.sold = std::min(t.qty, it->second);
-                    it->second -= t.sold;
-                }
-                t.fate = cargo_fate::settled;
-            }
-        }
-
-        apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
-                     &rep.building_labour);
-        run_nation_step(w, reg, rep, econ_tick);
-        advance_tech_gates(w);
-
-        // LOOK 2 — what arrives, what is cut. Prices now are this tick's clear:
-        // the prices standing when the cargo lands.
+        // LOOK 2 — what arrives, what is cut. Prices now are the last clear's:
+        // the prices standing when the cargo lands (arrivals are credited at the
+        // top of the tick, before the economy runs — app::step_economy's order).
         std::vector<std::uint32_t> arrived;
         // The pool model the reading ASSUMES — an arrival credits (corp,
         // DESTINATION MARKET), BL-1003 — is CHECKED here, not trusted: each such
@@ -648,6 +608,51 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
             if (std::fabs(gained - want) > 1e-3 * std::max(1.0, std::fabs(want)))
                 ++out.pool_model_mismatches;
         }
+
+        economy_report rep = run_economy_step(w, reg, /*spectating=*/true, &lp);
+        adopt_new(window); // the scorer's own dispatch_convoy verbs (BL-600)
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+                         reg.logistics_cost(convoy_mode::space), &lp);
+        adopt_new(window);
+
+        const std::size_t rows_before = w.exchanges.total;
+        auto flows = clear_markets(w, reg, rep);
+        const std::size_t pushed = w.exchanges.total - rows_before;
+
+        // LOOK 1 — this tick's arrivals meet their first clear (BL-995 order:
+        // they were credited at the top of this same tick).
+        {
+            if (pushed > w.exchanges.size())
+                ++out.ring_overflows;
+            std::map<std::tuple<entity_id, entity_id, std::size_t>, double> sold_by;
+            const std::size_t n = std::min(pushed, w.exchanges.size());
+            for (std::size_t i = w.exchanges.size() - n; i < w.exchanges.size(); ++i)
+            {
+                const exchange_record& e = w.exchanges.oldest_first(i);
+                if (e.seller == null_entity)
+                    continue;
+                sold_by[{e.seller, e.market, static_cast<std::size_t>(e.resource)}] +=
+                    static_cast<double>(e.quantity);
+            }
+            for (cargo_track& t : tracks) // ascending id: the attribution order
+            {
+                if (t.fate != cargo_fate::awaiting_sale)
+                    continue;
+                t.sell_market = arrival_sell_market(w, t);
+                const auto it = sold_by.find({t.corp, t.sell_market, t.r});
+                if (it != sold_by.end())
+                {
+                    t.sold = std::min(t.qty, it->second);
+                    it->second -= t.sold;
+                }
+                t.fate = cargo_fate::settled;
+            }
+        }
+
+        apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
+                     &rep.building_labour);
+        run_nation_step(w, reg, rep, econ_tick);
+        advance_tech_gates(w);
 
         run_firm_exits(w, reg.firm_exit(), &rep.firm_exits);
 
@@ -1069,6 +1074,12 @@ int main(int argc, char** argv)
         std::size_t seen = 0;
         for (int t = 1; t <= n_trade_ticks; ++t)
         {
+            // BL-995: app::step_economy's order — advance -> credit arrivals ->
+            // economy -> dispatch -> clear -> budget.
+            advance_convoys(w);
+            credit_arrived_convoys(w, t);
+            const economy_report report = run_economy_step(w, reg);
+            seen = w.convoys.size(); // what is appended past here is this dispatch
             dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
                              reg.logistics_cost(convoy_mode::space));
             // Count only convoys appended THIS tick — w.convoys is append-only
@@ -1087,12 +1098,8 @@ int main(int argc, char** argv)
                     ++tick_im[static_cast<std::size_t>(t - 1)];
                 }
             }
-            advance_convoys(w);
-            const economy_report report = run_economy_step(w, reg);
             const auto flows = clear_markets(w, reg, report);
             apply_budget(w, reg, flows, report.workforce_contention, nullptr);
-            credit_arrived_convoys(w, t);
-            seen = w.convoys.size();
         }
         routes += static_cast<long>(w.trade_routes.size());
     }

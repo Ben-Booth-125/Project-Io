@@ -484,6 +484,9 @@ static purity_trace run_purity_world(bool perturb_angles)
     {
         // Fresh shortfall + surpluses each econ tick.
         w.markets.at(dest_mkt).demand[ri(resource_type::iron_ore)] = 50.0f;
+        // BL-995: last tick's delivery would have sold at the destination's
+        // clear (this loop runs no clear), so it is not still pending there.
+        w.pool_at(corp_id, dest_mkt).quantities[ri(resource_type::iron_ore)] = 0.0f;
         w.markets.at(dest_mkt).supply[ri(resource_type::iron_ore)] = 0.0f;
         for (entity_id body : { src_a, src_b })
         {

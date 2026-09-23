@@ -567,9 +567,9 @@ int main(int argc, char* argv[])
 
     std::printf("BL-251 data-creep instrument (+BL-254 convoy traffic) — real generated world,"
                 " %d ticks\n", total_ticks);
-    std::printf("Sequence per tick: [seed convoy] -> advance_orbits -> dispatch_convoys ->\n"
-                "                   advance_convoys -> run_economy_step -> clear_markets ->\n"
-                "                   apply_budget -> credit_arrived_convoys -> advance_surveys\n"
+    std::printf("Sequence per tick: [seed convoy] -> advance_orbits -> advance_convoys ->\n"
+                "                   credit_arrived_convoys -> run_economy_step -> dispatch_convoys ->\n"
+                "                   clear_markets -> apply_budget -> advance_surveys\n"
                 "                   (mirrors main.cpp; the seed is the harness's own, BL-254)\n\n");
 
     std::printf("PLATEAU DEFINITION\n");
@@ -648,13 +648,13 @@ int main(int argc, char* argv[])
         const long long convoys_before = static_cast<long long>(w.convoys.size());
         seed_scheduled_convoy(w, plan, t);
         advance_orbits(w, 1.0);
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space));
         advance_convoys(w);
+        credit_arrived_convoys(w, t); // app order: arrivals before the economy
         economy_report rep = run_economy_step(w, reg);
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
+                         reg.logistics_cost(convoy_mode::space));
         auto flows = clear_markets(w, reg, rep);
         apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets);
-        credit_arrived_convoys(w, t);
         advance_surveys(w, 1);
 
         max_convoys  = std::max(max_convoys,  static_cast<long long>(w.convoys.size()));

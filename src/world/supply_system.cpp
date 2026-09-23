@@ -160,6 +160,10 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
     // and it is placed here rather than at the four call sites because this is
     // the one seam app.cpp, main.cpp and every harness already share. A convoy
     // cut here never reaches the loop below, so it never credits its destination.
+    // BL-995: this tick's deliveries start empty (world::arrived_this_tick —
+    // transient, the dispatch pass later this tick reads it).
+    w.arrived_this_tick.clear();
+
     std::vector<interception_record> cuts = intercept_convoys(w, tick);
     if (out_cuts != nullptr)
         out_cuts->insert(out_cuts->end(), cuts.begin(), cuts.end());
@@ -186,6 +190,10 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
         // nothing priced ever agreed with. The cargo reaches pricing through the
         // ordinary auto-surplus path off this pool at the next clear (BL-382).
         w.pool_at(convoy.corp, convoy.dest_market).quantities[
+            static_cast<std::size_t>(convoy.cargo_resource)] += convoy.cargo_qty;
+        // BL-995: remembered for this tick's dispatch — a delivery sells at its
+        // destination's clear before it may move again.
+        w.arrived_this_tick[{convoy.corp, convoy.dest_market}].quantities[
             static_cast<std::size_t>(convoy.cargo_resource)] += convoy.cargo_qty;
 
         // Record the persistent trade route this completed lane ran (BL-088). The
@@ -728,6 +736,124 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// BL-995 — the net-price rule's shared sizing (supply_system.hpp)
+// ---------------------------------------------------------------------------
+
+float dispatch_market_price(const market_component& mc, std::size_t r)
+{
+    if (r >= resource_count || mc.base_price[r] <= 0.0f)
+        return 0.0f;
+    return (mc.price[r] > 0.0f) ? mc.price[r] : mc.base_price[r];
+}
+
+float dispatch_home_price(const world& w, entity_id src_key, std::size_t r)
+{
+    const auto it = w.markets.find(src_key);
+    return (it != w.markets.end()) ? dispatch_market_price(it->second, r) : 0.0f;
+}
+
+float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id dest,
+                          std::size_t r, float landed_cost)
+{
+    // THE DERIVATION. Clearing aims each market's price at the UNSMOOTHED
+    // target (price_target, market_clearing.hpp):
+    //     p_target(S') = clamp(base x sqrt(D / S'), floor x base, ceil x base)
+    // with D this market's demand and S' the supply listed at its next clear.
+    // A haul pays while the price it lands into is above its landed cost, so
+    // the market can absorb supply up to the S* at which p_target(S*) ==
+    // landed. Inside the band, base x sqrt(D / S*) = landed gives
+    //     S* = D x (base / landed)^2,
+    // and what is left to absorb is S* - S, S being LAST clear's supply (what
+    // the market already gets). At the band's edges:
+    //   * landed below floor x base: the target never falls to the landed
+    //     cost however much is listed, so there is no finite S* — unbounded
+    //     (the caller's surplus caps the send);
+    //   * landed at or above ceil x base, or no demand at all (the target sits
+    //     on the floor): no supply level prices above landed — nothing.
+    // The ZERO-SUPPLY case is the doc's own rule: nothing to scale, so the
+    // market absorbs its unmet demand.
+    //
+    // It is sized off the TARGET, never the eased market price: the eased
+    // price lags its target, so a size read off it asks for more every tick
+    // and the price saws below the landed cost (cold review, 2026-09-23). The
+    // DESTINATION is still chosen on the last resolved price (the doc's rule).
+    if (r >= resource_count)
+        return 0.0f;
+    const auto it = w.markets.find(dest);
+    if (it == w.markets.end())
+        return 0.0f;
+    const market_component& dm = it->second;
+    const float base = dm.base_price[r];
+    if (base <= 0.0f)
+        return 0.0f;
+    const float S = dm.supply[r];
+    const float D = dm.demand[r];
+    if (S <= 0.0f)
+        return std::max(0.0f, D - S);
+    if (!(landed_cost > 0.0f))
+        return std::numeric_limits<float>::infinity();
+    const float lo = base * reg.price_band().floor_mult;
+    const float hi = base * reg.price_band().ceil_mult;
+    if (landed_cost < lo)
+        return std::numeric_limits<float>::infinity();
+    if (landed_cost >= hi || D <= 0.0f)
+        return 0.0f;
+    const float ratio  = base / landed_cost;
+    const float s_star = D * ratio * ratio;
+    return std::max(0.0f, s_star - S);
+}
+
+float dispatch_pending(const world& w, const recipe_registry& reg, entity_id dest,
+                       std::size_t r, const std::vector<entity_id>& sorted_corp_ids,
+                       reservation_memo& memo)
+{
+    if (r >= resource_count)
+        return 0.0f;
+    // Every corp's cargo bound for `dest` — held convoys included (their cargo
+    // is committed; a hold pauses it, it does not un-send it), and convoys
+    // committed earlier in THIS pass included (commit_convoy appends to
+    // w.convoys before the next decision is sized). Vector order: fixed.
+    float pending = 0.0f;
+    for (const convoy_component& c : w.convoys)
+        if (c.dest_market == dest && static_cast<std::size_t>(c.cargo_resource) == r)
+            pending += c.cargo_qty;
+    // Plus every corp's stock already IN `dest` above its processor
+    // reservation — this tick's production and arrivals, which list at the
+    // next clear. Ascending corp id: a fixed accumulation order.
+    for (const entity_id corp : sorted_corp_ids)
+    {
+        const stockpile_component* p = w.find_pool(corp, dest);
+        if (p == nullptr || !(p->quantities[r] > 0.0f))
+            continue;
+        auto mit = memo.find({corp, dest});
+        if (mit == memo.end())
+            mit = memo.emplace(std::make_pair(corp, dest),
+                               processor_reservation(w, reg, corp, dest)).first;
+        const float excess = p->quantities[r] - mit->second[r];
+        if (excess > 0.0f)
+            pending += excess;
+    }
+    return pending;
+}
+
+float dispatch_room(const world& w, const recipe_registry& reg, entity_id dest, std::size_t r,
+                    float landed_cost, const std::vector<entity_id>& sorted_corp_ids,
+                    reservation_memo& memo)
+{
+    const float absorb = dispatch_absorbable(w, reg, dest, r, landed_cost);
+    if (!(absorb > 0.0f))
+        return 0.0f;
+    return std::max(0.0f, absorb - dispatch_pending(w, reg, dest, r, sorted_corp_ids, memo));
+}
+
+float dispatch_arrived(const world& w, entity_id corp, entity_id key, std::size_t r)
+{
+    const auto it = w.arrived_this_tick.find({corp, key});
+    return (it != w.arrived_this_tick.end() && r < resource_count) ? it->second.quantities[r]
+                                                                   : 0.0f;
+}
+
 convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                       float logistics_cost_land, float logistics_cost_space,
                       lp_pool_map* shared_lp_pools)
@@ -743,13 +869,14 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
     //   net(d) = price_d - haul_per_unit(src -> d)
     //   send to argmax_d net(d)  if  net(d) - price_src > margin x price_src
     //
-    // HANDLING AND DUTY ARE ABSENT, deliberately: the code carries neither as a
-    // per-unit charge on a haul. Port handling is not charged anywhere (a sea
-    // leg's whole price is `leg.cost`), and the only import duty in the economy
-    // is the tariff clearing charges the BUYER of a matched trade
-    // (market_clearing.cpp, `any_import_tariff_enacted`) — never the convoy. So
-    // the rule's `- handling - duty(d)` terms are zero here, and join
-    // `haul_per_unit` the day either becomes a per-haul charge.
+    // HANDLING AND DUTY. The design charges both: arrival duty at a border
+    // (MARKETS.md § Tariffs — rate x price_d x qty, paid by the convoy on
+    // arrival) and handling at every port a cargo passes (SUPPLY.md §
+    // Logistical cost). The code carries NEITHER yet — no per-port handling is
+    // charged, and the tariff is still the matched-trade charge clearing puts on
+    // the buyer — so both terms are zero here. When either is built it is a
+    // per-unit cost of the haul and MUST enter net(d) (and the landed cost the
+    // quantity is sized against) beside haul_per_unit.
     //
     // WHEN IT RUNS. After run_economy_step and BEFORE clear_markets (app.cpp
     // step_economy). Every market-side read below is therefore LAST tick's
@@ -772,10 +899,7 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
 
     const float              margin     = reg.dispatch_margin();
     const grid_goods_params& grid_rules = reg.grid_goods();
-
-    // BL-354 note: inter-body distances are evaluated inside price_convoy_leg at
-    // w.current_day_tick via the tick-pure angle, so sourcing, pricing and convoy
-    // speed are a pure function of tick.
+    const auto&              launch_draw = launch_draw_per_convoy();
 
     // Sorted id walks (the standing.hpp convention): corporations and markets are
     // unordered_maps, and convoy insertion order — hence trade-route creation order
@@ -793,11 +917,9 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
         market_ids.push_back(id);
     std::sort(market_ids.begin(), market_ids.end());
 
-    // The last resolved price, base price as the fallback — the same reading
-    // the corp scorer and the market ledger use.
-    const auto price_of = [](const market_component& mc, std::size_t r) {
-        return (mc.price[r] > 0.0f) ? mc.price[r] : mc.base_price[r];
-    };
+    // Processor reservations do not change within the pass (nothing below
+    // touches a building), so each (corp, market) is computed once.
+    reservation_memo memo;
 
     // BL-995 CALL: a good under a standing SELL ORDER (corp, body, resource) is
     // under manual control and is not auto-hauled — the same yield clearing's
@@ -808,6 +930,15 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
     for (const sell_order& o : w.sell_orders)
         if (o.quantity > 0.0f)
             order_controlled.insert({o.corp, o.body, static_cast<std::size_t>(o.resource)});
+
+    struct candidate
+    {
+        float     net;
+        entity_id dest;
+        float     haul;
+        bool      space;
+    };
+    std::vector<candidate> cands;
 
     for (const entity_id corp_id : corp_ids)
     {
@@ -823,13 +954,15 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
             const entity_id src_body = pool_key_body(w, src_key);
             if (src_body == null_entity)
                 continue;
-            const auto              smit       = w.markets.find(src_key);
-            const market_component* src_market =
-                (smit != w.markets.end()) ? &smit->second : nullptr;
+            const bool src_is_market = (w.markets.find(src_key) != w.markets.end());
 
             // The same reservation auto-surplus holds back: what a seller may
             // haul is exactly what it would otherwise list at home.
-            const auto reserve = processor_reservation(w, reg, corp_id, src_key);
+            auto rit = memo.find({corp_id, src_key});
+            if (rit == memo.end())
+                rit = memo.emplace(std::make_pair(corp_id, src_key),
+                                   processor_reservation(w, reg, corp_id, src_key)).first;
+            const std::array<float, resource_count> reserve = rit->second;
 
             for (std::size_t ri = 0; ri < resource_count; ++ri)
             {
@@ -841,9 +974,13 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                     continue;
 
                 // Live pool read: an earlier commit in this pass (a launch's
-                // propellant burn) may have drawn this pool down.
+                // propellant burn) may have drawn this pool down. THIS TICK'S
+                // DELIVERIES into the pool are not shippable: SUPPLY.md — a
+                // delivery reaches its destination's clear before it can move
+                // again (world::arrived_this_tick).
+                const float pool_qty = w.pool_at(corp_id, src_key).quantities[ri];
                 const float surplus =
-                    w.pool_at(corp_id, src_key).quantities[ri] - reserve[ri];
+                    pool_qty - reserve[ri] - dispatch_arrived(w, corp_id, src_key, ri);
                 if (!(surplus > 0.0f))
                     continue;
 
@@ -851,115 +988,87 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 // sold at home at all — a market-less body's body-level pool,
                 // or a home market that does not price the good (auto-surplus
                 // lists neither). Any positive net price then beats home.
-                const float price_src =
-                    (src_market != nullptr && src_market->base_price[ri] > 0.0f)
-                        ? price_of(*src_market, ri) : 0.0f;
-                const float gate = price_src + margin * price_src;
+                const float price_src = dispatch_home_price(w, src_key, ri);
+                const float gate      = price_src + margin * price_src;
 
-                // Destination = argmax net(d), ties to the lower market id: the
-                // walk ascends and only a STRICTLY better net displaces the best.
-                entity_id best_dest = null_entity;
-                float     best_net  = 0.0f;
-                float     best_haul = 0.0f;
+                // Every destination that clears the margin, with its net price.
+                // The per-unit haul is priced on a ONE-UNIT leg (cost is linear
+                // in quantity, so this is exact); pricing the choice at the full
+                // surplus would let a space leg carrying propellant be refused
+                // for burning the fuel it is exporting (cold review #10).
+                const float probe_qty = std::min(surplus, 1.0f);
+                cands.clear();
                 for (const entity_id dest_id : market_ids)
                 {
                     if (dest_id == src_key)
                         continue;
                     const market_component& dm = w.markets.at(dest_id);
-                    if (dm.base_price[ri] <= 0.0f)
-                        continue; // the destination does not price the good
-                    const float price_d = price_of(dm, ri);
+                    const float price_d = dispatch_market_price(dm, ri);
                     // net(d) <= price_d (a haul is never negative), so a
                     // destination whose GROSS price cannot clear the gate cannot
                     // clear it net: skip it before routing a leg.
                     if (!(price_d > gate))
                         continue;
-                    // Priced once at the full surplus; the committed leg is
-                    // re-priced at its real quantity below.
                     const convoy_leg leg = price_convoy_leg(
-                        w, reg, nodes, corp_id, src_key, dest_id, ri, surplus,
+                        w, reg, nodes, corp_id, src_key, dest_id, ri, probe_qty,
                         logistics_cost_space);
                     if (!leg.viable)
                         continue; // unroutable / unpadded / unfuelled / same market
-                    const float haul = leg.cost / surplus;
+                    const float haul = leg.cost / probe_qty;
                     const float net  = price_d - haul;
-                    if (best_dest == null_entity || net > best_net)
-                    {
-                        best_dest = dest_id;
-                        best_net  = net;
-                        best_haul = haul;
-                    }
+                    // The margin gate: net(d) - price_src > margin x price_src.
+                    // With no home price this reduces to net(d) > 0.
+                    if (!(net - price_src > margin * price_src))
+                        continue;
+                    cands.push_back({net, dest_id, haul, leg.mode == convoy_mode::space});
                 }
-                if (best_dest == null_entity)
+                if (cands.empty())
                     continue;
-                // The margin gate: net(d) - price_src > margin x price_src. With
-                // no home price this reduces to net(d) > 0.
-                if (!(best_net - price_src > margin * price_src))
-                    continue;
+                // argmax net(d), ties to the lower market id — a total order.
+                std::sort(cands.begin(), cands.end(), [](const candidate& a, const candidate& b) {
+                    return (a.net != b.net) ? (a.net > b.net) : (a.dest < b.dest);
+                });
 
-                // Quantity: what the gap can absorb, not what the pool holds.
-                const market_component& dm      = w.markets.at(best_dest);
-                const float             price_d = price_of(dm, ri);
-                const float             landed  = price_src + best_haul;
-                float absorb;
-                if (dm.supply[ri] > 0.0f)
+                // BL-995 CALL: the send goes to the best-net destination that
+                // still has ROOM (absorbable less what is already pending there).
+                // A destination the rest of the market has already filled cannot
+                // take the cargo at a price above its landed cost, so the next-
+                // best destination that still beats home by the margin takes it,
+                // rather than the cargo defaulting to a home sale.
+                for (const candidate& c : cands)
                 {
-                    // From price ~ sqrt(demand/supply): adding q to supply
-                    // brings price_d down to the landed price when
-                    // q = supply_d * ((price_d / landed)^2 - 1).
-                    if (landed > 0.0f)
-                    {
-                        const float ratio = price_d / landed;
-                        absorb = dm.supply[ri] * (ratio * ratio - 1.0f);
-                    }
-                    else
-                    {
-                        // BL-995 CALL: a zero landed cost (no home price and a
-                        // free haul) has no finite q; the surplus caps it.
-                        absorb = surplus;
-                    }
+                    const float landed = price_src + c.haul;
+                    const float room =
+                        dispatch_room(w, reg, c.dest, ri, landed, corp_ids, memo);
+                    float qty = std::min(surplus, room);
+                    // A space launch burns its propellant from this same pool:
+                    // when the cargo IS the propellant, leave the launch's draw.
+                    if (c.space && launch_draw[ri] > 0.0f)
+                        qty = std::min(qty, pool_qty - launch_draw[ri]);
+                    if (!(qty > 0.0f) || !std::isfinite(qty))
+                        continue;
+
+                    // Re-price the committed leg at its real quantity.
+                    const convoy_leg leg = price_convoy_leg(
+                        w, reg, nodes, corp_id, src_key, c.dest, ri, qty,
+                        logistics_cost_space);
+                    if (!leg.viable)
+                        continue;
+
+                    // Commit through the shared path: the solvency gate, the
+                    // passive-LP gate (BL-597), the pool debit, the propellant
+                    // burn and the convoy itself all live there, so a rival's
+                    // convoy and the player's are the same object built by the
+                    // same code.
+                    bool refused_no_lp = false;
+                    if (commit_convoy(w, reg, corp_id, src_body,
+                                      src_is_market ? src_key : null_entity,
+                                      c.dest, ri, qty, leg, &pools_by_body, &refused_no_lp))
+                        ++out.dispatched;
+                    else if (refused_no_lp)
+                        ++out.refused_no_lp;
+                    break; // one destination per (pool, good) per pass
                 }
-                else
-                {
-                    // No supply to scale: the destination absorbs its unmet demand.
-                    absorb = std::max(0.0f, dm.demand[ri] - dm.supply[ri]);
-                }
-
-                // Less what this corp already has on the way to d — including
-                // convoys this same pass committed from another of its pools —
-                // so a gap draws enough to close it and no herd floods it.
-                // w.convoys is a vector: insertion order, deterministic.
-                float in_transit = 0.0f;
-                for (const convoy_component& c : w.convoys)
-                    if (c.corp == corp_id && c.dest_market == best_dest &&
-                        static_cast<std::size_t>(c.cargo_resource) == ri)
-                        in_transit += c.cargo_qty;
-
-                const float qty = std::min(surplus, absorb) - in_transit;
-                if (!(qty > 0.0f) || !std::isfinite(qty))
-                    continue;
-
-                // Re-price the committed leg at its real quantity (cost is linear
-                // in quantity, so the per-unit haul is unchanged; the launch
-                // propellant gate is the one term that reads the quantity).
-                const convoy_leg leg = price_convoy_leg(
-                    w, reg, nodes, corp_id, src_key, best_dest, ri, qty,
-                    logistics_cost_space);
-                if (!leg.viable)
-                    continue;
-
-                // Commit through the shared path: the solvency gate, the
-                // passive-LP gate (BL-597), the pool debit, the propellant
-                // burn and the convoy itself all live there, so a rival's
-                // convoy and the player's are the same object built by the
-                // same code.
-                bool refused_no_lp = false;
-                if (commit_convoy(w, reg, corp_id, src_body,
-                                  src_market != nullptr ? src_key : null_entity,
-                                  best_dest, ri, qty, leg, &pools_by_body, &refused_no_lp))
-                    ++out.dispatched;
-                else if (refused_no_lp)
-                    ++out.refused_no_lp;
             }
         }
     }

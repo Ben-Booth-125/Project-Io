@@ -1941,29 +1941,27 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
-        // ---- Directed-dispatch candidate: haul into a public shortfall -------
+        // ---- Directed-dispatch candidate: haul toward a better net price -----
         // (BL-600, LOGISTICS.md § Logistic Points / SUPPLY.md § Dispatch
         // trigger; the same dated grant BL-599 lands under). `dispatch_convoy`
         // reaches the corp-command seam exactly as `place_sell_order` does
         // (§ 2C) — through `apply_corp_command`, which already prices and
         // commits it via `price_convoy_leg` + `commit_convoy`
         // (corp_command.cpp): the SAME two functions the auto-dispatcher's
-        // net-price rule calls (SUPPLY.md's "no fourth code path" rule). This
-        // block supplies exactly that scan's opinion as one scored candidate
-        // rather than reimplementing pricing here — it prices with the shared
-        // function to RANK opportunities, and the seam re-prices and commits
-        // for real at apply time.
+        // net-price rule calls (SUPPLY.md's "no fourth code path" rule). It
+        // prices with the shared function to RANK opportunities, and the seam
+        // re-prices and commits for real at apply time.
         //
-        // Bounded to the corp's own surplus pools (own asset bodies) against
-        // markets carrying a PUBLIC shortfall (demand > supply — the same
-        // aggregates `export_corp_blackboard` shows a rival, visibility-honest
-        // per BL-068/DISCOVERY.md, and the same reading
-        // `forecast_glut_multiplier` gives the build candidates above), and
-        // keeps only the single best-scoring opportunity — the same
-        // one-candidate-per-eval shape `max_trades` already gives the
-        // order-book verb, so a directed haul competes for exactly one slot
-        // rather than flooding the candidate list with every (body, resource)
-        // pair.
+        // BL-995: it reads the auto-dispatcher's OWN rule, not a rule of its
+        // own. A destination qualifies when its net price (last resolved price
+        // less the per-unit haul) beats the home price by more than the
+        // authored margin, and the haul is sized by the same room
+        // (`dispatch_room`: absorbable against the unsmoothed target, less every
+        // corp's pending cargo) — so the scorer never values a haul the market
+        // cannot take. Markets and resolved prices are the public aggregates
+        // `export_corp_blackboard` shows a rival (BL-068/DISCOVERY.md). It keeps
+        // only the single best-scoring opportunity — the one-candidate-per-eval
+        // shape `max_trades` gives the order-book verb.
         {
             // BL-1003: the source is a (corp, market) pool, so no "market on
             // this body" pick is needed any more — the pool key IS the market.
@@ -1985,6 +1983,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 market_ids.push_back(mid);
             }
             std::sort(market_ids.begin(), market_ids.end());
+
+            // Sorted corp ids for `dispatch_room`'s pending sum (a fixed float
+            // order), and a reservation memo shared across this corp's eval.
+            std::vector<entity_id> all_corp_ids;
+            all_corp_ids.reserve(w.corporations.size());
+            for (const auto& [cid, cc] : w.corporations)
+            {
+                (void)cc;
+                all_corp_ids.push_back(cid);
+            }
+            std::sort(all_corp_ids.begin(), all_corp_ids.end());
+            reservation_memo memo;
+            const float margin = reg.dispatch_margin();
 
             entity_id   best_market   = null_entity;
             entity_id   best_src_key  = null_entity;
@@ -2008,76 +2019,60 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 {
                     // Same hold rule as the trade candidate above (BL-293):
                     // never divert stock below the threshold the corp's own
-                    // chain might still want.
-                    const float surplus = pool.quantities[r] - p.trade_hold_threshold;
-                    if (surplus <= 0.0f)
+                    // chain might still want. This tick's deliveries are not
+                    // shippable (BL-995: a delivery meets a clear first).
+                    const float surplus = pool.quantities[r] - p.trade_hold_threshold
+                                          - dispatch_arrived(w, corp, src_key, r);
+                    if (!(surplus > 0.0f))
                         continue;
+
+                    // The goods are already the corp's and would sell at home
+                    // at the next clear, so a haul earns only the GAP over the
+                    // home price (SUPPLY.md § Dispatch trigger).
+                    const float home_price = dispatch_home_price(w, src_key, r);
+                    const float gate       = home_price + margin * home_price;
+                    const float probe_qty  = std::min(surplus, 1.0f);
 
                     for (const entity_id mid : market_ids)
                     {
-                        const market_component& mc = w.markets.at(mid);
-                        // Same-body IS a real haul (BL-096 multi-market bodies):
-                        // `price_convoy_leg` routes it over `intra_body_path`
-                        // exactly like the auto-dispatcher's own scan does, so
-                        // this candidate does not special-case it away. Its own
-                        // market is not a destination (BL-1003): the leg refuses.
+                        // Same-body IS a real haul (BL-096 multi-market bodies);
+                        // its own market is not a destination (BL-1003).
                         if (mid == src_key)
                             continue;
-                        if (mc.base_price[r] <= 0.0f)
-                            continue; // this market does not price the good
+                        const market_component& mc = w.markets.at(mid);
+                        const float price = dispatch_market_price(mc, r);
+                        if (!(price > gate))
+                            continue; // cannot beat home net of any haul
 
-                        const float shortfall = mc.demand[r] - mc.supply[r];
-                        if (shortfall <= 0.0f)
-                            continue; // no PUBLIC shortfall here
+                        // Priced through the SHARED function on a one-unit leg
+                        // (cost is linear in quantity), purely to RANK — nothing
+                        // here mutates the world beyond the A* path cache
+                        // `price_convoy_leg` itself warms. The seam re-prices
+                        // and commits for real at apply time.
+                        const convoy_leg probe = price_convoy_leg(
+                            w, reg, nodes, corp, src_key, mid, r, probe_qty,
+                            reg.logistics_cost(convoy_mode::space));
+                        if (!probe.viable)
+                            continue; // unroutable / unpadded / unfuelled lane
+                        const float haul = probe.cost / probe_qty;
+                        const float net  = price - haul;
+                        if (!(net - home_price > margin * home_price))
+                            continue; // under the dispatch margin
 
-                        const float qty = std::min(surplus, shortfall);
-                        if (qty <= 0.0f)
+                        const float room = dispatch_room(w, reg, mid, r, home_price + haul,
+                                                         all_corp_ids, memo);
+                        const float qty = std::min(surplus, room);
+                        if (!(qty > 0.0f) || !std::isfinite(qty))
                             continue;
 
-                        // Priced through the SHARED function, purely to RANK
-                        // candidates — nothing here mutates the world beyond
-                        // the A* path cache `price_convoy_leg` itself warms
-                        // (the same non-const-`w` shape `body_reach_field`
-                        // uses above). The seam re-prices and commits for
-                        // real at apply time.
-                        const convoy_leg leg = price_convoy_leg(
-                            w, reg, nodes, corp, src_key, mid, r, qty,
-                            reg.logistics_cost(convoy_mode::space));
-                        if (!leg.viable)
-                            continue; // unroutable / unpadded / unfuelled lane
-
-                        // Valued at the CLEARED price, not the floor: unlike
-                        // the trade candidate (a standing order the book
-                        // might not fill at all), a dispatched convoy WILL
-                        // credit the destination pool on arrival — the
-                        // conservative choice there does not apply here.
-                        //
-                        // BL-995: valued NET OF THE HOME PRICE. The goods are
-                        // already the corp's and would sell at home at the next
-                        // clear, so the haul earns only the GAP: a valuation of
-                        // qty x dest_price alone would send goods away from a
-                        // better home market (SUPPLY.md § Dispatch trigger).
-                        const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : mc.base_price[r];
-                        const market_component& home = w.markets.at(src_key);
-                        const float home_price =
-                            (home.base_price[r] > 0.0f)
-                                ? ((home.price[r] > 0.0f) ? home.price[r] : home.base_price[r])
-                                : 0.0f;
-                        const float revenue = qty * (price - home_price);
-                        const float score   = revenue - leg.cost;
+                        const float cost  = haul * qty;
+                        const float score = qty * (price - home_price) - cost;
                         if (score <= 0.0f)
                             continue; // never haul at a loss
 
                         // THE TIE-BREAK IS WRITTEN OUT (BL-1050), not left to
                         // the walk: on an exactly equal score the lane with the
-                        // lowest (source market, resource, market id) wins. That
-                        // is what the sorted walk above already yields — the
-                        // pools are a std::map, the resource index ascends, the
-                        // market ids are sorted — so this changes no choice the
-                        // scan makes today. It states the rule instead of
-                        // inheriting it from three loop orders, so a future
-                        // reordering of any of them cannot silently move a
-                        // convoy's destination.
+                        // lowest (source market, resource, market id) wins.
                         const bool better =
                             (score > best_score) ||
                             (score == best_score && best_market != null_entity &&
@@ -2090,7 +2085,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                             best_src_key  = src_key;
                             best_ri       = r;
                             best_qty      = qty;
-                            best_leg      = leg;
+                            best_leg      = probe;
+                            best_leg.cost = cost;
                         }
                     }
                 }

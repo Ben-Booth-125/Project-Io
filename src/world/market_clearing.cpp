@@ -24,6 +24,26 @@ namespace {
 /// `recipe_registry::price_band()`. They arrive as parameters below.
 constexpr float price_smoothing  = 0.5f;  ///< EMA factor toward the tick's target price.
 
+} // namespace
+
+float price_target(float base, float supply, float demand,
+                   float price_floor_mult, float price_ceil_mult)
+{
+    float target;
+    if (supply <= 0.0f && demand <= 0.0f)
+        target = base; // no signal this tick — pull gently back toward base
+    else if (supply <= 0.0f)
+        target = base * price_ceil_mult; // demand with no supply — top of the band
+    else
+        target = base * std::sqrt(demand / supply); // demand 0 → target 0 → floored below
+
+    const float lo = base * price_floor_mult;
+    const float hi = base * price_ceil_mult;
+    return std::clamp(target, lo, hi);
+}
+
+namespace {
+
 /// Resolve one resource's price for a market this tick. The target is
 /// `base × sqrt(demand/supply)` (damped elasticity), clamped to the band and
 /// reached by an exponential moving average from the prior price. Untraded
@@ -35,17 +55,11 @@ float resolve_price(float prior, float base, float supply, float demand,
     if (base <= 0.0f)
         return prior; // never traded here — leave it (stays 0)
 
-    float target;
-    if (supply <= 0.0f && demand <= 0.0f)
-        target = base; // no signal this tick — pull gently back toward base
-    else if (supply <= 0.0f)
-        target = base * price_ceil_mult; // demand with no supply — top of the band
-    else
-        target = base * std::sqrt(demand / supply); // demand 0 → target 0 → floored below
-
+    // BL-995: the unsmoothed target is its own exported function so dispatch
+    // sizes a haul against the SAME price law clearing aims at.
+    const float target = price_target(base, supply, demand, price_floor_mult, price_ceil_mult);
     const float lo = base * price_floor_mult;
     const float hi = base * price_ceil_mult;
-    target = std::clamp(target, lo, hi);
 
     const float next = prior + price_smoothing * (target - prior);
     return std::clamp(next, lo, hi);

@@ -212,13 +212,13 @@ void tick(world& w, const recipe_registry& reg, int t,
           std::map<entity_id, corp_budget>* breakdown = nullptr)
 {
     w.current_econ_tick = t;
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space));
     advance_convoys(w);
+    credit_arrived_convoys(w, t); // app order: arrivals before the economy
     const economy_report report = run_economy_step(w, reg);
+    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
+                     reg.logistics_cost(convoy_mode::space));
     const auto flows = clear_markets(w, reg, report);
     apply_budget(w, reg, flows, report.workforce_contention, breakdown);
-    credit_arrived_convoys(w, t);
 }
 
 std::vector<entity_id> sorted_corp_ids(const world& w)
@@ -549,10 +549,11 @@ void run_settle_rows(const recipe_registry& reg)
     for (int t = 0; t < k_past_retention_ticks; ++t)
     {
         w.current_econ_tick = t;
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space));
         advance_convoys(w);
+        credit_arrived_convoys(w, t); // app order: arrivals before the economy
         const economy_report report = run_economy_step(w, reg);
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
+                         reg.logistics_cost(convoy_mode::space));
         const auto flows = clear_markets(w, reg, report);
 
         std::map<entity_id, float> before;
@@ -594,7 +595,6 @@ void run_settle_rows(const recipe_registry& reg)
                           && static_cast<float>(b0 + net_f) == cit->second.balance;
             ++per_tick_rows;
         }
-        credit_arrived_convoys(w, t);
 
         // --- the handoff: the record play receives -------------------------
         if (t + 1 == k_settle_ticks)

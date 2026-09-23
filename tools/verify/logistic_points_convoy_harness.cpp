@@ -426,17 +426,18 @@ void p6_shared_pool_contention()
 
         lp_pool_map shared_pool;
 
-        // Passive first (matches main.cpp/app.cpp's real tick order —
-        // dispatch_convoys runs before run_economy_step's march pass).
+        // Active first (matches main.cpp/app.cpp's real tick order since
+        // BL-1066/BL-995 — run_economy_step's march pass runs BEFORE
+        // dispatch_convoys, so armies claim the anchor first).
         // BL-995: auto-dispatch chases a net price, so the destination must
         // price iron above home (10 vs 5) for the haul to happen at all.
         s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
         s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
         s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
+        const unit_march_tick mt = run_unit_march(s.w, reg, &shared_pool);
         const convoy_dispatch_tick ct = dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),
                                                           reg.logistics_cost(convoy_mode::space),
                                                           &shared_pool);
-        const unit_march_tick mt = run_unit_march(s.w, reg, &shared_pool);
 
         const std::string tag = " (run " + std::to_string(run) + ")";
         // Exactly one of the two draws should have been admitted from the
@@ -483,9 +484,9 @@ void p6_shared_pool_contention()
         s.w.units[unit] = uc;
 
         // The pool is sized to the CONVOY'S CARGO (the dest market is short 30
-        // units, below), so the convoy exactly exhausts it and the mobilised
-        // unit's 2.0-point march finds nothing left. Under the pre-NR-620
-        // distance draw this was 3.0, the leg's three plains edges.
+        // units, below): the convoy alone would exactly exhaust it. The
+        // mobilised unit's 2.0-point march draws FIRST (the real tick order),
+        // leaving 28 — too little for the 30-unit convoy.
         recipe_registry reg = make_registry(30.0f);
         military_capability_params mp = reg.military();
         mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = 2.0f;
@@ -497,28 +498,29 @@ void p6_shared_pool_contention()
         s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
         s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
         s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
+        const unit_march_tick mt = run_unit_march(s.w, reg, &shared_pool);
         const convoy_dispatch_tick ct = dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),
                                                           reg.logistics_cost(convoy_mode::space),
                                                           &shared_pool);
-        const unit_march_tick mt = run_unit_march(s.w, reg, &shared_pool);
-        return { ct.dispatched == 1, mt.refused_no_lp == 1 };
+        // { march granted, convoy refused for want of LP }
+        return { mt.marching == 1 && mt.refused_no_lp == 0,
+                 ct.dispatched == 0 && ct.refused_no_lp == 1 };
     };
 
     const auto a = run_scenario();
     const auto b = run_scenario();
     check(a.first == b.first && a.second == b.second,
           "the contested outcome (which side is granted) is IDENTICAL across two independent runs");
-    // Concrete numbers, pinned rather than trusted from prose: the dest market
-    // is short 30 units and the source holds 100, so the convoy's cargo is 30 —
-    // exactly the pool (30.0), so the convoy (which draws FIRST, matching the
-    // real driver's dispatch_convoys-before-run_unit_march tick order) is
-    // GRANTED, exhausting the anchor's pool to 0.0 and leaving nothing for
-    // the mobilised unit's 2.0-point march — which is then REFUSED. This is
-    // "war flips the queue" made concrete: the convoy claims the anchor
-    // first, so the army goes unsupplied THIS tick, purely from visitation
-    // order over one shared pool.
-    check(a.first == true, "the convoy (drawn first) is granted — its 30 units of cargo exactly exhaust the pool");
-    check(a.second == true, "...leaving nothing for the mobilised unit's march, which is refused");
+    // Concrete numbers, pinned rather than trusted from prose. The real driver
+    // now runs run_unit_march BEFORE dispatch_convoys (BL-1066/BL-995: advance
+    // -> arrivals -> economy (march inside) -> dispatch -> clear), so the
+    // mobilised unit's 2.0-point march draws the anchor FIRST and is GRANTED,
+    // leaving 28 of the 30.0 pool; the dest market is short 30 and the source
+    // holds 100, so the convoy's cargo is 30 — more than is left — and it is
+    // REFUSED for want of passive LP. Armies claim the anchor before goods:
+    // the goods-vs-force priority LOGISTICS.md says must be chosen.
+    check(a.first == true, "the march (drawn first, the real tick order) is granted");
+    check(a.second == true, "...leaving 28 of 30 LP, so the 30-unit convoy is refused for want of LP");
 }
 
 // ---------------------------------------------------------------------------
