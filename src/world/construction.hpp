@@ -22,6 +22,28 @@ enum class construction_result : uint8_t
     // build, so the value became unreachable. Tech is the only method lock now.
 };
 
+/// BL-323 S3 site-time multiplier for building `type`/`target` on `tile`: landform
+/// x reach x stack, each 1.0 in the cheapest case (PRODUCTION.md § Construction site
+/// time). It scales the build's duration, and since the per-tick draw is the authored
+/// cost over the AUTHORED duration, it scales the materials and cash drawn too.
+/// Const: reads the reach field without building it (an unbuilt field reads 1.0).
+float construction_site_multiplier(const world& w, const recipe_registry& reg,
+                                   entity_id tile, building_type type, resource_type target);
+
+/// The economy ticks a build of `type`/`target` on `tile` takes at full rate: the
+/// authored duration times the site multiplier, rounded, floored at 1; 0 for an
+/// instant (undurationed) type. What `construct_building` sets `ticks_remaining` to.
+int construction_build_ticks(const world& w, const recipe_registry& reg,
+                             entity_id tile, building_type type, resource_type target);
+
+/// BL-1066 (Ben, 2026-09-23): what a build will actually draw, priced now — the flat
+/// `build_cost` plus the materials at the tile market's current price, times the site
+/// multiplier. The ONE figure the affordability gate, the Build door and the rival
+/// scorer price a build at, so no reader can commit to less than the build will draw.
+float construction_capex(const world& w, const recipe_registry& reg, entity_id tile,
+                         building_type type, resource_type target,
+                         std::uint16_t recipe = no_recipe);
+
 /// Attempt to construct a building of `type` (targeting `target` for an extraction
 /// site) on `tile` for corporation `corp`, paying the registry build cost from the
 /// corporation's balance. The Layer 4 build front door (docs/ui/SELECTION.md, the
