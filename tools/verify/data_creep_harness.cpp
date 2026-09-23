@@ -349,7 +349,7 @@ enum counter : int
     c_corporations,
     c_corp_assets_total,   ///< Sum over corporations of assets.size().
     c_nation_tiles_total,  ///< Sum over nations of tiles.size().
-    c_corp_body_pools,
+    c_corp_market_pools,
     c_convoys,
     c_trade_routes,
     c_glimpse_stamps,
@@ -386,7 +386,7 @@ const char* const k_counter_names[c_count] = {
     "world.corporations",
     "corporation.assets (sum)",
     "nation.tiles (sum)",
-    "world.corp_body_pools",
+    "world.corp_market_pools",
     "world.convoys",
     "world.trade_routes",
     "world.body_last_glimpse_tick",
@@ -468,7 +468,7 @@ sample take_sample(int tick, const world& w, const economy_report& rep,
         nation_tiles += static_cast<long long>(nat.tiles.size());
     s.v[c_nation_tiles_total] = nation_tiles;
 
-    s.v[c_corp_body_pools]  = static_cast<long long>(w.corp_body_pools.size());
+    s.v[c_corp_market_pools]  = static_cast<long long>(w.corp_market_pools.size());
     s.v[c_convoys]          = static_cast<long long>(w.convoys.size());
     s.v[c_trade_routes]     = static_cast<long long>(w.trade_routes.size());
     s.v[c_glimpse_stamps]   = static_cast<long long>(w.body_last_glimpse_tick.size());

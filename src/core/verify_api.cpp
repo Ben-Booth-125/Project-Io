@@ -2685,12 +2685,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // Read the player's home-body pool quantity of `res` — the stock a sell order
     // draws from. A floored order that cannot clear leaves stock in the pool; a
     // script asserts the floor was honoured by comparing pool before/after a tick.
+    // BL-1003: pools key (corp, market) and a sell order on a body lists from
+    // every one of them, so this reads the corp's aggregate on the home body.
     v.set_function("home_pool", [this](const std::string& res) -> double {
         const resource_type rt = resource_from_name(res);
-        const auto it = m_world.corp_body_pools.find(
-            std::make_pair(m_world.player_entity, m_world.home_body));
-        if (it == m_world.corp_body_pools.end()) return 0.0;
-        return static_cast<double>(it->second.quantities[static_cast<std::size_t>(rt)]);
+        const stockpile_component total =
+            body_pool_total(m_world, m_world.player_entity, m_world.home_body);
+        return static_cast<double>(total.quantities[static_cast<std::size_t>(rt)]);
     });
 
     // --- US-011: survey dispatch --------------------------------------------
@@ -3054,7 +3055,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const auto it = m_world.corporations.find(m_world.player_entity);
         if (it == m_world.corporations.end())
             return false;
-        auto& pool = m_world.corp_body_pools[{m_world.player_entity, m_world.home_body}];
+        // BL-1003: the player's HOME pool on the home body (the HQ's market).
+        auto& pool = m_world.pool_at(m_world.player_entity,
+                                     corp_home_pool_key(m_world, m_world.player_entity,
+                                                        m_world.home_body));
         pool.quantities[static_cast<std::size_t>(resource_from_name(res))] +=
             static_cast<float>(qty);
         return true;
@@ -3159,10 +3163,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             SDL_Log("economy balance: %-26s %.1f%s",
                     cc.name.c_str(), cc.balance,
                     cc.balance < 0.0f ? "  [NEGATIVE]" : "");
-        for (const auto& [key, pool] : m_world.corp_body_pools)
+        for (const auto& [key, pool] : m_world.corp_market_pools)
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (pool.quantities[r] > 0.0f)
-                    SDL_Log("economy pool: corp=%u body=%u %s=%.1f",
+                    SDL_Log("economy pool: corp=%u pool=%u %s=%.1f", // BL-1003: market (or body) key
                             static_cast<unsigned>(key.first),
                             static_cast<unsigned>(key.second),
                             ui::resource_name(static_cast<resource_type>(r)),
@@ -3219,17 +3223,23 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                   << (cc.balance - cc.starting_capital) << "," << cc.assets.size() << "\n";
             }
         }
-        // stockpiles.csv — one row per (corp, body, resource) with stock > 0.
+        // stockpiles.csv — one row per (corp, pool, resource) with stock > 0.
+        // BL-1003: pools key (corp, market); body_id is the pool's body, and the
+        // trailing pool_key column (appended, so existing readers keep working)
+        // names the market (or the body, for a market-less body's pool).
         {
             std::ofstream f(path("stockpiles.csv"));
-            f << "corp_id,corp_name,body_id,body_name,resource,quantity\n";
-            for (const auto& [key, pool] : m_world.corp_body_pools)
+            f << "corp_id,corp_name,body_id,body_name,resource,quantity,pool_key\n";
+            for (const auto& [key, pool] : m_world.corp_market_pools)
+            {
+                const entity_id body = pool_key_body(m_world, key.second);
                 for (std::size_t r = 0; r < resource_count; ++r)
                     if (pool.quantities[r] > 0.0f)
-                        f << key.first << ",\"" << corp_name(key.first) << "\"," << key.second
-                          << ",\"" << body_name(key.second) << "\","
+                        f << key.first << ",\"" << corp_name(key.first) << "\"," << body
+                          << ",\"" << body_name(body) << "\","
                           << ui::resource_name(static_cast<resource_type>(r)) << ","
-                          << pool.quantities[r] << "\n";
+                          << pool.quantities[r] << "," << key.second << "\n";
+            }
         }
         // Per-market display label = its generated city name (population centre anchoring
         // the market's centre tile), or the body name as a fallback. Shared with the

@@ -1991,7 +1991,7 @@ std::vector<entity_id> generate_corporations(
         // production / trade have materials from turn one. Generated for every
         // corp (fixed RNG-draw order) so the stream stays deterministic even
         // when a holdless corp has no body to seed; only corps with a home body
-        // receive a pool. Populates the existing corp_body_pools map (no new
+        // receive a pool. Populates the existing corp_market_pools map (no new
         // save field). The pre-game warm-start then evolves this seed.
         const auto stock = generate_starting_stockpile(
             corp_focuses[static_cast<std::size_t>(c)],
@@ -1999,7 +1999,10 @@ std::vector<entity_id> generate_corporations(
             params.base_capital, stock_rng);
         if (home_body != null_entity)
         {
-            stockpile_component& pool = w.pool_for(corp_id, home_body);
+            // BL-1003: the HQ's tile market pool (body-level if no market yet;
+            // rehome_body_pools moves it once the home markets are carved).
+            stockpile_component& pool =
+                w.pool_at(corp_id, corp_home_pool_key(w, corp_id, home_body));
             for (std::size_t r = 0; r < resource_count; ++r)
                 pool.quantities[r] += stock[r];
         }
@@ -2114,8 +2117,8 @@ int remove_specialist_roster(world& w)
             w.stockpiles.erase(cc.hq_building);
         }
 
-        for (auto it = w.corp_body_pools.begin(); it != w.corp_body_pools.end();)
-            it = (it->first.first == cid) ? w.corp_body_pools.erase(it) : std::next(it);
+        for (auto it = w.corp_market_pools.begin(); it != w.corp_market_pools.end();)
+            it = (it->first.first == cid) ? w.corp_market_pools.erase(it) : std::next(it);
 
         // Units are keyed by their own id; collect then erase so the map is not
         // mutated under its iterator. Order-insensitive: every erase is by key.
@@ -2527,7 +2530,7 @@ std::vector<entity_id> generate_background_firms(
             {
                 const auto stock = generate_starting_stockpile(
                     focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
-                stockpile_component& pool = w.pool_for(corp_id, home_body);
+                stockpile_component& pool = w.pool_at(corp_id, corp_home_pool_key(w, corp_id, home_body)); // BL-1003: HQ tile market pool
                 for (std::size_t r = 0; r < resource_count; ++r)
                     pool.quantities[r] += stock[r];
             }
@@ -3628,7 +3631,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                                                stock_rng);
                 if (home_body != null_entity)
                 {
-                    stockpile_component& pool = w.pool_for(corp_id, home_body);
+                    stockpile_component& pool = w.pool_at(corp_id, corp_home_pool_key(w, corp_id, home_body)); // BL-1003: HQ tile market pool
                     for (std::size_t r = 0; r < resource_count; ++r)
                         pool.quantities[r] += stock[r];
                 }
@@ -4032,7 +4035,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             {
                 const auto stock = generate_starting_stockpile(
                     focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
-                stockpile_component& pool = w.pool_for(corp_id, home_body);
+                stockpile_component& pool = w.pool_at(corp_id, corp_home_pool_key(w, corp_id, home_body)); // BL-1003: HQ tile market pool
                 for (std::size_t r = 0; r < resource_count; ++r)
                     pool.quantities[r] += stock[r];
             }

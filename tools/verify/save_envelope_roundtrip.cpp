@@ -85,7 +85,7 @@ world make_world()
         cc.is_player = true;
         w.corporations[corp] = cc;
     }
-    w.pool_for(corp, body).quantities[ri(resource_type::iron_ore)] = 99.5f;
+    w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)] = 99.5f;
     w.current_econ_tick = 3;
 
     return w;

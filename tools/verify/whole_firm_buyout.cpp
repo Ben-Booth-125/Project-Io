@@ -183,8 +183,8 @@ std::vector<std::string> dangling_refs(const world& w, entity_id gone)
         if (c.contractor == gone)                              note("world::mercenary_contracts[*].contractor");
     for (const active_battle& b : w.battles)
         if (b.attacker == gone || b.defender == gone)          note("world::battles[*]");
-    for (const auto& kv : w.corp_body_pools)
-        if (kv.first.first == gone)                            note("world::corp_body_pools key");
+    for (const auto& kv : w.corp_market_pools)
+        if (kv.first.first == gone)                            note("world::corp_market_pools key");
     for (const auto& kv : w.workforce_supply_overrides)
         if (kv.first.first == gone)                            note("world::workforce_supply_overrides key");
     for (const auto& kv : w.sentiment.pairs)
@@ -348,9 +348,9 @@ fixture build_fixture()
 
     // --- references of every kind, so R4 has something to find --------------
     // (corp, body) pools on two bodies, one of which the buyer also holds.
-    w.pool_for(f.target, f.body).quantities[ri(resource_type::iron_ore)]     = 40.0f;
-    w.pool_for(f.target, f.body_far).quantities[ri(resource_type::iron_ore)] = 7.0f;
-    w.pool_for(f.buyer,  f.body).quantities[ri(resource_type::iron_ore)]     = 3.0f;
+    w.pool_at(f.target, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)]     = 40.0f;
+    w.pool_at(f.target, pool_key_for_body(w, f.body_far)).quantities[ri(resource_type::iron_ore)] = 7.0f;
+    w.pool_at(f.buyer, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)]     = 3.0f;
 
     w.workforce_supply_overrides[{f.target, f.body_far}] = 6.0f;
     w.workforce_supply_overrides[{f.buyer,  f.body}]     = 4.0f;
@@ -669,9 +669,9 @@ void run_transfer_rows(const recipe_registry& reg)
 
     // Pooled stock on the shared body, before.
     const float buyer_pool_before =
-        w.corp_body_pools.at({f.buyer, f.body}).quantities[ri(resource_type::iron_ore)];
+        w.corp_market_pools.at({f.buyer, pool_key_for_body(w, f.body)}).quantities[ri(resource_type::iron_ore)];
     const float target_pool_before =
-        w.corp_body_pools.at({f.target, f.body}).quantities[ri(resource_type::iron_ore)];
+        w.corp_market_pools.at({f.target, pool_key_for_body(w, f.body)}).quantities[ri(resource_type::iron_ore)];
 
     // --- R5's solvency half, FIRST: one credit short is refused ------------
     {
@@ -703,14 +703,14 @@ void run_transfer_rows(const recipe_registry& reg)
                    && std::find(acq.assets.begin(), acq.assets.end(), a) != acq.assets.end();
     check(holdings_ok, "R3", "every holding transferred to the acquirer");
 
-    check(w.corp_body_pools.count({f.target, f.body}) == 0
-              && w.corp_body_pools.count({f.target, f.body_far}) == 0,
+    check(w.corp_market_pools.count({f.target, pool_key_for_body(w, f.body)}) == 0
+              && w.corp_market_pools.count({f.target, pool_key_for_body(w, f.body_far)}) == 0,
           "R3", "the target's (corp, body) pools are gone");
-    check(w.corp_body_pools.at({f.buyer, f.body}).quantities[ri(resource_type::iron_ore)]
+    check(w.corp_market_pools.at({f.buyer, pool_key_for_body(w, f.body)}).quantities[ri(resource_type::iron_ore)]
               == buyer_pool_before + target_pool_before,
           "R3", "colliding pools MERGED (stock summed, not replaced)");
-    check(w.corp_body_pools.count({f.buyer, f.body_far}) == 1
-              && w.corp_body_pools.at({f.buyer, f.body_far})
+    check(w.corp_market_pools.count({f.buyer, pool_key_for_body(w, f.body_far)}) == 1
+              && w.corp_market_pools.at({f.buyer, pool_key_for_body(w, f.body_far)})
                          .quantities[ri(resource_type::iron_ore)] == 7.0f,
           "R3", "a pool on a body the buyer did not hold came across whole");
 

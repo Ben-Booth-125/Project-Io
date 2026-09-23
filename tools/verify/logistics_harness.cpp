@@ -151,7 +151,7 @@ int main()
         w.player_entity = corp;
 
         constexpr std::size_t ri = 0;
-        w.pool_for(corp, body).quantities[ri] = 100.0f; // on-body stockpile surplus
+        w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri] = 100.0f; // on-body stockpile surplus
 
         const entity_id short_market = w.create_entity();
         market_component mm{};
@@ -195,7 +195,7 @@ int main()
         cc.assets.push_back(bld);
         w.corporations[corp] = cc;
         w.player_entity = corp;
-        w.pool_for(corp, body).quantities[0] = 100.0f;
+        w.pool_at(corp, pool_key_for_body(w, body)).quantities[0] = 100.0f;
         const entity_id short_market = w.create_entity();
         market_component mm{}; mm.body = body; mm.centre_tile = tile_at(w, body, 0, 2);
         mm.demand[0] = 10.0f; mm.supply[0] = 0.0f;

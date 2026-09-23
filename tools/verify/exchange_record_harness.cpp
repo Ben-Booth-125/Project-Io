@@ -128,9 +128,9 @@ fixture build(world& w, bool reverse_market_insert)
 
     // Surplus in both corps' pools, in two resources, so the per-resource walk
     // has something to order too.
-    w.pool_for(f.c1, f.body).quantities[ri(resource_type::iron_ore)] = 40.0f;
-    w.pool_for(f.c1, f.body).quantities[ri(resource_type::coal)]     = 25.0f;
-    w.pool_for(f.c2, f.body).quantities[ri(resource_type::iron_ore)] = 10.0f;
+    w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)] = 40.0f;
+    w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::coal)]     = 25.0f;
+    w.pool_at(f.c2, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)] = 10.0f;
 
     w.current_econ_tick = 7;
     return f;
@@ -152,9 +152,9 @@ int main()
         world w;
         const fixture f = build(w, false);
 
-        const float pool_before_c1_iron = w.pool_for(f.c1, f.body).quantities[ri(resource_type::iron_ore)];
-        const float pool_before_c1_coal = w.pool_for(f.c1, f.body).quantities[ri(resource_type::coal)];
-        const float pool_before_c2_iron = w.pool_for(f.c2, f.body).quantities[ri(resource_type::iron_ore)];
+        const float pool_before_c1_iron = w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)];
+        const float pool_before_c1_coal = w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::coal)];
+        const float pool_before_c2_iron = w.pool_at(f.c2, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)];
 
         const auto flows = clear_markets(w, reg, empty_report);
 
@@ -200,10 +200,10 @@ int main()
 
         // ...and the quantity is what actually left the pool.
         const float moved_c1 = (pool_before_c1_iron + pool_before_c1_coal)
-            - (w.pool_for(f.c1, f.body).quantities[ri(resource_type::iron_ore)]
-               + w.pool_for(f.c1, f.body).quantities[ri(resource_type::coal)]);
+            - (w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)]
+               + w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::coal)]);
         const float moved_c2 = pool_before_c2_iron
-            - w.pool_for(f.c2, f.body).quantities[ri(resource_type::iron_ore)];
+            - w.pool_at(f.c2, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)];
         check(near(qty_by_seller[f.c1], moved_c1, 1e-2f),
               "E2 the recorded quantity is exactly what left the seller's pool (corp 1)");
         check(near(qty_by_seller[f.c2], moved_c2, 1e-2f),
@@ -362,7 +362,7 @@ int main()
             w.current_econ_tick = t;
             // Re-stock, so each tick has something to clear rather than trailing
             // off to zero -- the measurement wants a BUSY tick, not a quiet one.
-            for (auto& [key, pool] : w.corp_body_pools)
+            for (auto& [key, pool] : w.corp_market_pools)
                 pool.quantities[static_cast<std::size_t>(resource_type::iron_ore)] += 20.0f;
             clear_markets(w, reg, empty_report);
             std::printf("  %4d   %14llu   %9llu\n", t,

@@ -100,7 +100,7 @@ fixture make_fixture(int quarters, float filed_balance)
         f.w.buildings[f.doomed_building] = bc;
         f.w.corporations.at(f.doomed).assets.push_back(f.doomed_building);
     }
-    f.w.corp_body_pools[std::make_pair(f.doomed, f.body)].quantities[k_stone] = 40.0f;
+    f.w.corp_market_pools[std::make_pair(f.doomed, pool_key_for_body(f.w, f.body))].quantities[k_stone] = 40.0f;
     {
         f.doomed_unit = f.w.create_entity();
         unit_component uc{};
@@ -143,7 +143,7 @@ bool world_holds(const world& w, entity_id id)
     if (w.corporations.count(id)) return true;
     for (const auto& kv : w.buildings)
         (void)kv; // buildings carry no corp field; ownership is the asset list
-    for (const auto& kv : w.corp_body_pools)
+    for (const auto& kv : w.corp_market_pools)
         if (kv.first.first == id) return true;
     for (const auto& kv : w.units)
         if (kv.second.owner == id) return true;
@@ -201,7 +201,7 @@ int main()
               "F1", "four filed quarters below the floor: the firm is erased, "
                     "its building demolished, its unit disbanded");
         check(f.w.markets.at(f.market).inventory[k_stone] == 40.0f &&
-              f.w.corp_body_pools.count(std::make_pair(f.doomed, f.body)) == 0,
+              f.w.corp_market_pools.count(std::make_pair(f.doomed, pool_key_for_body(f.w, f.body))) == 0,
               "F1b", "...and its pool lands WHOLE in the local market's real "
                      "inventory - the conservation law, not a vanishing");
     }
@@ -250,7 +250,7 @@ int main()
         std::vector<firm_exit_record> out;
         run_firm_exits(f.w, firm_exit_params{}, &out);
         check(out.empty() && f.w.corporations.count(f.doomed) == 1 &&
-              f.w.corp_body_pools.count(std::make_pair(f.doomed, f.body)) == 1 &&
+              f.w.corp_market_pools.count(std::make_pair(f.doomed, pool_key_for_body(f.w, f.body))) == 1 &&
               f.w.markets.at(f.market).inventory[k_stone] == 0.0f,
               "F5", "inert params (the unloaded-registry defaults) touch "
                     "nothing - the standing inertness discipline");

@@ -7,7 +7,7 @@
 -- Run: ProjectIo --verify scripts/verify/export_mockdata.lua
 -- Output (docs/ui/mockdata/):
 --   corporations.csv      corp_id,name,focus,home_nation,balance,starting_capital,since_start,buildings
---   stockpiles.csv        corp_id,corp_name,body_id,body_name,resource,quantity
+--   stockpiles.csv        corp_id,corp_name,body_id,body_name,resource,quantity,pool_key
 --   markets.csv           market_id,market_label,body_id,body_name,resource,supply,demand,price,base_price
 --   market_prices.csv     market_id,market_label,body_name,resource,tick,price,supply,demand  (time series)
 --   cashflow.csv          corp_id,corp_name,income,expenditure,maintenance,wages,interest,net

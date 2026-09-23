@@ -151,13 +151,13 @@ bool corp_owns_port(const world& w, entity_id corp)
 
 float corp_stockpile_total(const world& w, entity_id corp, resource_type res)
 {
-    // Reads the live (corp, body) pool store — the per-building
+    // Reads the live (corp, market) pool store (BL-1003) — the per-building
     // stockpile_component is authored empty and never credited in L3
-    // (world.hpp § corp_body_pools). The map is keyed (corp, body), so the
-    // corp's pools sit in one contiguous ascending-body run.
+    // (world.hpp § corp_market_pools). The map is keyed (corp, key), so the
+    // corp's pools sit in one contiguous ascending-key run: a corp-wide sum.
     float total = 0.0f;
-    for (auto it = w.corp_body_pools.lower_bound({corp, entity_id{0}});
-         it != w.corp_body_pools.end() && it->first.first == corp; ++it)
+    for (auto it = w.corp_market_pools.lower_bound({corp, entity_id{0}});
+         it != w.corp_market_pools.end() && it->first.first == corp; ++it)
         total += it->second.quantities[static_cast<std::size_t>(res)];
     return total;
 }

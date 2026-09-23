@@ -118,7 +118,9 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
                                 std::isfinite(cv.cargo_qty);
         if (creditable)
         {
-            w.pool_for(interceptor_corp, rec.body).quantities[
+            // BL-1003: the pool of the market whose catchment holds the
+            // interception tile — where the captured cargo physically is.
+            w.pool_at(interceptor_corp, pool_key_for_tile(w, tile)).quantities[
                 static_cast<std::size_t>(cv.cargo_resource)] += cv.cargo_qty;
             rec.outcome = interception_outcome::captured;
         }
@@ -165,13 +167,14 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
         if (!convoy.arrived)
             continue;
 
-        // Find the destination market's body so we can credit the (corp, body) pool.
+        // The destination market's body, for the trade-route record below.
         const auto mit = w.markets.find(convoy.dest_market);
         if (mit == w.markets.end())
             continue;
         const entity_id dest_body = mit->second.body;
 
-        // Credit the destination pool. The credit is the whole delivery —
+        // Credit the DESTINATION MARKET's pool (BL-1003) — so a same-body haul
+        // sells at the destination, not back at home. The credit is the whole delivery —
         // deliberately NO direct write into market supply here. This runs after
         // clear_markets in the tick, and clear_markets zeroes the supply/demand
         // arrays at its top, so a supply += here would be erased before pricing
@@ -179,7 +182,7 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
         // consumers (the AI scorer's glut forecast among them): a private signal
         // nothing priced ever agreed with. The cargo reaches pricing through the
         // ordinary auto-surplus path off this pool at the next clear (BL-382).
-        w.pool_for(convoy.corp, dest_body).quantities[
+        w.pool_at(convoy.corp, convoy.dest_market).quantities[
             static_cast<std::size_t>(convoy.cargo_resource)] += convoy.cargo_qty;
 
         // Record the persistent trade route this completed lane ran (BL-088). The
@@ -315,25 +318,23 @@ bool corp_has_launchpad_on(const world& w, const corporation_component& corp, en
 }
 
 /// Stock of the drawn good `dr` the corp can actually burn launching `cargo_qty`
-/// units of `ri` off `body` — its on-body stockpile, minus the cargo itself when
-/// the cargo IS the drawn good (a launch cannot burn the propellant it is
-/// exporting).
-float launch_draw_available(const world& w, entity_id corp, entity_id body,
+/// units of `ri` out of the source pool `src_key` (BL-1003: the pool the cargo
+/// leaves), minus the cargo itself when the cargo IS the drawn good (a launch
+/// cannot burn the propellant it is exporting).
+float launch_draw_available(const world& w, entity_id corp, entity_id src_key,
                             std::size_t dr, std::size_t ri, float cargo_qty)
 {
-    const auto pit = w.corp_body_pools.find({corp, body});
-    if (pit == w.corp_body_pools.end())
+    const stockpile_component* p = w.find_pool(corp, src_key);
+    if (p == nullptr)
         return 0.0f;
-    float avail = pit->second.quantities[dr];
+    float avail = p->quantities[dr];
     if (ri == dr)
         avail -= cargo_qty;
     return avail;
 }
 
-/// Tile of the corp's lowest-id building on `body` — its production anchor, used as the
-/// intra-body haul origin (BL-077). Mirrors market_clearing's representative_tile, kept local
-/// here to avoid a supply_system -> market_clearing link dependency. null_entity if the corp
-/// holds nothing on the body.
+} // namespace
+
 entity_id corp_representative_tile(const world& w, const corporation_component& corp, entity_id body)
 {
     entity_id best_building = null_entity;
@@ -355,6 +356,33 @@ entity_id corp_representative_tile(const world& w, const corporation_component& 
     return best_tile;
 }
 
+entity_id convoy_origin_tile(const world& w, const corporation_component& corp, entity_id src_key)
+{
+    const auto mit = w.markets.find(src_key);
+    if (mit == w.markets.end())
+        return corp_representative_tile(w, corp, src_key); // body-level pool
+    // A market pool: the corp's lowest-id building in THAT catchment, else the
+    // market's own centre (stock that arrived by convoy sits at the market).
+    entity_id best_building = null_entity;
+    entity_id best_tile     = null_entity;
+    for (const entity_id bid : corp.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        if (pool_key_for_tile(w, bit->second.tile) != src_key)
+            continue;
+        if (best_building == null_entity || bid < best_building)
+        {
+            best_building = bid;
+            best_tile     = bit->second.tile;
+        }
+    }
+    return best_tile != null_entity ? best_tile : mit->second.centre_tile;
+}
+
+namespace {
+
 /// True when an active (built AND non-decommissioned) Port sits on `tile` —
 /// the sea-mode endpoint gate (BL-608, SUPPLY.md § Infrastructure gates:
 /// "Port building at both endpoints"). Ownership-agnostic like
@@ -375,18 +403,6 @@ bool tile_has_active_port(const world& w, entity_id tile)
             return true;
     }
     return false;
-}
-
-/// Find the market entity for a given body — the lowest-id one, so the pick is
-/// stable when a body hosts several markets (w.markets is an unordered_map; the
-/// first hit would inherit hash layout). Returns null_entity if none exists.
-entity_id market_for_body(const world& w, entity_id body)
-{
-    entity_id best = null_entity;
-    for (const auto& [mid, mc] : w.markets)
-        if (mc.body == body && (best == null_entity || mid < best))
-            best = mid;
-    return best;
 }
 
 /// Fraction in [0, cap] to discount an intra-body haul cost by — summed over the
@@ -455,13 +471,18 @@ logistics_nodes collect_logistics_nodes(const world& w)
 
 convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id corp_id,
-                            entity_id src_body, entity_id dest_market_id,
+                            entity_id src_key, entity_id dest_market_id,
                             std::size_t ri, float qty, float logistics_cost_space)
 {
     convoy_leg leg;
 
     const auto cit = w.corporations.find(corp_id);
     if (cit == w.corporations.end())
+        return leg;
+    // BL-1003: the source is a POOL — a market, or a market-less body. Moving
+    // goods into the market they already sit in is not a haul.
+    const entity_id src_body = pool_key_body(w, src_key);
+    if (src_body == null_entity || src_key == dest_market_id)
         return leg;
     const auto mit = w.markets.find(dest_market_id);
     if (mit == w.markets.end())
@@ -500,10 +521,12 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
     float       node_discount = 0.0f; // BL-148/149: intra-body city/hub discount.
     if (src_body == dest_body)
     {
-        // Intra-body (BL-077): haul the corp's on-body stockpile from its
-        // representative tile to the short market's centre, terrain-weighted
-        // over the tile grid (land, or sea when the path must cross water).
-        const entity_id origin      = corp_representative_tile(w, corp, src_body);
+        // Intra-body (BL-077): haul the source pool's stock from its origin
+        // tile (BL-1003: `convoy_origin_tile` — the corp's lowest-id building in
+        // the source catchment, else the source market's centre) to the short
+        // market's centre, terrain-weighted over the tile grid (land, or sea
+        // when the path must cross water).
+        const entity_id origin      = convoy_origin_tile(w, corp, src_key);
         const entity_id dest_centre = dest_market.centre_tile;
         if (origin == null_entity || dest_centre == null_entity)
             return leg; // no production anchor / unanchored market: cannot route
@@ -552,7 +575,7 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
             const auto& launch_draw = launch_draw_per_convoy();
             for (std::size_t dr = 0; dr < resource_count; ++dr)
                 if (launch_draw[dr] > 0.0f
-                    && launch_draw_available(w, corp_id, src_body, dr, ri, qty) < launch_draw[dr])
+                    && launch_draw_available(w, corp_id, src_key, dr, ri, qty) < launch_draw[dr])
                     return leg;
         }
         mode      = convoy_mode::space;
@@ -594,6 +617,11 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     if (corp.balance < leg.cost)
         return false; // the solvency gate, in ONE place for both callers
 
+    // BL-1003: the pool the cargo leaves is the SOURCE MARKET's, or — when the
+    // source body has no market — the body-level pool.
+    const entity_id src_key =
+        (w.markets.find(src_market) != w.markets.end()) ? src_market : src_body;
+
     // BL-597: the passive-LP admissibility gate, before any mutation —
     // same "refused outright, mutates nothing" contract as BL-596's active
     // gate (run_unit_march). Space legs have no intra-body path at all and
@@ -620,10 +648,9 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
         std::unordered_map<entity_id, float>& pools =
             lp_pool_for_body(pools_by_body, w, src_body, mil.active_lp_per_anchor_tick);
 
-        // Same locus as price_convoy_leg's own origin — the corp's
-        // representative (lowest-id building) tile on the source body, the
-        // convoy's actual dispatch point.
-        const entity_id origin = corp_representative_tile(w, corp, src_body);
+        // Same locus as price_convoy_leg's own origin — `convoy_origin_tile`
+        // of the source pool, the convoy's actual dispatch point.
+        const entity_id origin = convoy_origin_tile(w, corp, src_key);
         const entity_id nearest_anchor =
             (origin != null_entity) ? nearest_lp_anchor(w, src_body, origin, pools) : null_entity;
 
@@ -657,7 +684,7 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
 
     // Debit cost and source pool; create the convoy.
     corp.balance -= leg.cost;
-    w.pool_for(corp_id, src_body).quantities[ri] -= qty;
+    w.pool_at(corp_id, src_key).quantities[ri] -= qty;
 
     // BL-308: burn the launch's draw. Charged once per launch (not per unit,
     // not per AU) and only on the space lane; price_convoy_leg's availability
@@ -666,7 +693,7 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     // determinism discipline the gate above uses.
     if (leg.mode == convoy_mode::space)
     {
-        auto&       quantities  = w.pool_for(corp_id, src_body).quantities;
+        auto&       quantities  = w.pool_at(corp_id, src_key).quantities;
         const auto& launch_draw = launch_draw_per_convoy();
         for (std::size_t dr = 0; dr < resource_count; ++dr)
             if (launch_draw[dr] > 0.0f)
@@ -758,37 +785,43 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 // the winner — pricing the leg and committing the cargo — is
                 // the shared dispatch the player's `dispatch_convoy` verb calls
                 // with this scan removed, so the two cannot drift apart.
-                entity_id  best_src_body = null_entity;
+                entity_id  best_src_key  = null_entity;
                 float      best_qty      = 0.0f;
                 convoy_leg best_leg;
                 best_leg.cost = std::numeric_limits<float>::max();
 
-                for (auto& [src_key, src_pool] : w.corp_body_pools)
+                // BL-1003: sources are the corp's (corp, market) pools — its
+                // slice of the std::map, ascending key. A pool IN the short
+                // market is not a source (price_convoy_leg refuses it); its
+                // stock reaches that market by auto-surplus instead.
+                for (auto it = w.corp_market_pools.lower_bound({corp_id, entity_id{0}});
+                     it != w.corp_market_pools.end() && it->first.first == corp_id; ++it)
                 {
-                    if (src_key.first != corp_id)
-                        continue;
-                    const entity_id src_body = src_key.second;
+                    const entity_id src_key = it->first.second;
 
-                    const float surplus = src_pool.quantities[ri];
+                    const float surplus = it->second.quantities[ri];
                     if (surplus <= 0.0f)
                         continue;
                     const float qty = std::min(surplus, shortfall);
 
                     const convoy_leg leg = price_convoy_leg(
-                        w, reg, nodes, corp_id, src_body, dest_market_id, ri, qty,
+                        w, reg, nodes, corp_id, src_key, dest_market_id, ri, qty,
                         logistics_cost_space);
                     if (!leg.viable)
-                        continue; // unroutable / unpadded / unfuelled lane
+                        continue; // unroutable / unpadded / unfuelled / same market
                     if (leg.cost < best_leg.cost)
                     {
-                        best_src_body = src_body;
-                        best_qty      = qty;
-                        best_leg      = leg;
+                        best_src_key = src_key;
+                        best_qty     = qty;
+                        best_leg     = leg;
                     }
                 }
 
-                if (best_src_body == null_entity)
+                if (best_src_key == null_entity)
                     continue;
+                const entity_id best_src_body = pool_key_body(w, best_src_key);
+                const entity_id best_src_market =
+                    (w.markets.find(best_src_key) != w.markets.end()) ? best_src_key : null_entity;
 
                 // Commit through the shared path: the solvency gate, the
                 // passive-LP gate (BL-597), the pool debit, the propellant
@@ -796,7 +829,7 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 // convoy and the player's are the same object built by the
                 // same code.
                 bool refused_no_lp = false;
-                if (commit_convoy(w, reg, corp_id, best_src_body, market_for_body(w, best_src_body),
+                if (commit_convoy(w, reg, corp_id, best_src_body, best_src_market,
                               dest_market_id, ri, best_qty, best_leg, &pools_by_body, &refused_no_lp))
                     ++out.dispatched;
                 else if (refused_no_lp)

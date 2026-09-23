@@ -365,7 +365,7 @@ struct sentiment_event
 
 /// THE TABLE. Sparse and directed: keyed (observer, subject), and an ABSENT ROW
 /// IS NEUTRAL. A `std::map` so every walk is a sorted walk over ids (BL-158),
-/// which is the same reason `corp_body_pools` and `corp_reputation` are maps.
+/// which is the same reason `corp_market_pools` and `corp_reputation` are maps.
 ///
 /// A struct rather than a bare typedef so it can carry a serialiser and any
 /// later derived index without changing every signature that names it.

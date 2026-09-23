@@ -275,6 +275,7 @@ std::vector<potential_trade_record> derive_potential_trades(
     world& w, const recipe_registry& reg, entity_id src_body, entity_id here_mid)
 {
     std::vector<potential_trade_record> out;
+    (void)src_body; // BL-1003: the source is the pool at `here_mid`, not the body
 
     const entity_id corp = w.player_entity;
     if (w.corporations.find(corp) == w.corporations.end())
@@ -309,7 +310,9 @@ std::vector<potential_trade_record> derive_potential_trades(
             if (!(sell > buy))
                 continue; // no gross spread — prune before paying for a path
 
-            const convoy_leg leg = price_convoy_leg(w, reg, nodes, corp, src_body, dm,
+            // BL-1003: the goods are bought HERE, so the haul leaves this
+            // market's pool — the source pool key is `here_mid`.
+            const convoy_leg leg = price_convoy_leg(w, reg, nodes, corp, here_mid, dm,
                                                     r, 1.0f, space_cost);
             if (!leg.viable)
                 continue;
@@ -755,7 +758,7 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
     // under 7 ms at the worst tick — bounded, because the gross-spread test prunes
     // before the pricing call and the A* cache is warm after the first pair.
     // The estate is part of the key because a BUILD OR A DEMOLITION moves the
-    // haulage origin (`corp_representative_tile`) and can open or shut a lane
+    // haulage origin (`convoy_origin_tile`, BL-1003) and can open or shut a lane
     // outright, and both are presses — they land between econ ticks, so a key of
     // tick alone would leave the derivation stale for the rest of the quarter
     // after the player changed the thing it depends on.

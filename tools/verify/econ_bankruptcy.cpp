@@ -174,7 +174,7 @@ int main()
         const entity_id rival_corp = w.create_entity();
         w.corporations[rival_corp] = cc;
         // Seed rival's pool so the processor isn't immediately idle
-        w.pool_for(rival_corp, body).quantities[ri(resource_type::iron_ore)] = 4.0f;
+        w.pool_at(rival_corp, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)] = 4.0f;
     }
 
     // --- per-building burn accumulators (indexed by building_type enum value) ---

@@ -25,14 +25,16 @@ entity_id lowest_market_on_body(const world& w, entity_id body)
     return best;
 }
 
-/// The procurement price basis: the resolved price at @p body's market, or
-/// `base_price` before first resolution — space_programme.cpp's own reading.
-/// Zero when the body has no market at all: a purchase with no price basis is
-/// refused, never priced at nothing — a zero-credit draw would be confiscation
-/// wearing a purchase's name.
-float unit_price_at(const world& w, entity_id body, std::size_t ri)
+/// The procurement price basis: the resolved price at the supplier pool's
+/// market (BL-1003: @p pool_key is that market; a body key — a market-less
+/// body — finds none), or `base_price` before first resolution —
+/// space_programme.cpp's own reading. Zero when there is no market at all: a
+/// purchase with no price basis is refused, never priced at nothing — a
+/// zero-credit draw would be confiscation wearing a purchase's name.
+float unit_price_at(const world& w, entity_id pool_key, std::size_t ri)
 {
-    const entity_id mid = lowest_market_on_body(w, body);
+    const entity_id mid = (w.markets.find(pool_key) != w.markets.end())
+        ? pool_key : lowest_market_on_body(w, pool_key);
     if (mid == null_entity)
         return 0.0f;
     const market_component& mc = w.markets.at(mid);
@@ -105,7 +107,7 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
         return out;
 
     // Stock already promised to an earlier claim THIS derivation, keyed
-    // (corp, body, resource) — space_programme.cpp's reservation, so two
+    // (corp, pool key, resource) — space_programme.cpp's reservation, so two
     // treasuries never buy the same units.
     std::map<std::tuple<entity_id, entity_id, std::size_t>, float> reserved;
     // BL-742: inventory already promised to an earlier MARKET fallback this
@@ -168,33 +170,36 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
                 continue;
             const std::size_t ri = static_cast<std::size_t>(good);
 
-            // The supplier: the (corp, body) pool holding the MOST unreserved
+            // The supplier: the (corp, market) pool holding the MOST unreserved
             // stock — strict >, so ties keep the lowest key the std::map walk
             // reached first. The player's corp is never eligible (see the
             // header: a forced sale is an unsanctioned auto-action). Unlike
             // the space programme there is no whole-lump gate: upkeep is
             // continuous, so a pool short of the bill still supplies what it
-            // holds and the bill is CAPPED to it.
+            // holds and the bill is CAPPED to it. BL-1003: each pool is its
+            // own candidate, priced at its own market.
             entity_id best_corp  = null_entity;
+            entity_id best_key   = null_entity;
             entity_id best_body  = null_entity;
             float     best_avail = 0.0f;
-            for (const auto& [key, pool] : w.corp_body_pools) // ascending (corp, body)
+            for (const auto& [key, pool] : w.corp_market_pools) // ascending (corp, pool key)
             {
                 const entity_id corp = key.first;
-                const entity_id body = key.second;
+                const entity_id body = pool_key_body(w, key.second);
                 if (corp == w.player_entity)
                     continue;
                 if (w.corporations.find(corp) == w.corporations.end())
                     continue;
-                if (w.bodies.find(body) == w.bodies.end())
+                if (body == null_entity)
                     continue;
                 float avail = pool.quantities[ri];
-                const auto rit = reserved.find(std::make_tuple(corp, body, ri));
+                const auto rit = reserved.find(std::make_tuple(corp, key.second, ri));
                 if (rit != reserved.end())
                     avail -= rit->second;
                 if (avail > best_avail)
                 {
                     best_corp  = corp;
+                    best_key   = key.second;
                     best_body  = body;
                     best_avail = avail;
                 }
@@ -278,7 +283,7 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
                 continue;
             }
 
-            const float unit = unit_price_at(w, best_body, ri);
+            const float unit = unit_price_at(w, best_key, ri);
             if (!std::isfinite(unit) || !(unit > 0.0f))
                 continue; // no price basis, no purchase
 
@@ -287,7 +292,7 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
             if (!std::isfinite(amount) || !(amount > 0.0f))
                 continue;
 
-            reserved[std::make_tuple(best_corp, best_body, ri)] += quantity;
+            reserved[std::make_tuple(best_corp, best_key, ri)] += quantity;
             line_claimed += amount;
 
             budget_claim c;
@@ -304,6 +309,7 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
             np.nation   = nid;
             np.supplier = best_corp;
             np.body     = best_body;
+            np.pool     = best_key;
             np.resource = good;
             np.quantity = quantity;
             np.credits  = amount;
@@ -416,8 +422,8 @@ void settle_network_purchases(world& w,
         const float drawn = np.quantity * fill;
 
         const std::size_t ri  = static_cast<std::size_t>(np.resource);
-        const auto        pit = w.corp_body_pools.find(std::make_pair(np.supplier, np.body));
-        if (fill > 0.0f && pit != w.corp_body_pools.end()
+        const auto        pit = w.corp_market_pools.find(std::make_pair(np.supplier, np.pool));
+        if (fill > 0.0f && pit != w.corp_market_pools.end()
             && pit->second.quantities[ri] >= drawn)
         {
             // The terminal sink: the materials leave the supplier's pool and

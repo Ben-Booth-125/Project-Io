@@ -34,7 +34,7 @@
 /// What became of an intercepted convoy's cargo.
 enum class interception_outcome : std::uint8_t
 {
-    captured  = 0, ///< Credited whole to the interceptor's pool at the interception body.
+    captured  = 0, ///< Credited whole to the interceptor's pool at the interception tile's market.
     destroyed = 1, ///< Nothing credited anywhere — the fallback, never a mint.
 };
 
@@ -56,7 +56,7 @@ struct interception_record
 
 /// Cut every convoy standing on a tile held by a unit whose owner has declared
 /// hostility toward the convoy's corp. The cargo credits the interceptor's
-/// `(corp, body)` pool at the interception body, or — if the interceptor is not
+/// pool at the interception tile's market (BL-1003), or — if the interceptor is not
 /// a corporation, or the tile resolves to no body — is destroyed. The convoy is
 /// then erased: it never arrives and never credits its destination.
 ///
@@ -91,7 +91,7 @@ std::vector<interception_record> intercept_convoys(world& w, int tick);
 void advance_convoys(world& w);
 
 /// Credit and retire all arrived convoys: add cargo_qty of cargo_resource to the
-/// destination (corp, body) pool, increase the destination market's supply for that
+/// destination (corp, dest market) pool (BL-1003), increase the destination market's supply for that
 /// resource (so the next clearing pass reprices), and erase the convoy from
 /// world.convoys. Called after clear_markets so the market supply injection takes
 /// effect at the *next* tick's clearing pass.
@@ -121,7 +121,7 @@ void credit_arrived_convoys(world& w, int tick = 0,
 
 /// Auto-dispatch convoys to fill shortfalls. For each (corp, body, resource) where
 /// market demand exceeded supply in the last clearing pass (indicated by the market
-/// demand field), search other (corp, body) pools on any body for a surplus of the
+/// demand field), search the corp's other (corp, market) pools for a surplus of the
 /// same resource and dispatch a convoy if one is found and affordable. Logistics
 /// cost constants are passed in directly (loaded from economy.lua by the caller).
 ///
@@ -193,7 +193,7 @@ struct logistics_nodes
 logistics_nodes collect_logistics_nodes(const world& w);
 
 /// One priced candidate leg: what hauling `qty` of resource index `ri` from
-/// `src_body` to `dest_market_id` would cost, in credits and in econ ticks.
+/// source pool `src_key` to `dest_market_id` would cost, in credits and in econ ticks.
 struct convoy_leg
 {
     /// False when the lane cannot be flown at all — no production anchor, no
@@ -210,6 +210,13 @@ struct convoy_leg
 /// is why `w` is non-const. Mutates no game state and creates nothing.
 ///
 /// @param nodes                From collect_logistics_nodes; the intra-body discount source.
+/// @param src_key              BL-1003: the SOURCE POOL KEY — the market whose (corp, market)
+///                             pool the cargo leaves, or a body id for a market-less body's
+///                             body-level pool. The source body is `pool_key_body(src_key)`;
+///                             the intra-body origin is `convoy_origin_tile(src_key)`; the
+///                             launch draw reads this pool. `src_key == dest_market_id`
+///                             (a haul into the market the goods already sit in) answers
+///                             `viable = false`.
 /// @param ri                   Resource index; out-of-range answers `viable = false`.
 /// @param qty                  Units of cargo. Non-finite or non-positive answers `viable = false`.
 /// @param logistics_cost_space Space-lane base cost per unit distance per unit cargo. Every
@@ -217,8 +224,18 @@ struct convoy_leg
 ///                             parameter only because `dispatch_convoys` has always taken it.
 convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id corp_id,
-                            entity_id src_body, entity_id dest_market_id,
+                            entity_id src_key, entity_id dest_market_id,
                             std::size_t ri, float qty, float logistics_cost_space);
+
+/// Tile of the corp's lowest-id building on `body` (BL-077's production anchor).
+/// `null_entity` if the corp holds nothing on the body.
+entity_id corp_representative_tile(const world& w, const corporation_component& corp, entity_id body);
+
+/// BL-1003 — where a haul out of the source pool `src_key` starts: for a market
+/// pool, the corp's lowest-id building in that market's catchment, else the
+/// market's own centre tile (stock that arrived by convoy sits at the market);
+/// for a body-level pool, `corp_representative_tile` on that body.
+entity_id convoy_origin_tile(const world& w, const corporation_component& corp, entity_id src_key);
 
 /// The goods ONE space-mode convoy launch burns from the dispatching corp's
 /// on-body pool (BL-308) — per LAUNCH, not per tonne and not per AU: the pad is
@@ -245,21 +262,19 @@ const std::array<float, resource_count>& launch_draw_per_convoy();
 /// gate lives in `price_convoy_leg`, so a viable space leg cannot drive the
 /// propellant pool negative here.
 ///
-/// @param src_body   The body the cargo leaves; the pool debited is (corp, src_body).
-/// @param src_market Recorded as the convoy's `source_market`, purely as the lane's
-///                   display endpoint. Passed rather than re-derived so the player's
-///                   NAMED source market is the one recorded: the auto-dispatcher
-///                   selects by body and passes the body's lowest-id market (which may
-///                   be `null_entity` on a body carrying none), while the player's verb
-///                   passes the market they actually dispatched from. The cargo and the
-///                   cost are a function of `src_body` either way.
+/// @param src_body   The body the cargo leaves (the passive-LP gate's body).
+/// @param src_market BL-1003: the SOURCE MARKET — the pool debited is (corp, src_market),
+///                   and it is recorded as the convoy's `source_market`. `null_entity`
+///                   (or any non-market id) only for a market-less source body, whose
+///                   body-level pool (corp, src_body) is debited instead. Must be the
+///                   same source `price_convoy_leg` priced (its `src_key`).
 ///
 /// BL-597 (LOGISTICS.md § Logistic Points): before any mutation, an
 /// intra-body leg (`leg.mode != convoy_mode::space`) must also clear the
 /// PASSIVE-LP admissibility gate — LOGISTICS.md rule 1, "LP is a CAP, not a
 /// PRICE": no second credit charge, `leg.cost` (haulage) stays the only
 /// price, LP only decides whether the leg is admissible at all. The corp's
-/// dispatch tile (`corp_representative_tile(w, corp, src_body)`, the same
+/// dispatch tile (`convoy_origin_tile` of the source pool, the same
 /// origin `price_convoy_leg` routes from) draws against its NEAREST anchor's
 /// pool (`nearest_lp_anchor`, logistics.hpp — the same reduction BL-596's
 /// active march gate uses), by the leg's CARGO QUANTITY (Ben, 2026-08-25,

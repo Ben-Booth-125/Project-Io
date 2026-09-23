@@ -154,10 +154,10 @@ int main()
     // (corp,body) stockpile-pool keys.
     {
         std::vector<std::pair<entity_id, entity_id>> ka, kb;
-        ka.reserve(a.corp_body_pools.size());
-        kb.reserve(b.corp_body_pools.size());
-        for (const auto& kv : a.corp_body_pools) ka.push_back(kv.first);
-        for (const auto& kv : b.corp_body_pools) kb.push_back(kv.first);
+        ka.reserve(a.corp_market_pools.size());
+        kb.reserve(b.corp_market_pools.size());
+        for (const auto& kv : a.corp_market_pools) ka.push_back(kv.first);
+        for (const auto& kv : b.corp_market_pools) kb.push_back(kv.first);
         std::sort(ka.begin(), ka.end());
         std::sort(kb.begin(), kb.end());
         check(ka == kb, "corp-body pool keys identical");

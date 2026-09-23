@@ -263,7 +263,7 @@ int main()
               "P.R5 construct_building seeds the CHOSEN recipe (BL-162 seam)");
         // Give the corp the inputs the recipe needs so the run is not input-starved,
         // and pin the BL-181 dial for the same reason as P.R3 above.
-        wp.pool_for(corp, body).quantities[ri(resource_type::iron_ore)] = 1000.0f;
+        wp.pool_at(corp, pool_key_for_body(wp, body)).quantities[ri(resource_type::iron_ore)] = 1000.0f;
         wp.buildings[built].workforce_auto   = false;
         wp.buildings[built].workforce_target = 100;
         const economy_report rep = run_economy_step(wp, reg);

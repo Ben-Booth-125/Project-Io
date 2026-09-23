@@ -116,7 +116,7 @@ int main()
       cc.is_player = true; w.corporations[chain_corp] = cc; }
     // Seed steel directly — steel's own iron_ore/coal chain is pre-existing,
     // tested elsewhere (econ_harness); this harness scopes to the NEW chain.
-    w.pool_for(chain_corp, body).quantities[ri(resource_type::steel)] = 1.0e5f;
+    w.pool_at(chain_corp, pool_key_for_body(w, body)).quantities[ri(resource_type::steel)] = 1.0e5f;
 
     auto make_processor = [&](uint16_t recipe_id) {
         const entity_id bld = w.create_entity();

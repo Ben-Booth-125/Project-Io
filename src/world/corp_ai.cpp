@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <limits>
 #include <map>
+#include <set> // BL-1003: the trade candidate's per-(body, resource) seen set
 #include <ostream>
 #include <string>
 #include <tuple> // BL-1050: the haul destination's written-out id tie-break
@@ -41,21 +42,6 @@ entity_id tile_body(const world& w, entity_id tile)
 {
     const auto it = w.tiles.find(tile);
     return (it != w.tiles.end()) ? it->second.body : null_entity;
-}
-
-/// The LOWEST-ID market on `body`, or `null_entity` if it carries none.
-///
-/// Lowest id rather than map order: `world::markets` is an unordered_map, so
-/// "the first one found" is a hash-layout answer and this file may not have
-/// one. The same stable pick `market_clearing.cpp` and `supply_system.cpp` each
-/// make internally (a body may host several markets — BL-096).
-entity_id market_on_body(const world& w, entity_id body)
-{
-    entity_id best = null_entity;
-    for (const auto& [mid, mc] : w.markets)
-        if (mc.body == body && (best == null_entity || mid < best))
-            best = mid;
-    return best;
 }
 
 // ---------------------------------------------------------------------------
@@ -511,8 +497,10 @@ float standing_economic(const world& w, const recipe_registry& reg,
         worth += reg.economics(bit->second.type).build_cost;
     }
 
-    // HELD STOCK, at the resolved price of the market on the pool's OWN body.
-    // `corp_body_pools` is a std::map, so this walk is key-ordered.
+    // HELD STOCK, at the resolved price of the pool's OWN market (BL-1003: the
+    // pool key IS the market; a body-level pool sits on a market-less body and
+    // is valued at nothing, as before). `corp_market_pools` is a std::map, so
+    // this walk is key-ordered.
     //
     // Unlike the building term this one IS marked to market, and the asymmetry
     // is the right call rather than an oversight. A balance sheet must not move
@@ -525,14 +513,14 @@ float standing_economic(const world& w, const recipe_registry& reg,
     //
     // A good the local market does not price contributes NOTHING, which is the
     // honest answer rather than a gap: there is nowhere to sell it.
-    for (const auto& [key, pool] : w.corp_body_pools)
+    for (auto it = w.corp_market_pools.lower_bound({corp, entity_id{0}});
+         it != w.corp_market_pools.end() && it->first.first == corp; ++it)
     {
-        if (key.first != corp)
-            continue;
-        const entity_id mid = market_on_body(w, key.second);
-        if (mid == null_entity)
-            continue;
-        const market_component& mc = w.markets.at(mid);
+        const stockpile_component& pool = it->second;
+        const auto mit = w.markets.find(it->first.second);
+        if (mit == w.markets.end())
+            continue; // body-level pool: no market prices it
+        const market_component& mc = mit->second;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             if (mc.base_price[r] <= 0.0f)
@@ -1127,14 +1115,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     continue;
                 const entity_id body = tit->second.body;
 
-                // The corp's own stock on this body, plus what the local market
-                // actually holds — the SAME two sources the production tick
-                // draws inputs from (economy_system.cpp § run_processing, the
-                // BL-130 pool + inventory coverage). Read const: a candidate
-                // that is only being scored must not author a pool.
-                const auto pit = w.corp_body_pools.find(std::make_pair(corp, body));
+                // The corp's own stock in this tile's market pool (BL-1003),
+                // plus what that market actually holds — the SAME two sources
+                // the production tick draws inputs from (economy_system.cpp §
+                // run_processing, the BL-130 pool + inventory coverage). Read
+                // const: a candidate that is only being scored must not author
+                // a pool.
                 const stockpile_component* pool =
-                    (pit != w.corp_body_pools.end()) ? &pit->second : nullptr;
+                    w.find_pool(corp, pool_key_for_tile(w, tile));
                 const entity_id mid = market_for_tile(w, tile);
                 const auto      mit = (mid != null_entity) ? w.markets.find(mid) : w.markets.end();
                 const market_component* mkt = (mit != w.markets.end()) ? &mit->second : nullptr;
@@ -1918,24 +1906,34 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // numbers behind it are corp_ai_params fields precisely so tuning it
         // never needs this code changed. See AI_OPPONENT.md § 6.
         {
-            // corp_body_pools is a std::map, so this walk is already ordered by
-            // (corp, body) — the deterministic iteration the whole scorer rests on.
-            for (const auto& [key, pool] : w.corp_body_pools)
+            // corp_market_pools is a std::map, so this walk is already ordered by
+            // (corp, market) — the deterministic iteration the whole scorer rests on.
+            //
+            // BL-1003 CALL: `place_sell_order` names a BODY, and clearing lists
+            // it across the corp's market pools on that body (market_clearing.cpp).
+            // So the candidate is per (body, resource): its excess is the corp's
+            // stock summed over the body (`body_pool_total`), and its floor is
+            // read off the lowest-id market pool on the body that prices the
+            // good — the first one this sorted walk reaches. Seen once per eval.
+            std::set<std::pair<entity_id, std::size_t>> seen_triple;
+            for (auto pit = w.corp_market_pools.lower_bound({corp, entity_id{0}});
+                 pit != w.corp_market_pools.end() && pit->first.first == corp; ++pit)
             {
-                if (key.first != corp)
-                    continue;
-                const entity_id body = key.second;
-                const entity_id mid  = market_on_body(w, body);
-                if (mid == null_entity)
-                    continue;
-                const market_component& mc = w.markets.at(mid);
+                const auto mit = w.markets.find(pit->first.second);
+                if (mit == w.markets.end())
+                    continue; // body-level pool: nowhere to list it
+                const market_component& mc = mit->second;
+                const entity_id body = mc.body;
+                const stockpile_component total = body_pool_total(w, corp, body);
 
                 for (std::size_t r = 0; r < resource_count; ++r)
                 {
                     if (mc.base_price[r] <= 0.0f)
                         continue; // this market does not price the good
+                    if (!seen_triple.emplace(body, r).second)
+                        continue; // an earlier market pool on this body spoke for it
 
-                    const float excess = pool.quantities[r] - p.trade_hold_threshold;
+                    const float excess = total.quantities[r] - p.trade_hold_threshold;
                     if (excess <= 0.0f)
                         continue;
 
@@ -2002,12 +2000,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // rather than flooding the candidate list with every (body, resource)
         // pair.
         {
-            // `market_on_body` (top of this file) is the same stable pick
-            // `supply_system.cpp`'s own (internal-linkage) `market_for_body`
-            // makes. It was a lambda here and a second identical one in the
-            // trade block above until BL-700 needed a third for the standing
-            // read; three copies of one rule is one copy too many, so it is now
-            // a single file-local function.
+            // BL-1003: the source is a (corp, market) pool, so no "market on
+            // this body" pick is needed any more — the pool key IS the market.
             const logistics_nodes nodes = collect_logistics_nodes(w);
 
             // ASCENDING MARKET ID (BL-1050). The destination scan below is a
@@ -2028,17 +2022,22 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             std::sort(market_ids.begin(), market_ids.end());
 
             entity_id   best_market   = null_entity;
-            entity_id   best_src_body = null_entity;
+            entity_id   best_src_key  = null_entity;
             std::size_t best_ri       = 0;
             float       best_qty      = 0.0f;
             float       best_score    = 0.0f;
             convoy_leg  best_leg;
 
-            for (const auto& [key, pool] : w.corp_body_pools)
+            // BL-1003: sources are the corp's (corp, market) pools. The verb
+            // names its source MARKET, so a body-level pool (a market-less
+            // body) cannot be dispatched from here, exactly as before.
+            for (auto pit = w.corp_market_pools.lower_bound({corp, entity_id{0}});
+                 pit != w.corp_market_pools.end() && pit->first.first == corp; ++pit)
             {
-                if (key.first != corp)
+                const stockpile_component& pool = pit->second;
+                const entity_id src_key = pit->first.second;
+                if (w.markets.find(src_key) == w.markets.end())
                     continue;
-                const entity_id src_body = key.second;
 
                 for (std::size_t r = 0; r < resource_count; ++r)
                 {
@@ -2055,7 +2054,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         // Same-body IS a real haul (BL-096 multi-market bodies):
                         // `price_convoy_leg` routes it over `intra_body_path`
                         // exactly like the auto-dispatcher's own scan does, so
-                        // this candidate does not special-case it away.
+                        // this candidate does not special-case it away. Its own
+                        // market is not a destination (BL-1003): the leg refuses.
+                        if (mid == src_key)
+                            continue;
                         if (mc.base_price[r] <= 0.0f)
                             continue; // this market does not price the good
 
@@ -2074,7 +2076,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         // uses above). The seam re-prices and commits for
                         // real at apply time.
                         const convoy_leg leg = price_convoy_leg(
-                            w, reg, nodes, corp, src_body, mid, r, qty,
+                            w, reg, nodes, corp, src_key, mid, r, qty,
                             reg.logistics_cost(convoy_mode::space));
                         if (!leg.viable)
                             continue; // unroutable / unpadded / unfuelled lane
@@ -2092,7 +2094,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
                         // THE TIE-BREAK IS WRITTEN OUT (BL-1050), not left to
                         // the walk: on an exactly equal score the lane with the
-                        // lowest (source body, resource, market id) wins. That
+                        // lowest (source market, resource, market id) wins. That
                         // is what the sorted walk above already yields — the
                         // pools are a std::map, the resource index ascends, the
                         // market ids are sorted — so this changes no choice the
@@ -2103,13 +2105,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         const bool better =
                             (score > best_score) ||
                             (score == best_score && best_market != null_entity &&
-                             std::make_tuple(src_body, r, mid) <
-                                 std::make_tuple(best_src_body, best_ri, best_market));
+                             std::make_tuple(src_key, r, mid) <
+                                 std::make_tuple(best_src_key, best_ri, best_market));
                         if (better)
                         {
                             best_score    = score;
                             best_market   = mid;
-                            best_src_body = src_body;
+                            best_src_key  = src_key;
                             best_ri       = r;
                             best_qty      = qty;
                             best_leg      = leg;
@@ -2120,7 +2122,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
             if (best_market != null_entity)
             {
-                const entity_id src_market = market_on_body(w, best_src_body);
+                const entity_id src_market = best_src_key; // a market, by the filter above
                 if (src_market != null_entity)
                 {
                     candidate c;
@@ -2604,7 +2606,10 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
             add_fact(bb, tick, bid, "building_workforce_target", b.workforce_target, 1.0f, fact_provenance::own_asset);
             add_fact(bb, tick, bid, "building_decommissioned", b.decommissioned ? 1.0 : 0.0, 1.0f, fact_provenance::own_asset);
         }
-        for (const auto& [key, pool] : w.corp_body_pools) // std::map: sorted
+        // BL-1003 CALL: the fact's subject is the POOL KEY — a market id (or a
+        // body id for a market-less body's pool) — not the body, so an agent
+        // reads where its stock actually sits and sells.
+        for (const auto& [key, pool] : w.corp_market_pools) // std::map: sorted
         {
             if (key.first != corp)
                 continue;

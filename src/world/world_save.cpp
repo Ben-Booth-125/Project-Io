@@ -835,7 +835,7 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_store(out, w.corporations, w_corp);
 
     // --- pair-keyed economy tables ------------------------------------------
-    w_map(out, w.corp_body_pools, w_id_pair, w_stockpile);
+    w_map(out, w.corp_market_pools, w_id_pair, w_stockpile); // BL-1003: (corp, market|body) keys
     w_map(out, w.workforce_supply_overrides, w_id_pair,
           [](std::ostream& s, const float& v) { w_f32(s, v); });
     // BL-546: `corp_reputation` (one float per pair) became `sentiment` (two,
@@ -1001,7 +1001,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     if (!r_store(in, s.corporations, r_corp))
         return false;
 
-    if (!r_map(in, s.corp_body_pools, r_id_pair, r_stockpile))
+    if (!r_map(in, s.corp_market_pools, r_id_pair, r_stockpile))
         return false;
     if (!r_map(in, s.workforce_supply_overrides, r_id_pair,
                [](std::istream& st, float& v) { return r_f32(st, v); }))

@@ -252,7 +252,16 @@ inline constexpr uint32_t world_save_magic =
 /// say what a nation's space weight was, and the scorer re-authors weights on
 /// its own cadence anyway. Claimed through
 /// `tools/session/next_save_version.js --claim`.
-inline constexpr uint32_t world_save_version = 23;
+/// Bumped to 25 by BL-1003 (pools per market; v24 is claimed by BL-996 on an
+/// unmerged branch, so it is skipped): `corp_body_pools` became
+/// `corp_market_pools`, keyed (corp, market) — or (corp, body) on a body with
+/// no market. The byte LAYOUT is unchanged (a pair of ids and a stockpile per
+/// entry), and that is exactly why the bump is needed: a v23 stream would load
+/// its body-keyed pools as orphan body-level pools on bodies that have markets,
+/// which nothing would ever list, draw or absorb. Refused whole on the
+/// strict-equality contract; no migration. Claimed through
+/// `tools/session/next_save_version.js --claim`.
+inline constexpr uint32_t world_save_version = 25;
 
 /// Write @p w as a complete world snapshot.
 ///

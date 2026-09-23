@@ -24,7 +24,7 @@ struct world;
 // Like the space programme: a named supplier, a direct deal priced at the
 // supplier body's market (resolved price, or base_price before first
 // resolution), the credit moved by `run_national_budget`'s own transfer, the
-// goods drawn from the supplier's (corp, body) pool and CONSUMED — repairs go
+// goods drawn from the supplier's (corp, market) pool and CONSUMED — repairs go
 // into the roadbed and land nowhere. Nothing here bids, clears, or touches a
 // market's demand array.
 //
@@ -98,6 +98,7 @@ struct network_purchase
     entity_id     supplier = null_entity;
     entity_id     body     = null_entity; ///< Where the goods stand (the pool's body).
     entity_id     market   = null_entity; ///< BL-742: the inventory market, when supplier is null.
+    entity_id     pool     = null_entity; ///< BL-1003: the supplier's POOL KEY (market, or a market-less body).
     resource_type resource = resource_type::stone;
     float         quantity = 0.0f; ///< Units the claim asked for — the bill.
     float         credits  = 0.0f; ///< quantity x the supplier market's unit price — the claim amount.
@@ -111,7 +112,7 @@ struct network_purchase
 /// `run_national_budget`. For each nation in @p budgets (ascending id): tally
 /// its network — road tiles by level through `tile_to_nation`, plus active
 /// ports / inland hubs standing on its territory — multiply by the authored
-/// rates, and for each material with a positive bill pick the (corp, body)
+/// rates, and for each material with a positive bill pick the (corp, market)
 /// pool holding the most unreserved stock (strict >, so ties keep the lowest
 /// key; the player's corp never eligible), CAP the bill at that stock, price
 /// it at the supplier body's market, and append one UNEARMARKED

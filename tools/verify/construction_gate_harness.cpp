@@ -117,8 +117,8 @@ int main()
               b.ticks_remaining, 2);
         check(std::fabs(b.construction_progress) < 1e-4f,
               "A: no fractional remainder at full rate", b.construction_progress, 0.0f);
-        const float drawn = rep.purchases.count({s.corp, s.w.markets[s.market].body})
-            ? rep.purchases.at({s.corp, s.w.markets[s.market].body})[ri(resource_type::steel)] : 0.0f;
+        const float drawn = rep.purchases.count({s.corp, s.market})
+            ? rep.purchases.at({s.corp, s.market})[ri(resource_type::steel)] : 0.0f;
         check(std::fabs(drawn - per_tick_need) < 1e-3f,
               "A: draws one tick of materials as market demand (pay-as-you-build)", drawn, per_tick_need);
         const float spent = bal0 - s.w.corporations[s.corp].balance;

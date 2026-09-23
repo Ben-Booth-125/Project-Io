@@ -162,7 +162,7 @@ scenario make_scenario(float stock, float base = 8.0f)
     cc.balance = 1000.0f;
     s.w.corporations[s.corp] = cc;
 
-    s.w.pool_for(s.corp, s.body).quantities[ri(resource_type::steel)] = stock;
+    s.w.pool_at(s.corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] = stock;
     return s;
 }
 
@@ -182,7 +182,7 @@ corp_command place_cmd(const scenario& s, float qty, float floor,
 
 float pool_steel(const scenario& s)
 {
-    return s.w.corp_body_pools.at(std::make_pair(s.corp, s.body)).quantities[ri(resource_type::steel)];
+    return s.w.corp_market_pools.at(std::make_pair(s.corp, pool_key_for_body(s.w, s.body))).quantities[ri(resource_type::steel)];
 }
 
 } // namespace
@@ -502,7 +502,7 @@ int main()
         // threshold. No buildings, so trade is the only candidate available:
         // this isolates the trade scorer from build/dial/survey competition.
         s.w.player_entity = null_entity;
-        s.w.pool_for(s.corp, s.body).quantities[ri(resource_type::steel)] =
+        s.w.pool_at(s.corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] =
             p.trade_hold_threshold + 100.0f;
 
         economy_report rep;
@@ -531,7 +531,7 @@ int main()
         // And a corp with nothing spare places nothing at all.
         scenario q = make_scenario(0.0f);
         q.w.player_entity = null_entity;
-        q.w.pool_for(q.corp, q.body).quantities[ri(resource_type::steel)] =
+        q.w.pool_at(q.corp, pool_key_for_body(q.w, q.body)).quantities[ri(resource_type::steel)] =
             p.trade_hold_threshold - 1.0f; // just under the threshold
         economy_report rep3;
         run_corp_strategic_step(q.w, reg, rep3, 0, p);
@@ -543,7 +543,7 @@ int main()
         scenario pl = make_scenario(0.0f);
         pl.w.player_entity = pl.corp;
         pl.w.corporations[pl.corp].is_player = true;
-        pl.w.pool_for(pl.corp, pl.body).quantities[ri(resource_type::steel)] =
+        pl.w.pool_at(pl.corp, pool_key_for_body(pl.w, pl.body)).quantities[ri(resource_type::steel)] =
             p.trade_hold_threshold + 500.0f;
         economy_report rep4;
         run_corp_strategic_step(pl.w, reg, rep4, 0, p);
@@ -785,7 +785,7 @@ int main()
 
             // Pool empty, so every unit of the want is a want ON THE MARKET and
             // the two readings of "the want" (gross, and net of own stock) agree.
-            s.w.pool_for(s.corp, s.body).quantities[r_iron] = 0.0f;
+            s.w.pool_at(s.corp, pool_key_for_body(s.w, s.body)).quantities[r_iron] = 0.0f;
             return s;
         };
 
@@ -826,8 +826,8 @@ int main()
             // The FILL, captured before clear_markets consumes the report. This
             // is the half that must NOT move: `purchases` is goods actually
             // received and actually paid for.
-            const float fill = rep.purchases.count({s.corp, s.body})
-                             ? rep.purchases.at({s.corp, s.body})[r_iron] : 0.0f;
+            const float fill = rep.purchases.count({s.corp, pool_key_for_body(s.w, s.body)})
+                             ? rep.purchases.at({s.corp, pool_key_for_body(s.w, s.body)})[r_iron] : 0.0f;
 
             clear_markets(s.w, reg, rep);
             const market_component& mc = s.w.markets.at(s.market);

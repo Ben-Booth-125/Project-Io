@@ -89,7 +89,7 @@ fixture make_fixture()
     add_building(f.w, f.corp, f.body, building_type::extraction_site);
     add_building(f.w, f.corp, f.body, building_type::processing_facility);
 
-    f.w.pool_for(f.corp, f.body).quantities[static_cast<std::size_t>(resource_type::iron_ore)] = 120.0f;
+    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[static_cast<std::size_t>(resource_type::iron_ore)] = 120.0f;
 
     f.market = f.w.create_entity();
     market_component mc{};
