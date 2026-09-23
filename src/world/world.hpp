@@ -947,11 +947,13 @@ void absorb_body_pool_into_market(world& w, entity_id body, entity_id market);
 /// its lowest-id building there, else `pool_key_for_body`.
 entity_id corp_home_pool_key(const world& w, entity_id corp, entity_id body);
 
-/// Re-key every body-level pool that sits on a body which now HAS markets into
-/// its corporation's `corp_home_pool_key` there. World build seeds opening
-/// stock before the home body's markets are carved; this pass, run once the
-/// markets exist, leaves no orphan body-level pool behind. Ascending key order.
-void rehome_body_pools(world& w);
+/// WORLD BUILD ONLY: re-key every pool into its corporation's
+/// `corp_home_pool_key` on that pool's body. World build seeds opening stock
+/// before the home body's markets are carved (into a body-level pool, or into a
+/// BL-910 capital market the carve then out-competes); this pass, run once the
+/// markets stand, puts every unit where the HQ clears. Never call it once play
+/// has begun — it would move produced goods between catchments for free.
+void rehome_opening_pools(world& w);
 
 /// Resolve the corporation that owns @p building by scanning each corporation's
 /// `assets`. Siblings of `pool_at` / `workforce_supply`.

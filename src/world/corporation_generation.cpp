@@ -2000,7 +2000,7 @@ std::vector<entity_id> generate_corporations(
         if (home_body != null_entity)
         {
             // BL-1003: the HQ's tile market pool (body-level if no market yet;
-            // rehome_body_pools moves it once the home markets are carved).
+            // rehome_opening_pools moves it once the home markets are carved).
             stockpile_component& pool =
                 w.pool_at(corp_id, corp_home_pool_key(w, corp_id, home_body));
             for (std::size_t r = 0; r < resource_count; ++r)

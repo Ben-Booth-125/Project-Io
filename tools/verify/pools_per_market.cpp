@@ -19,16 +19,18 @@
 //       its fill books under (corp, B).
 //   (b) WANT: a construction site in B's catchment registers its want under
 //       (corp, B), and clearing puts that demand on market B, none on A.
-//   (b') DRAW: the site draws the (corp, B) pool first, then B's shelf, and
-//       bids and pays only for the shelf's part; stock in A is not reachable.
+//   (b') DRAW: the site draws B's SHELF only — never its owner's pool (the
+//       pool is what the corp's processors hold back; cold review 2026-09-23);
+//       want and fill are the whole need, at B; stock in A is not reachable.
 //   (c) CONVOY: a haul from (corp, A) to market B debits A's pool, credits
 //       B's pool on arrival, and the cargo sells AT B, at B's price.
 //   (d) SPAWN: a body with no market keeps one body-level pool; the market
 //       that spawns there absorbs it whole.
 //   (e) SAVE: a flat-binary round trip preserves every (corp, market) and
 //       body-level pool key and quantity, and the state hash.
-//   (f) REHOME: a stray body-level pool on a body that HAS markets moves to
-//       the corp's home (HQ tile) market pool — world build's seeding order.
+//   (f) REHOME: world build's opening stock — a body-level pool, or a pool in
+//       a market that no longer serves the HQ tile — moves to the corp's home
+//       (HQ tile) market pool.
 //   (g) SELL ORDER: a standing sell order on a body lists from each of the
 //       corp's market pools there, ascending market id, each into its own
 //       market, capped at the order's quantity.
@@ -271,8 +273,8 @@ int main()
               "(b).4 market A — the corp's representative market — sees none of it");
     }
 
-    // (b') the site draws its owner's pool AT ITS MARKET first, then the shelf,
-    // and bids and pays only for what comes off the shelf.
+    // (b') the site draws its market's SHELF only; its owner's pool is not
+    // touched, and the whole need is bid for and billed.
     {
         scenario s = make_scenario();
         recipe_registry reg;
@@ -298,13 +300,13 @@ int main()
         const auto wit = rep.wants.find({s.corp, s.market_b});
         const auto pit = rep.purchases.find({s.corp, s.market_b});
         check(s.w.buildings.at(site).ticks_remaining == 0,
-              "(b').1 pool 6 + shelf 10 cover the need of 10: the build completes at full rate");
-        check(near(pool_q(s.w, s.corp, s.market_b, r_steel), 0.0f) &&
-              near(s.w.markets.at(s.market_b).inventory[r_steel], 6.0f),
-              "(b').2 it drew the (corp, B) pool first (6), then 4 off B's shelf");
-        check(wit != rep.wants.end() && near(wit->second[r_steel], 4.0f) &&
-              pit != rep.purchases.end() && near(pit->second[r_steel], 4.0f),
-              "(b').3 want and fill are the shelf's 4 only — own stock is not bid for or billed");
+              "(b').1 the shelf's 10 covers the need of 10: the build completes at full rate");
+        check(near(pool_q(s.w, s.corp, s.market_b, r_steel), 6.0f) &&
+              near(s.w.markets.at(s.market_b).inventory[r_steel], 0.0f),
+              "(b').2 it drew all 10 off B's shelf and left the (corp, B) pool's 6 alone");
+        check(wit != rep.wants.end() && near(wit->second[r_steel], 10.0f) &&
+              pit != rep.purchases.end() && near(pit->second[r_steel], 10.0f),
+              "(b').3 want and fill are the whole need of 10, booked at market B");
         check(near(pool_q(s.w, s.corp, s.market_a, r_steel), 50.0f),
               "(b').4 the corp's stock in market A is untouched: goods do not teleport within a body");
     }
@@ -464,13 +466,14 @@ int main()
         s.w.corporations.at(s.corp).assets.push_back(hq);
         s.w.corporations.at(s.corp).hq_building = hq;
 
-        s.w.pool_at(s.corp, s.body).quantities[r_iron] = 25.0f; // world build's seeding order
-        rehome_body_pools(s.w);
+        s.w.pool_at(s.corp, s.body).quantities[r_iron] = 25.0f;     // seeded before the carve
+        s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 5.0f;  // seeded into a stale home
+        rehome_opening_pools(s.w);
         check(s.w.find_pool(s.corp, s.body) == nullptr,
               "(f).1 no body-level pool is left on a body that has markets");
-        check(near(pool_q(s.w, s.corp, s.market_b, r_iron), 25.0f) &&
+        check(near(pool_q(s.w, s.corp, s.market_b, r_iron), 30.0f) &&
               pool_q(s.w, s.corp, s.market_a, r_iron) == 0.0f,
-              "(f).2 it moved to the HQ tile's market (B), not the lowest-id building's (A)");
+              "(f).2 both moved to the HQ tile's market (B): 25 body-level + 5 from market A");
     }
 
     // -----------------------------------------------------------------------
@@ -503,6 +506,39 @@ int main()
         check(near(pool_q(s.w, s.corp, s.market_a, r_steel), 0.0f) &&
               near(pool_q(s.w, s.corp, s.market_b, r_steel), 5.0f),
               "(g).2 each pool was debited only what sold from it (A 0, B 5)");
+    }
+
+    // -----------------------------------------------------------------------
+    // (h) a completing contract draws the supplier's stock across its pools on
+    //     the body — home first — before building anything to order
+    //     (cold review 2026-09-23: drawing the home pool alone minted goods)
+    // -----------------------------------------------------------------------
+    {
+        scenario s = make_scenario();
+        recipe_registry reg;
+        const entity_id buyer = s.w.create_entity();
+        s.w.corporations[buyer] = corporation_component{};
+        s.w.corporations.at(buyer).balance = 1.0e6f;
+        s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 10.0f; // home (anchor in A)
+        s.w.pool_at(s.corp, s.market_b).quantities[r_iron] = 50.0f; // held in B
+
+        procurement_contract c;
+        c.id              = 1;
+        c.buyer           = buyer;
+        c.supplier        = s.corp;
+        c.body            = s.body;
+        c.resource        = resource_type::iron_ore;
+        c.quantity        = 40.0f;
+        c.lead_time_ticks = 1;
+        s.w.procurement_contracts.push_back(c);
+
+        run_economy_step(s.w, reg);
+        check(s.w.procurement_contracts.empty(), "(h).1 the contract completed");
+        check(near(pool_q(s.w, s.corp, s.market_a, r_iron), 0.0f) &&
+              near(pool_q(s.w, s.corp, s.market_b, r_iron), 20.0f),
+              "(h).2 the supplier gave its home 10 then 30 of B's 50 (A 0, B 20)");
+        check(near(body_pool_total(s.w, buyer, s.body).quantities[r_iron], 40.0f),
+              "(h).3 the buyer received 40 — every unit drawn, none minted");
     }
 
     std::printf("\n%s  (%d passed, %d failed)\n", g_fail == 0 ? "ALL PASS" : "FAILURES",

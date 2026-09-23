@@ -2636,9 +2636,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // BL-1003: corporations are generated (and their opening stock seeded)
     // before the home body's markets are carved, so that stock sits in a
-    // body-level pool on a body that now has markets. Move each into the corp's
-    // home market pool (PRODUCTION.md § Stockpile and output flow).
-    rehome_body_pools(w);
+    // body-level pool, or in a capital market the carve no longer routes the HQ
+    // to. Move each into the corp's home market pool (PRODUCTION.md § Stockpile
+    // and output flow).
+    rehome_opening_pools(w);
 
     return w;
 }

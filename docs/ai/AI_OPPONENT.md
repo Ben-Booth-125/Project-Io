@@ -628,7 +628,8 @@ does not trade, because it drags the resolved price down for everyone including 
 auto-surplus path clears that stock at the reference price anyway. So the rule is the narrowest
 thing that is still trading:
 
-- **Candidate**: for each `(corp, body)` pool, each resource the local market prices, stock above
+- **Candidate**: for each body, each resource the local market prices, the corp's stock summed
+  across its market pools on that body (`PRODUCTION.md` § Stockpile and output flow) above
   `trade_hold_threshold` (50 units) — well clear of any processor's per-tick draw, so listing can
   never compete with feeding the corp's own chain.
 - **Quantity**: `trade_release_fraction` (0.5) of the excess. It meters its release rather than
@@ -1160,9 +1161,11 @@ progresses and reveals tiles an agent can then build on.
 **Enumeration.** `CORPS` returns one JSON line per corp (`id`, `name`, `is_player`,
 `home_nation`) then `END`, because corp ids in a generated world are non-obvious (NR-061).
 `BODIES` is its sibling: `survey`, `place_sell_order` and `request_quote` all take a body id as
-`subject`, and the blackboard keys pool facts by the corp's own `(corp, body)` pool and market
-facts by **market** id — so without `BODIES` an agent could never name a body it has no pool and
-no activity on, which is every body worth surveying.
+`subject`, while the blackboard keys pool facts by the corp's own pool key — a **market** id
+where the body has markets, the body id only where it has none — and market facts by **market**
+id. A pool fact's subject is therefore not a body to pass to those verbs: resolve it with the
+market's `body` (or `BODIES`). Without `BODIES` an agent could never name a body it has no pool
+and no activity on, which is every body worth surveying.
 
 **The wrapper.** `tools/mcp/server.js` spawns that process and speaks MCP-over-stdio to it —
 hand-rolled JSON-RPC 2.0 (no SDK dependency) covering `initialize`, `tools/list`, `tools/call`,

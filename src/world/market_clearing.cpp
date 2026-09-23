@@ -345,25 +345,35 @@ entity_id corp_home_pool_key(const world& w, entity_id corp, entity_id body)
     return pool_key_for_body(w, body);
 }
 
-void rehome_body_pools(world& w)
+void rehome_opening_pools(world& w)
 {
+    // WORLD BUILD ONLY. Every pool that exists here is opening stock, and it
+    // belongs in its corp's HOME pool as the markets finally stand. Two cases,
+    // one rule (cold review 2026-09-23): a body-level pool seeded before the
+    // carve, AND a market pool seeded into a BL-910 capital market that existed
+    // before the carve but no longer serves the HQ tile once the carve's
+    // markets are nearer. Called after play begins this would move produced
+    // goods between catchments for free, which is the teleport BL-1003 removed.
+    //
     // Collect first: pool_at inserts, which must not happen under the walk.
-    std::vector<std::pair<entity_id, entity_id>> strays; // ascending (corp, body)
+    struct move { std::pair<entity_id, entity_id> from; entity_id to; };
+    std::vector<move> moves; // ascending (corp, key)
     for (const auto& [key, pool] : w.corp_market_pools)
     {
-        if (w.markets.find(key.second) != w.markets.end())
-            continue; // already a market pool
-        if (pool_key_for_body(w, key.second) == key.second)
-            continue; // a market-less body: a body-level pool is correct there
-        strays.push_back(key);
+        const entity_id body = pool_key_body(w, key.second);
+        if (body == null_entity)
+            continue;
+        const entity_id home = corp_home_pool_key(w, key.first, body);
+        if (home != key.second)
+            moves.push_back({key, home});
     }
-    for (const auto& key : strays)
+    for (const move& mv : moves)
     {
-        const auto src = w.corp_market_pools.find(key);
+        const auto src = w.corp_market_pools.find(mv.from);
         const stockpile_component moved = src->second;
         w.corp_market_pools.erase(src);
-        const entity_id dst_key = corp_home_pool_key(w, key.first, key.second);
-        stockpile_component& dst = w.pool_at(key.first, dst_key);
+        const entity_id dst_key = mv.to;
+        stockpile_component& dst = w.pool_at(mv.from.first, dst_key);
         for (std::size_t r = 0; r < resource_count; ++r)
             dst.quantities[r] += moved.quantities[r];
     }

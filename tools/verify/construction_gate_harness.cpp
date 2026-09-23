@@ -6,6 +6,7 @@
 // glob ignores it.
 
 #include "world/components.hpp"
+#include "world/construction.hpp" // BL-1066: construction_capex / construction_build_ticks
 #include "world/economy_system.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
@@ -147,6 +148,55 @@ int main()
               "C: starved build is paused (no progress)", b.construction_progress, 0.0f);
         check(std::fabs(bal0 - s.w.corporations[s.corp].balance) < 1e-4f,
               "C: a paused build spends nothing", 0.0, 0.0);
+    }
+
+    // --- Case D (BL-1066): on a HARD site with capacity on, the capex the gate
+    // charges is exactly what the build draws to completion — flat cash, steel
+    // and construction capacity, each over the site's rounded build ticks.
+    {
+        recipe_registry reg_d = reg;
+        construction_params cpd = cp;
+        cpd.capacity_per_build_tick = 0.5f;
+        reg_d.set_construction(cpd);
+        scene s = make_scene(reg_d, /*steel_supply=*/1000.0f);
+        const entity_id tile = s.w.buildings.at(s.bld).tile;
+        s.w.tiles.at(tile).landform = terrain_landform::mountain; // x2.0
+        const std::size_t cap = ri(resource_type::construction_capacity);
+        market_component& m = s.w.markets.at(s.market);
+        m.base_price[cap] = 4.0f;
+        m.price[cap]      = 4.0f;
+        m.inventory[cap]  = 1000.0f;
+
+        const int ticks = construction_build_ticks(s.w, reg_d, tile, building_type::processing_facility,
+                                                   resource_type::iron_ore);
+        // x2.0 landform, less one stack step (the scene's building already stands
+        // on the tile, which a real placement would not count) — above the authored 3.
+        check(ticks > 3, "D: a mountain site takes longer than the authored 3 ticks", ticks, 4);
+        const float capex = construction_capex(s.w, reg_d, tile, building_type::processing_facility,
+                                               resource_type::iron_ore);
+        s.w.buildings.at(s.bld).ticks_remaining = ticks;
+
+        const float bal0 = s.w.corporations[s.corp].balance;
+        float steel = 0.0f, capacity = 0.0f;
+        for (int t = 0; t < 20 && s.w.buildings.at(s.bld).ticks_remaining > 0; ++t)
+        {
+            const economy_report rep = run_economy_step(s.w, reg_d);
+            if (const auto it = rep.purchases.find({s.corp, s.market}); it != rep.purchases.end())
+            {
+                steel    += it->second[ri(resource_type::steel)];
+                capacity += it->second[cap];
+            }
+        }
+        const float cash = bal0 - s.w.corporations[s.corp].balance;
+        check(s.w.buildings.at(s.bld).ticks_remaining == 0, "D: the build completes", 0.0, 0.0);
+        const float want_steel = 24.0f * static_cast<float>(ticks) / 3.0f;
+        check(std::fabs(steel - want_steel) < 1e-2f,
+              "D: it drew the authored 24 steel times ticks / 3", steel, want_steel);
+        check(std::fabs(capacity - 0.5f * static_cast<float>(ticks)) < 1e-2f,
+              "D: it drew 0.5 capacity per build tick", capacity, 0.5f * static_cast<float>(ticks));
+        const float drawn_value = cash + steel * 8.0f + capacity * 4.0f;
+        check(std::fabs(capex - drawn_value) < 1e-1f,
+              "D: construction_capex == cash + steel + capacity actually drawn", capex, drawn_value);
     }
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",

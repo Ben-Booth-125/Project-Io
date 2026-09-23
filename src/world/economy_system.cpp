@@ -690,26 +690,22 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         const entity_id mid = market_for_tile(w, b.tile);
         market_component* m = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
 
-        // BL-1003 — THE SITE DRAWS ITS OWNER'S POOL AT THIS MARKET FIRST, then
-        // the shelf (PRODUCTION.md § Stockpile and output flow: a building's
-        // inputs draw "that same pool and that market's inventory"). The pool
-        // is the (corp, tile market) pool — the body-level pool on a
-        // market-less body — and want and fill book under the same key, so the
-        // site's demand prices ITS shelf, not the corp's lowest-id building's.
-        // Looked up, never inserted: a site with nothing pooled authors no pool.
+        // BL-1003 — want and fill book under the SITE's market key (the
+        // body-level key on a market-less body), so the site's demand prices ITS
+        // shelf, not the corp's lowest-id building's. A site draws the SHELF
+        // only, never the owner's pool (cold review 2026-09-23): by construction
+        // time the last clearing has sold the pool down to its processor
+        // reservation, so a pool-first draw would raid the stock the corp's own
+        // processors hold back, and the affordability gate prices every unit at
+        // the market (construction_capex). The corp's surplus reaches its own
+        // site the way any seller's does — listed, then bought off the shelf.
         const entity_id corp     = owner_corp_of(w, bid);
         const entity_id body     = building_body(w, b);
         const entity_id pool_key = (mid != null_entity) ? mid : body;
-        stockpile_component* own = nullptr;
-        if (corp != null_entity)
-            if (const auto pit = w.corp_market_pools.find(std::make_pair(corp, pool_key));
-                pit != w.corp_market_pools.end())
-                own = &pit->second;
-        auto own_have = [&](std::size_t r) { return own ? std::max(0.0f, own->quantities[r]) : 0.0f; };
 
-        // Rate = the fraction of this tick's material need the pool plus the
-        // shelf can supply, set by the scarcest required material; below
-        // 1/max_stretch it pauses.
+        // Rate = the fraction of this tick's material need the market can
+        // supply, set by the scarcest required material; below 1/max_stretch it
+        // pauses.
         float rate = 1.0f;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
@@ -718,7 +714,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             const float need = need_row[r];
             if (need <= 0.0f)
                 continue;
-            const float avail = own_have(r) + (m ? std::max(0.0f, m->inventory[r]) : 0.0f);
+            const float avail = m ? std::max(0.0f, m->inventory[r]) : 0.0f;
             rate = std::min(rate, avail / need);
         }
 
@@ -750,8 +746,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         if (capacity_rate > 0.0f)
         {
             const float need  = need_row[cap_index];
-            const float avail = own_have(cap_index)
-                              + (m ? std::max(0.0f, m->inventory[cap_index]) : 0.0f);
+            const float avail = m ? std::max(0.0f, m->inventory[cap_index]) : 0.0f;
             const float cov   = (need > 0.0f) ? (avail / need) : 1.0f;
             rate = std::min(rate, std::max(cov, pause_below));
         }
@@ -762,11 +757,9 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
 
         // BL-441: register the WANT before the pause check, not after. The want
         // is this tick's full-rate material need — unreduced by `rate`, which is
-        // how much of that want the pool and shelf could actually meet — LESS
-        // what the owner already holds in its pool here (BL-1003). That is the
-        // processor's reading (NR-281) and the upkeep draw's: a corp feeding a
-        // site from its own stock is not bidding for it and must not push its
-        // price. Previously a site paused for want of steel registered NO demand
+        // how much of that want the shelf could actually meet. A site draws
+        // only the shelf, so the whole need is a bid on it (BL-1003 books it at
+        // the site's own market). Previously a site paused for want of steel registered NO demand
         // for steel, which is the same defect as the starved processor's and
         // arguably starker: the shortage silenced the one voice that would have
         // priced it. NR-282 records why construction is in scope.
@@ -775,7 +768,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             auto& want = report.wants[std::make_pair(corp, pool_key)];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                const float need = need_row[r] - own_have(r);
+                const float need = need_row[r];
                 if (need > 0.0f)
                     want[r] += need;
             }
@@ -784,12 +777,11 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         if (rate <= 0.0f)
             continue;
 
-        // Draw this tick's materials pool-first (BL-1003), the remainder from the
-        // market's real inventory (BL-130), and charge the flat build_cost
-        // portion incrementally to the owning corp. `bought` records only what
-        // came OFF THE SHELF — the FILL the site is billed for; stock drawn from
-        // the corp's own pool is its own and is not bought. Since BL-441 the
-        // pricing signal comes from `report.wants` above; this is the receipt.
+        // Draw this tick's materials from the market's real inventory (BL-130)
+        // and charge the flat build_cost portion incrementally to the owning
+        // corp. `bought` records the DRAWN quantity — the FILL, what the site
+        // actually received and is billed for. Since BL-441 the pricing signal
+        // comes from `report.wants` above; this is the receipt only.
         if (corp != null_entity && body != null_entity)
         {
             auto& bought = report.purchases[std::make_pair(corp, pool_key)];
@@ -798,14 +790,10 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                 const float need = need_row[r];
                 if (need <= 0.0f)
                     continue;
-                const float drawn     = need * rate;
-                const float from_pool = std::min(own_have(r), drawn);
-                if (from_pool > 0.0f)
-                    own->quantities[r] -= from_pool;
-                const float from_shelf = drawn - from_pool;
-                bought[r] += from_shelf;
+                const float drawn = need * rate;
+                bought[r] += drawn;
                 if (m)
-                    m->inventory[r] = std::max(0.0f, m->inventory[r] - from_shelf);
+                    m->inventory[r] = std::max(0.0f, m->inventory[r] - drawn);
             }
             const auto cit = w.corporations.find(corp);
             if (cit != w.corporations.end())
@@ -1084,13 +1072,27 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 // on the named body (`corp_home_pool_key`: the HQ's tile market,
                 // else the lowest-id building's). A contract that names markets
                 // is the fuller answer.
-                const auto skit = w.corp_market_pools.find(
-                    std::make_pair(c.supplier, corp_home_pool_key(w, c.supplier, c.body)));
-                if (skit != w.corp_market_pools.end())
-                {
-                    float& sq = skit->second.quantities[ri];
-                    sq -= std::min(sq, c.quantity); // a pool never goes negative
-                }
+                //
+                // The HOME pool first, then every other pool the supplier holds on
+                // that body in ascending key order (cold review 2026-09-23): stock
+                // the supplier holds in another catchment is still its stock, and
+                // building to order while it sits there would mint goods.
+                const entity_id home_key = corp_home_pool_key(w, c.supplier, c.body);
+                float to_draw = c.quantity;
+                const auto draw_from = [&](stockpile_component& pool) {
+                    float& sq = pool.quantities[ri];
+                    const float take = std::min(sq, to_draw); // a pool never goes negative
+                    sq -= take;
+                    to_draw -= take;
+                };
+                if (const auto skit = w.corp_market_pools.find(std::make_pair(c.supplier, home_key));
+                    skit != w.corp_market_pools.end())
+                    draw_from(skit->second);
+                for (auto it = w.corp_market_pools.lower_bound({c.supplier, entity_id{0}});
+                     to_draw > 0.0f && it != w.corp_market_pools.end() && it->first.first == c.supplier;
+                     ++it)
+                    if (it->first.second != home_key && pool_key_body(w, it->first.second) == c.body)
+                        draw_from(it->second);
                 const entity_id land_on = (c.delivery_body != null_entity) ? c.delivery_body : c.body;
                 w.pool_at(c.buyer, corp_home_pool_key(w, c.buyer, land_on)).quantities[ri] += c.quantity;
                 // BL-546: one `contract_completed` occurrence folded into the

@@ -38,7 +38,7 @@ int construction_build_ticks(const world& w, const recipe_registry& reg,
 
 /// BL-1066 (Ben, 2026-09-23): what a build will actually draw, priced now — the flat
 /// `build_cost` plus the materials at the tile market's current price, times the site
-/// multiplier. The ONE figure the affordability gate, the Build door and the rival
+/// multiplier, plus the construction capacity drawn per build tick. The ONE figure the affordability gate, the Build door and the rival
 /// scorer price a build at, so no reader can commit to less than the build will draw.
 float construction_capex(const world& w, const recipe_registry& reg, entity_id tile,
                          building_type type, resource_type target,

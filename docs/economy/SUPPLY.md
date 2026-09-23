@@ -83,7 +83,9 @@ The cost is charged in full at dispatch (`dispatch_convoys` debits `corp.balance
 
 **Logistics-node discount** (BL-148 / BL-149, logistics nodes). The intra-body haul cost is further discounted for each **logistics node** the A\* path crosses, so the world's cities — and the player's own hubs — form a cheap network the specialist corporation plugs into. A **population centre** on the path discounts by `logistics.node_discount.city_per_scale × centre.scale` (tier 1–5); an **Inland Logistics Hub** by a flat `logistics.node_discount.hub`. The summed discount is capped (`node_discount.cap`) so a route is never free, and is applied as `cost × (1 − discount)` (`dispatch_convoys`, over `logistics_path.tiles`). Since intra-body markets are city-seeded, most hauls deliver *into* a city and take the discount; the player extends the reach by placing hubs along a corridor. Deterministic — a pure function of the path tiles and the (population-centre / hub) node sets.
 
-**Same-body dispatch** moves goods from one of the corp's market pools to another market on the same body, hauling from the source market's `centre_tile` to the destination's at the per-leg cost above. It is real trade: the goods leave one pool and sell from another.
+**Same-body dispatch** moves goods from one of the corp's market pools to another market on the same body, hauling from the corp's lowest-id building in the source market's catchment (the market's own
+`centre_tile` when it holds none there — convoyed stock sits at the market) to the destination's
+`centre_tile`, at the per-leg cost above. It is real trade: the goods leave one pool and sell from another.
 
 ---
 

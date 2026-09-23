@@ -755,9 +755,10 @@ building under construction:
   demand** (competing with population and other builds, bidding the local price up) and pays
   the resolved price for them, plus the same fraction of the flat `build_cost`;
 - progresses at a **rate set by how much of that per-tick material need the local market can
-  supply** — read from, and drained from, the owner's own pool at the site's market first and then
-  the market's real stock (`market_component.inventory`, MARKETS.md § Real market inventory); only
-  what comes off the shelf is bid for and paid for: market supplies the full need → full speed; supplies part
+  supply** — read from, and drained from, the real stock of the market whose catchment holds the
+  site (`market_component.inventory`, MARKETS.md § Real market inventory), never the owner's pool:
+  the pool is what the corp's processors hold back, and its surplus reaches the site by being listed
+  and bought like anyone's. Market supplies the full need → full speed; supplies part
   → **stretched** (up to `max_stretch ≈ 10×` the base duration); supplies less than
   `1/max_stretch` → **paused** until supply recovers.
 

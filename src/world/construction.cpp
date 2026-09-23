@@ -73,7 +73,16 @@ float construction_capex(const world& w, const recipe_registry& reg, entity_id t
     const float duration = reg.economics(type).build_duration_ticks;
     if (duration <= 0.0f)
         return authored;
-    return authored * static_cast<float>(construction_build_ticks(w, reg, tile, type, target)) / duration;
+    const float ticks = static_cast<float>(construction_build_ticks(w, reg, tile, type, target));
+    // BL-709 construction capacity: drawn flat per build tick, not per unit of
+    // material (run_construction's need row), so it scales with the ticks alone.
+    float capacity_cost = 0.0f;
+    if (const float cap_rate = reg.construction().capacity_per_build_tick; cap_rate > 0.0f && mkt)
+    {
+        const std::size_t ci = static_cast<std::size_t>(resource_type::construction_capacity);
+        capacity_cost = cap_rate * ticks * (mkt->price[ci] > 0.0f ? mkt->price[ci] : mkt->base_price[ci]);
+    }
+    return authored * ticks / duration + capacity_cost;
 }
 
 int construction_build_ticks(const world& w, const recipe_registry& reg,
