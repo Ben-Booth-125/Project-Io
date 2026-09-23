@@ -5,9 +5,12 @@
 #include "world.hpp"
 
 #include <cstddef>
+#include <array>
 #include <cstdint>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -166,6 +169,46 @@ struct convoy_dispatch_tick
 convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                       float logistics_cost_land, float logistics_cost_space,
                       lp_pool_map* shared_lp_pools = nullptr);
+
+// ---------------------------------------------------------------------------
+// BL-995 — the net-price rule's sizing, shared by dispatch_convoys and the rival
+// scorer's directed dispatch (corp_ai.cpp), so both size a haul identically.
+// ---------------------------------------------------------------------------
+
+/// Per-pass memo of `processor_reservation` keyed (corp, pool key).
+using reservation_memo = std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>>;
+
+/// Last resolved price of good `r` in `mc`, base price as the fallback; 0 when
+/// the market does not price the good at all.
+float dispatch_market_price(const market_component& mc, std::size_t r);
+
+/// The HOME price of a pool: its market's last resolved price, or 0 for a
+/// body-level pool (no market to sell into) or a good its market does not price.
+float dispatch_home_price(const world& w, entity_id src_key, std::size_t r);
+
+/// Supply `dest` can absorb before its UNSMOOTHED target price (`price_target`)
+/// falls to `landed_cost`: S* - S with S* = D x (base / landed)^2, clamped by the
+/// price band (+infinity when landed sits below the band's floor, 0 at or above
+/// its ceiling or with no demand); a zero-supply market absorbs its unmet demand.
+/// The derivation is written out at the definition.
+float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id dest,
+                          std::size_t r, float landed_cost);
+
+/// Supply already on its way into `dest`'s next clear: EVERY corp's convoys
+/// bound there (held ones included), plus every corp's stock in (corp, dest)
+/// above its processor reservation. `sorted_corp_ids` fixes the float order.
+float dispatch_pending(const world& w, const recipe_registry& reg, entity_id dest,
+                       std::size_t r, const std::vector<entity_id>& sorted_corp_ids,
+                       reservation_memo& memo);
+
+/// max(0, absorbable - pending): what one more haul into `dest` may carry.
+float dispatch_room(const world& w, const recipe_registry& reg, entity_id dest, std::size_t r,
+                    float landed_cost, const std::vector<entity_id>& sorted_corp_ids,
+                    reservation_memo& memo);
+
+/// This tick's delivery of good `r` into the (corp, key) pool
+/// (`world::arrived_this_tick`) — not shippable until it has met a clear.
+float dispatch_arrived(const world& w, entity_id corp, entity_id key, std::size_t r);
 
 // ---------------------------------------------------------------------------
 // The shared dispatch (BL-452)

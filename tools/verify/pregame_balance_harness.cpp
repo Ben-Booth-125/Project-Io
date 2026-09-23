@@ -73,13 +73,13 @@ constexpr resource_type tradeables[] = {
 // Run the full per-tick economy step, matching app::step_economy.
 void tick(world& w, const recipe_registry& reg, int t)
 {
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space));
     advance_convoys(w);
+    credit_arrived_convoys(w, t); // app order: arrivals before the economy
     const economy_report report = run_economy_step(w, reg);
+    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
+                     reg.logistics_cost(convoy_mode::space));
     const auto flows = clear_markets(w, reg, report);
     apply_budget(w, reg, flows, report.workforce_contention, nullptr);
-    credit_arrived_convoys(w, t);
 }
 
 void seed_default_recipes(world& w, const recipe_registry& reg)

@@ -209,11 +209,12 @@ tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out,
     if (phases)
         snap(s_prev);
 
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space), &lp);
     advance_convoys(w);
+    credit_arrived_convoys(w, t); // app order: arrivals before the economy
     attribute(&phase_deltas::convoys);
     economy_report rep = run_economy_step(w, reg, /*spectating=*/true, &lp);
+    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
+                     reg.logistics_cost(convoy_mode::space), &lp);
     attribute(&phase_deltas::agency);
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
@@ -222,7 +223,6 @@ tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out,
     run_nation_step(w, reg, rep, t);
     advance_tech_gates(w);
     attribute(&phase_deltas::nation);
-    credit_arrived_convoys(w, t);
     attribute(&phase_deltas::arrivals);
     // BL-743: the insolvency wind-up, last — app::step_economy's own order.
     run_firm_exits(w, reg.firm_exit(), &rep.firm_exits);

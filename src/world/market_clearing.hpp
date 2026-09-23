@@ -220,6 +220,14 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     const recipe_registry& reg,
     const economy_report& report);
 
+/// The UNSMOOTHED price a market aims at for one good this tick: `base x
+/// sqrt(demand / supply)`, `base x ceil` for demand with no supply, `base` with
+/// neither, clamped to [floor_mult, ceil_mult] x base. `resolve_price` eases the
+/// market price toward this; BL-995's dispatch sizes a haul against it directly
+/// (the eased price lags, and a size read off it overshoots every tick).
+float price_target(float base, float supply, float demand,
+                   float price_floor_mult, float price_ceil_mult);
+
 /// Input reservation a corporation needs to keep in ONE goods pool to feed a
 /// full run of the processors that draw that pool next tick — so it sells only
 /// the genuine surplus. BL-1003: a processor draws the pool of its own tile

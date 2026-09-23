@@ -378,6 +378,19 @@ struct world
     /// below; the index remains the storage order and nothing else.
     std::vector<convoy_component> convoys;
 
+    /// BL-995 — this tick's DELIVERIES, per (corp, market): what
+    /// `credit_arrived_convoys` credited into each pool this tick. TRANSIENT:
+    /// cleared at the top of every `credit_arrived_convoys` call, never saved,
+    /// never folded into a state hash. SUPPLY.md § Dispatch trigger: a delivery
+    /// reaches its destination's clear before it can move again, so
+    /// `dispatch_convoys` subtracts this from a pool's shippable surplus.
+    ///
+    /// Safe to leave out of the save: saves are taken BETWEEN ticks, and the
+    /// only reader (dispatch) runs later in the same tick as the writer (credit),
+    /// which clears it first — so a loaded world with an empty map behaves
+    /// exactly as the saved one would have on its next tick.
+    std::map<std::pair<entity_id, entity_id>, stockpile_component> arrived_this_tick;
+
     /// Next stable convoy handle. Monotonic and never reused, exactly like
     /// `next_order_id`: an arrived convoy's id does not come back, so a command
     /// naming a convoy that has already landed is refused rather than silently

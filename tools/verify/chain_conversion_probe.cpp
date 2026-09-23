@@ -171,16 +171,16 @@ int main(int argc, char** argv)
         w.current_econ_tick = t;
         w.current_day_tick  = t;
         lp.clear();
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space), &lp);
         advance_convoys(w);
+        credit_arrived_convoys(w, t); // app order: arrivals before the economy
         economy_report rep = run_economy_step(w, reg, /*spectating=*/false, &lp);
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
+                         reg.logistics_cost(convoy_mode::space), &lp);
         auto flows = clear_markets(w, reg, rep);
         apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                      &rep.building_labour);
         run_nation_step(w, reg, rep, t);
         advance_tech_gates(w);
-        credit_arrived_convoys(w, t);
     }
     const site_counts after = count_sites(w);
     const std::map<int, int> proc_after = count_processors(w);

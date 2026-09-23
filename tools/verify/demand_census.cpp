@@ -423,10 +423,12 @@ economy_report tick_to_clearing(world& w, const recipe_registry& reg, int t, lp_
     w.current_econ_tick = t;
     w.current_day_tick  = t;
     lp.clear();
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space), &lp);
     advance_convoys(w);
-    return run_economy_step(w, reg, /*spectating=*/false, &lp);
+    credit_arrived_convoys(w, t); // app order: arrivals before the economy
+    economy_report rep = run_economy_step(w, reg, /*spectating=*/false, &lp);
+    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
+                     reg.logistics_cost(convoy_mode::space), &lp);
+    return rep;
 }
 
 /// The rest of the tick, for the warm start only.
@@ -437,7 +439,6 @@ void finish_tick(world& w, const recipe_registry& reg, int t, economy_report& re
                  &rep.building_labour);
     run_nation_step(w, reg, rep, t);
     advance_tech_gates(w);
-    credit_arrived_convoys(w, t);
 }
 
 // ---------------------------------------------------------------------------
