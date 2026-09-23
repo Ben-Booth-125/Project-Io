@@ -110,7 +110,7 @@
    "id": "46",
    "theme": "the generation reaches the game",
    "state": "proposed",
-   "status_line": "PROPOSED 2026-09-18 (Ben's sprint 46 form, NR-898). Starts after sprint 45's re-bless (BL-1044). Items are cut at the start of the next session.",
+   "status_line": "PROPOSED 2026-09-18 (Ben's sprint 46 form, NR-898); sprint 45 CLOSED 2026-09-23 and its strays triaged into this one. Items are cut at the start of the next session from drafts/sprint-46-items.json (21 rows) plus the seven already filed.",
    "opened_date": null,
    "closed_date": null,
    "author": "Ben (2026-09-18, sprint 46 form); Claude (cut from a three-lane read with an adversarial check per lane)",
@@ -127,7 +127,11 @@
     "Capital-market shells: census, then price or fold them.",
     "The post-1200 verb set measured, then decided.",
     "The generation doc sweep (superseded arc, preferred sellers, stale warm-start and tariff lines, MANUAL.md).",
-    "The select-corporation screen, designed with Ben first, built last."
+    "The select-corporation screen, designed with Ben first, built last.",
+    "BL-1066 (the player cannot build) — PRIORITY S, found by BL-1044's visual suite: on the shipped world a placed military base never completes (not cash, not the tech gate, not the fixture bound). The app lays the same web, so the core loop's first move may not land, and it blocks eleven verify scripts through lib.lua's fixture.",
+    "BL-1065 (the CTest tier relinked) — nine targets do not link the Lua TUs their harnesses pull through harness_params.hpp, three no longer compile (mercenary_contracts, retired by NR-885), and 48 more rows time out at the 60 s default in Debug.",
+    "BL-1046, BL-1049, BL-1062, BL-1063 — sprint 45's strays, fitted here 2026-09-23 because each touches or protects what crosses into play: a captured capital's stranded treasury, the civilisation/creed tables at the 1200 resume, the order-dependence lint, and the replay tripwire's lost message. The sprint's other nine strays were cancelled the same day (generation-internal polish), restorable from the cold store.",
+    "DENSITY_FOLLOWS_CITIES (draft) — Ben, NR-913: BL-1044 ships the web unpooled and density becomes its own design pass. rho(firms, urban) 0.139 against rho(firms, goods) 0.167 on the shipped world; pooling was measured (0.186-0.211) and not shipped."
    ],
    "risk": "The largest sprint yet: eight carry rows, a retirement, the flip and two new surfaces. Its re-bless follows sprint 45's (Ben: two re-blesses), so every world-mover in it lands behind switches and turns on together. Tariffs are weak in play even when enacted (matched-trade tariffs rarely fire; convoy-arrival duty was cancelled). Campaign tech state has no per-nation consumer today.",
    "done_when": "Round 6 plays; Begin opens on the wizard's world byte for byte; each play-list row carries (with a reading) or is stated deferred in the contract; no path reads epoch_year to choose an arc; the default epoch is 1960 on the industrial roster; one re-bless authorised by Ben; a cold review passed; the select-corporation screen checked live.",

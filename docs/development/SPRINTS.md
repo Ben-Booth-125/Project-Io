@@ -77,6 +77,10 @@ and/or a version goal (v0.1.1 etc.).
 - The post-1200 verb set measured, then decided.
 - The generation doc sweep (superseded arc, preferred sellers, stale warm-start and tariff lines, MANUAL.md).
 - The select-corporation screen, designed with Ben first, built last.
+- BL-1066 (the player cannot build) — PRIORITY S, found by BL-1044's visual suite: on the shipped world a placed military base never completes (not cash, not the tech gate, not the fixture bound). The app lays the same web, so the core loop's first move may not land, and it blocks eleven verify scripts through lib.lua's fixture.
+- BL-1065 (the CTest tier relinked) — nine targets do not link the Lua TUs their harnesses pull through harness_params.hpp, three no longer compile (mercenary_contracts, retired by NR-885), and 48 more rows time out at the 60 s default in Debug.
+- BL-1046, BL-1049, BL-1062, BL-1063 — sprint 45's strays, fitted here 2026-09-23 because each touches or protects what crosses into play: a captured capital's stranded treasury, the civilisation/creed tables at the 1200 resume, the order-dependence lint, and the replay tripwire's lost message. The sprint's other nine strays were cancelled the same day (generation-internal polish), restorable from the cold store.
+- DENSITY_FOLLOWS_CITIES (draft) — Ben, NR-913: BL-1044 ships the web unpooled and density becomes its own design pass. rho(firms, urban) 0.139 against rho(firms, goods) 0.167 on the shipped world; pooling was measured (0.186-0.211) and not shipped.
 
 **Done when.** Round 6 plays; Begin opens on the wizard's world byte for byte; each play-list row carries (with a reading) or is stated deferred in the contract; no path reads epoch_year to choose an arc; the default epoch is 1960 on the industrial roster; one re-bless authorised by Ben; a cold review passed; the select-corporation screen checked live.
 
@@ -152,7 +156,7 @@ RULED (Ben, 2026-09-18, sprint 46 form): (1) the EPOCH FLIP lands IN SPRINT 46, 
 | 43 | the 1960 baseline | CLOSED 2026-09-17. Four items delivered in one day, one lane plus one worktree port; no shipped world moved (digests identical). The gate is NR-888: W1, W2 and the clock, on the 1960 baseline. |
 | 44 | the corporate web's plumbing | CLOSED 2026-09-18. Four items: harness parity, a world-bytes pin, the charter-budget seam (off by default, 16/16 pins held), and the cost sweep. No shipped world moved. NR-889 (the density cap) carries the cost readings for Ben. |
 | 45 | industrialisation makes the web real | OPEN 2026-09-18. Ten items in three waves: world copies, the span boundary, the Industry tree and the charter rules first, all behind switches; then the span, Beat 1 and the stockpile budget; then the real-stockpile sweep and one re-bless that turns it all on at epoch 0. |
-| 46 | the generation reaches the game | PROPOSED 2026-09-18 (Ben's sprint 46 form, NR-898). Starts after sprint 45's re-bless (BL-1044). Items are cut at the start of the next session. |
+| 46 | the generation reaches the game | PROPOSED 2026-09-18 (Ben's sprint 46 form, NR-898); sprint 45 CLOSED 2026-09-23 and its strays triaged into this one. Items are cut at the start of the next session from drafts/sprint-46-items.json (21 rows) plus the seven already filed. |
 
 **Next up.** SPRINT 43 OPEN (2026-09-17): the 1960 baseline — BL-1026 (seed library re-read), then BL-1027 (span cost to 1960), BL-1028 (weakness counters to 1960), BL-1029 (Digitisation readings at 1960), serially in one lane. Sprints 44 (the corporate web's plumbing) and 45 (industrialisation makes the web real) are proposed goal rows; their items are cut at the gates.
 
