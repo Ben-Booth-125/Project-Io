@@ -170,16 +170,57 @@ end
 -- the captures depict a world a player can actually reach, and the muster gate
 -- (BL-325 S2: hire onto a COMPLETED military_base of your own) gets exercised on
 -- every fixture run instead of only in its own harness.
+-- Place the building selected by place_mode on the nearest placeable tile to
+-- the player's own works: rings of growing radius around the player's first
+-- listed building, each ring walked in a fixed order so the pick is
+-- deterministic. Returns {x, y} on success, or nil and the last refusal (a
+-- tech_locked or era_locked refusal is the same on every tile, so it ends the walk).
+function place_near_player(max_ring)
+    local home = nil
+    for _, b in ipairs(verify.buildings()) do
+        if b.player then home = b; break end
+    end
+    if not home then return nil, "no player building to place near" end
+    local why = "no placeable tile within " .. max_ring .. " tiles"
+    for r = 1, max_ring do
+        for dy = -r, r do
+            for dx = -r, r do
+                if math.abs(dx) == r or math.abs(dy) == r then
+                    local res = verify.build_at(home.x + dx, home.y + dy)
+                    if res == "placed" then return { x = home.x + dx, y = home.y + dy } end
+                    -- tech/era refusals hold on every tile; insufficient_funds
+                    -- does NOT (a hard site costs more, BL-1066), so it walks on.
+                    if res == "tech_locked" or res == "era_locked" then
+                        return nil, res
+                    end
+                    if res ~= "no_tile" then why = res end
+                end
+            end
+        end
+    end
+    return nil, why
+end
+
 function raise_player_force(corp)
     local VERB_HIRE_UNIT = 8 -- corp_verb::hire_unit
 
     -- 1. Place the muster base through the same construct_building path a click
-    --    uses. build_first_valid picks the first placeable tile on the active
-    --    body, so no grid coordinate is hard-coded into the fixture.
+    --    uses, on the nearest placeable tile to the player's own works (BL-1066).
+    --    Not build_first_valid: its raster-first tile sits in whatever market
+    --    catchment the grid starts in, and a build draws its materials from ITS
+    --    catchment's shelf — the fixture was staging a base the player would
+    --    never place, in a market that held none of the steel it needed.
+    --    The type is tech-gated and the gate opens with play, so a `tech_locked`
+    --    answer steps the economy and tries again, within a bound.
     verify.place_mode("military_base")
-    local placed = verify.build_first_valid()
-    if placed ~= "placed" then
-        error("fixture could not place a military base: " .. tostring(placed))
+    local placed, why = place_near_player(24)
+    for _ = 1, 20 do
+        if placed or why ~= "tech_locked" then break end
+        verify.econ_step(1)
+        placed, why = place_near_player(24)
+    end
+    if not placed then
+        error("fixture could not place a military base near the player's works: " .. tostring(why))
     end
 
     -- 2. Wait for it. Construction is durative and pay-as-you-build, so the tick
@@ -196,7 +237,11 @@ function raise_player_force(corp)
         verify.econ_step(1)
     end
     if not base then
-        error("fixture's military base never completed within 40 ticks")
+        -- Worded as what it may be, not as "slow": the BL-1066 stall read as a
+        -- long build for a sprint when construction had in fact stopped.
+        error("fixture's military base did not complete within 40 ticks of placement "
+              .. "at (" .. placed.x .. "," .. placed.y .. ") — construction is stalled or "
+              .. "starved of materials or capacity, not merely slow (see BL-1066)")
     end
 
     -- 3. Muster onto it. Which roster rows are available depends on the corp's
