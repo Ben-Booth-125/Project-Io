@@ -213,22 +213,6 @@
   },
   {
    "group": "wizard",
-   "short_name": "CAPITAL_MARKET_SHELLS",
-   "title": "Capital-market shells are counted, then priced from the template or folded into their nearest carve market",
-   "priority": "B",
-   "difficulty": 2,
-   "world_mover": true,
-   "requires": [],
-   "authority_doc": "docs/economy/MARKETS.md",
-   "design": "RULED (Ben, 2026-09-18, sprint 46 planned row 9): census, then price or fold.\n\nWHY. The sim marks has_market on every living capital at the close (history_sim.cpp:7825-7833); hard_coded_world.cpp:1566-1597 makes a default market_component for each, setting only body and centre_tile — no base price, no price (the comment :1570-1576 says so). The carve (:2255-2299) prices its own markets from the template and never folds these in. Endemic pricing (:2334-2358) sets base prices on every Kepler market, so a shell prices endemic goods only and is zero for the rest. Flag readers: history_sweep.cpp:1592, :2432; digitisation_sim_harness.cpp:1410.\n\nTHE WORK. Census per seed: shells, how many coincide with or sit near a carve market, whether market_for_tile routes any tile to one (landscape_score.cpp:59-87 counts markets). Then Ben picks: price shells from the template as the carve does, or fold each into its nearest carve market and drop the rest. Lands behind the sprint switch.\n\nDONE WHEN. The census is printed; after setup no market has an all-zero price vector outside endemic goods (asserted).",
-   "files": [
-    "src/world/hard_coded_world.cpp",
-    "src/world/landscape_score.cpp",
-    "tools/verify/history_sweep.cpp"
-   ]
-  },
-  {
-   "group": "wizard",
    "short_name": "POST_1200_FORCES_MEASURED",
    "title": "Each Empires force that is off after 1200 is measured on the Exploration and Digitisation spans, then ruled on",
    "priority": "B",

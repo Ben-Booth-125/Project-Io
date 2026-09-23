@@ -91,6 +91,17 @@ The cost is charged in full at dispatch (`dispatch_convoys` debits `corp.balance
 
 ## Dispatch trigger
 
+**One beat per haul: arrivals land before the clear, dispatch follows it (Ben, 2026-09-23).**
+Convoys move only on the economy tick, and within it the order is fixed: convoys **advance**,
+**arrivals are credited** to their destination market's pool, the economy runs and the markets
+**clear**, and only then does **dispatch** read that clearing's shortfalls and send new cargo. So a
+delivery reaches its destination's clear before it can move again — it lists and sells where it
+landed first — and a one-tick leg genuinely takes a tick. The reverse order (dispatch at the top of
+the tick, arrivals credited at its end) re-exported every delivery before any clearing saw it, and
+on a many-market body cargo circulated market to market without ever reaching a shelf. Dispatch
+runs after the insolvency wind-up, so a firm leaving the field sends nothing. Owner: BL-1066 (the
+player cannot build).
+
 **Auto-dispatch is the default, and it is the SELLER chasing a NET PRICE (Ben, 2026-09-15).** On each economy Tick, for every `(corp, market)` pool holding a good above its processor reservation, the system asks where that good fetches the most once the haul is paid, and sends it there if that beats selling at home. The loop runs without player intervention.
 
 It replaced a buyer-side rule — scan each market for a shortfall, fill it from the cheapest reachable source — that never read a price at all. Under it a seller never moved goods toward a better market, only toward an empty one, and trade stayed local however wide the gaps were.

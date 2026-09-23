@@ -1409,11 +1409,17 @@ void app::step_economy()
     // per LOGISTICS.md's bifold table. Local to this tick; never persisted
     // (LP is a per-tick RATE, ruling on NR-343).
     lp_pool_map tick_lp_pools;
-    dispatch_convoys(m_world, m_registry,
-                     m_registry.logistics_cost(convoy_mode::land),
-                     m_registry.logistics_cost(convoy_mode::space), &tick_lp_pools);
+    // BL-1066 (Ben, 2026-09-23): the convoy ORDER within the economy tick is
+    // advance -> credit arrivals -> economy -> clearing -> ... -> dispatch
+    // (SUPPLY.md § Dispatch trigger, "One beat per haul"). A delivery lands
+    // BEFORE its destination clears, so it lists and sells there first; dispatch
+    // reads THIS tick's shortfalls; and a one-tick leg takes a tick. The old
+    // order (dispatch first, credit last) re-exported every delivery at the top
+    // of the next tick before it ever reached a clearing — cargo ping-ponged
+    // market to market on a many-market body and never reached a shelf.
     advance_convoys(m_world);
-    lap(0); // convoys
+    credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
+    lap(0); // convoys: advance + arrivals
     // BL-409: under spectate the session has no human seat, so the strategic
     // tier evaluates every corp — the player's included. Default false, so an
     // ordinary played session runs exactly as before.
@@ -1452,13 +1458,19 @@ void app::step_economy()
     // BL-262 first slice: cache this tick's standing profile for the Corporations panel
     // (transient runtime cache, not serialised — same treatment as m_last_econ_report).
     m_last_corp_standings = compute_corp_standings(m_world, flows);
-    credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
     // BL-743: the insolvency wind-up, LAST — it reads the returns this tick's
     // apply_budget just filed, and everything above already ran against the
     // field as it stood. Inert at unauthored params; the player's corp is
     // exempt inside the pass itself.
     run_firm_exits(m_world, m_registry.firm_exit(), &m_last_econ_report.firm_exits);
-    lap(5); // standings + convoy credit + exits
+    // BL-1066: dispatch LAST — after clearing (this tick's shortfalls), and after
+    // the wind-up (an exiting firm dispatches nothing). It draws the same tick's
+    // LP pool the march already drew from: armies now claim first (NR, the
+    // goods-vs-force priority LOGISTICS.md says must be chosen, not inherited).
+    dispatch_convoys(m_world, m_registry,
+                     m_registry.logistics_cost(convoy_mode::land),
+                     m_registry.logistics_cost(convoy_mode::space), &tick_lp_pools);
+    lap(5); // standings + exits + dispatch
 
     // Post-step presentation (BL-361: extracted to core/session_history.cpp):
     // the nation-voiced agency comms (BL-212), the persona counsel posts

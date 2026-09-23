@@ -404,6 +404,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
                             era_minus_one_fixture* fixture)
 {
     world w;
+    // BL-910 capital markets, recorded as they are placed so the pricing pass
+    // after the carve can price them (Ben, 2026-09-23 — see that pass).
+    std::vector<entity_id> capital_market_shells;
 
     // --- The generation budget (BL-754) -------------------------------------
     //
@@ -1592,7 +1595,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
                         market_component mc;
                         mc.body        = kepler;
                         mc.centre_tile = anchor_tile;
-                        w.markets[w.create_entity()] = mc;
+                        const entity_id shell_id = w.create_entity();
+                        w.markets[shell_id] = mc;
+                        capital_market_shells.push_back(shell_id);
                     }
                 }
             }
@@ -2358,6 +2363,43 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     mc.base_price[ri] = source_price * (1.0f + distance_gain * norm);
                     mc.price[ri]      = mc.base_price[ri];
                 }
+            }
+        }
+    }
+
+    // --- Capital markets are priced, at a premium (Ben, 2026-09-23) ---------
+    //
+    // The BL-910 capital markets stand at every living polity's capital from
+    // the 1200 close, placed before the carve and default-constructed: base
+    // price 0 for every good but the endemic ones set just above. An unpriced
+    // good is never listed (clear_markets skips base_price <= 0), and under
+    // pools per market (BL-1003) every building in a capital's catchment
+    // produces into that capital's pool — so on the shipped verify world the
+    // body's whole pooled steel (~3,000) sat unsellable in nine capitals and a
+    // player's build starved beside it (BL-1066). Ben's ruling: the capitals
+    // stay real markets, priced ABOVE the carve's — a capital is where a
+    // realm's court, treasury and demand concentrate. So each shell takes the
+    // carve template's base price for every good it lacks, and then every good,
+    // endemic included, is lifted by the premium.
+    //
+    // PROVISIONAL: the premium's size is an authored placeholder, logged for
+    // Ben's call (NEEDS_REVIEW) — not derived. It is well inside the price
+    // band's ceiling (10x), so a capital's steel can still be undercut by a
+    // haul from a carve market.
+    {
+        constexpr float kCapitalMarketPricePremium = 1.25f; // PROVISIONAL (BL-1066)
+        for (const entity_id sid : capital_market_shells)
+        {
+            const auto sit = w.markets.find(sid);
+            if (sit == w.markets.end())
+                continue;
+            market_component& mc = sit->second;
+            for (std::size_t ri = 0; ri < resource_count; ++ri)
+            {
+                if (mc.base_price[ri] <= 0.0f)
+                    mc.base_price[ri] = gen_cfg.kepler_base_price[ri];
+                mc.base_price[ri] *= kCapitalMarketPricePremium;
+                mc.price[ri]       = mc.base_price[ri];
             }
         }
     }

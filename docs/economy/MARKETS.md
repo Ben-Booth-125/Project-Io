@@ -35,6 +35,15 @@ deterministic, with a seeded jitter on the borderline. If no centre qualifies, o
 fallback market is seeded. On seed 0 the home body carries nine carved markets, and *no single one
 of them stands for the body*.
 
+**A living polity's capital carries a market, priced at a premium (Ben, 2026-09-23).** The Era −1
+history marks a market at every living polity's capital at the 1200 close (`CIVILISATION.md`), and
+those markets stand on the home body beside the carve's. Each is priced like a carve market — the
+template base price for every good, the endemic field where it applies — and then lifted by a
+**capital premium** over all of it: a capital is where a realm's court, treasury and demand
+concentrate, so goods cost more there. An unpriced market is not a neutral default: a good with no
+base price is never listed, so stock in its catchment could never be sold. Owner: BL-1066 (the
+player cannot build).
+
 **A market also emerges where trade CONCENTRATED, not from population alone** (Ben, 2026-09-03,
 the eight-phase reorder point 4: *"markets should begin to emerge towards the end of this
 phase"*). The carve above is a **nation-grain** judgement — this nation's geology, and how many
