@@ -91,16 +91,17 @@ The cost is charged in full at dispatch (`dispatch_convoys` debits `corp.balance
 
 ## Dispatch trigger
 
-**One beat per haul: arrivals land before the clear, dispatch follows it (Ben, 2026-09-23).**
-Convoys move only on the economy tick, and within it the order is fixed: convoys **advance**,
-**arrivals are credited** to their destination market's pool, the economy runs and the markets
-**clear**, and only then does **dispatch** read that clearing's shortfalls and send new cargo. So a
-delivery reaches its destination's clear before it can move again — it lists and sells where it
-landed first — and a one-tick leg genuinely takes a tick. The reverse order (dispatch at the top of
-the tick, arrivals credited at its end) re-exported every delivery before any clearing saw it, and
-on a many-market body cargo circulated market to market without ever reaching a shelf. Dispatch
-runs after the insolvency wind-up, so a firm leaving the field sends nothing. Owner: BL-1066 (the
-player cannot build).
+**One beat per haul: arrivals land before the clear, and a seller hauls before it sells (Ben,
+2026-09-23).** Convoys move only on the economy tick, and within it the order is fixed: convoys
+**advance**, **arrivals are credited** to their destination market's pool, the economy runs, then
+**dispatch** — and only then do the markets **clear**. Dispatch sits before the clear because
+auto-surplus sells every unit a pool holds above its reservation to the local market, and a market's
+shelf belongs to no one and never moves: a seller that has not chosen to haul by the clear has sold
+at home. So the seller weighs home against elsewhere while the goods are still its own (the rule
+below), and a delivery reaches its destination's clear before it can move again, since cargo moves
+only toward a strictly better net price. The reverse order (dispatch at the top of the tick,
+arrivals at its end) re-exported every delivery before any clearing saw it, and cargo circulated
+market to market without reaching a shelf. Owner: BL-995 (trade reaches for price).
 
 **Auto-dispatch is the default, and it is the SELLER chasing a NET PRICE (Ben, 2026-09-15).** On each economy Tick, for every `(corp, market)` pool holding a good above its processor reservation, the system asks where that good fetches the most once the haul is paid, and sends it there if that beats selling at home. The loop runs without player intervention.
 

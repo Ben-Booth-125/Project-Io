@@ -170,4 +170,9 @@ BL-1066 (the player cannot build) opens it, and Ben's rulings on it (2026-09-23)
   - [ ] T5 every other reader: a body-aggregate helper or a stated market (R4).
   - [ ] T6 save format, state hash, the new pools_per_market harness (R1-R3, R5).
   - [ ] T7 main session: merge, build, world_determinism, the straddle count, the BL-1066 probe re-read, cold review (R5-R8).
+- [ ] **BL-995 (trade reaches for price)** — restored 2026-09-23 on Ben's BL-1066 ruling; economy-dev in a worktree; requirement group `trade-reaches-for-price`. Dispatch moves before the clear.
+  - [ ] T1 the net-price rule and its quantity, the shortfall scan retired (R2, R3).
+  - [ ] T2 the tick order at every replicating site; the margin threshold authored (R1, R4).
+  - [ ] T3 directed verb parity; the scorer's home-price valuation (R5, R6).
+  - [ ] T4 trade_reaches_for_price harness (R7); main session: determinism, far trade, the BL-1066 probe, cold review (R8-R10).
 - [ ] **BL-1066 (the player cannot build)** — after BL-1003: price the site multiplier at placement (gate, Build door preview, rival scorer); construction capacity where the player stands (measure first); the fixture places near home and waits out the tech gate.

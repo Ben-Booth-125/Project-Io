@@ -7181,6 +7181,123 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "trade-reaches-for-price",
+   "title": "BL-995 - Auto-dispatch is the seller chasing a net price, before the clear, for every corp",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-995 - sprint 46 (restored 2026-09-23 on Ben's BL-1066 ruling)",
+   "batch": "sprint-46",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: app.cpp, main.cpp, harness_params.hpp"
+     ],
+     "requirement": "Dispatch runs after the economy step and before clearing (advance -> arrivals -> economy -> dispatch -> clearing), at every site that replicates the app's tick.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: supply_system.cpp",
+      "headless: trade_reaches_for_price (new)"
+     ],
+     "requirement": "For every (corp, market) pool holding a good above its processor reservation, net(d) = price_d - haul_per_unit(src->d) [- handling - duty where the code carries them], at last resolved prices; the good goes to argmax net(d), ties to the lower market id, only if net(d) - price_src > margin_threshold x price_src. The shortfall scan is retired.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: supply_system.cpp",
+      "headless: trade_reaches_for_price"
+     ],
+     "requirement": "Quantity = min(surplus, q) less what the corp already has in transit to d, with q = supply_d x ((price_d / landed_cost)^2 - 1); a destination with zero supply absorbs its unmet demand. No destination receives more than its q in one tick.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: scripts/economy.lua"
+     ],
+     "requirement": "The margin threshold is authored in data, nonzero, and its value is stated with the reasoning it was chosen by.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: convoy_command"
+     ],
+     "requirement": "The player's directed verb and auto-dispatch price a leg identically (shared price_convoy_leg/commit_convoy), asserted; one rule for every corp, the player's included.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "code: corp_ai.cpp"
+     ],
+     "requirement": "The rival scorer's directed-dispatch valuation subtracts the home price (qty x (dest_price - home_price) - leg.cost).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "headless: trade_reaches_for_price"
+     ],
+     "requirement": "Rows: a seller sends to a farther higher-priced market over a nearer cheaper one; a good never moves to a lower net price (no churn); a delivery sells at its destination's clear.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R8",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "headless: haulage_measure --far-trade"
+     ],
+     "requirement": "world_determinism bit-identical run to run, digests reported old -> new, not re-pinned; the far-trade reading shows delivered volume sold at destinations.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R9",
+     "status": "pending",
+     "verification": [
+      "headless: BL-1066 probe (Release --verify)"
+     ],
+     "requirement": "The BL-1066 near-home military base probe re-taken: steel arrives at the build market and the build progresses.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R10",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review of the change before commit.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
