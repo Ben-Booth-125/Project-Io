@@ -16,6 +16,10 @@ DEVLOG entry for its session, its requirement group, and the archived backlog ro
 
 ## Sprint 45 — industrialisation makes the web real (opened 2026-09-18)
 
+**CLOSED 2026-09-23.** All seventeen items delivered, one re-bless spent; the retro is in
+sprints.json. What the sprint raised and did not answer: NR-915 (the tick tail), BL-1065 (the
+CTest tier), BL-1066 (the player cannot build) and the sprint 46 draft DENSITY_FOLLOWS_CITIES.
+
 Three waves. Every world-mover lands behind a switch and turns on together in BL-1044, so the sprint
 spends one re-bless. Memory caps concurrency (15.5 GB; a sweep holds ~2.9 GB): lanes run their own
 harnesses one at a time and never `player_seed_sweep`; the main session runs the 16-seed
