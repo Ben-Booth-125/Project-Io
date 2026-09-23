@@ -1948,7 +1948,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // (§ 2C) — through `apply_corp_command`, which already prices and
         // commits it via `price_convoy_leg` + `commit_convoy`
         // (corp_command.cpp): the SAME two functions the auto-dispatcher's
-        // shortfall scan calls (SUPPLY.md's "no fourth code path" rule). This
+        // net-price rule calls (SUPPLY.md's "no fourth code path" rule). This
         // block supplies exactly that scan's opinion as one scored candidate
         // rather than reimplementing pricing here — it prices with the shared
         // function to RANK opportunities, and the seam re-prices and commits
@@ -2051,8 +2051,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         // might not fill at all), a dispatched convoy WILL
                         // credit the destination pool on arrival — the
                         // conservative choice there does not apply here.
+                        //
+                        // BL-995: valued NET OF THE HOME PRICE. The goods are
+                        // already the corp's and would sell at home at the next
+                        // clear, so the haul earns only the GAP: a valuation of
+                        // qty x dest_price alone would send goods away from a
+                        // better home market (SUPPLY.md § Dispatch trigger).
                         const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : mc.base_price[r];
-                        const float revenue = qty * price;
+                        const market_component& home = w.markets.at(src_key);
+                        const float home_price =
+                            (home.base_price[r] > 0.0f)
+                                ? ((home.price[r] > 0.0f) ? home.price[r] : home.base_price[r])
+                                : 0.0f;
+                        const float revenue = qty * (price - home_price);
                         const float score   = revenue - leg.cost;
                         if (score <= 0.0f)
                             continue; // never haul at a loss

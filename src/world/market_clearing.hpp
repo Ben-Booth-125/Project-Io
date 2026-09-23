@@ -220,6 +220,16 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     const recipe_registry& reg,
     const economy_report& report);
 
+/// Input reservation a corporation needs to keep in ONE goods pool to feed a
+/// full run of the processors that draw that pool next tick — so it sells only
+/// the genuine surplus. BL-1003: a processor draws the pool of its own tile
+/// market (`pool_key_for_tile`), so only processors keyed to @p pool_key
+/// reserve against it. BL-995: shared by clearing's auto-surplus and by
+/// `dispatch_convoys`, so what a seller may haul is exactly what it would list.
+/// @pre `corp` is a key of `w.corporations`.
+std::array<float, resource_count> processor_reservation(
+    const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key);
+
 /// Resolve which market a tile clears against (its market catchment). Among the
 /// markets on the tile's body: a body with a single market routes there
 /// unconditionally; with several, the tile clears against the market whose

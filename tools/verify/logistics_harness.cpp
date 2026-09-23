@@ -159,6 +159,11 @@ int main()
         mm.centre_tile = tile_at(w, body, 0, 2); // far end of the column
         mm.demand[ri]  = 10.0f;
         mm.supply[ri]  = 0.0f;
+        // BL-995: auto-dispatch chases a net price, so the short market must
+        // PRICE the good; the body-level pool has no home market (price 0), so
+        // any positive net sends it, and a zero-supply market takes its unmet 10.
+        mm.base_price[ri] = 5.0f;
+        mm.price          = mm.base_price;
         w.markets[short_market] = mm;
 
         recipe_registry reg; // default per-mode logistics costs {land .02, sea .05, air .15, space 1}
@@ -199,6 +204,7 @@ int main()
         const entity_id short_market = w.create_entity();
         market_component mm{}; mm.body = body; mm.centre_tile = tile_at(w, body, 0, 2);
         mm.demand[0] = 10.0f; mm.supply[0] = 0.0f;
+        mm.base_price[0] = 5.0f; mm.price = mm.base_price; // BL-995: see T7
         w.markets[short_market] = mm;
         out_corp     = corp;
         out_mid_tile = tile_at(w, body, 0, 1); // the tile the path crosses

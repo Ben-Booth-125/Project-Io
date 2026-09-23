@@ -352,6 +352,9 @@ void p5_dispatch_counters()
     // A pool that comfortably covers ONE shortfall haul but not a second.
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 10.0f);
 
+    // BL-995: auto-dispatch chases a net price, so the destination must
+    // price iron above home (10 vs 5) for the haul to happen at all.
+    s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
     s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
     s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
 
@@ -363,6 +366,9 @@ void p5_dispatch_counters()
     // Drive the SAME shortfall again with a pool too small this time.
     recipe_registry tiny_reg = make_registry(/*lp_per_anchor*/ 0.01f);
     scenario s2 = make_scenario(100.0f, 1000.0f);
+    // BL-995: auto-dispatch chases a net price, so the destination must
+    // price iron above home (10 vs 5) for the haul to happen at all.
+    s2.w.markets.at(s2.dst_market).price[r_iron]  = 10.0f;
     s2.w.markets.at(s2.dst_market).demand[r_iron] = 30.0f;
     s2.w.markets.at(s2.dst_market).supply[r_iron] = 0.0f;
     const convoy_dispatch_tick t2 = dispatch_convoys(s2.w, tiny_reg,
@@ -422,6 +428,9 @@ void p6_shared_pool_contention()
 
         // Passive first (matches main.cpp/app.cpp's real tick order —
         // dispatch_convoys runs before run_economy_step's march pass).
+        // BL-995: auto-dispatch chases a net price, so the destination must
+        // price iron above home (10 vs 5) for the haul to happen at all.
+        s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
         s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
         s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
         const convoy_dispatch_tick ct = dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),
@@ -483,6 +492,9 @@ void p6_shared_pool_contention()
         reg.set_military(mp);
 
         lp_pool_map shared_pool;
+        // BL-995: auto-dispatch chases a net price, so the destination must
+        // price iron above home (10 vs 5) for the haul to happen at all.
+        s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
         s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
         s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
         const convoy_dispatch_tick ct = dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),

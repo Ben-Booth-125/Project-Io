@@ -180,18 +180,18 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         // contend, per LOGISTICS.md's bifold table and the "war flips the
         // queue" finding. Local to this tick; never persisted.
         lp_pool_map tick_lp_pools;
-        // BL-1066: advance -> arrivals -> economy -> ... -> dispatch (app.cpp's order).
+        // BL-995: advance -> arrivals -> economy -> dispatch -> clearing (app.cpp's order).
         advance_convoys(w);
         credit_arrived_convoys(w, t);
         economy_report report = run_economy_step(w, reg, /*spectating=*/false, &tick_lp_pools);
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
         auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings,        // BL-343: law enforcement seam
                      &report.building_labour); // BL-614: wages on the per-building grant
         run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
         // Age any dispatched survey by the days this tick spans (app.cpp does the
         // same on the day boundary). Without it the geographic fog never lifted
         // here: `survey` was an applicable verb whose effect never arrived, so no
@@ -237,8 +237,8 @@ int run_serve(int ticks, long long as_corp, bool as_any)
 // --export-blackboard <corp|all> [--out <dir>] [--ticks N]  (BL-206)
 //
 // Headless: builds the canonical world, loads the Lua economy data, runs N
-// warm-up ticks of the real per-tick sequence (dispatch/advance convoys →
-// run_economy_step → clear_markets → apply_budget → credit convoys), then
+// warm-up ticks of the real per-tick sequence (advance + credit convoys →
+// run_economy_step → dispatch convoys → clear_markets → apply_budget), then
 // dumps each requested corp's visibility-honest blackboard as
 // blackboard_<corp>_<tick>.jsonl. No SDL; deterministic by construction.
 int run_blackboard_export(const std::string& which, const std::string& out_dir, int ticks)
@@ -291,18 +291,18 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         // BL-597: see step_one_tick's own comment above — one shared LP pool
         // per tick for both the passive (convoy) and active (march) draws.
         lp_pool_map tick_lp_pools;
-        // BL-1066: advance -> arrivals -> economy -> ... -> dispatch (app.cpp's order).
+        // BL-995: advance -> arrivals -> economy -> dispatch -> clearing (app.cpp's order).
         advance_convoys(w);
         credit_arrived_convoys(w, t);
         economy_report report = run_economy_step(w, reg, /*spectating=*/false, &tick_lp_pools);
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
         auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings,        // BL-343: law enforcement seam
                      &report.building_labour); // BL-614: wages on the per-building grant
         run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
     }
 
     std::filesystem::create_directories(out_dir);

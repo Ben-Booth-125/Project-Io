@@ -1573,6 +1573,15 @@ logistics = {
         hub            = 0.12, -- flat discount fraction per Inland Logistics Hub tile on the path.
         cap            = 0.50, -- ceiling on the summed node discount (fraction of the haul cost).
     },
+
+    -- BL-995 (trade reaches for price; docs/economy/SUPPLY.md § Dispatch trigger): the
+    -- auto-dispatch margin threshold. A (corp, market) pool's good is hauled to market d only
+    -- when its net price there (price_d less the per-unit haul) beats the home price by more
+    -- than dispatch_margin x home price. 0.05: a gap under 5% of the home price is noise —
+    -- within one tick's price movement from a single clear — not a reason to move a cargo
+    -- across a continent, and a haul chasing it would reverse on the next reprice. Never zero
+    -- (the loader refuses a non-positive value and keeps the 0.05 default). First cut; measure.
+    dispatch_margin = 0.05,
 }
 
 print("[Lua] economy.lua loaded")

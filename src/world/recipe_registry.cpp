@@ -1000,5 +1000,12 @@ void recipe_registry::load_from_lua(lua_state& lua)
             p.discount_cap            = nd->get_or("cap",            p.discount_cap);
             m_logistics_nodes = p;
         }
+
+        // BL-995: the auto-dispatch margin threshold (logistics.dispatch_margin).
+        // SUPPLY.md: "never zero" — a non-finite or non-positive value is not a
+        // threshold, so it is refused and the struct default stands.
+        sol::optional<float> margin = (*logistics)["dispatch_margin"];
+        if (margin && std::isfinite(*margin) && *margin > 0.0f)
+            m_dispatch_margin = *margin;
     }
 }

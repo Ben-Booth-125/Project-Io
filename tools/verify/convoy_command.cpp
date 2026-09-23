@@ -544,13 +544,20 @@ int main()
         // the same 25 down the same lane. The two convoys must agree on cost,
         // speed and mode — the three numbers a duplicated implementation would
         // get subtly wrong.
+        //
+        // BL-995: the auto-dispatcher is now the SELLER chasing a net price,
+        // so the destination must price the good above home (10 vs 5) for it
+        // to haul at all; with zero supply there, the quantity is its unmet
+        // demand — the same 25. The player's fixture carries the same prices.
         scenario a = make_scenario(100.0f);
+        a.w.markets.at(a.dst_market).price[r_iron]  = 10.0f;
         a.w.markets.at(a.dst_market).demand[r_iron] = 25.0f;
         a.w.markets.at(a.dst_market).supply[r_iron] = 0.0f;
         dispatch_convoys(a.w, reg, reg.logistics_cost(convoy_mode::land),
                          reg.logistics_cost(convoy_mode::space));
 
         scenario p = make_scenario(100.0f);
+        p.w.markets.at(p.dst_market).price[r_iron] = 10.0f;
         apply_corp_command(p.w, reg, dispatch_cmd(p, 25.0f));
 
         check(a.w.convoys.size() == 1 && p.w.convoys.size() == 1,
@@ -601,7 +608,9 @@ int main()
                     apply_corp_command(s.w, reg, dispatch_cmd(s, 5.0f + static_cast<float>(t)));
                 if (t == 3 && !s.w.convoys.empty())
                     apply_corp_command(s.w, reg, hold_cmd(s.corp, s.w.convoys.front().id));
-                // Auto traffic: a standing shortfall at the destination market.
+                // Auto traffic: a standing shortfall at the destination market,
+                // priced above home (BL-995: the seller hauls toward price).
+                s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
                 s.w.markets.at(s.dst_market).demand[r_iron] = 12.0f;
                 s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
                 dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),

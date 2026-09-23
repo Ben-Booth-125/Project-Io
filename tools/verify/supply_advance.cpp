@@ -138,6 +138,12 @@ static void test_dispatch_and_gate()
         mc.body = dest_body;
         mc.supply[ri(resource_type::iron_ore)] = 0.0f;
         mc.demand[ri(resource_type::iron_ore)] = 50.0f;
+        // BL-995: dispatch is the seller chasing a net price, so the
+        // destination must PRICE iron (5, against a 1/unit space haul and no
+        // home price) for anything to move; with zero supply there, the
+        // quantity is its unmet demand of 50.
+        mc.base_price[ri(resource_type::iron_ore)] = 5.0f;
+        mc.price = mc.base_price;
         w.markets[dest_mkt] = mc;
     }
 
@@ -440,6 +446,15 @@ static purity_trace run_purity_world(bool perturb_angles)
         entity_id mkt = w.create_entity();
         market_component mc{};
         mc.body = body;
+        // BL-995: only the destination prices iron (well above any space haul
+        // in this fixture), so every tick has one net-price gain to chase; the
+        // lower-id source pool fills the unmet demand and the other sees it in
+        // transit, so exactly one convoy leaves per tick.
+        if (body == dest)
+        {
+            mc.base_price[ri(resource_type::iron_ore)] = 50.0f;
+            mc.price = mc.base_price;
+        }
         w.markets[mkt] = mc;
         if (body == dest)
             dest_mkt = mkt;

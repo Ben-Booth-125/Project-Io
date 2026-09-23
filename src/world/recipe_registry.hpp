@@ -1140,6 +1140,12 @@ public:
     /// BL-148/149 logistics-node discount tunables (logistics.node_discount in Lua).
     const logistics_node_params& logistics_nodes() const { return m_logistics_nodes; }
 
+    /// BL-995 (trade reaches for price): the auto-dispatch margin threshold
+    /// (logistics.dispatch_margin in Lua). A pool's good is hauled to market d
+    /// only when `net(d) - price_src > dispatch_margin() * price_src`
+    /// (SUPPLY.md § Dispatch trigger). Never zero: see m_dispatch_margin.
+    float dispatch_margin() const { return m_dispatch_margin; }
+
     /// Player road-placement cost for a tier (BL-172): 1=Track, 2=Road, 3=Highway; clamped to
     /// [1,3]. Authored in economy.roads.{track,road,highway}. Default arg keeps BL-147 callers
     /// (Track) unchanged.
@@ -1367,6 +1373,7 @@ public:
         m_logistics_costs[static_cast<std::size_t>(m)] = v;
     }
     void set_logistics_nodes(const logistics_node_params& p) { m_logistics_nodes = p; }
+    void set_dispatch_margin(float v) { m_dispatch_margin = v; }
     void set_road_econ(std::uint8_t tier, const road_economics& r)
     {
         const std::size_t i = (tier < 1u ? 1u : (tier > 3u ? 3u : tier)) - 1u;
@@ -1636,6 +1643,13 @@ private:
     /// BL-148/149 node-discount tunables (logistics.node_discount). Defaults match economy.lua
     /// so a hand-built harness registry discounts city/hub routes sensibly without Lua.
     logistics_node_params m_logistics_nodes = {};
+
+    /// BL-995 dispatch margin (logistics.dispatch_margin). The default mirrors
+    /// economy.lua so a hand-built harness registry that never authors it still
+    /// refuses a haul whose gain is a rounding error — SUPPLY.md: the threshold
+    /// is "never zero". A non-finite or non-positive authored value is refused
+    /// at load and this default stands.
+    float m_dispatch_margin = 0.05f;
 
     /// Road-placement cost per tier (BL-172): index 0..2 = Track/Road/Highway (road_level 1/2/3).
     /// Credit defaults are used by the Lua-free harnesses; the material line is seeded from Lua
