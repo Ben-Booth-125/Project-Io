@@ -582,7 +582,7 @@ inline void run_app_validation_tick(world& w, const recipe_registry& reg, int ec
     const clk::time_point t0 = clk::now();
     w.current_econ_tick = econ_step;                                  // app.cpp:1258
     lp_pool_map tick_lp_pools;                                        // app.cpp step_economy
-    advance_convoys(w);                  // BL-1066 order: advance -> arrivals -> ... -> dispatch
+    advance_convoys(w);                  // BL-995 order: advance -> arrivals -> economy -> dispatch -> clear
     credit_arrived_convoys(w, k_validation_day_tick);
     const clk::time_point t1 = clk::now();
     lap_done(0);
@@ -590,6 +590,8 @@ inline void run_app_validation_tick(world& w, const recipe_registry& reg, int ec
     // m_validation_run is true for every tick of this run (app.cpp:653).
     economy_report report = run_economy_step(w, reg, /*spectating=*/true,
                                              &tick_lp_pools);
+    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // BL-995: before the clear
+                     reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
     const clk::time_point t2 = clk::now();
     lap_done(1);
     const auto flows = clear_markets(w, reg, report);                 // app.cpp:1285
@@ -608,8 +610,6 @@ inline void run_app_validation_tick(world& w, const recipe_registry& reg, int ec
     // harness discards it (nothing in a world reads that cache).
     (void)compute_corp_standings(w, flows);
     run_firm_exits(w, reg.firm_exit(), &report.firm_exits);
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // BL-1066: dispatch last
-                     reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
     const clk::time_point t6 = clk::now();
     lap_done(5);
     // app.cpp:1317-1354, laps 6-8: agency comms, the history recorders and the
@@ -701,11 +701,13 @@ inline void run_app_live_window(world& w, const recipe_registry& reg, int first_
         // app.cpp:410-420 -> app::step_economy
         w.current_econ_tick = first_econ_step + (k - 1);                  // app.cpp:1258
         lp_pool_map tick_lp_pools;                                        // app.cpp step_economy
-        advance_convoys(w);              // BL-1066 order: advance -> arrivals -> ... -> dispatch
+        advance_convoys(w);              // BL-995 order: advance -> arrivals -> economy -> dispatch -> clear
         credit_arrived_convoys(w, day);
         const clk::time_point t1 = clk::now();
         economy_report report = run_economy_step(w, reg, /*spectating=*/false, // app.cpp:1281-1283
                                                  &tick_lp_pools);
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // BL-995: before the clear
+                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
         const clk::time_point t2 = clk::now();
         const auto flows = clear_markets(w, reg, report);                 // app.cpp:1285
         const clk::time_point t3 = clk::now();
@@ -718,8 +720,6 @@ inline void run_app_live_window(world& w, const recipe_registry& reg, int first_
         // Phase 5, the app's lap(5) (app.cpp:1315): standings + convoy credit + exits.
         (void)compute_corp_standings(w, flows);
         run_firm_exits(w, reg.firm_exit(), &report.firm_exits);
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // BL-1066: dispatch last
-                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
         const clk::time_point t6 = clk::now();
         // app.cpp:1317-1354, laps 6-8: NOT mirrored, NOT timed (see above).
 

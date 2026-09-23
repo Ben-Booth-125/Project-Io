@@ -1409,14 +1409,15 @@ void app::step_economy()
     // per LOGISTICS.md's bifold table. Local to this tick; never persisted
     // (LP is a per-tick RATE, ruling on NR-343).
     lp_pool_map tick_lp_pools;
-    // BL-1066 (Ben, 2026-09-23): the convoy ORDER within the economy tick is
-    // advance -> credit arrivals -> economy -> clearing -> ... -> dispatch
-    // (SUPPLY.md § Dispatch trigger, "One beat per haul"). A delivery lands
-    // BEFORE its destination clears, so it lists and sells there first; dispatch
-    // reads THIS tick's shortfalls; and a one-tick leg takes a tick. The old
-    // order (dispatch first, credit last) re-exported every delivery at the top
-    // of the next tick before it ever reached a clearing — cargo ping-ponged
-    // market to market on a many-market body and never reached a shelf.
+    // BL-1066 / BL-995 (Ben, 2026-09-23): the convoy ORDER within the economy
+    // tick is advance -> credit arrivals -> economy -> DISPATCH -> clearing ->
+    // budget ... (SUPPLY.md § Dispatch trigger, "One beat per haul"). A delivery
+    // lands BEFORE its destination clears, so it lists and sells there first;
+    // dispatch sits before the clear because auto-surplus sells every unit a
+    // pool holds above its reservation, so a seller that has not chosen to haul
+    // by the clear has sold at home. Dispatch reads LAST tick's resolved prices
+    // and supply/demand (clear_markets rewrites them only below). Cargo moves
+    // only toward a strictly better net price, so a delivery is not re-exported.
     advance_convoys(m_world);
     credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
     lap(0); // convoys: advance + arrivals
@@ -1433,7 +1434,14 @@ void app::step_economy()
     m_last_econ_report = run_economy_step(m_world, m_registry,
                                           m_ui.spectating || m_validation_run,
                                           &tick_lp_pools);
-    lap(1); // economy step (production + corp AI)
+    // BL-995: dispatch BEFORE the clear — the seller hauls before it sells. It
+    // draws the same tick's LP pool the march (inside run_economy_step) already
+    // drew from: armies claim first (the goods-vs-force priority LOGISTICS.md
+    // says must be chosen, not inherited).
+    dispatch_convoys(m_world, m_registry,
+                     m_registry.logistics_cost(convoy_mode::land),
+                     m_registry.logistics_cost(convoy_mode::space), &tick_lp_pools);
+    lap(1); // economy step (production + corp AI) + dispatch
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
     lap(2); // market clearing
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
@@ -1463,14 +1471,7 @@ void app::step_economy()
     // field as it stood. Inert at unauthored params; the player's corp is
     // exempt inside the pass itself.
     run_firm_exits(m_world, m_registry.firm_exit(), &m_last_econ_report.firm_exits);
-    // BL-1066: dispatch LAST — after clearing (this tick's shortfalls), and after
-    // the wind-up (an exiting firm dispatches nothing). It draws the same tick's
-    // LP pool the march already drew from: armies now claim first (NR, the
-    // goods-vs-force priority LOGISTICS.md says must be chosen, not inherited).
-    dispatch_convoys(m_world, m_registry,
-                     m_registry.logistics_cost(convoy_mode::land),
-                     m_registry.logistics_cost(convoy_mode::space), &tick_lp_pools);
-    lap(5); // standings + exits + dispatch
+    lap(5); // standings + exits
 
     // Post-step presentation (BL-361: extracted to core/session_history.cpp):
     // the nation-voiced agency comms (BL-212), the persona counsel posts

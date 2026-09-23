@@ -119,11 +119,18 @@ void advance_convoys(world& w);
 void credit_arrived_convoys(world& w, int tick = 0,
                             std::vector<interception_record>* out_cuts = nullptr);
 
-/// Auto-dispatch convoys to fill shortfalls. For each (corp, body, resource) where
-/// market demand exceeded supply in the last clearing pass (indicated by the market
-/// demand field), search the corp's other (corp, market) pools for a surplus of the
-/// same resource and dispatch a convoy if one is found and affordable. Logistics
-/// cost constants are passed in directly (loaded from economy.lua by the caller).
+/// Auto-dispatch: the SELLER chases a NET PRICE (BL-995, SUPPLY.md § Dispatch
+/// trigger). For every (corp, market) pool — ascending key — holding a good above
+/// its processor reservation, at LAST tick's resolved prices:
+///   net(d) = price_d - haul_per_unit(src -> d)
+/// and the good goes to argmax_d net(d) (ties to the lower market id) only if
+/// net(d) - price_src > reg.dispatch_margin() x price_src. The quantity is
+/// min(surplus, q) less what the corp already has in transit to d, with
+/// q = supply_d x ((price_d / landed_cost)^2 - 1), or d's unmet demand when d
+/// has no supply. Runs AFTER run_economy_step and BEFORE clear_markets, so the
+/// seller hauls before auto-surplus sells at home. One rule for every corp,
+/// the player's included. There is no shortfall scan: a short market prices
+/// the good high and this rule reaches it.
 ///
 /// Space-mode convoys require a building_type::launchpad in the source corp's assets
 /// on the source body. Land-mode is ungated. Sea mode is selected automatically when
@@ -137,7 +144,7 @@ void credit_arrived_convoys(world& w, int tick = 0,
 /// @param shared_lp_pools BL-597: forwarded to every `commit_convoy` call this
 ///        pass makes. Null (the default) builds one private `lp_pool_map`
 ///        local to this call, shared across every convoy THIS pass commits
-///        (so two shortfalls converging on one anchor within one
+///        (so two hauls drawing on one anchor within one
 ///        `dispatch_convoys` call already contend, mirroring how
 ///        `run_unit_march` shares one pool across all its units) but
 ///        discarded before the caller gets it back — the real per-tick driver
@@ -163,12 +170,12 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
 // ---------------------------------------------------------------------------
 // The shared dispatch (BL-452)
 // ---------------------------------------------------------------------------
-// dispatch_convoys above is TWO things bolted together: a shortfall scan that
-// decides *what to haul from where*, and the dispatch itself — price the leg,
-// commit the cargo, put a convoy on the lane. Only the first half is the
-// auto-dispatcher's own opinion. The second half is what a convoy IS, and the
-// player's `dispatch_convoy` verb (corp_command.hpp) needs exactly it with the
-// scan removed.
+// dispatch_convoys above is TWO things bolted together: the net-price rule
+// (BL-995) that decides *what to haul from where to where*, and the dispatch
+// itself — price the leg, commit the cargo, put a convoy on the lane. Only the
+// first half is the auto-dispatcher's own opinion. The second half is what a
+// convoy IS, and the player's `dispatch_convoy` verb (corp_command.hpp) needs
+// exactly it with the rule removed.
 //
 // So it is factored out here rather than reimplemented there. There is no
 // fourth code path: `dispatch_convoys` and `apply_corp_command` call the same

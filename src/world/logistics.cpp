@@ -275,7 +275,7 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
     // Answer from a completed flood field rather than a per-pair search
     // (2026-08-25 — see flood_field_for above). Prefer a field either endpoint
     // already anchors; on a double miss, flood from the DESTINATION, because
-    // the hot callers (dispatch's shortfall scan, nearest_lp_anchor, the march
+    // the hot callers (dispatch's net-price rule, nearest_lp_anchor, the march
     // pass) ask many origins about the same few destination tiles.
     const logistics_flood_field* field = nullptr;
     {

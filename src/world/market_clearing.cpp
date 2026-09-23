@@ -137,11 +137,10 @@ entity_id nearest_market(const world& w, const std::vector<entity_id>& body_mark
     return best != null_entity ? best : body_markets.front(); // all unanchored
 }
 
-/// Input reservation a corporation needs to keep in ONE goods pool to feed a
-/// full run of the processors that draw that pool next tick — so it sells only
-/// the genuine surplus. BL-1003: a processor draws the pool of its own tile
-/// market (`pool_key_for_tile`), so only processors keyed to @p pool_key
-/// reserve against it.
+} // namespace
+
+// BL-995: exported (market_clearing.hpp) so auto-dispatch reserves exactly what
+// auto-surplus reserves — one definition of "the genuine surplus".
 std::array<float, resource_count> processor_reservation(
     const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key)
 {
@@ -172,6 +171,8 @@ std::array<float, resource_count> processor_reservation(
     }
     return reserve;
 }
+
+namespace {
 
 /// A corporation's representative tile on a body: the tile of its lowest-id
 /// building there. BL-1003: no goods flow routes through this any more — it
