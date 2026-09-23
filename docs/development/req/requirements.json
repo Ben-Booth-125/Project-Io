@@ -7095,29 +7095,29 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: world.hpp, economy_system.cpp",
       "headless: pools_per_market (new)"
      ],
      "requirement": "The goods pool is keyed (corp, market): a building's output enters the pool of market_for_tile(its tile), and its inputs (processing, construction, upkeep) draw that pool and that market's inventory. A body with no market keeps ONE body-level pool, and the market that spawns there absorbs it whole. Labour pools stay (corp, body). The map is renamed so no caller can pass a body where a market is meant by accident.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "corp_market_pools keyed (corp, market), body-level fallback absorbed on spawn; pools_per_market ALL PASS 37/37 (8a41899d, fix round 6665d4d0)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: economy_system.hpp, market_clearing.cpp",
       "headless: pools_per_market"
      ],
      "requirement": "Wants, purchases, upkeep_wants, auto-surplus and standing orders book at the market the draw or sale happens in. A build's want lands on its own tile's market (BL-1066's probe read demand 0.00 there). market_for_corp_on_body no longer routes any goods flow.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "wants/purchases/upkeep_wants book at the draw market; a build want lands on its own market (probe: demand 8.75 at 56166, price 161). market_for_corp_on_body removed."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: supply_system.cpp",
       "headless: pools_per_market",
@@ -7125,22 +7125,22 @@
      ],
      "requirement": "A convoy debits its source market's pool and credits its destination market's pool, so a same-body haul sells at the destination price. The dispatcher sources from (corp, market) pools. A harness hauls a good between two markets on one body and reads the sale at the destination.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "convoys debit the source market pool and credit the destination market pool; far-trade: 0 of 3,040 same-body hauls landed in a pool that clears at home."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: every former corp_body_pools reader",
       "code: grep"
      ],
      "requirement": "Every reader that wanted a body total (UI stockpile rows, header, corp_ai held stock, condition_set, unit-roster gate, acquisition transfer, network and space upkeep suppliers, verify_api) reads a named body-aggregate helper or a specific market by a stated rule. Generation seeds a corp's opening stock into its HQ tile's market pool. No pool is looked up by a body id where a market exists.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "every former reader rekeyed; contract delivery draws home then other pools (cold-review fix, pools_per_market (h)); opening stock rehomed after the carve."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: world_save.cpp, world.cpp",
       "headless: world_determinism",
@@ -7148,7 +7148,7 @@
      ],
      "requirement": "Save format: save_game_version moves and the pools round-trip (asserted); the state hash folds the new key in sorted order; world_determinism and world_copy_determinism are bit-identical run to run. Digests MOVE, and are reported old -> new, not re-pinned (the re-bless is Ben's).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "world_save_version 23 -> 25; save_roundtrip exit 0; world_determinism bit-identical x2; digests moved and NOT re-pinned (commit messages carry old -> new)."
     },
     {
      "id": "R6",
@@ -7162,23 +7162,23 @@
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: BL-1066 probe (Release --verify)"
      ],
      "requirement": "The BL-1066 reading re-taken: a military base the player places in its home catchment, and one placed outside it, each read for steel want, arrivals and progress, beside the pre-change trace.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "BL-1066 probe re-taken three times (BL-1066 rounds 1-3 in its design): the want now prices the build market; the stall moved upstream to steel supply."
     },
     {
      "id": "R8",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review of the merged change, fix round included, before the commit.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "cold review: 5 findings, all fixed in 6665d4d0."
     }
    ]
   },
@@ -7196,106 +7196,106 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: app.cpp, main.cpp, harness_params.hpp"
      ],
      "requirement": "Dispatch runs after the economy step and before clearing (advance -> arrivals -> economy -> dispatch -> clearing), at every site that replicates the app's tick.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "dispatch between economy and clear at app.cpp, main.cpp x2, harness_params.hpp x2 and twelve harnesses (fix round)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: supply_system.cpp",
       "headless: trade_reaches_for_price (new)"
      ],
      "requirement": "For every (corp, market) pool holding a good above its processor reservation, net(d) = price_d - haul_per_unit(src->d) [- handling - duty where the code carries them], at last resolved prices; the good goes to argmax net(d), ties to the lower market id, only if net(d) - price_src > margin_threshold x price_src. The shortfall scan is retired.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "net-price rule built; shortfall scan deleted; trade_reaches_for_price ALL PASS 31/31."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: supply_system.cpp",
       "headless: trade_reaches_for_price"
      ],
      "requirement": "Quantity = min(surplus, q) less what the corp already has in transit to d, with q = supply_d x ((price_d / landed_cost)^2 - 1); a destination with zero supply absorbs its unmet demand. No destination receives more than its q in one tick.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "absorbable sized from the unsmoothed target, all-corp pending subtracted; rows (c).1-(c).7."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: scripts/economy.lua"
      ],
      "requirement": "The margin threshold is authored in data, nonzero, and its value is stated with the reasoning it was chosen by.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "logistics.dispatch_margin = 0.05, nonzero, reason in economy.lua; loader rejects <= 0."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: convoy_command"
      ],
      "requirement": "The player's directed verb and auto-dispatch price a leg identically (shared price_convoy_leg/commit_convoy), asserted; one rule for every corp, the player's included.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "convoy_command ALL PASS 50/50 (auto vs directed parity)."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: corp_ai.cpp"
      ],
      "requirement": "The rival scorer's directed-dispatch valuation subtracts the home price (qty x (dest_price - home_price) - leg.cost).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "corp_ai values qty x (dest - home) - leg.cost and considers every market beating home; corp_ai_harness ALL PASS."
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: trade_reaches_for_price"
      ],
      "requirement": "Rows: a seller sends to a farther higher-priced market over a nearer cheaper one; a good never moves to a lower net price (no churn); a delivery sells at its destination's clear.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "rows (a)-(g) incl. no re-export of a same-tick delivery."
     },
     {
      "id": "R8",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "headless: haulage_measure --far-trade"
      ],
      "requirement": "world_determinism bit-identical run to run, digests reported old -> new, not re-pinned; the far-trade reading shows delivered volume sold at destinations.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "world_determinism bit-identical x2; haulage_measure --far-trade 4 seeds: 3,712.2 units sold at destination in year one, 82.5% past the nearest market, 0 failures."
     },
     {
      "id": "R9",
-     "status": "pending",
+     "status": "failed",
      "verification": [
       "headless: BL-1066 probe (Release --verify)"
      ],
      "requirement": "The BL-1066 near-home military base probe re-taken: steel arrives at the build market and the build progresses.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "BL-1066 probe (f274a3d5): the base still stalls — not a dispatch fault: listed steel on the body falls 234 -> 0 by ~tick 9 and 3,460 sits on ownerless shelves (BL-1066 round 3)."
     },
     {
      "id": "R10",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review of the change before commit.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "cold review: 10 findings; 7 fixed in the fix round (2cfb373a), 3 low noted (solvency before income, held convoys count, space-leg pricing)."
     }
    ]
   }
