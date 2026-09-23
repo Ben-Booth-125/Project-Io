@@ -17447,55 +17447,6 @@
         "resolved"
       ]
     },
-    "BL-1003": {
-      "status": "cancelled",
-      "glyph": "✗",
-      "sprint": null,
-      "written": "2026-09-15",
-      "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION)",
-      "requires": [
-        "BL-1006"
-      ],
-      "blocked_on": null,
-      "parked": false,
-      "id": "BL-1003",
-      "short_name": "POOLS_PER_MARKET",
-      "category": "Economy",
-      "priority": "A",
-      "difficulty": 5,
-      "title": "Goods pools are keyed per (corp, market), so a same-body haul delivers and sells where it arrives",
-      "authority_doc": "docs/economy/PRODUCTION.md",
-      "files": [
-        "src/world/world.hpp",
-        "src/world/market_clearing.cpp",
-        "src/world/economy_system.cpp",
-        "src/world/supply_system.cpp",
-        "src/world/world_save.cpp",
-        "src/world/landscape_score.cpp"
-      ],
-      "design": "CANCELLED 2026-09-16 (Ben: \"This work is highly unstructured, so just leave it at wave A and we can reinvent anything important later. (So archive).\"). Closed UNBUILT at the end of backlog wave A, never started. Whatever design it carried stands in its authority doc (docs/economy/PRODUCTION.md); re-file from there if the work is wanted again, and re-read the doc first, because this item's prose is dated 2026-09-15.\n\n--- THE ORIGINAL ITEM ---\nSETTLED (Ben, 2026-09-15, form: pools per market over a consignment). PRODUCTION.md § Stockpile and output flow owns it; MARKETS.md § Market centres and seeding and SUPPLY.md § Convoy entity amended.\n\nDEFECT IT FIXES (found 2026-09-15): pools are keyed (corp, body) (world.hpp:272, :701-703); commit_convoy debits pool_for(corp, src_body) (supply_system.cpp:660) and arrival credits pool_for(corp, dest_body) (:182-183) — the same pool on one body — and auto-surplus then sells through market_for_corp_on_body, the lowest-id building's market (market_clearing.cpp:206-221). Every same-body market-to-market haul paid haulage and sold back at home. haulage_measure's 1614 same-body hauls measured dispatch, never trade.\n\nTHE RULE: a building's output enters the pool of market_for_tile(building tile); its inputs draw that pool plus that market's inventory; wants, purchases, auto-surplus, standing orders and the running remainder key (corp, market). A body with no market keeps one body-level pool until its first building spawns one. Labour pools stay (corp, body).\n\nCOSTS, STATED: save format (save_game_version moves, round-trip assertion owed per NR-708); state_hash folds the new key in sorted order; a roster straddling a catchment line now needs hauls, so the landscape search must score it — measure how many generated firms straddle before and after.\n\nDONE WHEN: a harness hauls a good between two markets on one body and the goods sell at the destination price; world_determinism bit-identical across runs; save round-trips pools; the landscape search winner still validates.",
-      "resolved": "2026-09-16",
-      "_row_keys": [
-        "status",
-        "glyph",
-        "sprint",
-        "written",
-        "author",
-        "requires",
-        "blocked_on",
-        "parked",
-        "id",
-        "short_name",
-        "category",
-        "priority",
-        "difficulty",
-        "title",
-        "authority_doc",
-        "files",
-        "design",
-        "resolved"
-      ]
-    },
     "BL-1004": {
       "status": "cancelled",
       "glyph": "✗",

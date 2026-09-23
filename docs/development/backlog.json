@@ -16,6 +16,37 @@
    "status": "designed",
    "glyph": "✓",
    "sprint": "46",
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION); restored 2026-09-23 by Ben's ruling on BL-1066",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1003",
+   "short_name": "POOLS_PER_MARKET",
+   "category": "Economy",
+   "priority": "S",
+   "difficulty": 5,
+   "title": "Goods pools are keyed per (corp, market), so a same-body haul delivers and sells where it arrives",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/world.hpp",
+    "src/world/market_clearing.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/supply_system.cpp",
+    "src/world/world_save.cpp",
+    "src/world/landscape_score.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/core/verify_api.cpp"
+   ],
+   "design": "RESTORED 2026-09-23 (Ben, BL-1066 form: \"Restore BL-1003 pools per market\"). It is the structural cause of BL-1066 (the player cannot build): on the shipped home body (255 markets) a build draws from its TILE's market, but wants, fills, pools and auto-surplus book at the corp's representative market, and a same-body convoy credits the seller's own (corp, body) pool. So steel at 10x base price at a build market induced nothing, and a market no steel seller calls home is empty forever. Measured: the player's base at tile (45,97), market 56211, drew 0 steel for 100 ticks while 558 steel sat in 5 of 255 markets. PRODUCTION.md § Stockpile and output flow already states the rule; the prose below is 2026-09-15 and its file:line anchors predate sprint 45 — re-read before trusting them. BL-1006 (far trade reading), its old prerequisite, is complete. The re-pin of every world digest this moves is a re-bless and is Ben's to authorise; it should ride sprint 46's single re-bless with BL-1049.\n\n--- THE ORIGINAL ITEM (2026-09-15) ---\nSETTLED (Ben, 2026-09-15, form: pools per market over a consignment). PRODUCTION.md § Stockpile and output flow owns it; MARKETS.md § Market centres and seeding and SUPPLY.md § Convoy entity amended.\n\nDEFECT IT FIXES (found 2026-09-15): pools are keyed (corp, body) (world.hpp:272, :701-703); commit_convoy debits pool_for(corp, src_body) (supply_system.cpp:660) and arrival credits pool_for(corp, dest_body) (:182-183) — the same pool on one body — and auto-surplus then sells through market_for_corp_on_body, the lowest-id building's market (market_clearing.cpp:206-221). Every same-body market-to-market haul paid haulage and sold back at home. haulage_measure's 1614 same-body hauls measured dispatch, never trade.\n\nTHE RULE: a building's output enters the pool of market_for_tile(building tile); its inputs draw that pool plus that market's inventory; wants, purchases, auto-surplus, standing orders and the running remainder key (corp, market). A body with no market keeps one body-level pool until its first building spawns one. Labour pools stay (corp, body).\n\nCOSTS, STATED: save format (save_game_version moves, round-trip assertion owed per NR-708); state_hash folds the new key in sorted order; a roster straddling a catchment line now needs hauls, so the landscape search must score it — measure how many generated firms straddle before and after.\n\nDONE WHEN: a harness hauls a good between two markets on one body and the goods sell at the destination price; world_determinism bit-identical across runs; save round-trips pools; the landscape search winner still validates."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
    "written": "2026-09-18",
    "author": "Ben (2026-09-18, sprint 45 elicitation); Claude (item text, from a five-lane engine read with an adversarial check per lane)",
    "requires": [],
@@ -163,7 +194,9 @@
    "sprint": "46",
    "written": "2026-09-23",
    "author": "Claude (found running BL-1044's owed visual suite, 2026-09-23)",
-   "requires": [],
+   "requires": [
+    "BL-1003"
+   ],
    "blocked_on": null,
    "parked": false,
    "id": "BL-1066",
@@ -175,10 +208,11 @@
    "authority_doc": "docs/economy/PRODUCTION.md",
    "files": [
     "src/world/construction.cpp",
+    "src/world/economy_system.cpp",
     "src/world/corporation_generation.cpp",
     "scripts/verify/lib.lua"
    ],
-   "design": "FOUND 2026-09-23 running BL-1044's owed visual suite: 11 of the 12 script failures share one cause — scripts/verify/lib.lua's shared UI fixture (`raise_player_force`) cannot stage, because the player's military base never completes.\n\nMEASURED on the shipped verify world (Release, --verify, one script at a time, probes in the session scratchpad): the player corp opens on 460.7 credits with 4 buildings; `military_base` is `tech_locked` at tick 0 and PLACEABLE after 12 econ ticks (the gate opens with time); placed then, the base is NOT complete 100 ticks later, while the corp's balance climbs past 70,000. So it is not cash, not the tech gate and not the fixture's 40-tick bound: construction itself does not proceed. The two candidates are the ones BL-709 made construction depend on — CONSTRUCTION CAPACITY on the body (the charter web at the pinned 650:2 lays a median 65 firms over 148-538 markets, and the provisioning step charters yards only where a centre's turn reaches them) and the MATERIALS the build draws from the market.\n\nWHY IT MATTERS BEYOND THE HARNESS. The app's start path lays the same web the verify path now does (NR-909), so this is the world a player is handed: if construction cannot complete, the core loop's first move does not land. The fixture is the messenger, not the subject — and note its error text says 'never completed within 40 ticks', which reads as a slow build rather than a stalled one.\n\nTHE WORK. Read which of capacity or materials is empty at the stall (the construction ledger's own rows, or a probe on `body_construction_demand` / the yard provisioning in the charter walk); then either the web must charter a yard where the player stands, or construction must be able to source capacity across a market, or the opening corp must carry enough to build one. Whichever it is, the reading belongs beside NR-913's density finding: a sparse web is the common cause.\n\nDONE WHEN. On every library seed, the seated player can place AND complete a military base from its opening position within the fixture's bound, and scripts/verify/lib.lua stages on a pristine world (it also needs the tech gate's 12 ticks, which the fixture does not currently wait for)."
+   "design": "DIAGNOSED 2026-09-23 (Release --verify probes with a temporary run_construction trace; probes and patch in that session's scratchpad). Capacity is NOT the stall: BL-709 floors capacity coverage at 1/max_stretch, so it only stretches. The stall is MATERIALS, in three layers:\n\n(1) WRONG MARKET, AND NOTHING CAN REFILL IT. The fixture's build_first_valid placed at raster-first tile (45,97), market 56211: 0 steel for 100 ticks, demand there 0.00 — the build's want booked at the corp's representative market, not the draw market. Steel existed on the body (558 units) but in 5 of 255 markets, and a same-body convoy lands in the seller's own (corp, body) pool. Structural cause, owned by BL-1003 (pools per market).\n\n(2) THE SITE MULTIPLIER DRAWS MORE THAN WAS PRICED. The per-tick draw is cost/build_duration_ticks per unit of progress, but ticks_remaining carries BL-323's site multiplier, so a hard site draws cost x multiplier while construct_building's affordability gate priced the authored cost. Placed next to home (market 56166, 36.5 steel), the 35-steel base drew 36.5, stalled at 4.1 of 5+ progress units and never finished.\n\n(3) ZERO CONSTRUCTION CAPACITY. 0 construction yards on the body, so every build runs at the 10% floor: a 4-tick base takes 40+ ticks (ten years at a quarterly tick).\n\nRULINGS (Ben, 2026-09-23, form):\n- Sourcing: restore BL-1003 (pools per market). This item requires it.\n- Site multiplier: it stretches MATERIALS AND CASH as well as time, and that is PRICED AT PLACEMENT — the affordability gate, the Build door's capex preview and the rival scorer price cost x the site multiplier (PRODUCTION.md § Construction site time).\n- Capacity: IN SCOPE here. Either the charter web charters a yard the player's catchment reaches, or the opening corp carries capacity; choose by measurement once BL-1003 has landed, since pools per market move where capacity sits.\n\nPLUS THE FIXTURE: scripts/verify/lib.lua must place near the player's own works (not raster-first) and wait out the 12-tick tech gate, and its error must say 'stalled' when progress stops rather than 'never completed within 40 ticks'.\n\nDONE WHEN. On every library seed, the seated player can place AND complete a military base in its home catchment within the fixture's bound; the affordability gate refuses a site whose multiplied cost the corp cannot meet; and scripts/verify/lib.lua stages on a pristine world."
   }
  ]
 }

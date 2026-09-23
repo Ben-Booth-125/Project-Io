@@ -763,6 +763,26 @@ spread across the build. The front door shows the analog rate/ETA/paused status 
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A build stalled for want
 of an input registers that want as demand, so the stall is visible to the price signal.
 
+### Construction site time — a hard site costs more, and the price says so (Ben, 2026-09-23)
+
+A build's duration depends on **where**, not only **what**. Three multipliers, each 1.0 in the
+cheapest case, are fixed at placement: **landform** (the per-landform cost a convoy pays to cross it,
+plains 1.0 up to mountain 2.0 — `LOGISTICS.md`), **reach** (linear in the tile's distance from its
+nearest supply anchor, up to `1 + site_time_reach_scale` at the reach budget's edge), and **stack**
+(an established site builds faster — one discount step per building of the same type already on
+the tile, floored at `site_time_stack_min`).
+
+**The multiplier stretches materials and cash as well as time.** The per-tick draw is the build's
+materials and flat cost over the *authored* duration, and a hard site simply draws it for more
+ticks, so a site at ×1.5 consumes one and a half times the authored basket. That is the ruling, not
+an accident of arithmetic: a mountain build hauls more stone and keeps a crew longer.
+
+**So it is priced at placement.** Every reader of a build's cost — the affordability gate, the
+Build door's capex preview and the rival scorer — prices `cost × site multiplier`, never the
+authored cost alone. A commitment gate that priced less than the build will draw admits a build
+the corp or the market cannot finish — a 35-steel base on a market holding 36.5 steel, at a site
+that draws 43. Owner: BL-1066 (the player cannot build).
+
 ### Construction materials are per-named-building, not per-type (BL-590, 2026-08-24)
 
 **Ruling (Ben, 2026-08-23): materials vary per named building.** `resource_build_cost`
