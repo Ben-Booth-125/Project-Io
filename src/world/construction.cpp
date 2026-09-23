@@ -9,6 +9,86 @@
 #include <algorithm> // std::find (asset-list removal in demolish_building), std::max, std::clamp
 #include <cmath>     // std::lround (BL-323 S3 site-time multiplier)
 
+float construction_site_multiplier(const world& w, const recipe_registry& reg,
+                                   entity_id tile, building_type type, resource_type target)
+{
+    const auto tile_it = w.tiles.find(tile);
+    if (tile_it == w.tiles.end())
+        return 1.0f;
+    // BL-323 S3: duration depends on WHERE, not just WHAT. Three multipliers,
+    // each 1.0 at the cheapest case, so an anchor-adjacent plains
+    // first-of-its-kind build reproduces the flat authored figure exactly:
+    //   landform  — logistics.hpp's own per-landform cost (plains 1.0 ..
+    //               mountain 2.0), the same number a convoy pays to cross it.
+    //   reach     — linear in the tile's distance from its nearest supply
+    //               anchor, 1.0 at the anchor up to (1 + site_time_reach_scale)
+    //               at the max_logistics_reach budget edge. 1.0 when the reach
+    //               rule is off or the field is unbuilt — no scale to normalise by.
+    //   stack     — an established site (a tile already carrying a building of
+    //               the SAME type) builds faster: one discount step per prior
+    //               building, floored at site_time_stack_min.
+    const construction_params& cparams = reg.construction();
+    const float landform_factor = landform_logistics_cost(tile_it->second.landform);
+    float reach_factor = 1.0f;
+    if (cparams.max_logistics_reach > 0.0f)
+    {
+        const float reach = tile_reach_cost(w, tile);
+        if (reach >= 0.0f)
+        {
+            const float frac = std::clamp(reach / cparams.max_logistics_reach, 0.0f, 1.0f);
+            reach_factor = 1.0f + frac * cparams.site_time_reach_scale;
+        }
+    }
+    const int existing = placement_rules::buildings_on_tile(w, tile, type, target);
+    const float stack_factor = std::max(cparams.site_time_stack_min,
+        1.0f - static_cast<float>(existing) * cparams.site_time_stack_discount);
+    return landform_factor * reach_factor * stack_factor;
+}
+
+float construction_capex(const world& w, const recipe_registry& reg, entity_id tile,
+                         building_type type, resource_type target, std::uint16_t recipe)
+{
+    // Materials priced at the tile market's CURRENT price (base price where none has
+    // resolved). The draw itself happens tick by tick at the price prevailing then
+    // (economy_system.cpp § run_construction); this is the commitment figure.
+    const market_component* mkt = nullptr;
+    if (const entity_id mid = market_for_tile(w, tile); mid != null_entity)
+        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+            mkt = &mit->second;
+    // BL-590: the material cost specific to THIS named building (target/recipe).
+    const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
+    float material_cost = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (material_cost_row[r] <= 0.0f)
+            continue;
+        const float p = mkt ? (mkt->price[r] > 0.0f ? mkt->price[r] : mkt->base_price[r]) : 0.0f;
+        material_cost += material_cost_row[r] * p;
+    }
+    const float authored = reg.economics(type).build_cost + material_cost;
+    // The draw is the authored cost over the AUTHORED duration per full-rate tick,
+    // for as many ticks as the site actually takes — so the ratio is the ROUNDED
+    // tick count over the authored duration, not the raw multiplier (a 4-tick build
+    // at x1.2 takes 5 ticks and draws 1.25x). An instant build draws nothing per tick.
+    const float duration = reg.economics(type).build_duration_ticks;
+    if (duration <= 0.0f)
+        return authored;
+    return authored * static_cast<float>(construction_build_ticks(w, reg, tile, type, target)) / duration;
+}
+
+int construction_build_ticks(const world& w, const recipe_registry& reg,
+                             entity_id tile, building_type type, resource_type target)
+{
+    const float duration = reg.economics(type).build_duration_ticks;
+    // 0 stays instant (some infrastructure types are undurationed by design); any
+    // real duration is floored at 1 tick so the multiplier can never zero out a
+    // build that was supposed to take time.
+    if (duration <= 0.0f)
+        return 0;
+    return std::max(1, static_cast<int>(std::lround(
+        duration * construction_site_multiplier(w, reg, tile, type, target))));
+}
+
 construction_result construct_building(world& w, const recipe_registry& reg,
                                        entity_id corp, entity_id tile,
                                        building_type type, resource_type target,
@@ -82,45 +162,13 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     }
 
     corporation_component& cc = corp_it->second;
-    const building_economics& econ = reg.economics(type);
-    // BL-590: the material cost specific to THIS named building (target/recipe),
-    // not just its type — see resource_build_cost_for's comment.
-    const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
-
-    // Material cost (BL-044 → BL-095): a building's resource_build_cost is bought
-    // from the local market — but under BL-095 it is no longer a single up-front
-    // debit. Placement gates on affordability (you must be able to afford the whole
-    // build to commit to it), then construction is *paid as it is built*: each
-    // economy tick the build draws 1/build_duration_ticks of its materials as real
-    // market demand and pays the resolved price, and the flat build_cost accrues at
-    // the same pace (economy_system.cpp § run_construction). The rate is gated on
-    // the market's recent supply of those materials, so a starved build stretches
-    // or pauses rather than completing instantly. The affordability figure below is
-    // priced at the *current* market price for the commitment check; the actual
-    // spend happens tick by tick at the price prevailing then.
-    const market_component* mkt = nullptr;
-    {
-        const entity_id mid = market_for_tile(w, tile);
-        if (mid != null_entity)
-        {
-            const auto mit = w.markets.find(mid);
-            if (mit != w.markets.end())
-                mkt = &mit->second;
-        }
-    }
-    float material_cost = 0.0f;
-    for (std::size_t r = 0; r < resource_count; ++r)
-    {
-        if (material_cost_row[r] <= 0.0f)
-            continue;
-        const float p = mkt ? (mkt->price[r] > 0.0f ? mkt->price[r] : mkt->base_price[r]) : 0.0f;
-        material_cost += material_cost_row[r] * p;
-    }
-
     // Affordability is a commitment gate only (BL-095): the corp must be able to
     // afford the whole build to start it, but is not debited here — payment is
-    // spread across construction by run_construction (pay-as-you-build).
-    const float total_cost = econ.build_cost + material_cost;
+    // spread across construction by run_construction (pay-as-you-build). BL-1066
+    // (Ben, 2026-09-23): "the whole build" is what the build will DRAW — flat cost
+    // plus materials, times the site multiplier (PRODUCTION.md § Construction site
+    // time). Pricing the authored cost admitted builds the corp could not finish.
+    const float total_cost = construction_capex(w, reg, tile, type, target, recipe);
     if (cc.balance < total_cost)
         return construction_result::insufficient_funds;
 
@@ -138,42 +186,11 @@ construction_result construct_building(world& w, const recipe_registry& reg,
          || type == building_type::military_base
          || type == building_type::research_institute) ? 0.0f : 0.5f; // BL-332: passive, like military_base
     // Build-time pacing (playtest patch, 2026-07-06): the building sits idle
-    // for build_duration_ticks economy ticks before economy_system lets it produce.
-    //
-    // BL-323 S3: that duration now depends on WHERE, not just WHAT. Three
-    // multipliers, each 1.0 at the cheapest case so an anchor-adjacent plains
-    // first-of-its-kind build reproduces the old flat behaviour exactly:
-    //   landform  — reuse logistics.hpp's own per-landform cost (plains 1.0 ..
-    //               mountain 2.0), the same number a convoy pays to cross it.
-    //   reach     — linear in the tile's distance from its nearest supply
-    //               anchor, 1.0 at the anchor up to (1 + site_time_reach_scale)
-    //               at the max_logistics_reach budget edge. Skipped (1.0) when
-    //               the reach rule is disabled or the field/tile is unreachable
-    //               — there is then no scale to normalise against.
-    //   stack     — an established site (a tile that already carries a building
-    //               of the SAME type) builds faster: one discount step per prior
-    //               building, floored at site_time_stack_min.
-    const construction_params& cparams = reg.construction();
-    const float landform_factor = landform_logistics_cost(tile_it->second.landform);
-    float reach_factor = 1.0f;
-    if (cparams.max_logistics_reach > 0.0f)
-    {
-        const float reach = tile_reach_cost(w, tile);
-        if (reach >= 0.0f)
-        {
-            const float frac = std::clamp(reach / cparams.max_logistics_reach, 0.0f, 1.0f);
-            reach_factor = 1.0f + frac * cparams.site_time_reach_scale;
-        }
-    }
-    const int existing = placement_rules::buildings_on_tile(w, tile, type, target);
-    const float stack_factor = std::max(cparams.site_time_stack_min,
-        1.0f - static_cast<float>(existing) * cparams.site_time_stack_discount);
-    const float site_multiplier = landform_factor * reach_factor * stack_factor;
-    // 0 stays instant (some infrastructure types are undurationed by design);
-    // any real duration is floored at 1 tick so the multiplier can never zero
-    // out a build that was supposed to take time.
-    bc.ticks_remaining = econ.build_duration_ticks <= 0.0f ? 0
-        : std::max(1, static_cast<int>(std::lround(econ.build_duration_ticks * site_multiplier)));
+    // for its build ticks before economy_system lets it produce. BL-323 S3: that
+    // duration depends on WHERE, not just WHAT (construction_build_ticks above),
+    // read before this building is inserted so it does not count itself toward
+    // the stack discount.
+    bc.ticks_remaining = construction_build_ticks(w, reg, tile, type, target);
 
     if (type == building_type::extraction_site)
     {

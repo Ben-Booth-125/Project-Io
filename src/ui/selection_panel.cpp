@@ -3856,7 +3856,6 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
 
     for (candidate& c : cands)
     {
-        const building_economics& econ = reg.economics(c.type);
         // BL-344: the player's own corp is named, so a tech-gated type reads as
         // "Locked - not researched" in the ledger rather than offering a Build
         // button that construct_building would then refuse.
@@ -3870,12 +3869,9 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
         // materials priced at the local market. This ledger used to gate on build_cost
         // alone, so between the two figures it offered an enabled Build button that
         // then failed with nothing but a post-hoc toast.
-        c.capex = econ.build_cost;
-        // BL-590: the material cost specific to THIS named building.
-        const auto& material_cost_row = reg.resource_build_cost_for(c.type, c.target, c.recipe);
-        for (std::size_t ri = 0; ri < resource_count; ++ri)
-            if (material_cost_row[ri] > 0.0f)
-                c.capex += material_cost_row[ri] * price(ri);
+        // BL-1066: the SAME function the gate prices with — flat cost plus materials,
+        // times this tile's site multiplier — so the two cannot disagree again.
+        c.capex = construction_capex(w, reg, tile_id, c.type, c.target, c.recipe);
 
         c.produces = (c.type == building_type::extraction_site ||
                       c.type == building_type::processing_facility);
