@@ -27,20 +27,17 @@ float player_balance(const world& w)
 // header strip's STOCKPILE figure and the ledger's Cargo Value use one valuation.
 float player_stockpile_value(const world& w)
 {
-    std::unordered_map<entity_id, const market_component*> by_body;
-    by_body.reserve(w.markets.size());
-    for (const auto& [mid, mc] : w.markets)
-        by_body.emplace(mc.body, &mc);
-
+    // BL-1003: pools key (corp, market), so each pool is valued at its OWN
+    // market's price; a body-level pool (a market-less body) has no price.
     float value = 0.0f;
-    for (const auto& [key, pool] : w.corp_body_pools)
+    for (const auto& [key, pool] : w.corp_market_pools)
     {
         if (key.first != w.player_entity)
             continue;
-        const auto mit = by_body.find(key.second);
-        if (mit == by_body.end())
+        const auto mit = w.markets.find(key.second);
+        if (mit == w.markets.end())
             continue;
-        const market_component& mc = *mit->second;
+        const market_component& mc = mit->second;
         for (std::size_t r = 0; r < resource_count; ++r)
             if (pool.quantities[r] > 0.0f)
                 value += pool.quantities[r] * mc.price[r];

@@ -37,7 +37,7 @@ struct world;
 // playing politics over rather than merely scaling into.
 //
 // THE GOODS ARE CONSUMED. Settlement draws the lump from the supplier's
-// (corp, body) pool and credits it to nobody: the satellite launched. The
+// (corp, market) pool and credits it to nobody: the satellite launched. The
 // credit half stays on the supplier's balance — it is a sale, reported through
 // `corp_budget::subsidies` so `net()` explains the delta.
 //
@@ -50,7 +50,7 @@ struct world;
 // in the BL-644 report: this cut skips the player even under spectate.)
 //
 // DETERMINISM. Derivation walks `w.nation_budgets` (std::map, ascending
-// nation) and `w.corp_body_pools` (std::map, ascending (corp, body));
+// nation) and `w.corp_market_pools` (std::map, ascending (corp, pool key));
 // settlement walks the transfer record in its stored order. No RNG, no clock,
 // no unordered accumulation. The share formula is nation_budget.cpp's own,
 // character for character, so a claim the derivation gates as affordable is
@@ -81,6 +81,7 @@ struct space_purchase
     entity_id     supplier = null_entity; ///< The corp whose pool held the lump; null = THE MARKET.
     entity_id     body     = null_entity; ///< Where the goods stand — the claim's earmark subject.
     entity_id     market   = null_entity; ///< BL-742: the inventory market, when supplier is null.
+    entity_id     pool     = null_entity; ///< BL-1003: the supplier's POOL KEY (market, or a market-less body).
     resource_type resource = resource_type::spacecraft_components;
     float         quantity = 0.0f; ///< The lump; leaves the pool whole on completion.
     float         credits  = 0.0f; ///< quantity x the supplier market's unit price — the claim amount.
@@ -90,9 +91,9 @@ struct space_purchase
 
 /// Derive this tick's space-programme purchase claims, BEFORE
 /// `run_national_budget`. For each nation with a positive `space_programme`
-/// share, and each good with a positive lump: pick the (corp, body) pool
+/// share, and each good with a positive lump: pick the (corp, market) pool
 /// holding the most unreserved stock covering a WHOLE lump (ties to the lowest
-/// key; the player's corp never eligible), price the lump at that body's
+/// key; the player's corp never eligible), price the lump at that pool's
 /// market, and — when the line's remaining share covers it — append one
 /// earmarked claim to @p claims and one intent to the returned vector. Stock a
 /// claim names is reserved against later nations in the same derivation, so

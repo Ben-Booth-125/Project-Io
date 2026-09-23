@@ -24,15 +24,17 @@ entity_id lowest_market_on_body(const world& w, entity_id body)
     return best;
 }
 
-/// The procurement price basis: the resolved price at @p body's market, or
-/// `base_price` before first resolution — `request_quote`'s own "what the good
-/// actually costs here" reading, with no volume discount (the state pays spot).
-/// Zero when the body has no market at all: a purchase with no price basis is
-/// refused, never priced at nothing — a zero-credit draw would be confiscation
-/// wearing a purchase's name.
-float unit_price_at(const world& w, entity_id body, std::size_t ri)
+/// The procurement price basis: the resolved price at the supplier pool's
+/// market (BL-1003: @p pool_key is that market; a body key — a market-less
+/// body — finds none), or `base_price` before first resolution —
+/// `request_quote`'s own "what the good actually costs here" reading, with no
+/// volume discount (the state pays spot). Zero when there is no market at all:
+/// a purchase with no price basis is refused, never priced at nothing — a
+/// zero-credit draw would be confiscation wearing a purchase's name.
+float unit_price_at(const world& w, entity_id pool_key, std::size_t ri)
 {
-    const entity_id mid = lowest_market_on_body(w, body);
+    const entity_id mid = (w.markets.find(pool_key) != w.markets.end())
+        ? pool_key : lowest_market_on_body(w, pool_key);
     if (mid == null_entity)
         return 0.0f;
     const market_component& mc = w.markets.at(mid);
@@ -69,7 +71,7 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
     };
 
     // Stock already promised to an earlier claim THIS derivation, keyed
-    // (corp, body, resource). Two nations walked in ascending id never claim
+    // (corp, pool key, resource). Two nations walked in ascending id never claim
     // the same units, so a funded claim always finds its lump at settlement.
     std::map<std::tuple<entity_id, entity_id, std::size_t>, float> reserved;
     // BL-742: inventory promised to an earlier MARKET fallback, (market, resource).
@@ -119,31 +121,35 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
                 continue;
             const std::size_t ri = static_cast<std::size_t>(good);
 
-            // The supplier: the (corp, body) pool holding the MOST unreserved
+            // The supplier: the (corp, market) pool holding the MOST unreserved
             // stock that covers a WHOLE lump — strict >, so ties keep the
             // lowest key the std::map walk reached first. The player's corp is
             // never eligible (see the header: a forced sale is an unsanctioned
-            // auto-action on the player's corp).
+            // auto-action on the player's corp). BL-1003: each pool is its own
+            // candidate, priced at its own market; the claim's subject stays
+            // the pool's BODY.
             entity_id best_corp = null_entity;
+            entity_id best_key  = null_entity;
             entity_id best_body = null_entity;
             float     best_avail = 0.0f;
-            for (const auto& [key, pool] : w.corp_body_pools) // ascending (corp, body)
+            for (const auto& [key, pool] : w.corp_market_pools) // ascending (corp, pool key)
             {
                 const entity_id corp = key.first;
-                const entity_id body = key.second;
+                const entity_id body = pool_key_body(w, key.second);
                 if (corp == w.player_entity)
                     continue;
                 if (w.corporations.find(corp) == w.corporations.end())
                     continue;
-                if (w.bodies.find(body) == w.bodies.end())
+                if (body == null_entity)
                     continue; // the claim's subject must survive the gather check
                 float avail = pool.quantities[ri];
-                const auto rit = reserved.find(std::make_tuple(corp, body, ri));
+                const auto rit = reserved.find(std::make_tuple(corp, key.second, ri));
                 if (rit != reserved.end())
                     avail -= rit->second;
                 if (avail >= lump && avail > best_avail)
                 {
                     best_corp  = corp;
+                    best_key   = key.second;
                     best_body  = body;
                     best_avail = avail;
                 }
@@ -214,7 +220,7 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
                 continue;
             }
 
-            const float unit = unit_price_at(w, best_body, ri);
+            const float unit = unit_price_at(w, best_key, ri);
             if (!std::isfinite(unit) || !(unit > 0.0f))
                 continue; // no price basis, no purchase
 
@@ -231,7 +237,7 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
                 continue;
             line_claimed += amount;
 
-            reserved[std::make_tuple(best_corp, best_body, ri)] += lump;
+            reserved[std::make_tuple(best_corp, best_key, ri)] += lump;
 
             budget_claim c;
             c.nation  = nid;
@@ -245,6 +251,7 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
             sp.nation   = nid;
             sp.supplier = best_corp;
             sp.body     = best_body;
+            sp.pool     = best_key;
             sp.resource = good;
             sp.quantity = lump;
             sp.credits  = amount;
@@ -335,8 +342,8 @@ void settle_space_purchases(world& w,
         sp.funded = true;
 
         const std::size_t ri  = static_cast<std::size_t>(sp.resource);
-        const auto        pit = w.corp_body_pools.find(std::make_pair(sp.supplier, sp.body));
-        if (pit != w.corp_body_pools.end() && pit->second.quantities[ri] >= sp.quantity)
+        const auto        pit = w.corp_market_pools.find(std::make_pair(sp.supplier, sp.pool));
+        if (pit != w.corp_market_pools.end() && pit->second.quantities[ri] >= sp.quantity)
         {
             // The terminal sink: the lump leaves the supplier's pool and
             // is credited to nobody — the satellite launched. The credit

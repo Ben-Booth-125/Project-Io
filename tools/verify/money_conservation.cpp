@@ -100,7 +100,7 @@ static uint64_t state_hash(const world& w)
     for (const auto& [cid, cc] : corps) { mix(cid); mixf(cc->balance); }
 
     std::map<std::pair<entity_id, entity_id>, const stockpile_component*> pools;
-    for (const auto& [key, pc] : w.corp_body_pools) pools[key] = &pc;
+    for (const auto& [key, pc] : w.corp_market_pools) pools[key] = &pc;
     for (const auto& [key, pc] : pools)
     {
         mix(key.first); mix(key.second);
@@ -319,8 +319,8 @@ int main()
         std::printf("        buyer paid %.4f   supplier received %.4f\n", buyer_paid, supplier_received);
 
         // --- Delivery actually reaches the buyer ----------------------------
-        const double landed_here  = w.pool_for(f.buyer, f.buyer_body).quantities[ri(resource_type::iron_ore)];
-        const double landed_there = w.pool_for(f.buyer, f.supplier_body).quantities[ri(resource_type::iron_ore)];
+        const double landed_here  = w.pool_at(f.buyer, pool_key_for_body(w, f.buyer_body)).quantities[ri(resource_type::iron_ore)];
+        const double landed_there = w.pool_at(f.buyer, pool_key_for_body(w, f.supplier_body)).quantities[ri(resource_type::iron_ore)];
         check(landed_here >= 100.0,
               "P1.9 the full contracted quantity lands in the buyer's pool ON THE BUYER'S BODY");
         check(near(landed_there, 0.0),
@@ -420,7 +420,7 @@ int main()
         // Stock both sides so there is something to trade, then post a matched
         // pair on the SUPPLIER's market: a foreign buyer (the buyer corp,
         // resident in the other nation) lifting a local seller's ask.
-        w.pool_for(f.supplier, f.supplier_body).quantities[ri(resource_type::iron_ore)] += 200.0f;
+        w.pool_at(f.supplier, pool_key_for_body(w, f.supplier_body)).quantities[ri(resource_type::iron_ore)] += 200.0f;
 
         const float ask = 2.5f;
         const float qty = 40.0f;
@@ -452,7 +452,7 @@ int main()
         {
             recipe_registry creg;
             fixture c = build_fixture(creg);
-            c.w.pool_for(c.supplier, c.supplier_body).quantities[ri(resource_type::iron_ore)] += 200.0f;
+            c.w.pool_at(c.supplier, pool_key_for_body(c.w, c.supplier_body)).quantities[ri(resource_type::iron_ore)] += 200.0f;
             post_pair(c.w, c.supplier, c.buyer, c.supplier_body, resource_type::iron_ore, qty, ask);
             economy_report crep = run_economy_step(c.w, creg);
             auto cflows = clear_markets(c.w, creg, crep);
@@ -474,7 +474,7 @@ int main()
             fixture c = build_fixture(creg);
             law dl = l; dl.enacting_nation = c.supplier_nat; c.w.laws.push_back(dl);
             c.w.corporations[c.buyer].home_nation = c.supplier_nat; // now a domestic buyer
-            c.w.pool_for(c.supplier, c.supplier_body).quantities[ri(resource_type::iron_ore)] += 200.0f;
+            c.w.pool_at(c.supplier, pool_key_for_body(c.w, c.supplier_body)).quantities[ri(resource_type::iron_ore)] += 200.0f;
             post_pair(c.w, c.supplier, c.buyer, c.supplier_body, resource_type::iron_ore, qty, ask);
             economy_report crep = run_economy_step(c.w, creg);
             auto cflows = clear_markets(c.w, creg, crep);

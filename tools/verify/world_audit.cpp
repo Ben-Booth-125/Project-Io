@@ -764,8 +764,8 @@ int main()
             continue;
         }
         ++stock_corps;
-        const auto pit = w.corp_body_pools.find(std::make_pair(cid, hb));
-        if (pit == w.corp_body_pools.end())
+        const auto pit = w.corp_market_pools.find(std::make_pair(cid, pool_key_for_body(w, hb)));
+        if (pit == w.corp_market_pools.end())
         {
             ++stock_bad;
             std::printf("  BAD: corp=%u has no stockpile on its home body\n",
@@ -818,18 +818,18 @@ int main()
     }
 
     world w2 = make_hard_coded_world(no_prehistory());
-    bool det_ok = (w.corp_body_pools.size() == w2.corp_body_pools.size());
+    bool det_ok = (w.corp_market_pools.size() == w2.corp_market_pools.size());
     int det_bad = 0;
-    for (const auto& [key, pool] : w.corp_body_pools)
+    for (const auto& [key, pool] : w.corp_market_pools)
     {
-        const auto it2 = w2.corp_body_pools.find(key);
-        if (it2 == w2.corp_body_pools.end()) { ++det_bad; continue; }
+        const auto it2 = w2.corp_market_pools.find(key);
+        if (it2 == w2.corp_market_pools.end()) { ++det_bad; continue; }
         for (std::size_t r = 0; r < resource_count; ++r)
             if (pool.quantities[r] != it2->second.quantities[r]) { ++det_bad; break; }
     }
     if (det_bad != 0) det_ok = false;
     std::printf("  BL-116 R3 stockpiles identical across two generations (%zu pools, %d mismatched): %s\n",
-                w.corp_body_pools.size(), det_bad, det_ok ? "PASS" : "FAIL");
+                w.corp_market_pools.size(), det_bad, det_ok ? "PASS" : "FAIL");
 
     const bool stockpile_ok = (stock_bad == 0) && focus_ok && det_ok;
 

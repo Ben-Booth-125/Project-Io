@@ -147,7 +147,7 @@ int main()
         w.corporations[corp_p] = cc;
     }
     // Seed P's pool with 4 iron ore -> coverage 4/8 = 0.5 (between t_idle and t_full).
-    w.pool_for(corp_p, body).quantities[ri(resource_type::iron_ore)] = 4.0f;
+    w.pool_at(corp_p, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)] = 4.0f;
 
     // --- run one tick ---
     economy_report rep = run_economy_step(w, reg);
@@ -169,8 +169,8 @@ int main()
     // Processing: batches_full = 8*0.5 = 4 -> steel produced = 4; iron bought = 8-4 = 4.
     check(near(p_out, 4.0f), "R3.2 processing produces full batch outputs", p_out, 4.0f);
     check(!p_idle && p_has_lim, "R3.2 processor active with a limiting input", p_idle ? 1.0f : 0.0f, 0.0f);
-    check(near(rep.purchases[{corp_p, body}][ri(resource_type::iron_ore)], 4.0f),
-          "R4.2 auto-bought shortfall = need - pool = 4", rep.purchases[{corp_p, body}][ri(resource_type::iron_ore)], 4.0f);
+    check(near(rep.purchases[{corp_p, pool_key_for_body(w, body)}][ri(resource_type::iron_ore)], 4.0f),
+          "R4.2 auto-bought shortfall = need - pool = 4", rep.purchases[{corp_p, pool_key_for_body(w, body)}][ri(resource_type::iron_ore)], 4.0f);
 
     // Deposit depletion (Brief B, R2): the reserve is drawn down by the output.
     check(near(w.tiles[tile_e].resource_remaining[ri(resource_type::iron_ore)], 1.0e6f - 20.0f),
@@ -390,7 +390,7 @@ int main()
         ws.markets[m] = mc;
         const entity_id corp = ws.create_entity();
         { corporation_component cc; cc.balance = 0.0f; ws.corporations[corp] = cc; }
-        ws.pool_for(corp, b).quantities[ri(resource_type::steel)] = 10.0f;
+        ws.pool_at(corp, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)] = 10.0f;
 
         // The order goes into the WORLD's book (BL-293), not into a vector handed
         // to clear_markets — clearing reads the book itself now.
@@ -405,8 +405,8 @@ int main()
               "SO.1 steel price floored+eased to 5.0", ws.markets[m].price[ri(resource_type::steel)], 5.0f);
         check(near(f[corp].income, 50.0f),
               "SO.2 standing order sells 10 at the resolved price 5, not the floor (income 50)", f[corp].income, 50.0f);
-        check(near(ws.pool_for(corp, b).quantities[ri(resource_type::steel)], 0.0f),
-              "SO.3 pool debited by the order", ws.pool_for(corp, b).quantities[ri(resource_type::steel)], 0.0f);
+        check(near(ws.pool_at(corp, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)], 0.0f),
+              "SO.3 pool debited by the order", ws.pool_at(corp, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)], 0.0f);
     }
 
     // --- BL-351: duplicate sell orders cannot over-commit the pool ---
@@ -424,7 +424,7 @@ int main()
         ws.markets[m] = mc;
         const entity_id corp = ws.create_entity();
         { corporation_component cc; cc.balance = 0.0f; ws.corporations[corp] = cc; }
-        ws.pool_for(corp, b).quantities[ri(resource_type::steel)] = 10.0f;
+        ws.pool_at(corp, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)] = 10.0f;
 
         // BL-293: the book is world state, so the duplicate orders are placed on
         // the world rather than handed to clear_markets.
@@ -435,7 +435,7 @@ int main()
 
         economy_report empty;
         auto f = clear_markets(ws, reg, empty);
-        const float pool_after = ws.pool_for(corp, b).quantities[ri(resource_type::steel)];
+        const float pool_after = ws.pool_at(corp, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)];
         const float cleared    = 10.0f - pool_after;
         check(cleared <= 10.0f + 1e-3f && near(cleared, 10.0f),
               "BL351.1 duplicate orders clear at most the pool (10 total)", cleared, 10.0f);
@@ -464,7 +464,7 @@ int main()
         { corporation_component cc; cc.balance = 0.0f; ws.corporations[seller] = cc; }
         const entity_id buyer = ws.create_entity();
         { corporation_component cc; cc.balance = 0.0f; ws.corporations[buyer] = cc; }
-        ws.pool_for(seller, b).quantities[ri(resource_type::steel)] = 10.0f;
+        ws.pool_at(seller, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)] = 10.0f;
 
         // BL-293: both sides of the book are world state now.
         sell_order so; so.corp = seller; so.body = b; so.resource = resource_type::steel;
@@ -480,9 +480,9 @@ int main()
         check(near(f[seller].income, 5.0f * 2.0f + 5.0f * 6.828427f),
               "BL351.4 multi-order seller: matched order + other order's auto-clear",
               f[seller].income, 44.142f);
-        check(near(ws.pool_for(seller, b).quantities[ri(resource_type::steel)], 0.0f),
+        check(near(ws.pool_at(seller, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)], 0.0f),
               "BL351.5 pool debited by both orders' full listed quantity",
-              ws.pool_for(seller, b).quantities[ri(resource_type::steel)], 0.0f);
+              ws.pool_at(seller, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)], 0.0f);
         check(near(f[buyer].expenditure, 5.0f * 2.0f),
               "BL351.6 buyer pays the matched quantity at the ask", f[buyer].expenditure, 10.0f);
     }
@@ -522,8 +522,8 @@ int main()
         { corporation_component cc; const entity_id bid = wm.create_entity();
           building_component bld{}; bld.tile = tile_b; wm.buildings[bid] = bld;
           cc.assets.push_back(bid); wm.corporations[corp_b] = cc; }
-        wm.pool_for(corp_a, b).quantities[ri(resource_type::steel)] = 10.0f;
-        wm.pool_for(corp_b, b).quantities[ri(resource_type::steel)] = 10.0f;
+        wm.pool_at(corp_a, pool_key_for_body(wm, b)).quantities[ri(resource_type::steel)] = 10.0f;
+        wm.pool_at(corp_b, pool_key_for_body(wm, b)).quantities[ri(resource_type::steel)] = 10.0f;
 
         economy_report empty;
         clear_markets(wm, reg, empty);
@@ -575,7 +575,7 @@ int main()
             corporation_component cc; cc.balance = 1000.0f; cc.is_player = true;
             cc.assets.push_back(eb);
             qw.corporations[ec] = cc;
-            qw.pool_for(ec, qb).quantities[ri(resource_type::iron_ore)] = 100.0f;
+            qw.pool_at(ec, pool_key_for_body(qw, qb)).quantities[ri(resource_type::iron_ore)] = 100.0f;
             economy_report r = run_economy_step(qw, reg);
             float out = -1.0f;
             for (const auto& br : r.buildings)

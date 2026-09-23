@@ -227,7 +227,7 @@ scene make_scene()
     }
 
     // Stock to sell: 100 steel in the (corp, body) pool.
-    s.w.pool_for(s.corp, s.body).quantities[ri(resource_type::steel)] = 100.0f;
+    s.w.pool_at(s.corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] = 100.0f;
 
     return s;
 }

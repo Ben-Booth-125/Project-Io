@@ -87,7 +87,7 @@ uint64_t world::state_hash(int tick) const
             //     non-neutral, and the non-neutral side folds (id, value) while
             //     the other folds nothing. Neutral state contributes nothing,
             //     exactly as a pool that was never created contributes nothing
-            //     to the `corp_body_pools` walk below.
+            //     to the `corp_market_pools` walk below.
             //   * WHY IT MATTERS. At the shipped rates every building is
             //     neutral, so a world in which this mechanism has never fired
             //     hashes exactly as it did before the field existed. That is
@@ -116,8 +116,8 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
-    // Corp/body stockpile pools — std::map, already sorted by (corp,body).
-    for (const auto& [key, sc] : corp_body_pools)
+    // Corp/market goods pools (BL-1003) — std::map, already sorted by (corp, pool key).
+    for (const auto& [key, sc] : corp_market_pools)
     {
         fnv1a_u32(h, key.first);
         fnv1a_u32(h, key.second);

@@ -247,7 +247,7 @@ int main()
         if (final_tick)
         {
             check(w.procurement_contracts.empty(), "R0.3 the contract completes and is removed within its own lead time");
-            check(near(w.pool_for(buyer, body).quantities[ri(resource_type::iron_ore)], 20.0f),
+            check(near(w.pool_at(buyer, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)], 20.0f),
                   "R0.3 the full quantity lands in the BUYER's pool on completion, before any auto-sell");
             check(near(w.corporations[buyer].balance, starting_balance - total),
                   "Q1 SPLIT: by completion the treasury has paid exactly the deposit plus the paced remainder, before any auto-sell income");
@@ -382,7 +382,7 @@ int main()
               "R1 the buyer's balance after the whole run is bit-identical");
         check(bit_eq(f.w.corporations[f.supplier].balance, baseline::supplier_balance),
               "R1 the supplier's balance after the whole run is bit-identical");
-        check(bit_eq(f.w.pool_for(f.buyer, f.body).quantities[ri(resource_type::iron_ore)],
+        check(bit_eq(f.w.pool_at(f.buyer, pool_key_for_body(f.w, f.body)).quantities[ri(resource_type::iron_ore)],
                      baseline::buyer_pool_iron),
               "R1 the buyer's iron pool after the whole run is bit-identical");
     }

@@ -313,7 +313,7 @@ int main()
             if (std::fabs(corp.balance) > k_balance_bound) balance_bound = false;
         }
         // Pool quantities finite.
-        for (const auto& [key, pool] : w.corp_body_pools)
+        for (const auto& [key, pool] : w.corp_market_pools)
         {
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (!finite_ok(pool.quantities[r])) all_finite = false;

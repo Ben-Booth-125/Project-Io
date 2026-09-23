@@ -157,7 +157,7 @@ scenario make_scenario(float stock = 100.0f, float balance = 1000.0f, bool with_
     dm.price         = dm.base_price;
     s.w.markets[s.dst_market] = dm;
 
-    s.w.pool_for(s.corp, s.body).quantities[r_iron] = stock;
+    s.w.pool_at(s.corp, s.src_market).quantities[r_iron] = stock; // BL-1003: the source market's pool
     return s;
 }
 
@@ -177,8 +177,8 @@ recipe_registry make_registry(float lp_per_anchor)
 
 float pool_iron(const scenario& s)
 {
-    const auto it = s.w.corp_body_pools.find({s.corp, s.body});
-    return it != s.w.corp_body_pools.end() ? it->second.quantities[r_iron] : 0.0f;
+    const auto it = s.w.corp_market_pools.find({s.corp, s.src_market});
+    return it != s.w.corp_market_pools.end() ? it->second.quantities[r_iron] : 0.0f;
 }
 
 logistics_nodes nodes_of(world& w) { return collect_logistics_nodes(w); }
@@ -198,7 +198,7 @@ void p1_granted_draw()
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 50.0f);
     const logistics_nodes nodes = nodes_of(s.w);
 
-    const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.body, s.dst_market,
+    const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
                                             r_iron, 25.0f, reg.logistics_cost(convoy_mode::space));
     check(leg.viable, "the leg prices viable (a plains column, no water)");
     check(leg.mode == convoy_mode::land, "an all-plains intra-body lane is land mode");
@@ -242,7 +242,7 @@ void p2_refused_mutates_nothing()
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 0.5f);
     const logistics_nodes nodes = nodes_of(s.w);
 
-    const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.body, s.dst_market,
+    const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
                                             r_iron, 25.0f, reg.logistics_cost(convoy_mode::space));
     check(leg.viable, "fixture: the leg prices viable, and its 25 units exceed the tiny pool");
 
@@ -274,7 +274,7 @@ void p3_no_anchor_no_dispatch()
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 1.0e6f); // generous — doesn't matter
     const logistics_nodes nodes = nodes_of(s.w);
 
-    const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.body, s.dst_market,
+    const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
                                             r_iron, 25.0f, reg.logistics_cost(convoy_mode::space));
     check(leg.viable, "fixture: the leg still prices (LP is a separate gate from routability)");
 
@@ -315,17 +315,18 @@ void p4_space_leg_exempt()
     cc.assets.push_back(pad);
     w.corporations[corp] = cc;
 
-    w.pool_for(corp, src_body).quantities[r_iron] = 50.0f;
-    w.pool_for(corp, src_body).quantities[static_cast<std::size_t>(resource_type::propellant)] = 5.0f;
-
     entity_id src_mkt = w.create_entity();
     market_component sm{}; sm.body = src_body; w.markets[src_mkt] = sm;
     entity_id dst_mkt = w.create_entity();
     market_component dm{}; dm.body = dest_body; w.markets[dst_mkt] = dm;
 
+    // BL-1003: the stock sits in the source MARKET's pool.
+    w.pool_at(corp, src_mkt).quantities[r_iron] = 50.0f;
+    w.pool_at(corp, src_mkt).quantities[static_cast<std::size_t>(resource_type::propellant)] = 5.0f;
+
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 0.0f); // no LP anywhere
     const logistics_nodes nodes = collect_logistics_nodes(w);
-    const convoy_leg leg = price_convoy_leg(w, reg, nodes, corp, src_body, dst_mkt,
+    const convoy_leg leg = price_convoy_leg(w, reg, nodes, corp, src_mkt, dst_mkt,
                                             r_iron, 10.0f, reg.logistics_cost(convoy_mode::space));
     check(leg.viable && leg.mode == convoy_mode::space, "fixture: an inter-body leg prices as space mode");
 
@@ -523,14 +524,14 @@ void p7_default_is_private_and_fresh()
     // Two legs, each individually within the pool (dist ~1.0 each), committed
     // with NO shared pool passed — if any hidden state persisted between the
     // two calls, the second would see the first's draw and could refuse.
-    const convoy_leg leg1 = price_convoy_leg(s.w, reg, nodes, s.corp, s.body, s.dst_market,
+    const convoy_leg leg1 = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
                                              r_iron, 5.0f, reg.logistics_cost(convoy_mode::space));
     bool refused1 = false;
     const bool ok1 = commit_convoy(s.w, reg, s.corp, s.body, s.src_market, s.dst_market,
                                    r_iron, 5.0f, leg1, nullptr, &refused1);
     check(ok1 && !refused1, "first call (no shared pool) commits");
 
-    const convoy_leg leg2 = price_convoy_leg(s.w, reg, nodes, s.corp, s.body, s.dst_market,
+    const convoy_leg leg2 = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
                                              r_iron, 5.0f, reg.logistics_cost(convoy_mode::space));
     bool refused2 = false;
     const bool ok2 = commit_convoy(s.w, reg, s.corp, s.body, s.src_market, s.dst_market,

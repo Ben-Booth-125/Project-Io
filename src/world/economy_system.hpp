@@ -186,14 +186,17 @@ struct economy_report
     /// describes something already erased.
     std::vector<battle_dispatch> battle_dispatches;
 
-    /// Per (corporation, body): the input quantities a consumer could not cover
+    /// Per (corporation, pool key) — BL-1003: the MARKET the draw happened in
+    /// (the consumer's tile market), or the body id on a market-less body. The
+    /// input quantities a consumer could not cover
     /// from its own pool and auto-bought from the market this tick — the FILL.
     /// Resource-indexed. This is goods actually RECEIVED, and it is what the
     /// money follows: auto_buys, the VWAP accumulator, and corporate expenditure
     /// all read this and must keep reading it (market_clearing.cpp).
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> purchases;
 
-    /// BL-441. Per (corporation, body): the input quantities a consumer WANTED
+    /// BL-441. Per (corporation, pool key), keyed exactly as `purchases`
+    /// (BL-1003): the input quantities a consumer WANTED
     /// from the market this tick — the WANT, whether or not the draw succeeded.
     /// Resource-indexed, and the ONLY thing `mc.demand` is allowed to read.
     ///

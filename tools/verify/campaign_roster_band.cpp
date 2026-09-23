@@ -93,7 +93,7 @@ int main()
 
         // Satisfy every campaign gate axis (steel/ore, food, port, energy) so
         // gate failure cannot be confused with era gating.
-        stockpile_component& pool = w.pool_for(corp, body);
+        stockpile_component& pool = w.pool_at(corp, pool_key_for_body(w, body));
         pool.quantities[static_cast<std::size_t>(resource_type::steel)]          = 1000.0f;
         pool.quantities[static_cast<std::size_t>(resource_type::food_rations)]   = 1000.0f;
         pool.quantities[static_cast<std::size_t>(resource_type::coal)]           = 1000.0f;

@@ -117,13 +117,13 @@ int main()
         const entity_id corp = w.create_entity();
         { corporation_component cc; cc.balance = 10000.0f; cc.is_player = true;
           cc.assets.push_back(bld); w.corporations[corp] = cc; }
-        w.pool_for(corp, body).quantities[ri(resource_type::iron_ore)] = 12.0f; // covers 12 of the 20 needed
+        w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)] = 12.0f; // covers 12 of the 20 needed
 
         const economy_report rep = run_economy_step(w, reg);
         float out = 0.0f;
         for (const auto& br : rep.buildings) if (br.building == bld) out = br.output_quantity;
         check(near(out, 10.0f), "R3 pool + market inventory together still yield a full batch");
-        check(near(w.pool_for(corp, body).quantities[ri(resource_type::iron_ore)], 0.0f),
+        check(near(w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)], 0.0f),
               "R3 pool drawn down to zero (pool-first)");
         check(near(w.markets.at(market).inventory[ri(resource_type::iron_ore)], 100.0f - 8.0f),
               "R3 market inventory drained only by the remainder (20 - 12 = 8)");
@@ -172,14 +172,14 @@ int main()
           mc.price = mc.base_price; w.markets[market] = mc; }
         const entity_id corp = w.create_entity();
         { corporation_component cc; cc.balance = 1000.0f; cc.is_player = true; w.corporations[corp] = cc; }
-        w.pool_for(corp, body).quantities[ri(resource_type::steel)] = 50.0f; // pure surplus, no processors reserving it.
+        w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::steel)] = 50.0f; // pure surplus, no processors reserving it.
 
         const economy_report rep = run_economy_step(w, reg);
         auto flows = clear_markets(w, reg, rep);
         (void)flows;
         check(near(w.markets.at(market).inventory[ri(resource_type::steel)], 50.0f),
               "R5 a corp's real surplus sale lands in market inventory");
-        check(near(w.pool_for(corp, body).quantities[ri(resource_type::steel)], 0.0f),
+        check(near(w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::steel)], 0.0f),
               "R5 the corp's pool is debited by the sold quantity");
     }
 

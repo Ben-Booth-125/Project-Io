@@ -265,7 +265,7 @@ static void test_predicate()
         const auto cuts = intercept_convoys(s.w, 7);
         check(cuts.empty(), "R3: a NEUTRAL unit on the head tile intercepts nothing");
         check(s.w.convoys.size() == 1, "R3: the convoy survives");
-        check(near_f(s.w.pool_for(s.raider, s.body).quantities[ri(resource_type::iron_ore)], 0.0f),
+        check(near_f(s.w.pool_at(s.raider, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)], 0.0f),
               "R3: nothing credited to the neutral corp");
     }
 
@@ -343,9 +343,9 @@ static void test_conservation()
 
         const auto cuts = intercept_convoys(s.w, 3);
         const float raided =
-            s.w.pool_for(s.raider, s.body).quantities[ri(resource_type::iron_ore)];
+            s.w.pool_at(s.raider, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)];
         const float delivered =
-            s.w.pool_for(s.victim, s.body).quantities[ri(resource_type::iron_ore)];
+            s.w.pool_at(s.victim, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)];
         check(cuts.size() == 1, "R4: exactly one interception");
         check_f(near_f(raided, 137.5f), "R4: captured qty credited to the interceptor EXACTLY",
                 raided, 137.5);
@@ -358,10 +358,10 @@ static void test_conservation()
         // And the delivery that would have happened does not: crediting after
         // the cut adds nothing, because there is no convoy left to credit.
         credit_arrived_convoys(s.w, 4);
-        check_f(near_f(s.w.pool_for(s.victim, s.body).quantities[ri(resource_type::iron_ore)],
+        check_f(near_f(s.w.pool_at(s.victim, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)],
                        0.0f),
                 "R4: the destination is never credited for a cut convoy",
-                s.w.pool_for(s.victim, s.body).quantities[ri(resource_type::iron_ore)], 0.0);
+                s.w.pool_at(s.victim, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)], 0.0);
     }
 
     // Destroyed fallback: an interceptor that is not a corporation holds no
@@ -381,14 +381,14 @@ static void test_conservation()
         if (cuts.size() == 1)
             check(cuts[0].outcome == interception_outcome::destroyed,
                   "R4: outcome is DESTROYED when the cargo cannot be credited");
-        check_f(near_f(s.w.pool_for(freebooter, s.body).quantities[ri(resource_type::iron_ore)],
+        check_f(near_f(s.w.pool_at(freebooter, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)],
                        0.0f),
                 "R4: destroyed cargo credits NOTHING",
-                s.w.pool_for(freebooter, s.body).quantities[ri(resource_type::iron_ore)], 0.0);
-        check_f(near_f(s.w.pool_for(s.victim, s.body).quantities[ri(resource_type::iron_ore)],
+                s.w.pool_at(freebooter, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)], 0.0);
+        check_f(near_f(s.w.pool_at(s.victim, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)],
                        0.0f),
                 "R4: destroyed cargo is not returned to the victim either",
-                s.w.pool_for(s.victim, s.body).quantities[ri(resource_type::iron_ore)], 0.0);
+                s.w.pool_at(s.victim, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)], 0.0);
         check(s.w.convoys.empty(), "R4: the convoy is gone either way");
     }
 }
@@ -414,7 +414,7 @@ static void test_determinism()
         declare_hostile(s.w, s.raider, s.victim);
         auto cuts = intercept_convoys(s.w, 11);
         const float raided =
-            s.w.pool_for(s.raider, s.body).quantities[ri(resource_type::iron_ore)];
+            s.w.pool_at(s.raider, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)];
         return std::pair<std::vector<interception_record>, float>{ std::move(cuts), raided };
     };
 
@@ -562,10 +562,10 @@ static void test_reportable()
         credit_arrived_convoys(s.w, 9); // two-arg form, as every existing caller uses
         check(s.w.convoys.empty(),
               "R7: a caller passing no sink still gets the cut (behaviour unchanged)");
-        check_f(near_f(s.w.pool_for(s.raider, s.body).quantities[ri(resource_type::iron_ore)],
+        check_f(near_f(s.w.pool_at(s.raider, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)],
                        33.0f),
                 "R7: ... including the capture credit",
-                s.w.pool_for(s.raider, s.body).quantities[ri(resource_type::iron_ore)], 33.0);
+                s.w.pool_at(s.raider, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::iron_ore)], 33.0);
     }
 }
 

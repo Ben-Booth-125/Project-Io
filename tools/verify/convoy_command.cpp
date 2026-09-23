@@ -91,8 +91,8 @@ std::string fingerprint(const world& w)
     for (const entity_id id : corp_ids)
         o << "C" << id << ':' << w.corporations.at(id).balance << ';';
 
-    // corp_body_pools is a std::map — already in (corp, body) order.
-    for (const auto& [key, sc] : w.corp_body_pools)
+    // corp_market_pools is a std::map — already in (corp, pool key) order.
+    for (const auto& [key, sc] : w.corp_market_pools)
     {
         o << "P" << key.first << '/' << key.second << ':';
         for (const float q : sc.quantities) o << q << ',';
@@ -235,7 +235,7 @@ scenario make_scenario(float stock = 100.0f, float balance = 1000.0f)
     dm.price         = dm.base_price;
     s.w.markets[s.dst_market] = dm;
 
-    s.w.pool_for(s.corp, s.body).quantities[r_iron] = stock;
+    s.w.pool_at(s.corp, s.src_market).quantities[r_iron] = stock; // BL-1003: the source market's pool
     return s;
 }
 
@@ -261,17 +261,25 @@ corp_command hold_cmd(entity_id corp, uint32_t convoy_id)
     return cmd;
 }
 
+/// Iron ore in the corp's SOURCE market pool (BL-1003: pools key (corp, market)).
 float pool_iron(const scenario& s)
 {
-    const auto it = s.w.corp_body_pools.find({s.corp, s.body});
-    return it != s.w.corp_body_pools.end() ? it->second.quantities[r_iron] : 0.0f;
+    const auto it = s.w.corp_market_pools.find({s.corp, s.src_market});
+    return it != s.w.corp_market_pools.end() ? it->second.quantities[r_iron] : 0.0f;
 }
 
-/// Iron ore held by the corp anywhere at all — in the pool or in flight. The
+/// Iron ore in the corp's DESTINATION market pool — where a delivery lands.
+float dst_pool_iron(const scenario& s)
+{
+    const auto it = s.w.corp_market_pools.find({s.corp, s.dst_market});
+    return it != s.w.corp_market_pools.end() ? it->second.quantities[r_iron] : 0.0f;
+}
+
+/// Iron ore held by the corp anywhere at all — in either pool or in flight. The
 /// conservation quantity R3 tracks.
 float iron_everywhere(const scenario& s)
 {
-    float total = pool_iron(s);
+    float total = pool_iron(s) + dst_pool_iron(s);
     for (const convoy_component& c : s.w.convoys)
         if (c.corp == s.corp && c.cargo_resource == resource_type::iron_ore)
             total += c.cargo_qty;
@@ -347,7 +355,7 @@ int main()
         // Nothing else moved: every other resource in the pool, and both
         // markets' arrays, are untouched.
         bool other_resources_clean = true;
-        const auto& q = s.w.corp_body_pools.at({s.corp, s.body}).quantities;
+        const auto& q = s.w.corp_market_pools.at({s.corp, s.src_market}).quantities;
         for (std::size_t i = 0; i < resource_count; ++i)
             if (i != r_iron && q[i] != 0.0f) other_resources_clean = false;
         check(other_resources_clean, "R0.10 no other resource in the pool moved");
@@ -433,7 +441,7 @@ int main()
             corporation_component rc;
             rc.balance = 1000.0f;
             s.w.corporations[rival] = rc;
-            s.w.pool_for(rival, s.body).quantities[r_iron] = 40.0f;
+            s.w.pool_at(rival, pool_key_for_body(s.w, s.body)).quantities[r_iron] = 40.0f;
             // The rival needs its own anchor to have a route at all.
             const entity_id rb = s.w.create_entity();
             building_component b{};
@@ -519,9 +527,12 @@ int main()
             credit_arrived_convoys(s.w, i);
         }
         check(s.w.convoys.empty(), "R3.11 the convoy arrives and is retired");
-        check(std::fabs(pool_iron(s) - 100.0f) < 1e-3f,
-              "R3.12 CONSERVATION: the delivered cargo lands in the destination pool in full "
-              "(same-body lane: 70 held + 30 delivered = 100)");
+        // BL-1003: a same-body lane now DELIVERS — the 30 land in the
+        // destination market's pool, not back in the source pool it left.
+        check(std::fabs(pool_iron(s) - 70.0f) < 1e-3f &&
+              std::fabs(dst_pool_iron(s) - 30.0f) < 1e-3f,
+              "R3.12 CONSERVATION: the delivered cargo lands in the DESTINATION market's pool in full "
+              "(same-body lane: 70 held at source + 30 delivered at destination = 100)");
     }
 
     // -----------------------------------------------------------------------
@@ -573,7 +584,7 @@ int main()
             corporation_component oc;
             oc.balance = 1000.0f;
             s.w.corporations[other] = oc;
-            s.w.pool_for(other, s.body).quantities[r_iron] = 200.0f;
+            s.w.pool_at(other, pool_key_for_body(s.w, s.body)).quantities[r_iron] = 200.0f;
             const entity_id ob = s.w.create_entity();
             building_component b{};
             b.tile = tile_at(s.w, s.body, 0, 0);

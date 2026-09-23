@@ -377,17 +377,17 @@ void draw_rival_building_summary(const world& w, const recipe_registry& reg,
             ImGui::Text("Production:  workforce %.0f%%",
                         static_cast<double>(b.workforce_assigned) * 100.0);
 
-        // Stockpile: the owner's (corp, body) pool this building feeds — pools
-        // are corp-per-body (world::corp_body_pools), not per building, and the
-        // label says so rather than implying a per-site hoard.
+        // Stockpile: the owner's (corp, market) pool this building feeds — pools
+        // are corp-per-market (world::corp_market_pools, BL-1003), not per
+        // building, and the label says so rather than implying a per-site hoard.
         if (tile_it != w.tiles.end())
         {
-            const auto pit = w.corp_body_pools.find({owner, tile_it->second.body});
+            const stockpile_component* sp = w.find_pool(owner, pool_key_for_tile(w, b.tile));
             float total = 0.0f;
-            if (pit != w.corp_body_pools.end())
-                for (const float q : pit->second.quantities)
+            if (sp != nullptr)
+                for (const float q : sp->quantities)
                     total += q;
-            ImGui::Text("Stockpile:   %.1f pooled on this body", static_cast<double>(total));
+            ImGui::Text("Stockpile:   %.1f pooled at this market", static_cast<double>(total));
         }
         ImGui::TextDisabled("Competitor \xe2\x80\x94 god view");
         return;
@@ -1246,10 +1246,10 @@ void draw_corporation_god_facts(const world& w, const recipe_registry& reg,
     ImGui::Text("Should-have buffer: %s",
                 fmt::credits(corp_should_have_buffer(w, reg, report, id)).c_str());
 
-    // Per-body stockpile pools. corp_body_pools is a std::map, so this walk is
+    // Per-market goods pools (BL-1003). corp_market_pools is a std::map, so this walk is
     // deterministic; only bodies actually holding stock get a row.
     bool any_pool = false;
-    for (const auto& [key, pool] : w.corp_body_pools)
+    for (const auto& [key, pool] : w.corp_market_pools)
     {
         if (key.first != id)
             continue;
@@ -1269,9 +1269,14 @@ void draw_corporation_god_facts(const world& w, const recipe_registry& reg,
             ImGui::TextDisabled("Pools");
             any_pool = true;
         }
-        const auto body_it = w.bodies.find(key.second);
-        ImGui::Text("%s: %.1f (most: %s %.1f)",
+        // BL-1003: the key is a market (or a market-less body); name the body
+        // and, for a market pool, the market's id.
+        const auto body_it = w.bodies.find(pool_key_body(w, key.second));
+        const bool is_market = w.markets.find(key.second) != w.markets.end();
+        ImGui::Text("%s%s%u: %.1f (most: %s %.1f)",
                     body_it != w.bodies.end() ? body_it->second.name.c_str() : "?",
+                    is_market ? " market #" : " #",
+                    static_cast<unsigned>(key.second),
                     static_cast<double>(total),
                     resource_name(static_cast<resource_type>(top)),
                     static_cast<double>(pool.quantities[top]));

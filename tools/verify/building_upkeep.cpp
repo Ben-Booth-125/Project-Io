@@ -115,7 +115,7 @@ struct fixture
         w.corporations[corp] = cc;
     }
 
-    stockpile_component& pool() { return w.pool_for(corp, body); }
+    stockpile_component& pool() { return w.pool_at(corp, pool_key_for_body(w, body)); }
 };
 
 /// A registry authoring ONE resource on ONE building type in ONE band.
@@ -205,9 +205,9 @@ void r3_rates_are_per_type_and_era_banded()
         f.build(1, building_type::processing_facility);
         recipe_registry reg = make_registry(building_type::processing_facility,
                                             era_band::ancient, resource_type::tools, 0.0f);
-        const std::size_t pools_before = f.w.corp_body_pools.size();
+        const std::size_t pools_before = f.w.corp_market_pools.size();
         run_building_upkeep(f.w, reg, g_upkeep_report);
-        check(f.w.corp_body_pools.size() == pools_before,
+        check(f.w.corp_market_pools.size() == pools_before,
               "R3 a zero-rate pass creates no pool that did not already exist");
     }
 }
@@ -255,7 +255,7 @@ void r1_the_draw_and_its_order()
         f.w.corporations.at(f.corp).assets.push_back(b2);
 
         f.pool().quantities[ri(resource_type::tools)] = 10.0f;
-        f.w.pool_for(f.corp, body2).quantities[ri(resource_type::tools)] = 10.0f;
+        f.w.pool_at(f.corp, pool_key_for_body(f.w, body2)).quantities[ri(resource_type::tools)] = 10.0f;
 
         recipe_registry reg = make_registry(building_type::extraction_site,
                                             era_band::ancient, resource_type::tools, 1.0f);
@@ -263,7 +263,7 @@ void r1_the_draw_and_its_order()
 
         check_near(f.pool().quantities[ri(resource_type::tools)], 9.0f,
                    "R1 the home-body building drew from the home-body pool");
-        check_near(f.w.pool_for(f.corp, body2).quantities[ri(resource_type::tools)], 9.0f,
+        check_near(f.w.pool_at(f.corp, pool_key_for_body(f.w, body2)).quantities[ri(resource_type::tools)], 9.0f,
                    "R1 the other-body building drew from THAT body's pool, not the first");
     }
 
@@ -528,11 +528,11 @@ void r7_the_reservation_ceiling()
         const int before = f.w.buildings.at(f.buildings[0]).supply_factor_permille;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
 
-        check_near(want_of(rep, f.corp, f.body, good), need,
+        check_near(want_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), need,
                    "R7a the WHOLE shortfall reaches the want register");
-        check_near(fill_of(rep, f.corp, f.body, good), need,
+        check_near(fill_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), need,
                    "R7a the fill is what the shelf actually supplied");
-        check_near(upkeep_want_of(rep, f.corp, f.body, good), need,
+        check_near(upkeep_want_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), need,
                    "R7a the attribution mirror carries the same bid");
         check_near(f.w.markets.begin()->second.inventory[ri(good)], 10.0f - need,
                    "R7a the market's real inventory is drained by the fill");
@@ -576,9 +576,9 @@ void r7_the_reservation_ceiling()
         economy_report rep;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
 
-        check_near(want_of(rep, f.corp, f.body, good), need,
+        check_near(want_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), need,
                    "R7c the want is the full shortfall, UNREDUCED by what the shelf holds");
-        check_near(fill_of(rep, f.corp, f.body, good), 0.2f,
+        check_near(fill_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), 0.2f,
                    "R7c the fill is only what was delivered");
         check_near(f.w.markets.begin()->second.inventory[ri(good)], 0.0f,
                    "R7c the shelf is emptied, never driven negative");
@@ -596,7 +596,7 @@ void r7_the_reservation_ceiling()
         economy_report rep;
         run_building_upkeep(f.w, reg, rep);
 
-        check_near(want_of(rep, f.corp, f.body, good), need * 0.6f,
+        check_near(want_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), need * 0.6f,
                    "R7d only what the POOL could not cover is bid");
         check_near(f.pool().quantities[ri(good)], 0.0f, "R7d the pool is spent first");
     }

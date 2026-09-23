@@ -228,8 +228,8 @@ scenario_result run_scenario(const recipe_registry& reg)
     // Fund only the MET units' goods draw: 10 heads x 2.0 ordnance/head =
     // 20.0 needed, credited generously. The unmet corps' pools stay at their
     // auto-created zero, so their draw is fully unmet.
-    f.w.pool_for(corp_in_met, f.body).quantities[ordnance_idx()]  = 1000.0f;
-    f.w.pool_for(corp_out_met, f.body).quantities[ordnance_idx()] = 1000.0f;
+    f.w.pool_at(corp_in_met, pool_key_for_body(f.w, f.body)).quantities[ordnance_idx()]  = 1000.0f;
+    f.w.pool_at(corp_out_met, pool_key_for_body(f.w, f.body)).quantities[ordnance_idx()] = 1000.0f;
 
     unit_upkeep_tick tick = run_unit_upkeep(f.w, reg, g_upkeep_report);
 
@@ -321,7 +321,7 @@ int main()
         anchor(f, 0, 0);
         const entity_id corp = add_corp(f.w);
         const entity_id u    = add_unit(f.w, corp, at(f, 2, 0), 10, 560);
-        f.w.pool_for(corp, f.body).quantities[ordnance_idx()] = 1000.0f;
+        f.w.pool_at(corp, pool_key_for_body(f.w, f.body)).quantities[ordnance_idx()] = 1000.0f;
         run_unit_upkeep(f.w, reg, g_upkeep_report);
         check(f.w.units.at(u).supply_factor_permille == 620,
               "U6 recovery continues on a second in-supply tick (560 -> 620)");

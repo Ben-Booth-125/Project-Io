@@ -210,7 +210,7 @@ void inject_interbody_demand(world& w,
 /// be able to trade as a player does." An empty book is the prior pooled model
 /// exactly, so existing econ_harness expectations are unchanged.
 ///
-/// @param w      World; markets and (corp, body) pools are mutated, and the
+/// @param w      World; markets and (corp, market) pools are mutated, and the
 ///               standing order book (`sell_orders` / `buy_orders`) is read.
 /// @param reg    Loaded registry (for processor input reservations).
 /// @param report Economy step report (its purchases drive the buy side).

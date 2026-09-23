@@ -137,10 +137,13 @@ entity_id nearest_market(const world& w, const std::vector<entity_id>& body_mark
     return best != null_entity ? best : body_markets.front(); // all unanchored
 }
 
-/// Input reservation a corporation needs to keep on a body to feed a full run of
-/// its own processors next tick — so it sells only the genuine surplus.
+/// Input reservation a corporation needs to keep in ONE goods pool to feed a
+/// full run of the processors that draw that pool next tick — so it sells only
+/// the genuine surplus. BL-1003: a processor draws the pool of its own tile
+/// market (`pool_key_for_tile`), so only processors keyed to @p pool_key
+/// reserve against it.
 std::array<float, resource_count> processor_reservation(
-    const world& w, const recipe_registry& reg, entity_id corp, entity_id body)
+    const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key)
 {
     std::array<float, resource_count> reserve = {};
     const corporation_component& cc = w.corporations.at(corp);
@@ -156,8 +159,7 @@ std::array<float, resource_count> processor_reservation(
         if (b.type != building_type::processing_facility)
             continue;
 
-        const auto tit = w.tiles.find(b.tile);
-        if (tit == w.tiles.end() || tit->second.body != body)
+        if (pool_key_for_tile(w, b.tile) != pool_key)
             continue;
 
         const recipe* rcp = reg.get_recipe(b.recipe);
@@ -172,9 +174,9 @@ std::array<float, resource_count> processor_reservation(
 }
 
 /// A corporation's representative tile on a body: the tile of its lowest-id
-/// building there. Used to route the corp's body-aggregate supply/demand to a
-/// market when the body carries several. `null_entity` if the corp holds nothing
-/// on the body.
+/// building there. BL-1003: no goods flow routes through this any more — it
+/// survives only to place a standing BUY order, which names a body and no tile.
+/// `null_entity` if the corp holds nothing on the body.
 entity_id representative_tile(const world& w, entity_id corp, entity_id body)
 {
     const auto cit = w.corporations.find(corp);
@@ -200,10 +202,17 @@ entity_id representative_tile(const world& w, entity_id corp, entity_id body)
     return best_tile;
 }
 
-/// Route a corp's body-aggregate clearing to one market: the market nearest the
-/// corp's representative tile on the body (one market → that market; no holdings
-/// there → the body's lowest-id market). `null_entity` if the body has no market.
-entity_id market_for_corp_on_body(
+/// The market a standing BUY order on (corp, body) bids in: the market nearest
+/// the corp's representative tile on the body (one market → that market; no
+/// holdings there → the body's lowest-id market). `null_entity` if no market.
+///
+/// BL-1003 CALL: a buy order names a body, not a market, and its matched goods
+/// land in that market's inventory (not the buyer's pool), where the buyer's
+/// works in THAT catchment draw them. The corp's lowest-id building's catchment
+/// is the simplest stable reading; a verb naming the market is the fuller
+/// answer. Nothing else routes through this — every pool lists, and every want
+/// and fill books, in its own keyed market.
+entity_id buy_order_market(
     const world& w, const std::unordered_map<entity_id, std::vector<entity_id>>& by_body,
     entity_id corp, entity_id body)
 {
@@ -232,6 +241,132 @@ entity_id market_for_tile(const world& w, entity_id tile)
     if (it == by_body.end())
         return null_entity;
     return nearest_market(w, it->second, tit->second);
+}
+
+// --- Goods-pool keys (BL-1003, PRODUCTION.md § Stockpile and output flow) ---
+
+entity_id pool_key_for_tile(const world& w, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return null_entity;
+    const entity_id mid = market_for_tile(w, tile);
+    return mid != null_entity ? mid : tit->second.body;
+}
+
+entity_id pool_key_for_body(const world& w, entity_id body)
+{
+    const auto& by_body = markets_by_body(w);
+    const auto it = by_body.find(body);
+    if (it == by_body.end() || it->second.empty())
+        return body;
+    return it->second.front(); // ascending: the lowest-id market
+}
+
+entity_id pool_key_body(const world& w, entity_id key)
+{
+    if (const auto mit = w.markets.find(key); mit != w.markets.end())
+        return mit->second.body;
+    if (w.bodies.find(key) != w.bodies.end())
+        return key;
+    return null_entity;
+}
+
+stockpile_component body_pool_total(const world& w, entity_id corp, entity_id body)
+{
+    stockpile_component total;
+    // The corp's slice of a std::map is contiguous and ascending by key, so the
+    // float sum below has one order on every run and every platform.
+    for (auto it = w.corp_market_pools.lower_bound({corp, entity_id{0}});
+         it != w.corp_market_pools.end() && it->first.first == corp; ++it)
+    {
+        if (pool_key_body(w, it->first.second) != body)
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            total.quantities[r] += it->second.quantities[r];
+    }
+    return total;
+}
+
+void absorb_body_pool_into_market(world& w, entity_id body, entity_id market)
+{
+    if (body == null_entity || market == null_entity || body == market)
+        return;
+    // Collect first, then mutate: pool_at inserts, and inserting while walking
+    // the same map is an iterator hazard. Ascending (corp, body) order.
+    std::vector<entity_id> corps;
+    for (const auto& [key, pool] : w.corp_market_pools)
+        if (key.second == body)
+            corps.push_back(key.first);
+    for (const entity_id corp : corps)
+    {
+        const auto src = w.corp_market_pools.find({corp, body});
+        const stockpile_component moved = src->second;
+        w.corp_market_pools.erase(src);
+        stockpile_component& dst = w.pool_at(corp, market);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            dst.quantities[r] += moved.quantities[r];
+    }
+}
+
+entity_id corp_home_pool_key(const world& w, entity_id corp, entity_id body)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return pool_key_for_body(w, body);
+    const corporation_component& cc = cit->second;
+
+    auto tile_on_body = [&](entity_id bid) -> entity_id {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            return null_entity;
+        const auto tit = w.tiles.find(bit->second.tile);
+        if (tit == w.tiles.end() || tit->second.body != body)
+            return null_entity;
+        return bit->second.tile;
+    };
+
+    if (const entity_id hq_tile = tile_on_body(cc.hq_building); hq_tile != null_entity)
+        return pool_key_for_tile(w, hq_tile);
+
+    entity_id best = null_entity;
+    entity_id best_tile = null_entity;
+    for (const entity_id bid : cc.assets)
+    {
+        const entity_id t = tile_on_body(bid);
+        if (t != null_entity && (best == null_entity || bid < best))
+        {
+            best      = bid;
+            best_tile = t;
+        }
+    }
+    if (best_tile != null_entity)
+        return pool_key_for_tile(w, best_tile);
+    return pool_key_for_body(w, body);
+}
+
+void rehome_body_pools(world& w)
+{
+    // Collect first: pool_at inserts, which must not happen under the walk.
+    std::vector<std::pair<entity_id, entity_id>> strays; // ascending (corp, body)
+    for (const auto& [key, pool] : w.corp_market_pools)
+    {
+        if (w.markets.find(key.second) != w.markets.end())
+            continue; // already a market pool
+        if (pool_key_for_body(w, key.second) == key.second)
+            continue; // a market-less body: a body-level pool is correct there
+        strays.push_back(key);
+    }
+    for (const auto& key : strays)
+    {
+        const auto src = w.corp_market_pools.find(key);
+        const stockpile_component moved = src->second;
+        w.corp_market_pools.erase(src);
+        const entity_id dst_key = corp_home_pool_key(w, key.first, key.second);
+        stockpile_component& dst = w.pool_at(key.first, dst_key);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            dst.quantities[r] += moved.quantities[r];
+    }
 }
 
 void inject_population_demand(world& w, const recipe_registry& reg)
@@ -658,6 +793,10 @@ entity_id maybe_spawn_market(world& w, const recipe_registry& reg, entity_id bod
 
     const entity_id mid = w.create_entity();
     w.markets[mid] = mc;
+    // BL-1003: the body had no market, so every corp's goods there sat in one
+    // body-level pool. The new market is now the only catchment on the body, so
+    // that pool becomes its pool, whole (PRODUCTION.md § Stockpile and output flow).
+    absorb_body_pool_into_market(w, body, mid);
     return mid;
 }
 
@@ -800,7 +939,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // DETERMINISM. The append order is a total order over the clearing walk, not
     // whatever a hash container happens to iterate in, and each of the four sites
     // walks a sequence that is already deterministic for its own reason:
-    //   1. `auto_sells`  — built from `world::corp_body_pools`, a std::map, with
+    //   1. `auto_sells`  — built from `world::corp_market_pools`, a std::map, with
     //                      the resource index ascending inside each pool.
     //   2. `auto_buys`   — built from `economy_report::purchases`, a std::map
     //                      (BL-422 made it one, for this same class of reason).
@@ -935,20 +1074,23 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         return ok;
     };
 
-    // Auto-surplus: each corp's pool above its processor reservation.
-    for (auto& [key, pool] : w.corp_body_pools)
+    // Auto-surplus: each corp's pool above its processor reservation, listed
+    // into the pool's OWN market (BL-1003 — the pool key is the market). A
+    // body-level pool (key = a market-less body) has nowhere to list and stays.
+    for (auto& [key, pool] : w.corp_market_pools)
     {
         const entity_id corp = key.first;
-        const entity_id body = key.second;
+        const entity_id mid  = key.second;
 
-        const entity_id mid = market_for_corp_on_body(w, by_body, corp, body);
-        if (mid == null_entity)
-            continue;
+        const auto mkit = w.markets.find(mid);
+        if (mkit == w.markets.end())
+            continue; // body-level pool: no market on its body yet
         if (w.corporations.find(corp) == w.corporations.end())
             continue;
+        const entity_id body = mkit->second.body;
 
-        const market_component& mc = w.markets.at(mid);
-        const auto reserve = processor_reservation(w, reg, corp, body);
+        const market_component& mc = mkit->second;
+        const auto reserve = processor_reservation(w, reg, corp, mid);
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
@@ -982,34 +1124,50 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // debited once per order downstream and the corp is paid for goods it never
     // held — money and goods from nothing. Insertion order decides who gets the
     // stock, which is the same time priority the matching pass uses.
+    //
+    // BL-1003: the order names a BODY, and the corp may hold a pool in several of
+    // that body's markets. The order lists from each of those pools in ascending
+    // market-id order, each into its OWN market, until the order's quantity is
+    // spent — so goods sell where they sit, and the order's quantity stays one
+    // cap across the body. Reservation is per (corp, market, resource) pool.
+    //
+    // BL-1003 CALL: ascending market id decides which catchment's stock an order
+    // sells first; a verb that names the market is the fuller answer.
     std::map<std::tuple<entity_id, entity_id, std::size_t>, float> listed_from_pool;
 
     for (const sell_order& order : standing_sells)
     {
         if (order.quantity <= 0.0f)
             continue;
-        const entity_id mid = market_for_corp_on_body(w, by_body, order.corp, order.body);
-        if (mid == null_entity)
+        const auto bmit = by_body.find(order.body);
+        if (bmit == by_body.end())
             continue;
         const std::size_t r = static_cast<std::size_t>(order.resource);
-        // BL-708: the same listing gate the auto-surplus path takes. A standing
-        // sell order is still a seller, and an off-grid seller of a grid good
-        // has nothing to deliver against it.
-        if (any_grid && grid_rules.grid(r) && !market_connected(mid))
-            continue;
-        const auto pkit = w.corp_body_pools.find(std::make_pair(order.corp, order.body));
-        if (pkit == w.corp_body_pools.end())
-            continue;
+        float order_left = order.quantity;
+        for (const entity_id mid : bmit->second) // ascending market id
+        {
+            if (order_left <= 0.0f)
+                break;
+            // BL-708: the same listing gate the auto-surplus path takes. A
+            // standing sell order is still a seller, and an off-grid seller of a
+            // grid good has nothing to deliver against it.
+            if (any_grid && grid_rules.grid(r) && !market_connected(mid))
+                continue;
+            const auto pkit = w.corp_market_pools.find(std::make_pair(order.corp, mid));
+            if (pkit == w.corp_market_pools.end())
+                continue;
 
-        float& claimed = listed_from_pool[{order.corp, order.body, r}];
-        const float unclaimed = pkit->second.quantities[r] - claimed;
-        const float available = std::min(order.quantity, unclaimed);
-        if (available <= 0.0f)
-            continue; // an earlier order already spoke for the whole pool
-        claimed += available;
+            float& claimed = listed_from_pool[{order.corp, mid, r}];
+            const float unclaimed = pkit->second.quantities[r] - claimed;
+            const float available = std::min(order_left, unclaimed);
+            if (available <= 0.0f)
+                continue; // an earlier order already spoke for this whole pool
+            claimed    += available;
+            order_left -= available;
 
-        w.markets.at(mid).supply[r] += available;
-        sell_books[mid][r].push_back({order.corp, available, order.floor_price, available});
+            w.markets.at(mid).supply[r] += available;
+            sell_books[mid][r].push_back({order.corp, available, order.floor_price, available});
+        }
     }
 
     // BL-130 fills real inventory from this tick's REAL corp-sourced sales only —
@@ -1039,18 +1197,19 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     //
     // std::map, so accumulation is over a sorted key set — the ordering BL-422's
     // latent unordered_map float-accumulation nondeterminism was found in.
+    //
+    // BL-1003: keyed (corp, market) — the market the draw happened in — so the
+    // want lands on that market directly. A body-level key (no market on the
+    // body) has no market to bid in and is skipped.
     for (const auto& [key, wanted] : report.wants)
     {
-        const entity_id corp = key.first;
-        const entity_id body = key.second;
-
-        const entity_id mid = market_for_corp_on_body(w, by_body, corp, body);
-        if (mid == null_entity)
+        const auto mkit = w.markets.find(key.second);
+        if (mkit == w.markets.end())
             continue;
 
         for (std::size_t r = 0; r < resource_count; ++r)
             if (wanted[r] > 0.0f)
-                w.markets.at(mid).demand[r] += wanted[r];
+                mkit->second.demand[r] += wanted[r];
     }
 
     // The FILL, kept strictly separate: goods actually delivered to a consumer
@@ -1058,14 +1217,13 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // and the expenditure a corp is actually charged — so it must go on reading
     // `purchases`. Billing the want instead would pay for deliveries nobody made,
     // which is BL-422's defect in the opposite direction. Also a std::map.
+    // BL-1003: keyed (corp, market) like `wants` — billed in the market drawn.
     for (const auto& [key, bought] : report.purchases)
     {
         const entity_id corp = key.first;
-        const entity_id body = key.second;
-
-        const entity_id mid = market_for_corp_on_body(w, by_body, corp, body);
-        if (mid == null_entity)
-            continue;
+        const entity_id mid  = key.second;
+        if (w.markets.find(mid) == w.markets.end())
+            continue; // body-level key: nothing was bought from a market
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
@@ -1081,7 +1239,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     {
         if (order.quantity <= 0.0f)
             continue;
-        const entity_id mid = market_for_corp_on_body(w, by_body, order.corp, order.body);
+        const entity_id mid = buy_order_market(w, by_body, order.corp, order.body);
         if (mid == null_entity)
             continue;
         const std::size_t r = static_cast<std::size_t>(order.resource);
@@ -1106,9 +1264,10 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // --- Auto-surplus clearing: income at ref_price, pool debited immediately ---
     for (const auto_sell_entry& se : auto_sells)
     {
-        const entity_id body = w.markets.at(se.market).body;
-        auto pkit = w.corp_body_pools.find(std::make_pair(se.corp, body));
-        if (pkit != w.corp_body_pools.end())
+        // BL-1003: the pool debited is the one this entry listed from — the
+        // (corp, market) pool of the market it sold into.
+        auto pkit = w.corp_market_pools.find(std::make_pair(se.corp, se.market));
+        if (pkit != w.corp_market_pools.end())
         {
             float& q = pkit->second.quantities[se.r];
             const float left = std::min(q, se.qty); // defensive: a pool never goes negative
@@ -1249,9 +1408,10 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // --- Debit pools and accrue cash flows for matched explicit trades ---
     for (const matched_trade& t : trades)
     {
-        const entity_id body = w.markets.at(t.market).body;
-        auto pkit = w.corp_body_pools.find(std::make_pair(t.seller, body));
-        if (pkit != w.corp_body_pools.end())
+        // BL-1003: the seller's pool in the market the trade matched in — the
+        // pool its sell-book entry listed from.
+        auto pkit = w.corp_market_pools.find(std::make_pair(t.seller, t.market));
+        if (pkit != w.corp_market_pools.end())
         {
             float& q = pkit->second.quantities[t.r];
             const float left = std::min(q, t.qty); // defensive: a pool never goes negative
@@ -1341,7 +1501,6 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     for (const entity_id mid : book_mids)
     {
         const auto& sell_by_r = sell_books[mid];
-        const entity_id body = w.markets.at(mid).body;
         for (const std::size_t r : sorted_resources(sell_by_r))
         {
             const float rp = ref_price[mid][r];
@@ -1351,8 +1510,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                     continue;
                 if (se.floor_price > rp)
                     continue; // reservation price above the market: hold, don't sell
-                auto pkit = w.corp_body_pools.find(std::make_pair(se.corp, body));
-                if (pkit != w.corp_body_pools.end())
+                // BL-1003: the (corp, market) pool this book entry listed from.
+                auto pkit = w.corp_market_pools.find(std::make_pair(se.corp, mid));
+                if (pkit != w.corp_market_pools.end())
                 {
                     // Sell only what matching left unsold, order by order. The
                     // aggregate-per-seller form this replaced charged one corp's

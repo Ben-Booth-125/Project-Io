@@ -709,7 +709,7 @@ int main()
             { "nation_budgets", w.nation_budgets.size(), loaded.nation_budgets.size() },
             { "tile_to_nation", w.tile_to_nation.size(), loaded.tile_to_nation.size() },
             { "corporations", w.corporations.size(), loaded.corporations.size() },
-            { "corp_body_pools", w.corp_body_pools.size(), loaded.corp_body_pools.size() },
+            { "corp_market_pools", w.corp_market_pools.size(), loaded.corp_market_pools.size() },
             { "workforce_supply_overrides", w.workforce_supply_overrides.size(), loaded.workforce_supply_overrides.size() },
             { "sentiment", w.sentiment.pairs.size(), loaded.sentiment.pairs.size() },
             { "convoys", w.convoys.size(), loaded.convoys.size() },

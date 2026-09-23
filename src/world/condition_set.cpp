@@ -78,10 +78,11 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
 
         case condition_subject::stockpile:
         {
-            // corp_body_pools is a std::map, so this walks in key order.
+            // corp_market_pools is a std::map, so this walks in key order; a corp-wide
+            // sum across every (corp, market) pool (BL-1003).
             const std::size_t ri = static_cast<std::size_t>(c.resource);
             float total = 0.0f;
-            for (const auto& [key, pool] : w.corp_body_pools)
+            for (const auto& [key, pool] : w.corp_market_pools)
                 if (key.first == subject_corp)
                     total += pool.quantities[ri];
             return total;

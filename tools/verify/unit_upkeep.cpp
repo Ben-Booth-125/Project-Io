@@ -185,8 +185,8 @@ void u1_exact_charge()
 
     // 2 credits/head, 0.5 ordnance/head. No decay: the pool is stocked.
     recipe_registry reg = registry_with_upkeep(2.0f, 0.5f, 100);
-    f.w.pool_for(f.corp, f.body).quantities[ORD] = 1000.0f;
-    f.w.pool_for(f.corp, f.body).quantities[IRO] = 77.0f; // an untouched neighbour
+    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] = 1000.0f;
+    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[IRO] = 77.0f; // an untouched neighbour
 
     const float balance_before = f.w.corporations.at(f.corp).balance;
 
@@ -195,7 +195,7 @@ void u1_exact_charge()
           "U1a the pass saw three units, disbanded none, met every draw");
 
     // The goods half: 50 heads x 0.5 = 25 ordnance, and NOTHING else drawn.
-    const stockpile_component& pool = f.w.pool_for(f.corp, f.body);
+    const stockpile_component& pool = f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body));
     check(near(pool.quantities[ORD], 975.0f),
           "U1b ordnance debited by exactly N x the authored rate (1000 - 50*0.5)");
     check(near(pool.quantities[IRO], 77.0f),
@@ -246,11 +246,11 @@ void u2_shortfall_decay()
 
     // 1 ordnance/head = 20 needed per tick; the pool holds 5.
     recipe_registry reg = registry_with_upkeep(0.0f, 1.0f, 150);
-    f.w.pool_for(f.corp, f.body).quantities[ORD] = 5.0f;
+    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] = 5.0f;
 
     unit_upkeep_tick t = run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(t.unmet == 1, "U2a a short draw is reported unmet");
-    check(f.w.pool_for(f.corp, f.body).quantities[ORD] == 0.0f,
+    check(f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] == 0.0f,
           "U2b the pool took what was there and floored at zero (never negative)");
     check(f.w.units.at(u).supply_factor_permille == 850,
           "U2c supply fell by exactly the authored decay scalar (1000 - 150)");
@@ -260,7 +260,7 @@ void u2_shortfall_decay()
         run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(f.w.units.at(u).supply_factor_permille == 400,
           "U2d four ticks of unmet draw = four subtractions (1000 - 4*150)");
-    check(f.w.pool_for(f.corp, f.body).quantities[ORD] == 0.0f,
+    check(f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] == 0.0f,
           "U2e stock is still exactly zero, never negative");
 
     // It floors at zero rather than running negative.
@@ -273,11 +273,11 @@ void u2_shortfall_decay()
 
     // Restock and the SAME rule recovers it — one rule, symmetric.
     recipe_registry rec = registry_with_upkeep(0.0f, 1.0f, 150, 200);
-    f.w.pool_for(f.corp, f.body).quantities[ORD] = 1000.0f;
+    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] = 1000.0f;
     run_unit_upkeep(f.w, rec, g_upkeep_report);
     check(f.w.units.at(u).supply_factor_permille == 200,
           "U2h a met draw recovers at the authored rate");
-    check(near(f.w.pool_for(f.corp, f.body).quantities[ORD], 980.0f),
+    check(near(f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD], 980.0f),
           "U2i and the met draw debited the full 20 heads x 1.0");
 }
 
@@ -354,7 +354,7 @@ rollout run_rollout(int ticks)
     add_unit(f, ROW_LEVY,   7, f.base);
 
     recipe_registry reg = registry_with_upkeep(1.5f, 0.4f, 90, 30, 0.002f);
-    f.w.pool_for(f.corp, f.body).quantities[ORD] = 100.0f;
+    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] = 100.0f;
 
     std::unordered_map<entity_id, corp_cash_flow>    flows;
     std::map<std::pair<entity_id, entity_id>, float> contention;
@@ -365,7 +365,7 @@ rollout run_rollout(int ticks)
         run_unit_upkeep(f.w, reg, g_upkeep_report);
         apply_budget(f.w, reg, flows, contention);
         r.balances.push_back(f.w.corporations.at(f.corp).balance);
-        r.pool_ordnance.push_back(f.w.pool_for(f.corp, f.body).quantities[ORD]);
+        r.pool_ordnance.push_back(f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD]);
     }
 
     // Strengths and stack entries, in ascending unit id so the digest itself is
@@ -418,7 +418,7 @@ void u5_inert_at_zero()
     const entity_id u2 = add_unit(f, ROW_RIFLE, 25, f.base);
 
     const float balance_before = f.w.corporations.at(f.corp).balance;
-    const std::size_t pools_before = f.w.corp_body_pools.size();
+    const std::size_t pools_before = f.w.corp_market_pools.size();
 
     std::unordered_map<entity_id, corp_cash_flow>    flows;
     std::map<std::pair<entity_id, entity_id>, float> contention;
@@ -434,7 +434,7 @@ void u5_inert_at_zero()
           "U5b the balance is bit-identical after 25 ticks");
     check(breakdown.at(f.corp).upkeep == 0.0f, "U5c the upkeep term is exactly zero");
     check(breakdown.at(f.corp).net() == 0.0f,  "U5d net() is exactly zero");
-    check(f.w.corp_body_pools.size() == pools_before,
+    check(f.w.corp_market_pools.size() == pools_before,
           "U5e no pool was even CREATED (an all-zero goods table touches nothing)");
     check(f.w.units.at(u1).supply_factor_permille == 1000
               && f.w.units.at(u2).supply_factor_permille == 1000,
@@ -589,10 +589,10 @@ void u8_the_reservation_ceiling()
         economy_report rep;
         const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
 
-        const auto wit = rep.wants.find(std::make_pair(f.corp, f.body));
+        const auto wit = rep.wants.find(std::make_pair(f.corp, pool_key_for_body(f.w, f.body)));
         check(wit != rep.wants.end() && near(wit->second[ORD], need),
               "U8 under the ceiling the unit's shortfall reaches the want register");
-        const auto pit = rep.purchases.find(std::make_pair(f.corp, f.body));
+        const auto pit = rep.purchases.find(std::make_pair(f.corp, pool_key_for_body(f.w, f.body)));
         check(pit != rep.purchases.end() && near(pit->second[ORD], need),
               "U8 and the fill is what the shelf supplied");
         check(near(f.w.markets.at(mid).inventory[ORD], 100.0f - need),

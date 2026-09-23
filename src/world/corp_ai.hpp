@@ -304,7 +304,7 @@ struct standing_index
 /// DETERMINISTIC BY CONSTRUCTION, in three separate places:
 ///   * cash and building value walk `corporation_component::assets`, a vector
 ///     in authored order;
-///   * held stock walks `world::corp_body_pools`, a std::map, so key-ordered;
+///   * held stock walks `world::corp_market_pools`, a std::map, so key-ordered;
 ///   * the military term accumulates `unit_strength` as an INTEGER over
 ///     `world::units`, which is an unordered_map — a float accumulator there
 ///     would make the sum depend on hash layout, since float addition is not

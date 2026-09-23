@@ -47,8 +47,8 @@ bool owns(const world& w, entity_id corp, entity_id building)
 // hire_unit's cost debit (BL-324)
 //
 // The campaign roster gate (unit_roster.hpp) asks a yes/no question: does the
-// corp hold ANY of the resource an axis needs, summed across its (corp, body)
-// pools — the live L3 store (world.hpp § corp_body_pools).
+// corp hold ANY of the resource an axis needs, summed across its (corp, market)
+// pools — the live L3 store (world.hpp § corp_market_pools).
 // The debit below spends a flat, first-cut draw (hire_axis_cost) from that
 // same resource preference order — not final balance, just enough that
 // hiring is a real spend rather than a free unlock. Two-phase (check every
@@ -85,15 +85,18 @@ bool corp_can_afford_axis(const world& w, entity_id corp, hire_axis axis)
     return false;
 }
 
-/// Debit @p amount of @p res from @p corp's (corp, body) pools, draining in
-/// ascending body-id order (the map's own key order, so deterministic). Only
-/// called after affordability is confirmed, so this should never under-run —
-/// but walks defensively rather than assuming a single pool holds the whole
-/// amount.
+/// Debit @p amount of @p res from @p corp's goods pools, draining in ascending
+/// pool-key order (the map's own key order, so deterministic). Only called
+/// after affordability is confirmed, so this should never under-run — but walks
+/// defensively rather than assuming a single pool holds the whole amount.
+///
+/// BL-1003 CALL: a hire names no tile, and the gate sums the corp's stock
+/// everywhere, so the debit stays corp-wide across every (corp, market) pool,
+/// lowest key first — exactly the reach it had across (corp, body) pools.
 void debit_from_corp(world& w, entity_id corp, resource_type res, float amount)
 {
-    for (auto it = w.corp_body_pools.lower_bound({corp, entity_id{0}});
-         it != w.corp_body_pools.end() && it->first.first == corp; ++it)
+    for (auto it = w.corp_market_pools.lower_bound({corp, entity_id{0}});
+         it != w.corp_market_pools.end() && it->first.first == corp; ++it)
     {
         if (amount <= 0.0f) return;
         float& q = it->second.quantities[static_cast<std::size_t>(res)];
@@ -578,19 +581,21 @@ void dissolve_into(world& w, entity_id acquirer, entity_id target)
     // --- TRANSFER: filed returns -------------------------------------------
     merge_returns(acq.returns, tgt.returns);
 
-    // --- TRANSFER: (corp, body) stockpile pools ----------------------------
-    // Collected first, then merged, then erased: `pool_for` INSERTS, and mutating
+    // --- TRANSFER: (corp, market) goods pools ------------------------------
+    // Collected first, then merged, then erased: `pool_at` INSERTS, and mutating
     // the map mid-walk is the kind of thing that reads fine and is wrong. The
-    // walk is over a std::map, so it is a sorted walk by (corp, body) — BL-158.
+    // walk is over a std::map, so it is a sorted walk by (corp, key) — BL-158.
+    // BL-1003: each pool keeps its KEY — the target's stock in market M becomes
+    // the acquirer's stock in market M; goods do not move by changing hands.
     {
         std::vector<std::pair<entity_id, stockpile_component>> moving;
-        for (auto it = w.corp_body_pools.lower_bound({target, entity_id{0}});
-             it != w.corp_body_pools.end() && it->first.first == target; ++it)
+        for (auto it = w.corp_market_pools.lower_bound({target, entity_id{0}});
+             it != w.corp_market_pools.end() && it->first.first == target; ++it)
             moving.emplace_back(it->first.second, it->second);
         for (const auto& mv : moving)
         {
-            w.corp_body_pools.erase(std::make_pair(target, mv.first));
-            stockpile_component& dst = w.pool_for(acquirer, mv.first);
+            w.corp_market_pools.erase(std::make_pair(target, mv.first));
+            stockpile_component& dst = w.pool_at(acquirer, mv.first);
             for (std::size_t r = 0; r < resource_count; ++r)
                 dst.quantities[r] += mv.second.quantities[r];
         }
@@ -833,23 +838,25 @@ void run_firm_exits(world& w, const firm_exit_params& p,
         }
 
         // LIQUIDATE pools: dumped to the local market's REAL inventory — the
-        // conservation law (inventory gains what pools lose). A body with no
-        // market loses the goods; stated, not hidden.
+        // conservation law (inventory gains what pools lose). BL-1003: a market
+        // pool dumps into ITS market; a body-level pool (a market-less body)
+        // loses the goods; stated, not hidden.
         {
             std::vector<std::pair<entity_id, stockpile_component>> pools;
-            for (auto it = w.corp_body_pools.lower_bound({target, entity_id{0}});
-                 it != w.corp_body_pools.end() && it->first.first == target; ++it)
+            for (auto it = w.corp_market_pools.lower_bound({target, entity_id{0}});
+                 it != w.corp_market_pools.end() && it->first.first == target; ++it)
                 pools.emplace_back(it->first.second, it->second);
-            for (const auto& [body, pool] : pools)
+            for (const auto& [key, pool] : pools)
             {
-                const entity_id mid = any_market_on_body(w, body);
+                const entity_id mid = (w.markets.find(key) != w.markets.end())
+                    ? key : any_market_on_body(w, key);
                 if (mid != null_entity)
                 {
                     market_component& mc = w.markets.at(mid);
                     for (std::size_t r = 0; r < resource_count; ++r)
                         mc.inventory[r] += pool.quantities[r];
                 }
-                w.corp_body_pools.erase(std::make_pair(target, body));
+                w.corp_market_pools.erase(std::make_pair(target, key));
             }
         }
 
@@ -1457,12 +1464,13 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 return corp_command_result::rejected_invalid;
 
             // The corp must actually HOLD the cargo. The source pool is keyed
-            // by (corp, body), so reading the acting corp's own pool is the
-            // ownership check — there is no way to name someone else's stock.
+            // by (corp, market) — BL-1003: the pool AT the named source market,
+            // not the corp's stock anywhere on its body — so reading the acting
+            // corp's own pool is the ownership check; there is no way to name
+            // someone else's stock.
             const entity_id src_body = src_it->second.body;
-            const auto      pit      = w.corp_body_pools.find({cmd.corp, src_body});
-            const float     stock    =
-                (pit != w.corp_body_pools.end()) ? pit->second.quantities[r] : 0.0f;
+            const stockpile_component* sp = w.find_pool(cmd.corp, cmd.subject);
+            const float     stock    = (sp != nullptr) ? sp->quantities[r] : 0.0f;
             if (cmd.quantity > stock)
                 return corp_command_result::rejected_state; // the goods are not there
 
@@ -1472,7 +1480,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // a cost that is not a finite number.
             const logistics_nodes nodes = collect_logistics_nodes(w);
             const convoy_leg      leg   = price_convoy_leg(
-                w, reg, nodes, cmd.corp, src_body, cmd.counterparty, r, cmd.quantity,
+                w, reg, nodes, cmd.corp, cmd.subject, cmd.counterparty, r, cmd.quantity,
                 reg.logistics_cost(convoy_mode::space));
             if (!leg.viable)
                 return corp_command_result::rejected_placement;

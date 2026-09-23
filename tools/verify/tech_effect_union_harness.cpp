@@ -472,8 +472,8 @@ void section_u4()
 
     check(near(a1, a0 * 1.25f), "U4b the earning corp's extraction moved by exactly *1.25");
     check(b1 == b0, "U4c the rival's output is BIT-identical to baseline");
-    check(mod.w.pool_for(mod.corp_a, mod.body).quantities[ri(resource_type::iron_ore)] >
-          base.w.pool_for(base.corp_a, base.body).quantities[ri(resource_type::iron_ore)],
+    check(mod.w.pool_at(mod.corp_a, pool_key_for_body(mod.w, mod.body)).quantities[ri(resource_type::iron_ore)] >
+          base.w.pool_at(base.corp_a, pool_key_for_body(base.w, base.body)).quantities[ri(resource_type::iron_ore)],
           "U4d ...and the extra units really landed in the earner's pool");
 
     // U4b' — the STACK TAPER pre-pass (the second read site). Two A-owned

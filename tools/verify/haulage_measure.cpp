@@ -71,13 +71,12 @@
 //       at arrival, beside the haul paid per unit, so a gap play erases shows.
 //
 // DEFINITIONS, stated because each is a choice a reader should be able to see:
-//   * HOME is where the source pool clears: `market_for_corp_on_body`
-//     (market_clearing.cpp), mirrored here as `pool_clearing_market`.
+//   * HOME is where the source pool clears — since per-market pools (BL-1003)
+//     the pool IS the convoy's source market's, so home is `source_market`.
 //   * The SELL MARKET of an arrival is where the pool the cargo lands in clears
-//     on the next clear. On today's tree that pool is (corp, destination body),
-//     so a same-body haul lands back in the pool it left and its sell market IS
-//     home — which is why same-body (a) reads zero, and the reading says so.
-//     `arrival_sell_market` is the ONE line per-market pools change.
+//     on the next clear: (corp, destination MARKET), so a same-body haul sells
+//     at its destination. Under the retired (corp, body) pools it landed back in
+//     the pool it left and same-body (a) read zero. `arrival_sell_market`.
 //   * SOLD is read from the exchange record of the first clear after arrival
 //     (rows whose seller is the corp, at the sell market, in the cargo's good),
 //     attributed CARGO-FIRST: min(cargo, what the corp sold there), shared across
@@ -100,9 +99,9 @@
 // discover. Its guards are non-vacuity guards only — the data layer was parsed,
 // each window saw a dispatch and a delivery, no clear pushed more exchange rows
 // than the ring retains (which would under-read every sale), and every credited
-// arrival raised the (corp, destination body) pool by exactly its cargo, so the
+// arrival raised the (corp, destination market) pool by exactly its cargo, so the
 // pool model the definitions above lean on is checked against the tree rather
-// than assumed. When per-market pools land, that guard is the one that goes red.
+// than assumed. If the pool model moves again, that guard is the one that goes red.
 
 #include "scripting/lua_state.hpp"
 #include "world/components.hpp"
@@ -213,63 +212,25 @@ struct cargo_track
     double        sold          = 0.0;
 };
 
-/// Where the (corp, body) pool clears — an exact mirror of market_clearing.cpp's
-/// anonymous `market_for_corp_on_body`: one market on the body is that market;
-/// no representative tile (the corp holds nothing there) is the body's lowest-id
-/// market; otherwise the market nearest the corp's lowest-id building's tile.
-entity_id pool_clearing_market(const world& w, entity_id corp, entity_id body)
-{
-    if (body == null_entity)
-        return null_entity;
-    std::vector<entity_id> on_body;
-    for (const auto& [mid, mc] : w.markets)
-        if (mc.body == body)
-            on_body.push_back(mid);
-    if (on_body.empty())
-        return null_entity;
-    std::sort(on_body.begin(), on_body.end());
-    if (on_body.size() == 1)
-        return on_body.front();
-
-    entity_id best_building = null_entity;
-    entity_id best_tile     = null_entity;
-    if (const auto cit = w.corporations.find(corp); cit != w.corporations.end())
-        for (const entity_id bid : cit->second.assets)
-        {
-            const auto bit = w.buildings.find(bid);
-            if (bit == w.buildings.end())
-                continue;
-            const auto tit = w.tiles.find(bit->second.tile);
-            if (tit == w.tiles.end() || tit->second.body != body)
-                continue;
-            if (best_building == null_entity || bid < best_building)
-            {
-                best_building = bid;
-                best_tile     = bit->second.tile;
-            }
-        }
-    if (best_tile == null_entity || w.tiles.find(best_tile) == w.tiles.end())
-        return on_body.front();
-    return market_for_tile(w, best_tile);
-}
-
-/// Where an ARRIVED cargo sells: the clearing market of the pool it was credited
-/// to. THIS IS THE ONE LINE PER-MARKET POOLS (BL-1003) CHANGE — on today's tree
-/// `credit_arrived_convoys` credits (corp, destination BODY), so the answer is
-/// that pool's clearing market, which for a same-body haul is home.
+/// Where an ARRIVED cargo sells: the market of the pool it was credited to.
+/// Since BL-1003 (per-market pools) `credit_arrived_convoys` credits
+/// (corp, DESTINATION MARKET), so the answer is the destination itself — a
+/// same-body haul sells where it was delivered, not back at home.
 entity_id arrival_sell_market(const world& w, const cargo_track& t)
 {
-    return pool_clearing_market(w, t.corp, t.dest_body);
+    (void)w;
+    return t.dest_market;
 }
 
 /// The seller's nearest market at dispatch: the market other than `home` that
-/// the dispatcher's own pricing reaches cheapest per unit from (corp, src_body).
+/// the dispatcher's own pricing reaches cheapest per unit from the source pool
+/// `src_key` (BL-1003: a market, or a market-less body).
 /// Priced at one unit — the leg cost is linear in quantity, so the order is the
 /// order at any cargo size. Ties to the lower id (ascending walk, strict <).
 entity_id sellers_nearest_market(world& w, const recipe_registry& reg,
                                  const logistics_nodes& nodes,
                                  const std::vector<entity_id>& market_ids, entity_id corp,
-                                 entity_id src_body, entity_id home, std::size_t r)
+                                 entity_id src_key, entity_id home, std::size_t r)
 {
     entity_id best      = null_entity;
     float     best_cost = std::numeric_limits<float>::max();
@@ -277,7 +238,7 @@ entity_id sellers_nearest_market(world& w, const recipe_registry& reg,
     {
         if (mid == home)
             continue;
-        const convoy_leg leg = price_convoy_leg(w, reg, nodes, corp, src_body, mid, r, 1.0f,
+        const convoy_leg leg = price_convoy_leg(w, reg, nodes, corp, src_key, mid, r, 1.0f,
                                                 reg.logistics_cost(convoy_mode::space));
         if (!leg.viable)
             continue;
@@ -491,7 +452,7 @@ struct far_seed_result
     std::array<far_tally, 2> windows{};
     long ring_overflows = 0; ///< clears that pushed more exchange rows than the ring retains
     long arrivals_checked = 0;      ///< credited arrivals whose pool gain was checked
-    long pool_model_mismatches = 0; ///< (corp, destination body) pools that did not gain their cargo
+    long pool_model_mismatches = 0; ///< (corp, destination market) pools that did not gain their cargo
     int  priced         = 0;
     int  markets        = 0;
     int  play_quarters  = 0;
@@ -552,7 +513,9 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
             // verb: the market the command named).
             t.src_body = (cv.mode != convoy_mode::space) ? t.dest_body
                                                          : body_of_market(w, cv.source_market);
-            t.home            = pool_clearing_market(w, t.corp, t.src_body);
+            // BL-1003: the source pool IS the source market's pool, so home is
+            // the convoy's own source market (null for a market-less body).
+            t.home            = cv.source_market;
             t.p_home_dispatch = price_at(w, t.home, t.r);
             t.p_dest_dispatch = price_at(w, t.dest_market, t.r);
             if (window >= 0 && t.src_body != null_entity)
@@ -563,7 +526,8 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
                     nodes_built = true;
                 }
                 t.nearest = sellers_nearest_market(w, reg, nodes, market_ids, t.corp,
-                                                   t.src_body, t.home, t.r);
+                                                   t.home != null_entity ? t.home : t.src_body,
+                                                   t.home, t.r);
             }
             by_id[t.id] = tracks.size();
             tracks.push_back(t);
@@ -630,15 +594,15 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
         // the prices standing when the cargo lands.
         std::vector<std::uint32_t> arrived;
         // The pool model the reading ASSUMES — an arrival credits (corp,
-        // destination body) — is CHECKED here, not trusted: each such pool is
-        // read before and after the credit, and must have gained exactly the
-        // cargo that landed in it. When the tree moves (per-market pools), this
-        // goes red instead of the reading quietly describing a world that is gone.
+        // DESTINATION MARKET), BL-1003 — is CHECKED here, not trusted: each such
+        // pool is read before and after the credit, and must have gained exactly
+        // the cargo that landed in it. If the tree moves again, this goes red
+        // instead of the reading quietly describing a world that is gone.
         using pool_key = std::tuple<entity_id, entity_id, std::size_t>;
         std::map<pool_key, std::pair<double, double>> pool_watch; // before, expected gain
         auto pool_qty = [&](const pool_key& k) {
-            const auto pit = w.corp_body_pools.find({std::get<0>(k), std::get<1>(k)});
-            return pit != w.corp_body_pools.end()
+            const auto pit = w.corp_market_pools.find({std::get<0>(k), std::get<1>(k)});
+            return pit != w.corp_market_pools.end()
                        ? static_cast<double>(pit->second.quantities[std::get<2>(k)])
                        : 0.0;
         };
@@ -646,7 +610,7 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
             if (cv.arrived)
             {
                 arrived.push_back(cv.id);
-                const pool_key k{cv.corp, body_of_market(w, cv.dest_market),
+                const pool_key k{cv.corp, cv.dest_market,
                                  static_cast<std::size_t>(cv.cargo_resource)};
                 if (pool_watch.find(k) == pool_watch.end())
                     pool_watch[k] = {pool_qty(k), 0.0};
@@ -674,7 +638,7 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
             t.fate           = cargo_fate::awaiting_sale;
             t.p_home_arrival = price_at(w, t.home, t.r);
             t.p_dest_arrival = price_at(w, t.dest_market, t.r);
-            pool_watch[{t.corp, t.dest_body, t.r}].second += t.qty;
+            pool_watch[{t.corp, t.dest_market, t.r}].second += t.qty;
             ++out.arrivals_checked;
         }
         for (const auto& [k, before_expected] : pool_watch)
@@ -787,7 +751,7 @@ int run_far_trade(int argc, char** argv)
     std::printf("window Y: dispatches in play quarters %d-%d (the year after %d year(s) of play)\n",
                 4 * o.years + 1, 4 * o.years + 4, o.years);
     std::printf("pools on this tree are keyed (corp, body): an arrival is credited to the "
-                "(corp, destination body) pool\n");
+                "(corp, destination market) pool\n");
 
     std::array<far_tally, 2> pooled{};
     long overflows = 0;
@@ -844,15 +808,13 @@ int run_far_trade(int argc, char** argv)
                     k == 0 ? "E" : "Y", t.n_del_sb, t.v_del_sb, t.v_a_sb, t.n_sb_del_home,
                     t.n_sb_del);
     }
-    std::printf("  WHY: credit_arrived_convoys credits the (corp, destination BODY) pool, and a "
-                "same-body haul's\n"
-                "  destination body is its source body — the cargo returns to the pool it left, "
-                "which clears at the\n"
-                "  seller's own market (market_for_corp_on_body). A same-body haul therefore moves "
-                "no volume to\n"
-                "  another market on this tree, however many are dispatched: the dispatch count "
-                "measured dispatch,\n"
-                "  never trade. Per-market pools (BL-1003) are what can move this figure.\n");
+    std::printf("  WHY: credit_arrived_convoys credits the (corp, destination MARKET) pool "
+                "(BL-1003), so a same-body\n"
+                "  haul's cargo sells at its destination. Under the retired (corp, body) pools "
+                "it returned to the pool\n"
+                "  it left and sold at home; a nonzero 'landed in a pool that clears at home' "
+                "count now means a haul\n"
+                "  whose destination IS its source market, which dispatch refuses.\n");
 
     std::printf("\n--- non-vacuity guards ---\n");
     check(min_priced > 10,
@@ -867,7 +829,7 @@ int run_far_trade(int argc, char** argv)
     std::printf("  pool model: %ld credited arrivals checked; %ld pool(s) did not gain their cargo\n",
                 arrivals_checked, pool_mismatches);
     check(arrivals_checked > 0 && pool_mismatches == 0,
-          "every credited arrival raised the (corp, destination body) pool by exactly its cargo "
+          "every credited arrival raised the (corp, destination market) pool by exactly its cargo "
           "(the pool model this reading assumes is the tree's)");
 
     std::printf("\n=== haulage_measure --far-trade: %d failure(s) ===\n", g_failures);

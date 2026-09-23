@@ -142,7 +142,7 @@ static void test_dispatch_and_gate()
     }
 
     // Source pool with iron surplus.
-    w.pool_for(corp_id, src_body).quantities[ri(resource_type::iron_ore)] = 100.0f;
+    w.pool_at(corp_id, pool_key_for_body(w, src_body)).quantities[ri(resource_type::iron_ore)] = 100.0f;
 
     // --- Test gate: NO launchpad on source body → no convoy dispatched ---
     dispatch_convoys(w, reg,
@@ -180,7 +180,7 @@ static void test_dispatch_and_gate()
           w.corporations.at(corp_id).balance, 500.0f);
 
     // Fuel the pad. 3 units of propellant on the source body; a launch burns 1.
-    w.pool_for(corp_id, src_body).quantities[ri(resource_type::propellant)] = 3.0f;
+    w.pool_at(corp_id, pool_key_for_body(w, src_body)).quantities[ri(resource_type::propellant)] = 3.0f;
 
     // Also add a source market (needed by credit_arrived_convoys).
     entity_id src_mkt = w.create_entity();
@@ -189,6 +189,9 @@ static void test_dispatch_and_gate()
         mc.body = src_body;
         w.markets[src_mkt] = mc;
     }
+    // BL-1003: a market arriving on a market-less body takes its body-level
+    // pool whole — what maybe_spawn_market does; this fixture inserts by hand.
+    absorb_body_pool_into_market(w, src_body, src_mkt);
 
     dispatch_convoys(w, reg,
                      reg.logistics_cost(convoy_mode::land),
@@ -212,13 +215,13 @@ static void test_dispatch_and_gate()
               balance_after, 500.0f - expected_cost);
 
         // Source pool debited.
-        const float src_qty = w.pool_for(corp_id, src_body).quantities[ri(resource_type::iron_ore)];
+        const float src_qty = w.pool_at(corp_id, pool_key_for_body(w, src_body)).quantities[ri(resource_type::iron_ore)];
         check(near(src_qty, 100.0f - 50.0f), "R5: source pool debited",
               src_qty, 100.0f - 50.0f);
 
         // BL-308: the launch burned exactly one unit of propellant — per LAUNCH,
         // not per unit of cargo and not per AU.
-        const float prop_left = w.pool_for(corp_id, src_body).quantities[ri(resource_type::propellant)];
+        const float prop_left = w.pool_at(corp_id, pool_key_for_body(w, src_body)).quantities[ri(resource_type::propellant)];
         check(near(prop_left, 3.0f - 1.0f), "R6: one launch burns one propellant (BL-308)",
               prop_left, 2.0f);
     }
@@ -251,7 +254,7 @@ static void test_credit_arrived()
     w.markets[dest_mkt] = mc;
 
     // Pre-seed the dest pool.
-    w.pool_for(corp_id, dest_body).quantities[ri(resource_type::iron_ore)] = 5.0f;
+    w.pool_at(corp_id, pool_key_for_body(w, dest_body)).quantities[ri(resource_type::iron_ore)] = 5.0f;
 
     // Arrived convoy carrying 30 iron.
     convoy_component cv{};
@@ -267,7 +270,7 @@ static void test_credit_arrived()
 
     check(w.convoys.empty(), "convoy retired after credit");
 
-    const float pool_qty = w.pool_for(corp_id, dest_body).quantities[ri(resource_type::iron_ore)];
+    const float pool_qty = w.pool_at(corp_id, pool_key_for_body(w, dest_body)).quantities[ri(resource_type::iron_ore)];
     check(near(pool_qty, 5.0f + 30.0f), "R7: pool credited",
           pool_qty, 5.0f + 30.0f);
 
@@ -318,7 +321,7 @@ static void test_price_convergence()
         mc.price[ri(resource_type::iron_ore)]      = 1.0f;
         w.markets[mkt_a] = mc;
     }
-    w.pool_for(corp, body_a).quantities[ri(resource_type::iron_ore)] = 500.0f;
+    w.pool_at(corp, pool_key_for_body(w, body_a)).quantities[ri(resource_type::iron_ore)] = 500.0f;
 
     entity_id mkt_b = w.create_entity();
     {
@@ -344,8 +347,8 @@ static void test_price_convergence()
     economy_report report;
     std::array<float, resource_count> shortfall{};
     shortfall[ri(resource_type::iron_ore)] = 50.0f;
-    report.wants[{corp, body_b}]     = shortfall;
-    report.purchases[{corp, body_b}] = shortfall;
+    report.wants[{corp, pool_key_for_body(w, body_b)}]     = shortfall; // BL-1003: keyed (corp, market)
+    report.purchases[{corp, pool_key_for_body(w, body_b)}] = shortfall;
 
     // --- Phase 1: diverge without convoys (3 ticks to settle EMA) ---
     for (int i = 0; i < 3; ++i)
@@ -469,8 +472,8 @@ static purity_trace run_purity_world(bool perturb_angles)
         w.markets.at(dest_mkt).supply[ri(resource_type::iron_ore)] = 0.0f;
         for (entity_id body : { src_a, src_b })
         {
-            w.pool_for(corp_id, body).quantities[ri(resource_type::iron_ore)]   = 100.0f;
-            w.pool_for(corp_id, body).quantities[ri(resource_type::propellant)] = 5.0f;
+            w.pool_at(corp_id, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)]   = 100.0f;
+            w.pool_at(corp_id, pool_key_for_body(w, body)).quantities[ri(resource_type::propellant)] = 5.0f;
         }
 
         w.current_day_tick  = tick;

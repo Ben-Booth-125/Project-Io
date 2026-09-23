@@ -172,7 +172,7 @@ scenario make_scenario(bool src_port, bool dst_port, float stock = 100.0f,
     dm.price              = dm.base_price;
     s.w.markets[s.dst_market] = dm;
 
-    s.w.pool_for(s.corp, s.body).quantities[r_iron] = stock;
+    s.w.pool_at(s.corp, pool_key_for_body(s.w, s.body)).quantities[r_iron] = stock;
     return s;
 }
 
@@ -190,8 +190,8 @@ corp_command dispatch_cmd(const scenario& s, float qty)
 
 float pool_iron(const scenario& s)
 {
-    const auto it = s.w.corp_body_pools.find({s.corp, s.body});
-    return it != s.w.corp_body_pools.end() ? it->second.quantities[r_iron] : 0.0f;
+    const auto it = s.w.corp_market_pools.find({s.corp, pool_key_for_body(s.w, s.body)});
+    return it != s.w.corp_market_pools.end() ? it->second.quantities[r_iron] : 0.0f;
 }
 
 std::string fingerprint(const world& w)
@@ -203,7 +203,7 @@ std::string fingerprint(const world& w)
     std::sort(corp_ids.begin(), corp_ids.end());
     for (const entity_id id : corp_ids)
         o << "C" << id << ':' << w.corporations.at(id).balance << ';';
-    for (const auto& [key, sc] : w.corp_body_pools)
+    for (const auto& [key, sc] : w.corp_market_pools)
     {
         o << "P" << key.first << '/' << key.second << ':';
         for (const float q : sc.quantities) o << q << ',';

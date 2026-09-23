@@ -261,8 +261,8 @@ constexpr int& gate_axis_q(campaign_roster_gate_input& g, hire_axis axis)
     return g.ore_q;
 }
 
-/// Sum @p corp's holding of @p res across its (corp, body) pools — the live
-/// L3 store (world.hpp § corp_body_pools). Exported so both the gate above and
+/// Sum @p corp's holding of @p res across its (corp, market) pools — the live
+/// L3 store (world.hpp § corp_market_pools). Exported so both the gate above and
 /// the hire verb's cost debit (corp_command.cpp) share one aggregation.
 float corp_stockpile_total(const world& w, entity_id corp, resource_type res);
 

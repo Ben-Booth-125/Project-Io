@@ -907,15 +907,11 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
                 static_cast<double>(np.quantity);
     }
 
-    // The want register. `clear_markets` drops a want whose (corp, body) has no
-    // market on that body; the dropped mass is REPORTED rather than folded away.
-    std::set<entity_id> bodies_with_market;
-    for (const entity_id mid : mids)
-        bodies_with_market.insert(w.markets.at(mid).body);
-
+    // The want register. `clear_markets` drops a want whose (corp, key) is not a
+    // market (BL-1003: a body-level key); the dropped mass is REPORTED, not folded.
     for (const auto& [key, wanted] : rep.wants)   // std::map — sorted keys
     {
-        const bool folds = (bodies_with_market.count(key.second) != 0);
+        const bool folds = (w.markets.find(key.second) != w.markets.end());
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             if (wanted[r] <= 0.0f)
@@ -935,7 +931,7 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     // with no market never reaches a demand register.
     for (const auto& [key, wanted] : rep.upkeep_wants)  // std::map — sorted keys
     {
-        if (bodies_with_market.count(key.second) == 0)
+        if (w.markets.find(key.second) == w.markets.end())
             continue;
         for (std::size_t r = 0; r < resource_count; ++r)
             if (wanted[r] > 0.0f)

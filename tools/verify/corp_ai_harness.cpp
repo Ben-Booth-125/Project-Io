@@ -501,13 +501,13 @@ int main()
         {
             scene s = make_scene(1000.0f);
             add_muster_base(s);
-            s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)]   = 3.0f;
-            s.w.pool_for(s.ai_corp, s.hidden).quantities[ri(resource_type::steel)] = 4.0f;
+            s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)]   = 3.0f;
+            s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.hidden)).quantities[ri(resource_type::steel)] = 4.0f;
             const auto r = hire(s, iron_foot);
             check(r == corp_command_result::applied && s.w.units.size() == 1,
                   "BL-352 R4: pooled goods make the gated row hireable through the seam");
-            check(s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] == 0.0f &&
-                  s.w.pool_for(s.ai_corp, s.hidden).quantities[ri(resource_type::steel)] == 2.0f,
+            check(s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] == 0.0f &&
+                  s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.hidden)).quantities[ri(resource_type::steel)] == 2.0f,
                   "BL-352 R4: the debit drains pools in ascending body order by exactly the cost");
         }
 
@@ -525,10 +525,10 @@ int main()
         {
             scene s = make_scene(1000.0f);
             add_muster_base(s);
-            s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] = 3.0f;
+            s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] = 3.0f;
             const auto r = hire(s, iron_foot);
             check(r == corp_command_result::rejected_funds && s.w.units.empty() &&
-                  s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] == 3.0f,
+                  s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] == 3.0f,
                   "BL-352 R4: an unaffordable hire is refused whole — no partial debit");
         }
 
@@ -536,10 +536,10 @@ int main()
         {
             scene s = make_scene(1000.0f);
             add_muster_base(s);
-            s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] = 7.0f;
+            s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] = 7.0f;
             const auto r = hire(s, levy);
             check(r == corp_command_result::applied && s.w.units.size() == 1 &&
-                  s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] == 7.0f,
+                  s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] == 7.0f,
                   "BL-352 R4: an ungated row hires without touching the pools");
         }
     }
@@ -603,7 +603,7 @@ int main()
         // nothing else, so it cannot acquire a candidate the debit lacks.
         {
             scene s = make_scene(1000.0f);
-            s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::machinery)] = 1000.0f;
+            s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::machinery)] = 1000.0f;
             const campaign_roster_gate_input g = campaign_gate_input(s.w, s.ai_corp);
             check(g.ore_q == 0 && g.farm_q == 0 && g.energy_q == 0,
                   "BL-498 R5: a resource absent from the table opens no axis");
@@ -621,7 +621,7 @@ int main()
                 scene s = make_scene(1000.0f);
                 for (std::size_t a = 0; a < hire_axis_count; ++a)
                     for (const resource_type r : hire_axis_resources(static_cast<hire_axis>(a)))
-                        s.w.pool_for(s.ai_corp, s.body).quantities[ri(r)] = 1000.0f;
+                        s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(r)] = 1000.0f;
                 add_bldg(s, building_type::port);
                 const auto  rows  = available_rows(s.w, s.ai_corp, band);
                 const auto& table = unit_roster_table();
@@ -653,16 +653,16 @@ int main()
                     if (a == ax) continue;
                     const resource_type other =
                         hire_axis_resources(static_cast<hire_axis>(a)).candidates[0];
-                    s.w.pool_for(s.ai_corp, s.body).quantities[ri(other)] = 1000.0f;
+                    s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(other)] = 1000.0f;
                 }
-                s.w.pool_for(s.ai_corp, s.body).quantities[ri(cand)] = hire_axis_cost;
+                s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(cand)] = hire_axis_cost;
 
                 corp_command cmd{};
                 cmd.tick = 1; cmd.corp = s.ai_corp; cmd.verb = corp_verb::hire_unit;
                 cmd.tile = s.t_rich; cmd.unit_type = static_cast<uint16_t>(probe_row);
                 const auto r = apply_corp_command(s.w, reg, cmd);
 
-                const float left = s.w.pool_for(s.ai_corp, s.body).quantities[ri(cand)];
+                const float left = s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(cand)];
                 const std::string label =
                     "BL-498 R5: axis " + std::to_string(ax) + " candidate " +
                     std::to_string(static_cast<int>(cand)) +
@@ -785,7 +785,7 @@ int main()
             s.w.corporations.at(s.ai_corp).science = 8.0f;
             stockpile_component pool;
             pool.quantities[ri(resource_type::iron_ore)] = 30.0f;
-            s.w.corp_body_pools[{s.ai_corp, s.body}] = pool;
+            s.w.corp_market_pools[{s.ai_corp, pool_key_for_body(s.w, s.body)}] = pool;
             const entity_id u = s.w.create_entity();
             unit_component uc{};
             uc.position               = s.t_rich;
@@ -1007,7 +1007,7 @@ int main()
 
             stockpile_component pool;
             pool.quantities[ri(resource_type::iron_ore)] = 10000.0f;
-            s.w.corp_body_pools[{s.ai_corp, s.body}] = pool;
+            s.w.corp_market_pools[{s.ai_corp, pool_key_for_body(s.w, s.body)}] = pool;
             return std::make_pair(std::move(s), f);
         };
 

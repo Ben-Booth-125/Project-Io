@@ -1142,7 +1142,7 @@ int main()
             nb.weights[k_schooling] = 0.25f;
             s.f.budgets[s.f.nation_a] = nb;
 
-            auto& pool = s.f.w.corp_body_pools[std::make_pair(s.f.corp_1, s.body_a)];
+            auto& pool = s.f.w.corp_market_pools[std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a))];
             pool.quantities[k_comp] = components_stock;
             pool.quantities[k_prop] = propellant_stock;
 
@@ -1164,7 +1164,7 @@ int main()
             space_fixture s = make_space_fixture(100.0f, 100.0f);
             const double credit_before = world_credit_exact(s.f.w);
             auto [intents, t] = run_space(s);
-            const auto& pool = s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+            const auto& pool = s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)));
 
             check(intents.size() == 2 &&
                   intents[0].resource == resource_type::spacecraft_components &&
@@ -1198,7 +1198,7 @@ int main()
             auto [intents, t] = run_space(s);
             check(intents.empty() && s.f.claims.empty() && t.transfers.empty() &&
                   snapshot(s.f.w) == before &&
-                  same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                  same(s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)))
                            .quantities[k_comp], 7.5f),
                   "R7d a supplier short of a whole lump is not a supplier: no "
                   "claim, no transfer, no draw - the tick is bit-identical");
@@ -1227,7 +1227,7 @@ int main()
                 check(intents.size() == 1 && intents[0].funded && intents[0].completed &&
                       same(intents[0].credits, 16.0f) &&
                       same(s.f.w.nations.at(s.f.nation_a).treasury, 112.0f) &&
-                      same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                      same(s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)))
                                .quantities[k_comp], 92.0f),
                       "R7f ...and once the accumulated share covers it the lump "
                       "fires whole - 16.0 paid, 8 units consumed, nothing "
@@ -1247,7 +1247,7 @@ int main()
             (void)t;
             check(intents.size() == 1 && intents[0].nation == s.f.nation_a &&
                   intents[0].funded && intents[0].completed &&
-                  same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                  same(s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)))
                            .quantities[k_comp], 2.0f) &&
                   same(s.f.w.nations.at(nation_b).treasury, 1024.0f),
                   "R7g stock a claim names is RESERVED: with one lump on hand "
@@ -1263,7 +1263,7 @@ int main()
             space_fixture s = make_space_fixture(8.0f, 0.0f); // corp_1: exactly one lump
             s.params.propellant_lump = 0.0f;
             s.f.w.player_entity = s.f.corp_2;
-            s.f.w.corp_body_pools[std::make_pair(s.f.corp_2, s.body_a)]
+            s.f.w.corp_market_pools[std::make_pair(s.f.corp_2, pool_key_for_body(s.f.w, s.body_a))]
                 .quantities[k_comp] = 1000.0f; // fatter, and ineligible
             auto [intents, t] = run_space(s);
             (void)t;
@@ -1272,11 +1272,11 @@ int main()
             space_fixture q = make_space_fixture(0.0f, 0.0f);
             q.params.propellant_lump = 0.0f;
             q.f.w.player_entity = q.f.corp_1;
-            q.f.w.corp_body_pools.at(std::make_pair(q.f.corp_1, q.body_a))
+            q.f.w.corp_market_pools.at(std::make_pair(q.f.corp_1, pool_key_for_body(q.f.w, q.body_a)))
                 .quantities[k_comp] = 1000.0f; // only the player holds stock
             auto [q_intents, qt] = run_space(q);
             check(rival_chosen && q_intents.empty() && qt.transfers.empty() &&
-                  same(q.f.w.corp_body_pools.at(std::make_pair(q.f.corp_1, q.body_a))
+                  same(q.f.w.corp_market_pools.at(std::make_pair(q.f.corp_1, pool_key_for_body(q.f.w, q.body_a)))
                            .quantities[k_comp], 1000.0f),
                   "R7h the player's corp is never a supplier: a fatter player "
                   "pool loses to a rival's, and a world where only the player "
@@ -1293,7 +1293,7 @@ int main()
             const double credit_before = world_credit_exact(s.f.w);
             std::vector<space_purchase> intents = derive_space_programme_claims(
                 s.f.w, s.f.budgets, s.params, s.f.claims);
-            s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+            s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)))
                 .quantities[k_comp] = 0.0f; // the out-of-band draw
             national_budget_tick t;
             run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
@@ -1400,7 +1400,7 @@ int main()
             economy_report rep;
             run_nation_step(s.f.w, reg, rep, /*econ_tick=*/1);
             const auto& pool =
-                s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+                s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)));
             check(rep.space_purchases.size() == 2 &&
                   rep.space_purchases[0].completed && rep.space_purchases[1].completed &&
                   same(pool.quantities[k_comp], 92.0f) &&
@@ -1539,7 +1539,7 @@ int main()
             nb.weights[k_exploration] = 0.25f;
             s.f.budgets[s.f.nation_a] = nb;
 
-            auto& pool = s.f.w.corp_body_pools[std::make_pair(s.f.corp_1, s.body_a)];
+            auto& pool = s.f.w.corp_market_pools[std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a))];
             pool.quantities[k_stone]  = stone_stock;
             pool.quantities[k_timber] = timber_stock;
 
@@ -1566,7 +1566,7 @@ int main()
             net_fixture s = make_net_fixture(100.0f, 100.0f);
             const double credit_before = world_credit_exact(s.f.w);
             auto [intents, t] = run_net(s);
-            const auto& pool = s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+            const auto& pool = s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)));
 
             check(intents.size() == 2 &&
                   intents[0].resource == resource_type::stone &&
@@ -1607,7 +1607,7 @@ int main()
             nb.weights[k_schooling]   = 0.5f;
             nb.weights[k_exploration] = 0.0f;
             auto [intents, t] = run_net(s);
-            const auto& pool = s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+            const auto& pool = s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)));
 
             bool fills_ok = true;
             int  n_log = 0;
@@ -1643,7 +1643,7 @@ int main()
                   same(intents[0].quantity, 6.0f) && same(intents[0].credits, 12.0f) &&
                   intents[0].funded && intents[0].completed &&
                   same(intents[0].drawn, 6.0f) &&
-                  same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                  same(s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)))
                            .quantities[k_stone], 0.0f) &&
                   same(s.f.w.nations.at(s.f.nation_a).treasury, 1012.0f),
                   "R9e a supplier short of the bill still supplies: the 16-unit "
@@ -1655,7 +1655,7 @@ int main()
         {
             net_fixture s = make_net_fixture(4.0f, 0.0f); // corp_1: thin but eligible
             s.f.w.player_entity = s.f.corp_2;
-            s.f.w.corp_body_pools[std::make_pair(s.f.corp_2, s.body_a)]
+            s.f.w.corp_market_pools[std::make_pair(s.f.corp_2, pool_key_for_body(s.f.w, s.body_a))]
                 .quantities[k_stone] = 1000.0f; // fatter, and ineligible
             auto [intents, t] = run_net(s);
             (void)t;
@@ -1663,11 +1663,11 @@ int main()
 
             net_fixture q = make_net_fixture(0.0f, 0.0f);
             q.f.w.player_entity = q.f.corp_1;
-            q.f.w.corp_body_pools.at(std::make_pair(q.f.corp_1, q.body_a))
+            q.f.w.corp_market_pools.at(std::make_pair(q.f.corp_1, pool_key_for_body(q.f.w, q.body_a)))
                 .quantities[k_stone] = 1000.0f; // only the player holds stock
             auto [q_intents, qt] = run_net(q);
             check(rival_chosen && q_intents.empty() && qt.transfers.empty() &&
-                  same(q.f.w.corp_body_pools.at(std::make_pair(q.f.corp_1, q.body_a))
+                  same(q.f.w.corp_market_pools.at(std::make_pair(q.f.corp_1, pool_key_for_body(q.f.w, q.body_a)))
                            .quantities[k_stone], 1000.0f),
                   "R9f the player's corp is never a supplier: a fatter player "
                   "pool loses to a rival's, and a world where only the player "
@@ -1703,7 +1703,7 @@ int main()
             const double credit_before = world_credit_exact(s.f.w);
             std::vector<network_purchase> intents = derive_network_upkeep_claims(
                 s.f.w, s.f.budgets, s.params, s.f.claims);
-            s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+            s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)))
                 .quantities[k_stone] = 0.0f; // the out-of-band draw
             national_budget_tick t;
             run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
@@ -1774,7 +1774,7 @@ int main()
             economy_report rep;
             run_nation_step(s.f.w, reg, rep, /*econ_tick=*/1);
             const auto& pool =
-                s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+                s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)));
             check(rep.network_purchases.size() == 2 &&
                   rep.network_purchases[0].completed && rep.network_purchases[1].completed &&
                   same(pool.quantities[k_stone], 84.0f) &&

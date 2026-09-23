@@ -252,7 +252,8 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     float produced_total = 0.0f;
     if (capacity > 0.0f && richness_total > 0.0f)
     {
-        stockpile_component& pool = w.pool_for(corp, body);
+        // BL-1003: output enters the pool of the site's own tile market.
+        stockpile_component& pool = w.pool_at(corp, pool_key_for_tile(w, b.tile));
         for (const resource_type r : placement_rules::k_extractable)
         {
             const std::size_t rr    = static_cast<std::size_t>(r);
@@ -328,7 +329,11 @@ building_report run_processing(world& w, const recipe_registry& reg,
         return rep;
     }
 
-    stockpile_component& pool = w.pool_for(corp, body);
+    // BL-1003: the processor draws and credits the pool of its own tile market
+    // (`market_id` IS `market_for_tile(b.tile)`), or the body-level pool on a
+    // market-less body. Want and fill book under the same key.
+    const entity_id pool_key = (market_id != null_entity) ? market_id : body;
+    stockpile_component& pool = w.pool_at(corp, pool_key);
     // BL-130: a processor's real available stock is its own pool PLUS the local
     // market's real inventory — a genuine finite draw, not an unconditional
     // auto-buy. Mutable: this function actually consumes what it draws, below.
@@ -377,7 +382,7 @@ building_report run_processing(world& w, const recipe_registry& reg,
     // precisely when the market most needs to hear it.
     if (has_input)
     {
-        auto& want_row = out.wants[std::make_pair(corp, body)];
+        auto& want_row = out.wants[std::make_pair(corp, pool_key)];
         for (std::size_t r = 0; r < resource_count; ++r)
             want_row[r] += wanted[r];
     }
@@ -414,7 +419,7 @@ building_report run_processing(world& w, const recipe_registry& reg,
     // is no longer what prices the resource (that is `out.wants`, above); it is
     // strictly the receipt, and it is what the corp is billed for. The two must
     // not be swapped: paying against the want would credit deliveries nobody made.
-    auto& bought = out.purchases[std::make_pair(corp, body)];
+    auto& bought = out.purchases[std::make_pair(corp, pool_key)];
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         const float in = rcp->inputs[r];
@@ -738,6 +743,13 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
 
         const entity_id corp = owner_corp_of(w, bid);
         const entity_id body = building_body(w, b);
+        // BL-1003: want and fill book under the site's OWN tile market — the
+        // market it draws from above — so its demand prices that shelf.
+        // BL-1003 CALL: the site still draws the market's inventory only, never
+        // the corp's pool (PRODUCTION.md § Construction as a rate says "read
+        // from, and drained from, the market's real stock"). The corp's own
+        // stock reaches it via auto-surplus into the same market's inventory.
+        const entity_id pool_key = (mid != null_entity) ? mid : body;
 
         // BL-441: register the WANT before the pause check, not after. A build
         // site draws only from the market, so its want is this tick's full-rate
@@ -748,7 +760,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         // that would have priced it. NR-282 records why construction is in scope.
         if (corp != null_entity && body != null_entity)
         {
-            auto& want = report.wants[std::make_pair(corp, body)];
+            auto& want = report.wants[std::make_pair(corp, pool_key)];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
                 const float need = need_row[r];
@@ -767,7 +779,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         // `report.wants` above instead; this is the receipt only.
         if (corp != null_entity && body != null_entity)
         {
-            auto& bought = report.purchases[std::make_pair(corp, body)];
+            auto& bought = report.purchases[std::make_pair(corp, pool_key)];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
                 const float need = need_row[r];
@@ -1049,14 +1061,21 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 // Draw what the supplier actually holds at the fulfilment body
                 // before building the rest to order, so a contract served out of
                 // existing stock moves goods rather than inventing them.
-                const auto skit = w.corp_body_pools.find(std::make_pair(c.supplier, c.body));
-                if (skit != w.corp_body_pools.end())
+                //
+                // BL-1003 CALL: a contract names bodies, not markets. The supplier
+                // is drawn from, and the buyer credited in, each corp's HOME pool
+                // on the named body (`corp_home_pool_key`: the HQ's tile market,
+                // else the lowest-id building's). A contract that names markets
+                // is the fuller answer.
+                const auto skit = w.corp_market_pools.find(
+                    std::make_pair(c.supplier, corp_home_pool_key(w, c.supplier, c.body)));
+                if (skit != w.corp_market_pools.end())
                 {
                     float& sq = skit->second.quantities[ri];
                     sq -= std::min(sq, c.quantity); // a pool never goes negative
                 }
                 const entity_id land_on = (c.delivery_body != null_entity) ? c.delivery_body : c.body;
-                w.pool_for(c.buyer, land_on).quantities[ri] += c.quantity;
+                w.pool_at(c.buyer, corp_home_pool_key(w, c.buyer, land_on)).quantities[ri] += c.quantity;
                 // BL-546: one `contract_completed` occurrence folded into the
                 // relational substrate, at the weight economy.lua authors
                 // (seeded from `reputation_on_complete`, so the magnitude is
@@ -2304,7 +2323,7 @@ namespace {
 ///     tick's resolved price;
 ///   * the market is the one the TILE clears against (`market_for_tile`), the
 ///     shelf the buyer is standing at, while the want/fill are keyed by
-///     (corp, body) exactly as construction's are.
+///     (corp, tile market) exactly as construction's are (BL-1003).
 ///
 /// THE CEILING IS READ AGAINST THE PRIOR RESOLVED PRICE, one tick stale, since
 /// this pass runs before `clear_markets` resolves the new one. That lag is
@@ -2336,13 +2355,17 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
                        entity_id corp, entity_id body, entity_id tile,
                        const std::array<float, resource_count>& need)
 {
-    // pool_for INSERTS on first access, so callers reach this only when there is
-    // something to draw — an all-zero basket never creates a pool, which is what
-    // keeps a zero-rate world byte-identical down to its pool set.
-    stockpile_component& pool = w.pool_for(corp, body);
-
+    // BL-1003: the draw is from the pool of the TILE's market — the shelf the
+    // buyer stands at — or the body-level pool on a market-less body, and the
+    // want/fill book under that same key.
     const entity_id  mid = market_for_tile(w, tile);
     market_component* m  = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
+    const entity_id pool_key = (mid != null_entity) ? mid : body;
+
+    // pool_at INSERTS on first access, so callers reach this only when there is
+    // something to draw — an all-zero basket never creates a pool, which is what
+    // keeps a zero-rate world byte-identical down to its pool set.
+    stockpile_component& pool = w.pool_at(corp, pool_key);
     const float res_mult = reg.price_band().reservation_mult;
 
     // BL-708. `any()` first, so a world that authors no grid good pays one bool
@@ -2357,7 +2380,7 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
         connected = (rc >= 0.0f) && std::isfinite(rc);
     }
 
-    // `wants` / `purchases` are std::maps keyed by (corp, body); touching them
+    // `wants` / `purchases` are std::maps keyed by (corp, pool key); touching them
     // only when there is a bid keeps a pool-covered tick from inserting empty
     // rows the census would then have to explain.
     std::array<float, resource_count>* want   = nullptr;
@@ -2401,8 +2424,8 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
                 {
                     if (want == nullptr)
                     {
-                        want = &report.wants[std::make_pair(corp, body)];
-                        upk  = &report.upkeep_wants[std::make_pair(corp, body)];
+                        want = &report.wants[std::make_pair(corp, pool_key)];
+                        upk  = &report.upkeep_wants[std::make_pair(corp, pool_key)];
                     }
                     (*want)[r] += shortfall; // the BID: the whole shortfall
                     (*upk)[r]  += shortfall; // attribution mirror; nothing pays it
@@ -2413,7 +2436,7 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
                     {
                         m->inventory[r] -= drawn;
                         if (bought == nullptr)
-                            bought = &report.purchases[std::make_pair(corp, body)];
+                            bought = &report.purchases[std::make_pair(corp, pool_key)];
                         (*bought)[r] += drawn; // the FILL: this is what is billed
                         shortfall -= drawn;
                     }

@@ -351,13 +351,19 @@ struct world
     /// SERIALISED, empty after a load.
     std::vector<carve_dropped_slot> gen_carve_dropped;
 
-    /// Shared stockpile pool keyed by (corporation, body). This is the Layer 3
-    /// economy's working store — extraction and processing credit/draw it, the
-    /// market lists surplus from it. A `std::map` (not unordered) so iteration is
-    /// deterministic, mirroring the `tile_to_nation` design rationale: keeping the
-    /// pool here off `building_component`/`body_component` lets the economy systems
-    /// stay on disjoint files. The per-building `stockpile_component` is unused in L3.
-    std::map<std::pair<entity_id, entity_id>, stockpile_component> corp_body_pools;
+    /// Shared goods pool keyed by (corporation, POOL KEY) — BL-1003, PRODUCTION.md
+    /// § Stockpile and output flow. The pool key is the MARKET whose catchment
+    /// holds the building's tile (`pool_key_for_tile`), or — on a body with no
+    /// market yet — the body id itself, until `maybe_spawn_market` folds that
+    /// body-level pool into the new market's (`absorb_body_pool_into_market`).
+    /// Entity ids are globally unique, so a market key and a body key never
+    /// collide. This is the Layer 3 economy's working store — extraction and
+    /// processing credit/draw it, the market lists surplus from it into the
+    /// keyed market. A `std::map` (not unordered) so iteration is deterministic,
+    /// mirroring the `tile_to_nation` design rationale. Labour pools stay per
+    /// (corp, body) and are NOT here. The per-building `stockpile_component` is
+    /// unused in L3.
+    std::map<std::pair<entity_id, entity_id>, stockpile_component> corp_market_pools;
 
     /// Active convoys — goods in transit. Appended by dispatch_convoys, advanced by
     /// advance_convoys, and retired (erased) by credit_arrived_convoys in
@@ -483,7 +489,7 @@ struct world
     /// an inter-body lane. Sampled once at the discrete completion tick by
     /// record_proximity_glimpses (orbits have already advanced for that frame), so no
     /// past position is ever reconstructed — the fog reads the stamp, never recomputes
-    /// geometry. Held off `body_component` (the `corp_body_pools` rationale) to keep the
+    /// geometry. Held off `body_component` (the `corp_market_pools` rationale) to keep the
     /// body's future flat-binary layout untouched. std::map for deterministic iteration.
     std::map<entity_id, int> body_last_glimpse_tick;
 
@@ -522,7 +528,7 @@ struct world
     /// Techs each corporation has EARNED, by tech id (BL-344). Per-corp, never
     /// global: two corporations research independently, and a gate that read a
     /// world-wide set would unlock a rival's content for the player. `std::map`
-    /// + `std::set` for deterministic iteration (the `corp_body_pools`
+    /// + `std::set` for deterministic iteration (the `corp_market_pools`
     /// rationale). Empty at world setup — nothing is earned until a tech's
     /// `condition_set` is satisfied and `advance_tech_gates` records it.
     std::map<entity_id, std::set<std::string>> earned_techs;
@@ -566,7 +572,7 @@ struct world
     /// stored order across `add` and `multiply`, which do not commute. The order
     /// is information the earned set does not carry, so it is state.
     /// `std::map` for deterministic iteration
-    /// (the `corp_body_pools` rationale). Empty at world setup, and stays
+    /// (the `corp_market_pools` rationale). Empty at world setup, and stays
     /// empty for the life of any world whose techs carry only
     /// unlock_structure — which is what keeps such a world bit-identical to
     /// the pre-BL-479 build.
@@ -807,23 +813,31 @@ struct world
     /// the ring's own run-to-run identity directly instead.
     exchange_record_ring exchanges;
 
-    /// Stockpile pool for a (corporation, body) pair, inserting an empty pool on
-    /// first access. The single point through which the economy systems read and
-    /// write the shared pool.
+    /// Goods pool for a (corporation, pool key) pair, inserting an empty pool on
+    /// first access. The key is a market id, or a body id on a market-less body
+    /// — resolve it with `pool_key_for_tile` / `pool_key_for_body`, never pass a
+    /// body id on a body that has markets.
     ///
     /// @param corp Corporation entity id.
-    /// @param body Body entity id.
-    /// @return     Reference to the (corp, body) stockpile, created if absent.
-    stockpile_component& pool_for(entity_id corp, entity_id body)
+    /// @param key  Pool key (market id, or body id on a market-less body).
+    /// @return     Reference to the (corp, key) stockpile, created if absent.
+    stockpile_component& pool_at(entity_id corp, entity_id key)
     {
-        return corp_body_pools[std::make_pair(corp, body)];
+        return corp_market_pools[std::make_pair(corp, key)];
+    }
+
+    /// Read-only lookup of a (corporation, pool key) pool; nullptr if absent.
+    const stockpile_component* find_pool(entity_id corp, entity_id key) const
+    {
+        const auto it = corp_market_pools.find(std::make_pair(corp, key));
+        return it == corp_market_pools.end() ? nullptr : &it->second;
     }
 
     /// Authored effective workforce supply per (corp, body) — Layer 4 step 1 of the
     /// labour-pool model (docs/economy/POPULATION.md § Workforce model). Absent
     /// entries fall back to `default_workforce_supply`; population centres replace
     /// this authored value with a population-derived figure in step 2. Held off the
-    /// component structs (the `corp_body_pools` rationale) so the economy stays on
+    /// component structs (the `corp_market_pools` rationale) so the economy stays on
     /// disjoint files.
     static constexpr float default_workforce_supply = 3.0f;
     std::map<std::pair<entity_id, entity_id>, float> workforce_supply_overrides;
@@ -897,8 +911,50 @@ private:
 // `building_to_corp` map is the natural O(1) backing if profiling ever warrants;
 // the accessor is the stable seam either way.
 
+// ---------------------------------------------------------------------------
+// Goods-pool keys (BL-1003 — pools per market). Defined in market_clearing.cpp,
+// beside `market_for_tile`, whose catchment partition they resolve through.
+// ---------------------------------------------------------------------------
+
+/// The goods-pool key for @p tile: the market whose catchment holds it
+/// (`market_for_tile`), or the tile's body id when that body has no market.
+/// `null_entity` for an unknown tile.
+entity_id pool_key_for_tile(const world& w, entity_id tile);
+
+/// The goods-pool key for a body with no tile named: the body id when it has no
+/// market, else its lowest-id market. Only for callers that genuinely have no
+/// tile (a body-level delivery); anything tied to a building uses
+/// `pool_key_for_tile`.
+entity_id pool_key_for_body(const world& w, entity_id body);
+
+/// The body a pool key sits on: the market's body for a market key, the key
+/// itself for a body key, `null_entity` for anything else.
+entity_id pool_key_body(const world& w, entity_id key);
+
+/// What @p corp holds on @p body across every pool key there (each market pool
+/// plus any body-level pool), summed in ascending key order. A READ-ONLY
+/// aggregate — never draw or deposit through it.
+stockpile_component body_pool_total(const world& w, entity_id corp, entity_id body);
+
+/// Fold every corporation's body-level pool on @p body into @p market's pool
+/// and erase the body-level entries. Called when a market spawns on a body that
+/// had none (PRODUCTION.md § Stockpile and output flow). Ascending corp order.
+void absorb_body_pool_into_market(world& w, entity_id body, entity_id market);
+
+/// A corporation's HOME pool key on @p body — where goods that belong to the
+/// corp on that body but to no particular building land (generation's opening
+/// stock). The pool key of the corp's HQ tile if the HQ is on @p body, else of
+/// its lowest-id building there, else `pool_key_for_body`.
+entity_id corp_home_pool_key(const world& w, entity_id corp, entity_id body);
+
+/// Re-key every body-level pool that sits on a body which now HAS markets into
+/// its corporation's `corp_home_pool_key` there. World build seeds opening
+/// stock before the home body's markets are carved; this pass, run once the
+/// markets exist, leaves no orphan body-level pool behind. Ascending key order.
+void rehome_body_pools(world& w);
+
 /// Resolve the corporation that owns @p building by scanning each corporation's
-/// `assets`. Siblings of `pool_for` / `workforce_supply`.
+/// `assets`. Siblings of `pool_at` / `workforce_supply`.
 ///
 /// @param w        Read-only world state.
 /// @param building Building entity id to resolve.
