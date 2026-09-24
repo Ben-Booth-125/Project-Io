@@ -63,6 +63,12 @@ constexpr ImU32 col_bridge     = IM_COL32(240, 240, 235, 255);
 /// inside one realm) never does, and the two facts should not read as one
 /// idiom repainted. A cool green against the road's warm ochre.
 constexpr ImU32 col_trade_link = IM_COL32(110, 205, 150, 220);
+/// SEA LANES (BL-1097). Its own water layer, a third hue: a pale sea-blue
+/// against the trade link's green and the road's ochre, so a lane earned by
+/// crossings never reads as a road repainted onto water or as an open border.
+/// Alpha kept below the trade link's so the water's own tint still shows
+/// through a long lane.
+constexpr ImU32 col_sea_lane = IM_COL32(140, 200, 245, 190);
 /// BL-1080: a region that has crossed the furnace — an ember square at its
 /// anchor, warm and saturated so it reads against every polity tint.
 constexpr ImU32 col_furnace = IM_COL32(255, 138, 48, 245);
@@ -627,6 +633,36 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
         }
     }
 
+    // --- Sea lanes (BL-1097), baked once -------------------------------------
+    //
+    // Built from `sea_lane_opened` events alone, one segment per DISTINCT
+    // (a, b) pair, anchor centre to anchor centre — the road bake's idiom on
+    // the water. A leg the era only crossed once or twice never gets an event
+    // and never gets a segment. The lane tier has one rung, so the first event
+    // for a pair is the whole story and a second (a resumed span re-noting
+    // would be a sim bug, not a fixture case) is ignored.
+    h.lane_segs.clear();
+    for (const lapse_event& e : h.lapse.events)
+    {
+        if (e.kind != static_cast<uint8_t>(lapse_event_kind::sea_lane_opened)) continue;
+        if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
+        const uint16_t a = e.region, b = e.other; // note_sea_leg: region = lo, other = hi
+        if (static_cast<std::size_t>(a) >= h.region_col.size()
+         || static_cast<std::size_t>(b) >= h.region_col.size()) continue;
+        const bool seen = std::any_of(h.lane_segs.begin(), h.lane_segs.end(),
+                                      [&](const lapse_lane_seg& s) { return s.region_a == a && s.region_b == b; });
+        if (seen) continue;
+        lapse_lane_seg seg;
+        seg.region_a  = a;
+        seg.region_b  = b;
+        seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
+        seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
+        seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[b]) + 0.5f, gw);
+        seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
+        seg.year_open = e.year;
+        h.lane_segs.push_back(seg);
+    }
+
     // --- The industry layer (BL-1080), baked once ------------------------------
     //
     // A region's first `furnace_lit` is its crossing; the list is ascending, so
@@ -1153,6 +1189,40 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)},
                         col_trade_link, w);
             ++prims;
+        }
+    }
+
+    // ── 3c'. SEA LANES (BL-1097), its own water layer beside the two above:
+    //    a lane is drawn from the frame its leg earned the tier to the
+    //    round's end, and never before — the crossings that fell short stay
+    //    invisible, as the walked-once settle tree does on land. Drawn as a
+    //    DASHED stroke, so a lane reads as traffic over water rather than a
+    //    road painted onto it or a trade link's solid green; the dash length
+    //    scales with the map so the rhythm holds at every zoom. Seam-crossing
+    //    lanes are stroked twice like the corridors above. ──
+    for (const lapse_lane_seg& s : h.lane_segs)
+    {
+        if (year < s.year_open) continue; // not yet a lane at this playhead
+        const float w = std::max(1.25f, scale * 0.20f);
+        const float dash = std::max(4.0f, scale * 1.5f);
+        const auto dashed = [&](float x0, float y0, float x1, float y1) {
+            const float dx = x1 - x0, dy = y1 - y0;
+            const float len = std::sqrt(dx * dx + dy * dy);
+            if (len <= 0.0f) return;
+            const float ux = dx / len, uy = dy / len;
+            for (float t = 0.0f; t < len; t += dash * 2.0f)
+            {
+                const float e = std::min(t + dash, len);
+                dl->AddLine({x0 + ux * t, y0 + uy * t}, {x0 + ux * e, y0 + uy * e},
+                            col_sea_lane, w);
+                ++prims;
+            }
+        };
+        dashed(px(s.c0), py(s.r0), px(s.c1), py(s.r1));
+        if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw)) // the seam, drawn off the other edge
+        {
+            const float shift = s.c1 < 0.0f ? world_w : -world_w;
+            dashed(px(s.c0) + shift, py(s.r0), px(s.c1) + shift, py(s.r1));
         }
     }
     dl->PopClipRect();
@@ -1997,6 +2067,17 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
     case lapse_event_kind::subject_freed:
         std::snprintf(buf, sizeof buf, "%s refuses renewal and breaks from %s.",
                       polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    case lapse_event_kind::province_bought:
+        // BL-1096: the purchase, distinct from "falls under" -- `other` is the
+        // buyer, `polity` the native whose province it now is by purchase.
+        std::snprintf(buf, sizeof buf, "%s buys the province of %s, and keeps its customs.",
+                      polity_name_of(h, e.other), polity_name_of(h, e.polity));
+        break;
+    case lapse_event_kind::sea_lane_opened:
+        // BL-1097: the crossing that made a leg a lane; region/other = the ends.
+        std::snprintf(buf, sizeof buf, "A sea lane opens between %s and %s.",
+                      R, region_name_of(h, e.other));
         break;
     default:
         std::snprintf(buf, sizeof buf, "Something happens at %s.", R);

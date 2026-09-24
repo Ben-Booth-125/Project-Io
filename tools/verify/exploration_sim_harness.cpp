@@ -20,6 +20,15 @@
 //        not an equivalence proof -- T6.5/T6.5b/T6.9 carry "w_want_q 0 changes
 //        nothing"
 //   R3c  BL-953: with the lean on the span stays deterministic (reported)
+//   T9   BL-1096: the purchase fork's price and verb, pure -- a coastal
+//        affordable native is bought, an interior or unaffordable one is
+//        taken; both constants at zero is OFF; out of domain is REJECTED
+//   R3d  BL-1096 CONTROL: the fork switched off through its constants
+//        reproduces the pre-BL-1096 R3b pins exactly (and the BL-1097 sea-leg
+//        record, noted beside the land record, moves nothing there)
+//   R3e  BL-1096/BL-1097 on the real span: bought <= formed, one event per
+//        binding by verb, kinds are verbs; the leg table sorted, non-empty
+//        where subjects were held, one sea_lane_opened per lane (reported)
 //   R4   objects with a term expire on schedule and not before
 //   R5   the round-level upkeep hook is callable and moves nothing (it is a
 //        documented no-op until BL-932)
@@ -437,6 +446,72 @@ int main()
     }
 
     // -----------------------------------------------------------------
+    // T9: BL-1096 -- BOUGHT OR TAKEN, decided on the ground's terms
+    // (EXPLORATION.md sec Two ways to claim ground across water). The
+    // verb is a pure function of the native seat, the buyer's purse and the
+    // two constants, so the three cases the requirement names go straight
+    // to it: a coastal affordable native is bought, an interior one is
+    // taken, a coastal unaffordable one is taken.
+    // -----------------------------------------------------------------
+    {
+        history_sim_params p;
+        p.subjection_purchase_rate_q = 1000; // the seller's whole chest
+        p.subjection_purchase_floor  = 400;
+
+        region coastal_poor;  coastal_poor.port_q  = 500; coastal_poor.treasury  = 100;
+        region coastal_rich;  coastal_rich.port_q  = 500; coastal_rich.treasury  = 5000;
+        region interior_poor; interior_poor.port_q = 0;   interior_poor.treasury = 100;
+
+        check(purchase_price_q(coastal_poor, p) == 400 && purchase_price_q(coastal_rich, p) == 5000,
+              "T9.1  the price is the greater of the floor and the seat's treasury at the rate");
+        {
+            history_sim_params half = p;
+            half.subjection_purchase_rate_q = 500;
+            region neg; neg.treasury = -50;
+            check(purchase_price_q(coastal_rich, half) == 2500 && purchase_price_q(neg, half) == 400,
+                  "T9.2  the rate is per mille of the seller's stock; a negative stock prices as empty");
+        }
+        check(subjection_verb(coastal_poor, 1000, p) == 0,
+              "T9.3  a coastal native whose price the buyer covers is BOUGHT (verb 0)");
+        check(subjection_verb(interior_poor, 1000000, p) == 1,
+              "T9.4  an interior native is TAKEN however rich the buyer (no coast to land on)");
+        check(subjection_verb(coastal_rich, 4999, p) == 1 && subjection_verb(coastal_rich, 5000, p) == 0,
+              "T9.5  a coastal native the buyer cannot afford is TAKEN; the boundary is >= price");
+        {
+            // ZERO-DISABLED: both at zero prices nothing and takes every coast.
+            history_sim_params off = p;
+            off.subjection_purchase_rate_q = 0;
+            off.subjection_purchase_floor  = 0;
+            check(subjection_purchase_params_valid(off)
+               && subjection_verb(coastal_poor, 1LL << 40, off) == 1,
+                  "T9.6  with both constants at zero the fork is OFF: valid, and every binding taken");
+            // One of the two alone is a legal shape: a flat price, or a pure rate.
+            history_sim_params flat = off; flat.subjection_purchase_floor = 400;
+            history_sim_params rate = off; rate.subjection_purchase_rate_q = 1000;
+            check(subjection_verb(coastal_poor, 400, flat) == 0
+               && subjection_verb(coastal_rich, 4999, rate) == 1
+               && subjection_verb(coastal_rich, 5000, rate) == 0,
+                  "T9.7  a floor alone is a flat price; a rate alone is proportional to the seller's stock");
+        }
+        {
+            // REJECT, NEVER CLAMP: out of domain refuses the fork whole.
+            history_sim_params bad_rate = p;  bad_rate.subjection_purchase_rate_q = 10001;
+            history_sim_params neg_rate = p;  neg_rate.subjection_purchase_rate_q = -1;
+            history_sim_params neg_floor = p; neg_floor.subjection_purchase_floor = -1;
+            history_sim_params big_floor = p; big_floor.subjection_purchase_floor = (1LL << 48) + 1;
+            history_sim_params edge = p;      edge.subjection_purchase_rate_q = 10000;
+                                              edge.subjection_purchase_floor  = 1LL << 48;
+            check(!subjection_purchase_params_valid(bad_rate) && !subjection_purchase_params_valid(neg_rate)
+               && !subjection_purchase_params_valid(neg_floor) && !subjection_purchase_params_valid(big_floor)
+               && subjection_purchase_params_valid(edge),
+                  "T9.8  the rate is valid on 0-10000 and the floor on 0-2^48, inclusive, and nowhere else");
+            check(subjection_verb(coastal_poor, 1LL << 40, bad_rate) == 1
+               && subjection_verb(coastal_poor, 1LL << 40, neg_floor) == 1,
+                  "T9.9  a rejected pair buys nothing: every binding is taken, never a clamped price");
+        }
+    }
+
+    // -----------------------------------------------------------------
     // R1/R2/R3: the resumed span, over a REAL Empires close
     // -----------------------------------------------------------------
     era_minus_one_fixture fixture;
@@ -467,8 +542,13 @@ int main()
 
         check(!p1.polities.empty(), "R2.0  the Empires close leaves at least one living polity");
 
+        // `tweak`, when given, edits the params after every default below is
+        // set -- the BL-1096 control (R3d) switches the purchase fork off
+        // through it, so the control and the pinned run differ in exactly
+        // the two constants and nothing else.
         const auto run_exploration = [&](uint32_t seed, int w_want_q = 0,
-                                         std::vector<region>* regions_out = nullptr) {
+                                         std::vector<region>* regions_out = nullptr,
+                                         void (*tweak)(history_sim_params&) = nullptr) {
             settlement_state ss = ss_a; // Independent copy each call.
             history_sim_params ep;
             ep.start_year = fixture.params.stop_year; // 1200, wherever Empires closed.
@@ -492,6 +572,7 @@ int main()
             ep.resume_grudges   = &p1.grudges;
             ep.resume_contacts  = &p1.contacts;
             ep.resume_corridors = &p1.surviving_corridors;
+            if (tweak != nullptr) tweak(ep);
             history_sim_state st = run_history_sim(ss, &fixture.creeds, fixture.terrain.view(),
                                                    fixture.gw, fixture.gh, ep, seed, nullptr,
                                                    fixture.works, nullptr);
@@ -677,6 +758,112 @@ int main()
                     "treasury_spent_on_roads=%lld\n",
                     static_cast<long long>(ex1.post_roads_built),
                     static_cast<long long>(ex1.treasury_spent_on_roads));
+
+        // R3d (BL-1096): THE CONTROL. The same span with the purchase fork
+        // switched OFF through the two constants (both zero) must be what the
+        // block was before the fork existed: the pre-BL-1096 R3b pins, exactly
+        // -- battles 30, conquests 27, foundings 816, subjections 3, freed 0,
+        // tribute 228427344, treaties 354, broken 1, owner changes 2061 (the
+        // 2026-09-16 wave A re-bless). That is "byte-identical to a run without
+        // the change" at this harness's grain: every counter and the whole
+        // ownership record, with the fork's own counters at zero. `subject_kind`
+        // is the one field that reads differently by design -- it is now the
+        // VERB, so with the fork off every subject reads TAKEN (1) where the
+        // proxy used to read a coast (0); nothing decides on it. The sea-leg
+        // record (BL-1097) is noted beside the land record and reads nothing
+        // back, so it is inside this same control: the land record and the
+        // ownership record are unmoved by its presence.
+        {
+            const history_sim_state off = run_exploration(0x515C0E17u, 0, nullptr,
+                [](history_sim_params& p) {
+                    p.subjection_purchase_rate_q = 0;
+                    p.subjection_purchase_floor  = 0;
+                });
+            bool subjects_all_taken = true;
+            for (const polity& q : off.polities)
+                if (q.overlord >= 0 && q.subject_kind != 1) subjects_all_taken = false;
+            check(!off.subjection_purchase_params_rejected
+               && off.provinces_bought == 0 && off.treasury_spent_on_purchases == 0
+               && subjects_all_taken,
+                  "R3d.0 with both purchase constants at zero the fork is off: nothing bought, nothing "
+                  "spent, not rejected, every subject TAKEN");
+            check(off.battles == 30 && off.conquests == 27 && off.foundings == 816
+               && off.subjections_formed == 3 && off.subjections_freed == 0
+               && off.tribute_remitted == 228427344 && off.treaties_formed == 354
+               && off.treaties_broken == 1 && off.owner_changes.size() == 2061,
+                  "R3d.1 CONTROL: the fork-off span matches the pre-BL-1096 pins exactly (battles, "
+                  "conquests, foundings, subjections, tribute, treaties, owner record)");
+            std::printf("      control (purchase off): battles=%lld conquests=%lld foundings=%lld "
+                        "subjections=%lld tribute=%lld treaties=%lld owner_changes=%zu "
+                        "sea_legs=%zu (campaign %lld, tribute-round %lld, lanes %lld)\n",
+                        static_cast<long long>(off.battles), static_cast<long long>(off.conquests),
+                        static_cast<long long>(off.foundings),
+                        static_cast<long long>(off.subjections_formed),
+                        static_cast<long long>(off.tribute_remitted),
+                        static_cast<long long>(off.treaties_formed), off.owner_changes.size(),
+                        off.sea_legs.size(), static_cast<long long>(off.sea_legs_noted_campaign),
+                        static_cast<long long>(off.sea_legs_noted_tribute),
+                        static_cast<long long>(off.sea_lanes_opened));
+        }
+
+        // R3e (BL-1096 / BL-1097): the fork ON, on the real span -- the
+        // bookkeeping holds together whatever this seed happened to buy.
+        // REPORTED, not gated on direction: whether this fixture buys at all
+        // is a fact about the seed; the 16-seed reading is exploration_sweep's.
+        {
+            int64_t bought_events = 0, bound_events = 0, lane_events = 0;
+            for (const lapse_event& e : ex1.events)
+            {
+                if (e.kind == static_cast<uint8_t>(lapse_event_kind::province_bought)) ++bought_events;
+                if (e.kind == static_cast<uint8_t>(lapse_event_kind::subject_bound))   ++bound_events;
+                if (e.kind == static_cast<uint8_t>(lapse_event_kind::sea_lane_opened)) ++lane_events;
+            }
+            bool kinds_are_verbs = true;
+            for (const polity& q : ex1.polities)
+                if ((q.overlord >= 0) != (q.subject_kind >= 0)
+                 || q.subject_kind < -1 || q.subject_kind > 1) kinds_are_verbs = false;
+            check(!ex1.subjection_purchase_params_rejected
+               && ex1.provinces_bought <= ex1.subjections_formed
+               && bought_events == ex1.provinces_bought
+               && bound_events  == ex1.subjections_formed - ex1.provinces_bought
+               && kinds_are_verbs,
+                  "R3e.0 fork ON: bought <= formed; one province_bought event per purchase and one "
+                  "subject_bound per take; every subject's kind is a verb set iff an overlord is");
+            check((ex1.provinces_bought == 0) == (ex1.treasury_spent_on_purchases == 0)
+               && ex1.treasury_spent_on_purchases
+                    >= ex1.provinces_bought * exploration_sim_params(world_params{}).subjection_purchase_floor,
+                  "R3e.1 the treasury moved for purchases is zero iff nothing was bought and never "
+                  "below bought x floor");
+            // BL-1097: the leg table is non-empty on a span that held subjects
+            // (the tribute-round leg is written once per round per link), sorted
+            // and canonical; land corridors are covered by R3d's control.
+            bool legs_sorted = true;
+            int64_t legs_over_tier = 0;
+            for (std::size_t i = 0; i < ex1.sea_legs.size(); ++i)
+            {
+                const sea_leg& l = ex1.sea_legs[i];
+                if (l.a >= l.b || l.uses <= 0) legs_sorted = false;
+                if (i > 0 && !(std::make_pair(ex1.sea_legs[i - 1].a, ex1.sea_legs[i - 1].b)
+                             < std::make_pair(l.a, l.b))) legs_sorted = false;
+                if (l.uses >= exploration_sim_params(world_params{}).sea_lane_tier1_uses) ++legs_over_tier;
+            }
+            check(legs_sorted
+               && (ex1.subjections_formed == 0 || !ex1.sea_legs.empty())
+               && ex1.sea_lanes_opened == lane_events
+               && ex1.sea_legs_noted_tribute + ex1.sea_legs_noted_campaign + ex1.sea_legs_noted_purchase > 0,
+                  "R3e.2 the sea-leg table is sorted and canonical, non-empty where subjects were held, "
+                  "and one sea_lane_opened event was noted per lane opened");
+            std::printf("      purchase fork ON: bought=%lld of %lld formed, spent=%lld | sea legs=%zu "
+                        "over tier=%lld (noted: campaign %lld purchase %lld tribute-round %lld; lanes %lld)\n",
+                        static_cast<long long>(ex1.provinces_bought),
+                        static_cast<long long>(ex1.subjections_formed),
+                        static_cast<long long>(ex1.treasury_spent_on_purchases), ex1.sea_legs.size(),
+                        static_cast<long long>(legs_over_tier),
+                        static_cast<long long>(ex1.sea_legs_noted_campaign),
+                        static_cast<long long>(ex1.sea_legs_noted_purchase),
+                        static_cast<long long>(ex1.sea_legs_noted_tribute),
+                        static_cast<long long>(ex1.sea_lanes_opened));
+        }
 
         // BL-930, folded into a real run: at least the tree's own root can
         // fire once the empire rim is available to SOME polity, or none do

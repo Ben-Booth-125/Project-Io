@@ -859,6 +859,10 @@ bool corridor_eq(const history_corridor& a, const history_corridor& b)
 {
     return a.a == b.a && a.b == b.b && a.uses == b.uses && a.tier == b.tier;
 }
+bool sea_leg_eq(const sea_leg& a, const sea_leg& b) // BL-1097
+{
+    return a.a == b.a && a.b == b.b && a.uses == b.uses;
+}
 bool dated_eq(const dated_object& a, const dated_object& b)
 {
     return a.expires_year == b.expires_year && a.kind == b.kind && a.a == b.a && a.b == b.b;
@@ -1025,6 +1029,7 @@ run_out resume(const era_minus_one_fixture& fx, const exploration_output& H, con
     hp.resume_dated_objects    = &H.dated_objects;
     hp.resume_civilisations    = &H.civilisations;
     hp.resume_universal_creeds = &H.universal_creeds;
+    hp.resume_sea_legs         = &H.sea_legs; // BL-1097: the leg record crosses the handoff
     hp.capture_year            = capture;
     if (s.tier_seed.has_value())
         hp.resume_seeds_corridor_tier = *s.tier_seed;
@@ -1448,6 +1453,7 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             note("grudges",          table_diff(O.grudges, H.grudges, grudge_eq));
             note("contacts",         table_diff(O.contacts, H.contacts, contact_eq));
             note("corridor record",  table_diff(O.supply_corridors, H.surviving_corridors, corridor_eq));
+            note("sea legs",         table_diff(O.sea_legs, H.sea_legs, sea_leg_eq)); // BL-1097
             note("dated objects",    table_diff(O.dated_objects, H.dated_objects, dated_eq));
             note("civilisations",    table_diff(O.civilisations, H.civilisations, civ_eq));
             note("universal creeds", table_diff(O.universal_creeds, H.universal_creeds, creed_eq));
@@ -1512,6 +1518,11 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                      : std::to_string(dated_symdiff(H.dated_objects, c_dated)) + " objects");
             note("civilisations",    table_diff(H.civilisations, C.civilisations, civ_eq));
             note("universal creeds", table_diff(H.universal_creeds, C.universal_creeds, creed_eq));
+            // BL-1097: the continued run's LIVE leg table at 1660 is what the
+            // handoff's record was folded from, so the two must agree row for
+            // row -- the leg record carries no bought rung, so unlike the road
+            // record there is no live-vs-record gap to tolerate.
+            note("sea legs (live at 1660 vs handoff)", table_diff(H.sea_legs, C.sea_legs, sea_leg_eq));
             row.record_rows_h = static_cast<int>(H.surviving_corridors.size());
             row.record_rows_c = static_cast<int>(C.supply_corridors.size());
             row.live_edges_h  = static_cast<int>(O.live_roads.size());
@@ -1648,6 +1659,7 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             note("grudges",           table_diff(V.grudges, S.grudges, grudge_eq));
             note("contacts",          table_diff(V.contacts, S.contacts, contact_eq));
             note("surviving network", table_diff(V.surviving_corridors, S.surviving_corridors, corridor_eq));
+            note("sea legs",          table_diff(V.sea_legs, S.sea_legs, sea_leg_eq)); // BL-1097
             note("dated objects",     table_diff(V.dated_objects, S.dated_objects, dated_eq));
             note("trade flows",       table_diff(V.trade_flows, S.trade_flows, flow_eq));
             note("holdings",          table_diff(V.holdings, S.holdings, holding_eq));

@@ -88,25 +88,32 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
 
 ### Wave 0, lane W1 (world-movers, the subjection block) — BL-1096 (purchase verb) then BL-1097 (sea legs recorded). Groups `purchase-verb`, `sea-legs-recorded`.
 
-- [ ] T1 `purchase_price_q(native_seat, params)` beside `choose_subjection_native`; params
+- [x] T1 `purchase_price_q(native_seat, params)` beside `choose_subjection_native`; params
   `subjection_purchase_rate_q` / `subjection_purchase_floor` on `history_sim_params`, validated,
-  zero-disabled. (1096 R1, R2)
-- [ ] T2 the fork inside the BL-934 block (history_sim.cpp:3817-3918): BUY when the native seat
+  zero-disabled. (1096 R1, R2) — plus `subjection_verb` (the pure fork) and
+  `subjection_purchase_params_valid`; pinned 2000‰ / 400 after the 16-seed grid.
+- [x] T2 the fork inside the BL-934 block (history_sim.cpp:3817-3918): BUY when the native seat
   has a port window and the price is affordable — debit/credit, `subject_kind = 0`, no grudge,
   shares untouched, `province_bought` noted, counters; else TAKE as today; the header comment at
   history_sim.hpp:2718-2731 rewritten. (1096 R1, R3, R4)
-- [ ] T3 `province_bought` on `lapse_event_kind` (append-only) and its ticker caption; the
+- [x] T3 `province_bought` on `lapse_event_kind` (append-only) and its ticker caption; the
   envelope bump claimed (`next_save_version.js --kind envelope --claim "BL-1096/1097 kinds"`) or
-  shared with BL-1083's claim if it landed first. (1096 R4)
-- [ ] T4 exploration_sim_harness: the price-fork case and the control equality; exploration_sweep:
-  the bought/taken split; the 16-seed reading written into the item. (1096 R2, R3)
-- [ ] T5 `sea_leg{a,b,uses}` on the sim state and the two span outputs (folded, sorted, validated);
+  shared with BL-1083's claim if it landed first. (1096 R4) — v22 claimed by this lane.
+- [x] T4 exploration_sim_harness: the price-fork case and the control equality; exploration_sweep:
+  the bought/taken split; the 16-seed reading written into the item. (1096 R2, R3) — T9, R3d,
+  R3e; R3b moves by one purchase (tribute +400) and is left for the sprint's re-bless.
+- [x] T5 `sea_leg{a,b,uses}` on the sim state and the two span outputs (folded, sorted, validated);
   `note_sea_leg` at the three sites; `sea_lane_opened` at `sea_lane_tier1_uses` (default 4).
-  (1097 R1, R2)
-- [ ] T6 round 5's lane bake and draw, its own water layer; the sweep column; EXPLORATION.md re-read
-  against the build. (1097 R3, R4, R5)
+  (1097 R1, R2) — the generation wiring `dp.resume_sea_legs` in hard_coded_world.cpp:1502 is
+  the main session's line (lanes G/W2 own the file).
+- [x] T6 round 5's lane bake and draw, its own water layer; the sweep column; EXPLORATION.md re-read
+  against the build. (1097 R3, R4, R5) — a dashed sea-blue stroke; no colonial tie is drawn
+  today, so "distinct from a tie" is by hue and idiom, not against a drawn tie.
 - [ ] T7 Release build; `world_determinism` twice; `save_envelope_roundtrip`;
   `industrialisation_sim_harness --fidelity`; cold review; Ben's live click on the lane line.
+  — no app build in the worktree (FetchContent); `save_envelope_roundtrip` pulls ImGui and is not
+  buildable by the Lua harness script; the rest ran on the branch; cold review and the live
+  click are the main session's and Ben's.
 
 ### Wave 0, lane W2 (world-movers, the band) — BL-1101 (band from history). Group `band-from-history`.
 

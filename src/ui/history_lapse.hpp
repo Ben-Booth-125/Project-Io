@@ -220,6 +220,25 @@ struct lapse_trade_seg
     std::vector<lapse_trade_span> spans; ///< Ascending by `year_open`.
 };
 
+/// ONE SEA LANE (BL-1097), baked once when the record lands from
+/// `lapse_event_kind::sea_lane_opened` — the same anchor-to-anchor geometry
+/// `lapse_road_seg` uses, on the water. A lane is the water analogue of a
+/// promoted road, not of a trade link: it only ever opens (traffic earned the
+/// tier, and the record carries no decay), so it holds a single open year
+/// and draws from that frame to the round's end. Distinct from a colonial
+/// TIE, which would be drawn only while an overlord link stands; the lane is
+/// what a colony leaves behind when the metropole falls (EXPLORATION.md sec
+/// The colonial tie is a sea lane). A leg that never earned the tier gets no
+/// segment here — the "never walked, never drawn" idiom of the road network.
+struct lapse_lane_seg
+{
+    uint16_t region_a = 0;
+    uint16_t region_b = 0;
+    float c0 = 0.0f, r0 = 0.0f; ///< Region A's anchor tile centre.
+    float c1 = 0.0f, r1 = 0.0f; ///< Region B's anchor tile centre.
+    int32_t year_open = 0;      ///< The year the leg's uses crossed the lane tier.
+};
+
 /// The recorded era, plus the derived fields the map and the board need.
 ///
 /// Lifted whole out of `generation_report` on the worker that produced it (see
@@ -340,6 +359,12 @@ struct history_lapse
     /// the Culture round, whose record carries no `trade_link_opened` /
     /// `trade_link_closed` events.
     std::vector<lapse_trade_seg> trade_segs;
+
+    /// Sea lanes (BL-1097), baked from `lapse.events` once at record time —
+    /// see `lapse_lane_seg`. Empty on every round whose record carries no
+    /// `sea_lane_opened` event (the Culture round, and any span in which no
+    /// leg's traffic reached the tier).
+    std::vector<lapse_lane_seg> lane_segs;
 
     // --- The industry layer (BL-1080), baked once at record time ------------
     //

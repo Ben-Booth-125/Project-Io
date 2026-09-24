@@ -199,7 +199,15 @@ inline constexpr uint32_t save_game_magic =
 /// so it is refused whole on the same strict-equality contract. 21 and not 20
 /// because the generation lane holds 20 (the v6 note above: two layouts never
 /// share a number).
-inline constexpr uint32_t save_game_version = 21; // BL-1080, round 6 shows industry
+///
+/// LAYOUT 22 = LAYOUT 21 PLUS TWO EVENT KINDS (sprint 47's one envelope bump,
+/// shared by every lane that appends a kind): `lapse_event_kind::province_bought`
+/// (BL-1096, a native bought rather than taken) and `sea_lane_opened` (BL-1097,
+/// a sea leg's uses crossing the lane tier). Both move `lapse_event_kind::count`
+/// and so the event-kind range check; no field changes width. A v21 stream is
+/// refused whole on the same strict-equality contract, since a v21 reader would
+/// refuse either byte as corrupt.
+inline constexpr uint32_t save_game_version = 22; // sprint 47: province_bought, sea_lane_opened
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.
