@@ -364,9 +364,10 @@ selected (CANVASES.md § Default state).
 **The player picks the seat, on a corporation selection canvas at Begin** (Ben, 2026-09-09:
 *"Begin should go directly to a 'corporation selection' interactive canvas"*; asked whether that
 reverses the 2026-08-26 retirement of the selection screen: *"Yes, it's time to reverse that
-ruling."*). The random draw is retired as the seat mechanism. The spawn shortlist survives as
-**what the canvas offers** — the viability floor still filters, the static score ranks what
-passes, and the player chooses among it rather than being drawn for.
+ruling."*). The random draw is retired as the seat mechanism. **The canvas offers every specialist**
+(Ben, 2026-09-24): the static score ranks them, and the viability floor **marks** the ones below
+it rather than removing them — a marked firm stays pickable, so a player can knowingly take a
+hard seat. The player chooses rather than being drawn for.
 [`CORPORATION_GENERATION.md`](../generation/CORPORATION_GENERATION.md) § The spawn shortlist,
 and the seat owns the shortlist; this doc owns only the screen.
 
@@ -388,3 +389,22 @@ had moved.
 **The canvas chooses the firm the player *is*** (Ben, 2026-09-17, NR-885; `../CONCEPT.md` §
 Player identity). The seat is an identity, not an address: the shortlist is a list of corporations,
 and picking one is becoming it.
+
+**The surface (Ben, 2026-09-24, the select-company design session).** *Its question: which
+corporation am I?*
+
+- **A ranked list beside the map.** The list is every specialist in static-score order, the
+  marked ones visibly below the floor; the map is the home body at the wizard's world, and it
+  **highlights the hovered row's firm** — its HQ, its works and its home market's catchment — so
+  where a firm stands is read by pointing at it, not by reading coordinates.
+- **A firm's card** shows four things and no more: the **industry and the goods it makes**; its
+  **HQ and home market, with that market's prices** for the firm's goods and inputs; its **cash,
+  debt and assets**; and **its nation and that nation's stance**. The landscape score is the list's
+  order, not a card line; trailing figures and rivals are not on the card.
+- **Picking opens a briefing, then a confirm.** The briefing is the firm's opening position in
+  prose — who you are, what you make, where you sell, what you owe, whose law you trade under,
+  and, for a marked firm, why the floor marked it. **Confirm** seats the player and opens play;
+  **Back** returns to the list with nothing changed. Choosing is a deliberate act, so it takes
+  two presses.
+- **The seat is reproducible from (seed, pick):** the same world and the same pick seat the same
+  firm in the same state.

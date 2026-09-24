@@ -473,6 +473,34 @@
     "tools/verify/history_sweep.cpp"
    ],
    "design": "FILED 2026-09-24. After BL-1047 (the epoch flip): the old arc is today's only route to a 1960 world, so it goes once the flip gives the span world that route. File:line anchors below are 2026-09-18; re-read them.\n\n--- FROM THE SPRINT 46 DRAFT ---\nRULED (Ben, 2026-09-18, NR-898 (2)): retire outright, no legacy field.\n\nWHY. The arc is chosen at era_minus_one.cpp:25-36 and built at 298-315 (stop = epoch, boundary = epoch - industrial_years, span1_band_ceiling = medieval, two tick bands). Machinery only it uses: history_sim_params::boundary_year and span1_band_ceiling (history_sim.hpp:182-192); sim_band_ceiling (history_sim.hpp:4288-4289; history_sim.cpp:249-258) and the ceiling argument threaded through build_stack (history_sim.cpp:289-300, 4281, 4286, 5762, 5799); the furnace-before-boundary note (history_sim.cpp:6980-6995); the two-span half of BL-976's protection derivation (~7849-7916 — the broadcast half STAYS, seed_national_tariffs reads it at hard_coded_world.cpp:1808-1821); world_params::industrial_years (hard_coded_world.hpp:96-100).\n\nTHE WORK. Delete era_minus_one_has_industrial_span, the two-span branch, industrial_years, boundary_year, span1_band_ceiling, sim_band_ceiling and the ceiling parameter; keep the protection field and broadcast. Harnesses that build the arc are rewritten or retired by the harness item: world_determinism R4 (636-685, digest '1960/two-span' at :666), era_world_harness R5 (113-118, 250-272), history_sweep's two-span reporting (1037-1075, the BL-760 section from 2159, 2509-2520, 3317), ownership_class.cpp:534, demand_census.cpp:1436, haulage_measure.cpp:178.\n\nDONE WHEN. grep industrial_years|boundary_year|span1_band_ceiling|has_industrial_span is empty in src/ and tools/; the '1960/two-span' digest is gone; the epoch-0 digests are unchanged."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "author": "Ben (2026-09-18 NR-898 (12); designed 2026-09-24 in the select-company session); Claude",
+   "requires": [
+    "BL-1073"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1076",
+   "short_name": "SELECT_CORPORATION_SCREEN",
+   "category": "UI",
+   "priority": "S",
+   "difficulty": 4,
+   "title": "The player chooses the corporation they play from a select-company canvas after the wizard",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/core/app.cpp",
+    "src/core/app.hpp",
+    "src/world/corporation_generation.cpp",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ],
+   "design": "DESIGNED WITH BEN, 2026-09-24 (the design session NR-898 (12) required before any code read). STARTUP.md § The seat owns it — read the whole section; CORPORATION_GENERATION.md § The spawn shortlist, and the seat was amended the same day. BL-880 (cancelled) was the first design and is superseded by the section.\n\nTHE RULINGS. (1) A ranked list beside the map; the map is the home body at the wizard's world and highlights the hovered row's firm (HQ, works, home market catchment). (2) EVERY specialist is offered, in static-score order; the viability floor MARKS the ones below it and they stay pickable. (3) The card shows four things: industry and goods; HQ and home market with its prices for the firm's goods and inputs; cash, debt and assets; its nation and that nation's stance. (4) Picking opens a briefing (the opening position in prose; for a marked firm, why the floor marked it), then Confirm seats the player and opens play, Back returns with nothing changed. (5) The seat is reproducible from (seed, pick).\n\nTHE WORK. The canvas at Begin over the adopted world (BL-1073 keeps it); the seat step re-pointed from the weighted draw to the pick (the draw stays for --verify/--serve/headless paths that have no player to ask, and says so); the pick as a command so an agent can make it (ACTIONS.json entry — the wizard is out of the dictionary's scope, but seating a corporation is a game act, not a wizard control: confirm with Ben if in doubt); question_log.json entry with the surface's question ('which corporation am I?').\n\nDONE WHEN. A live click-through: Begin -> list + map -> hover highlights -> pick -> briefing -> Confirm -> play opens seated on the chosen firm; Back returns unchanged; a marked firm is pickable; (seed, pick) reproduces the seat (state hash); question_log and ACTIONS entries written."
   }
  ]
 }

@@ -295,26 +295,6 @@
    ]
   },
   {
-   "group": "last",
-   "short_name": "SELECT_CORPORATION_SCREEN",
-   "status": "design-owed",
-   "title": "The player chooses the corporation they play from a select-corporation screen after the wizard",
-   "priority": "A",
-   "difficulty": 3,
-   "world_mover": false,
-   "requires": [
-    "BEGIN_ADOPTS_WIZARD_WORLD"
-   ],
-   "authority_doc": "docs/ui/STARTUP.md",
-   "design": "RULED (Ben, 2026-09-18, NR-898 (12)): the last item of sprint 46, designed with Ben first, built last. BL-880 (cancelled) was its first design — read it at the design session. NR-885 (2026-09-17): the player is a corporation holding a seat. Not surveyed on 2026-09-19 on purpose: the design session sets its question, surface and data before any code read.\n\nDONE WHEN. Set at the design session; at minimum a question_log entry, an ACTIONS.json entry and a live click.",
-   "files": [
-    "src/ui/startup_screens.cpp",
-    "docs/ui/STARTUP.md",
-    "docs/ui/question_log.json",
-    "docs/ai/ACTIONS.json"
-   ]
-  },
-  {
    "group": "carry",
    "short_name": "DENSITY_FOLLOWS_CITIES",
    "title": "Density follows cities: the charter web at the ruled prices is too sparse to track cities across the markets — a design pass on the density knobs",

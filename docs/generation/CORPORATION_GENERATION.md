@@ -431,8 +431,10 @@ world has been run forward, not during the passes above.
 
 **Reversed in intent (Ben, 2026-09-09): the player is to PICK the seat on a corporation selection
 canvas at Begin**, over the landscape the search selected (`docs/ui/STARTUP.md` § The seat). The shortlist and the weighted draw below remain the mechanism
-until that canvas exists, and afterwards they are what the canvas *offers* — the floor still filters,
-the static score ranks what passes, and the player chooses rather than being drawn for.
+until that canvas exists, and afterwards they are what the canvas *offers*: **every specialist**,
+ranked by the static score, the ones below the viability floor **marked, not removed** — a player may
+knowingly take a firm the floor rejects (Ben, 2026-09-24). The player chooses rather than being
+drawn for.
 
 Ben's call, 2026-08-26: **which corporation the player runs is drawn at random from a shortlist
 of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:
