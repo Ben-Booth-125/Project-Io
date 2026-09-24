@@ -151,7 +151,8 @@ save_envelope make_envelope()
     // BL-760 (2): a year field must differ from the authored default, or a run
     // that left it there would round-trip clean even if the writer swapped its
     // order — an assertion that cannot fail is not an assertion. 137 is
-    // non-default. (Its old twin, `industrial_years`, left the record at v20.)
+    // non-default. (Its old twin, the two-span arc's year field, left the
+    // record at v20.)
     e.params.prehistory_years = 137;
     e.params.body_count       = 7;
     // BL-1047 (save_game_version 20): the fields that choose the history. Each
@@ -397,8 +398,8 @@ int main()
                   && le.speed == env.speed,
               "S2 the clock survives (five distinct fields)");
 
-        // EVERY field, not three of six. prehistory_years and (until v20)
-        // industrial_years were both unasserted on a record whose version was just bumped to 4,
+        // EVERY field, not three of six. prehistory_years and (until v20) the
+        // two-span arc's year field were both unasserted on a record whose version was just bumped to 4,
         // and both default to 400 — so an order swap in the writer round-tripped
         // clean and the comment guarding it was the only check (BL-760 (2)).
         check(le.params.seed == env.params.seed && le.params.abundance == env.params.abundance

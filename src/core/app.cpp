@@ -513,7 +513,6 @@ bool same_world_params(const world_params& a, const world_params& b)
     const world_preferences& y = b.preferences;
     return a.seed == b.seed && a.era_seed == b.era_seed && a.abundance == b.abundance
         && a.epoch_year == b.epoch_year && a.prehistory_years == b.prehistory_years
-        && a.industrial_years == b.industrial_years
         && a.empires_start_year == b.empires_start_year
         && a.empires_stop_year == b.empires_stop_year
         && a.exploration_sim_enabled == b.exploration_sim_enabled

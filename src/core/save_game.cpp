@@ -83,8 +83,8 @@ bool r_prefs(std::istream& i, world_preferences& p)
     return true;
 }
 
-// save_game_version 20 (BL-1047): `industrial_years` is gone from the record
-// (the superseded arc it scoped is retired), and the descriptor gains the
+// save_game_version 20 (BL-1047): the superseded two-span arc's year field is
+// gone from the record (the arc is retired), and the descriptor gains the
 // fields that decide WHICH history generation plays -- `era_seed`, the span
 // switches and the span years -- so the envelope's params rebuild the world
 // they describe. Keep r_world_params in step, field for field.

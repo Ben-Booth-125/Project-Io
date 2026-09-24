@@ -114,15 +114,7 @@ struct world_params
     /// `epoch_year`. A harness that wants a longer or shorter round moves this.
     int64_t         empires_start_year = -400;
 
-    /// The SUPERSEDED two-span arc's industrial half, in years, closing at
-    /// `industrialisation_stop_year`. ZERO BY DEFAULT and no longer chosen by
-    /// the epoch (BL-1047): the arc was retired outright (Ben, 2026-09-18), and
-    /// this field survives only until BL-1075 deletes the arc's machinery.
-    /// Nothing but a harness pinning that arc sets it.
-    int             industrial_years = 0;
-
-    /// THE EMPIRES ROUND'S OWN STOP YEAR (BL-906), for a SINGLE-span run only
-    /// (`era_minus_one_has_industrial_span(params) == false`) — independent of
+    /// THE EMPIRES ROUND'S OWN STOP YEAR (BL-906) — independent of
     /// `epoch_year`.
     ///
     /// THE BUG THIS CLOSES. `era_minus_one_sim_params` used to set
@@ -138,17 +130,13 @@ struct world_params
     /// does not move if `empires_start_year` (the START side of the span) is
     /// ever retuned.
     ///
-    /// THE TWO-SPAN ARC (`industrial_years > 0`) DOES NOT READ THIS FIELD.
-    /// There the industrial half stops at `industrialisation_stop_year` and the
-    /// ancient half beneath it at `boundary_year`, both unaffected by BL-906.
-    ///
-    /// Default 1200 matches the doc for every existing single-span caller —
-    /// nothing opts in, the shipped world simply runs its documented span.
+    /// Default 1200 matches the doc — nothing opts in, the shipped world simply
+    /// runs its documented span.
     int64_t         empires_stop_year = 1200;
 
     /// BL-931 — RUN THE EXPLORATION SPAN, 1200 -> `exploration_stop_year`,
-    /// on the SAME `history_sim` engine, immediately after the single-span
-    /// Empires round closes (EXPLORATION.md sec The engine is shared).
+    /// on the SAME `history_sim` engine, immediately after the Empires round
+    /// closes (EXPLORATION.md sec The engine is shared).
     ///
     /// OFF BY DEFAULT, deliberately, unlike the Empires round itself. Wiring
     /// this on unconditionally would move `region::nation` (read by
@@ -161,10 +149,6 @@ struct world_params
     /// real and tested but does not yet change what a caller who asks for
     /// nothing new gets. A caller that wants the span opts in here.
     ///
-    /// Only read on a SINGLE-span Empires run (`!era_minus_one_has_industrial
-    /// _span(params)`) — the superseded two-span arc's own industrial half
-    /// already plays past 1660 on a different calendar mapping, and stacking
-    /// this on top of it is a question this item does not answer.
     /// DEFAULT FLIPPED TO TRUE (Ben, 2026-09-13, BL-946, resolving NR-847):
     /// the wizard now shows an Exploration round and it must have something
     /// real to run. This re-baselines `region::nation` to the 1660 CE map for
@@ -185,8 +169,7 @@ struct world_params
     ///
     /// THE RUN PREDICATE IS "EXPLORATION RAN", NEVER THE EPOCH (Ben,
     /// 2026-09-18): the span runs wherever Exploration runs, whatever
-    /// `epoch_year` says, and nowhere else. On the superseded two-span arc
-    /// Exploration is off, so this span is too. The call site nests it
+    /// `epoch_year` says, and nowhere else. The call site nests it
     /// inside the block that ran Exploration, so the predicate is structural
     /// rather than a second reading of the same conditions.
     ///

@@ -27,23 +27,16 @@ mechanism and sit inside the run. The old Stages 5 and 6 (the rupture and satura
 run and are DLC-era material alongside the parked space arc; what replaces them is § Stage 5
 below.
 
-**The run is two spans on one engine (Ben, 2026-09-03).** The sim plays the polities forward in
-an **ancient pass** — Classical and Medieval bands, ending at a **boundary year** — and, where the
-epoch lies past that boundary, an **industrial pass** from the boundary to the epoch with the
-Gunpowder and Industrial bands unlocked and sea legs open to Campaign and Settle. The first pass
-determines ancient borders and cultural doctrines; the second determines the extent of
-colonisation by the majors, who industrialised and when, and each polity's tariff posture. The
-**The industrial arc's calendar is stated, not derived (Ben, 2026-09-08).** The ancient pass runs
-**4000 years and ends at 1200 CE**; the industrial pass runs **1560 → 1960**. The 1200 → 1560 gap is
-a deliberate **coast** — the ancient pass ends in a stable dark age, and a span defined by little
-changing is the one span not worth stepping — so the world arrives at 1560 holding what 1200 left
-it, with only its self-moving accumulators (assimilation, grudge decay) advanced across. That
-supersedes the 400-year default for this arc: the boundary defaults to 400 years before the epoch
-elsewhere, and a boundary derived from the first furnace is the open alternative. Nothing resets between the spans — the region table, works and strain carry
-across — and on an ancient epoch the boundary falls past the stop year, so there is one span, as
-today. A third, economic pass follows the political map and is not this document's: it is the
-settle in `../generation/GENERATION_STRATEGY.md` § Three passes of simulated history, and it is
-the pass that produces market conditions at game start.
+**The run is three spans on one engine, each its own call.** Empires plays the polities forward
+from 400 BCE to 1200 CE; Exploration resumes that handoff to 1660; Industrialisation resumes
+Exploration's to 1960 (`../generation/CIVILISATION.md`, `../generation/EXPLORATION.md`,
+`../generation/INDUSTRIALISATION.md`). Nothing resets between the spans — the region table, works
+and strain carry across. The earlier design ran one call in two spans, an ancient pass capped at
+the Medieval band and an industrial pass 1560 → 1960 (Ben, 2026-09-03 and 2026-09-08); it is
+superseded and retired outright, with no legacy switch (Ben, 2026-09-18, NR-898). A further,
+economic pass follows the political map and is not this document's: it is the settle in
+`../generation/GENERATION_STRATEGY.md` § Three passes of simulated history, and it is the pass
+that produces market conditions at game start.
 
 The pre-epoch history is **produced by a running simulation, not narrated over a finished map.**
 The one-shot passes (`history_ladder`, `creeds`, `settlement`) found the cradles, the cultures and
@@ -186,12 +179,10 @@ people who raised a forge god did so because their cradle held ore (`CREEDS.md`)
 regions light up earlier. Endowment, not virtue, in both directions.
 
 The **date** is the sim's. **The furnace is an event inside the run, not a date fixed before it
-starts** — on an industrial epoch the second span is *where* industrialisation happens, so
-pre-resolving the year in the settlement pass answers the question before the pass that should
-answer it has run. A region lights in the year its owning polity's **materials capacity crosses
-the Industrial rung** of the capacity ladder, plus its own lag. The rung is read through the same
-span ceiling the works table and the unit roster read, so no polity lights a furnace at a band it
-could not build at, and on a two-span run no furnace can precede the boundary year.
+starts** — the run is *where* industrialisation happens, so pre-resolving the year in the
+settlement pass answers the question before the pass that should answer it has run. A region lights in the year its owning polity's **materials capacity crosses
+the Industrial rung** of the capacity ladder, plus its own lag. The rung is the same derivation
+the works table reads, so no polity lights a furnace at a band it could not build at.
 
 Everything downstream reads the result rather than the schedule: `derive_national_character` names
 the three earliest furnaces once nations exist, and the world's median furnace year — BL-219's

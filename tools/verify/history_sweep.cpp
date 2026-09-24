@@ -367,12 +367,12 @@ struct sweep_row
     /// which is the failure this item is most likely to have.
     int64_t works_raised   = 0;
     int     regions_with_works = 0;
-    /// BL-760 (1): raised/fielded DURING the run, split by roster band and by
-    /// span. Distinct from the end-of-run per-band works census below — that
-    /// one reports what is STANDING, this one what the run actually did, and
-    /// only this one can see a span-1 ceiling binding.
-    std::array<std::array<int64_t, roster_band_count>, 2> run_works_by_span_band{};
-    std::array<std::array<int64_t, roster_band_count>, 2> units_by_span_band{};
+    /// BL-760 (1): raised/fielded DURING the run, split by roster band.
+    /// Distinct from the end-of-run per-band works census below — that one
+    /// reports what is STANDING, this one what the run actually did. (Split by
+    /// span too until BL-1075 deleted the two-span arc it observed.)
+    std::array<int64_t, roster_band_count> run_works_by_band{};
+    std::array<int64_t, roster_band_count> units_by_band{};
     /// BL-757 R4: works standing at the end of the run, PER ROSTER BAND, so
     /// "the roster never fired" can be told apart from "it fired only at the
     /// bottom of the ladder". Derived in the harness from region::works_built
@@ -1032,19 +1032,16 @@ int main(int argc, char** argv)
     // that the struct-default arc existed; it was that it was the DEFAULT, so
     // a report describing a world nobody plays looked like a measurement of the
     // game. Three sprints were steered by numbers from it.
-    // The span is reported from the params rather than assumed, so a two-span
-    // run (BL-747) shows both halves and a single-span run says so outright
-    // instead of printing a boundary of INT64_MIN as if it meant something.
+    // The span is reported from the params rather than assumed. One span per
+    // call since BL-1075 deleted the two-span arc.
     {
-        const bool two_span = params.boundary_year != INT64_MIN;
         // Decision ROUNDS, counted the way the sim counts them — by walking
         // `step_for_year` — rather than by dividing the span by a step this
         // harness picked. Same reason `region_distance` is public.
-        int64_t rounds_span1 = 0, rounds_span2 = 0;
+        int64_t rounds = 0;
         for (int64_t y = params.start_year; y < params.stop_year;)
         {
-            if (two_span && y < params.boundary_year) ++rounds_span1;
-            else                                      ++rounds_span2;
+            ++rounds;
             y += step_for_year(params, y);
         }
 
@@ -1063,21 +1060,10 @@ int main(int argc, char** argv)
                           " seed, creeds, works and PRE-sim settlement all from the real run."
                           " S1b asserts the counts match the report, per seed"
                         : "history_sim_params STRUCT DEFAULTS — *not* the run that builds a world");
-        if (two_span)
-            std::printf("    spans:  ancient %lld -> %lld (%lld rounds, band ceiling %d)"
-                        " | industrial %lld -> %lld (%lld rounds, unrestricted)\n",
-                        static_cast<long long>(params.start_year),
-                        static_cast<long long>(params.boundary_year),
-                        static_cast<long long>(rounds_span1),
-                        static_cast<int>(params.span1_band_ceiling),
-                        static_cast<long long>(params.boundary_year),
-                        static_cast<long long>(params.stop_year),
-                        static_cast<long long>(rounds_span2));
-        else
-            std::printf("    spans:  SINGLE %lld -> %lld (%lld rounds), no boundary year\n",
-                        static_cast<long long>(params.start_year),
-                        static_cast<long long>(params.stop_year),
-                        static_cast<long long>(rounds_span2));
+        std::printf("    span:   %lld -> %lld (%lld rounds)\n",
+                    static_cast<long long>(params.start_year),
+                    static_cast<long long>(params.stop_year),
+                    static_cast<long long>(rounds));
         std::printf("    clock:  %d tick band%s\n",
                     params.tick_band_count, params.tick_band_count == 1 ? "" : "s");
         if (tuned)
@@ -1528,8 +1514,8 @@ int main(int argc, char** argv)
         row.peak_year       = sim.peak_year;
 
         row.works_raised = sim.works_raised;
-        row.run_works_by_span_band = sim.works_by_span_band;
-        row.units_by_span_band     = sim.units_by_span_band;
+        row.run_works_by_band = sim.works_by_band;
+        row.units_by_band     = sim.units_by_band;
 
         // BL-768 — the ancient road record. Derived here from the sim's own
         // output rather than recomputed: a census that re-derived the corridor
@@ -2153,14 +2139,11 @@ int main(int argc, char** argv)
                     static_cast<long long>(r.works_raised), r.regions_with_works);
     }
 
-    // --- BL-760 (1): the band ceiling gets an observable ------------------
+    // --- BL-760 (1): raised and fielded, by roster band -------------------
     //
-    // WITHOUT THIS SECTION span1_band_ceiling = medieval and = industrial are
-    // indistinguishable from outside the sim. `works_raised` is one scalar with
-    // no band split, so if no polity reaches materials capacity 4 before the
-    // boundary the clamp never binds and every check passes either way — which
-    // is how a two-span requirement came to be marked complete on substituted
-    // evidence.
+    // Built to give the superseded two-span arc's band ceiling an observable;
+    // that arc is deleted (BL-1075), and what stays is the band split itself —
+    // which rungs the roster reached at all. `works_raised` is one scalar.
     //
     // READ THE WORKS ROWS WITH BL-757 IN HAND: it measured ZERO works raised
     // across sixteen seeds because build_work never wins the scored contest. A
@@ -2169,16 +2152,13 @@ int main(int argc, char** argv)
     {
         static const char* kBand[roster_band_count] =
             { "classical", "medieval", "gunpowder", "industrial" };
-        std::array<std::array<int64_t, roster_band_count>, 2> w{}, u{};
+        std::array<int64_t, roster_band_count> w{}, u{};
         for (const auto& r : rows)
-            for (int sp = 0; sp < 2; ++sp)
-                for (int b = 0; b < roster_band_count; ++b)
-                {
-                    w[static_cast<std::size_t>(sp)][static_cast<std::size_t>(b)]
-                        += r.run_works_by_span_band[static_cast<std::size_t>(sp)][static_cast<std::size_t>(b)];
-                    u[static_cast<std::size_t>(sp)][static_cast<std::size_t>(b)]
-                        += r.units_by_span_band[static_cast<std::size_t>(sp)][static_cast<std::size_t>(b)];
-                }
+            for (int b = 0; b < roster_band_count; ++b)
+            {
+                w[static_cast<std::size_t>(b)] += r.run_works_by_band[static_cast<std::size_t>(b)];
+                u[static_cast<std::size_t>(b)] += r.units_by_band[static_cast<std::size_t>(b)];
+            }
 
         // ------------------------------------------------------------------
         // BL-768 — THE ANCIENT ROAD RECORD, per seed and pooled.
@@ -2488,33 +2468,13 @@ int main(int argc, char** argv)
                         "  measured over this sweep's seed spread rather than argued in prose.\n");
         }
 
-        std::printf("\n--- raised and fielded during the run, SPAN x BAND (all seeds) ---\n");
-        for (int sp = 0; sp < 2; ++sp)
-        {
-            std::printf("  span %d (%s)\n", sp, sp == 0 ? "ancient" : "industrial");
-            for (int b = 0; b < roster_band_count; ++b)
-                std::printf("    %-11s works %8lld   units %12lld\n", kBand[b],
-                            static_cast<long long>(w[static_cast<std::size_t>(sp)][static_cast<std::size_t>(b)]),
-                            static_cast<long long>(u[static_cast<std::size_t>(sp)][static_cast<std::size_t>(b)]));
-        }
-
-        int64_t span1_total = 0;
+        std::printf("\n--- raised and fielded during the run, BY BAND (all seeds) ---\n");
         for (int b = 0; b < roster_band_count; ++b)
-            span1_total += u[1][static_cast<std::size_t>(b)] + w[1][static_cast<std::size_t>(b)];
-
-        // B1 ASSERTS ONLY WHERE THE CEILING IS ACTUALLY SET, and that gate is
-        // the honest half. On a single-span arc sim_band_ceiling returns
-        // `industrial` for every year - i.e. NO restriction - so asserting
-        // "nothing above medieval" there would be asserting a property the sim
-        // does not enforce, and it would pass today only because no polity in
-        // these seeds reaches military capacity 4. One capacity step and it
-        // would report a ceiling breach on a run with no ceiling.
-        if (span1_total > 0)
-            check(u[0][2] == 0 && u[0][3] == 0 && w[0][2] == 0 && w[0][3] == 0,
-                  "B1   with an industrial span present, span 0 stays at or below medieval");
-        else
-            std::printf("  [SKIP] B1   single-span arc: sim_band_ceiling is unrestricted here,\n"
-                        "              so there is no ceiling to assert. Run with --epoch 1960.\n");
+            std::printf("    %-11s works %8lld   units %12lld\n", kBand[b],
+                        static_cast<long long>(w[static_cast<std::size_t>(b)]),
+                        static_cast<long long>(u[static_cast<std::size_t>(b)]));
+        // B1 (the two-span ceiling holds) is RETIRED with the arc it asserted
+        // (BL-1075): no run has a ceiling, so there is nothing left to hold.
     }
 
     // --- BL-912: THE EMPIRE TREE, ACROSS THE SWEEP --------------------------
@@ -3308,11 +3268,10 @@ int main(int argc, char** argv)
             {
                 const auto fs = span(firsts);
                 std::printf("  FIRST FURNACE YEAR           median %lld   range %lld..%lld"
-                            "   (boundary %lld, epoch %lld)\n",
+                            "   (span %lld -> %lld)\n",
                             static_cast<long long>(median_of(firsts)),
                             static_cast<long long>(fs.first), static_cast<long long>(fs.second),
-                            static_cast<long long>(params.boundary_year == INT64_MIN
-                                                   ? params.start_year : params.boundary_year),
+                            static_cast<long long>(params.start_year),
                             static_cast<long long>(params.stop_year));
             }
             else

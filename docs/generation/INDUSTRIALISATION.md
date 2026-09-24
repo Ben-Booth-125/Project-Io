@@ -150,8 +150,9 @@ That list is the contract: a struct, not a promise.
 arrive in `exploration_output`; the derivation of `polity::protection_q` from them is owed to this
 phase (BL-976, tariff derivation hands to Industrialisation), and `derive_national_protection` →
 `seed_national_tariffs` is the enactment seam that reads whatever this phase writes. The Era −1
-sim derives the scalar only on the two-span arc, from industrialisation timing; a single-span world
-carries no tariff, which is a legitimate outcome rather than a gap.
+sim derives no tariff scalar of its own — its one derivation, from industrialisation timing, ran
+on the retired two-span arc — so until this phase writes one a world carries no tariff, which is a
+legitimate outcome rather than a gap.
 
 ---
 

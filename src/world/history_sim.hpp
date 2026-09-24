@@ -171,27 +171,6 @@ struct history_sim_params
     };
     int tick_band_count = 6; ///< Live entries in `tick_bands`.
 
-    // --- The two spans (BL-747) -------------------------------------------
-    //
-    // ONE engine, TWO spans: an ancient span to a boundary year, then an
-    // industrial span from the boundary to the epoch with the higher roster
-    // bands unlocked. Expressed as params on the SINGLE existing invocation
-    // rather than as a second call to `run_history_sim` — see
-    // era_minus_one.hpp for the six axes a second caller drifts on.
-
-    /// The year the INDUSTRIAL span begins. Before it a polity may not reach
-    /// past `span1_band_ceiling`; at or after it the ladder is unrestricted.
-    /// The default is INT64_MIN — no year is before it, so the whole run is
-    /// one unrestricted span and the struct default is exactly today's
-    /// behaviour. A caller that sets neither field cannot change a world.
-    int64_t boundary_year = INT64_MIN;
-
-    /// The highest roster band reachable before `boundary_year`. `industrial`
-    /// (the default) is no restriction at all, so the ceiling is inert twice
-    /// over on a single-span run: no year is before the boundary, AND the
-    /// clamp is the identity.
-    roster_band span1_band_ceiling = roster_band::industrial;
-
     // --- Objective selection (BL-277 Q1) ----------------------------------
     int w_farm = 300; ///< Weight on a target region's farm endowment.
     int w_ore  = 250; ///< Weight on its ore endowment.
@@ -2577,8 +2556,8 @@ struct polity
     /// arc runs 4000 BCE -> 0 CE. Sentinel-as-zero meant three things at once.
     /// A polity that crossed the rung in year 0 wrote the sentinel, so it was
     /// re-detected on every later round and `polities_industrialised`
-    /// double-counted it. And on the default single-span arc `sim_band_ceiling`
-    /// is inert, so a median of four polities per world "crossed" between 2000
+    /// double-counted it. And with no roster ceiling on the run, a median of
+    /// four polities per world "crossed" between 2000
     /// and 3100 BCE - garbage that no consumer could tell from a real date, two
     /// lines beneath a summary correctly printing "no polity reached the rung".
     int64_t industrial_year = k_never_industrialised;
@@ -2592,39 +2571,15 @@ struct polity
     /// the run already accumulated, and read at the handoff by
     /// `derive_national_protection` -> `seed_national_tariffs`.
     ///
-    /// TWO TERMS, MULTIPLIED, and the product is the point:
-    ///   - HOW MUCH OF THE FIELD IS AHEAD of it (the share of surviving
-    ///     polities that lit a furnace strictly before it did), and
-    ///   - HOW FAR BEHIND it is (its own lag from the world's first furnace,
-    ///     as a share of the span from that furnace to the epoch).
-    /// Either alone reads flat. Rank alone is uniform by construction — the
-    /// last polity in a twelve-way field always scores 1000 whether it lit two
-    /// years late or never. Lag alone makes every non-industrialiser max out,
-    /// so a world where one polity of twelve industrialises tariffs eleven
-    /// nations identically. The product says "behind, AND far behind".
-    ///
-    /// A WORLD WHERE NOBODY LIT SCORES ZERO FOR EVERYONE, and it falls out
-    /// rather than being special-cased: with no furnace, nobody is strictly
-    /// ahead of anybody, the share term is zero for every polity, and the
-    /// product collapses. That is the honest reading — protection is a response
-    /// to an industrial competitor, and a world without one has nothing to
-    /// protect against. A world with no tariff is a legitimate outcome
-    /// (GENERATION_STRATEGY.md sec Asymmetry is the deliverable) and this is
-    /// where it comes from.
-    ///
-    /// THE COLONY TERM IS OWED, NOT FORGOTTEN. Ben's ruling names two movers:
-    /// industrialisation timing and whether the polity holds colonies, "since a
-    /// metropole protects its ties". The second has NO INPUT in this codebase —
-    /// BL-749 (sea-leg campaign) is what gives a polity ground across water,
-    /// and it has not landed. Rather than invent a proxy for a colony (a
-    /// far-flung holding is a large empire, not an overseas one), the term is
-    /// left out and recorded as owed. It is an addend on this scalar when
-    /// BL-749 lands, not a restructure.
-    ///
-    /// WRITTEN ON THE TWO-SPAN ARC ONLY (BL-976). The single-span arc runs no
-    /// industrial span, so the sim leaves this at zero there and the
-    /// derivation is Industrialisation's (INDUSTRIALISATION.md § The boundary);
-    /// `seed_national_tariffs` reads it on both arcs as the enactment seam.
+    /// NOTHING IN THE SIM WRITES IT (BL-1075). Its one derivation — the share
+    /// of surviving polities that lit a furnace ahead of this one, times how far
+    /// behind the world's first furnace it lit — read industrialisation timing,
+    /// a fact only the superseded two-span arc's industrial span produced, and
+    /// it was deleted with that arc. The scalar is Industrialisation's to write
+    /// from scarcity, flows and preference (INDUSTRIALISATION.md § The
+    /// boundary). The FIELD and its broadcast onto regions stay, because they
+    /// are the seam `seed_national_tariffs` reads; a zero is the honest tariff
+    /// posture of a world nothing has yet given one.
     int protection_q = 0;
 
     /// True for a seeded great power (BL-299). Majors start with more ground
@@ -3974,30 +3929,21 @@ struct history_sim_state
     /// this item fails, and neither is visible in the battle/founding counts.
     int64_t works_raised = 0;
 
-    /// BL-760 (1): works raised and units fielded, SPLIT BY ROSTER BAND and by
-    /// which span they happened in (index 0 = the ancient span, 1 = industrial).
+    /// BL-760 (1): works raised and units fielded, SPLIT BY ROSTER BAND.
     ///
-    /// WITHOUT THIS THE TWO-SPAN BAND CEILING HAS NO OBSERVABLE. `works_raised`
-    /// is one scalar with no band split, so nothing in the project could tell
-    /// `span1_band_ceiling = medieval` from `= industrial`: if no polity reaches
-    /// materials capacity 4 before the boundary the clamp never binds, and every
-    /// check stays green whether or not the ceiling works at all. A requirement
-    /// was marked complete on substituted evidence because of it.
+    /// ONE DIMENSION SINCE BL-1075. These were cross-tabulated [span][band] to
+    /// observe the superseded two-span arc's band ceiling; that arc and its
+    /// ceiling are deleted, every run is one unrestricted span per call, and the
+    /// span axis had nothing left to split. The band split still answers "which
+    /// rungs did the roster reach at all".
     ///
     /// READ THEM WITH BL-757 IN HAND. That item measured ZERO works raised
     /// across sixteen seeds, because `build_work` never wins the scored contest
     /// — so a band row of zeros here has two possible causes and the counter
     /// alone cannot separate them. The units rows are the ones carrying signal
     /// until that is fixed.
-    /// CROSS-TABULATED, not two marginals. [span][band], span 0 = ancient.
-    /// Two separate 1-D arrays cannot answer this question and the first cut of
-    /// this counter got that wrong: with a medieval span-1 ceiling, span 1
-    /// legitimately fields gunpowder, so units_by_band[gunpowder] > 0 and
-    /// units_by_span[0] > 0 - and an UNRESTRICTED run where span 0 fields
-    /// gunpowder produces the IDENTICAL pair of marginals. The counter built to
-    /// see the ceiling was blind to exactly the case it existed for.
-    std::array<std::array<int64_t, roster_band_count>, 2> works_by_span_band{};
-    std::array<std::array<int64_t, roster_band_count>, 2> units_by_span_band{};
+    std::array<int64_t, roster_band_count> works_by_band{};
+    std::array<int64_t, roster_band_count> units_by_band{};
 
     /// Battles in each century of the run, index 0 = the first hundred years.
     /// The sweep reports war frequency PER CENTURY rather than as a total,
@@ -4069,7 +4015,7 @@ struct history_sim_state
     /// outright rather than walked into existence. The split is the
     /// observable that tells "the mechanism never wins the region case" from
     /// "the mechanism never wins the corridor case", the same split
-    /// `works_by_span_band` exists to make for `build_work`.
+    /// `works_by_band` exists to make for `build_work`.
     int64_t supply_sites_upgraded           = 0;
     int64_t supply_sites_upgraded_regions   = 0;
     int64_t supply_sites_upgraded_corridors = 0;
@@ -4343,12 +4289,6 @@ int region_distance(const region& a, const region& b, int gw);
 /// that recomputed the ladder its own way would be testing its own arithmetic,
 /// the same reason `region_distance` is public.
 int step_for_year(const history_sim_params& p, int64_t y);
-
-/// The roster band ceiling in force at year @p y. ONE derivation, read by
-/// BOTH roster sites — the works table off materials capacity and the unit
-/// table off military — so the two tables cannot drift apart on the span.
-inline roster_band sim_band_ceiling(const history_sim_params& p, int64_t y)
-{ return y < p.boundary_year ? p.span1_band_ceiling : roster_band::industrial; }
 
 /// Bytes the time-lapse substrate occupies — the quantity the requirement
 /// bounds, and the reason the encoding is a change list rather than a grid.
@@ -4892,7 +4832,7 @@ struct polity_holdings
 ///   - cultures                  -> `region::culture` (shares) + `culture_count`
 ///                                  + `cultures` (the table itself, BL-969)
 ///   - works                     -> `region::works_built` and the five
-///                                  `work_*_mod` fields, plus `works_by_span_band`
+///                                  `work_*_mod` fields, plus `works_by_band`
 ///   - the strain accumulators   -> `region::contest_q` and `polity::cohesion_q`
 ///   - grudges (BL-827)          -> `grudges`
 ///   - contact (BL-908)          -> `contacts`
@@ -4928,8 +4868,8 @@ struct pass_one_output
     /// than assumed to.
     std::vector<culture> cultures;
 
-    /// Works raised, cross-tabulated [span][band] exactly as the sim counts them.
-    std::array<std::array<int64_t, roster_band_count>, 2> works_by_span_band{};
+    /// Works raised, by roster band, exactly as the sim counts them.
+    std::array<int64_t, roster_band_count> works_by_band{};
 
     /// The directed grudge table (BL-827) — an input to sentiment at world
     /// setup, never a quantity of its own.

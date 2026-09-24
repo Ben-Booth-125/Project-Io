@@ -74,7 +74,7 @@ inline constexpr uint32_t save_game_magic =
 /// `read_save_game` compares this constant for equality and rejects on any
 /// mismatch. There is no upgrade path to write, and adding one for a single
 /// raster would be inventing a scheme this file does not have.
-/// Bumped to 4 when `world_params` gained `industrial_years` (BL-747, the
+/// Bumped to 4 when `world_params` gained the industrial span's years (BL-747, the
 /// two-span prehistory): `w_world_params` gains one int between
 /// `prehistory_years` and `body_count`. A MID-RECORD gap again, so a v3
 /// stream's world-params record misreads `body_count` and the preferences
@@ -178,7 +178,7 @@ inline constexpr uint32_t save_game_magic =
 /// strict-equality contract as every prior bump.
 ///
 /// LAYOUT 20 = LAYOUT 19 WITH A RE-CUT `world_params` RECORD (BL-1047, the
-/// epoch flip): `w_world_params` drops `industrial_years` (the superseded
+/// epoch flip): `w_world_params` drops the industrial span's years (the superseded
 /// two-span arc's scope, retired) and gains `era_seed` after `seed`, then
 /// `empires_start_year`, `empires_stop_year`, `exploration_sim_enabled`,
 /// `exploration_stop_year`, `industrialisation_span_enabled`,

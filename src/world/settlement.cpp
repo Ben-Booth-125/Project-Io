@@ -921,7 +921,7 @@ settlement_state run_settlement(const planetology_state& pl,
     // a far backstop so an arrival year cannot run to an absurd value on a
     // pathological map, and `colonisation_field::last_arrival_year` reports when
     // the migration actually ended.
-    col_in.boundary_year = stop_year;
+    col_in.backstop_year = stop_year;
     const colonisation_field col_field = run_colonisation(col_in, col_sources);
 
     // WHEN THE MIGRATION ENDED, for the round that displays it (BL-858). Ben's

@@ -699,6 +699,8 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     out.band  = band_name;
     out.epoch = epoch;
 
+    // Since the epoch flip (BL-1047) generation reads no epoch, so both bands
+    // census the SAME generated world; only the roster band set here differs.
     reg.set_era(era_band_for_epoch(epoch));
 
     world_params p;

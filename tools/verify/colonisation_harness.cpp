@@ -108,7 +108,7 @@ struct test_map
         in.landform      = &landform;
         in.gw            = gw;
         in.gh            = gh;
-        in.boundary_year = boundary;
+        in.backstop_year = boundary;
         return in;
     }
 };
@@ -527,7 +527,7 @@ void case_real_worlds(int seed_count)
         in.river         = &riv;
         in.gw            = fx.gw;
         in.gh            = fx.gh;
-        in.boundary_year = 0;
+        in.backstop_year = 0;
 
         const colonisation_field f = run_colonisation(in, src);
 
@@ -1374,7 +1374,7 @@ void case_river_corridor(int seed_count)
         in.landform      = &lf;
         in.gw            = gw;
         in.gh            = gh;
-        in.boundary_year = 0;
+        in.backstop_year = 0;
 
         in.river = &riv;
         const colonisation_field with = run_colonisation(in, src);

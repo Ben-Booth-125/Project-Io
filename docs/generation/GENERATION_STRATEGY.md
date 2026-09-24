@@ -797,23 +797,22 @@ target.
 
 | Pass | Engine | Span | Produces |
 |---|---|---|---|
-| **1 — Ancient** | The polity sim (`history_sim`), Classical and Medieval bands | The prehistory span to the **boundary year** | Ancient borders, cultural doctrines — who walked where |
-| **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | **1560 → 1960** (Ben, 2026-09-08) | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
+| **1 — Ancient** | The polity sim (`history_sim`), the Empires round | **400 BCE → 1200 CE** | Ancient borders, cultural doctrines — who walked where |
+| **2 — Exploration and Industrialisation** | The same polity sim, two further calls each resumed from the last handoff, sea legs open | **1200 → 1660 → 1960** | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
 | **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which firms exist, what each market can close, the price field |
 
 **Pass 1 and pass 2 are one engine, not two.** The works roster is cumulative across its four
-bands and the unit roster is era-keyed, so the second span is the first span continued with more
-rows offered, not a second mechanism. What pass 2 adds is **reach across water** — a campaign or
+bands and the unit roster is era-keyed, so each later span is the first continued with more rows
+offered, not a second mechanism. What pass 2 adds is **reach across water** — a campaign or
 settle target across a sea leg, staged from harbour works — because colonisation by a major is
 reach played overseas, and it falls as every major does (`CIVILISATION.md` § How an empire actually falls).
 The epoch still arrives multipolar; the non-hegemony invariant is not relaxed for the sea.
 
-**The boundary year is a parameter with a default, not a fact.** The default is 400 years before
-the epoch, so that on a 1960 arc pass 2 is 1560 → 1960 and pass 1 is whatever
-`prehistory_years` leaves before it. A derived boundary — the year the first polity lights a
-furnace — is the better-founded alternative and is open; both are consequences of upstream
-scalars, and neither is a roll. On an ancient epoch there is no pass 2: the boundary falls past
-the epoch and the sim stops where it stops today.
+**The spans' years are fields, not facts, and none is the epoch.** Each span opens and closes on
+its own `world_params` year (§ The world descriptor), so the campaign calendar moves no span. The
+earlier single-call design put a **boundary year** 400 years before the epoch and capped the span
+before it at the Medieval band; that design is superseded and retired outright, with no legacy
+switch (Ben, 2026-09-18, NR-898).
 
 ### Pass 2 is the economy pass, and it is TWO phases (Ben, 2026-09-11)
 

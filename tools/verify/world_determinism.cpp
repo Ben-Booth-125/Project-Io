@@ -120,7 +120,7 @@ world_metrics measure(const world& w)
 // instrument, and nations, borders and city names do not move on a tick. They
 // are precisely what the pre-history pass writes, so R3 hashes them itself.
 //
-// Used ONLY by R3/R4. R1/R2 keep the metrics they were written against, so
+// Used ONLY by R3. R1/R2 keep the metrics they were written against, so
 // nothing about the existing cases changes.
 //
 // THE DIGEST PROVES SAME-SEED-SAME-WORLD ONLY FOR THE FIELDS IT FOLDS (BL-1009,
@@ -499,16 +499,10 @@ world timed_world(const world_params& p, generation_report* rep, const char* wha
     {
         // The span structure the run ACTUALLY used, read off the fixture rather
         // than re-derived — same reason the fixture exists at all (BL-462).
-        char boundary[32] = "(none)";
-        if (fx.params.boundary_year != INT64_MIN)
-            std::snprintf(boundary, sizeof boundary, "%lld",
-                          static_cast<long long>(fx.params.boundary_year));
-        std::printf("         span:   %lld -> %s -> %lld"
-                    "  (tick bands %d, span-1 ceiling band %d)\n",
-                    static_cast<long long>(fx.params.start_year), boundary,
+        std::printf("         span:   %lld -> %lld  (tick bands %d)\n",
+                    static_cast<long long>(fx.params.start_year),
                     static_cast<long long>(fx.params.stop_year),
-                    fx.params.tick_band_count,
-                    static_cast<int>(fx.params.span1_band_ceiling));
+                    fx.params.tick_band_count);
     }
     std::fflush(stdout);
     return w;
@@ -736,55 +730,16 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    // R4 — the TWO-SPAN arc (BL-747), and the generation budget (BL-754)
+    // R4 — RETIRED WITH THE TWO-SPAN ARC (BL-1075)
     // -----------------------------------------------------------------------
-    // Until BL-747 an `epoch_year` of 1960 skipped the Era -1 pass outright:
-    // `era_minus_one_enabled` gated on `epoch_year < 1700`, so the industrial
-    // arc generated with no year-tick history at all. It now runs the SAME
-    // engine across two spans — an ancient one capped at the medieval roster
-    // band, then an industrial one with the ladder unrestricted — expressed as
-    // params on the single existing invocation rather than a second call to
-    // `run_history_sim` (era_minus_one.hpp § a seventh caller).
-    //
-    // WHAT IS ASSERTED HERE AND WHAT IS NOT. Asserted: the pass runs at 1960
-    // at all, it spans both halves, and it is deterministic. NOT asserted: any
-    // magnitude — battle counts, founding counts or wall clock. Those are
-    // REPORTED, because the sprint's question is what the second span costs and
-    // a number nobody has chosen a target for is not a contract.
-    std::printf("\n--- R4: the two-span arc at epoch 1960 (BL-747) ---\n");
-    std::fflush(stdout);
-
-    const world_params ind_a{ .seed = seed_a, .abundance = abundance_level::standard,
-                              .epoch_year = 1960, .prehistory_years = 400,
-                              .industrial_years = 400 };
-
-    generation_report rep_i1{}, rep_i2{};
-    era_minus_one_fixture fx_i1, fx_i2;
-    const world w_i1 = timed_world(ind_a, &rep_i1, "seed A, epoch 1960 #1", fx_i1);
-    const world w_i2 = timed_world(ind_a, &rep_i2, "seed A, epoch 1960 #2", fx_i2);
-
-    const uint64_t d_i1 = deep_digest(w_i1, fx_i1);
-    const uint64_t d_i2 = deep_digest(w_i2, fx_i2);
-    print_coverage("1960/two-span", w_i1, fx_i1);
-    std::printf("     digest 1960/two-span = %016llX and %016llX\n",
-                static_cast<unsigned long long>(d_i1), static_cast<unsigned long long>(d_i2));
-    std::printf("     report 1960: years=%lld battles=%lld conquests=%lld foundings=%lld\n",
-                static_cast<long long>(rep_i1.prehistory_years),
-                static_cast<long long>(rep_i1.prehistory_battles),
-                static_cast<long long>(rep_i1.prehistory_conquests),
-                static_cast<long long>(rep_i1.prehistory_foundings));
-
-    check(rep_i1.prehistory_years == 800,
-          "R4.1 the 1960 arc ran BOTH spans (400 ancient + 400 industrial = 800 years)");
-    check(rep_i1.prehistory_battles + rep_i1.prehistory_conquests
-              + rep_i1.prehistory_foundings > 0,
-          "R4.2 the era pass DID something at epoch 1960 (it used to be skipped entirely)");
-    check(d_i1 == d_i2 && rep_i1.prehistory_battles == rep_i2.prehistory_battles,
-          "R4.3 the two-span run is deterministic (deep digest and counters both agree)");
-    if (rep_i1.handoff_invalid)
-        std::printf("     1960 handoff violation: %s\n", rep_i1.handoff_violation.c_str());
-    check(!rep_i1.handoff_invalid,
-          "R4.4 the 1960 arc's handoffs pass their validators on the shipped path (BL-969)");
+    // R4 built the superseded 1160 -> 1560 -> 1960 two-span arc an explicit
+    // `epoch_year = 1960` used to select, and asserted it ran both spans and
+    // was deterministic (digest '1960/two-span'). The arc is deleted outright
+    // (Ben, 2026-09-18, NR-898 (2)). The claim that replaces it is R3.8: the
+    // world a 1960 epoch builds is the shipped span-on world, byte for byte the
+    // one epoch 0 builds, and R3.1-R3.7 hold that world to the full guarantee.
+    // The generation budget (BL-754) is still printed per build by
+    // `timed_world`, which is all R4 ever did with it.
 
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "ALL PASS" : "FAILURES", failures,
                 failures == 1 ? "" : "s");
