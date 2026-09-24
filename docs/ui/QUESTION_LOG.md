@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**54 surfaces** — 8 settled, 46 awaiting Ben's wording.
+**55 surfaces** — 8 settled, 47 awaiting Ben's wording.
 
 ---
 
@@ -155,6 +155,14 @@ alphabetical order.
 **Because:** A biome-balance question ('forest and wetland stay sparse on the homeworld') was previously answered by eyeballing the map, which cannot distinguish a bad tuning constant from an unlucky seed. Putting the composition/landform histograms, the ocean threshold against the profile's target, and the profile that drove them on ONE surface is what makes the answer traceable to an input rather than to an impression. It earns its space as a tuning instrument, not shipped chrome - it is the last rail slot for that reason. A sibling question - 'why is THIS tile what it is?', asked by a per-tile derivation breadcrumb in a Tile view - was retired with the ledger's tab strip (Ben, 2026-08-30): the six-pass pipeline discards its intermediates and nothing in the code or the design now rebuilds them per tile, so the body-level shape is the only question this surface asks.
 
 *Demanded by BL-303 · `src/ui/generation_ledger.cpp` · id `generation_ledger_body`*
+
+### The generation wait - every wizard loading round and the building screen
+
+**Answers:** Is the world still being built, which step is it on, and how long has it taken?
+
+**Because:** A wait that sits still reads as a crash (Ben, 2026-09-24, watching the Industrialisation round load: the bar held on one step for the whole road pass). STARTUP.md § A wait never looks stopped: the outer bar is weighted by what each step COSTS, measured in Release (generation_step_cost_ms), not counted as equal steps; every step over about a second reports progress within itself on the inner bar (the spans by year, the borders by tile row, the roads by village, the old roads by corridor, the validation run by quarter); a caption names the step in generation's own words (generation_stage_labels); and an elapsed-seconds count shows the run is alive. One surface (ui::draw_generation_wait) draws every wizard loading round and the building screen, so there is one wait, not two. Nothing else is added: the loading round stays one line, the bars and these two lines - no map, no board.
+
+*Demanded by BL-1072 · `src/ui/generation_wait.cpp`, `src/ui/startup_screens.cpp`, `src/core/app.cpp`, `src/world/hard_coded_world.cpp` · id `generation_wait`*
 
 ### God-view corp/rival readouts (Selection facts column, rival Status rows, rival hover detail) + the survey tell on the Planetary canvas
 

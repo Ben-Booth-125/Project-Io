@@ -1,6 +1,7 @@
 #include "road_generation.hpp"
 
 #include "components.hpp"
+#include "hard_coded_world.hpp" // generation_progress -- the BL-1072 loading-bar tap
 #include "logistics.hpp"
 
 #include <algorithm>
@@ -205,7 +206,7 @@ std::uint8_t ancient_tier(int uses, int reach_a, int reach_b)
 
 } // namespace
 
-void generate_roads(world& w, entity_id body)
+void generate_roads(world& w, entity_id body, generation_progress* progress)
 {
     // Grid geometry (BL-620: the spur and border prefilters measure wrapped grid
     // distance, so they need the body's dimensions up front).
@@ -290,6 +291,38 @@ void generate_roads(world& w, entity_id body)
         }
     }
 
+    // BL-1072 -- THE LOADING BAR'S COUNT. This pass is most of a world build's
+    // wall clock (30-57 s Release, measured 2026-09-24), and nearly all of that
+    // is the village spur walk, so the bar counts the work the loops below
+    // naturally walk: one unit per backbone A* pair, one per village, and
+    // `kBorderUnitsPerNation` per nation for the border links (reported in
+    // proportion as that loop goes -- measured at about a dozen villages' worth
+    // of A* per nation, 1.1 s against 5,873 villages' 27.5 s on seed 28).
+    // Counted from the same `by_nation` the loops read, so it ends exactly on
+    // its total. WRITE-ONLY: nothing below reads it back.
+    constexpr long long kBorderUnitsPerNation = 12;
+    long long units_done = 0, units_total = 0;
+    {
+        for (const auto& [nation, members] : by_nation)
+        {
+            long long t = 0, v = 0;
+            for (const int m : members)
+                (nodes[m].scale >= kMidScale ? t : v) += 1;
+            if (t >= 2) units_total += t * (t - 1) / 2;
+            if (gw > 0) units_total += v;
+        }
+        units_total += kBorderUnitsPerNation * static_cast<long long>(by_nation.size());
+    }
+    const auto report_units = [&](long long done) {
+        if (progress == nullptr || units_total <= 0) return;
+        // Scaled into int range for the sink; exact at both ends.
+        constexpr long long cap = 1000000;
+        const long long total = std::min(units_total, cap);
+        progress->report_sub(static_cast<int>(done * total / units_total),
+                             static_cast<int>(total));
+    };
+    report_units(0);
+
     // 2+3. Per nation: a BACKBONE over towns-and-up (MST + relative-neighbour redundancy,
     //      the pre-BL-620 shape, now over the town set only), then each village joins the
     //      lattice locally with a Track spur.
@@ -342,6 +375,7 @@ void generate_roads(world& w, entity_id body)
                     d[a][b] = d[b][a] = c;
                     if (p.reachable)
                         edges.push_back({ c, a, b });
+                    report_units(++units_done); // BL-1072
                 }
 
             // Deterministic edge order: cost, then lo-tile-id, then hi-tile-id.
@@ -435,6 +469,7 @@ void generate_roads(world& w, entity_id body)
             {
                 if (nodes[m].scale >= kMidScale)
                     continue; // towns are backbone members, not spur clients
+                report_units(++units_done); // BL-1072: one village, before its A*
                 // The kSpurCandidates nearest targets by (distance^2, tile id), capped.
                 struct cand { long long d2; entity_id tile; };
                 std::array<cand, kSpurCandidates> best;
@@ -519,8 +554,16 @@ void generate_roads(world& w, entity_id body)
     for (int cc = 0; cc < gw; ++cc)
         scan_line([&](int r) { return grid[static_cast<std::size_t>(r) * gw + cc]; }, gh, false);
 
+    // BL-1072: the border links carry the last units, spread over however
+    // many adjacent pairs this map has.
+    const long long border_units = kBorderUnitsPerNation * static_cast<long long>(by_nation.size());
+    const long long border_base  = units_total - border_units;
+    const long long border_pairs = static_cast<long long>(adjacency.size());
+    long long       border_done  = 0;
     for (const auto& [na, nb] : adjacency)
     {
+        report_units(border_base + border_done * border_units / std::max(1LL, border_pairs));
+        ++border_done;
         const auto ia = by_nation.find(na);
         const auto ib = by_nation.find(nb);
         if (ia == by_nation.end() || ib == by_nation.end())
@@ -562,6 +605,8 @@ void generate_roads(world& w, entity_id body)
             stamp_edge(w, body, best_a, best_b, kTrack);
     }
 
+    report_units(units_total); // BL-1072: whole, whatever the border walk found
+
     // The A* cost cache (world.astar_cost_cache) was populated road-free while this
     // pass measured centre-pair costs to lay the network out — correct for the MST
     // decision, but now stale: the stamped roads lower those same lanes' costs. Drop
@@ -580,7 +625,8 @@ void generate_roads(world& w, entity_id body)
 
 void stamp_history_roads(world& w, entity_id body,
                          const std::vector<history_road_node>& nodes,
-                         const std::vector<history_corridor>&  corridors)
+                         const std::vector<history_corridor>&  corridors,
+                         generation_progress* progress)
 {
     if (corridors.empty() || nodes.empty())
         return; // A world with no Era -1 pass. The whole call is a no-op.
@@ -607,8 +653,13 @@ void stamp_history_roads(world& w, entity_id body,
     // `corridors` arrives sorted by (a, b) and stamping takes the max per tile,
     // so this walk is order-independent: a tile shared by two corridors ends at
     // the higher of the two tiers whichever is stamped first.
+    // BL-1072: one unit per corridor on the loading bar. Write-only.
+    const int corridor_total = static_cast<int>(std::min<std::size_t>(corridors.size(), 1000000));
+    int       corridor_done  = 0;
     for (const history_corridor& c : corridors)
     {
+        if (progress != nullptr && corridor_done < corridor_total)
+            progress->report_sub(++corridor_done, corridor_total);
         if (c.a >= nodes.size() || c.b >= nodes.size())
             continue; // A record written against a shorter node array.
         const history_road_node& na = nodes[c.a];

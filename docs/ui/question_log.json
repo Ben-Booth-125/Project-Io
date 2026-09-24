@@ -817,6 +817,21 @@
     "src/ui/history_lapse.cpp"
    ],
    "status": "settled"
+  },
+  "generation_wait": {
+   "surface": "The generation wait - every wizard loading round and the building screen",
+   "answers": "Is the world still being built, which step is it on, and how long has it taken?",
+   "because": "A wait that sits still reads as a crash (Ben, 2026-09-24, watching the Industrialisation round load: the bar held on one step for the whole road pass). STARTUP.md § A wait never looks stopped: the outer bar is weighted by what each step COSTS, measured in Release (generation_step_cost_ms), not counted as equal steps; every step over about a second reports progress within itself on the inner bar (the spans by year, the borders by tile row, the roads by village, the old roads by corridor, the validation run by quarter); a caption names the step in generation's own words (generation_stage_labels); and an elapsed-seconds count shows the run is alive. One surface (ui::draw_generation_wait) draws every wizard loading round and the building screen, so there is one wait, not two. Nothing else is added: the loading round stays one line, the bars and these two lines - no map, no board.",
+   "backlog_item": [
+    "BL-1072"
+   ],
+   "files": [
+    "src/ui/generation_wait.cpp",
+    "src/ui/startup_screens.cpp",
+    "src/core/app.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

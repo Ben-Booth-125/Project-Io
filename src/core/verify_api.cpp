@@ -321,6 +321,94 @@ int app::run_autostart()
     std::printf("[autostart] OK  bodies=%zu nations=%zu corps=%zu markets=%zu tiles=%zu\n",
                 m_world.bodies.size(), m_world.nations.size(), m_world.corporations.size(),
                 m_world.markets.size(), m_world.tiles.size());
+    // BL-1073: the cold-build half of the adopt check (tools/verify/
+    // begin_adopts_check.js compares it against --autostart-adopt's line).
+    std::printf("[autostart] state_hash=%016llX seed=%u\n",
+                static_cast<unsigned long long>(m_world.state_hash(m_world.current_day_tick)),
+                m_active_world_params.seed);
+    std::fflush(stdout);
+    return 0;
+}
+
+int app::run_autostart_adopt()
+{
+    // BL-1073, headless: the INTERACTIVE Begin, taken from the world the
+    // wizard's last round built. The same tail as run_autostart, with one
+    // difference -- the world is not built by begin_new_game but by round 6's
+    // own launch (launch_wizard_history_run, a real async worker, exactly the
+    // call the wizard makes on arriving at the round), and Begin adopts it.
+    //
+    // WHAT IT PROVES, and prints for tools/verify/begin_adopts_check.js:
+    //   1. round 6's landing caches its world;
+    //   2. an invalidation above the round (a reroll of Empires, a planetology
+    //      move) releases the cache;
+    //   3. Begin with a valid cache never calls make_hard_coded_world (the
+    //      `[begin] adopted` line, and `[gen budget]` never printing);
+    //   4. the campaign it opens has the SAME state hash as a cold
+    //      `--autostart` of the same params -- the checker compares the two.
+    m_lua.load("scripts/init.lua");
+    m_pending_world_params = fresh_world_params();
+    const int last = wizard_lapse_round_count - 1;
+
+    std::printf("[autostart-adopt] step 1: round 6's own build (async worker)\n");
+    std::fflush(stdout);
+    launch_wizard_history_run(last);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1800);
+    while (m_wiz_history_future[last].valid() && std::chrono::steady_clock::now() < deadline)
+    {
+        poll_wizard_history();
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+    }
+    if (m_wiz_history_future[last].valid() || !m_wiz_world || !m_wiz_world->ready)
+    {
+        std::printf("[autostart-adopt] FAILED: round 6 landed no world to cache\n");
+        return 1;
+    }
+    std::printf("[autostart-adopt] CACHED  round 6 world held for Begin\n");
+
+    // 2. The drop rule, on the real invalidation path. The handle is kept aside
+    // (a second reference, not a copy of the world) so the same build can go
+    // on to step 3 -- the question here is only whether the APP lets go of it.
+    {
+        const std::shared_ptr<wizard_world_cache> keep = m_wiz_world;
+        invalidate_wizard_rounds_below(wizard_planetology_round_count + 1); // Empires rerolled
+        const bool dropped_by_reroll = (m_wiz_world == nullptr);
+        m_wiz_world = keep;
+        invalidate_wizard_rounds_below(wizard_planetology_round_count - 1); // a planetology move
+        const bool dropped_by_chain = (m_wiz_world == nullptr);
+        m_wiz_world = keep;
+        std::printf("[autostart-adopt] %s  a reroll above round 6 drops the cache\n",
+                    dropped_by_reroll ? "PASS" : "FAIL");
+        std::printf("[autostart-adopt] %s  a planetology move drops the cache\n",
+                    dropped_by_chain ? "PASS" : "FAIL");
+        if (!dropped_by_reroll || !dropped_by_chain) return 1;
+    }
+
+    std::printf("[autostart-adopt] step 3: begin_new_game (adopts)\n");
+    std::fflush(stdout);
+    begin_new_game();
+    if (!m_worldgen_adopted)
+    {
+        std::printf("[autostart-adopt] FAILED: Begin did not adopt the cached world\n");
+        return 1;
+    }
+    const auto deadline2 = std::chrono::steady_clock::now() + std::chrono::seconds(1800);
+    while (m_screen != app_screen::in_game && std::chrono::steady_clock::now() < deadline2)
+    {
+        poll_worldgen();
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+    }
+    if (m_screen != app_screen::in_game)
+    {
+        std::printf("[autostart-adopt] FAILED: the tail did not reach play\n");
+        return 1;
+    }
+    std::printf("[autostart-adopt] OK  bodies=%zu nations=%zu corps=%zu markets=%zu tiles=%zu\n",
+                m_world.bodies.size(), m_world.nations.size(), m_world.corporations.size(),
+                m_world.markets.size(), m_world.tiles.size());
+    std::printf("[autostart-adopt] state_hash=%016llX seed=%u\n",
+                static_cast<unsigned long long>(m_world.state_hash(m_world.current_day_tick)),
+                m_active_world_params.seed);
     std::fflush(stdout);
     return 0;
 }

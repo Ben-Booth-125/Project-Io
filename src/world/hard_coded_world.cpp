@@ -354,6 +354,45 @@ int generation_stage_count(const world_gen_config& cfg)
     return 12;                                     // + bump 9-12: borders to finishing
 }
 
+int64_t generation_step_cost_ms(int label_index, const world_params& params)
+{
+    // MEASURED, Release (/O2), 2026-09-24, by tools/verify/gen_step_costs.cpp on
+    // the shipped arc (world_gen.lua's parsed config, the works table, seeds 0
+    // and 28), cross-read against world_determinism's `[gen steps]` lines on
+    // seeds ABCDEF01 and 12345678. Rounded central figures, in milliseconds:
+    // the bar needs the PROPORTIONS right, not the machine's absolute speed,
+    // so this is re-measured when a pass's cost moves materially, not per run.
+    //
+    // WHAT THE MEASUREMENT FOUND. The world build after the spans is dominated
+    // by ONE pass: `generate_roads` ran 30-57 s of a 40-70 s build, nearly all
+    // of it the village spur walk (~5,900 villages at ~4.7 ms of A* each on
+    // seed 28). Next come the old-road stamp (4-7 s, ~1,350-3,300 corridors)
+    // and `generate_nations`' density ripple (2-4 s, tiles x centres). Those
+    // three are the passes that report progress within themselves; every other
+    // step is under a second.
+    static constexpr int64_t cost[generation_stage_label_count] = {
+        1,     //  0 Preparing
+        90,    //  1 Forming the system
+        250,   //  2 Settling chemistry
+        0,     //  3 Drifting continents (never entered)
+        150,   //  4 Raising terrain
+        7,     //  5 Carving rivers
+        1,     //  6 Seeding peoples
+        12,    //  7 Founding regions (the settlement pass)
+        1600,  //  8 Running the ancient era
+        3500,  //  9 Drawing borders (generate_nations .. the province anchors)
+        38000, // 10 Laying roads (generate_roads)
+        150,   // 11 Placing companies
+        150,   // 12 Finishing (markets, the other bodies, laws, garrisons)
+        1500,  // 13 Running the exploration age
+        2000,  // 14 Running the Industrialisation span
+        5500,  // 15 Tracing the old roads (stamp_history_roads)
+    };
+    if (label_index < 0 || label_index >= generation_stage_label_count) return 0;
+    if (label_index == 8 && !era_minus_one_enabled(params)) return 1;
+    return cost[label_index];
+}
+
 std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
                                                      const world_params& params,
                                                      const world_gen_config& gen_cfg)
@@ -438,9 +477,75 @@ world make_hard_coded_world(world_params params, generation_report* report,
     int gen_stage = 0;
     if (progress != nullptr)
         progress->stage_count.store(generation_stage_count(gen_cfg), std::memory_order_relaxed);
-    const auto bump = [&](int label_index) {
+
+    // --- The step plan and its clocks (BL-1072) -----------------------------
+    //
+    // Which captioned steps THIS run will enter, each weighted by its measured
+    // Release cost, so the outer bar moves by what a step costs rather than by
+    // counting steps as equals. The plan is read off the same flags the gates
+    // below read; a planned span that turns out not to run just hands its
+    // weight to the next step (a jump forward, never back). The per-step
+    // clock beside it is REPORTED ONLY, on the BL-754 footing above.
+    std::array<int64_t, generation_stage_label_count> step_ms{};
+    int                   step_label = -1;
+    gen_clock::time_point step_begin = t_world_begin;
+    if (progress != nullptr)
+    {
+        const bool plan_history    = !gen_cfg.stop_after_migration;
+        const bool plan_explore    = plan_history && !gen_cfg.stop_after_ancient_era
+                                     && exploration_sim_enabled(params);
+        const bool plan_industrial = plan_explore && !gen_cfg.stop_after_exploration
+                                     && params.industrialisation_span_enabled;
+        const bool plan_setup      = generation_stage_count(gen_cfg) == 12;
+        int64_t total = 0;
+        for (int l : {0, 1, 2, 4, 5, 6, 7}) total += generation_step_cost_ms(l, params);
+        if (plan_history)    total += generation_step_cost_ms(8, params);
+        if (plan_explore)    total += generation_step_cost_ms(13, params);
+        if (plan_industrial) total += generation_step_cost_ms(14, params);
+        if (plan_setup)
+        {
+            for (int l : {9, 10, 11, 12}) total += generation_step_cost_ms(l, params);
+            // The old roads are stamped only where a history recorded corridors.
+            if (plan_history && era_minus_one_enabled(params))
+                total += generation_step_cost_ms(15, params);
+        }
+        progress->weight_done.store(0, std::memory_order_relaxed);
+        progress->weight_now.store(0, std::memory_order_relaxed);
+        progress->weight_total.store(total, std::memory_order_relaxed);
+    }
+    // Enter a captioned step: close the clock on the one being left, fold its
+    // weight into the finished sum, then publish the new step's weight and
+    // caption. The inner bar is cleared FIRST, so a reader that sees the new
+    // sum never also sees the old step's full inner bar on top of it.
+    const auto enter_step = [&](int label_index) {
+        const gen_clock::time_point now = gen_clock::now(); // reported only
+        if (step_label >= 0)
+        {
+            step_ms[static_cast<std::size_t>(step_label)] += ms_between(step_begin, now);
+            if (progress != nullptr)
+                progress->ms_step[static_cast<std::size_t>(step_label)].store(
+                    static_cast<int32_t>(step_ms[static_cast<std::size_t>(step_label)]),
+                    std::memory_order_relaxed);
+        }
+        step_label = label_index;
+        step_begin = now;
         if (progress == nullptr) return;
+        progress->sub_total.store(0, std::memory_order_relaxed);
+        progress->sub_progress.store(0, std::memory_order_relaxed);
+        progress->weight_done.store(progress->weight_done.load(std::memory_order_relaxed)
+                                        + progress->weight_now.load(std::memory_order_relaxed),
+                                    std::memory_order_relaxed);
+        progress->weight_now.store(generation_step_cost_ms(label_index, params),
+                                   std::memory_order_relaxed);
         progress->label.store(label_index, std::memory_order_relaxed);
+    };
+    // Progress WITHIN a step is reported by the pass itself, through
+    // `generation_progress::report_sub` (generate_nations, generate_roads,
+    // stamp_history_roads; the spans through the year counter).
+
+    const auto bump = [&](int label_index) {
+        enter_step(label_index);
+        if (progress == nullptr) return;
         progress->stage.store(++gen_stage, std::memory_order_relaxed);
     };
     bump(0);
@@ -1239,9 +1344,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // line above said the ancient era, which is 1,600 years long.
                 // A counter and a caption that describe different spans are
                 // worse than either alone.
+                enter_step(13); // the exploration age (BL-1072: its own weight)
                 if (progress != nullptr)
                 {
-                    progress->label.store(13, std::memory_order_relaxed); // the exploration age
                     progress->sub_progress.store(0, std::memory_order_relaxed);
                     progress->sub_total.store(
                         static_cast<int>(ep.stop_year - ep.start_year),
@@ -1432,9 +1537,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     if (fixture != nullptr)
                         fixture->industrialisation_open_regions = kepler_settlement.regions;
 
+                    enter_step(14); // the Industrialisation span (BL-1072: its own weight)
                     if (progress != nullptr)
                     {
-                        progress->label.store(14, std::memory_order_relaxed); // the Industrialisation span
                         progress->sub_progress.store(0, std::memory_order_relaxed);
                         progress->sub_total.store(
                             static_cast<int>(dp.stop_year - dp.start_year),
@@ -1962,7 +2067,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // off-lattice centre class ends here. Deterministic; no seed of its own —
     // a pure function of the generated tiles/nations/centres.
     bump(10);
-    generate_roads(w, kepler);
+    generate_roads(w, kepler, progress); // BL-1072: reports its village walk
 
     // ANCIENT ROADS, STAMPED FROM THE HISTORY (BL-768; Ben, the eight-phase
     // reorder point 4 — "we should also be laying simple roads to supply
@@ -1987,7 +2092,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
         road_nodes.reserve(kepler_settlement.regions.size());
         for (const region& p : kepler_settlement.regions)
             road_nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
-        stamp_history_roads(w, kepler, road_nodes, kepler_corridors);
+        enter_step(15); // BL-1072: a step of its own, 4-7 s in Release
+        stamp_history_roads(w, kepler, road_nodes, kepler_corridors, progress);
     }
 
     // Attach installations to the first two land tiles found in raster order.
@@ -2027,6 +2133,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
     generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count,
                                                  .seed_starting_force = gen_cfg.seed_starting_force },
         /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement, progress);
+
+    // BL-1072: "Finishing" is entered HERE, so its caption covers what is
+    // actually left -- the markets, the other bodies, laws, provinces and
+    // garrisons -- rather than being published after the last of it ran.
+    bump(12);
 
     // Kepler markets — population-anchored but RESOURCE-CARVED (BL-096). Markets
     // still anchor to population-centre tiles (catchment routing via market_for_tile
@@ -2626,7 +2737,6 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // seeded) for the border-province test. See nation_generation.hpp.
     seed_nation_garrisons(w);
 
-    bump(12);
     // BL-1053: the count published at the first line is the count reported.
     assert((progress == nullptr || gen_stage == generation_stage_count(gen_cfg))
            && "generation_stage_count disagrees with the bumps this run made");
@@ -2642,6 +2752,25 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // output stays exactly as it was when the app started publishing too.
     {
         const gen_clock::time_point t_world_end = gen_clock::now();
+
+        // BL-1072: close the last step's clock (reported only, like the rest),
+        // and fill the weighted bar: the build is whole.
+        if (step_label >= 0)
+        {
+            step_ms[static_cast<std::size_t>(step_label)] += ms_between(step_begin, t_world_end);
+            if (progress != nullptr)
+                progress->ms_step[static_cast<std::size_t>(step_label)].store(
+                    static_cast<int32_t>(step_ms[static_cast<std::size_t>(step_label)]),
+                    std::memory_order_relaxed);
+        }
+        if (progress != nullptr)
+        {
+            progress->sub_total.store(0, std::memory_order_relaxed);
+            progress->weight_now.store(0, std::memory_order_relaxed);
+            progress->weight_done.store(progress->weight_total.load(std::memory_order_relaxed),
+                                        std::memory_order_relaxed);
+        }
+
         const int64_t ms_total      = ms_between(t_world_begin, t_world_end);
         const int64_t ms_before     = ms_between(t_world_begin, t_settlement_begin);
         const int64_t ms_settlement = ms_between(t_settlement_begin, t_settlement_end);
@@ -2679,6 +2808,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
                          static_cast<long long>(params.epoch_year),
                          params.prehistory_years,
                          era_minus_one_has_industrial_span(params) ? params.industrial_years : 0);
+            // BL-1072: the per-step split the loading bar's weights are read from.
+            std::fprintf(stderr, "[gen steps]");
+            for (int l = 0; l < generation_stage_label_count; ++l)
+                if (step_ms[static_cast<std::size_t>(l)] > 0)
+                    std::fprintf(stderr, " %d:%lld", l,
+                                 static_cast<long long>(step_ms[static_cast<std::size_t>(l)]));
+            std::fprintf(stderr, "\n");
         }
     }
 

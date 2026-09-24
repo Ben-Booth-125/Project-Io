@@ -11,6 +11,7 @@
 #include "ui/detail_level.hpp"
 #include "ui/foldout_column.hpp"     // foldout_scroll_child — BL-904's wizard-column scroll verb
 #include "ui/generation_charts.hpp"
+#include "ui/generation_wait.hpp"      // BL-1072: the one wait surface
 #include "ui/generation_preview.hpp"
 #include "ui/history_lapse.hpp"      // BL-829/BL-830: round 4's map and its board
 #include "world/colonisation.hpp"   // colonisation_start_year -- the Culture round's own first year (BL-919)
@@ -284,12 +285,10 @@ void app::launch_wizard_history_run(int lapse_index)
     // The wait's own content. Cleared FIRST so no frame can read the previous
     // run's pass split as this one's — the same ordering begin_new_game keeps.
     generation_progress& prog = m_wiz_history_progress[lapse_index];
-    prog.stage.store(0, std::memory_order_relaxed);
-    prog.label.store(0, std::memory_order_relaxed);
+    // BL-1072: every field the wait reads, and the elapsed clock's start.
     // `stage_count` is published below, once this round's stop is known
     // (BL-1053): it is the stages the round's run will report, not a table size.
-    prog.sub_progress.store(0, std::memory_order_relaxed);
-    prog.sub_total.store(0, std::memory_order_relaxed);
+    prog.begin_wait();
     prog.lapse_tap = &tap; // BL-914: null-safe in run_history_sim/make_hard_coded_world.
 
     // UNDER --verify, ADOPT THE WORLD THE HARNESS ALREADY BUILT. run_verify opens
@@ -346,8 +345,8 @@ void app::launch_wizard_history_run(int lapse_index)
     // nothing here sets `stop_after_exploration` and the pending params carry
     // `industrialisation_span_enabled` unchanged (on by default). And
     // `stop_after_industrialisation` stays unset: stopping at the 1960 close
-    // would throw away exactly the world a full run exists to keep. The world
-    // is still discarded below; only the record is read.
+    // would throw away exactly the world a full run exists to keep -- and it
+    // IS kept now: see the world cache below (BL-1073).
     world_gen_config hist_cfg = cfg;
     if (lapse_index == 0)      hist_cfg.stop_after_migration   = true;
     else if (lapse_index == 1) hist_cfg.stop_after_ancient_era = true;
@@ -359,14 +358,36 @@ void app::launch_wizard_history_run(int lapse_index)
     // total never reads as the label table's size. Generation restates it.
     prog.stage_count.store(generation_stage_count(hist_cfg), std::memory_order_relaxed);
 
-    auto run = [this, hist_cfg, lapse_index, params = m_pending_world_params]() {
+    // BL-1073 -- THE LAST ROUND KEEPS ITS WORLD. Round 6's run is the full build
+    // Begin would make (same params, this same config, the same works), so its
+    // world and report are kept in a slot the app owns and Begin adopts them
+    // (STARTUP.md § The world cache). A fresh run supersedes whatever was held:
+    // the old cache is released now, the new one lands with the record. Rounds
+    // 3-5 stop early and their half-built worlds are still discarded -- a world
+    // stopped at a round has no nations, roads or companies.
+    std::shared_ptr<wizard_world_cache> slot;
+    if (lapse_index == wizard_lapse_round_count - 1)
+    {
+        drop_wizard_world("round 6 is running its build again");
+        slot = std::make_shared<wizard_world_cache>();
+        slot->params = m_pending_world_params;
+        m_wiz_world_pending = slot;
+    }
+
+    auto run = [this, hist_cfg, lapse_index, slot, params = m_pending_world_params]() {
         generation_report rep;
-        // The world itself is DISCARDED. What the round wants is the era it
-        // recorded, and holding the world would only invite a second, divergent
-        // copy of the campaign's own.
-        (void)make_hard_coded_world(params, &rep, hist_cfg,
-                                    &m_wiz_history_progress[lapse_index], &m_works);
-        return lapse_from_report(rep, lapse_index, /*adopted=*/false);
+        world w = make_hard_coded_world(params, &rep, hist_cfg,
+                                        &m_wiz_history_progress[lapse_index], &m_works);
+        ui::history_lapse lapse = lapse_from_report(rep, lapse_index, /*adopted=*/false);
+        if (slot)
+        {
+            // MOVED, never copied (see wizard_world_cache). `ready` is the
+            // worker's last write; the future landing is what publishes it.
+            slot->w      = std::move(w);
+            slot->report = std::move(rep);
+            slot->ready  = true;
+        }
+        return lapse;
     };
 
     if (!m_golden_dir.empty())
@@ -378,6 +399,21 @@ void app::launch_wizard_history_run(int lapse_index)
     // resolves it here and now rather than spinning forever in poll.
     if (!m_golden_dir.empty())
         poll_wizard_history();
+}
+
+void app::drop_wizard_world(const char* why)
+{
+    // The pending slot is released too: the worker filling it holds its own
+    // reference, so its world is freed when that run's future is consumed, and
+    // the landing finds no slot to cache.
+    const bool held = (m_wiz_world != nullptr) || (m_wiz_world_pending != nullptr);
+    m_wiz_world.reset();
+    m_wiz_world_pending.reset();
+    if (held)
+    {
+        std::printf("[wizard world] released: %s\n", why);
+        std::fflush(stdout);
+    }
 }
 
 void app::poll_wizard_history()
@@ -394,6 +430,11 @@ void app::poll_wizard_history()
                    != std::future_status::ready)
             continue;
         ui::history_lapse landed = m_wiz_history_future[i].get();
+        // BL-1073: the future just landed, so round 6's slot is whole (or this
+        // is a stale run whose world is dropped with its record, below).
+        std::shared_ptr<wizard_world_cache> world_slot;
+        if (i == wizard_lapse_round_count - 1)
+            world_slot = std::move(m_wiz_world_pending);
         if (m_wiz_history_stale[i])
         {
             // The ground moved while this ran: it is a true history of a world the
@@ -401,9 +442,21 @@ void app::poll_wizard_history()
             m_wiz_history_stale[i]   = false;
             m_wiz_history[i]         = ui::history_lapse{};
             m_wiz_history_playing[i] = false;
+            if (world_slot)
+            {
+                std::printf("[wizard world] dropped on landing: its round went stale mid-run\n");
+                std::fflush(stdout);
+            }
             continue;
         }
         m_wiz_history[i] = std::move(landed);
+        if (world_slot && world_slot->ready)
+        {
+            m_wiz_world = std::move(world_slot);
+            std::printf("[wizard world] cached for Begin (seed %u, era seed %u)\n",
+                        m_wiz_world->params.seed, m_wiz_world->params.era_seed);
+            std::fflush(stdout);
+        }
 
         // CONTINUITY (Ben, 2026-09-16): a round opens on the ground the round
         // before it left. The predecessor's LAST frame is folded to one colour
@@ -1304,35 +1357,14 @@ void app::draw_generation_screen()
                     ImGui::TextUnformatted(label);
 
                     // THE WAIT HAS A BAR (Ben, 2026-09-18: "wire in a progress bar
-                    // for 'Loading x round'"). The same pair the building screen
-                    // draws (app::draw_building_screen), from the round's own
-                    // `generation_progress`: the outer bar counts the passes this
-                    // run reports, so it only moves forward; the inner one is the
-                    // sim's year counter inside a span, drawn only while a span
-                    // reports it, and it restarts when a round runs a second span.
-                    // Still no pass captions — the 2026-09-16 ruling above stands:
-                    // the wait says it is a wait, and now how far along it is.
-                    const generation_progress& prog = m_wiz_history_progress[lapse_index];
-                    const int   done  = prog.stage.load(std::memory_order_relaxed);
-                    const int   total = std::max(1, prog.stage_count.load(std::memory_order_relaxed));
-                    const float bar_w = std::min(420.0f, w);
-                    const float bar_x = std::max(0.0f, (w - bar_w) * 0.5f);
-                    ImGui::Dummy({w, 10.0f});
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + bar_x);
-                    ImGui::ProgressBar(std::clamp(static_cast<float>(done) / static_cast<float>(total),
-                                                  0.0f, 1.0f),
-                                       {bar_w, 18.0f}, "");
-                    const int sub_total = prog.sub_total.load(std::memory_order_relaxed);
-                    if (sub_total > 0)
-                    {
-                        const int sub_done = prog.sub_progress.load(std::memory_order_relaxed);
-                        ImGui::Dummy({w, 4.0f});
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + bar_x);
-                        ImGui::ProgressBar(std::clamp(static_cast<float>(sub_done)
-                                                          / static_cast<float>(sub_total),
-                                                      0.0f, 1.0f),
-                                           {bar_w, 10.0f}, "");
-                    }
+                    // for 'Loading x round'"), AND SAYS WHAT IT IS DOING (Ben,
+                    // 2026-09-24, amending the 2026-09-16 "no captions"): the outer
+                    // bar weighted by what each step costs, an inner bar inside
+                    // every long step, a caption naming the step and an elapsed
+                    // count. It is the one wait surface the building screen draws
+                    // too (ui::draw_generation_wait, BL-1072): one wait, not two.
+                    ui::draw_generation_wait(m_wiz_history_progress[lapse_index], w,
+                                             nullptr, m_golden_dir.empty());
                 }
             }
             else if (rec.empty())
@@ -1629,7 +1661,13 @@ void app::draw_generation_screen()
         if (ImGui::Button("Back##wizback", {half, 34.0f}))
         {
             if (m_wiz_round == 0)
+            {
                 m_screen = app_screen::menu;
+                // BL-1073: re-entering the wizard re-runs the chain and every
+                // round below it, so a held world can never be adopted from
+                // here -- release its memory now rather than on re-entry.
+                drop_wizard_world("left the wizard for the menu");
+            }
             else
                 --m_wiz_round;
         }

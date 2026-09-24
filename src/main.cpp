@@ -665,6 +665,18 @@ int main(int argc, char* argv[])
                 return a.run(app::autostart_mode::play);
             }
 
+        // --autostart-adopt (BL-1073): the wizard's last round builds the world,
+        // Begin adopts it, the tail runs to play; prints the state hash that
+        // tools/verify/begin_adopts_check.js compares with a cold --autostart.
+        // Checked BEFORE --autostart only for readability: the match is exact.
+        for (int i = 1; i < argc; ++i)
+            if (std::string(argv[i]) == "--autostart-adopt")
+            {
+                app a;
+                if (epoch_set) a.set_epoch_year(epoch_year);
+                return a.run_autostart_adopt();
+            }
+
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--autostart")
             {
