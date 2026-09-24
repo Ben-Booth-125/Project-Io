@@ -37,12 +37,11 @@ NR-908 gave the divisor to live-play cost, and the pin was set on the median: at
 
 **Why it matters.** The divisor is pinned and the world is re-blessed on it. If a 31-second tick is not playable, the knob that fixes it is the same divisor (or a seat cap), and moving it costs another re-bless.
 
-- A: accept the tail — the anchor is a median, the spread is the world talking (as NR-910 accepted the seat spread), and a heavy world is a rich world.
-- B: re-tune the divisor against the TAIL rather than the median (a smaller divisor buys fewer charters everywhere, and moves the seat menu off its anchor).
-- C: leave the divisor and bound what the tail costs — a per-world seat cap, or a per-body ceiling on specialists as the density ceiling bounds firms.
-- D: measure first: what in the tick the specialists cost (the run phase-splits it: convoys dominate the val ticks), then rule.
+- A: pure speed-ups with identical results, no re-bless — cache the province ceiling within a tick (PROVINCES.md owns the rule; the cache must invalidate when centres/roads change), and resolve each pool's origin tile once per dispatch pass plus make markets_by_body stop rescanning (SUPPLY.md owns dispatch). Estimated: ~90% of the econ step, ~70% of dispatch.
+- B: A, then change the base scan's behaviour — stop at the first placeable tile, cache a corp's best base tile, or back off after the candidate loses; this also ends the offered-forever pattern but changes which bases are built (re-bless; AI_OPPONENT.md § 11 read first).
+- C: NR-915's original seat cap — misses seed 28 and moves the pinned seat menu; not recommended.
 
-> **Recommendation:** D then C. The phase split is already in the run, and the cost tracks specialists rather than firms, so a seat-side bound is the knob that does not disturb the anchor or the density ruling. A is defensible if 30 s a tick is acceptable on the richest worlds; B moves the seat menu the re-bless just pinned.
+> **Recommendation:** A now (identical results, verified by world_determinism and a before/after digest on the live tick), then re-measure; B only if the base-scan pattern still matters after A.
 
 *Files: `src/world/stockpile_budget.hpp`, `docs/generation/INDUSTRIALISATION.md`, `tools/verify/player_seed_sweep.cpp`*
 

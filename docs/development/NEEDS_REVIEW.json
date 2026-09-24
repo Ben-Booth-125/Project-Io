@@ -453,18 +453,18 @@
    "what": "NR-908 gave the divisor to live-play cost, and the pin was set on the median: at 650:2 the shipped world's live tick is a median x0.78 of the same seed's legacy world (4.5 s against 5.4 s), inside the band stage 2 read (x0.43 / x0.91 / x1.70 at 325 / 650 / 1300 with the tier off). The TAIL is not: seed 41 ticks 30.9 s against its legacy 5.3 s (x5.79), seed 31 25.5 s against 6.2 s (x4.12), seed 28 12.8 s against 4.1 s (x3.13); the other thirteen run x0.36 to x1.51. It is not a small-denominator artefact — those are absolute seconds per live tick, and 31 s a tick is heavy for play. The heavy worlds are the ones the seat menu opens widest (seed 41 seats 65 specialists, seed 31 seats 31, against a library median of 8.5), so the cost follows the specialists the budget charters rather than the background firms (seed 41 holds 56 firms, fewer than the median world's 65). Generation cost moved too: the budget row's generation is a median 53.3 s against the legacy row's 42.5 s (max 93 s), about 26% dearer.",
    "why_it_matters": "The divisor is pinned and the world is re-blessed on it. If a 31-second tick is not playable, the knob that fixes it is the same divisor (or a seat cap), and moving it costs another re-bless.",
    "options": [
-    "A: accept the tail — the anchor is a median, the spread is the world talking (as NR-910 accepted the seat spread), and a heavy world is a rich world.",
-    "B: re-tune the divisor against the TAIL rather than the median (a smaller divisor buys fewer charters everywhere, and moves the seat menu off its anchor).",
-    "C: leave the divisor and bound what the tail costs — a per-world seat cap, or a per-body ceiling on specialists as the density ceiling bounds firms.",
-    "D: measure first: what in the tick the specialists cost (the run phase-splits it: convoys dominate the val ticks), then rule."
+    "A: pure speed-ups with identical results, no re-bless — cache the province ceiling within a tick (PROVINCES.md owns the rule; the cache must invalidate when centres/roads change), and resolve each pool's origin tile once per dispatch pass plus make markets_by_body stop rescanning (SUPPLY.md owns dispatch). Estimated: ~90% of the econ step, ~70% of dispatch.",
+    "B: A, then change the base scan's behaviour — stop at the first placeable tile, cache a corp's best base tile, or back off after the candidate loses; this also ends the offered-forever pattern but changes which bases are built (re-bless; AI_OPPONENT.md § 11 read first).",
+    "C: NR-915's original seat cap — misses seed 28 and moves the pinned seat menu; not recommended."
    ],
-   "recommendation": "D then C. The phase split is already in the run, and the cost tracks specialists rather than firms, so a seat-side bound is the knob that does not disturb the anchor or the density ruling. A is defensible if 30 s a tick is acceptable on the richest worlds; B moves the seat menu the re-bless just pinned.",
+   "recommendation": "A now (identical results, verified by world_determinism and a before/after digest on the live tick), then re-measure; B only if the base-scan pattern still matters after A.",
    "files": [
     "src/world/stockpile_budget.hpp",
     "docs/generation/INDUSTRIALISATION.md",
     "tools/verify/player_seed_sweep.cpp"
    ],
-   "resolution": null
+   "resolution": null,
+   "investigation": "RE-TAKEN 2026-09-24 on the current tree (after BL-1003, BL-995, the tick reorder; tools/verify/live_tick_cost_probe, merged 158f1201). The tail is real but narrower — 650:2 vs legacy: seed 41 x3.04 (26.8 s vs 8.8 s), seed 31 x1.93, seed 28 x1.28; median seeds ~x0.8-1.0 — partly because the legacy worlds got slower too. NR-915's diagnosis does NOT hold: the cost does not follow specialists as such. (1) ~80% of a heavy tick is ONE corp_ai loop: the military_base candidate (corp_ai.cpp ~1730) — a base-less corp scans every tile of its home nation with can_place_in_world, and nearly every call reaches province_building_ceiling -> measure_province_sustain, which rebuilds a map over every population centre in the world (6-14k) per call (~0.8-2 ms). Almost every tile passes, so the candidate is offered every evaluation and the corp still has no base next time. Cost ~ base-less corps due x home-nation tiles x centres: seed 41 has 91 base-less corps (48 of its 65 specialists are new and base-less); seed 28's tail comes from charters in huge nations (2,600-3,100 tiles each), not seat count. (2) BL-995 dispatch is 5-45% of the tick: ~150-190k legs priced per tick on 255-423 markets, 72% of it re-resolving the SAME source pool's origin tile per destination (convoy_origin_tile -> pool_key_for_tile -> markets_by_body/nearest_market; ~509M market visits a tick on seed 31)."
   },
   {
    "id": "NR-916",
