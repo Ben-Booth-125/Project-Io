@@ -1394,6 +1394,33 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return std::make_tuple(lit, static_cast<double>(points), crossings);
     });
 
+    // BL-1080 (map layer, Ben 2026-09-24): THE INDUSTRY HEAT on the current
+    // lapse round at the playhead, read through the same `lapse_industry_heat`
+    // the map draws: (held regions whose realm carries any heat; the mean heat
+    // over held regions, 0..1; the hottest realm's heat). It lets a script
+    // claim the map HEATS rather than hoping a capture shows sparks.
+    v.set_function("history_industry_heat", [this]() {
+        const int i = wizard_lapse_index();
+        int heated = 0, held = 0;
+        double sum = 0.0, peak = 0.0;
+        if (!m_wiz_history[i].empty())
+        {
+            const ui::history_lapse& h = m_wiz_history[i];
+            const int year = m_wiz_history_year[i];
+            const std::vector<uint16_t> slice = owner_slice_at(h.lapse, year);
+            for (uint16_t o : slice)
+            {
+                if (o == owner_none) continue;
+                ++held;
+                const double heat = ui::lapse_industry_heat(h, o, year);
+                if (heat > 0.0) ++heated;
+                sum += heat;
+                peak = std::max(peak, heat);
+            }
+        }
+        return std::make_tuple(heated, held > 0 ? sum / held : 0.0, peak);
+    });
+
     // BL-916: the year of the LAST recorded event of one kind (the wire byte
     // of `lapse_event_kind`) on the current lapse round, or a year before the
     // span when there is none. It lets a script PARK on the moment a realm

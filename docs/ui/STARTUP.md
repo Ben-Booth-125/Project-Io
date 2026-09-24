@@ -221,7 +221,14 @@ the phase's three beats as they occur:
 **The round shows industry, not only borders (Ben, 2026-09-24).** The record carries what the span
 actually computes about industry, and the round draws it three ways. **The map** marks every region
 that has crossed the furnace with an ember square at its anchor, from its crossing year on; a
-crossing the span inherited from an earlier span is marked from the first frame. **The board** gains
+crossing the span inherited from an earlier span is marked from the first frame. **The map also heats
+industry points (Ben, 2026-09-24)**, because a span on an antiquity-epoch world draws no crossing and
+its ember layer stays empty while the points climb: each realm's ground is stippled with sparks, the
+fraction of its ground that sparks set by its points per region held over the record's peak density
+(square-rooted, so the skewed low end still shows). The heat is by polity territory, not by region,
+because the record samples points per polity only. Sparks, not a wash, so the polity colours and
+frontiers stay readable beneath; a spark lit at one heat stays lit at every higher one, so the heat
+visibly grows across the span. **The board** gains
 an industry column: each polity's industry points at the step, beside People, Land, Pop and Might,
 and only on a record that carries points, so the earlier rounds keep their board. **The ticker**
 names each crossing (*"X, in the realm of Y, lights its furnaces"*). Rail is drawn only if the span

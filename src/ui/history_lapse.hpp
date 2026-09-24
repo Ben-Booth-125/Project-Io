@@ -361,6 +361,14 @@ struct history_lapse
     /// column is drawn only then, so the three earlier rounds keep their board.
     bool industry_recorded = false;
 
+    /// THE INDUSTRY HEAT's scale (BL-1080, map layer ruled by Ben 2026-09-24):
+    /// the highest industry DENSITY any sample in the record carries — a
+    /// polity's `industry_points` over the regions it holds at that step. The
+    /// map heats each realm's ground by its density over this peak, so the
+    /// heat is one scale across the whole span and visibly grows toward it.
+    /// Zero on a record with no points (the three earlier rounds): no heat.
+    double industry_density_peak = 0.0;
+
     /// The map prints its primitive count to stderr ONCE per record, so the
     /// draw-index bound is a measured number in every capture log. Mutable
     /// because the draw takes the record by const reference and this is not
@@ -445,6 +453,15 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
 /// 1 at the round's first year, 0 once the opening stretch has passed. Public
 /// so the caller can tell whether it is worth building the carried colours.
 float lapse_carry_fade(const history_lapse& h, int year);
+
+/// THE INDUSTRY HEAT of one polity at @p year, in [0, 1] (BL-1080): the square
+/// root of its industry points per region held, at the recorded step at or
+/// before the year, over `industry_density_peak`. BY POLITY TERRITORY, not by region,
+/// because the record samples points per polity only — a per-region series
+/// would be new save-format state for a heat the polity series already draws.
+/// 0 with no sample, no points, or a record that carries none. Public so the
+/// verify API reads the same number the map draws.
+float lapse_industry_heat(const history_lapse& h, uint16_t polity, int year);
 
 /// The colour @p owner is drawn in on @p h — a culture's lineage hue on the
 /// Culture round, a polity's identity slot elsewhere. Public so one round can
