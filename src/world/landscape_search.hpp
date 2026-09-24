@@ -71,6 +71,7 @@
 #include <vector>
 
 class recipe_registry;
+struct generation_progress; // hard_coded_world.hpp; the search only writes its inner bar
 
 /// The three axes, in the fixed order a round proposes them.
 enum class landscape_axis : int
@@ -138,6 +139,14 @@ struct landscape_search_params
     /// in the search reads it back, so the walk stays a pure function of
     /// (base world, seed, rounds).
     bool print_rounds = true;
+
+    /// BL-1085: a loading screen's sink, or null. The search reports its
+    /// evaluations done over the evaluations planned on the INNER bar
+    /// (`generation_progress::report_sub`) so "Searching the landscape" never
+    /// looks stopped. WRITE-ONLY, as every progress tap is: nothing in the
+    /// walk reads it back, so a watched search is the same walk as an
+    /// unwatched one.
+    generation_progress* progress = nullptr;
 
     std::uint8_t min_road_tier    = 1;
     std::uint8_t max_road_tier    = 3;

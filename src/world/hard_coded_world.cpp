@@ -387,6 +387,14 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
         1500,  // 13 Running the exploration age
         2000,  // 14 Running the Industrialisation span
         5500,  // 15 Tracing the old roads (stamp_history_roads)
+        // The two steps finish_campaign_world runs after generation (BL-1085),
+        // measured by `gen_step_costs --finish 0 28` on the same footing
+        // (Release, 2026-09-24): the search 28,801 / 12,623 ms over 13
+        // evaluations (a budget world skips the roster axis); the twelve-tick
+        // settle 113,922 / 68,832 ms -- of which ONE tick is 50-90 s and the
+        // rest ~1.5 s each (the `[finish_campaign_world]` line names it).
+        20000, // 16 Searching the landscape (build_stockpile_budget .. apply)
+        90000, // 17 Proving the field (run_settle, twelve ticks)
     };
     if (label_index < 0 || label_index >= generation_stage_label_count) return 0;
     if (label_index == 8 && !era_minus_one_enabled(params)) return 1;
@@ -508,6 +516,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
             if (plan_history && era_minus_one_enabled(params))
                 total += generation_step_cost_ms(15, params);
         }
+        // BL-1085: the caller's own steps after this build (the search and the
+        // settle, on round 6 and the cold build) are in the plan too, so the
+        // bar has somewhere left to go when generation returns.
+        total += progress->weight_after.load(std::memory_order_relaxed);
         progress->weight_done.store(0, std::memory_order_relaxed);
         progress->weight_now.store(0, std::memory_order_relaxed);
         progress->weight_total.store(total, std::memory_order_relaxed);
@@ -2750,7 +2762,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
         {
             progress->sub_total.store(0, std::memory_order_relaxed);
             progress->weight_now.store(0, std::memory_order_relaxed);
-            progress->weight_done.store(progress->weight_total.load(std::memory_order_relaxed),
+            // The build is whole; the caller's steps after it (`weight_after`,
+            // BL-1085) stay undone until finish_campaign_world enters them.
+            progress->weight_done.store(progress->weight_total.load(std::memory_order_relaxed)
+                                            - progress->weight_after.load(std::memory_order_relaxed),
                                         std::memory_order_relaxed);
         }
 

@@ -62,6 +62,7 @@
 #include "world/stockpile_budget.hpp" // BL-1042: the new-game charter budget
 
 #include <chrono> // poll_wizard_surface's zero-wait future probe
+#include <thread> // join_workers' wait (BL-1108)
 #include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
@@ -251,6 +252,13 @@ void app::apply_ui_scale()
 
 app::~app()
 {
+    // BL-1108: FIRST, before any member a worker reads is gone. Members destruct
+    // in reverse declaration order, so `m_works` and the progress sinks died
+    // BEFORE the futures blocked on the workers still reading them -- the
+    // 0xC0000005 on closing the window mid-build (2026-09-24, twice). run()
+    // joins with the window up; this covers every path that never ran it.
+    join_workers(/*on_screen=*/false);
+
     m_ground.shutdown(); // baked-ground textures die before their renderer
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
@@ -258,6 +266,74 @@ app::~app()
     SDL_DestroyRenderer(m_renderer);
     SDL_DestroyWindow(m_window);
     SDL_Quit();
+}
+
+void app::join_workers(bool on_screen)
+{
+    // Every future a worker may still be running behind: the cold build, the
+    // four wizard rounds, the surface preview. `wait()` on a DEFERRED future
+    // would run it here, so those (the --verify capture path's) are skipped:
+    // a deferred future never runs on its own and its destructor never blocks.
+    const auto pending = [](const auto& f) {
+        return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::timeout;
+    };
+    const auto any_pending = [&] {
+        if (pending(m_worldgen_future) || pending(m_wiz_surface_future)) return true;
+        for (int i = 0; i < wizard_lapse_round_count; ++i)
+            if (pending(m_wiz_history_future[i])) return true;
+        return false;
+    };
+    if (!any_pending())
+        return;
+
+    std::printf("[exit] finishing the build before quitting (a worker is still running)\n");
+    std::fflush(stdout);
+    const auto t0 = std::chrono::steady_clock::now();
+    while (any_pending())
+    {
+        if (on_screen && m_window != nullptr && m_renderer != nullptr)
+        {
+            // A plain frame with one line on it, so the wait is not a hang:
+            // events are pumped (and ignored -- a second close changes nothing)
+            // and the window repaints, which is what Windows judges us by.
+            SDL_Event ev;
+            while (SDL_PollEvent(&ev))
+                ImGui_ImplSDL3_ProcessEvent(&ev);
+            ImGui_ImplSDLRenderer3_NewFrame();
+            ImGui_ImplSDL3_NewFrame();
+            ImGui::NewFrame();
+            const ImVec2 disp = ImGui::GetIO().DisplaySize;
+            ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always,
+                                    {0.5f, 0.5f});
+            if (ImGui::Begin("##quitwait", nullptr,
+                             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
+                                 | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse
+                                 | ImGuiWindowFlags_AlwaysAutoResize
+                                 | ImGuiWindowFlags_NoBackground))
+            {
+                const long long secs = std::chrono::duration_cast<std::chrono::seconds>(
+                                           std::chrono::steady_clock::now() - t0).count();
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
+                ImGui::Text("Finishing the build before quitting... %lld s", secs);
+                ImGui::PopStyleColor();
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
+                ImGui::TextUnformatted("A world build cannot be stopped mid-pass; "
+                                       "the window closes when it lands.");
+                ImGui::PopStyleColor();
+            }
+            ImGui::End();
+            ImGui::Render();
+            SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
+            SDL_RenderClear(m_renderer);
+            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+            SDL_RenderPresent(m_renderer);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+    }
+    std::printf("[exit] workers joined after %lld ms\n",
+                static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                           std::chrono::steady_clock::now() - t0).count()));
+    std::fflush(stdout);
 }
 
 int app::run(autostart_mode autostart)
@@ -480,6 +556,11 @@ int app::run(autostart_mode autostart)
         }
     }
 
+    // BL-1108: a build still running on a worker reads the progress sinks and
+    // the works table, which die with this object; join it here, with the
+    // window still up to say so, before anything it reads is destroyed.
+    join_workers(/*on_screen=*/true);
+
     // Persist any free drag-resize captured this session (toggles/presets already
     // saved on change). Fullscreen: keep the last windowed size, don't overwrite it.
     save_settings();
@@ -547,45 +628,82 @@ void app::begin_new_game()
     m_worldgen_params = m_pending_world_params;
     m_generation_report = generation_report{};
 
+    // --- BL-1085: BEGIN WAITS FOR ROUND 6, THEN ADOPTS ----------------------
+    //
+    // Round 6's worker runs the whole build -- generation, then
+    // finish_campaign_world's search and settle (STARTUP.md § Handoff) -- so
+    // Begin has three cases and none of them builds twice:
+    //   1. the worker is STILL RUNNING: wait on it behind the wait surface
+    //      (never a second concurrent build -- BL-1078's memory-pressure case);
+    //   2. it LANDED and the cache is valid: adopt it;
+    //   3. there is nothing to adopt (menu -> Begin, --autostart, a stale
+    //      landing, params that moved): the cold worker makes the same calls.
+    const int last = wizard_lapse_round_count - 1;
+    if (m_wiz_history_future[last].valid())
+    {
+        m_begin_waits_round6 = true;
+        std::printf("[begin] round 6 is still building: waiting on its worker "
+                    "(no second build)\n");
+        std::fflush(stdout);
+        m_screen = app_screen::building;
+        return;
+    }
+    if (try_adopt_wizard_world())
+        return;
+    launch_cold_build();
+}
+
+bool app::try_adopt_wizard_world()
+{
     // --- BL-1073: BEGIN ADOPTS THE WIZARD'S WORLD ----------------------------
     //
-    // Round 6 already ran this exact build (STARTUP.md § The world cache), so a
-    // valid cache is MOVED into m_world and the loading screen goes straight to
-    // the tail -- the prelude, the validation run, the seat -- instead of
-    // building the same world a second time. A cache whose params differ from
-    // the pending ones is released and the build runs cold, as it always did.
+    // Round 6 already ran this exact build and finished it (STARTUP.md § The
+    // world cache), so a valid cache is handed to poll_worldgen, which MOVES
+    // it into play and runs the tail -- the presentation half, the seat --
+    // instead of building the same world a second time. A cache whose params
+    // differ from the pending ones is released and the build runs cold.
     if (m_wiz_world && m_wiz_world->ready
         && !same_world_params(m_wiz_world->params, m_pending_world_params))
         drop_wizard_world("its params no longer match the wizard's");
-    if (m_wiz_world && m_wiz_world->ready)
-    {
-        m_world             = std::move(m_wiz_world->w);
-        m_generation_report = std::move(m_wiz_world->report);
-        m_wiz_world.reset(); // one world at most: the cache is spent
+    if (!(m_wiz_world && m_wiz_world->ready))
+        return false;
 
-        // The wait surface reads a finished build: the outer bar full, the
-        // validation run's quarters to come on the inner bar.
-        m_worldgen_progress.begin_wait();
-        m_worldgen_progress.stage_count.store(1, std::memory_order_relaxed);
-        m_worldgen_progress.stage.store(1, std::memory_order_relaxed);
-        m_worldgen_progress.label.store(12, std::memory_order_relaxed); // "Finishing"
-        m_worldgen_progress.weight_total.store(1, std::memory_order_relaxed);
-        m_worldgen_progress.weight_done.store(1, std::memory_order_relaxed);
-        m_worldgen_progress.budget_ready.store(false, std::memory_order_relaxed);
-        m_worldgen_progress.grid_w.store(0, std::memory_order_relaxed); // no carve to draw
-        m_worldgen_progress.grid_h.store(0, std::memory_order_relaxed);
-        m_carve_view.clear();
+    m_worldgen_slot = std::move(m_wiz_world);
+    m_wiz_world.reset(); // one world at most: the cache is spent
 
-        std::printf("[begin] adopted the wizard's world (seed %u, era seed %u): "
-                    "make_hard_coded_world not called\n",
-                    m_pending_world_params.seed, m_pending_world_params.era_seed);
-        std::fflush(stdout);
+    // The wait surface reads a finished build: the outer bar full, nothing
+    // left to caption but the seat to come.
+    m_worldgen_progress.begin_wait();
+    m_worldgen_progress.stage_count.store(1, std::memory_order_relaxed);
+    m_worldgen_progress.stage.store(1, std::memory_order_relaxed);
+    m_worldgen_progress.label.store(12, std::memory_order_relaxed); // "Finishing"
+    m_worldgen_progress.weight_total.store(1, std::memory_order_relaxed);
+    m_worldgen_progress.weight_done.store(1, std::memory_order_relaxed);
+    m_worldgen_progress.budget_ready.store(false, std::memory_order_relaxed);
+    m_worldgen_progress.grid_w.store(0, std::memory_order_relaxed); // no carve to draw
+    m_worldgen_progress.grid_h.store(0, std::memory_order_relaxed);
+    m_carve_view.clear();
 
-        m_worldgen_adopted = true;
-        m_screen           = app_screen::building;
-        return;
-    }
-    std::printf("[begin] no wizard world to adopt: building (make_hard_coded_world)\n");
+    std::printf("[begin] adopted the wizard's world (seed %u, era seed %u): "
+                "make_hard_coded_world not called\n",
+                m_pending_world_params.seed, m_pending_world_params.era_seed);
+    std::fflush(stdout);
+
+    m_worldgen_adopted = true;
+    m_screen           = app_screen::building;
+    return true;
+}
+
+generation_progress& app::building_sink()
+{
+    return m_begin_waits_round6 ? m_wiz_history_progress[wizard_lapse_round_count - 1]
+                                : m_worldgen_progress;
+}
+
+void app::launch_cold_build()
+{
+    std::printf("[begin] no wizard world to adopt: building (make_hard_coded_world, "
+                "then finish_campaign_world)\n");
     std::fflush(stdout);
 
     // BL-1072: every field the wait reads, and the elapsed clock's start.
@@ -623,16 +741,33 @@ void app::begin_new_game()
     m_carve_seen = m_worldgen_progress.carve_epoch.load(std::memory_order_relaxed);
 
     // The works table is an input to generation now (BL-321), so it must be
-    // loaded on THIS thread before the worker starts reading it.
+    // loaded on THIS thread before the worker starts reading it. So is the
+    // recipe registry (BL-1085): the finish bands it and settles on it, and
+    // sol2 is not thread-safe, so it is loaded here and a COPY goes over.
     ensure_works_loaded();
+    load_recipe_registry();
+    auto slot      = std::make_shared<wizard_world_cache>();
+    slot->params   = m_worldgen_params;
+    slot->registry = m_registry;
+    // The finish's two steps are in the bar's plan before the build starts
+    // (generation adds `weight_after` into its total; BL-1085).
+    m_worldgen_progress.weight_after.store(finish_campaign_weight_ms(m_worldgen_params),
+                                           std::memory_order_relaxed);
 
-    // The worker writes only into locals plus the atomics; the finished world is
-    // moved across by the future, so nothing is shared mutable state.
-    m_worldgen_future = std::async(std::launch::async, [this] {
+    // The worker writes only into its slot plus the atomics; the slot is
+    // handed across by the future, so nothing is shared mutable state.
+    m_worldgen_future = std::async(std::launch::async, [this, slot] {
         // m_works is loaded once at startup and never mutated after, so handing
         // the worker a pointer to it shares nothing mutable (BL-321).
-        return make_hard_coded_world(m_worldgen_params, &m_generation_report,
-                                     m_worldgen_cfg, &m_worldgen_progress, &m_works);
+        slot->w = make_hard_coded_world(m_worldgen_params, &slot->report,
+                                        m_worldgen_cfg, &m_worldgen_progress, &m_works);
+        // THE SAME CALL ROUND 6 MAKES, in the same order (STARTUP.md
+        // § Handoff): an adopted world and a cold build open on one state hash.
+        slot->finish = finish_campaign_world(slot->w, slot->report, slot->registry,
+                                             m_worldgen_params, m_worldgen_cfg,
+                                             &m_worldgen_progress);
+        slot->ready  = true;
+        return slot;
     });
 
     m_screen = app_screen::building;
@@ -640,111 +775,62 @@ void app::begin_new_game()
 
 void app::poll_worldgen()
 {
-    // THE VALIDATION RUN (BL-978, warm start retired), in time-boxed batches.
-    // Phase 6 SELECTS a landscape statically; this is its "validate
-    // dynamically, once" (GENERATION_STRATEGY.md § Three passes):
-    // `validation_ticks` real econ ticks on the winner, and the balances,
-    // pools, returns and prices they leave are the opening position play
-    // receives (ERAS.md § The opening position).
+    // --- BL-1085: Begin pressed while round 6 was still building ------------
     //
-    // Still batched one slice per loading-screen frame, and that is a hard
-    // constraint rather than a leftover: an econ tick on a searched landscape
-    // measured ~0.9 s in the RELEASE build (2026-09-03, run_economy_step
-    // dominant), so even twelve ticks inside one frame would sit past the ~5 s
-    // at which Windows judges the app hung and kills it on the next click —
-    // the AppHangB1 stall of 2026-08-12. The window repaints between slices.
-    if (m_validation_ticks_done >= 0)
+    // Keep polling the wizard's futures (the wizard's own draw is not running
+    // on this screen) until round 6 lands; then adopt what it cached, or --
+    // if the landing was stale and dropped its world -- build cold. Either
+    // way the second build only ever starts after the first has finished.
+    if (m_begin_waits_round6)
     {
-        const auto slice_begin = std::chrono::steady_clock::now();
-        constexpr auto slice_budget = std::chrono::milliseconds(50);
-        while (m_validation_ticks_done < validation_ticks &&
-               std::chrono::steady_clock::now() - slice_begin < slice_budget)
+        poll_wizard_history();
+        if (m_wiz_history_future[wizard_lapse_round_count - 1].valid())
+            return; // still running
+        m_begin_waits_round6 = false;
+        std::printf("[begin] round 6 landed\n");
+        std::fflush(stdout);
+        if (!try_adopt_wizard_world())
         {
-            step_economy();
-            ++m_validation_ticks_done;
-            m_worldgen_progress.sub_progress.store(m_validation_ticks_done,
-                                                   std::memory_order_relaxed);
+            launch_cold_build();
+            return; // the cold worker's future is polled from the next call
         }
-        if (m_validation_ticks_done >= validation_ticks)
-        {
-            m_validation_ticks_done = -1;
-            m_validation_run        = false;
-            m_worldgen_progress.sub_total.store(0, std::memory_order_relaxed);
-            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - m_validation_begin).count();
-            char label[48];
-            std::snprintf(label, sizeof label, "validation_run_%d_ticks", validation_ticks);
-            std::printf("[start_new_game] %-24s %6lld ms\n", label,
-                        static_cast<long long>(ms));
-            std::fflush(stdout);
-            // BL-630: the validation run is over, so the trailing figures the
-            // seat card shows now exist (the floor itself reads phase 6's static
-            // score — BL-1020). Seat BEFORE finish_new_game, which is what flips
-            // to `in_game` — the first drawn frame must already have a player.
-            //
-            // BL-1076: THE PLAYER PICKS. Three routes, in precedence order:
-            //   1. `--seat <id>` — a pick made at launch (an agent's route);
-            //   2. the interactive path — open the selection canvas, whose
-            //      Confirm calls finish_new_game itself;
-            //   3. no player to ask (--autostart*, windowed autostart) — the
-            //      weighted draw, said out loud.
-            if (m_seat_pick_arg >= 0)
-            {
-                m_seat_result = rank_spawn_candidates(m_world, m_landscape_winner_score);
-                const corp_command_result r =
-                    take_seat_pick(static_cast<entity_id>(m_seat_pick_arg));
-                if (r == corp_command_result::applied)
-                {
-                    finish_new_game();
-                    return;
-                }
-                std::printf("[seat] --seat %lld REJECTED (%s): nothing seated\n",
-                            m_seat_pick_arg,
-                            r == corp_command_result::rejected_no_corp
-                                ? "rejected_no_corp: no such corporation"
-                                : "rejected_invalid: not a ranked specialist");
-                std::fflush(stdout);
-                if (!m_player_picks_seat)
-                {
-                    // Headless: a pick that was refused is a failed run, never
-                    // a silent fall-back to the draw (the AI-facing-seam rule).
-                    m_seat_pick_failed = true;
-                    return;
-                }
-                open_seat_screen(); // a person is here: let them choose
-                return;
-            }
-            if (m_player_picks_seat)
-            {
-                open_seat_screen();
-                return;
-            }
-            m_seat_drawn_because = "no player to ask (autostart)";
-            seat_player();
-            finish_new_game();
-        }
-        return;
+        // adopted: fall through and take the slot now
     }
 
-    // BL-1073: a world Begin adopted from the wizard is already in m_world, so
-    // there is no worker to wait for -- straight to the tail. (Its sink carries
-    // no budget, so the print below is skipped for it.)
-    const bool adopted = m_worldgen_adopted;
-    m_worldgen_adopted = false;
-    if (!adopted && !m_worldgen_future.valid())
+    // --- The finished world: adopted from the wizard, or the cold worker's ---
+    std::shared_ptr<wizard_world_cache> built;
+    if (m_worldgen_adopted)
+    {
+        m_worldgen_adopted = false;
+        built = std::move(m_worldgen_slot);
+    }
+    else
+    {
+        if (!m_worldgen_future.valid())
+            return;
+        if (m_worldgen_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+            return;
+        built = m_worldgen_future.get();
+    }
+    if (!built || !built->ready)
+    {
+        // Cannot happen by construction (`ready` is the worker's last write and
+        // the future is the synchronisation); said out loud rather than played.
+        std::printf("[begin] FAILED: the build landed no world\n");
+        std::fflush(stdout);
+        m_screen = app_screen::menu;
         return;
-    if (!adopted && m_worldgen_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-        return;
-
-    if (!adopted)
-        m_world = m_worldgen_future.get();
+    }
 
     // BL-754: the generation budget, on the app's own console alongside the
     // `[start_new_game]` phase lines it already prints. Deliberately the same
     // words and the same order as the `[gen budget]` line the harness tier
     // emits, so an app run and a `world_determinism` run can be read against
     // each other digit for digit. The on-screen half is in
-    // draw_building_screen; this is the half that survives into a log.
+    // draw_building_screen; this is the half that survives into a log. The
+    // COLD build's sink only: an adopted world was built on round 6's sink,
+    // and its absence here is begin_adopts_check.js's proof that Begin never
+    // built.
     if (m_worldgen_progress.budget_ready.load(std::memory_order_acquire))
     {
         std::printf("[gen budget] total %lld ms  (pre-settlement %lld, settlement %lld, "
@@ -771,27 +857,66 @@ void app::poll_worldgen()
         std::fflush(stdout);
     }
 
-    // The main-thread tail: setup_world, the Lua economy load, the landscape
-    // search and its winner — then the winner's VALIDATION RUN, the seat, and
-    // play.
-    //
-    // BL-630 straightened this out. The old code branched here into the
-    // starting-corp selection stage, which had to sit in this one frame because
-    // corp_ai excluded the flagged corp and the pool had to be read before
-    // background firms existed. Both constraints are gone: the validation run
-    // goes under spectate with NOBODY seated, and the seat is drawn afterwards
-    // from the specialists (`is_background == false` names that pool explicitly,
-    // so it no longer depends on WHEN the list is read).
+    // --- INTO PLAY: the world, its report, the registry the settle ran on, the
+    // winner's score (the seat's floor and rank, BL-1020) -- MOVED, never
+    // copied (a copied world does not iterate as its original; the slot is
+    // spent). Then the presentation half of Begin (STARTUP.md § Handoff, item
+    // 2) and the seat (item 3).
+    m_world                  = std::move(built->w);
+    m_generation_report      = std::move(built->report);
+    m_registry               = std::move(built->registry);
+    m_landscape_winner_score = built->finish.search.winner_score;
+    built.reset();
     start_new_game_prelude();
+    // BL-568: the cadence key continues from the settle's twelve steps, which
+    // the worker stamped 0..11 (`run_settle`); the first live quarter is 12.
+    m_econ_steps = static_cast<uint64_t>(k_campaign_settle_ticks);
 
-    // Arm the validation run; the batches above run it from the next call.
-    m_validation_run        = true;
-    m_validation_ticks_done = 0;
-    m_econ_steps            = 0; // BL-568: a new campaign's cadence starts at slot 0.
-    m_validation_begin      = std::chrono::steady_clock::now();
-    m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
-    m_worldgen_progress.sub_total.store(validation_ticks, std::memory_order_relaxed);
-    m_screen = app_screen::building;
+    // BL-630: the settle is over, so the trailing figures the seat card shows
+    // exist (the floor itself reads phase 6's static score — BL-1020). Seat
+    // BEFORE finish_new_game, which is what flips to `in_game` — the first
+    // drawn frame must already have a player.
+    //
+    // BL-1076: THE PLAYER PICKS. Three routes, in precedence order:
+    //   1. `--seat <id>` — a pick made at launch (an agent's route);
+    //   2. the interactive path — open the selection canvas, whose
+    //      Confirm calls finish_new_game itself;
+    //   3. no player to ask (--autostart*, windowed autostart) — the
+    //      weighted draw, said out loud.
+    if (m_seat_pick_arg >= 0)
+    {
+        m_seat_result = rank_spawn_candidates(m_world, m_landscape_winner_score);
+        const corp_command_result r =
+            take_seat_pick(static_cast<entity_id>(m_seat_pick_arg));
+        if (r == corp_command_result::applied)
+        {
+            finish_new_game();
+            return;
+        }
+        std::printf("[seat] --seat %lld REJECTED (%s): nothing seated\n",
+                    m_seat_pick_arg,
+                    r == corp_command_result::rejected_no_corp
+                        ? "rejected_no_corp: no such corporation"
+                        : "rejected_invalid: not a ranked specialist");
+        std::fflush(stdout);
+        if (!m_player_picks_seat)
+        {
+            // Headless: a pick that was refused is a failed run, never
+            // a silent fall-back to the draw (the AI-facing-seam rule).
+            m_seat_pick_failed = true;
+            return;
+        }
+        open_seat_screen(); // a person is here: let them choose
+        return;
+    }
+    if (m_player_picks_seat)
+    {
+        open_seat_screen();
+        return;
+    }
+    m_seat_drawn_because = "no player to ask (autostart)";
+    seat_player();
+    finish_new_game();
 }
 
 void app::draw_building_screen()
@@ -818,20 +943,20 @@ void app::draw_building_screen()
 
         // THE ONE WAIT SURFACE (BL-1072): the same bars, caption and elapsed
         // count every wizard loading round draws -- the outer bar weighted by
-        // measured step cost, the inner bar inside every long step. After
-        // generation the winner's validation run (BL-978) takes over
-        // (m_validation_ticks_done >= 0): the outer bar is full, the inner bar
-        // counts its quarters, and the caption says what it is.
-        const bool validating = (m_validation_ticks_done >= 0);
-        ui::draw_generation_wait(m_worldgen_progress, 420.0f,
-                                 validating ? "Proving the field" : nullptr,
-                                 m_golden_dir.empty());
+        // measured step cost, the inner bar inside every long step. The
+        // search and the settle are steps of the same run now (BL-1085), so
+        // the caption names them from the label table like every other step;
+        // while Begin waits on round 6 the sink drawn is that round's.
+        generation_progress& sink = building_sink();
+        ui::draw_generation_wait(sink, 420.0f, nullptr, m_golden_dir.empty());
 
         ImGui::Dummy({420.0f, 8.0f});
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
-        ImGui::TextUnformatted(validating
-            ? "Three years of commerce prove the chosen landscape."
-            : "Four hundred years of history are being lived through.");
+        const int step = sink.label.load(std::memory_order_relaxed);
+        ImGui::TextUnformatted(step == 16 ? "The landscape is searched for the field play opens on."
+                               : step == 17 ? "Three years of commerce prove the chosen landscape."
+                               : m_begin_waits_round6 ? "Round 6 is still building this world."
+                                                      : "Four hundred years of history are being lived through.");
         ImGui::PopStyleColor();
 
         // --- The generation budget, on the screen that spends it (BL-754) ---
@@ -1261,170 +1386,58 @@ void app::start_new_game_prelude()
         m_sim_loop.set_speed(cfg.get_or("default_speed", 2));
     }
 
-    setup_world(m_pending_world_params);
-    mark("setup_world");
-    load_economy();
-    mark("load_economy");
-
-    // BL-365: generate REAL background corporations now that the recipe registry
-    // is loaded (their measured stop condition reads real recipe outputs, which
-    // setup_world's world-gen pass — run before load_economy — cannot see; see
-    // generate_background_firms' own header comment for the full ordering
-    // rationale). Run BEFORE the validation run below (BL-978) so the new firms'
-    // opening balances/pools get the same simulated operating history every
-    // other generated corp receives.
-    // BL-770 PHASE 6 — the landscape is SEARCHED, not simply generated.
+    // --- BL-1085: THE PRESENTATION HALF, AND NOTHING THAT MOVES THE WORLD ----
     //
-    // This is the caller `landscape_score` never had: until now it existed only
-    // inside its own harness, which is why the warm start's retirement (now
-    // BL-978) and the budget were both blocked on an item that had already
-    // "landed". Phase 6 scores candidate landscapes statically — no clock, no
-    // ticks — and applies the winner by a deterministic argmax
-    // (GENERATION_STRATEGY.md § The eight phases).
-    //
-    // ALL THREE AXES ARE LIVE HERE (BL-977). The roster axis used to be a no-op
-    // at this seam — `generate_corporations` appends and had already run inside
-    // make_hard_coded_world, so `regenerate_specialists` was held false and a
-    // third of every round proposed a roster nobody could apply. Every candidate
-    // now REPLACES the world-gen specialists (`remove_specialist_roster`, then
-    // `generate_corporations` from `world::gen_settlement`, the same record
-    // world-gen read) and lays its background firms; the winner is applied the
-    // same way. The road axis is likewise live now that term 5 reads reach COST
-    // rather than the coverage boolean NR-793 showed never flips.
-    //
-    // The seat is drawn AFTER this (seat_player, from the surviving specialists),
-    // so replacing the roster here orphans nothing. What the loading screen's
-    // ledger listed during generation was the world-gen roster; the one the
-    // player meets is the winner's.
-    //
-    // The seed is the same one the bare pass used. Mirrored by
-    // tools/verify/harness_params.hpp `shipped_search_params` — change both.
-    {
-        landscape_search_params sp;
-        sp.regenerate_specialists  = true;
-        sp.seed                    = m_active_world_params.seed ^ 0x8A21F00Du;
-        sp.start.placement_seed    = sp.seed;
-        sp.start.corporation_count = m_worldgen_cfg.corporation_count;
-        // BL-1042 — THE CHARTER BUDGET: the world's own industry-point
-        // stockpile (Beat 1, INDUSTRIALISATION.md Part III), split over the carved
-        // centres by `build_stockpile_budget` and charged at
-        // `stockpile_charter_spend` — its firm price DERIVED from the world's
-        // whole stockpile (BL-1064, NR-907), its other constants named and
-        // ruled in stockpile_budget.hpp (NR-910). ONE budget and ONE spend
-        // reach BOTH `sp` AND the winner's apply below — or the search would
-        // score one world and the app lay another — and the budget is a local
-        // of this block, so it outlives the search and the apply both.
-        //
-        // The span runs by default (BL-1044), so this is a budget world. A
-        // budget no centre can buy a specialist with falls back to the
-        // no-budget world in both the search and the apply (NR-910). On a world
-        // the span did not run on no region holds a point, the budget is EMPTY,
-        // and the apply's legacy branch runs first. MIRRORED by
-        // tools/verify/harness_params.hpp `apply_shipped_landscape` — change
-        // both, and review the two diffs against each other (BL-1031's pins see
-        // world/* only, through the mirror).
-        // MEASURED 2026-09-07 (placement + tier only): ~20 s for 19 evaluations,
-        // ~1.1 s each. The per-round lines the search prints are the live
-        // measurement now that the roster axis regenerates specialists per
-        // candidate; BL-977's report carries the before/after.
-        const stockpile_budget stockpile = build_stockpile_budget(m_world);
-        const charter_spend_params spend = stockpile_charter_spend(stockpile);
-        sp.budget = &stockpile.budget;
-        sp.spend  = spend;
-        const landscape_search_result r = search_landscape(m_world, m_registry, sp);
-        charter_spend_report charter_report;
-        apply_landscape_candidate(m_world, m_registry, r.winner, true,
-                                  &stockpile.budget, spend, &charter_report);
-        if (stockpile.points_total != 0 || stockpile.rejected)
-        {
-            const auto why = [&](stockpile_unspent_reason k) {
-                return static_cast<long long>(stockpile.unspent[static_cast<std::size_t>(k)]);
-            };
-            // BL-1064: an empty budget (rejected, or every point unspent) prices nothing.
-            char price[96] = "no price (an empty budget)";
-            if (!stockpile.budget.empty())
-                std::snprintf(price, sizeof price, "firm price %d (the stock / %lld), specialist %lld",
-                              static_cast<int>(stockpile.firm_price_points),
-                              static_cast<long long>(stockpile.price_divisor),
-                              static_cast<long long>(spend.specialist_price_points()));
-            std::printf("[stockpile_budget] %lld points: %lld to %zu centres, %lld unspent "
-                        "(carve_dropped %lld, carve_no_tile %lld, razed %lld, "
-                        "no_carved_centre %lld, rejected %lld)%s%s; %s; spent %lld of %lld%s\n",
-                        static_cast<long long>(stockpile.points_total),
-                        static_cast<long long>(stockpile.points_to_centres),
-                        stockpile.budget.points().size(),
-                        static_cast<long long>(stockpile.points_unspent()),
-                        why(stockpile_unspent_reason::carve_dropped),
-                        why(stockpile_unspent_reason::carve_no_tile),
-                        why(stockpile_unspent_reason::razed),
-                        why(stockpile_unspent_reason::no_carved_centre),
-                        why(stockpile_unspent_reason::rejected),
-                        stockpile.rejected ? " REJECTED: " : "",
-                        stockpile.rejected ? stockpile.rejection.c_str() : "",
-                        price,
-                        static_cast<long long>(charter_report.points_spent),
-                        static_cast<long long>(charter_report.points_budgeted),
-                        charter_report.refused     ? " (spend REFUSED)"
-                        : charter_report.fell_back ? " (NO SPECIALIST affordable: the no-budget "
-                                                     "world, NR-910)"
-                                                   : "");
-        }
-        // Kept for the seat (BL-1020): the shortlist gates and ranks on this
-        // static score, read at each specialist's holdings, after the settle.
-        m_landscape_winner_score = r.winner_score;
-        std::printf("[landscape_search] winner corps=%d placement=%08X tier=%u  "
-                    "accepted roster=%d placement=%d road_tier=%d of %d rounds\n",
-                    r.winner.corporation_count, r.winner.placement_seed,
-                    static_cast<unsigned>(r.winner.road_tier),
-                    r.accepted_by_axis[0], r.accepted_by_axis[1], r.accepted_by_axis[2],
-                    sp.rounds);
-    }
-    mark("background_firms");
-
-    // AGAIN, and this one is not belt-and-braces (2026-08-17). load_economy's
-    // pass above runs BEFORE this generation pass, so every processor a
-    // background firm authors here kept `no_recipe` for the whole campaign — a
-    // live defect, not a harness artefact: those buildings pay maintenance every
-    // tick and can never produce, and they report as ordinary idleness.
-    // tier_margin measured 26.5% of processing building-ticks recipe-less with no
-    // pass at all and still 11.3% with only the pre-firms pass; this call is the
-    // remaining 11.3%. Idempotent, so running it twice costs one map walk.
-    assign_default_recipes(m_world, m_registry);
-
-    // Seed the balance history with the opening capital. The winner's
-    // validation run (poll_worldgen; `validation_ticks` in app.hpp) appends to
-    // it from here, so every corp opens onto moved balances, non-empty pools
-    // and live market figures rather than a cold zero state. run_verify stays
-    // deterministically cold and never runs the validation ticks.
-    //
-    // This does NOT move the campaign calendar. The clock is rebased in
-    // finish_new_game, so the run consumes no in-game time and play still opens
-    // at `epoch_year` (ERAS.md § The opening position has no calendar meaning).
-    {
-        const auto pit = m_world.corporations.find(m_world.player_entity);
-        ui::push_capped(m_balance_history,
-            pit != m_world.corporations.end() ? pit->second.balance : 0.0f);
-    }
+    // The world in m_world is FINISHED: the worker that built it (round 6's,
+    // or the cold one) ran `finish_campaign_world` -- the genesis history, the
+    // survey states, the band, the recipe passes, the landscape search and the
+    // winner's apply, the twelve-tick settle -- so the search block that sat
+    // here until 2026-09-24 (~20 s on the UI thread, BL-1078's freeze) and the
+    // batched validation run poll_worldgen ran after it are gone, obsoleted
+    // (Ben, 2026-09-24). What remains is what STARTUP.md § Handoff item 2
+    // names: the epoch formatter, the chat line, zoom/focus/frame, the
+    // registry's presentation half (reach budget, works, tech tree, the
+    // unpriced-basket report, the persona bench). The balance series from the
+    // filed returns is seeded in finish_new_game, once the seat is known.
+    setup_presentation(m_pending_world_params);
+    mark("setup_presentation");
+    finish_economy_presentation();
+    mark("economy_presentation");
 }
 
 void app::finish_new_game()
 {
+    // THE BALANCE SERIES FROM THE RETURNS THE SETTLE FILED (STARTUP.md
+    // § Handoff, item 2; BL-1085). The twelve pre-game ticks ran inside the
+    // worker with no presentation half of their own -- no agency comms, no
+    // history samples, no last report (Ben's delegated reading, 2026-09-24:
+    // the ticks have no calendar and no seated corp, so nothing they emitted
+    // had a reader) -- so the header sparkline and the Budget ledger's profit
+    // chart are seeded HERE, from the seated corp's own filed returns: the
+    // opening capital, then each settle quarter's closing balance, income and
+    // expenditure, oldest first, exactly the samples the old validation run
+    // recorded live. Seeded after the seat because the series is the player's.
     {
-        // The validation run's per-phase split (poll_worldgen printed its
-        // total). The last two are the BL-398 split of persona_counsel; they
-        // are sub-totals of it, not additional phases, hence the indented names.
-        static const char* const phase_names[11] = {
-            "convoys", "run_economy_step", "clear_markets", "apply_budget",
-            "tech_gates", "standings_credit", "agency_comms", "persona_counsel",
-            "history_recorders", "  ..bb_export", "  ..pack_eval" };
-        const auto& acc = step_economy_phase_ms();
-        for (std::size_t i = 0; i < acc.size(); ++i)
-            std::printf("[validation phases] %-18s %9.1f ms\n", phase_names[i], acc[i]);
-        std::fflush(stdout);
+        m_balance_history.clear();
+        m_income_history.clear();
+        m_expenditure_history.clear();
+        const auto pit = m_world.corporations.find(m_world.player_entity);
+        if (pit != m_world.corporations.end())
+        {
+            const std::vector<quarterly_return>& rs = pit->second.returns;
+            ui::push_capped(m_balance_history,
+                            rs.empty() ? pit->second.balance : rs.front().balance - rs.front().net);
+            for (const quarterly_return& r : rs)
+            {
+                ui::push_capped(m_balance_history, r.balance);
+                ui::push_capped(m_income_history, r.income);
+                ui::push_capped(m_expenditure_history, r.expenditure);
+            }
+        }
     }
 
     // Rebase the clock one last time. sim_loop measures from construction, so without
-    // this the wall-clock cost of building the world and running the validation run
+    // this the wall-clock cost of building the world and running the settle
     // would land as elapsed in-game days on the first frame of play.
     {
         const int speed = m_sim_loop.speed();
@@ -1447,12 +1460,21 @@ void app::ensure_works_loaded()
     m_works.load_from_lua(m_lua);
 }
 
-void app::load_economy()
+void app::load_recipe_registry()
 {
     // Load the Lua data layer, then build the registry from it (protected calls).
     m_lua.load("scripts/recipes.lua");
     m_lua.load("scripts/economy.lua");
     m_registry.load_from_lua(m_lua);
+}
+
+void app::load_economy()
+{
+    // THE VERIFY PATH (run_verify, its `new_world`): a world built inline by
+    // setup_world, unsearched and unsettled, given its economy here. Begin no
+    // longer comes this way (BL-1085): its world arrives finished from the
+    // worker, registry included, and runs only `finish_economy_presentation`.
+    load_recipe_registry();
 
     // BL-433: gate the roster on the campaign's era band, derived from the epoch
     // year the live world was actually built from. Must happen HERE, after the
@@ -1463,24 +1485,10 @@ void app::load_economy()
     // propellant and spacecraft chains; a 1960 one (the default since BL-1047)
     // sees everything. Ids are untouched either way: the filter masks, it does
     // not remove. The band is read HERE, after generation, and generation never
-    // reads it -- so the epoch that picks it moves no generated world.
-    m_registry.set_era(era_band_for_epoch(m_active_world_params.epoch_year));
-
-    // BL-323 S2b: mirror the reach budget onto ui_state so every placement surface
-    // filters on the same number the authoritative gate uses. Done here, once, right
-    // after the registry is loaded — a surface that filtered on a different budget
-    // would offer tiles construct_building then refuses.
-    m_ui.max_logistics_reach = m_registry.construction().max_logistics_reach;
-
-    // BL-321 Era -1 works table. Usually already loaded by now — world
-    // generation needs it and runs first — but kept here so the ordering is
-    // stated in both places and neither can quietly stop loading it.
-    ensure_works_loaded();
-
-    // BL-087 mock tech/quest tree — display data for the F9 viewer only; no
-    // simulation system reads it (the tech system is post-prototype).
-    m_lua.load("scripts/tech_tree.lua");
-    m_tech_tree.load_from_lua(m_lua);
+    // reads it -- so the epoch that picks it moves no generated world. ONE
+    // function names it (`campaign_band_from_epoch`, world/finish_campaign_world):
+    // the round-6 worker and the harness mirror band through the same body.
+    m_registry.set_era(campaign_band_from_epoch(m_world, m_active_world_params));
 
     // Author processing recipes onto generated assets. The recipe id is a registry
     // index, unknown at generation time, so it is assigned here once the registry
@@ -1493,6 +1501,27 @@ void app::load_economy()
     // never produce, reported as ordinary idleness. 20.3% of processing
     // building-ticks in tier_margin, silently dragging the BL-436 calibration.
     assign_default_recipes(m_world, m_registry);
+
+    finish_economy_presentation();
+}
+
+void app::finish_economy_presentation()
+{
+    // BL-323 S2b: mirror the reach budget onto ui_state so every placement surface
+    // filters on the same number the authoritative gate uses. Done here, once, right
+    // after the registry is in hand — a surface that filtered on a different budget
+    // would offer tiles construct_building then refuses.
+    m_ui.max_logistics_reach = m_registry.construction().max_logistics_reach;
+
+    // BL-321 Era -1 works table. Usually already loaded by now — world
+    // generation needs it and runs first — but kept here so the ordering is
+    // stated in both places and neither can quietly stop loading it.
+    ensure_works_loaded();
+
+    // BL-087 mock tech/quest tree — display data for the F9 viewer only; no
+    // simulation system reads it (the tech system is post-prototype).
+    m_lua.load("scripts/tech_tree.lua");
+    m_tech_tree.load_from_lua(m_lua);
 
     // BL-652 — AN INJECTOR THAT CANNOT PRICE A BASKET ENTRY SAYS SO.
     //
@@ -1553,81 +1582,34 @@ void app::step_economy()
         t = now;
     };
 
-    // BL-568: the cadence key. The day tick (mirrored each frame) is 90n at a
-    // quarter boundary and rotates only half the corp_ai slots; this counter
-    // advances by exactly one per step across the validation run, live play and
-    // --verify, which is the schedule every harness already certifies.
-    m_world.current_econ_tick = static_cast<int>(m_econ_steps++);
-
-    // BL-597: one shared passive/active Logistic Point pool for this tick —
-    // handed to both dispatch_convoys (passive) and run_economy_step's march
-    // pass (active) so the two genuinely contend for one anchor's capacity,
-    // per LOGISTICS.md's bifold table. Local to this tick; never persisted
-    // (LP is a per-tick RATE, ruling on NR-343).
-    lp_pool_map tick_lp_pools;
-    // BL-1066 / BL-995 (Ben, 2026-09-23): the convoy ORDER within the economy
-    // tick is advance -> credit arrivals -> economy -> DISPATCH -> clearing ->
-    // budget ... (SUPPLY.md § Dispatch trigger, "One beat per haul"). A delivery
-    // lands BEFORE its destination clears, so it lists and sells there first;
-    // dispatch sits before the clear because auto-surplus sells every unit a
-    // pool holds above its reservation, so a seller that has not chosen to haul
-    // by the clear has sold at home. Dispatch reads LAST tick's resolved prices
-    // and supply/demand (clear_markets rewrites them only below). Cargo moves
-    // only toward a strictly better net price, so a delivery is not re-exported.
-    advance_convoys(m_world);
-    credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
-    lap(0); // convoys: advance + arrivals
-    // BL-409: under spectate the session has no human seat, so the strategic
-    // tier evaluates every corp — the player's included. Default false, so an
-    // ordinary played session runs exactly as before.
-    //
-    // BL-630 adds the SECOND case with no human seat, and it is the same case
-    // rather than a new exception: through the winner's validation run nobody
-    // has been seated yet (the seat is drawn from what these ticks produce), so
-    // the prohibition this flag lifts has no subject to protect. Every corp is
-    // scorer-driven for every validation tick and every corp files real returns
-    // — which is what makes a viability read possible at all.
-    m_last_econ_report = run_economy_step(m_world, m_registry,
-                                          m_ui.spectating || m_validation_run,
-                                          &tick_lp_pools);
-    // BL-995: dispatch BEFORE the clear — the seller hauls before it sells. It
-    // draws the same tick's LP pool the march (inside run_economy_step) already
-    // drew from: armies claim first (the goods-vs-force priority LOGISTICS.md
-    // says must be chosen, not inherited).
-    dispatch_convoys(m_world, m_registry,
-                     m_registry.logistics_cost(convoy_mode::land),
-                     m_registry.logistics_cost(convoy_mode::space), &tick_lp_pools);
-    lap(1); // economy step (production + corp AI) + dispatch
-    auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
-    lap(2); // market clearing
-    apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
-                 &m_last_econ_report.budgets,
-                 &m_last_econ_report.buildings,        // BL-343: law enforcement seam
-                 &m_last_econ_report.building_labour); // BL-614: wages on the per-building grant
-    lap(3); // budget
-    // Sprint N3: the nation step — score the due nations' weights, spend the
-    // treasury against this tick's claims, dispatch the earmarked surveys. After
-    // apply_budget so the treasury holds this quarter's levy and tariff; before
-    // the tech gates so a `surplus` gate reads the moved balance. Keyed on the
-    // econ counter (BL-568), which step_economy set at its top.
-    run_nation_step(m_world, m_registry, m_last_econ_report, m_world.current_econ_tick);
-    lap(3); // nation step (folded into the budget phase)
-    // BL-344: evaluate the tech gates once per economy tick, after the money loop
-    // has moved balances (a `surplus` gate should read this quarter's balance, not
-    // last quarter's). Monotonic and deterministic; a no-op once everything
-    // earnable is earned.
-    advance_tech_gates(m_world);
-
-    lap(4); // tech gates
-    // BL-262 first slice: cache this tick's standing profile for the Corporations panel
-    // (transient runtime cache, not serialised — same treatment as m_last_econ_report).
-    m_last_corp_standings = compute_corp_standings(m_world, flows);
-    // BL-743: the insolvency wind-up, LAST — it reads the returns this tick's
-    // apply_budget just filed, and everything above already ran against the
-    // field as it stood. Inert at unauthored params; the player's corp is
-    // exempt inside the pass itself.
-    run_firm_exits(m_world, m_registry.firm_exit(), &m_last_econ_report.firm_exits);
-    lap(5); // standings + exits
+    // THE WORLD HALF IS ONE FUNCTION (BL-1085): `run_settle_tick`, the tick the
+    // worker's settle ran twelve times and every harness runs -- convoys,
+    // the economy step and dispatch, the clear, the budget and nation step,
+    // the tech gates, the standings and the exits, in that order and for the
+    // reasons its own header gives. The cadence key (BL-568): this counter
+    // advances by exactly one per step across the settle, live play and
+    // --verify, which is the schedule every harness certifies. BL-409: under
+    // spectate the session has no human seat, so the strategic tier evaluates
+    // every corp -- the player's included; default false, so an ordinary
+    // played session runs exactly as before.
+    std::array<clk::time_point, k_campaign_settle_lap_count + 1> lap_clock{};
+    settle_tick_hooks hooks;
+    hooks.lap_clock = &lap_clock;
+    settle_tick_result tick = run_settle_tick(m_world, m_registry,
+                                              static_cast<int>(m_econ_steps++),
+                                              static_cast<int>(m_sim_loop.day_tick()),
+                                              m_ui.spectating, &hooks);
+    for (int i = 0; i < k_campaign_settle_lap_count; ++i)
+        acc[static_cast<std::size_t>(i)] +=
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                lap_clock[static_cast<std::size_t>(i + 1)] - lap_clock[static_cast<std::size_t>(i)])
+                .count() / 1000.0;
+    t = lap_clock[k_campaign_settle_lap_count];
+    // BL-262: this tick's standing profile for the Corporations panel; the
+    // report for the ledgers (transient runtime caches, not serialised).
+    m_last_econ_report    = std::move(tick.report);
+    m_last_corp_standings = std::move(tick.standings);
+    const auto& flows     = tick.flows;
 
     // Post-step presentation (BL-361: extracted to core/session_history.cpp):
     // the nation-voiced agency comms (BL-212), the persona counsel posts
@@ -1638,20 +1620,15 @@ void app::step_economy()
         const int day = static_cast<int>(m_sim_loop.day_tick());
         session_history::post_nation_agency_comms(m_world, m_last_econ_report, m_chat, day);
         lap(6); // agency comms
-        // BL-468: battle traffic to the Field channel. Suppressed through the
-        // validation run for the same reason counsel is — a pre-game battle
-        // would post lines the player never saw, all stamped on the same day.
-        if (!m_validation_run)
-            session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
-        // Persona counsel is suppressed through the validation run (2026-08-12,
-        // under the warm start it replaces): measured at ~1.05 s/tick — 93% of
-        // the AppHangB1 stall — against ~80 ms for everything else combined,
-        // and what it buys there is advisory chat for quarters the player never
-        // saw, all stamped on the same pre-game day. Live play keeps it (and
-        // inherits its cost; NR-210 records the open in-game hitch).
-        if (!m_validation_run)
-            session_history::post_persona_counsel(m_world, m_persona_bench,
-                                                  m_counsel_channel, m_chat, day);
+        // BL-468: battle traffic to the Field channel. The settle never comes
+        // through here (it runs inside the worker, BL-1085), so nothing
+        // pre-game posts lines the player never saw.
+        session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
+        // Persona counsel: ~1.05 s/tick measured 2026-08-12 (NR-210 records
+        // the open in-game hitch). It was suppressed through the old validation
+        // run; the settle now has no presentation half at all.
+        session_history::post_persona_counsel(m_world, m_persona_bench,
+                                              m_counsel_channel, m_chat, day);
         lap(7); // persona counsel
         session_history::history_stores h{
             m_balance_history, m_income_history, m_expenditure_history,
@@ -1678,30 +1655,15 @@ world_params app::fresh_world_params() const
 
 void app::setup_world(world_params params)
 {
-    m_active_world_params = params;          // remember the descriptor the live world was built from
-
-    // BL-705: the tick calendar counts from the year the world was GENERATED at,
-    // not from a constant. This and the load path below are the only two places
-    // m_active_world_params is assigned, so they are the two places that publish
-    // it. Display only — nothing simulated reads it back.
-    ui::fmt::set_campaign_epoch_year(static_cast<int>(params.epoch_year));
-
-    // Capture the Planetology report alongside the world (BL-167). This is the one
-    // call site, so filling it here gives both run() and run_verify() a report to
-    // show without a second generation pass. It is presentation data only — the app
-    // holds it, the `world` struct never sees it.
+    // THE VERIFY PATH (run_verify, its `new_world`; BL-1085). Begin no longer
+    // comes through here: its world arrives from the worker with the genesis
+    // history and survey states already in it (`finish_campaign_world`), and
+    // Begin runs `setup_presentation` alone. A world is absent here only when
+    // the caller did not go through a worker, so it is generated inline.
     // World-gen balance values (BL-236): loaded here, ahead of load_economy's
     // recipes/economy pass, since make_hard_coded_world runs before it. A missing
     // or malformed world_gen.lua throws (BL-110's protected-call-throws-on-error
     // rule), so a broken mod script fails loudly rather than silently reverting.
-    // GENERATION ITSELF NO LONGER HAPPENS HERE (2026-08-12). `begin_new_game`
-    // runs make_hard_coded_world on a worker thread and hands the finished world
-    // to `poll_worldgen`, which stores it in m_world before calling this. The
-    // Lua config load stays on the main thread either way — sol2 is not
-    // thread-safe — and is done by begin_new_game before the worker starts.
-    //
-    // A world is only absent here if a caller reached setup_world without going
-    // through begin_new_game (run_verify does), so generate inline in that case.
     if (m_world.bodies.empty())
     {
         world_gen_config gen_cfg;
@@ -1718,6 +1680,24 @@ void app::setup_world(world_params params)
     // presentation-only and never otherwise reaches `world` — this is that bridge,
     // and it must run exactly once per generation (not idempotent).
     seed_genesis_history(m_world, m_generation_report);
+
+    setup_presentation(params);
+
+    // Seed survey states (BL-067): home (and the star) open surveyed; every other
+    // body opens hidden until the player dispatches a survey.
+    init_survey_states(m_world);
+    m_last_survey_day = 0;
+}
+
+void app::setup_presentation(const world_params& params)
+{
+    m_active_world_params = params;          // remember the descriptor the live world was built from
+
+    // BL-705: the tick calendar counts from the year the world was GENERATED at,
+    // not from a constant. This and the load path below are the only two places
+    // m_active_world_params is assigned, so they are the two places that publish
+    // it. Display only — nothing simulated reads it back.
+    ui::fmt::set_campaign_epoch_year(static_cast<int>(params.epoch_year));
 
     // Open the comms log with a deterministic epoch line (BL-205): the Public
     // channel exists from campaign start, so the panel is never an empty shell.
@@ -1774,10 +1754,8 @@ void app::setup_world(world_params params)
     // null state — re-clicking the active lens clears back here. See LENSES.md.
     m_ui.overlay = overlay_mode::none;
 
-    // Seed survey states (BL-067): home (and the star) open surveyed; every other
-    // body opens hidden until the player dispatches a survey. Shared by run() and
-    // run_verify() so both start from the same deterministic survey state.
-    init_survey_states(m_world);
+    // The survey day counter restarts with the view (the survey STATES are
+    // world state: `init_survey_states`, run once by whoever built the world).
     m_last_survey_day = 0;
 }
 
@@ -2054,8 +2032,8 @@ bool app::load_game_from(const std::string& path)
     // after a load rather than on the second.
     m_world.current_day_tick = static_cast<int>(env.day_tick);
     // The cadence counter resumes where an unsaved campaign would be: the
-    // validation run's steps plus every live quarter since (BL-568).
-    m_econ_steps = static_cast<uint64_t>(validation_ticks) + env.econ_tick;
+    // settle's steps plus every live quarter since (BL-568).
+    m_econ_steps = static_cast<uint64_t>(k_campaign_settle_ticks) + env.econ_tick;
     m_world.current_econ_tick = static_cast<int>(m_econ_steps);
 
     m_balance_history     = std::move(env.balance_history);

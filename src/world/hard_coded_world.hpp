@@ -257,6 +257,12 @@ struct world_params
 /// worker thread and reads these from the render thread every frame. No mutex,
 /// no callback, no re-entrant rendering. `stage` is monotonic and never exceeds
 /// `stage_count`, so a reader can always form a fraction.
+///
+/// One `ms_step` slot per captioned step label -- generation's sixteen plus
+/// the two `finish_campaign_world` adds after it (BL-1085): the search and
+/// the settle. `generation_stage_labels` below is held to this by static_assert.
+inline constexpr int generation_step_slot_count = 18;
+
 struct generation_progress
 {
     std::atomic<int> stage{0};       ///< Passes completed so far.
@@ -289,10 +295,18 @@ struct generation_progress
     std::atomic<int64_t> weight_total{0};
     std::atomic<int64_t> weight_done{0}; ///< Steps finished, summed.
     std::atomic<int64_t> weight_now{0};  ///< The step under way.
+    /// THE CALLER'S OWN STEPS AFTER GENERATION (BL-1085): the weight of what
+    /// the caller will run on this sink once `make_hard_coded_world` returns
+    /// -- `finish_campaign_world`'s search and settle, on round 6 and the cold
+    /// build; zero on a round that stops early. Set by the caller after
+    /// `begin_wait` and before the worker starts; generation adds it into
+    /// `weight_total` when it publishes its plan and leaves it UNDONE at its
+    /// end, so the bar never reaches its end early and never steps back.
+    std::atomic<int64_t> weight_after{0};
 
     /// Measured wall clock per step label, for the log (BL-1072). Write-only
     /// from the worker, filled as each step ends; NEVER read by generation.
-    std::array<std::atomic<int32_t>, 16> ms_step{};
+    std::array<std::atomic<int32_t>, generation_step_slot_count> ms_step{};
 
     // --- Render-thread only (BL-1072) ---------------------------------------
     //
@@ -314,6 +328,7 @@ struct generation_progress
         weight_total.store(0, std::memory_order_relaxed);
         weight_done.store(0, std::memory_order_relaxed);
         weight_now.store(0, std::memory_order_relaxed);
+        weight_after.store(0, std::memory_order_relaxed);
         for (auto& m : ms_step) m.store(0, std::memory_order_relaxed);
         wait_began = std::chrono::steady_clock::now();
         wait_shown = 0.0f;
@@ -559,10 +574,15 @@ inline const char* const generation_stage_labels[] = {
     "Running the exploration age", // 13 — 1200 -> 1660, after the ancient era
     "Running the Industrialisation span", // 14 — 1660 -> 1960, after the exploration age (BL-1040)
     "Tracing the old roads", // 15 — re-captions stage 10: the history's corridors stamped (BL-1072)
+    // The two steps `finish_campaign_world` runs AFTER generation on the same
+    // sink (BL-1085): never entered by make_hard_coded_world, never counted by
+    // generation_stage_count; weighted like every other step.
+    "Searching the landscape", // 16 — phase 6's search and the winner's apply
+    "Proving the field",       // 17 — the twelve-tick settle
 };
 inline constexpr int generation_stage_label_count =
     static_cast<int>(sizeof(generation_stage_labels) / sizeof(generation_stage_labels[0]));
-static_assert(generation_stage_label_count <= 16,
+static_assert(generation_stage_label_count <= generation_step_slot_count,
               "generation_progress::ms_step holds one slot per stage label");
 
 /// BL-1053: how many stages a `make_hard_coded_world` call on @p cfg will

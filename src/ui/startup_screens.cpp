@@ -369,6 +369,18 @@ void app::launch_wizard_history_run(int lapse_index)
         drop_wizard_world("round 6 is running its build again");
         slot = std::make_shared<wizard_world_cache>();
         slot->params = m_pending_world_params;
+        // BL-1085: ROUND 6 DOES ALL OF BEGIN'S WORK. After its build the worker
+        // runs `finish_campaign_world` -- the search, the winner, the twelve-
+        // tick settle -- on the registry it is handed: loaded from Lua HERE, on
+        // the main thread (sol2 is not thread-safe), and COPIED into the slot,
+        // the `m_works` pattern. The worker bands the copy from the world it
+        // built; Begin moves it into m_registry, so play runs on the registry
+        // the settle ran on. The finish's two steps join the bar's plan before
+        // the build starts (generation adds `weight_after` into its total).
+        load_recipe_registry();
+        slot->registry = m_registry;
+        prog.weight_after.store(finish_campaign_weight_ms(m_pending_world_params),
+                                std::memory_order_relaxed);
         m_wiz_world_pending = slot;
     }
 
@@ -379,6 +391,13 @@ void app::launch_wizard_history_run(int lapse_index)
         ui::history_lapse lapse = lapse_from_report(rep, lapse_index, /*adopted=*/false);
         if (slot)
         {
+            // THE SAME CALL BEGIN'S COLD WORKER MAKES, in the same order
+            // (STARTUP.md § Handoff), so an adopted world and a cold build open
+            // the campaign on one state hash. The record above was read off
+            // the report BEFORE the finish, which reads the report and never
+            // writes it.
+            slot->finish = finish_campaign_world(w, rep, slot->registry, params, hist_cfg,
+                                                 &m_wiz_history_progress[lapse_index]);
             // MOVED, never copied (see wizard_world_cache). `ready` is the
             // worker's last write; the future landing is what publishes it.
             slot->w      = std::move(w);
@@ -452,10 +471,11 @@ void app::poll_wizard_history()
         {
             m_wiz_world = std::move(world_slot);
             std::printf("[wizard world] cached for Begin (seed %u, era seed %u, "
-                        "span seeds %u/%u/%u/%u)\n",
+                        "span seeds %u/%u/%u/%u): searched and settled, %zu corporations\n",
                         m_wiz_world->params.seed, m_wiz_world->params.era_seed,
                         m_wiz_world->params.span_seed[0], m_wiz_world->params.span_seed[1],
-                        m_wiz_world->params.span_seed[2], m_wiz_world->params.span_seed[3]);
+                        m_wiz_world->params.span_seed[2], m_wiz_world->params.span_seed[3],
+                        m_wiz_world->w.corporations.size());
             std::fflush(stdout);
         }
 
@@ -1860,7 +1880,22 @@ void app::draw_generation_screen()
             if (m_wiz_round < wizard_round_count - 1)
             {
                 ++m_wiz_round;
-                m_wiz_dirty = true;
+                // Dirty on the PLANETOLOGY rounds only, as the walk always
+                // meant (the chain preview and the surface build re-run per
+                // round); on a lapse round the Next press never dirties, and a
+                // dirty flag there re-runs the chain, which invalidates every
+                // lapse round below it and drops round 6's slot mid-build.
+                if (m_wiz_round < wizard_planetology_round_count)
+                    m_wiz_dirty = true;
+                // ARRIVING ON A LAPSE ROUND STARTS ITS RUN, here as on the Next
+                // press above (BL-1085): the walk used to skip the handler, so
+                // no round ever ran and Begin always built cold -- the one
+                // path the item exists to retire. Same guard as the press.
+                const int arrived = m_wiz_round - wizard_planetology_round_count;
+                if (arrived >= 0 && arrived < wizard_lapse_round_count
+                    && m_wiz_history[arrived].empty()
+                    && !m_wiz_history_future[arrived].valid())
+                    launch_wizard_history_run(arrived);
             }
             else
             {

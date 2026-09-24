@@ -304,8 +304,11 @@ int app::run_autostart()
     // Poll on a wall clock, not a spin count — the interactive app polls once
     // per frame, and a tight loop finishes 600k iterations long before a 25 s
     // generation does (which is exactly how the first cut of this reported a
-    // false failure).
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(300);
+    // false failure). The budget is the adopt path's (BL-1085): the cold
+    // worker now runs the search and the twelve-tick settle after its build —
+    // measured 2026-09-24 in Release at 85 s + 29 s + 114 s on seed 0 — and
+    // the 300 s this once allowed reported that as a hang.
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1800);
     while (m_screen != app_screen::in_game && !m_seat_pick_failed
            && std::chrono::steady_clock::now() < deadline)
     {

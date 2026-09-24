@@ -8,7 +8,10 @@
 #include "world/corp_command.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
+#include "world/finish_campaign_world.hpp" // BL-1085: --serve opens on the searched, settled world
 #include "world/hard_coded_world.hpp"
+#include "world/works_roster.hpp"
+#include "world/world_gen_config.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
@@ -121,44 +124,39 @@ namespace {
 // Responses are one line each except BLACKBOARD, which is N JSONL lines + END.
 int run_serve(int ticks, long long as_corp, bool as_any)
 {
+    // BL-1085 -- THE CAMPAIGN START THE APP OPENS ON, searched and settled
+    // (STARTUP.md § Handoff: "run_serve adopts the searched and settled
+    // world"). The world is built from world_gen.lua's PARSED config and the
+    // works table, then `finish_campaign_world` runs -- the band, the recipe
+    // passes, the landscape search and its winner, the twelve-tick settle --
+    // the same call in the same order as round 6's worker and Begin's cold
+    // worker, so the state hash printed below equals a cold `--autostart`'s on
+    // the same (default) params. Until 2026-09-24 this path laid the UNSEARCHED
+    // seed candidate (NR-909); `--verify` still does, for its goldens.
     lua_state lua;
+    lua.load("scripts/world_gen.lua");
+    world_gen_config cfg{};
+    cfg.load_from_lua(lua);
+    works_registry works;
+    lua.load("scripts/works.lua");
+    works.load_from_lua(lua);
     lua.load("scripts/recipes.lua");
     lua.load("scripts/economy.lua");
     recipe_registry reg;
     reg.load_from_lua(lua);
 
-    world w = make_hard_coded_world();
-
-    const uint16_t default_recipe = reg.default_recipe_id(); // BL-429
-    for (auto& [id, b] : w.buildings)
-        if (b.type == building_type::processing_facility && b.recipe == no_recipe)
-            b.recipe = default_recipe;
-
-    // BL-1044 — THE CHARTER BUDGET, SPENT ON THE SEED CANDIDATE (Ben,
-    // 2026-09-21, NR-909). This path does not search. The Industrialisation span
-    // runs by default (make_hard_coded_world()'s default params, seed 0), so
-    // its world carries a stockpile budget, and a non-empty one is spent as the
-    // harness's unsearched apply spends it — the search's seed candidate. An
-    // EMPTY budget (a world the span did not run on, or a rejected one) lays
-    // exactly the BL-365 call below, byte for byte.
-    const seed_candidate_spend scs = spend_stockpile_on_seed_candidate(
-        w, reg, /*world_seed=*/0u, world_gen_config{}.corporation_count);
-    if (!scs.spent)
-    {
-        if (scs.stockpile.rejected)
-            std::fprintf(stderr, "[stockpile_budget] run_serve: the stockpile budget was REJECTED "
-                                 "(%s); the pre-budget web is laid\n", scs.stockpile.rejection.c_str());
-        // BL-365: real background corporations, generated now that reg is loaded.
-        generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
-    }
-    else
-        std::fprintf(stderr, "[stockpile_budget] run_serve: %lld points spent on the seed candidate "
-                             "(%zu specialists, %zu firms)%s\n",
-                     static_cast<long long>(scs.report.points_spent),
-                     scs.report.specialists.size(), scs.report.firms.size(),
-                     scs.report.refused     ? " — spend REFUSED, the no-budget world"
-                     : scs.report.fell_back ? " — no specialist affordable, the no-budget world (NR-910)"
-                                            : "");
+    const world_params params{};
+    generation_report  rep;
+    world w = make_hard_coded_world(params, &rep, cfg, /*progress=*/nullptr, &works);
+    const finish_campaign_result fin =
+        finish_campaign_world(w, rep, reg, params, cfg, /*progress=*/nullptr);
+    // Before the warm-up ticks: the same moment --autostart hashes (after the
+    // settle, before play), so the two lines compare digit for digit.
+    std::fprintf(stderr, "[serve] searched and settled: %zu corporations, winner placement=%08X; "
+                         "state_hash=%016llX seed=%u\n",
+                 w.corporations.size(), fin.search.winner.placement_seed,
+                 static_cast<unsigned long long>(w.state_hash(w.current_day_tick)),
+                 params.seed);
 
     // BL-387: the session actor, resolved after world construction so the
     // default can be the player corp. Only meaningful when !as_any; a pinned

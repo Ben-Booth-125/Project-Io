@@ -119,7 +119,9 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 // 2026-09-07 measurement), so a harness that builds N worlds pays ~20 s x N
 // more than it did. That is the price of measuring the subject.
 
+#include "world/campaign_settle.hpp"        // BL-1085: THE tick and THE settle (promoted from here)
 #include "world/corporation_generation.hpp" // assign_default_recipes
+#include "world/finish_campaign_world.hpp"  // BL-1085: the band, the search params
 #include "world/landscape_search.hpp"
 #include "world/stockpile_budget.hpp"     // BL-1042: the shipped path's charter budget
 #include "world/world.hpp"
@@ -200,12 +202,8 @@ inline landscape_search_params shipped_search_params(
     std::uint32_t world_seed,
     int corporation_count = world_gen_config{}.corporation_count)
 {
-    landscape_search_params sp;
-    sp.regenerate_specialists  = true;
-    sp.seed                    = world_seed ^ 0x8A21F00Du;
-    sp.start.placement_seed    = sp.seed;
-    sp.start.corporation_count = corporation_count;
-    return sp;
+    // BL-1085: the campaign's own params, not a restatement of them.
+    return campaign_search_params(world_seed, corporation_count);
 }
 
 /// Lay the shipped start's economic substrate onto @p w — a fresh
@@ -375,7 +373,7 @@ inline void print_shipped_landscape(const shipped_landscape& s)
 
 /// `app::validation_ticks` (app.hpp:746), restated because app.hpp brings SDL.
 /// If the app's number moves, this one moves with it.
-inline constexpr int k_app_validation_ticks = 12;
+inline constexpr int k_app_validation_ticks = k_campaign_settle_ticks; // world/campaign_settle.hpp
 
 /// Everything the app holds for one campaign start that the world was built
 /// from. Owned by the caller, so two starts (a reproduction check) never share
@@ -443,7 +441,9 @@ inline void build_app_base_world(lua_state& lua, const world_params& params,
     lua.load("scripts/recipes.lua");           // app.cpp:1153
     lua.load("scripts/economy.lua");           // app.cpp:1154
     out.reg.load_from_lua(lua);                // app.cpp:1155
-    out.reg.set_era(era_band_for_epoch(params.epoch_year)); // app.cpp:1165
+    // BL-1085: the ONE band function the round-6 worker, load_economy and this
+    // mirror share; BL-1101 (band from history) replaces its body.
+    out.reg.set_era(campaign_band_from_epoch(out.w, params));
     // app.cpp:1176 ensure_works_loaded: already loaded above. app.cpp:1180-1181
     // (tech_tree.lua) and 1220-1228 (persona bench) write no world state, and
     // app.cpp:1209-1221 only reads it.
@@ -492,10 +492,8 @@ inline void build_app_start_world(lua_state& lua, const world_params& params,
 /// and src/ui, outside this build. So a tick's figure is a lower bound on the
 /// app's step_economy, and the gap WIDENS WITH DENSITY: the comms and the
 /// recorders walk corporations, buildings and markets, which a denser web grows.
-inline constexpr int k_app_tick_phase_count = 6;
-inline constexpr const char* k_app_tick_phase_names[k_app_tick_phase_count] = {
-    "convoys", "run_economy_step", "clear_markets", "apply_budget+nation_step",
-    "tech_gates", "standings+credit+firm_exits" };
+inline constexpr int k_app_tick_phase_count = k_campaign_settle_lap_count;
+inline constexpr const char* const* k_app_tick_phase_names = k_campaign_settle_lap_names;
 
 struct app_tick_timing
 {
@@ -566,65 +564,34 @@ inline double ms_between(clk::time_point a, clk::time_point b)
 /// `k_app_tick_phase_names`. It is a READ hook (world_copy_determinism digests the
 /// world there) and must not write the world. A hooked tick's @p timing would
 /// count the hook inside the next lap, so an instrument times OR hooks, not both.
+///
+/// BL-1085: NO LONGER A RESTATEMENT. The tick body is `run_settle_tick`
+/// (world/campaign_settle.hpp), the one function the app's `step_economy`,
+/// the round-6 worker's settle and every harness call; this is that call
+/// with the settle's tick state (day tick 0, spectating) and the timing and
+/// hook plumbing an instrument wants.
 inline void run_app_validation_tick(world& w, const recipe_registry& reg, int econ_step,
                                     app_tick_timing* timing = nullptr,
                                     void (*after_lap)(const world&, int lap, void* ctx) = nullptr,
                                     void* after_lap_ctx = nullptr)
 {
-    using harness_timing_detail::clk;
     using harness_timing_detail::ms_between;
-    constexpr int k_validation_day_tick = 0; // m_sim_loop.day_tick(), see above
-    const auto lap_done = [&](int lap) {
-        if (after_lap != nullptr)
-            after_lap(w, lap, after_lap_ctx);
-    };
-
-    const clk::time_point t0 = clk::now();
-    w.current_econ_tick = econ_step;                                  // app.cpp:1258
-    lp_pool_map tick_lp_pools;                                        // app.cpp step_economy
-    advance_convoys(w);                  // BL-995 order: advance -> arrivals -> economy -> dispatch -> clear
-    credit_arrived_convoys(w, k_validation_day_tick);
-    const clk::time_point t1 = clk::now();
-    lap_done(0);
-    // app.cpp:1281-1283: `m_ui.spectating || m_validation_run`, and
-    // m_validation_run is true for every tick of this run (app.cpp:653).
-    economy_report report = run_economy_step(w, reg, /*spectating=*/true,
-                                             &tick_lp_pools);
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // BL-995: before the clear
-                     reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
-    const clk::time_point t2 = clk::now();
-    lap_done(1);
-    const auto flows = clear_markets(w, reg, report);                 // app.cpp:1285
-    const clk::time_point t3 = clk::now();
-    lap_done(2);
-    apply_budget(w, reg, flows, report.workforce_contention,          // app.cpp:1287-1290
-                 &report.budgets, &report.buildings, &report.building_labour);
-    run_nation_step(w, reg, report, w.current_econ_tick);             // app.cpp:1297
-    const clk::time_point t4 = clk::now();
-    lap_done(3);
-    advance_tech_gates(w);                                            // app.cpp:1303
-    const clk::time_point t5 = clk::now();
-    lap_done(4);
-    // Phase 5, the app's lap(5) (app.cpp:1315): standings + convoy credit + exits.
-    // compute_corp_standings reads a const world into the app's UI cache; the
-    // harness discards it (nothing in a world reads that cache).
-    (void)compute_corp_standings(w, flows);
-    run_firm_exits(w, reg.firm_exit(), &report.firm_exits);
-    const clk::time_point t6 = clk::now();
-    lap_done(5);
-    // app.cpp:1317-1354, laps 6-8: agency comms, the history recorders and the
-    // strategy readout (counsel and battle dispatches are suppressed through
-    // this run by the app). Presentation over a const world, NOT mirrored and
-    // NOT TIMED — so tick_ms is a lower bound on the app's tick.
+    std::array<std::chrono::steady_clock::time_point, k_campaign_settle_lap_count + 1> clock{};
+    settle_tick_hooks hooks;
+    hooks.after_lap = after_lap;
+    hooks.ctx       = after_lap_ctx;
+    hooks.lap_clock = &clock;
+    (void)run_settle_tick(w, reg, econ_step, /*day_tick=*/0, /*spectating=*/true, &hooks);
+    // The app's laps 6-8 (agency comms, the history recorders, the strategy
+    // readout) are presentation over a const world, NOT run here -- so tick_ms
+    // is a lower bound on the app's live tick. (The settle itself never runs
+    // them anywhere: it is the same call inside the generation worker.)
     if (timing != nullptr)
     {
-        timing->tick_ms.push_back(ms_between(t0, t6));
-        timing->phase_ms[0] += ms_between(t0, t1);
-        timing->phase_ms[1] += ms_between(t1, t2);
-        timing->phase_ms[2] += ms_between(t2, t3);
-        timing->phase_ms[3] += ms_between(t3, t4);
-        timing->phase_ms[4] += ms_between(t4, t5);
-        timing->phase_ms[5] += ms_between(t5, t6);
+        timing->tick_ms.push_back(ms_between(clock[0], clock[k_campaign_settle_lap_count]));
+        for (int i = 0; i < k_campaign_settle_lap_count; ++i)
+            timing->phase_ms[i] += ms_between(clock[static_cast<std::size_t>(i)],
+                                              clock[static_cast<std::size_t>(i + 1)]);
     }
 }
 
@@ -696,43 +663,23 @@ inline void run_app_live_window(world& w, const recipe_registry& reg, int first_
         advance_orbits(w, static_cast<double>(k_econ_tick_days));        // app.cpp:385
         advance_surveys(w, k_econ_tick_days);                             // app.cpp:395
         w.current_day_tick = day;                                         // app.cpp:401
-        const clk::time_point t0 = clk::now();
-
-        // app.cpp:410-420 -> app::step_economy
-        w.current_econ_tick = first_econ_step + (k - 1);                  // app.cpp:1258
-        lp_pool_map tick_lp_pools;                                        // app.cpp step_economy
-        advance_convoys(w);              // BL-995 order: advance -> arrivals -> economy -> dispatch -> clear
-        credit_arrived_convoys(w, day);
-        const clk::time_point t1 = clk::now();
-        economy_report report = run_economy_step(w, reg, /*spectating=*/false, // app.cpp:1281-1283
-                                                 &tick_lp_pools);
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // BL-995: before the clear
-                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
-        const clk::time_point t2 = clk::now();
-        const auto flows = clear_markets(w, reg, report);                 // app.cpp:1285
-        const clk::time_point t3 = clk::now();
-        apply_budget(w, reg, flows, report.workforce_contention,          // app.cpp:1287-1290
-                     &report.budgets, &report.buildings, &report.building_labour);
-        run_nation_step(w, reg, report, w.current_econ_tick);             // app.cpp:1297
-        const clk::time_point t4 = clk::now();
-        advance_tech_gates(w);                                            // app.cpp:1303
-        const clk::time_point t5 = clk::now();
-        // Phase 5, the app's lap(5) (app.cpp:1315): standings + convoy credit + exits.
-        (void)compute_corp_standings(w, flows);
-        run_firm_exits(w, reg.firm_exit(), &report.firm_exits);
-        const clk::time_point t6 = clk::now();
-        // app.cpp:1317-1354, laps 6-8: NOT mirrored, NOT timed (see above).
+        // app.cpp's in_game frame loop -> app::step_economy's world half, which
+        // IS `run_settle_tick` (BL-1085): the live tick state is the day tick and
+        // spectating = false (the seated corp is excluded from the scorer).
+        std::array<std::chrono::steady_clock::time_point, k_campaign_settle_lap_count + 1> lc{};
+        settle_tick_hooks hooks;
+        hooks.lap_clock = &lc;
+        (void)run_settle_tick(w, reg, first_econ_step + (k - 1), day, /*spectating=*/false,
+                              &hooks);
+        // The app's laps 6-8: NOT mirrored, NOT timed (see above).
 
         if (timing != nullptr)
         {
-            timing->between_ms += ms_between(b0, t0);
-            timing->tick_ms.push_back(ms_between(t0, t6));
-            timing->phase_ms[0] += ms_between(t0, t1);
-            timing->phase_ms[1] += ms_between(t1, t2);
-            timing->phase_ms[2] += ms_between(t2, t3);
-            timing->phase_ms[3] += ms_between(t3, t4);
-            timing->phase_ms[4] += ms_between(t4, t5);
-            timing->phase_ms[5] += ms_between(t5, t6);
+            timing->between_ms += ms_between(b0, lc[0]);
+            timing->tick_ms.push_back(ms_between(lc[0], lc[k_campaign_settle_lap_count]));
+            for (int i = 0; i < k_campaign_settle_lap_count; ++i)
+                timing->phase_ms[i] += ms_between(lc[static_cast<std::size_t>(i)],
+                                                  lc[static_cast<std::size_t>(i + 1)]);
             // app.cpp:1323,1338 — counsel is handed the DAY tick. A COUNT, not a
             // cost: BL-398 bounds the export and the evaluation to the one
             // open-channel corp; only the sort and the channels walk the set.
