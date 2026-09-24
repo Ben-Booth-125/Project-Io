@@ -501,6 +501,49 @@
     "docs/ai/ACTIONS.json"
    ],
    "design": "DESIGNED WITH BEN, 2026-09-24 (the design session NR-898 (12) required before any code read). STARTUP.md § The seat owns it — read the whole section; CORPORATION_GENERATION.md § The spawn shortlist, and the seat was amended the same day. BL-880 (cancelled) was the first design and is superseded by the section.\n\nTHE RULINGS. (1) A ranked list beside the map; the map is the home body at the wizard's world and highlights the hovered row's firm (HQ, works, home market catchment). (2) EVERY specialist is offered, in static-score order; the viability floor MARKS the ones below it and they stay pickable. (3) The card shows four things: industry and goods; HQ and home market with its prices for the firm's goods and inputs; cash, debt and assets; its nation and that nation's stance. (4) Picking opens a briefing (the opening position in prose; for a marked firm, why the floor marked it), then Confirm seats the player and opens play, Back returns with nothing changed. (5) The seat is reproducible from (seed, pick).\n\nTHE WORK. The canvas at Begin over the adopted world (BL-1073 keeps it); the seat step re-pointed from the weighted draw to the pick (the draw stays for --verify/--serve/headless paths that have no player to ask, and says so); the pick as a command so an agent can make it (ACTIONS.json entry — the wizard is out of the dictionary's scope, but seating a corporation is a game act, not a wizard control: confirm with Ben if in doubt); question_log.json entry with the surface's question ('which corporation am I?').\n\nDONE WHEN. A live click-through: Begin -> list + map -> hover highlights -> pick -> briefing -> Confirm -> play opens seated on the chosen firm; Back returns unchanged; a marked firm is pickable; (seed, pick) reproduces the seat (state hash); question_log and ACTIONS entries written."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1077",
+   "short_name": "VILLAGE_ROADS_COST",
+   "author": "Claude (measured by BL-1072's gen_step_costs, 2026-09-24)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Laying village roads is most of every world build: 30-61 s of a 40-83 s Release build",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/road_generation.cpp",
+    "tools/verify/gen_step_costs.cpp"
+   ],
+   "design": "MEASURED 2026-09-24 (tools/verify/gen_step_costs, Release, shipped settings, BL-1072): generate_roads costs 30-61 s of a 40-83 s build, ~90% of it placing village roads — ~5,900 villages at ~4.7 ms each (a path search per village). BL-1072 made the wait legible, not shorter; round 6 (BL-1068) and Begin's cold path both pay it. No doc owns a generation time budget (BL-754 reports per-pass clocks and asserts none).\n\nTHE WORK. Profile the per-village cost (the A* per village? a shared field?), then bound it without changing the roads laid — e.g. one multi-source search per centre instead of one per village, or a cached reach field — so the digests hold; if a bound must change the roads, that is Ben's call (it moves the world). LOGISTICS.md § the ancient network owns how village roads are laid.\n\nDONE WHEN. generate_roads under ~10 s Release on the library seeds, world_determinism digests unchanged (or a moved digest ruled by Ben)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1078",
+   "short_name": "BEGIN_BLOCKS_THE_WINDOW",
+   "author": "Claude (found building BL-1073, 2026-09-24)",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Begin freezes the window: background firms and the validation run block the UI thread past Windows' hang threshold",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/core/app.cpp"
+   ],
+   "design": "FOUND 2026-09-24 building BL-1073 (Begin adopts the wizard's world): even with the world adopted, background_firms blocks ~18 s on the UI thread in Release (Windows marks a window hung after ~5 s), and the validation run then took 112 s for 12 ticks (~9.4 s a tick; measured under memory pressure, so possibly inflated — STARTUP.md's figure is ~0.9 s). Related: NR-915 (the live-tick tail), under investigation.\n\nTHE WORK. Move every post-Begin step that can exceed ~1 s onto the worker the wizard already uses, behind the same wait surface BL-1072 built (caption, bar, elapsed count), so the window never stops pumping events; re-measure the validation run's per-tick cost quietly and reconcile STARTUP.md's figure.\n\nDONE WHEN. From Begin to the select-company canvas (BL-1076) the window never stops responding, and the wait shows what it is doing."
   }
  ]
 }
