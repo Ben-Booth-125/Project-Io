@@ -12,6 +12,83 @@ release.
 
 ## [Unreleased]
 
+## [0.1.25] — 2026-09-24
+
+*The generation reaches the game. Sprint 45 built the last span of the pre-campaign history — the
+Industrialisation span, 1660 → 1960 — and laid a corporate web over the world it leaves; sprint 46
+carried that world into play: the wizard now plays the whole arc, Begin keeps the world the wizard
+built, and the player chooses the corporation they become. Sprint 46 closed early, on Ben's call,
+with its core landed and its carry rows handed to sprint 47. **The release's subject is the economy
+that the new world exposed**: a player could not build a military base, and following that one stall
+down found that goods could not move between markets on one body at all — every same-body haul had
+been a cost with no effect — and that the live tick's tail was one AI loop repeating work, not the
+seats it had been blamed on.*
+
+### Added
+
+- **The Industrialisation span, 1660 → 1960** (sprint 45; the phase formerly named Digitisation,
+  renamed because digitisation names computing, which belongs to the campaign). It runs on the
+  shared engine from the Exploration age's close, with the corridor tier on by default, and cities
+  make industry points.
+- **A corporate web chartered from the world's own stockpile** (sprint 45): the charter price is the
+  world's stockpile over a pinned divisor (650:2, province cap 2), the no-specialist world falls
+  back before anything is chartered, and exactly one player seat is asserted and counted.
+- **Wizard round 6 plays the Industrialisation span** as a time-lapse, like the rounds before it,
+  and shows industry: industry points as a heat over the map and an Ind column on the board.
+- **The wait says what it is doing.** Every loading screen names the step under way, the bar moves
+  inside every long pass (weighted by measured cost), and an elapsed count shows the run is alive.
+- **Begin adopts the wizard's world** instead of rebuilding it (≈53 s saved in Release); an adopted
+  world and a cold rebuild with the same settings open on the same state hash.
+- **The select-company canvas.** Every specialist, ranked, beside a map that highlights the hovered
+  firm; below-floor firms marked but pickable; a four-line card; a briefing, then Confirm. The pick
+  is a real command (`take_seat`), legal only before play.
+- **Goods pools per market** (BL-1003): a building buys and sells where it stands, and a haul sells
+  where it arrives. Before this, every same-body haul returned to the pool it left.
+- **Trade reaches for price** (BL-995): a seller weighs home against every other market, after the
+  haul, before it sells — 3,712 units a year sold at their destinations over four seeds, 82.5% of it
+  past the seller's nearest market.
+- **A market exports its own shelf** (BL-1071): stock no one owns can now leave a market by the same
+  net-price rule.
+- **Capital markets are real markets**, priced at a premium over the carve.
+- **Instruments**: `steel_chain_probe`, `live_tick_cost_probe`, `market_export_harness`,
+  `trade_reaches_for_price`, `pools_per_market`, `gen_step_costs`, `begin_adopts_check.js`,
+  `seat_pick_check.js`; `next_save_version.js` covers the save envelope's version too.
+
+### Changed
+
+- **The epoch flips to 1960.** Generation no longer reads the epoch: every span runs on its own
+  fixed years, so epoch 0 and 1960 build the identical world and the epoch names the calendar and the
+  recipe band only.
+- **The economy tick's order**: convoys advance, arrivals land, the economy runs, sellers dispatch,
+  then the markets clear — a delivery reaches its destination's clear before it can move again.
+- **A build is priced at what it will draw**, the site multiplier and construction capacity
+  included, at the gate, the Build door and the rival scorer alike.
+- **The live tick is 5–9× faster with identical results** (BL-1079): the province ceiling is built
+  once per scan and each pool's origin resolved once per dispatch pass — seed 41 from 30 s to 5.5 s a
+  tick. The tail was one muster-base loop repeating work, not the specialist seats (NR-915).
+- **Armies claim Logistic Points before convoys**, a chosen priority rather than a phase-order
+  accident.
+
+### Removed
+
+- **The superseded 1560 → 1960 two-span arc** and its machinery, and the three narrative passes
+  only it ran (ruptures, the Charter Act and border accord, the common tongue).
+
+### Known — recorded, not fixed
+
+- **The player's base still does not reliably complete.** On the flipped world its reading is owed
+  (BL-1066); construction capacity is unresolved, and stranded shelf stock moves slowly — the
+  Logistic Point cap brakes market exports hardest.
+- **Begin still blocks the window** for ≈18 s placing background firms (BL-1078), and **laying
+  village roads is most of every world build** — 30–61 s of a 40–83 s Release build (BL-1077).
+- **Density does not follow cities** on the chartered web (NR-913), shipped that way by ruling.
+- **The CTest tier is not a working gate** (BL-1065): targets that no longer link and rows that time
+  out. This release was gated on the Release build, `world_determinism`, both save round trips and
+  the harnesses named in each merge — not on `ctest`.
+- **World digests moved** across the sprint and are **not re-pinned**: the one re-bless is taken in
+  sprint 47, with the seat folded into the state hash (BL-1082).
+- Save files from v0.1.24 are refused (`world_save_version` 25, envelope 21).
+
 ## [0.1.24] — 2026-09-18
 
 *The pre-campaign history stops being one ancient pass and becomes an arc the player inherits.
@@ -1131,7 +1208,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.24...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.25...HEAD
+[0.1.25]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.24...v0.1.25
 [0.1.24]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.23...v0.1.24
 [0.1.23]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.22...v0.1.23
 [0.1.22]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.21...v0.1.22

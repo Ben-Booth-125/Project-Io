@@ -13,34 +13,9 @@
  ],
  "items": [
   {
-   "status": "complete",
-   "glyph": "✓",
-   "sprint": "46",
-   "written": "2026-09-15",
-   "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION); restored 2026-09-23 by Ben on BL-1066",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-995",
-   "short_name": "TRADE_REACHES_FOR_PRICE",
-   "category": "Economy",
-   "priority": "S",
-   "difficulty": 5,
-   "title": "Auto-dispatch is the seller chasing a net price, bounded by what the gap absorbs, for every corp including the player",
-   "authority_doc": "docs/economy/SUPPLY.md",
-   "files": [
-    "src/world/supply_system.cpp",
-    "src/world/corp_ai.cpp",
-    "scripts/economy.lua",
-    "tools/verify/convoy_command.cpp"
-   ],
-   "design": "RESTORED 2026-09-23 (Ben, on BL-1066: \"restore BL-995 with dispatch before the clear\"). WHY NOW: with pools per market (BL-1003) and priced capital markets, auto-surplus sells every unit above processor reservation to the LOCAL market each tick, and market inventory belongs to no one — so pooled steel on the shipped body fell to 0 and the shortfall dispatcher had nothing to ship; a player build at a market pricing steel at 10x base starved beside 3,000 steel on other shelves. Only a seller choosing to haul BEFORE the local sale makes inter-market trade real.\n\nPLACEMENT (the ruling): dispatch runs AFTER the economy step and BEFORE clearing — advance -> arrivals -> economy -> DISPATCH -> clearing. It prices with the last resolved prices (market.price). Arrivals still land before the clear (SUPPLY.md one beat per haul); churn cannot return because a good moves only toward a strictly better net price.\n\nPREREQUISITES: BL-1003 delivered; BL-1006 complete; BL-1004 (sea legs) was cancelled — the rule prices a leg with whatever price_convoy_leg charges today, and handling/duty terms only where the code already carries them. Re-read SUPPLY.md § Dispatch trigger before trusting the anchors below, which are 2026-09-15.\n\n--- THE ORIGINAL ITEM (2026-09-15) ---\nSETTLED (Ben, 2026-09-15, form). SUPPLY.md § Dispatch trigger owns the rule.\n\nFor every (corp, market) pool holding a good above its processor reservation, using last tick's prices: net(d) = price_d - haul_per_unit(src->d) - handling_per_unit - duty_per_unit(d); send to argmax_d net(d) (ties lower market id) if net(d) - price_src > margin_threshold x price_src. Quantity = min(surplus, q) less what the corp already has in transit to d, where q = supply_d x ((price_d / landed_cost)^2 - 1) from the sqrt price law; a destination with zero supply absorbs its unmet demand. The threshold is authored in data, measured, never zero. The shortfall scan is RETIRED — a short market prices high, so the rule reaches it.\n\nONE RULE FOR EVERY CORP, THE PLAYER'S INCLUDED; the player keeps hold_convoy and the directed verb. The rival scorer's directed-dispatch valuation (corp_ai.cpp:2068-2072, qty x dest_price - leg.cost) subtracts the home price too.\n\nWHY: the shortfall trigger never read a price, so a seller never moved goods toward a better market. With per-market pools (BL-1003) and cheap sea legs (BL-1004) this is property 7 of INDUSTRIALISATION.md.\n\nDONE WHEN: convoy_command asserts the directed verb and auto-dispatch price a leg identically; a harness row shows a seller sending to a farther higher-priced market over a nearer cheaper one; no destination receives more in one tick than its q; and the far-trade reading (BL-1006) shows a material share of delivered volume skipping the nearest market after a year of play.\n\nDELIVERED 2026-09-24: merged 25aa31f7 + fix round f274a3d5; trade_reaches_for_price 31/31; far-trade 3,712 u sold at destinations year one, 82.5% past the nearest market. Requirement R9 (the BL-1066 probe) moves to BL-1066.",
-   "resolved": "2026-09-24"
-  },
-  {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-15",
    "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION); restored 2026-09-23 by Ben's ruling on BL-1066",
    "requires": [],
@@ -66,12 +41,12 @@
     "src/ui/selection_panel.cpp",
     "src/core/verify_api.cpp"
    ],
-   "design": "RESTORED 2026-09-23 (Ben, BL-1066 form: \"Restore BL-1003 pools per market\"). It is the structural cause of BL-1066 (the player cannot build): on the shipped home body (255 markets) a build draws from its TILE's market, but wants, fills, pools and auto-surplus book at the corp's representative market, and a same-body convoy credits the seller's own (corp, body) pool. So steel at 10x base price at a build market induced nothing, and a market no steel seller calls home is empty forever. Measured: the player's base at tile (45,97), market 56211, drew 0 steel for 100 ticks while 558 steel sat in 5 of 255 markets. PRODUCTION.md § Stockpile and output flow already states the rule; the prose below is 2026-09-15 and its file:line anchors predate sprint 45 — re-read before trusting them. BL-1006 (far trade reading), its old prerequisite, is complete. The re-pin of every world digest this moves is a re-bless and is Ben's to authorise; it should ride sprint 46's single re-bless with BL-1049.\n\n--- THE ORIGINAL ITEM (2026-09-15) ---\nSETTLED (Ben, 2026-09-15, form: pools per market over a consignment). PRODUCTION.md § Stockpile and output flow owns it; MARKETS.md § Market centres and seeding and SUPPLY.md § Convoy entity amended.\n\nDEFECT IT FIXES (found 2026-09-15): pools are keyed (corp, body) (world.hpp:272, :701-703); commit_convoy debits pool_for(corp, src_body) (supply_system.cpp:660) and arrival credits pool_for(corp, dest_body) (:182-183) — the same pool on one body — and auto-surplus then sells through market_for_corp_on_body, the lowest-id building's market (market_clearing.cpp:206-221). Every same-body market-to-market haul paid haulage and sold back at home. haulage_measure's 1614 same-body hauls measured dispatch, never trade.\n\nTHE RULE: a building's output enters the pool of market_for_tile(building tile); its inputs draw that pool plus that market's inventory; wants, purchases, auto-surplus, standing orders and the running remainder key (corp, market). A body with no market keeps one body-level pool until its first building spawns one. Labour pools stay (corp, body).\n\nCOSTS, STATED: save format (save_game_version moves, round-trip assertion owed per NR-708); state_hash folds the new key in sorted order; a roster straddling a catchment line now needs hauls, so the landscape search must score it — measure how many generated firms straddle before and after.\n\nDONE WHEN: a harness hauls a good between two markets on one body and the goods sell at the destination price; world_determinism bit-identical across runs; save round-trips pools; the landscape search winner still validates."
+   "design": "RESTORED 2026-09-23 (Ben, BL-1066 form: \"Restore BL-1003 pools per market\"). It is the structural cause of BL-1066 (the player cannot build): on the shipped home body (255 markets) a build draws from its TILE's market, but wants, fills, pools and auto-surplus book at the corp's representative market, and a same-body convoy credits the seller's own (corp, body) pool. So steel at 10x base price at a build market induced nothing, and a market no steel seller calls home is empty forever. Measured: the player's base at tile (45,97), market 56211, drew 0 steel for 100 ticks while 558 steel sat in 5 of 255 markets. PRODUCTION.md § Stockpile and output flow already states the rule; the prose below is 2026-09-15 and its file:line anchors predate sprint 45 — re-read before trusting them. BL-1006 (far trade reading), its old prerequisite, is complete. The re-pin of every world digest this moves is a re-bless and is Ben's to authorise; it should ride sprint 46's single re-bless with BL-1049.\n\n--- THE ORIGINAL ITEM (2026-09-15) ---\nSETTLED (Ben, 2026-09-15, form: pools per market over a consignment). PRODUCTION.md § Stockpile and output flow owns it; MARKETS.md § Market centres and seeding and SUPPLY.md § Convoy entity amended.\n\nDEFECT IT FIXES (found 2026-09-15): pools are keyed (corp, body) (world.hpp:272, :701-703); commit_convoy debits pool_for(corp, src_body) (supply_system.cpp:660) and arrival credits pool_for(corp, dest_body) (:182-183) — the same pool on one body — and auto-surplus then sells through market_for_corp_on_body, the lowest-id building's market (market_clearing.cpp:206-221). Every same-body market-to-market haul paid haulage and sold back at home. haulage_measure's 1614 same-body hauls measured dispatch, never trade.\n\nTHE RULE: a building's output enters the pool of market_for_tile(building tile); its inputs draw that pool plus that market's inventory; wants, purchases, auto-surplus, standing orders and the running remainder key (corp, market). A body with no market keeps one body-level pool until its first building spawns one. Labour pools stay (corp, body).\n\nCOSTS, STATED: save format (save_game_version moves, round-trip assertion owed per NR-708); state_hash folds the new key in sorted order; a roster straddling a catchment line now needs hauls, so the landscape search must score it — measure how many generated firms straddle before and after.\n\nDONE WHEN: a harness hauls a good between two markets on one body and the goods sell at the destination price; world_determinism bit-identical across runs; save round-trips pools; the landscape search winner still validates.\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-18",
    "author": "Ben (2026-09-18, sprint 45 elicitation); Claude (item text, from a five-lane engine read with an adversarial check per lane)",
    "requires": [],
@@ -87,46 +62,12 @@
    "files": [
     "src/world/history_sim.cpp"
    ],
-   "design": "FITTED TO SPRINT 46 (Ben, 2026-09-23: fit the strays into 46 or drop them — the focus is wiring the generation into the game). A nation's opening treasury IS what crosses into play (NATION_GENERATION.md § Pass 7, and NR-912 re-read its rate on the shipped world), so a chest stranded on a captured capital is a wrong number in the campaign, not a fidelity nit.\n\nCONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass run after each generation round is done — this one after Industrialisation — not built mid-sprint.\n\nFOUND 2026-09-18 by the sprint 45 engine read (industry-points lane, checked). When a capital falls the loser re-seats at held.front() and the treasury stays on the captured region (history_sim.cpp:3784-3806). The conqueror's upkeep reads only regions[q.capital].treasury, and consolidation fires once, at the span's start (cpp:886, :902-916), so a captured treasury is neither the loser's nor the winner's — it is stranded. EXPLORATION.md's located-stock rule says a conqueror who takes the seat takes the stores standing in it.\n\nNOT ON SPRINT 45's RE-BLESS (Ben, 2026-09-18, elicitation: offered as a rider, not taken). Beat 1's industry points do not inherit the defect, because they are read per region at the handoff. Fix: fold a captured seat's treasury into the conqueror's capital at capture (or state that it stays and why), then measure; it moves shipped worlds."
-  },
-  {
-   "status": "complete",
-   "glyph": "✓",
-   "sprint": "46",
-   "written": "2026-09-18",
-   "author": "Ben (2026-09-18, sprint 45 elicitation); Claude (item text, from a five-lane engine read with an adversarial check per lane)",
-   "requires": [
-    "BL-1044"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1047",
-   "short_name": "EPOCH_FLIP_GATES",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 4,
-   "title": "The epoch flip: four >=1700 gates and the settlement stop year decouple, and the superseded arc is retired or named",
-   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
-   "files": [
-    "src/world/era_minus_one.cpp",
-    "src/world/era_band.hpp",
-    "src/world/settlement.cpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/hard_coded_world.hpp",
-    "src/main.cpp",
-    "src/core/save_game.cpp",
-    "tools/verify/world_determinism.cpp",
-    "tools/verify/era_world_harness.cpp",
-    "tools/verify/haulage_measure.cpp",
-    "tools/verify/exploration_sweep.cpp"
-   ],
-   "design": "RULED (Ben, 2026-09-18, sprint 46 form): (1) the EPOCH FLIP lands IN SPRINT 46, once the superseded arc is retired and the epoch gates decoupled — re-ruling NR-869's 'waits for Beats 2 and 3' (their items were archived unbuilt); (2) RETIRE the superseded 1560->1960 arc OUTRIGHT (no legacy field); The call this item owed is settled: no legacy field.\n\nAMENDED 2026-09-18 from the sprint 46 read (checked): the couplings are SIX, not four plus a stop year — era_minus_one.cpp ~l.35 (the arc), era_band.hpp ~42 (the band), settlement.cpp ~1197 (antiquity: founding schedule, Stage 4), hard_coded_world.cpp ~1851 (antiquity_start: the three narrative passes, retired separately), run_settlement's stop at hard_coded_world.cpp ~813, era_minus_one.cpp ~327 (the Empires start = epoch - prehistory_years, so a calendar-only flip would open Empires in 1560 CE — give it its own fixed 400 BCE field, mirroring empires_stop_year), and the demography anchor (the antiquity branch grows demography to stop_year, settlement.cpp ~1208-1213). Also: app.cpp ~1170 (set_era) and ~1365 (--epoch), ui/format.cpp ~153 (the calendar); the save seam writes industrial_years (drop it) but not era_seed or the span switches (add them). The line cites in the design below are stale.\n\nSCHEDULED FOR THE PHASE'S CLOSE (Ben, 2026-09-18, sprint 45 elicitation: the span runs on at epoch 0 and the flip waits for Beats 2 and 3; NR-869 makes the flip the phase's done-when). INDUSTRIALISATION.md: the flip changes the calendar alone.\n\nWHY IT IS NOT ONE LINE (engine read 2026-09-18, checked). epoch_year feeds FOUR >= 1700 predicates and a stop year: the arc (era_minus_one.cpp:35, which turns Exploration off), the recipe band (era_band.hpp:42), the settlement pass's antiquity branch (settlement.cpp:1164 — founding schedule, Stage 4 furnace), antiquity_start (hard_coded_world.cpp:1595 — ruptures, the Charter Act, globalisation), and run_settlement's stop year (hard_coded_world.cpp:748). Decoupling only the arc regresses the Empires round's inputs. Consumers of an explicit epoch 1960 build the superseded arc today: world_determinism R4 (:654-676, asserts prehistory_years == 800), era_world_harness R5 (:112-118), haulage_measure's far mode (:178), main.cpp --epoch.\n\nOWED FROM BEN: retire the superseded 1560 -> 1960 arc, or keep it behind one explicit legacy-arc field read by all four gates (never by the arc predicate alone) — which also needs a save_game decision (save_game.cpp:86-101 writes world_params).\n\nDELIVERED 2026-09-24: merged 41ab4ee9; generation reads no epoch, so epoch 0 and 1960 build the identical world (R3.8); envelope 20 (stacked under BL-1080 as 21); world_determinism ALL PASS, save_roundtrip and save_envelope_roundtrip PASS on main.",
-   "resolved": "2026-09-24"
+   "design": "FITTED TO SPRINT 46 (Ben, 2026-09-23: fit the strays into 46 or drop them — the focus is wiring the generation into the game). A nation's opening treasury IS what crosses into play (NATION_GENERATION.md § Pass 7, and NR-912 re-read its rate on the shipped world), so a chest stranded on a captured capital is a wrong number in the campaign, not a fidelity nit.\n\nCONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass run after each generation round is done — this one after Industrialisation — not built mid-sprint.\n\nFOUND 2026-09-18 by the sprint 45 engine read (industry-points lane, checked). When a capital falls the loser re-seats at held.front() and the treasury stays on the captured region (history_sim.cpp:3784-3806). The conqueror's upkeep reads only regions[q.capital].treasury, and consolidation fires once, at the span's start (cpp:886, :902-916), so a captured treasury is neither the loser's nor the winner's — it is stranded. EXPLORATION.md's located-stock rule says a conqueror who takes the seat takes the stores standing in it.\n\nNOT ON SPRINT 45's RE-BLESS (Ben, 2026-09-18, elicitation: offered as a rider, not taken). Beat 1's industry points do not inherit the defect, because they are read per region at the handoff. Fix: fold a captured seat's treasury into the conqueror's capital at capture (or state that it stays and why), then measure; it moves shipped worlds.\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-18",
    "author": "Claude (found by the BL-1036 cold review, 2026-09-18)",
    "requires": [],
@@ -145,7 +86,7 @@
     "src/world/history_sim.hpp",
     "tools/verify/industrialisation_sim_harness.cpp"
    ],
-   "design": "FITTED TO SPRINT 46 (Ben, 2026-09-23). The civilisation and creed tables are part of what the campaign opens on (the culture lens is sprint 46's own draft row), and this is a digest mover — sprint 46 carries its own re-bless, so it rides that one rather than earning another.\n\nCONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass run after each generation round is done — this one after Industrialisation — not built mid-sprint.\n\nFOUND 2026-09-18 by the BL-1036 cold review. BL-1036 carries the civilisation and universal-creed tables across the 1660 resume, but Exploration's own resume at 1200 still passes neither table (hard_coded_world.cpp:1142-1146; the KNOWN GAP comment at the new resume params in history_sim.hpp). So the tables restart at 0 in 1200 while regions and polities keep their pre-1200 indices into them. A pre-1200 civilisation index then resolves to whatever Exploration coins first; a pair already recorded before 1200 is recorded again under a new name, coined from the Exploration span's own seed; and make_exploration_output hands that table on, so the 1660 resume inherits the misalignment. Nothing reads the indices as table offsets today (only >= 0 checks), so nothing crashes: the damage is to data truth and to the world log.\n\nTHE WORK. Pass the Empires span's civilisation and creed tables to the 1200 resume, as BL-1036 does at 1660, and add a count to industrialisation_sim_harness --fidelity of regions whose civilisation index is at or past the handoff table's size, plus duplicate member pairs. MOVES SHIPPED WORLDS: deep_digest folds the prose history log, and dropping the duplicate civilisation lines changes it. Not on sprint 45's re-bless, which carries only BL-1037 (Ben, 2026-09-18)."
+   "design": "FITTED TO SPRINT 46 (Ben, 2026-09-23). The civilisation and creed tables are part of what the campaign opens on (the culture lens is sprint 46's own draft row), and this is a digest mover — sprint 46 carries its own re-bless, so it rides that one rather than earning another.\n\nCONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass run after each generation round is done — this one after Industrialisation — not built mid-sprint.\n\nFOUND 2026-09-18 by the BL-1036 cold review. BL-1036 carries the civilisation and universal-creed tables across the 1660 resume, but Exploration's own resume at 1200 still passes neither table (hard_coded_world.cpp:1142-1146; the KNOWN GAP comment at the new resume params in history_sim.hpp). So the tables restart at 0 in 1200 while regions and polities keep their pre-1200 indices into them. A pre-1200 civilisation index then resolves to whatever Exploration coins first; a pair already recorded before 1200 is recorded again under a new name, coined from the Exploration span's own seed; and make_exploration_output hands that table on, so the 1660 resume inherits the misalignment. Nothing reads the indices as table offsets today (only >= 0 checks), so nothing crashes: the damage is to data truth and to the world log.\n\nTHE WORK. Pass the Empires span's civilisation and creed tables to the 1200 resume, as BL-1036 does at 1660, and add a count to industrialisation_sim_harness --fidelity of regions whose civilisation index is at or past the handoff table's size, plus duplicate member pairs. MOVES SHIPPED WORLDS: deep_digest folds the prose history log, and dropping the duplicate civilisation lines changes it. Not on sprint 45's re-bless, which carries only BL-1037 (Ben, 2026-09-18).\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "glyph": "✓",
@@ -153,7 +94,7 @@
    "blocked_on": null,
    "parked": false,
    "status": "designed",
-   "sprint": "46",
+   "sprint": null,
    "author": "Claude (BL-1050's own prose, unbuilt; 2026-09-20)",
    "requires": [
     "BL-1050"
@@ -169,12 +110,12 @@
     "tools/verify/world_copy_determinism.cpp",
     "tools/session/"
    ],
-   "design": "FITTED TO SPRINT 46 (Ben, 2026-09-23). It guards the byte-identical-replay rule that sprint 45 had to fix by hand in BL-1050 — seven readers found one at a time, at the cost of a whole item and part of a re-bless. Wiring the generation into the game means saving and loading it, so the rule is load-bearing for 46, and a lint is what keeps it from rotting again.\n\nCONTINUITY PASS. BL-1050's prose asks for it and its R1-R7 do not require it, so it was not built with the item (lane report, 2026-09-20). The rule (TECH_FOUNDATIONS.md ~104-111: a loaded world replays byte for byte, and so does a copy) is today held by six hand-fixed readers and one tripwire type; nothing stops the seventh being written. THE WORK: a check that fails when a store on `world` that should be faithful_unordered_map is a plain unordered_map, and when a reader walks an unordered store into a float sum, a strict-inequality tie-break or a write order — a source scan is acceptable if it names what it cannot see. Run it in the verify suite. DONE WHEN: it fails on a deliberately reverted reader (BL-1050's own five make the fixtures) and passes on main."
+   "design": "FITTED TO SPRINT 46 (Ben, 2026-09-23). It guards the byte-identical-replay rule that sprint 45 had to fix by hand in BL-1050 — seven readers found one at a time, at the cost of a whole item and part of a re-bless. Wiring the generation into the game means saving and loading it, so the rule is load-bearing for 46, and a lint is what keeps it from rotting again.\n\nCONTINUITY PASS. BL-1050's prose asks for it and its R1-R7 do not require it, so it was not built with the item (lane report, 2026-09-20). The rule (TECH_FOUNDATIONS.md ~104-111: a loaded world replays byte for byte, and so does a copy) is today held by six hand-fixed readers and one tripwire type; nothing stops the seventh being written. THE WORK: a check that fails when a store on `world` that should be faithful_unordered_map is a plain unordered_map, and when a reader walks an unordered store into a float sum, a strict-inequality tie-break or a write order — a source scan is acceptable if it names what it cannot see. Run it in the verify suite. DONE WHEN: it fails on a deliberately reverted reader (BL-1050's own five make the fixtures) and passes on main.\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-20",
    "author": "Claude (BL-1034 cold review, carried again by BL-1050 and its review, 2026-09-20)",
    "requires": [],
@@ -191,12 +132,12 @@
     "src/main.cpp",
     "src/world/landscape_search.cpp"
    ],
-   "design": "FITTED TO SPRINT 46 (Ben, 2026-09-23). The faithful_unordered_map throw is the tripwire the replay rule stands on, and it fires inside the landscape search every new game runs — a crash there currently reaches std::terminate with its message lost, which is a debugging hole in the exact path 46 is wiring.\n\nCONTINUITY PASS. FOUND by BL-1034 (world copies diverge) cold review, carried unbuilt through BL-1050 and named again by its review (2026-09-20). faithful_unordered_map throws a logic_error when a copy cannot keep its source order — the tripwire the byte-identical-replay rule stands on. Thrown inside a landscape-search worker thread it reaches std::terminate, and the handler (main.cpp ~l.383) drops the message, so the one diagnostic the tripwire exists to print is exactly what is lost. THE WORK: catch in the worker and carry the message to the joining thread (or set a failure slot the search reports), so a tripwire throw names the store and the site. DONE WHEN: a deliberately unfaithful copy inside a worker prints its message and fails the run, rather than terminating silently."
+   "design": "FITTED TO SPRINT 46 (Ben, 2026-09-23). The faithful_unordered_map throw is the tripwire the replay rule stands on, and it fires inside the landscape search every new game runs — a crash there currently reaches std::terminate with its message lost, which is a debugging hole in the exact path 46 is wiring.\n\nCONTINUITY PASS. FOUND by BL-1034 (world copies diverge) cold review, carried unbuilt through BL-1050 and named again by its review (2026-09-20). faithful_unordered_map throws a logic_error when a copy cannot keep its source order — the tripwire the byte-identical-replay rule stands on. Thrown inside a landscape-search worker thread it reaches std::terminate, and the handler (main.cpp ~l.383) drops the message, so the one diagnostic the tripwire exists to print is exactly what is lost. THE WORK: catch in the worker and carry the message to the joining thread (or set a failure slot the search reports), so a tripwire throw names the store and the site. DONE WHEN: a deliberately unfaithful copy inside a worker prints its message and fails the run, rather than terminating silently.\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-23",
    "author": "Claude (found running BL-1044's owed ctest pass, 2026-09-22)",
    "requires": [],
@@ -212,12 +153,12 @@
    "files": [
     "CMakeLists.txt"
    ],
-   "design": "FOUND 2026-09-22 running BL-1044's owed ctest pass. `nmake all` stops at the first failing target, so the suite reads as \"Not Run\" rather than as a broken build, and the breakage hid.\n\nWHAT IS BROKEN. Every harness that builds its world in APP ORDER goes through tools/verify/harness_params.hpp, which includes scripting/lua_state.hpp and calls build_app_base_world — so it needs lua54 AND the Lua TUs the Lua-free world superset excludes (world_gen_config.cpp, works_registry.cpp, recipe_registry.cpp, tech_tree.cpp). The CMake targets name those by hand, one target at a time, and the ones written before harness_params spread do not. Measured tonight, building all 157 CTest targets by name: player_seed_sweep failed on LNK2019 world_gen_config::load_from_lua / works_registry::load_from_lua (fixed at ee7ef3c3, which restored the player_seed_sweep_guard row — the row that now carries the one-player invariant, S7); campaign_lapse, chain_conversion_probe, convoy_cargo_census and others fail on LNK2019 lua_close / luaL_unref, i.e. they do not link lua54 at all. battle_engagement_harness is a separate, older break (a torn-out mercenary symbol, 2026-08-30).\n\nTHE WORK. Take the failing list from the overnight build (scratchpad overnight3/build_failures.txt, or rebuild by name to regenerate it); for each, add lua54 and whichever Lua TUs it pulls, or move it onto a shared helper so the list stops being hand-kept — the hand-kept list is the defect, and DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds is what keeps growing it. Then run the suite and record which rows breach the 60 s default now that the span runs by default (BL-1044: the budget row's generation is a median 53.3 s in Release).\n\nDONE WHEN. Every CTest target builds by name, `ctest --test-dir build` runs every row rather than reporting Not Run, and the rows that legitimately exceed 60 s carry a raised timeout with the reason.\n\nTHE LIST, measured 2026-09-22 by building all 157 CTest test names (14 stops, three classes). (a) DOES NOT LINK LUA (LNK2019 lua_close / luaL_unref), 9: campaign_lapse, chain_conversion_probe, convoy_cargo_census, industrialisation_sim_harness, exploration_sweep, history_sweep, material_floor, stockpile_budget_check, world_copy_determinism. (b) DOES NOT COMPILE against the current headers, 3: whole_firm_buyout and battle_engagement_harness read world::mercenary_contracts, retired by NR-885 on 2026-09-17; nation_scorer_harness fails on a missing type. Those are stale harnesses, not a link list — each is a decision to re-point or retire. (c) NOT A TARGET, 1: player_seed_sweep_guard is a ctest TEST name whose target is player_seed_sweep (fixed at ee7ef3c3); the build loop took test names, so a name that is not a target reads as a stop."
+   "design": "FOUND 2026-09-22 running BL-1044's owed ctest pass. `nmake all` stops at the first failing target, so the suite reads as \"Not Run\" rather than as a broken build, and the breakage hid.\n\nWHAT IS BROKEN. Every harness that builds its world in APP ORDER goes through tools/verify/harness_params.hpp, which includes scripting/lua_state.hpp and calls build_app_base_world — so it needs lua54 AND the Lua TUs the Lua-free world superset excludes (world_gen_config.cpp, works_registry.cpp, recipe_registry.cpp, tech_tree.cpp). The CMake targets name those by hand, one target at a time, and the ones written before harness_params spread do not. Measured tonight, building all 157 CTest targets by name: player_seed_sweep failed on LNK2019 world_gen_config::load_from_lua / works_registry::load_from_lua (fixed at ee7ef3c3, which restored the player_seed_sweep_guard row — the row that now carries the one-player invariant, S7); campaign_lapse, chain_conversion_probe, convoy_cargo_census and others fail on LNK2019 lua_close / luaL_unref, i.e. they do not link lua54 at all. battle_engagement_harness is a separate, older break (a torn-out mercenary symbol, 2026-08-30).\n\nTHE WORK. Take the failing list from the overnight build (scratchpad overnight3/build_failures.txt, or rebuild by name to regenerate it); for each, add lua54 and whichever Lua TUs it pulls, or move it onto a shared helper so the list stops being hand-kept — the hand-kept list is the defect, and DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds is what keeps growing it. Then run the suite and record which rows breach the 60 s default now that the span runs by default (BL-1044: the budget row's generation is a median 53.3 s in Release).\n\nDONE WHEN. Every CTest target builds by name, `ctest --test-dir build` runs every row rather than reporting Not Run, and the rows that legitimately exceed 60 s carry a raised timeout with the reason.\n\nTHE LIST, measured 2026-09-22 by building all 157 CTest test names (14 stops, three classes). (a) DOES NOT LINK LUA (LNK2019 lua_close / luaL_unref), 9: campaign_lapse, chain_conversion_probe, convoy_cargo_census, industrialisation_sim_harness, exploration_sweep, history_sweep, material_floor, stockpile_budget_check, world_copy_determinism. (b) DOES NOT COMPILE against the current headers, 3: whole_firm_buyout and battle_engagement_harness read world::mercenary_contracts, retired by NR-885 on 2026-09-17; nation_scorer_harness fails on a missing type. Those are stale harnesses, not a link list — each is a decision to re-point or retire. (c) NOT A TARGET, 1: player_seed_sweep_guard is a ctest TEST name whose target is player_seed_sweep (fixed at ee7ef3c3); the build loop took test names, so a name that is not a target reads as a stop.\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-23",
    "author": "Claude (found running BL-1044's owed visual suite, 2026-09-23)",
    "requires": [
@@ -243,38 +184,12 @@
     "src/main.cpp",
     "tools/verify/harness_params.hpp"
    ],
-   "design": "DIAGNOSED 2026-09-23 (Release --verify probes with a temporary run_construction trace; probes and patch in that session's scratchpad). Capacity is NOT the stall: BL-709 floors capacity coverage at 1/max_stretch, so it only stretches. The stall is MATERIALS, in three layers:\n\n(1) WRONG MARKET, AND NOTHING CAN REFILL IT. The fixture's build_first_valid placed at raster-first tile (45,97), market 56211: 0 steel for 100 ticks, demand there 0.00 — the build's want booked at the corp's representative market, not the draw market. Steel existed on the body (558 units) but in 5 of 255 markets, and a same-body convoy lands in the seller's own (corp, body) pool. Structural cause, owned by BL-1003 (pools per market).\n\n(2) THE SITE MULTIPLIER DRAWS MORE THAN WAS PRICED. The per-tick draw is cost/build_duration_ticks per unit of progress, but ticks_remaining carries BL-323's site multiplier, so a hard site draws cost x multiplier while construct_building's affordability gate priced the authored cost. Placed next to home (market 56166, 36.5 steel), the 35-steel base drew 36.5, stalled at 4.1 of 5+ progress units and never finished.\n\n(3) ZERO CONSTRUCTION CAPACITY. 0 construction yards on the body, so every build runs at the 10% floor: a 4-tick base takes 40+ ticks (ten years at a quarterly tick).\n\nRULINGS (Ben, 2026-09-23, form):\n- Sourcing: restore BL-1003 (pools per market). This item requires it.\n- Site multiplier: it stretches MATERIALS AND CASH as well as time, and that is PRICED AT PLACEMENT — the affordability gate, the Build door's capex preview and the rival scorer price cost x the site multiplier (PRODUCTION.md § Construction site time).\n- Capacity: IN SCOPE here. Either the charter web charters a yard the player's catchment reaches, or the opening corp carries capacity; choose by measurement once BL-1003 has landed, since pools per market move where capacity sits.\n\nPLUS THE FIXTURE: scripts/verify/lib.lua must place near the player's own works (not raster-first) and wait out the 12-tick tech gate, and its error must say 'stalled' when progress stops rather than 'never completed within 40 ticks'.\n\nDONE WHEN. On every library seed, the seated player can place AND complete a military base in its home catchment within the fixture's bound; the affordability gate refuses a site whose multiplied cost the corp cannot meet; and scripts/verify/lib.lua stages on a pristine world.\n\nROUND 2 (2026-09-23, after BL-1003 merged; traces in that session scratchpad). With pools per market the build want reaches its own market (demand 8.75, steel priced 161) and convoys dispatch, but the base still stalled: (i) ~3,000 steel, nearly all the body pooled, sat in NINE BL-910 capital markets with base price 0 — never listed; (ii) the shortfall dispatcher ran at the top of the tick and credited arrivals at its end, so every delivery was re-exported before any clearing saw it (995 steel dispatches in 100 ticks into one market); (iii) with capacity stocked by hand the base ran at full rate and then starved for steel, so capacity is necessary but not sufficient.\n\nRULINGS (Ben, 2026-09-23): capital markets are PRICED, at a premium over the carve (MARKETS.md; the size is NR-916) — this absorbs the sprint 46 draft CAPITAL_MARKET_SHELLS, whose census-then-choose plan the ruling replaces; and the tick order is advance -> arrivals -> economy -> clearing -> dispatch (SUPPLY.md § Dispatch trigger, one beat per haul). The goods-vs-force LP priority that reorder flips is NR-917.\n\nROUND 3 (2026-09-23, after BL-995 merged f274a3d5). Trade is now real world-wide (haulage_measure --far-trade, 4 seeds: 3,712 units sold at destinations in year one, 82.5% of it past the seller’s nearest market). The base still stalls, and the trace says why: STEEL PRODUCTION ON THE BODY COLLAPSES — listed steel 234/tick at tick 1, 75 by tick 5, 0 from ~tick 9 in every market — while unmet steel demand climbs 0 -> 341/tick; and the ~3,460 steel of opening stock was sold to the SHELVES at tick 1 (before any price gap existed), where it belongs to no one and never moves. With capacity stocked by hand the base runs at full rate and starves the moment its local shelf empties. Open: (1) why the shipped world stops making steel within ~9 ticks; (2) whether shelf stock should ever move (a merchant buying low and hauling — the option passed over for BL-995); (3) construction capacity, a TRANSMITTED good (road network, like power), so its reach is a wiring question — the earlier '0 yards' reading was a probe miscount by type name.\n\nWORLD RULED (Ben, 2026-09-24, option B): BL-1066's done-when is taken on the FLIPPED world — after BL-1047 (epoch flip gates), on the 1960 world the player is actually handed — not on the epoch-0 verify world every reading so far was taken on (steel_chain_probe found epoch 0 is the ancient band with no steel makers at all; its anachronisms are BL-1070). Epoch 0 stays a supported start (Ben, same day)."
-  },
-  {
-   "status": "complete",
-   "glyph": "✓",
-   "sprint": "46",
-   "written": "2026-09-24",
-   "author": "Ben (2026-09-20 raised; 2026-09-24 named); Claude (filed from the sprint 46 draft)",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1067",
-   "short_name": "PHASE_RENAME_INDUSTRIALISATION",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 2,
-   "title": "The 1660-1960 phase is renamed Industrialisation: Digitisation names computing, which belongs to the campaign",
-   "authority_doc": "docs/GLOSSARY.md",
-   "files": [
-    "docs/generation/INDUSTRIALISATION.md",
-    "src/world/history_sim.hpp",
-    "src/world/hard_coded_world.hpp",
-    "tools/verify/industrialisation_sim_harness.cpp",
-    "src/ui/startup_screens.cpp"
-   ],
-   "design": "NAMED (Ben, 2026-09-24): Industrialisation. The draft offered alternatives (The Industrial Age, Steam, The Machine Age) because the word is used three other ways inside the phase — reading 8 of the span harness, a region industrialising (region::industrial_year, settlement.cpp Stage 4), and the Industry tree — and Ben chose the plain word; step (4) below is how the collisions are kept legible. The draft required BL-1044, which is delivered; the digest pins are awaiting sprint 46 re-bless, so the rename’s check is that world_determinism digests are IDENTICAL before and after it.\n\n--- FROM THE SPRINT 46 DRAFT (2026-09-20) ---\nTHE WORK. (1) docs/generation/DIGITISATION.md -> the new file name, and every citation of it (CLAUDE.md's doc map, GLOSSARY.md, GENERATION_STRATEGY.md, EXPLORATION.md, INDUSTRY_TREE.md, TREES.md, ERAS.md, sprints.json, this drafts file). (2) The identifiers: digitisation_span_enabled, digitisation_output, digitisation_stop_year, digitisation_params, digitisation_sim_params, digitisation_timelapse, tools/verify/digitisation_sim_harness.cpp, the --through/--fidelity help text, and the wizard's round label. A rename only — no behaviour moves, so world_determinism digests and the pins must not move, and the save seam is untouched unless a field name is serialised by name (it is not: flat binary). (3) GLOSSARY.md gets the term with its span and its boundary against the campaign era. (4) Where the phase name and the region event would now read alike, say which is which at each site (reading 8's title, region::industrial_year's comment). DONE WHEN: a grep for 'digitisation' (any case) in src/, tools/ and docs/ returns nothing but history; every harness builds and passes; --digest-check 16/16 against the post-re-bless pins.\n\nDELIVERED 2026-09-24: merged af9da971; digests unchanged; the app builds.",
-   "resolved": "2026-09-24"
+   "design": "DIAGNOSED 2026-09-23 (Release --verify probes with a temporary run_construction trace; probes and patch in that session's scratchpad). Capacity is NOT the stall: BL-709 floors capacity coverage at 1/max_stretch, so it only stretches. The stall is MATERIALS, in three layers:\n\n(1) WRONG MARKET, AND NOTHING CAN REFILL IT. The fixture's build_first_valid placed at raster-first tile (45,97), market 56211: 0 steel for 100 ticks, demand there 0.00 — the build's want booked at the corp's representative market, not the draw market. Steel existed on the body (558 units) but in 5 of 255 markets, and a same-body convoy lands in the seller's own (corp, body) pool. Structural cause, owned by BL-1003 (pools per market).\n\n(2) THE SITE MULTIPLIER DRAWS MORE THAN WAS PRICED. The per-tick draw is cost/build_duration_ticks per unit of progress, but ticks_remaining carries BL-323's site multiplier, so a hard site draws cost x multiplier while construct_building's affordability gate priced the authored cost. Placed next to home (market 56166, 36.5 steel), the 35-steel base drew 36.5, stalled at 4.1 of 5+ progress units and never finished.\n\n(3) ZERO CONSTRUCTION CAPACITY. 0 construction yards on the body, so every build runs at the 10% floor: a 4-tick base takes 40+ ticks (ten years at a quarterly tick).\n\nRULINGS (Ben, 2026-09-23, form):\n- Sourcing: restore BL-1003 (pools per market). This item requires it.\n- Site multiplier: it stretches MATERIALS AND CASH as well as time, and that is PRICED AT PLACEMENT — the affordability gate, the Build door's capex preview and the rival scorer price cost x the site multiplier (PRODUCTION.md § Construction site time).\n- Capacity: IN SCOPE here. Either the charter web charters a yard the player's catchment reaches, or the opening corp carries capacity; choose by measurement once BL-1003 has landed, since pools per market move where capacity sits.\n\nPLUS THE FIXTURE: scripts/verify/lib.lua must place near the player's own works (not raster-first) and wait out the 12-tick tech gate, and its error must say 'stalled' when progress stops rather than 'never completed within 40 ticks'.\n\nDONE WHEN. On every library seed, the seated player can place AND complete a military base in its home catchment within the fixture's bound; the affordability gate refuses a site whose multiplied cost the corp cannot meet; and scripts/verify/lib.lua stages on a pristine world.\n\nROUND 2 (2026-09-23, after BL-1003 merged; traces in that session scratchpad). With pools per market the build want reaches its own market (demand 8.75, steel priced 161) and convoys dispatch, but the base still stalled: (i) ~3,000 steel, nearly all the body pooled, sat in NINE BL-910 capital markets with base price 0 — never listed; (ii) the shortfall dispatcher ran at the top of the tick and credited arrivals at its end, so every delivery was re-exported before any clearing saw it (995 steel dispatches in 100 ticks into one market); (iii) with capacity stocked by hand the base ran at full rate and then starved for steel, so capacity is necessary but not sufficient.\n\nRULINGS (Ben, 2026-09-23): capital markets are PRICED, at a premium over the carve (MARKETS.md; the size is NR-916) — this absorbs the sprint 46 draft CAPITAL_MARKET_SHELLS, whose census-then-choose plan the ruling replaces; and the tick order is advance -> arrivals -> economy -> clearing -> dispatch (SUPPLY.md § Dispatch trigger, one beat per haul). The goods-vs-force LP priority that reorder flips is NR-917.\n\nROUND 3 (2026-09-23, after BL-995 merged f274a3d5). Trade is now real world-wide (haulage_measure --far-trade, 4 seeds: 3,712 units sold at destinations in year one, 82.5% of it past the seller’s nearest market). The base still stalls, and the trace says why: STEEL PRODUCTION ON THE BODY COLLAPSES — listed steel 234/tick at tick 1, 75 by tick 5, 0 from ~tick 9 in every market — while unmet steel demand climbs 0 -> 341/tick; and the ~3,460 steel of opening stock was sold to the SHELVES at tick 1 (before any price gap existed), where it belongs to no one and never moves. With capacity stocked by hand the base runs at full rate and starves the moment its local shelf empties. Open: (1) why the shipped world stops making steel within ~9 ticks; (2) whether shelf stock should ever move (a merchant buying low and hauling — the option passed over for BL-995); (3) construction capacity, a TRANSMITTED good (road network, like power), so its reach is a wiring question — the earlier '0 yards' reading was a probe miscount by type name.\n\nWORLD RULED (Ben, 2026-09-24, option B): BL-1066's done-when is taken on the FLIPPED world — after BL-1047 (epoch flip gates), on the 1960 world the player is actually handed — not on the epoch-0 verify world every reading so far was taken on (steel_chain_probe found epoch 0 is the ancient band with no steel makers at all; its anachronisms are BL-1070). Epoch 0 stays a supported start (Ben, same day).\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": "47",
    "written": "2026-09-24",
    "author": "Ben (2026-09-18, NR-898 (6)); Claude (filed from the sprint 46 draft 2026-09-24, Ben asking to see the round)",
    "requires": [
@@ -300,7 +215,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-24",
    "requires": [],
    "blocked_on": null,
@@ -320,12 +235,12 @@
     "src/world/components.hpp",
     "src/world/world_save.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-24). POPULATION.md § Housing owns the rule. Filed into sprint 46 on Ben's call though it is not a perfect fit for a sprint about wiring the generation into the game — it answers BL-1066's steel finding (the industrial band's iron ore and steel have almost no genuine buyer).\n\nTHE WORK. (1) A per-centre housing stock sized to population, wearing at an authored rate. (2) The upkeep and growth draw registered as WANT on the catchment market — the household path in market_clearing.cpp is the model; it must bid (MARKETS.md property 3) — with an era-banded basket authored in economy.lua (ancient: timber, stone, clay, planks; industrial: steel, dressed stone, ceramics). (3) Housing condition below full caps growth and lowers habitability, recovers with supply, never destroys (dim, never dark). (4) The condition is persistent state: save seam and state hash in the same commit. (5) Surfaced where a centre's habitability is read, with its cause.\n\nMEASURE on the flipped 1960 world (BL-1047) with demand_census: steel's genuine demand before and after, and that the draw does not collapse habitability world-wide on tick 0 (ship the shape inert or ramped if the supply is not there yet — PRODUCTION.md's corollary for authoring).\n\nDONE WHEN. On the flipped world, industrial centres bid steel for housing, steel makers are induced by it, and no centre's condition sits at its floor for want of a good its band cannot make."
+   "design": "SETTLED (Ben, 2026-09-24). POPULATION.md § Housing owns the rule. Filed into sprint 46 on Ben's call though it is not a perfect fit for a sprint about wiring the generation into the game — it answers BL-1066's steel finding (the industrial band's iron ore and steel have almost no genuine buyer).\n\nTHE WORK. (1) A per-centre housing stock sized to population, wearing at an authored rate. (2) The upkeep and growth draw registered as WANT on the catchment market — the household path in market_clearing.cpp is the model; it must bid (MARKETS.md property 3) — with an era-banded basket authored in economy.lua (ancient: timber, stone, clay, planks; industrial: steel, dressed stone, ceramics). (3) Housing condition below full caps growth and lowers habitability, recovers with supply, never destroys (dim, never dark). (4) The condition is persistent state: save seam and state hash in the same commit. (5) Surfaced where a centre's habitability is read, with its cause.\n\nMEASURE on the flipped 1960 world (BL-1047) with demand_census: steel's genuine demand before and after, and that the draw does not collapse habitability world-wide on tick 0 (ship the shape inert or ramped if the supply is not there yet — PRODUCTION.md's corollary for authoring).\n\nDONE WHEN. On the flipped world, industrial centres bid steel for housing, steel makers are induced by it, and no centre's condition sits at its floor for want of a good its band cannot make.\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-24",
    "requires": [],
    "blocked_on": null,
@@ -343,12 +258,12 @@
     "src/world/corp_ai.cpp",
     "docs/economy/ERAS.md"
    ],
-   "design": "FOUND 2026-09-24 by tools/verify/steel_chain_probe (seeds 0-2, epoch 0 — the world --verify builds): the home body has ZERO steel makers, yet ancient AI firms start mines that cost 20 steel each (the type default) — 149 sites paused for steel by tick 19: petroleum 64, iron ore 56, coal 21, copper 3, rare earth 2, silica 2 — and the military base costs 35 steel. BL-590 gave the ancient roster timber-and-stone baskets but left the other extraction targets and the military base on steel. Ben (2026-09-24): epoch 0 stays a supported start, so this is real work.\n\nTHE WORK. (1) Author ancient material_overrides for every extraction target and the military base (and any other type an ancient corp can build) in economy.lua, per PRODUCTION.md § Construction materials are per-named-building. (2) ERAS.md decides whether an ancient firm may open a petroleum, coal or rare-earth mine at all; if not, the era band refuses it at the door (building_available / the recipe band), not the scorer. (3) Re-run steel_chain_probe at epoch 0.\n\nDONE WHEN. At epoch 0 no construction site pauses for a good the ancient band cannot make, and the verify fixture's military base completes at epoch 0."
+   "design": "FOUND 2026-09-24 by tools/verify/steel_chain_probe (seeds 0-2, epoch 0 — the world --verify builds): the home body has ZERO steel makers, yet ancient AI firms start mines that cost 20 steel each (the type default) — 149 sites paused for steel by tick 19: petroleum 64, iron ore 56, coal 21, copper 3, rare earth 2, silica 2 — and the military base costs 35 steel. BL-590 gave the ancient roster timber-and-stone baskets but left the other extraction targets and the military base on steel. Ben (2026-09-24): epoch 0 stays a supported start, so this is real work.\n\nTHE WORK. (1) Author ancient material_overrides for every extraction target and the military base (and any other type an ancient corp can build) in economy.lua, per PRODUCTION.md § Construction materials are per-named-building. (2) ERAS.md decides whether an ancient firm may open a petroleum, coal or rare-earth mine at all; if not, the era band refuses it at the door (building_available / the recipe band), not the scorer. (3) Re-run steel_chain_probe at epoch 0.\n\nDONE WHEN. At epoch 0 no construction site pauses for a good the ancient band cannot make, and the verify fixture's military base completes at epoch 0.\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-24",
    "requires": [],
    "blocked_on": null,
@@ -366,12 +281,12 @@
     "src/world/market_clearing.cpp",
     "src/world/corp_ai.cpp"
    ],
-   "design": "MECHANISM RULED (Ben, 2026-09-24): option (b) — the market exports its own surplus shelf stock by the net-price rule, the haul paid from the export. SUPPLY.md § Dispatch trigger ('A market exports its own shelf') owns it.\n\nTHE WORK. In the dispatch step, AFTER corporations' dispatch: for each market and good, shelf inventory (above what its own local consumers drew last clear — measure, do not guess) is a source under net(d) = price_d - haul - [handling, duty when built]; send to argmax net(d) above the margin, quantity = the same absorbable room corporations use (all pending subtracted). The convoy has no corporation: model its owner as the source market (a convoy field or a sentinel owner) and settle: on arrival the cargo lands on the DESTINATION market's shelf and sells there; the haul is charged against the export's proceeds — decide with FINANCE.md where the net proceeds go (the source market holds no treasury today: the options are that they vanish as the market's margin, or credit the source market's nation as a tariff-like line) and state it. Interdiction, LP and the arrived-this-tick rule apply as to any convoy. Harness rows: a shelf with a far better-priced market exports; one under the margin does not; no churn; goods conserved (shelf debit = cargo = destination shelf credit).\n\nDONE WHEN. On the epoch-0 verify world the stranded shelf steel moves toward the markets pricing it (steel_chain_probe's shelf geography), and haulage_measure --far-trade shows market exports as their own line.\n\n--- EARLIER ---\nRULED IN DIRECTION (Ben, 2026-09-24: 'goods should move'); the MECHANISM is open. FOUND on BL-1066: auto-surplus sells every unit above processor reservation to the local market (the market is buyer of last resort), and market inventory has no owner, so nothing hauls it — on the epoch-0 verify world ~3,300 steel sat on 13 of 255 shelves while construction sites elsewhere paused for it. BL-995 (trade reaches for price) makes a SELLER haul before it sells; stock already on a shelf still cannot move.\n\nMECHANISM OPTIONS (Ben's call, then written into SUPPLY.md and MARKETS.md): (a) any corporation may BUY shelf stock at the shelf's price and haul it under the same net-price rule — a merchant is just a corp acting on a gap, one rule for every corp; (b) the market itself exports its surplus shelf stock by the net-price rule, the haul paid from the sale; (c) a construction site or processor may buy from the nearest stocked shelf across markets, paying the haul (narrow: fixes consumers, not trade).\n\nDONE WHEN. A shelf holding a good that another market prices above landed cost is drawn down by hauls, measured by haulage_measure --far-trade and steel_chain_probe's shelf geography."
+   "design": "MECHANISM RULED (Ben, 2026-09-24): option (b) — the market exports its own surplus shelf stock by the net-price rule, the haul paid from the export. SUPPLY.md § Dispatch trigger ('A market exports its own shelf') owns it.\n\nTHE WORK. In the dispatch step, AFTER corporations' dispatch: for each market and good, shelf inventory (above what its own local consumers drew last clear — measure, do not guess) is a source under net(d) = price_d - haul - [handling, duty when built]; send to argmax net(d) above the margin, quantity = the same absorbable room corporations use (all pending subtracted). The convoy has no corporation: model its owner as the source market (a convoy field or a sentinel owner) and settle: on arrival the cargo lands on the DESTINATION market's shelf and sells there; the haul is charged against the export's proceeds — decide with FINANCE.md where the net proceeds go (the source market holds no treasury today: the options are that they vanish as the market's margin, or credit the source market's nation as a tariff-like line) and state it. Interdiction, LP and the arrived-this-tick rule apply as to any convoy. Harness rows: a shelf with a far better-priced market exports; one under the margin does not; no churn; goods conserved (shelf debit = cargo = destination shelf credit).\n\nDONE WHEN. On the epoch-0 verify world the stranded shelf steel moves toward the markets pricing it (steel_chain_probe's shelf geography), and haulage_measure --far-trade shows market exports as their own line.\n\n--- EARLIER ---\nRULED IN DIRECTION (Ben, 2026-09-24: 'goods should move'); the MECHANISM is open. FOUND on BL-1066: auto-surplus sells every unit above processor reservation to the local market (the market is buyer of last resort), and market inventory has no owner, so nothing hauls it — on the epoch-0 verify world ~3,300 steel sat on 13 of 255 shelves while construction sites elsewhere paused for it. BL-995 (trade reaches for price) makes a SELLER haul before it sells; stock already on a shelf still cannot move.\n\nMECHANISM OPTIONS (Ben's call, then written into SUPPLY.md and MARKETS.md): (a) any corporation may BUY shelf stock at the shelf's price and haul it under the same net-price rule — a merchant is just a corp acting on a gap, one rule for every corp; (b) the market itself exports its surplus shelf stock by the net-price rule, the haul paid from the sale; (c) a construction site or processor may buy from the nearest stocked shelf across markets, paying the haul (narrow: fixes consumers, not trade).\n\nDONE WHEN. A shelf holding a good that another market prices above landed cost is drawn down by hauls, measured by haulage_measure --far-trade and steel_chain_probe's shelf geography.\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": "47",
    "written": "2026-09-24",
    "blocked_on": null,
    "parked": false,
@@ -398,7 +313,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": "47",
    "written": "2026-09-24",
    "blocked_on": null,
    "parked": false,
@@ -422,67 +337,9 @@
    "design": "FILED 2026-09-24 after Ben saw Begin discard the wizard's world and reload. BL-1068 made round 6 run the FULL build (no stop flag), so the world Begin needs now exists at the end of the wizard. File:line anchors below are 2026-09-18; re-read them.\n\n--- FROM THE SPRINT 46 DRAFT ---\nRULED (Ben, 2026-09-18, NR-898 (5)); re-files BL-1025 (archived unbuilt).\n\nWHY. The wizard's worker calls make_hard_coded_world with a stop flag (chosen :335-338), keeps only the record and discards the world (startup_screens.cpp:345-353); a world stopped at a round has no nations, roads or corporations (:325-327; returns hard_coded_world.cpp:1688-1717). Begin (startup_screens.cpp:1648-1651, :1806) calls app::begin_new_game (app.cpp:502-561), which reloads config and rebuilds (:553-558); poll_worldgen (:617) then runs start_new_game_prelude (:653, defined :985): setup_world (:1019), economy, landscape search (:1057-1076). Invalidation already exists: m_wiz_history_stale (startup_screens.cpp:380-388), invalidate_wizard_rounds_below (app.hpp:274-287, called :971). Under --verify the wizard adopts the harness report (:292-303).\n\nTHE WORK. Measure the Release build cost first (BL-1025's 73 s was Debug). Round 6's run is the full build; keep the finished world and its report. begin_new_game moves a valid cached world into m_world and jumps to the poll_worldgen tail (prelude, validation run, seat); otherwise the async build. Any world-changing control drops the cache via the stale flag. STARTUP.md states the cache's owner, invalidation rule and memory cost (a world is large; memory caps this machine).\n\nDONE WHEN. With a valid cache Begin never calls make_hard_coded_world (log); a reroll on any round drops it; an adopted world and a cold rebuild with the same settings have the same state hash; checked live."
   },
   {
-   "status": "complete",
-   "glyph": "✓",
-   "sprint": "46",
-   "written": "2026-09-24",
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "difficulty": 3,
-   "id": "BL-1074",
-   "short_name": "NARRATIVE_PASSES_RETIRED",
-   "requires": [],
-   "author": "Ben (2026-09-18, NR-898 (3)); Claude (filed from the sprint 46 draft 2026-09-24, Ben: start the retirement)",
-   "priority": "A",
-   "title": "The three narrative passes that ran only on the superseded arc are deleted: ruptures, the Charter Act and border accord, the common tongue",
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-   "files": [
-    "src/world/settlement.cpp",
-    "src/world/history_ladder.cpp",
-    "src/world/creeds.cpp",
-    "src/world/hard_coded_world.cpp",
-    "src/core/save_game.cpp"
-   ],
-   "design": "FILED 2026-09-24 (Ben: 'start the retirement'). File:line anchors below are 2026-09-18 and predate sprint 45's close and BL-1067's rename; re-read them.\n\n--- FROM THE SPRINT 46 DRAFT ---\nRULED (Ben, 2026-09-18, NR-898 (3)).\n\nWHY. Every call sits behind !antiquity_start (hard_coded_world.cpp:1854), so only the 1960 arc reaches them. Ruptures: settlement.cpp 1714-2128 (helpers transfer_tile, scale_abundance, flip, redact at 1719-1782), tag_rupture :189, declared settlement.hpp:1111-1136, called hard_coded_world.cpp:1860-1863; writes settlement_state::checkpoints and lacunae (settlement.hpp:801-805), saved at save_game.cpp:388-397, read by history_log.cpp:156-161 and history_sweep.cpp:1154, 3787. Charter Act and border accord: history_ladder.cpp 390-471, history_ladder.hpp:129-145, called :1868-1869; ladder_rung::charter and borders (planetology.hpp:325-326), max_rung saved at save_game.cpp:27. Common tongue: creeds.cpp 278-309 (the dated line :305), creeds.hpp:239-241, called :1875-1876. Tests: settlement_harness S5b, S6a, S6b, S8b (268-295, 355-380); era_world_harness :269; history_ladder_harness :137, 208-251, 277-305; creeds_harness C4 (170-194).\n\nTHE WORK. Delete the three functions, their calls and the antiquity_start flag. DECIDE AT THE CUT (unsure in the read): lacunae has no other writer, so it goes; checkpoints has one other writer, resolve_plague_event (settlement.cpp:2502), whose only callers found were in demography_harness — keep or drop the field and its save record. Whether ladder_rung::charter and borders go (the save's max_rung moves with them). Fix the comments at hard_coded_world.cpp:1849-1853 and :1883. Remove or rewrite C4, the charter/accord checks, S6, S8b and R5's rupture check.\n\nDONE WHEN. grep resolve_historical_ruptures|record_institutional_history|record_globalisation is empty; the harness gate is green; the epoch-0 digests are unchanged.\n\nDELIVERED 2026-09-24: merged 0ed71d5d; epoch-0 digests unchanged; envelope 19.",
-   "resolved": "2026-09-24"
-  },
-  {
-   "status": "complete",
-   "glyph": "✓",
-   "sprint": "46",
-   "written": "2026-09-24",
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "difficulty": 3,
-   "id": "BL-1075",
-   "short_name": "TWO_SPAN_ARC_RETIRED",
-   "requires": [
-    "BL-1047",
-    "BL-1074"
-   ],
-   "author": "Ben (2026-09-18, NR-898 (2)); Claude (filed from the sprint 46 draft 2026-09-24)",
-   "priority": "A",
-   "title": "The superseded 1560->1960 two-span arc and its sim machinery are deleted outright",
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-   "files": [
-    "src/world/era_minus_one.cpp",
-    "src/world/era_minus_one.hpp",
-    "src/world/history_sim.hpp",
-    "src/world/history_sim.cpp",
-    "src/world/hard_coded_world.hpp",
-    "tools/verify/world_determinism.cpp",
-    "tools/verify/era_world_harness.cpp",
-    "tools/verify/history_sweep.cpp"
-   ],
-   "design": "FILED 2026-09-24. After BL-1047 (the epoch flip): the old arc is today's only route to a 1960 world, so it goes once the flip gives the span world that route. File:line anchors below are 2026-09-18; re-read them.\n\n--- FROM THE SPRINT 46 DRAFT ---\nRULED (Ben, 2026-09-18, NR-898 (2)): retire outright, no legacy field.\n\nWHY. The arc is chosen at era_minus_one.cpp:25-36 and built at 298-315 (stop = epoch, boundary = epoch - industrial_years, span1_band_ceiling = medieval, two tick bands). Machinery only it uses: history_sim_params::boundary_year and span1_band_ceiling (history_sim.hpp:182-192); sim_band_ceiling (history_sim.hpp:4288-4289; history_sim.cpp:249-258) and the ceiling argument threaded through build_stack (history_sim.cpp:289-300, 4281, 4286, 5762, 5799); the furnace-before-boundary note (history_sim.cpp:6980-6995); the two-span half of BL-976's protection derivation (~7849-7916 — the broadcast half STAYS, seed_national_tariffs reads it at hard_coded_world.cpp:1808-1821); world_params::industrial_years (hard_coded_world.hpp:96-100).\n\nTHE WORK. Delete era_minus_one_has_industrial_span, the two-span branch, industrial_years, boundary_year, span1_band_ceiling, sim_band_ceiling and the ceiling parameter; keep the protection field and broadcast. Harnesses that build the arc are rewritten or retired by the harness item: world_determinism R4 (636-685, digest '1960/two-span' at :666), era_world_harness R5 (113-118, 250-272), history_sweep's two-span reporting (1037-1075, the BL-760 section from 2159, 2509-2520, 3317), ownership_class.cpp:534, demand_census.cpp:1436, haulage_measure.cpp:178.\n\nDONE WHEN. grep industrial_years|boundary_year|span1_band_ceiling|has_industrial_span is empty in src/ and tools/; the '1960/two-span' digest is gone; the epoch-0 digests are unchanged.\n\nDELIVERED 2026-09-24: merged 41ab4ee9 (with BL-1047); the two-span digest and R4 retired; grep empty.",
-   "resolved": "2026-09-24"
-  },
-  {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": "47",
    "written": "2026-09-24",
    "author": "Ben (2026-09-18 NR-898 (12); designed 2026-09-24 in the select-company session); Claude",
    "requires": [
@@ -510,7 +367,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-24",
    "requires": [],
    "blocked_on": null,
@@ -527,12 +384,12 @@
     "src/world/road_generation.cpp",
     "tools/verify/gen_step_costs.cpp"
    ],
-   "design": "MEASURED 2026-09-24 (tools/verify/gen_step_costs, Release, shipped settings, BL-1072): generate_roads costs 30-61 s of a 40-83 s build, ~90% of it placing village roads — ~5,900 villages at ~4.7 ms each (a path search per village). BL-1072 made the wait legible, not shorter; round 6 (BL-1068) and Begin's cold path both pay it. No doc owns a generation time budget (BL-754 reports per-pass clocks and asserts none).\n\nTHE WORK. Profile the per-village cost (the A* per village? a shared field?), then bound it without changing the roads laid — e.g. one multi-source search per centre instead of one per village, or a cached reach field — so the digests hold; if a bound must change the roads, that is Ben's call (it moves the world). LOGISTICS.md § the ancient network owns how village roads are laid.\n\nDONE WHEN. generate_roads under ~10 s Release on the library seeds, world_determinism digests unchanged (or a moved digest ruled by Ben)."
+   "design": "MEASURED 2026-09-24 (tools/verify/gen_step_costs, Release, shipped settings, BL-1072): generate_roads costs 30-61 s of a 40-83 s build, ~90% of it placing village roads — ~5,900 villages at ~4.7 ms each (a path search per village). BL-1072 made the wait legible, not shorter; round 6 (BL-1068) and Begin's cold path both pay it. No doc owns a generation time budget (BL-754 reports per-pass clocks and asserts none).\n\nTHE WORK. Profile the per-village cost (the A* per village? a shared field?), then bound it without changing the roads laid — e.g. one multi-source search per centre instead of one per village, or a cached reach field — so the digests hold; if a bound must change the roads, that is Ben's call (it moves the world). LOGISTICS.md § the ancient network owns how village roads are laid.\n\nDONE WHEN. generate_roads under ~10 s Release on the library seeds, world_determinism digests unchanged (or a moved digest ruled by Ben).\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": null,
    "written": "2026-09-24",
    "requires": [],
    "blocked_on": null,
@@ -548,39 +405,12 @@
    "files": [
     "src/core/app.cpp"
    ],
-   "design": "FOUND 2026-09-24 building BL-1073 (Begin adopts the wizard's world): even with the world adopted, background_firms blocks ~18 s on the UI thread in Release (Windows marks a window hung after ~5 s), and the validation run then took 112 s for 12 ticks (~9.4 s a tick; measured under memory pressure, so possibly inflated — STARTUP.md's figure is ~0.9 s). Related: NR-915 (the live-tick tail), under investigation.\n\nTHE WORK. Move every post-Begin step that can exceed ~1 s onto the worker the wizard already uses, behind the same wait surface BL-1072 built (caption, bar, elapsed count), so the window never stops pumping events; re-measure the validation run's per-tick cost quietly and reconcile STARTUP.md's figure.\n\nDONE WHEN. From Begin to the select-company canvas (BL-1076) the window never stops responding, and the wait shows what it is doing."
-  },
-  {
-   "status": "complete",
-   "glyph": "✓",
-   "sprint": "46",
-   "written": "2026-09-24",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1079",
-   "short_name": "LIVE_TICK_SPEEDUPS",
-   "author": "Ben (2026-09-24, NR-915 option A); Claude",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "The live tick's two hot loops are cut with identical results: the province ceiling cached within a tick, and each pool's origin tile resolved once per dispatch pass",
-   "authority_doc": "docs/generation/PROVINCES.md",
-   "files": [
-    "src/world/province.cpp",
-    "src/world/placement_rules.cpp",
-    "src/world/corp_ai.cpp",
-    "src/world/supply_system.cpp",
-    "src/world/market_clearing.cpp",
-    "tools/verify/live_tick_cost_probe.cpp"
-   ],
-   "design": "RULED (Ben, 2026-09-24): NR-915 option A — pure speed-ups, identical results, no re-bless. The measurement is NR-915's investigation entry (tools/verify/live_tick_cost_probe).\n\nTHE WORK. (1) measure_province_sustain rebuilds a map over every population centre per call and the military_base candidate calls it ~820-3,100 times per base-less corp per evaluation: build the population-by-tile map once per tick (or per scan) and invalidate it wherever centres or their scale change (growth, razing, urban transform, road changes if the sustain reads them) — find every writer. (2) dispatch: resolve each source pool's origin tile ONCE per pass, not per destination; make markets_by_body stop scanning every market per call (build once per pass). (3) NO RESULT MAY MOVE: world_determinism digests identical, AND a live-tick state hash after N ticks identical before/after on seeds 0, 28, 41 (add the before/after hash to live_tick_cost_probe or a sibling). (4) Re-measure the tail with live_tick_cost_probe on seeds 41, 31, 28, 0, 13 on a quiet machine.\n\nDONE WHEN. Identical hashes; the econ step and dispatch shares fall as estimated (~90% / ~70%); NR-915 resolved with the new tail.\n\nDELIVERED 2026-09-24: merged e97bbe52; live-tick state hashes identical before/after on seeds 0/28/41; tail x0.11-x0.28 of before (seed 41 30.5 s -> 5.5 s a tick, noisy machine).",
-   "resolved": "2026-09-24"
+   "design": "FOUND 2026-09-24 building BL-1073 (Begin adopts the wizard's world): even with the world adopted, background_firms blocks ~18 s on the UI thread in Release (Windows marks a window hung after ~5 s), and the validation run then took 112 s for 12 ticks (~9.4 s a tick; measured under memory pressure, so possibly inflated — STARTUP.md's figure is ~0.9 s). Related: NR-915 (the live-tick tail), under investigation.\n\nTHE WORK. Move every post-Begin step that can exceed ~1 s onto the worker the wizard already uses, behind the same wait surface BL-1072 built (caption, bar, elapsed count), so the window never stops pumping events; re-measure the validation run's per-tick cost quietly and reconcile STARTUP.md's figure.\n\nDONE WHEN. From Begin to the select-company canvas (BL-1076) the window never stops responding, and the wait shows what it is doing.\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": "47",
    "written": "2026-09-24",
    "requires": [
     "BL-1068"
@@ -604,32 +434,9 @@
    "design": "RULED (Ben, 2026-09-24). Found watching BL-1068's round 6: it animates borders and seats, but the phase's story is industry, and none of it shows — on the verify seed the map barely changes 1810-1960. INDUSTRIALISATION.md § Beat 1 owns what industrialises (industry points; a region's furnace crossing, region::industrial_year; the Industry tree).\n\nTHE WORK (a reading to confirm at the live click, not a closed design). (1) The span's timelapse records, per sampled year, the industry the round is about: which regions have crossed the furnace (by year), each polity's industry points, and the railway/road corridors the span lays if it lays any — whatever the span actually computes; do not invent a quantity it lacks. (2) The map: a region that has crossed the furnace is marked (tinted or glyphed) from its crossing year on, so the lapse visibly industrialises. (3) The board gains an industry column (industry points) beside People/Land/Pop. (4) The ticker carries crossings ('X's heartland lights its furnaces, 1782') beside treaties. (5) The record is save-format state (envelope version; claim it through the ledger BL-1081 adds, or by the scan if that has not landed). Watched and unwatched runs byte-identical; world_determinism digests unchanged.\n\nDONE WHEN. A live Release click-through of round 6 where industry visibly spreads across the span, the board ranks industry, and the ticker names crossings.\n\nMAP LAYER RULED (Ben, 2026-09-24): the built map layer marks furnace crossings, but the span world never draws them (settlement's Stage 4 runs only on worlds that start at 1700+; CORPORATION_GENERATION.md: antiquity worlds skip Stage 4) — on the verify seed the map and ticker stay empty while the board's Ind column rises 17.2M -> 31.4M. Ben's call: the map shows INDUSTRY POINTS as a heat — by region where the span records points per region, else by polity territory — because that is what the span computes. The furnace marks and crossing ticker lines stay, inert until a world draws crossings. Live click owed after the heat lands."
   },
   {
-   "status": "complete",
-   "glyph": "✓",
-   "sprint": "46",
-   "written": "2026-09-24",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1081",
-   "short_name": "ENVELOPE_VERSION_LEDGER",
-   "author": "Ben (2026-09-24, yes); Claude",
-   "category": "Tools",
-   "priority": "C",
-   "difficulty": 1,
-   "title": "next_save_version.js and the reservation ledger cover the save envelope's version too",
-   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
-   "files": [
-    "tools/session/next_save_version.js",
-    "save_version_reservations.jsonl"
-   ],
-   "design": "RULED (Ben, 2026-09-24). Two agents bumped save_game_version (the envelope, save_game.cpp) in one day (BL-1068 to 18, BL-1074 to 19) with no ledger: next_save_version.js reads only world_save_version, and an envelope line in the ledger made it report a false collision. THE WORK: the tool reads both constants and every ref, the ledger records which version a claim is for (world or envelope), and it reports the next safe number of each. DONE WHEN: `node tools/session/next_save_version.js` prints both and the ledger's existing rows parse unchanged.",
-   "resolved": "2026-09-24"
-  },
-  {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "46",
+   "sprint": "47",
    "written": "2026-09-24",
    "author": "Ben (2026-09-24, yes at the re-bless); Claude (found by BL-1076's reproducibility check)",
    "requires": [
