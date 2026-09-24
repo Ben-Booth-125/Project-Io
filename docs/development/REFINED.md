@@ -175,6 +175,10 @@ BL-1066 (the player cannot build) opens it, and Ben's rulings on it (2026-09-23)
 the game is first something the player WATCHES. Order: BL-1067 (the rename) -> BL-1068 -> Begin
 adopts the wizard's world. The economy thread (BL-1066 and the steel collapse) runs alongside.
 
+**The one re-bless** (Ben, 2026-09-24: "Ok"): authorised in principle, taken ONCE after sprint 46's
+world-movers have landed (BL-1003, BL-995, BL-1066's slices, BL-1049, the epoch flip). Until then every
+digest movement is reported old -> new in its commit and nothing is re-pinned.
+
 - [ ] **BL-1067 (rename to Industrialisation)** — agent in a worktree; digests must not move.
 - [ ] **BL-1068 (round 6 plays the span)** — after BL-1067; a live click-through is its done-when.
 - [ ] **BL-995 (trade reaches for price)** — restored 2026-09-23 on Ben's BL-1066 ruling; economy-dev in a worktree; requirement group `trade-reaches-for-price`. Dispatch moves before the clear.
