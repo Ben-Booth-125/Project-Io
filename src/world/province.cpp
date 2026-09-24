@@ -9,6 +9,7 @@
 #include <map>
 #include <ostream>
 #include <queue>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -1062,7 +1063,41 @@ std::map<entity_id, int> population_scale_by_tile(const world& w)
     return by_tile;
 }
 
+/// BL-1079: the state behind a live `province_ceiling_scope` (province.hpp).
+/// The two unordered maps are read ONLY by key lookup, never iterated, so their
+/// layout cannot reach any result.
+struct ceiling_memo
+{
+    const world*                           w = nullptr;
+    bool                                   pop_built = false;
+    std::map<entity_id, int>               pop_by_tile;
+    std::unordered_map<uint32_t, int>      ceiling;     // province id -> ceiling
+    bool                                   standing_built = false;
+    std::unordered_map<uint32_t, int>      standing;    // province id -> buildings
+};
+
+thread_local ceiling_memo* t_ceiling_memo = nullptr;
+
+/// The live memo for @p w, or null when no scope is open on this world.
+ceiling_memo* memo_for(const world& w)
+{
+    return (t_ceiling_memo != nullptr && t_ceiling_memo->w == &w) ? t_ceiling_memo : nullptr;
+}
+
 } // namespace
+
+province_ceiling_scope::province_ceiling_scope(const world& w)
+    : m_prev(t_ceiling_memo), m_self(new ceiling_memo)
+{
+    static_cast<ceiling_memo*>(m_self)->w = &w;
+    t_ceiling_memo = static_cast<ceiling_memo*>(m_self);
+}
+
+province_ceiling_scope::~province_ceiling_scope()
+{
+    t_ceiling_memo = static_cast<ceiling_memo*>(m_prev);
+    delete static_cast<ceiling_memo*>(m_self);
+}
 
 province_sustain measure_province_sustain(const world& w, const province& pr)
 {
@@ -1079,7 +1114,25 @@ province_sustain measure_province_sustain(const world& w, const province& pr)
     if (province_kind_of(w, pr) != province_kind::land)
         return s; // every term zero, ceiling 0
 
-    const std::map<entity_id, int> pop_by_tile = population_scale_by_tile(w);
+    // BL-1079: inside a province_ceiling_scope the map is built once per scope;
+    // outside one, per call exactly as before. Same map either way.
+    std::map<entity_id, int>        local_pop;
+    const std::map<entity_id, int>* pop_src = nullptr;
+    if (ceiling_memo* m = memo_for(w))
+    {
+        if (!m->pop_built)
+        {
+            m->pop_by_tile = population_scale_by_tile(w);
+            m->pop_built   = true;
+        }
+        pop_src = &m->pop_by_tile;
+    }
+    else
+    {
+        local_pop = population_scale_by_tile(w);
+        pop_src   = &local_pop;
+    }
+    const std::map<entity_id, int>& pop_by_tile = *pop_src;
 
     int pop_scale_total = 0;
 
@@ -1122,13 +1175,34 @@ int province_building_ceiling(const world& w, uint32_t province_id)
     const province* pr = w.provinces.find(province_id);
     if (pr == nullptr)
         return -1; // UNKNOWN, never "no room" — see the header's contract.
-    return measure_province_sustain(w, *pr).ceiling;
+    ceiling_memo* m = memo_for(w);
+    if (m != nullptr)
+        if (const auto it = m->ceiling.find(province_id); it != m->ceiling.end())
+            return it->second;
+    const int c = measure_province_sustain(w, *pr).ceiling;
+    if (m != nullptr)
+        m->ceiling.emplace(province_id, c);
+    return c;
 }
 
 int province_buildings_standing(const world& w, uint32_t province_id)
 {
     if (province_id == 0)
         return 0;
+    // BL-1079: inside a province_ceiling_scope, one building walk counts every
+    // province at once. A count per key, so the walk order still cannot matter.
+    if (ceiling_memo* m = memo_for(w))
+    {
+        if (!m->standing_built)
+        {
+            for (const auto& [bid, bc] : w.buildings)
+                if (const uint32_t pid = w.provinces.province_of(bc.tile); pid != 0)
+                    ++m->standing[pid];
+            m->standing_built = true;
+        }
+        const auto it = m->standing.find(province_id);
+        return it != m->standing.end() ? it->second : 0;
+    }
     // Order-independent: a count, not a fold, so the unordered walk is safe.
     int n = 0;
     for (const auto& [bid, bc] : w.buildings)

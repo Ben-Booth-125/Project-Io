@@ -483,7 +483,8 @@ logistics_nodes collect_logistics_nodes(const world& w)
 convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id corp_id,
                             entity_id src_key, entity_id dest_market_id,
-                            std::size_t ri, float qty, float logistics_cost_space)
+                            std::size_t ri, float qty, float logistics_cost_space,
+                            const entity_id* known_origin)
 {
     convoy_leg leg;
 
@@ -537,7 +538,9 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         // the source catchment, else the source market's centre) to the short
         // market's centre, terrain-weighted over the tile grid (land, or sea
         // when the path must cross water).
-        const entity_id origin      = convoy_origin_tile(w, corp, src_key);
+        const entity_id origin      = known_origin != nullptr
+                                          ? *known_origin // BL-1079: resolved once per pool
+                                          : convoy_origin_tile(w, corp, src_key);
         const entity_id dest_centre = dest_market.centre_tile;
         if (origin == null_entity || dest_centre == null_entity)
             return leg; // no production anchor / unanchored market: cannot route
@@ -956,6 +959,23 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 continue;
             const bool src_is_market = (w.markets.find(src_key) != w.markets.end());
 
+            // BL-1079 (live tick speedups): this pool's intra-body origin tile,
+            // resolved on the first intra-body leg and reused for every other
+            // destination and good of the pool. It reads only the corp's
+            // buildings and the market set, and nothing in this pass moves either
+            // (commit_convoy writes balances, pools and the convoy list), so the
+            // value is the one each leg used to recompute for itself.
+            bool      origin_known = false;
+            entity_id origin_tile  = null_entity;
+            const auto pool_origin = [&]() -> const entity_id* {
+                if (!origin_known)
+                {
+                    origin_tile  = convoy_origin_tile(w, w.corporations.at(corp_id), src_key);
+                    origin_known = true;
+                }
+                return &origin_tile;
+            };
+
             // The same reservation auto-surplus holds back: what a seller may
             // haul is exactly what it would otherwise list at home.
             auto rit = memo.find({corp_id, src_key});
@@ -1011,7 +1031,8 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                         continue;
                     const convoy_leg leg = price_convoy_leg(
                         w, reg, nodes, corp_id, src_key, dest_id, ri, probe_qty,
-                        logistics_cost_space);
+                        logistics_cost_space,
+                        dm.body == src_body ? pool_origin() : nullptr);
                     if (!leg.viable)
                         continue; // unroutable / unpadded / unfuelled / same market
                     const float haul = leg.cost / probe_qty;
@@ -1051,7 +1072,7 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                     // Re-price the committed leg at its real quantity.
                     const convoy_leg leg = price_convoy_leg(
                         w, reg, nodes, corp_id, src_key, c.dest, ri, qty,
-                        logistics_cost_space);
+                        logistics_cost_space, c.space ? nullptr : pool_origin());
                     if (!leg.viable)
                         continue;
 

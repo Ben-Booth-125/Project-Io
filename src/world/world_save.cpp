@@ -771,7 +771,7 @@ void clear_derived_state(world& w)
     // makes the next `market_for_tile` rebuild rather than trust an empty index.
     w.body_market_index.clear();
     w.body_market_index_count  = 0;
-    w.body_market_index_max_id = null_entity;
+    w.body_market_index_cursor = 0; // not an id: the allocator cursor at build (BL-1079)
 
     // BL-1050's per-body centre index, on the same terms: a pure function of
     // `population_centres` + `population_centre_tile`, both of which the

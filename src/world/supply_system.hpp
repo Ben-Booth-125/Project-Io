@@ -275,7 +275,14 @@ struct convoy_leg
 convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id corp_id,
                             entity_id src_key, entity_id dest_market_id,
-                            std::size_t ri, float qty, float logistics_cost_space);
+                            std::size_t ri, float qty, float logistics_cost_space,
+                            const entity_id* known_origin = nullptr);
+// BL-1079 (live tick speedups): `known_origin`, when given, is the caller's
+// already-resolved `convoy_origin_tile(corp, src_key)` — the SAME value this
+// function would compute (null_entity included), handed in so a caller pricing
+// one pool against every destination resolves it once per pool, not once per
+// leg. It must be computed against the world as it stands; nothing between the
+// two may move the corp's buildings or the market set.
 
 /// Tile of the corp's lowest-id building on `body` (BL-077's production anchor).
 /// `null_entity` if the corp holds nothing on the body.
