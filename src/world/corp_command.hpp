@@ -128,6 +128,19 @@ enum class corp_verb : uint8_t
     // walk (corp_command.cpp § dissolve_into) is the substance of the verb and
     // the price is the easy half. FINANCE.md § Whole-firm acquisition.
     buy_corporation,   ///< `corp` buys `counterparty` (a PUBLIC corporation) outright at `book_value + k_acquisition_multiple x trailing_net + balance`, floored at 0. Holdings, pools, balance and filed returns transfer; the target is dissolved. Never a fractional stake — there is no equity relation to hold.
+    // --- BL-1076: the seat is a game act (2026-09-24) ---
+    // Appended AFTER buy_corporation, same append-only rule. The player PICKS
+    // the corporation they are on the selection canvas at Begin (STARTUP.md §
+    // The seat), and Ben ruled the pick a game act: an agent must be able to
+    // make it, so it is a verb with a dictionary entry although the wizard is
+    // not. THE SEAT IS TAKEN ONCE, BEFORE PLAY: the phase is the HOST's gate,
+    // the way actor authority is — the in-play hosts (agent_protocol, so both
+    // --serve and the live agent seam) refuse the verb with rejected_state,
+    // and only the pre-play hosts (the canvas's Confirm, `--seat`, the verify
+    // API) route it here. The seam itself validates the WORLD half: `corp`
+    // exists and is a specialist. DELIBERATELY NOT in corp_ai.cpp's candidate
+    // list — no rival picks anyone's seat.
+    take_seat,         ///< `corp` becomes the player's corporation: `is_player` / `world::player_entity` re-point onto it. `corp` must be a SPECIALIST (not a background firm). Pre-play only — the in-play hosts refuse it.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -137,7 +150,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::buy_corporation) + 1;
+    static_cast<uint8_t>(corp_verb::take_seat) + 1;
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this

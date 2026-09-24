@@ -263,6 +263,10 @@ app::~app()
 int app::run(autostart_mode autostart)
 {
     const bool windowed_autostart = (autostart != autostart_mode::none);
+    // BL-1076: only a person at the plain interactive path is asked which
+    // corporation they are; the windowed autostart walks the wizard for
+    // nobody, so its tail draws (and says so).
+    m_player_picks_seat = !windowed_autostart;
     // Apply the player's persisted display settings before anything renders, so
     // the window opens at their last size/mode. Interactive-only: run_verify()
     // never touches settings, keeping golden captures at the fixed default size.
@@ -673,6 +677,45 @@ void app::poll_worldgen()
             // seat card shows now exist (the floor itself reads phase 6's static
             // score — BL-1020). Seat BEFORE finish_new_game, which is what flips
             // to `in_game` — the first drawn frame must already have a player.
+            //
+            // BL-1076: THE PLAYER PICKS. Three routes, in precedence order:
+            //   1. `--seat <id>` — a pick made at launch (an agent's route);
+            //   2. the interactive path — open the selection canvas, whose
+            //      Confirm calls finish_new_game itself;
+            //   3. no player to ask (--autostart*, windowed autostart) — the
+            //      weighted draw, said out loud.
+            if (m_seat_pick_arg >= 0)
+            {
+                m_seat_result = rank_spawn_candidates(m_world, m_landscape_winner_score);
+                const corp_command_result r =
+                    take_seat_pick(static_cast<entity_id>(m_seat_pick_arg));
+                if (r == corp_command_result::applied)
+                {
+                    finish_new_game();
+                    return;
+                }
+                std::printf("[seat] --seat %lld REJECTED (%s): nothing seated\n",
+                            m_seat_pick_arg,
+                            r == corp_command_result::rejected_no_corp
+                                ? "rejected_no_corp: no such corporation"
+                                : "rejected_invalid: not a ranked specialist");
+                std::fflush(stdout);
+                if (!m_player_picks_seat)
+                {
+                    // Headless: a pick that was refused is a failed run, never
+                    // a silent fall-back to the draw (the AI-facing-seam rule).
+                    m_seat_pick_failed = true;
+                    return;
+                }
+                open_seat_screen(); // a person is here: let them choose
+                return;
+            }
+            if (m_player_picks_seat)
+            {
+                open_seat_screen();
+                return;
+            }
+            m_seat_drawn_because = "no player to ask (autostart)";
             seat_player();
             finish_new_game();
         }
@@ -1062,7 +1105,54 @@ void app::seat_player()
     // kept from start_new_game_prelude's search.
     m_seat_result = seat_player_corporation(m_world, m_active_world_params.seed,
                                             m_landscape_winner_score);
+    finish_seat(/*picked=*/false);
+}
 
+void app::open_seat_screen()
+{
+    // BL-1076: rank, seat nobody, and hand the choice to the player. The
+    // ranking is the draw's own (rank_spawn_candidates), so the order the
+    // canvas offers is the order the shortlist has always been walked in.
+    m_seat_result = rank_spawn_candidates(m_world, m_landscape_winner_score);
+    m_seat_ui     = seat_screen_state{};
+    m_screen      = app_screen::choosing_seat;
+    std::printf("[seat] the selection canvas: %d specialists, %d above the floor%s\n",
+                m_seat_result.specialist_count, m_seat_result.shortlist_size,
+                m_seat_result.floor_unmet ? " (FLOOR UNMET: every firm is marked)" : "");
+    std::fflush(stdout);
+}
+
+corp_command_result app::take_seat_pick(entity_id corp)
+{
+    // THE PICK IS A GAME ACT (Ben, 2026-09-24): it goes through the command
+    // seam as `corp_verb::take_seat`, the same record an agent issues. This is
+    // the PRE-PLAY host, so it owns the phase half of the validation and the
+    // one the seam cannot do — the firm must be one the canvas OFFERS, a
+    // ranked specialist of this world. Everything is checked before anything
+    // moves; a refusal leaves the world as it was.
+    if (m_world.corporations.find(corp) == m_world.corporations.end())
+        return corp_command_result::rejected_no_corp;
+    bool offered = false;
+    for (const spawn_seat_candidate& c : m_seat_result.candidates)
+        if (c.corp == corp)
+            offered = true;
+    if (!offered)
+        return corp_command_result::rejected_invalid;
+
+    corp_command cmd;
+    cmd.tick = static_cast<int>(m_world.current_econ_tick);
+    cmd.corp = corp;
+    cmd.verb = corp_verb::take_seat;
+    const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+    if (r != corp_command_result::applied)
+        return r;
+    m_seat_result.seated = corp;
+    finish_seat(/*picked=*/true);
+    return r;
+}
+
+void app::finish_seat(bool picked)
+{
     // The player-scoped history caches were filled through the validation run
     // against whichever corp the GENERATOR provisionally flagged, so at this
     // instant they belong to somebody else. Rebuild the balance series from the
@@ -1099,11 +1189,24 @@ void app::seat_player()
     for (const auto& kv : m_world.corporations)
         if (kv.second.is_player)
             ++players;
+    // BL-1076: say HOW the seat was taken. A pick names its firm id so a log
+    // reader can re-issue it (`--seat <id>`); a draw names why nobody was asked.
+    // The ranking the canvas offers, in its order, so a log reader (and
+    // tools/verify/seat_pick_check.js) can name another firm to pick.
+    for (const spawn_seat_candidate& c : m_seat_result.candidates)
+        std::printf("[seat] ranked %u landscape %.4f%s\n", static_cast<unsigned>(c.corp),
+                    c.landscape, c.shortlisted ? "" : "  (below the floor)");
+    if (picked)
+        std::printf("[seat] picked %u (take_seat)\n", static_cast<unsigned>(m_seat_result.seated));
+    else
+        std::printf("[seat] drawn %u — %s\n", static_cast<unsigned>(m_seat_result.seated),
+                    m_seat_drawn_because ? m_seat_drawn_because : "no player to ask");
     std::printf("[start_new_game] seat: %s — shortlist %d of %d specialists; is_player on %d "
                 "corporation(s)%s%s\n",
                 name, m_seat_result.shortlist_size, m_seat_result.specialist_count, players,
                 m_seat_result.floor_unmet
-                    ? "   <-- VIABILITY FLOOR UNMET (no seat on scored ground; lowest id seated)"
+                    ? (picked ? "   <-- VIABILITY FLOOR UNMET (every firm marked; the pick stands)"
+                              : "   <-- VIABILITY FLOOR UNMET (no seat on scored ground; lowest id seated)")
                     : "",
                 players != 1 ? "   <-- ONE-is_player INVARIANT BROKEN (world.hpp)" : "");
     for (const spawn_seat_candidate& c : m_seat_result.candidates)
@@ -2014,6 +2117,8 @@ void app::render()
     {
         if (m_screen == app_screen::building)
             draw_building_screen();
+        else if (m_screen == app_screen::choosing_seat)
+            draw_seat_screen(); // BL-1076: the corporation selection canvas
         else if (m_screen == app_screen::generating)
             draw_generation_screen();
         else

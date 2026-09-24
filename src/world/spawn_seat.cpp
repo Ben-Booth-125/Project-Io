@@ -96,9 +96,8 @@ double seat_landscape_score(const world& w, const landscape_score& landscape,
     return sited > 0 ? sum / static_cast<double>(sited) : 0.0;
 }
 
-spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
-                                          const landscape_score& landscape,
-                                          spawn_seat_params params)
+spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& landscape,
+                                        spawn_seat_params params)
 {
     spawn_seat_result out;
 
@@ -209,23 +208,30 @@ spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
                          return a.corp < b.corp;
                      });
 
-    // --- the draw ------------------------------------------------------------
+    // AN UNMET FLOOR STANDS (recorded here so a ranking read by the selection
+    // canvas says it too, not only a draw).
+    out.floor_unmet = (out.shortlist_size == 0);
+    return out;
+}
+
+entity_id draw_spawn_seat(const spawn_seat_result& ranked, std::uint32_t seed)
+{
     entity_id chosen = null_entity;
 
-    if (out.shortlist_size > 0)
+    if (ranked.shortlist_size > 0)
     {
         // Cumulative-weight sampling over the sorted candidate walk — the same
         // idiom `pick_home_nation` uses (corporation_generation.cpp), so the
         // draw's determinism contract is the one the rest of generation already
         // holds. Seeded from the world seed alone.
         float total_w = 0.0f;
-        for (const spawn_seat_candidate& c : out.candidates)
+        for (const spawn_seat_candidate& c : ranked.candidates)
             total_w += c.weight;
 
         std::mt19937 rng(seed ^ 0x5EA7C0DEu);
         std::uniform_real_distribution<float> draw(0.0f, total_w);
         float cursor = draw(rng);
-        for (const spawn_seat_candidate& c : out.candidates)
+        for (const spawn_seat_candidate& c : ranked.candidates)
         {
             if (c.weight <= 0.0f)
                 continue;
@@ -240,7 +246,7 @@ spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
         // last subtraction. Fall through to the last shortlisted corp rather
         // than to null — the same guard pick_home_nation's fallback serves.
         if (chosen == null_entity)
-            for (const spawn_seat_candidate& c : out.candidates)
+            for (const spawn_seat_candidate& c : ranked.candidates)
                 if (c.shortlisted)
                     chosen = c.corp;
     }
@@ -253,20 +259,32 @@ spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
         // order is entity-id order. The trailing net is NOT consulted — it
         // stopped deciding anything with BL-1020, and a fallback that read it
         // would bring the retired gate back through the side door.
-        out.floor_unmet = true;
-        if (!out.candidates.empty())
-            chosen = out.candidates.front().corp;
+        if (!ranked.candidates.empty())
+            chosen = ranked.candidates.front().corp;
     }
+    return chosen;
+}
 
-    // --- re-point ------------------------------------------------------------
-    if (chosen != null_entity && w.corporations.find(chosen) != w.corporations.end())
-    {
-        for (auto& [id, cc] : w.corporations)
-            cc.is_player = false;
-        w.corporations[chosen].is_player = true;
-        w.player_entity                  = chosen;
-        out.seated                       = chosen;
-    }
+bool repoint_player(world& w, entity_id corp)
+{
+    if (corp == null_entity || w.corporations.find(corp) == w.corporations.end())
+        return false;
+    for (auto& [id, cc] : w.corporations)
+        cc.is_player = false;
+    w.corporations[corp].is_player = true;
+    w.player_entity                = corp;
+    return true;
+}
 
+spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
+                                          const landscape_score& landscape,
+                                          spawn_seat_params params)
+{
+    // Rank, draw, re-point — the three halves in sequence, byte-for-byte the
+    // decision this function made before the canvas split them (BL-1076).
+    spawn_seat_result out = rank_spawn_candidates(w, landscape, params);
+    const entity_id chosen = draw_spawn_seat(out, seed);
+    if (repoint_player(w, chosen))
+        out.seated = chosen;
     return out;
 }

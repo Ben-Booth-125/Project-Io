@@ -316,6 +316,24 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
             return host_op::none;
         }
 
+        // BL-1076: THE SEAT IS TAKEN BEFORE PLAY. Both hosts of this protocol
+        // (--serve and the live agent seam) are IN-PLAY hosts — the seam opens
+        // only once a campaign runs — so `take_seat` is refused here whole,
+        // before the seam, exactly as actor authority is: the phase is the
+        // host's to decide, and apply_corp_command stays permissive for the
+        // pre-play hosts (the selection canvas, `--seat`, the verify API).
+        if (cmd.verb == corp_verb::take_seat)
+        {
+            if (echo)
+            {
+                echo->parse_ok = true;
+                echo->cmd      = cmd;
+                echo->result   = corp_command_result::rejected_state;
+            }
+            out += "RESULT result=rejected_state building=-1\n";
+            return host_op::none;
+        }
+
         entity_id out_building = null_entity;
         const corp_command_result result = apply_corp_command(w, reg, cmd, &out_building);
         if (echo)

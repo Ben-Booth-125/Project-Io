@@ -578,6 +578,10 @@
    "The Acquisitions ledger (nav rail slot 5, and the Company lens's click destination): the Buy press on a PURCHASABLE row. The two groups are the whole affordance — Purchasable rows carry the press, Possible rows show the price and carry none, because a price you cannot meet is something to save toward rather than something refused. Also still a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger. NOTE FOR A PLANNER: the field is LARGE — measured over twelve seeds of the shipped spawn (tools/verify/acquisition_viability.cpp section C), 88 corporations yield a mean of 81.6 buyable firms, 35.8 of them Purchasable at the moment of reading. A company is publicly_held by construction (BL-678, companies are open); only a corporation can class private or closed and be unpriceable, which is a mean of 5.2 per seed. A mean of 10.6 firms per seed price at exactly ZERO, which is not a bargain - the price floor caught a firm whose debts exceed its book value, and buy_corporation transfers that debt at face value."
   ],
   [
+   "gameplay.take_seat",
+   "The corporation selection canvas at Begin (STARTUP.md § The seat): the ranked list of every specialist beside a map of the home body, a firm's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which corporation the player IS - so an agent must be able to make it. It is a corp_verb (29), but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <corp-id>` (every new-campaign path, --autostart included). NOTE FOR A PLANNER: the list order is the static landscape score (the ground a firm's holdings stand on), and firms below the viability floor are MARKED but offered; a marked firm is a harder opening, never an illegal one."
+  ],
+  [
    "chrome.quick_save_key",
    "Keyboard."
   ],

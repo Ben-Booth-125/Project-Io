@@ -17,11 +17,11 @@ the opening view the flow hands over to.
 
 ## The screen state machine
 
-`app_screen` (`app.hpp`) has four states; `run()` opens on **`menu`**:
+`app_screen` (`app.hpp`) has five states; `run()` opens on **`menu`**:
 
 ```
-menu  →  generating  →  building  →  in_game
-(main menu)  (New World wizard)  (carve, then validation run)  (play)
+menu  →  generating  →  building  →  choosing_seat  →  in_game
+(main menu)  (New World wizard)  (carve, then validation run)  (the seat canvas)  (play)
 ```
 
 `building` is the loading screen the world is carved on (CORPORATION_GENERATION.md
@@ -350,9 +350,12 @@ The wizard's "Begin", and the one and only generation call:
    the run in one frame would trip Windows' hang kill). It runs **in spectate** —
    `corp_ai_params::spectating`, no corp seated — because the seat comes after the
    run, so its card can show the figures the run files. `run_verify` stays cold.
-5. **Seat the player**: shortlist the specialists whose ground clears the viability
-   floor on phase 6's static landscape score, ranked by it; draw one against the
-   world seed, and re-point `is_player` / `world::player_entity` onto it. Owned by
+5. **Seat the player**: rank every specialist on phase 6's static landscape score,
+   marking the ones below the viability floor, and open the selection canvas
+   (§ The seat); the player's Confirm re-points `is_player` / `world::player_entity`
+   onto the firm picked, through the `take_seat` command. A path with no player to
+   ask (`--autostart`, the windowed autostart) draws one against the world seed
+   instead and says so; `--seat <corp-id>` makes the pick at launch. Owned by
    CORPORATION_GENERATION.md § The spawn shortlist, and the seat.
 6. Rebase the clock again (generation + validation-run wall time must not become
    in-game days), then `m_screen = in_game`.
@@ -435,3 +438,7 @@ corporation am I?*
   two presses.
 - **The seat is reproducible from (seed, pick):** the same world and the same pick seat the same
   firm in the same state.
+- **The pick is a game act** (Ben, 2026-09-24): Confirm issues the `take_seat` command, which has
+  an action-dictionary entry although the wizard has none, so an agent can make the same pick
+  (`--seat <corp-id>` at launch). The seat is taken once, before play: the in-play agent hosts
+  refuse the command.

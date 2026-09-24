@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**55 surfaces** — 8 settled, 47 awaiting Ben's wording.
+**56 surfaces** — 8 settled, 48 awaiting Ben's wording.
 
 ---
 
@@ -285,6 +285,14 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 **Because:** BL-511 removed the tile as a click target, so the mixture, the deposits and the buildings of a locality became unreachable by the gesture that used to reach them, and a CARD OF ITS OWN was the answer. BL-598 (Ben, 2026-08-24) reversed the premise rather than the answer: the tile is a click target again, and the province readings are SECTIONS of the tile element's one accordion. The question is unchanged and still earns its space - a player deciding whether a locality is worth a mine asks about the locality, not one hex - but it no longer earns a second element to ask it in. Two surfaces asking about one piece of ground made the player choose a grain before knowing what they wanted to know; one accordion, ordered from what can be acted on to what the ground merely is, does not. What was dropped in the fold is the province's own Buildings ROLL-UP (the same question the Buildings section's Built column answers, at a grain the player does not build at) and its member-tile list (whose job was to give back a tile that is no longer taken away). What was gained is Population, which had no home on either surface.
 
 *Demanded by BL-511, BL-598 · `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp` · id `province_card`*
+
+### Corporation selection canvas (Begin, before play)
+
+**Answers:** Which corporation am I?
+
+**Because:** THE SEAT IS AN IDENTITY, NOT AN ADDRESS (Ben, 2026-09-17, NR-885): the player is a corporation, so choosing one is becoming it, and a random draw assigned an identity nobody chose. Ben reversed the 2026-08-26 retirement of the selection screen on 2026-09-09 ("it's time to reverse that ruling") and designed the surface on 2026-09-24. It comes AFTER the firms and the settle, which is what makes a seat worth weighing: the retired pre-settle stage had no moved balances to show. A RANKED LIST BESIDE A MAP: every specialist in static-score order, with the ones below the viability floor visibly marked and still pickable, so a player can knowingly take a hard seat; the map is the home body and highlights the hovered row's HQ, works and home market catchment, so where a firm stands is read by pointing at it rather than by reading coordinates. THE CARD IS FOUR LINES AND NO MORE - industry and goods; HQ and home market with that market's prices for the firm's goods and inputs; cash, debt and assets; nation and its stance - because those are what an opening position is made of; the landscape score is the list's order, not a line, and trailing figures and rivals are left off. PICKING TAKES TWO PRESSES: a briefing in prose (who you are, what you make, where you sell, what you owe, whose law, and for a marked firm why the floor marked it), then Confirm or Back, because choosing who you are is a deliberate act. The pick is a game act (take_seat), reproducible from (seed, pick).
+
+*Demanded by BL-1076, BL-630, BL-1020, BL-1073 · `src/ui/seat_screen.cpp`, `src/core/app.cpp`, `src/world/spawn_seat.cpp` · id `seat_canvas`*
 
 ### Selection band - Building card (3-column band)
 

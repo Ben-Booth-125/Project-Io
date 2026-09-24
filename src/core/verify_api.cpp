@@ -49,6 +49,7 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -305,12 +306,18 @@ int app::run_autostart()
     // generation does (which is exactly how the first cut of this reported a
     // false failure).
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(300);
-    while (m_screen != app_screen::in_game && std::chrono::steady_clock::now() < deadline)
+    while (m_screen != app_screen::in_game && !m_seat_pick_failed
+           && std::chrono::steady_clock::now() < deadline)
     {
         // BL-630: no fork to take. poll_worldgen drives generation, then the
         // winner's validation run, then the seat, and lands on in_game by itself.
         poll_worldgen();
         std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 Hz, as the app polls
+    }
+    if (m_seat_pick_failed)
+    {
+        std::printf("[autostart] FAILED: the --seat pick was refused\n");
+        return 1;
     }
     if (m_screen != app_screen::in_game)
     {
@@ -393,7 +400,8 @@ int app::run_autostart_adopt()
         return 1;
     }
     const auto deadline2 = std::chrono::steady_clock::now() + std::chrono::seconds(1800);
-    while (m_screen != app_screen::in_game && std::chrono::steady_clock::now() < deadline2)
+    while (m_screen != app_screen::in_game && !m_seat_pick_failed
+           && std::chrono::steady_clock::now() < deadline2)
     {
         poll_worldgen();
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
@@ -1160,6 +1168,87 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_screen    = on ? app_screen::generating : app_screen::in_game;
         m_wiz_round = wizard_round_count - 1;
         m_wiz_dirty = true;
+    });
+
+    // --- BL-1076: the corporation selection canvas -------------------------
+    //
+    // Open the canvas over the verify world. run_verify never searches, so the
+    // ranking reads an empty landscape score: every specialist scores zero and
+    // is MARKED below the floor — which is itself a case the surface must draw
+    // (a marked firm stays pickable). Confirm under verify seats and returns to
+    // `in_game` without finish_new_game (there is no campaign clock to rebase).
+    v.set_function("show_seat_screen", [this](bool on) {
+        if (!on)
+        {
+            m_screen = app_screen::in_game;
+            return;
+        }
+        open_seat_screen();
+        m_seat_ui.from_verify = true;
+    });
+    // Point the canvas at candidate row @p row (0-based, rank order): the map
+    // highlight and the card follow it, exactly as a mouse hover does.
+    v.set_function("seat_hover", [this](int row) {
+        if (row >= 0 && row < static_cast<int>(m_seat_result.candidates.size()))
+            m_seat_ui.hovered = row;
+    });
+    // Press row @p row: opens that firm's briefing (the first of the two presses).
+    v.set_function("seat_brief", [this](int row) {
+        if (row >= 0 && row < static_cast<int>(m_seat_result.candidates.size()))
+        {
+            m_seat_ui.hovered  = row;
+            m_seat_ui.briefing = m_seat_result.candidates[static_cast<std::size_t>(row)].corp;
+        }
+    });
+    v.set_function("seat_back", [this]() { m_seat_ui.briefing = null_entity; });
+    // The briefing's Confirm: the pick through the seam. Returns the result name.
+    v.set_function("seat_confirm", [this]() -> std::string {
+        if (m_seat_ui.briefing == null_entity)
+            return "no_briefing";
+        const corp_command_result r = take_seat_pick(m_seat_ui.briefing);
+        if (r == corp_command_result::applied)
+            m_screen = app_screen::in_game;
+        return r == corp_command_result::applied    ? "applied"
+             : r == corp_command_result::rejected_no_corp ? "rejected_no_corp"
+                                                    : "rejected_invalid";
+    });
+    // (open, candidate count, shortlisted count, hovered row, briefing corp, player)
+    v.set_function("seat_state", [this]() {
+        return std::make_tuple(m_screen == app_screen::choosing_seat,
+                               static_cast<int>(m_seat_result.candidates.size()),
+                               m_seat_result.shortlist_size, m_seat_ui.hovered,
+                               static_cast<long long>(m_seat_ui.briefing),
+                               static_cast<long long>(m_world.player_entity));
+    });
+    // Candidate @p row's corporation id and whether the floor marked it.
+    v.set_function("seat_candidate", [this](int row) {
+        if (row < 0 || row >= static_cast<int>(m_seat_result.candidates.size()))
+            return std::make_tuple(-1LL, false);
+        const spawn_seat_candidate& c = m_seat_result.candidates[static_cast<std::size_t>(row)];
+        return std::make_tuple(static_cast<long long>(c.corp), !c.shortlisted);
+    });
+    // The lowest-id background firm (a company), or 0 — the id a script offers
+    // take_seat to prove a company is never a seat.
+    v.set_function("seat_background_firm", [this]() -> long long {
+        entity_id best = null_entity;
+        for (const auto& [id, cc] : m_world.corporations)
+            if (cc.is_background && (best == null_entity || id < best))
+                best = id;
+        return static_cast<long long>(best);
+    });
+    // The pre-play pick, as `--seat` makes it: rank, then take_seat_pick. Validated as untrusted (the id is range-checked here, the
+    // ranking check is take_seat_pick's). Returns the result name.
+    v.set_function("take_seat", [this](double id) -> std::string {
+        if (!(id >= 1.0) || id > static_cast<double>(std::numeric_limits<entity_id>::max())
+            || id != static_cast<double>(static_cast<long long>(id)))
+            return "rejected_invalid";
+        // Always re-ranked: a script may have rebuilt the world (new_world) since
+        // any earlier ranking, and a stale list would offer another world's firms.
+        m_seat_result = rank_spawn_candidates(m_world, m_landscape_winner_score);
+        const corp_command_result r = take_seat_pick(static_cast<entity_id>(id));
+        return r == corp_command_result::applied          ? "applied"
+             : r == corp_command_result::rejected_no_corp ? "rejected_no_corp"
+                                                          : "rejected_invalid";
     });
 
     // Park the wizard on a specific ROUND (0-5, BL-946: System, Life, Culture,

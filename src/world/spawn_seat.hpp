@@ -11,7 +11,9 @@
 // The spawn shortlist, and the seat (BL-630)
 // ---------------------------------------------------------------------------
 //
-// Which corporation the player runs is DRAWN, not picked (Ben, 2026-08-26).
+// Which corporation the player runs is PICKED on the selection canvas at Begin
+// (BL-1076; Ben 2026-09-09, designed 2026-09-24) from the ranking below; the
+// weighted DRAW (Ben, 2026-08-26) survives for the paths with no player to ask.
 // Authority: docs/generation/CORPORATION_GENERATION.md § The spawn shortlist,
 // and the seat; docs/ui/STARTUP.md § The seat.
 //
@@ -207,3 +209,34 @@ double seat_landscape_score(const world& w, const landscape_score& landscape,
 spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
                                           const landscape_score& landscape,
                                           spawn_seat_params params = {});
+
+// ---------------------------------------------------------------------------
+// The three halves of the seat, separable (BL-1076, the player chooses)
+// ---------------------------------------------------------------------------
+//
+// The seat is PICKED now, on the selection canvas at Begin (STARTUP.md § The
+// seat; Ben 2026-09-24): every specialist offered in static-score order, the
+// ones below the floor MARKED and still pickable. The canvas needs the RANKING
+// without the DRAW, and the pick needs the RE-POINT without either. So
+// `seat_player_corporation` is these three in sequence — `rank`, `draw`,
+// `repoint` — and is unchanged in result for every caller that still draws
+// (the paths with no player to ask: --autostart, --serve, the sweeps).
+
+/// Rank every specialist exactly as `seat_player_corporation` does — the
+/// floor, the weights, the order — and seat NOBODY. `seated` stays
+/// `null_entity`; `floor_unmet` is set when no specialist clears the floor.
+/// Reads @p w only.
+spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& landscape,
+                                        spawn_seat_params params = {});
+
+/// The weighted draw over an already-ranked @p ranked, against @p seed. Pure:
+/// returns the corp the draw lands on (the first-ranked specialist when the
+/// floor is unmet, `null_entity` when there is no specialist) and mutates
+/// nothing. The same seed and the same ranking give the same corp.
+entity_id draw_spawn_seat(const spawn_seat_result& ranked, std::uint32_t seed);
+
+/// Re-point `is_player` / `world::player_entity` onto @p corp, clearing every
+/// other `is_player` flag first (world.hpp's one-flag invariant). Returns false
+/// and mutates NOTHING when @p corp is not a corporation of @p w. The one
+/// mutation the seat makes, whether it was drawn or picked.
+bool repoint_player(world& w, entity_id corp);

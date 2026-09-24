@@ -84,6 +84,8 @@ const VERBS = [
   'withdraw_from_battle',                              // BL-467
   'accept_offer', 'abandon_contract',                  // BL-573
   'raze_centre',                                       // BL-616
+  'buy_corporation',                                   // BL-628
+  'take_seat',                                         // BL-1076 -- pre-play only: --serve refuses it (rejected_state)
 ];
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@
 #include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/spawn_seat.hpp"      // BL-630: the spawn shortlist and the seat
+#include "world/corp_command.hpp"    // BL-1076: the pick is corp_verb::take_seat
 #include "world/tech_tree.hpp"
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
@@ -71,6 +72,15 @@ public:
     /// pinned to the player corp — the seat the agent occupies. Call before
     /// run().
     void host_agent(uint16_t port) { m_agent_port = port; }
+
+    /// BL-1076: `--seat <corp-id>` — the seat, picked by whoever launched the
+    /// process rather than on the selection canvas (an agent's route to the
+    /// pre-play act; the in-play agent hosts refuse `take_seat`). Applies to
+    /// every new-campaign path, autostart included. @p corp is range-checked
+    /// by the caller; the tail validates it against the ranking and a rejected
+    /// pick seats nobody (headless paths fail, the interactive path falls back
+    /// to the canvas). Call before run() / run_autostart*().
+    void set_seat_pick(long long corp) { m_seat_pick_arg = corp; }
 
     /// BL-705: override `world_params::epoch_year` for every world this process
     /// generates (`--epoch <year>`). Absent = the struct's own default.
@@ -510,7 +520,14 @@ private:
     // be, they are SEATED on one drawn from the spawn shortlist after the
     // winner's validation run (STARTUP.md § The seat). `building` hosts the
     // carve and the validation run, and hands straight to `in_game`.
-    enum class app_screen { menu, generating, building, in_game };
+    //
+    // BL-1076 (Ben, 2026-09-09: "it's time to reverse that ruling"; designed
+    // 2026-09-24) brings a selection stage BACK, after the settle rather than
+    // before it: `choosing_seat` is the corporation selection canvas, drawn
+    // over the settled world once the validation run is over, and only on the
+    // interactive path — a path with no player to ask still draws the seat and
+    // goes straight to `in_game`. Like every pre-play screen it does not tick.
+    enum class app_screen { menu, generating, building, choosing_seat, in_game };
     app_screen m_screen = app_screen::menu;
     /// Pending `--load` target, consumed by run() before the frame loop.
     std::string m_pending_load;
@@ -770,6 +787,60 @@ private:
     /// empty after a `--load` (a saved campaign carries its seat in `world`).
     spawn_seat_result m_seat_result;
     void seat_player();                ///< Draw the seat and re-point the player-scoped caches.
+
+    // --- The seat is PICKED (BL-1076, STARTUP.md § The seat) ----------------
+    //
+    // After the validation run the tail no longer draws on the interactive
+    // path: it RANKS (rank_spawn_candidates, nobody seated) and opens the
+    // selection canvas. Confirm on the briefing issues `corp_verb::take_seat`
+    // through take_seat_pick, which is also the route `--seat <id>` and the
+    // verify API take. The draw survives for the paths with no player to ask.
+
+    /// True only on the interactive path (run() with no autostart and no
+    /// `--seat`): the tail opens the canvas instead of drawing.
+    bool m_player_picks_seat = false;
+    /// `--seat <corp-id>`: a pick made before the tail runs, by whoever
+    /// launched the process (an agent's route to the pre-play act). -1 = none.
+    /// Parsed in main.cpp as an untrusted input; validated here, against the
+    /// ranking, by take_seat_pick.
+    long long m_seat_pick_arg = -1;
+    /// Set by the tail when it drew rather than asked, naming why — printed.
+    const char* m_seat_drawn_because = nullptr;
+    /// A headless `--seat` pick was refused: the autostart loops stop and fail.
+    bool m_seat_pick_failed = false;
+
+    /// Rank the specialists and open the canvas (m_screen = choosing_seat).
+    void open_seat_screen();
+    /// The pick, as a game act: validate @p corp against the ranking (it must
+    /// be a ranked specialist) and apply `corp_verb::take_seat`. A rejection
+    /// mutates nothing. On success re-points the player-scoped caches and
+    /// frames the launch view, exactly as a drawn seat does.
+    corp_command_result take_seat_pick(entity_id corp);
+    /// The shared tail of a drawn and a picked seat: rebuild the player-scoped
+    /// caches, print the seat lines, frame the launch view.
+    void finish_seat(bool picked);
+    /// The seat canvas's draw (src/ui/seat_screen.cpp).
+    void draw_seat_screen();
+
+    /// The canvas's own state. Presentation only; rebuilt by open_seat_screen.
+    struct seat_screen_state
+    {
+        int       hovered  = 0;               ///< Candidate index the map and card show.
+        entity_id briefing = null_entity;     ///< The firm whose briefing is open, or none.
+        entity_id body     = null_entity;     ///< The body the map is baked for.
+        int       gw = 0, gh = 0;             ///< That body's grid.
+        /// Per-tile home market (market_for_tile), -1 slot for none, for the
+        /// catchment highlight. Indexed row * gw + col.
+        std::vector<entity_id> tile_market;
+        /// Run-merged political base, baked once per body: {row, c0, c1, colour}.
+        struct run { int row, c0, c1; uint32_t colour; };
+        std::vector<run> base;
+        /// Catchment runs for `catchment_of`, re-merged when the market changes.
+        entity_id        catchment_of = null_entity;
+        std::vector<run> catchment;
+        bool             from_verify  = false; ///< Confirm returns to in_game without finish_new_game.
+    };
+    seat_screen_state m_seat_ui;
     void frame_launch_view();          ///< Frame the opening view and selection on the player's holdings.
     entity_id m_launch_body = null_entity; ///< The body the launch view opens on (setup_world).
 

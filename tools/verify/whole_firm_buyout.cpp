@@ -645,8 +645,10 @@ void run_gate_rows(const recipe_registry& reg)
     }
 
     // --- R6: the append-only enum contract, asserted symbolically -----------
-    check(corp_verb_count == static_cast<uint8_t>(corp_verb::buy_corporation) + 1, "R6",
-          "corp_verb_count moved with the appended verb (the wire's range gate)");
+    // Re-specified 2026-09-24 (BL-1076 appended take_seat): the property is that
+    // the wire's range gate COVERS this verb, not that it stays the last one.
+    check(corp_verb_count > static_cast<uint8_t>(corp_verb::buy_corporation), "R6",
+          "corp_verb_count covers the appended verb (the wire's range gate)");
     check(static_cast<uint8_t>(corp_verb::raze_centre) == 27
               && static_cast<uint8_t>(corp_verb::build) == 0
               && static_cast<uint8_t>(corp_verb::hire_unit) == 8,

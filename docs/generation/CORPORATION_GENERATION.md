@@ -430,8 +430,9 @@ world has been run forward, not during the passes above.
 ### The spawn shortlist, and the seat
 
 **Reversed in intent (Ben, 2026-09-09): the player is to PICK the seat on a corporation selection
-canvas at Begin**, over the landscape the search selected (`docs/ui/STARTUP.md` § The seat). The shortlist and the weighted draw below remain the mechanism
-until that canvas exists, and afterwards they are what the canvas *offers*: **every specialist**,
+canvas at Begin**, over the landscape the search selected (`docs/ui/STARTUP.md` § The seat). The ranking below is what the canvas
+*offers*, and the weighted draw survives only for a path with no player to ask (a headless or
+autostarted run), which says so: **every specialist**,
 ranked by the static score, the ones below the viability floor **marked, not removed** — a player may
 knowingly take a firm the floor rejects (Ben, 2026-09-24). The player chooses rather than being
 drawn for.
@@ -444,8 +445,10 @@ of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:
    validation run ticks with **no seated corp**, under `corp_ai_params::spectating`.
 3. **Shortlist** — every specialist whose ground clears the viability floor on the static landscape
    score, ranked by that score.
-4. **Seat** — one is drawn from the shortlist against the world seed, and `is_player` /
-   `world::player_entity` are re-pointed onto it.
+4. **Seat** — the player picks one on the selection canvas (the `take_seat` command; a path with
+   no player to ask draws one from the shortlist against the world seed), and `is_player` /
+   `world::player_entity` are re-pointed onto it. The same world and the same pick seat the same
+   firm in the same state.
 
 **Spectate is the machine this needs, and it already exists.** BL-409 settled that under
 `spectating` the no-auto-act prohibition has *no subject*: every corp evaluates on the same
