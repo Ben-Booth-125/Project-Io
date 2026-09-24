@@ -609,13 +609,18 @@ happened in Sprint 19 (2026-08-25) and was caught only because a human read both
 **Before you edit the constant, allocate the number:**
 
 ```
-node tools/session/next_save_version.js [count] [--claim "<OWNER>"] [--allow-no-refs]
+node tools/session/next_save_version.js [count] [--kind world|envelope] [--claim "<OWNER>"] [--allow-no-refs]
 ```
 
 It is `next_id.js` one field over, and behaves the same way:
 
 - It scans `world_save.hpp` on **every ref** (local + remote-tracking) *and* the working tree,
   so the max it reports is the max across all in-flight branches, not your stale local one.
+- It covers **both** save versions: `world_save_version` (`world_save.hpp`) and the envelope's
+  `save_game_version` (`save_game.hpp`), each reported on its own. A claim names one with
+  `--kind world|envelope`; a ledger line without a `kind` is a world claim.
+- A branch already merged into main carries main's history, not a claim; the baseline is the
+  newer of local `main` and `origin/main`.
 - `--claim "<OWNER>"` appends the allocation to
   `docs/development/save_version_reservations.jsonl` — an append-only JSONL ledger, one claim
   per line, folded back into the next scan. This is the half that makes concurrency safe: the

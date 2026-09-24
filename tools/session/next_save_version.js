@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-// next_save_version.js — compute the next SAFE `world_save_version` across ALL branches,
+// next_save_version.js — compute the next SAFE save version across ALL branches, for BOTH
+// versions: `world_save_version` (src/world/world_save.hpp, the world half) and the envelope's
+// `save_game_version` (src/core/save_game.hpp) — BL-1081: two agents bumped the envelope in one
+// day with no ledger (2026-09-24). Each is scanned and reported on its own;
 // not just the working copy, so concurrent worktree sessions don't both bump to the same
 // number off a stale local header. Run this BEFORE editing `world_save_version` in
 // src/world/world_save.hpp (DEVELOPMENT_PRACTICES.md § Save-format versions).
@@ -10,7 +13,11 @@
 // than a BL-id collision, because the number IS the compatibility contract — two different
 // record layouts wearing one version means a save that reads as valid and is not.
 //
-// USAGE:   node tools/session/next_save_version.js [count] [--claim <OWNER>] [--allow-no-refs]
+// USAGE:   node tools/session/next_save_version.js [count] [--kind world|envelope] [--claim <OWNER>] [--allow-no-refs]
+//   --kind          — which version to report / claim. Omitted: both are reported, and a
+//                     --claim then REFUSES, because a claim is for one version or the other.
+//                     Ledger lines carry `kind`; a line without one is a world claim (every
+//                     line written before BL-1081).
 //   count           — how many consecutive versions to reserve (default 1). Use this when one
 //                     item lands two independent record changes, or to stack a wave by hand.
 //   --claim <OWNER> — record the allocated version(s) in the reservation ledger immediately.
@@ -35,7 +42,10 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const HEADER = 'src/world/world_save.hpp';
+const KINDS = {
+  world:    { header: 'src/world/world_save.hpp', name: 'world_save_version', decl: /\bworld_save_version\s*=\s*(\d+)\s*;/ },
+  envelope: { header: 'src/core/save_game.hpp',   name: 'save_game_version',  decl: /\bsave_game_version\s*=\s*(\d+)\s*;/ },
+};
 // Append-only reservation ledger, one JSON object per line: {version, owner, ts, branch}.
 // JSONL rather than a JSON array for the same reason id_reservations.jsonl is: two worktrees
 // each appending a line merge as a line-wise union, where two worktrees each appending an
@@ -95,25 +105,24 @@ function noteReadFailure(ref, file, r) {
 // One declaration, one regex. Deliberately anchored on the assignment rather than the whole
 // `inline constexpr uint32_t` spelling, so a type or storage-class change doesn't blind the
 // scan; a `==` comparison (save_roundtrip's static_assert) is excluded by requiring a single '='.
-const DECL = /\bworld_save_version\s*=\s*(\d+)\s*;/;
-function versionFromText(txt, source) {
-  const m = DECL.exec(txt);
+function versionFromText(K, txt, source) {
+  const m = K.decl.exec(txt);
   if (!m) {
-    problems.push(`no world_save_version declaration found in ${source}`);
+    problems.push(`no ${K.name} declaration found in ${source}`);
     return null;
   }
   return parseInt(m[1], 10);
 }
-function versionFromRef(ref) {
-  const r = gitTry(['show', `${ref}:${HEADER}`]);
-  if (!r.ok) { noteReadFailure(ref, HEADER, r); return null; }
-  return versionFromText(r.out, `${ref}:${HEADER}`);
+function versionFromRef(K, ref) {
+  const r = gitTry(['show', `${ref}:${K.header}`]);
+  if (!r.ok) { noteReadFailure(ref, K.header, r); return null; }
+  return versionFromText(K, r.out, `${ref}:${K.header}`);
 }
-function versionFromWorking() {
+function versionFromWorking(K) {
   try {
-    return versionFromText(fs.readFileSync(path.join(ROOT, HEADER), 'utf8'), '(working tree)');
+    return versionFromText(K, fs.readFileSync(path.join(ROOT, K.header), 'utf8'), '(working tree)');
   } catch (e) {
-    problems.push(`could not read working-tree ${HEADER}: ${e.message}`);
+    problems.push(`could not read working-tree ${K.header}: ${e.message}`);
     return null;
   }
 }
@@ -127,7 +136,7 @@ function ledgerEntries(txt, source) {
     try {
       const o = JSON.parse(s);
       const v = typeof o.version === 'number' ? o.version : parseInt(o.version, 10);
-      if (Number.isInteger(v)) out.push({ version: v, owner: o.owner || '(reserved)', branch: o.branch || '?', ts: o.ts || '?', source });
+      if (Number.isInteger(v)) out.push({ version: v, kind: o.kind === 'envelope' ? 'envelope' : 'world', owner: o.owner || '(reserved)', branch: o.branch || '?', ts: o.ts || '?', source });
     } catch { /* a malformed line is not a reason to fail the whole scan */ }
   }
   return out;
@@ -149,6 +158,11 @@ let claimOwner = null;
 const argv = process.argv.slice(2);
 const ci = argv.indexOf('--claim');
 if (ci !== -1) { claimOwner = argv[ci + 1] || '(reserved)'; argv.splice(ci, 2); }
+let onlyKind = null;
+const ki = argv.indexOf('--kind');
+if (ki !== -1) { onlyKind = argv[ki + 1]; argv.splice(ki, 2); }
+if (onlyKind !== null && !KINDS[onlyKind]) { console.error(`--kind must be world or envelope (got ${onlyKind})`); process.exit(1); }
+if (claimOwner && !onlyKind) { console.error('--claim needs --kind world|envelope: a claim is for one version or the other.'); process.exit(1); }
 const ai = argv.indexOf('--allow-no-refs');
 const allowNoRefs = ai !== -1;
 if (allowNoRefs) argv.splice(ai, 1);
@@ -175,26 +189,10 @@ if (scanBroken && !allowNoRefs) {
   process.exit(1);
 }
 
-// version -> Set(branch) from the header on each ref. COMMITTED refs only: the working tree
-// is this branch's uncommitted state, not a fourth branch, and folding it in here would make
-// every ordinary local bump report itself as a collision with itself.
-const headerBranches = new Map();
-const refVersion = new Map(); // full refname -> version, so the baseline is not re-read
-const noteHeader = (v, branch) => {
-  if (v === null) return;
-  if (!headerBranches.has(v)) headerBranches.set(v, new Set());
-  headerBranches.get(v).add(branch);
-};
-
-const claims = [];
-for (const ref of allRefs || []) {
-  const v = versionFromRef(ref);
-  refVersion.set(ref, v);
-  noteHeader(v, shortBranch(ref));
-  claims.push(...ledgerFromRef(ref));
-}
-const workingVersion = versionFromWorking();
-claims.push(...ledgerFromWorking());
+// Ledger claims from every ref and the working tree, read ONCE and split by kind below.
+const allClaims = [];
+for (const ref of allRefs || []) allClaims.push(...ledgerFromRef(ref));
+allClaims.push(...ledgerFromWorking());
 
 let currentBranch = '?';
 {
@@ -202,101 +200,133 @@ let currentBranch = '?';
   if (b.ok) currentBranch = b.out;
 }
 
-// Highest number anyone has taken, from any source.
-let max = 0;
-let maxWhere = [];
-for (const [v, branches] of headerBranches) {
-  if (v > max) { max = v; maxWhere = [...branches]; }
-  else if (v === max) maxWhere = [...new Set([...maxWhere, ...branches])];
-}
-if (workingVersion !== null) {
-  if (workingVersion > max) { max = workingVersion; maxWhere = ['(working tree)']; }
-  else if (workingVersion === max) maxWhere = [...new Set([...maxWhere, '(working tree)'])];
-}
-for (const c of claims) {
-  if (c.version > max) { max = c.version; maxWhere = [`ledger: ${c.owner}`]; }
-  else if (c.version === max) maxWhere = [...new Set([...maxWhere, `ledger: ${c.owner}`])];
-}
+function scanKind(kind) {
+  const K = KINDS[kind];
+  // version -> Set(branch) from the header on each ref. COMMITTED refs only: the working tree
+  // is this branch's uncommitted state, not a fourth branch, and folding it in here would make
+  // every ordinary local bump report itself as a collision with itself.
+  const headerBranches = new Map();
+  const refVersion = new Map(); // full refname -> version, so the baseline is not re-read
+  const noteHeader = (v, branch) => {
+    if (v === null) return;
+    if (!headerBranches.has(v)) headerBranches.set(v, new Set());
+    headerBranches.get(v).add(branch);
+  };
 
-const count = Math.max(1, parseInt(argv[0] || '1', 10));
-const first = max + 1;
-
-// --- report ------------------------------------------------------------------
-console.log(`Scanned ${HEADER} across ${(allRefs || []).length} ref(s) + working tree, and ${claims.length} ledger claim(s).`);
-console.log(`Working tree: world_save_version = ${workingVersion === null ? '?' : workingVersion}`);
-console.log(`Highest taken: ${max}  (on: ${maxWhere.join(', ')})`);
-if (count === 1) console.log(`\n>>> Next safe world_save_version: ${first}`);
-else console.log(`\n>>> Reserve ${count}: ${first} .. ${max + count}`);
-
-// Claims at or above the working header are the ones still in flight — the set a merging
-// session needs to see. Older claims are history and stay quiet.
-const floor = workingVersion === null ? 0 : workingVersion;
-const inFlight = claims.filter((c) => c.version >= floor).sort((a, b) => a.version - b.version || a.ts.localeCompare(b.ts));
-if (inFlight.length) {
-  console.log(`\nIn-flight claims (>= ${floor}):`);
-  const seen = new Set();
-  for (const c of inFlight) {
-    const key = `${c.version}|${c.owner}|${c.branch}`;
-    if (seen.has(key)) continue; // the same line on N refs is one claim
-    seen.add(key);
-    console.log(`  v${c.version}  ${c.owner}   [${c.branch}, ${c.ts}]`);
+  const claims = allClaims.filter((c) => c.kind === kind);
+  for (const ref of allRefs || []) {
+    const v = versionFromRef(K, ref);
+    refVersion.set(ref, v);
+    noteHeader(v, shortBranch(ref));
   }
-}
+  const workingVersion = versionFromWorking(K);
 
-// --- collisions --------------------------------------------------------------
-const collisions = [];
 
-// (a) One version, two owners in the ledger. Unambiguous: someone skipped the tool.
-const byVersion = new Map();
-for (const c of claims) {
-  if (!byVersion.has(c.version)) byVersion.set(c.version, new Map());
-  byVersion.get(c.version).set(c.owner, c.branch);
-}
-for (const [v, owners] of byVersion) {
-  if (owners.size > 1) {
-    collisions.push(`v${v} is claimed by ${owners.size} owners: ` + [...owners].map(([o, b]) => `${o} [${b}]`).join(' / '));
+  // Highest number anyone has taken, from any source.
+  let max = 0;
+  let maxWhere = [];
+  for (const [v, branches] of headerBranches) {
+    if (v > max) { max = v; maxWhere = [...branches]; }
+    else if (v === max) maxWhere = [...new Set([...maxWhere, ...branches])];
   }
-}
+  if (workingVersion !== null) {
+    if (workingVersion > max) { max = workingVersion; maxWhere = ['(working tree)']; }
+    else if (workingVersion === max) maxWhere = [...new Set([...maxWhere, '(working tree)'])];
+  }
+  for (const c of claims) {
+    if (c.version > max) { max = c.version; maxWhere = [`ledger: ${c.owner}`]; }
+    else if (c.version === max) maxWhere = [...new Set([...maxWhere, `ledger: ${c.owner}`])];
+  }
 
-// (b) One version, two unmerged branches carrying it in the header. This is the Sprint 19
-// failure verbatim. Everything at or below the integration baseline (main) is shared history
-// and expected on many branches; only versions ABOVE it can be a double-claim.
-const baselineRef = (allRefs || []).find((r) => r === 'refs/remotes/origin/main') || (allRefs || []).find((r) => r === 'refs/heads/main');
-const baseline = baselineRef ? (refVersion.get(baselineRef) ?? null) : null;
-if (baseline !== null) {
-  const above = new Set([...headerBranches.keys()].filter((v) => v > baseline));
-  if (workingVersion !== null && workingVersion > baseline) above.add(workingVersion);
-  for (const v of above) {
-    const committed = [...(headerBranches.get(v) || [])];
-    const others = committed.filter((b) => b !== currentBranch);
-    if (committed.length > 1) {
-      collisions.push(`v${v} is carried by ${committed.length} branches above main (v${baseline}): ${committed.join(', ')}`);
-    } else if (v === workingVersion && others.length) {
-      collisions.push(`v${v} is your uncommitted working-tree bump, but branch ${others.join(', ')} already carries it (main is v${baseline})`);
+  const count = Math.max(1, parseInt(argv[0] || '1', 10));
+  const first = max + 1;
+
+  // --- report ------------------------------------------------------------------
+  console.log(`\n=== ${K.name} (${kind}) ===`);
+  console.log(`Scanned ${K.header} across ${(allRefs || []).length} ref(s) + working tree, and ${claims.length} ledger claim(s).`);
+  console.log(`Working tree: ${K.name} = ${workingVersion === null ? '?' : workingVersion}`);
+  console.log(`Highest taken: ${max}  (on: ${maxWhere.join(', ')})`);
+  if (count === 1) console.log(`\n>>> Next safe ${K.name}: ${first}`);
+  else console.log(`\n>>> Reserve ${count}: ${first} .. ${max + count}`);
+
+  // Claims at or above the working header are the ones still in flight — the set a merging
+  // session needs to see. Older claims are history and stay quiet.
+  const floor = workingVersion === null ? 0 : workingVersion;
+  const inFlight = claims.filter((c) => c.version >= floor).sort((a, b) => a.version - b.version || a.ts.localeCompare(b.ts));
+  if (inFlight.length) {
+    console.log(`\nIn-flight claims (>= ${floor}):`);
+    const seen = new Set();
+    for (const c of inFlight) {
+      const key = `${c.version}|${c.owner}|${c.branch}`;
+      if (seen.has(key)) continue; // the same line on N refs is one claim
+      seen.add(key);
+      console.log(`  v${c.version}  ${c.owner}   [${c.branch}, ${c.ts}]`);
     }
   }
-} else {
-  console.log('\n(note: no main ref found — the two-branches-one-version check did not run.)');
-}
 
-if (collisions.length) {
-  console.log(`\n!!! ${collisions.length} save-version COLLISION(s) — resolve before merging:`);
-  for (const c of collisions) console.log(`  ${c}`);
-  console.log('  Stack them: keep the earlier claim, renumber the later one (its constant, its');
-  console.log('  header comment, its reader/writer comments, and save_roundtrip\'s static_assert).');
-}
+  // --- collisions --------------------------------------------------------------
+  const collisions = [];
 
-// --- claim -------------------------------------------------------------------
-if (claimOwner) {
-  const ts = new Date().toISOString();
-  const lines = [];
-  for (let v = first; v < first + count; v++) {
-    lines.push(JSON.stringify({ version: v, owner: claimOwner, ts, branch: currentBranch }));
+  // (a) One version, two owners in the ledger. Unambiguous: someone skipped the tool.
+  const byVersion = new Map();
+  for (const c of claims) {
+    if (!byVersion.has(c.version)) byVersion.set(c.version, new Map());
+    byVersion.get(c.version).set(c.owner, c.branch);
   }
-  fs.appendFileSync(path.join(ROOT, LEDGER), lines.join('\n') + '\n');
-  const what = count === 1 ? `v${first}` : `v${first}..v${max + count}`;
-  console.log(`\nClaimed ${what} for "${claimOwner}" -> ${LEDGER} (commit it, or drop the line if you abandon the bump).`);
+  for (const [v, owners] of byVersion) {
+    if (owners.size > 1) {
+      collisions.push(`v${v} is claimed by ${owners.size} owners: ` + [...owners].map(([o, b]) => `${o} [${b}]`).join(' / '));
+    }
+  }
+
+  // (b) One version, two unmerged branches carrying it in the header. This is the Sprint 19
+  // failure verbatim. Everything at or below the integration baseline (main) is shared history
+  // and expected on many branches; only versions ABOVE it can be a double-claim.
+  // The baseline is the NEWER of local main and origin/main (BL-1081): origin can sit dozens of
+  // commits behind a local main that has not been pushed, and a stale baseline reports every
+  // version main already merged as a double-claim.
+  const mainRefs = ['refs/heads/main', 'refs/remotes/origin/main'].filter((r) => (allRefs || []).includes(r));
+  const mainVersions = mainRefs.map((r) => refVersion.get(r)).filter((v) => v !== null && v !== undefined);
+  const baseline = mainVersions.length ? Math.max(...mainVersions) : null;
+  if (baseline !== null) {
+    const above = new Set([...headerBranches.keys()].filter((v) => v > baseline));
+    if (workingVersion !== null && workingVersion > baseline) above.add(workingVersion);
+    for (const v of above) {
+      // A branch already merged into main carries main's history, not a claim of its own.
+      const committed = [...(headerBranches.get(v) || [])].filter((br) => br === 'main' ||
+        !gitTry(['merge-base', '--is-ancestor', br, 'main']).ok);
+      const others = committed.filter((b) => b !== currentBranch);
+      if (committed.length > 1) {
+        collisions.push(`v${v} is carried by ${committed.length} branches above main (v${baseline}): ${committed.join(', ')}`);
+      } else if (v === workingVersion && others.length) {
+        collisions.push(`v${v} is your uncommitted working-tree bump, but branch ${others.join(', ')} already carries it (main is v${baseline})`);
+      }
+    }
+  } else {
+    console.log('\n(note: no main ref found — the two-branches-one-version check did not run.)');
+  }
+
+  if (collisions.length) {
+    console.log(`\n!!! ${collisions.length} save-version COLLISION(s) — resolve before merging:`);
+    for (const c of collisions) console.log(`  ${c}`);
+    console.log('  Stack them: keep the earlier claim, renumber the later one (its constant, its');
+    console.log('  header comment, its reader/writer comments, and save_roundtrip\'s static_assert).');
+  }
+
+  // --- claim -------------------------------------------------------------------
+  if (claimOwner && kind === onlyKind) {
+    const ts = new Date().toISOString();
+    const lines = [];
+    for (let v = first; v < first + count; v++) {
+      lines.push(JSON.stringify({ version: v, kind, owner: claimOwner, ts, branch: currentBranch }));
+    }
+    fs.appendFileSync(path.join(ROOT, LEDGER), lines.join('\n') + '\n');
+    const what = count === 1 ? `v${first}` : `v${first}..v${max + count}`;
+    console.log(`\nClaimed ${what} for "${claimOwner}" -> ${LEDGER} (commit it, or drop the line if you abandon the bump).`);
+  }
 }
+
+for (const kind of onlyKind ? [onlyKind] : ['world', 'envelope']) scanKind(kind);
 
 // A partial scan still yields a number, but not a trustworthy one.
 if (problems.length) {
