@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*21 entries — 3 open, 18 resolved.*
+*21 entries — 1 open, 20 resolved.*
 
 ---
 
@@ -45,36 +45,6 @@ NR-908 gave the divisor to live-play cost, and the pin was set on the median: at
 > **Recommendation:** D then C. The phase split is already in the run, and the cost tracks specialists rather than firms, so a seat-side bound is the knob that does not disturb the anchor or the density ruling. A is defensible if 30 s a tick is acceptable on the richest worlds; B moves the seat menu the re-bless just pinned.
 
 *Files: `src/world/stockpile_budget.hpp`, `docs/generation/INDUSTRIALISATION.md`, `tools/verify/player_seed_sweep.cpp`*
-
-### NR-916 — CALL: the size of the capital market premium — 1.25x the carve's price is a placeholder, not a derivation
-*question · raised 2026-09-23 · from BL-1066 (the player cannot build), main session 2026-09-23, on Ben's ruling that capital markets are priced at a premium.*
-
-The BL-910 capital markets (nine on the shipped verify world) now take the carve template's base price for every good they lacked, and every good, endemic included, is multiplied by kCapitalMarketPricePremium (hard_coded_world.cpp, PROVISIONAL). It ships at 1.25. Nothing derives that number: it was chosen to be clearly above 1 and far inside the 10x price band, so a carve market's haul can still undercut a capital.
-
-**Why it matters.** The premium sets how hard a capital pulls goods: convoys chase shortfall, and a dearer capital is where sellers list first. Too low and a capital is just another market; too high and every good the realm makes drains to its capital before anywhere else.
-
-- A: keep 1.25 as authored flavour (a capital is modestly dearer).
-- B: derive it — e.g. from the capital's population share or its polity's treasury at the 1200 close, so a great capital is dearer than a minor one.
-- C: a different flat figure.
-
-> **Recommendation:** A for now; B is the deeper answer and belongs with the Exploration-age capital-as-treasury design (EXPLORATION.md), not this item.
-
-*Files: `src/world/hard_coded_world.cpp`, `docs/economy/MARKETS.md`*
-
-### NR-917 — CALL: the convoy reorder hands armies first claim on Logistic Points — a goods-vs-force priority nobody has chosen
-*question · raised 2026-09-23 · from BL-1066, main session 2026-09-23, on Ben's ruling to reorder the tick (advance -> arrivals -> economy -> clearing -> dispatch).*
-
-Dispatch and the march share one Logistic Point pool per tick (BL-597). Dispatch used to run first, so convoys claimed LP before armies; it now runs last, so the march in run_economy_step claims first and convoys take what is left. LOGISTICS.md § The finding worth keeping says goods-vs-force priority 'is otherwise decided invisibly, by tick phase order' and should be an explicit rule, not an inherited default. The reorder flipped it, and nothing chose either order.
-
-**Why it matters.** In a war, which starves first — the front or the trade — is a design statement. Today it is a side effect of where a function call sits.
-
-- A: accept armies-first as the rule and write it into LOGISTICS.md.
-- B: restore convoys-first by reserving the passive share before the march runs.
-- C: an explicit split (a fixed or doctrine-driven share per side), order-independent.
-
-> **Recommendation:** A: an army's supply is the more urgent draw and the more legible one to starve on purpose. C is the complete answer and can follow when LP contention is actually measured in a war.
-
-*Files: `src/core/app.cpp`, `src/main.cpp`, `tools/verify/harness_params.hpp`, `docs/economy/LOGISTICS.md`*
 
 ---
 
@@ -383,4 +353,38 @@ NR-910 ruled the RULE — the divisor at which the median library world opens th
 > **RESOLVED.** RULED (Ben, 2026-09-22, the Gate 2 form): A — apply the ruled rule to the shipped world: re-pin the divisor to the value the fine seat curve (affording, m = 2, 16 library seeds) gives for a median of nine. The number is pinned by BL-1044 and written into DIGITISATION.md § 1. PINNED 650 (2026-09-22): the fine shipped seat curve at m = 2 reads median 7.5 / 7.5 / 8 / 8.5 / 8.5 / 9 / 13.5 at d = 600-660 by 10; 650 is the first divisor at nine, none opens zero, spread 4 to 98; its tick near x0.91 legacy (stage 2).
 
 *Files: `src/world/stockpile_budget.hpp`, `docs/generation/DIGITISATION.md`, `tools/verify/stockpile_budget_check.cpp`*
+
+### NR-916 — CALL: the size of the capital market premium — 1.25x the carve's price is a placeholder, not a derivation
+*question · raised 2026-09-23 · from BL-1066 (the player cannot build), main session 2026-09-23, on Ben's ruling that capital markets are priced at a premium.*
+
+The BL-910 capital markets (nine on the shipped verify world) now take the carve template's base price for every good they lacked, and every good, endemic included, is multiplied by kCapitalMarketPricePremium (hard_coded_world.cpp, PROVISIONAL). It ships at 1.25. Nothing derives that number: it was chosen to be clearly above 1 and far inside the 10x price band, so a carve market's haul can still undercut a capital.
+
+**Why it matters.** The premium sets how hard a capital pulls goods: convoys chase shortfall, and a dearer capital is where sellers list first. Too low and a capital is just another market; too high and every good the realm makes drains to its capital before anywhere else.
+
+- A: keep 1.25 as authored flavour (a capital is modestly dearer).
+- B: derive it — e.g. from the capital's population share or its polity's treasury at the 1200 close, so a great capital is dearer than a minor one.
+- C: a different flat figure.
+
+> **Recommendation:** A for now; B is the deeper answer and belongs with the Exploration-age capital-as-treasury design (EXPLORATION.md), not this item.
+
+> **RESOLVED.** RULED (Ben, 2026-09-24): 1.25 is fine; tune later if needed. The constant is marked authored, not provisional (hard_coded_world.cpp).
+
+*Files: `src/world/hard_coded_world.cpp`, `docs/economy/MARKETS.md`*
+
+### NR-917 — CALL: the convoy reorder hands armies first claim on Logistic Points — a goods-vs-force priority nobody has chosen
+*question · raised 2026-09-23 · from BL-1066, main session 2026-09-23, on Ben's ruling to reorder the tick (advance -> arrivals -> economy -> clearing -> dispatch).*
+
+Dispatch and the march share one Logistic Point pool per tick (BL-597). Dispatch used to run first, so convoys claimed LP before armies; it now runs last, so the march in run_economy_step claims first and convoys take what is left. LOGISTICS.md § The finding worth keeping says goods-vs-force priority 'is otherwise decided invisibly, by tick phase order' and should be an explicit rule, not an inherited default. The reorder flipped it, and nothing chose either order.
+
+**Why it matters.** In a war, which starves first — the front or the trade — is a design statement. Today it is a side effect of where a function call sits.
+
+- A: accept armies-first as the rule and write it into LOGISTICS.md.
+- B: restore convoys-first by reserving the passive share before the march runs.
+- C: an explicit split (a fixed or doctrine-driven share per side), order-independent.
+
+> **Recommendation:** A: an army's supply is the more urgent draw and the more legible one to starve on purpose. C is the complete answer and can follow when LP contention is actually measured in a war.
+
+> **RESOLVED.** RULED (Ben, 2026-09-24): accepted — armies claim Logistic Points first. Written into LOGISTICS.md § Refusal, surface and determinism as a chosen priority.
+
+*Files: `src/core/app.cpp`, `src/main.cpp`, `tools/verify/harness_params.hpp`, `docs/economy/LOGISTICS.md`*
 

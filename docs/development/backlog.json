@@ -219,7 +219,8 @@
    "written": "2026-09-23",
    "author": "Claude (found running BL-1044's owed visual suite, 2026-09-23)",
    "requires": [
-    "BL-1003"
+    "BL-1003",
+    "BL-1047"
    ],
    "blocked_on": null,
    "parked": false,
@@ -240,7 +241,7 @@
     "src/main.cpp",
     "tools/verify/harness_params.hpp"
    ],
-   "design": "DIAGNOSED 2026-09-23 (Release --verify probes with a temporary run_construction trace; probes and patch in that session's scratchpad). Capacity is NOT the stall: BL-709 floors capacity coverage at 1/max_stretch, so it only stretches. The stall is MATERIALS, in three layers:\n\n(1) WRONG MARKET, AND NOTHING CAN REFILL IT. The fixture's build_first_valid placed at raster-first tile (45,97), market 56211: 0 steel for 100 ticks, demand there 0.00 — the build's want booked at the corp's representative market, not the draw market. Steel existed on the body (558 units) but in 5 of 255 markets, and a same-body convoy lands in the seller's own (corp, body) pool. Structural cause, owned by BL-1003 (pools per market).\n\n(2) THE SITE MULTIPLIER DRAWS MORE THAN WAS PRICED. The per-tick draw is cost/build_duration_ticks per unit of progress, but ticks_remaining carries BL-323's site multiplier, so a hard site draws cost x multiplier while construct_building's affordability gate priced the authored cost. Placed next to home (market 56166, 36.5 steel), the 35-steel base drew 36.5, stalled at 4.1 of 5+ progress units and never finished.\n\n(3) ZERO CONSTRUCTION CAPACITY. 0 construction yards on the body, so every build runs at the 10% floor: a 4-tick base takes 40+ ticks (ten years at a quarterly tick).\n\nRULINGS (Ben, 2026-09-23, form):\n- Sourcing: restore BL-1003 (pools per market). This item requires it.\n- Site multiplier: it stretches MATERIALS AND CASH as well as time, and that is PRICED AT PLACEMENT — the affordability gate, the Build door's capex preview and the rival scorer price cost x the site multiplier (PRODUCTION.md § Construction site time).\n- Capacity: IN SCOPE here. Either the charter web charters a yard the player's catchment reaches, or the opening corp carries capacity; choose by measurement once BL-1003 has landed, since pools per market move where capacity sits.\n\nPLUS THE FIXTURE: scripts/verify/lib.lua must place near the player's own works (not raster-first) and wait out the 12-tick tech gate, and its error must say 'stalled' when progress stops rather than 'never completed within 40 ticks'.\n\nDONE WHEN. On every library seed, the seated player can place AND complete a military base in its home catchment within the fixture's bound; the affordability gate refuses a site whose multiplied cost the corp cannot meet; and scripts/verify/lib.lua stages on a pristine world.\n\nROUND 2 (2026-09-23, after BL-1003 merged; traces in that session scratchpad). With pools per market the build want reaches its own market (demand 8.75, steel priced 161) and convoys dispatch, but the base still stalled: (i) ~3,000 steel, nearly all the body pooled, sat in NINE BL-910 capital markets with base price 0 — never listed; (ii) the shortfall dispatcher ran at the top of the tick and credited arrivals at its end, so every delivery was re-exported before any clearing saw it (995 steel dispatches in 100 ticks into one market); (iii) with capacity stocked by hand the base ran at full rate and then starved for steel, so capacity is necessary but not sufficient.\n\nRULINGS (Ben, 2026-09-23): capital markets are PRICED, at a premium over the carve (MARKETS.md; the size is NR-916) — this absorbs the sprint 46 draft CAPITAL_MARKET_SHELLS, whose census-then-choose plan the ruling replaces; and the tick order is advance -> arrivals -> economy -> clearing -> dispatch (SUPPLY.md § Dispatch trigger, one beat per haul). The goods-vs-force LP priority that reorder flips is NR-917.\n\nROUND 3 (2026-09-23, after BL-995 merged f274a3d5). Trade is now real world-wide (haulage_measure --far-trade, 4 seeds: 3,712 units sold at destinations in year one, 82.5% of it past the seller’s nearest market). The base still stalls, and the trace says why: STEEL PRODUCTION ON THE BODY COLLAPSES — listed steel 234/tick at tick 1, 75 by tick 5, 0 from ~tick 9 in every market — while unmet steel demand climbs 0 -> 341/tick; and the ~3,460 steel of opening stock was sold to the SHELVES at tick 1 (before any price gap existed), where it belongs to no one and never moves. With capacity stocked by hand the base runs at full rate and starves the moment its local shelf empties. Open: (1) why the shipped world stops making steel within ~9 ticks; (2) whether shelf stock should ever move (a merchant buying low and hauling — the option passed over for BL-995); (3) construction capacity, a TRANSMITTED good (road network, like power), so its reach is a wiring question — the earlier '0 yards' reading was a probe miscount by type name."
+   "design": "DIAGNOSED 2026-09-23 (Release --verify probes with a temporary run_construction trace; probes and patch in that session's scratchpad). Capacity is NOT the stall: BL-709 floors capacity coverage at 1/max_stretch, so it only stretches. The stall is MATERIALS, in three layers:\n\n(1) WRONG MARKET, AND NOTHING CAN REFILL IT. The fixture's build_first_valid placed at raster-first tile (45,97), market 56211: 0 steel for 100 ticks, demand there 0.00 — the build's want booked at the corp's representative market, not the draw market. Steel existed on the body (558 units) but in 5 of 255 markets, and a same-body convoy lands in the seller's own (corp, body) pool. Structural cause, owned by BL-1003 (pools per market).\n\n(2) THE SITE MULTIPLIER DRAWS MORE THAN WAS PRICED. The per-tick draw is cost/build_duration_ticks per unit of progress, but ticks_remaining carries BL-323's site multiplier, so a hard site draws cost x multiplier while construct_building's affordability gate priced the authored cost. Placed next to home (market 56166, 36.5 steel), the 35-steel base drew 36.5, stalled at 4.1 of 5+ progress units and never finished.\n\n(3) ZERO CONSTRUCTION CAPACITY. 0 construction yards on the body, so every build runs at the 10% floor: a 4-tick base takes 40+ ticks (ten years at a quarterly tick).\n\nRULINGS (Ben, 2026-09-23, form):\n- Sourcing: restore BL-1003 (pools per market). This item requires it.\n- Site multiplier: it stretches MATERIALS AND CASH as well as time, and that is PRICED AT PLACEMENT — the affordability gate, the Build door's capex preview and the rival scorer price cost x the site multiplier (PRODUCTION.md § Construction site time).\n- Capacity: IN SCOPE here. Either the charter web charters a yard the player's catchment reaches, or the opening corp carries capacity; choose by measurement once BL-1003 has landed, since pools per market move where capacity sits.\n\nPLUS THE FIXTURE: scripts/verify/lib.lua must place near the player's own works (not raster-first) and wait out the 12-tick tech gate, and its error must say 'stalled' when progress stops rather than 'never completed within 40 ticks'.\n\nDONE WHEN. On every library seed, the seated player can place AND complete a military base in its home catchment within the fixture's bound; the affordability gate refuses a site whose multiplied cost the corp cannot meet; and scripts/verify/lib.lua stages on a pristine world.\n\nROUND 2 (2026-09-23, after BL-1003 merged; traces in that session scratchpad). With pools per market the build want reaches its own market (demand 8.75, steel priced 161) and convoys dispatch, but the base still stalled: (i) ~3,000 steel, nearly all the body pooled, sat in NINE BL-910 capital markets with base price 0 — never listed; (ii) the shortfall dispatcher ran at the top of the tick and credited arrivals at its end, so every delivery was re-exported before any clearing saw it (995 steel dispatches in 100 ticks into one market); (iii) with capacity stocked by hand the base ran at full rate and then starved for steel, so capacity is necessary but not sufficient.\n\nRULINGS (Ben, 2026-09-23): capital markets are PRICED, at a premium over the carve (MARKETS.md; the size is NR-916) — this absorbs the sprint 46 draft CAPITAL_MARKET_SHELLS, whose census-then-choose plan the ruling replaces; and the tick order is advance -> arrivals -> economy -> clearing -> dispatch (SUPPLY.md § Dispatch trigger, one beat per haul). The goods-vs-force LP priority that reorder flips is NR-917.\n\nROUND 3 (2026-09-23, after BL-995 merged f274a3d5). Trade is now real world-wide (haulage_measure --far-trade, 4 seeds: 3,712 units sold at destinations in year one, 82.5% of it past the seller’s nearest market). The base still stalls, and the trace says why: STEEL PRODUCTION ON THE BODY COLLAPSES — listed steel 234/tick at tick 1, 75 by tick 5, 0 from ~tick 9 in every market — while unmet steel demand climbs 0 -> 341/tick; and the ~3,460 steel of opening stock was sold to the SHELVES at tick 1 (before any price gap existed), where it belongs to no one and never moves. With capacity stocked by hand the base runs at full rate and starves the moment its local shelf empties. Open: (1) why the shipped world stops making steel within ~9 ticks; (2) whether shelf stock should ever move (a merchant buying low and hauling — the option passed over for BL-995); (3) construction capacity, a TRANSMITTED good (road network, like power), so its reach is a wiring question — the earlier '0 yards' reading was a probe miscount by type name.\n\nWORLD RULED (Ben, 2026-09-24, option B): BL-1066's done-when is taken on the FLIPPED world — after BL-1047 (epoch flip gates), on the 1960 world the player is actually handed — not on the epoch-0 verify world every reading so far was taken on (steel_chain_probe found epoch 0 is the ancient band with no steel makers at all; its anachronisms are BL-1070). Epoch 0 stays a supported start (Ben, same day)."
   },
   {
    "status": "designed",
@@ -292,6 +293,77 @@
     "src/world/world_gen_config.hpp"
    ],
    "design": "FILED 2026-09-24: Ben opened the Release build and found round 6 still the placeholder ('PLACEHOLDER - this round is not built yet'). Built after BL-1067 (the rename to Industrialisation), so every new identifier and label takes the new name. File:line anchors below are 2026-09-18 and predate BL-1003/BL-995/BL-1066; re-read before trusting them.\n\n--- FROM THE SPRINT 46 DRAFT ---\nRULED (Ben, 2026-09-18, NR-898 (6)); re-files BL-997 (archived unbuilt).\n\nWHY. Six rounds, two planetology (app.hpp:462-463), three lapse rounds (app.hpp:477, mirrored startup_screens.cpp:737-738), so every per-lapse array is sized 3 (app.hpp:628-688). Round headers startup_screens.cpp:791-823; loading labels stop at Exploration (:1301-1305); progress bars :1315-1344. Round 6 draws draw_pass_round_placeholder() (:838-854, called :1497). stop_after_industrialisation exists (world_gen_config.hpp:109; handled hard_coded_world.cpp:1711-1717) but the UI never sets it (startup_screens.cpp:332-334). The span block is hard_coded_world.cpp:1343-1520, params era_minus_one.cpp:426-473; it runs only when Exploration ran, industrialisation_span_enabled is on and stop_after_exploration is off (:1379-1380). It already feeds the live map and progress (:1431-1446, label 14), but no industrialisation_timelapse is recorded on the report (:1498-1501) — adding one is a save-format change.\n\nTHE WORK. wizard_lapse_round_count to 4; 'Loading the Industrialisation round'; a stop for lapse index 3 — or, better, round 6 runs the FULL build (no stop), which is what lets Begin adopt the world (the sibling item); be.industrialisation_timelapse in the :1498 block with a save_game_version bump; lapse_from_report for index 3; delete the placeholder. Needs industrialisation_span_enabled on, which BL-1044 does.\n\nDONE WHEN. A live click-through reaches round 6 and it plays 1660->1960 (a live check, not only a capture); a watched and an unwatched run are byte-identical; the placeholder is gone; save round-trip passes."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1069",
+   "short_name": "HOUSING_UPKEEP",
+   "author": "Ben (2026-09-24, a way to stimulate steel); Claude (written into POPULATION.md)",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 4,
+   "title": "Population centres keep a housing stock standing, and its upkeep is an era-banded materials draw that includes steel",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "src/world/economy_system.cpp",
+    "scripts/economy.lua",
+    "src/world/components.hpp",
+    "src/world/world_save.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-24). POPULATION.md § Housing owns the rule. Filed into sprint 46 on Ben's call though it is not a perfect fit for a sprint about wiring the generation into the game — it answers BL-1066's steel finding (the industrial band's iron ore and steel have almost no genuine buyer).\n\nTHE WORK. (1) A per-centre housing stock sized to population, wearing at an authored rate. (2) The upkeep and growth draw registered as WANT on the catchment market — the household path in market_clearing.cpp is the model; it must bid (MARKETS.md property 3) — with an era-banded basket authored in economy.lua (ancient: timber, stone, clay, planks; industrial: steel, dressed stone, ceramics). (3) Housing condition below full caps growth and lowers habitability, recovers with supply, never destroys (dim, never dark). (4) The condition is persistent state: save seam and state hash in the same commit. (5) Surfaced where a centre's habitability is read, with its cause.\n\nMEASURE on the flipped 1960 world (BL-1047) with demand_census: steel's genuine demand before and after, and that the draw does not collapse habitability world-wide on tick 0 (ship the shape inert or ramped if the supply is not there yet — PRODUCTION.md's corollary for authoring).\n\nDONE WHEN. On the flipped world, industrial centres bid steel for housing, steel makers are induced by it, and no centre's condition sits at its floor for want of a good its band cannot make."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1070",
+   "short_name": "EPOCH_ZERO_ANACHRONISMS",
+   "author": "Claude (steel_chain_probe, 2026-09-24); Ben (epoch 0 stays supported, 2026-09-24)",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "At epoch 0 the ancient world builds with steel and starts petroleum, coal and rare-earth mines",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/corp_ai.cpp",
+    "docs/economy/ERAS.md"
+   ],
+   "design": "FOUND 2026-09-24 by tools/verify/steel_chain_probe (seeds 0-2, epoch 0 — the world --verify builds): the home body has ZERO steel makers, yet ancient AI firms start mines that cost 20 steel each (the type default) — 149 sites paused for steel by tick 19: petroleum 64, iron ore 56, coal 21, copper 3, rare earth 2, silica 2 — and the military base costs 35 steel. BL-590 gave the ancient roster timber-and-stone baskets but left the other extraction targets and the military base on steel. Ben (2026-09-24): epoch 0 stays a supported start, so this is real work.\n\nTHE WORK. (1) Author ancient material_overrides for every extraction target and the military base (and any other type an ancient corp can build) in economy.lua, per PRODUCTION.md § Construction materials are per-named-building. (2) ERAS.md decides whether an ancient firm may open a petroleum, coal or rare-earth mine at all; if not, the era band refuses it at the door (building_available / the recipe band), not the scorer. (3) Re-run steel_chain_probe at epoch 0.\n\nDONE WHEN. At epoch 0 no construction site pauses for a good the ancient band cannot make, and the verify fixture's military base completes at epoch 0."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1071",
+   "short_name": "SHELF_STOCK_MOVES",
+   "author": "Ben (2026-09-24: goods should move); Claude",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "Stock on a market's shelf can move to a better market; today it belongs to no one and never leaves",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/market_clearing.cpp",
+    "src/world/corp_ai.cpp"
+   ],
+   "design": "RULED IN DIRECTION (Ben, 2026-09-24: 'goods should move'); the MECHANISM is open. FOUND on BL-1066: auto-surplus sells every unit above processor reservation to the local market (the market is buyer of last resort), and market inventory has no owner, so nothing hauls it — on the epoch-0 verify world ~3,300 steel sat on 13 of 255 shelves while construction sites elsewhere paused for it. BL-995 (trade reaches for price) makes a SELLER haul before it sells; stock already on a shelf still cannot move.\n\nMECHANISM OPTIONS (Ben's call, then written into SUPPLY.md and MARKETS.md): (a) any corporation may BUY shelf stock at the shelf's price and haul it under the same net-price rule — a merchant is just a corp acting on a gap, one rule for every corp; (b) the market itself exports its surplus shelf stock by the net-price rule, the haul paid from the sale; (c) a construction site or processor may buy from the nearest stocked shelf across markets, paying the haul (narrow: fixes consumers, not trade).\n\nDONE WHEN. A shelf holding a good that another market prices above landed cost is drawn down by hauls, measured by haulage_measure --far-trade and steel_chain_probe's shelf geography."
   }
  ]
 }

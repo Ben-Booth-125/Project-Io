@@ -2382,12 +2382,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // carve template's base price for every good it lacks, and then every good,
     // endemic included, is lifted by the premium.
     //
-    // PROVISIONAL: the premium's size is an authored placeholder, logged for
-    // Ben's call (NEEDS_REVIEW) — not derived. It is well inside the price
-    // band's ceiling (10x), so a capital's steel can still be undercut by a
-    // haul from a carve market.
+    // The premium's size is authored, not derived (Ben, 2026-09-24, NR-916:
+    // "1.25 is fine, we can tune later"). It is well inside the price band's
+    // ceiling (10x), so a capital's steel can still be undercut by a haul from
+    // a carve market.
     {
-        constexpr float kCapitalMarketPricePremium = 1.25f; // PROVISIONAL (BL-1066)
+        constexpr float kCapitalMarketPricePremium = 1.25f; // authored, tunable (NR-916)
         for (const entity_id sid : capital_market_shells)
         {
             const auto sit = w.markets.find(sid);

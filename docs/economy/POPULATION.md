@@ -296,6 +296,34 @@ belongs to.
 What remains deliberately **unquantified**: the cost of living — how much it costs a head to live,
 and which goods each stratum consumes in what proportion (§ Open items).
 
+### Housing — a centre keeps its dwellings standing (Ben, 2026-09-24)
+
+**A population centre holds a housing stock, and keeping it standing costs goods.** The stock is
+sized to the centre's population; it wears at an authored rate every tick, and making good that
+wear is an **upkeep draw of building materials** the centre bids for in its catchment market. A
+centre that grows must also add stock, so growth itself is a construction demand. This is the
+consumer MARKETS.md § The eight channels names in the Construction row — "centres as they grow" —
+given a mechanism: a centre is a builder that never finishes.
+
+**The basket is era-banded**, as the household basket is: the ancient band maintains its houses in
+timber, stone, clay and planks; the industrial band in steel, dressed stone and ceramics beside
+them. It is authored in data per band, so a band's basket names only goods that band makes. Steel
+is the reason this exists: an industrial world whose iron ore and steel had almost no genuine buyer
+(MARKETS.md § Three properties, the industrial census) gains a terminal sink that scales with how
+many people live there.
+
+**It bids, and it scales with the world** (MARKETS.md properties 1, 3 and 4). The want is
+registered on the catchment market's demand whether or not the shelf can meet it, so an unmet
+housing need prices its materials and calls forth the makers — a draw that could not do that
+would only shut the economy down. It scales with population, so housing demand grows as the world
+does rather than decaying into a fixed basket.
+
+**Unmet upkeep shows, and only shrinks** (§ Growth, decline and razing; the systemic-force rule).
+A centre whose housing is not kept up carries a visible **housing condition** below full; that
+condition caps the centre's growth and lowers its habitability, and it recovers as supply returns.
+It never destroys a centre and never zeroes it — passive failure only shrinks. A shortage has a
+cause the player can see, read and answer by supplying the market; it is never a hidden term.
+
 ---
 
 ## Land use

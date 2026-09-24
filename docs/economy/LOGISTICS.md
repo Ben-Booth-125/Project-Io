@@ -501,6 +501,10 @@ LP is what makes that priority explicit, and it is the strongest argument for it
   its consumer (settled rule 3, applied per half). Rates for both halves are first-cut in the
   landing items, argued against BL-543's (value anchor) unit-cost anchor and flagged for tuning
   rather than ruled ahead (NR-600).
+- **Armies claim first (Ben, 2026-09-24, NR-917).** Within a tick the march draws Logistic Points
+  before convoy dispatch does, so when an anchor is contended the front is supplied and the trade
+  waits. That is a chosen priority, not a phase-order accident: an army's supply is the more urgent
+  draw, and starving trade to feed a war is a legible cost a player can read and plan around.
 
 ---
 
