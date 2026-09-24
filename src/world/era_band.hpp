@@ -24,7 +24,7 @@
 enum class era_band : uint8_t
 {
     any        = 0, ///< Shared by both arcs. The default for an untagged entry.
-    ancient    = 1, ///< A campaign dated before `industrial_band_from_year` (epoch 0 CE).
+    ancient    = 1, ///< A world whose history never reached the Industrial rung (BL-1101).
     industrial = 2, ///< The 1960 product, including everything space-facing.
 };
 
@@ -34,24 +34,24 @@ enum class era_band : uint8_t
 inline constexpr std::size_t era_band_count =
     static_cast<std::size_t>(era_band::industrial) + 1;
 
-/// The first campaign year whose roster is the industrial band.
-///
-/// THE BAND'S OWN NUMBER (BL-1047). This once shared its 1700 with the
-/// settlement pass's antiquity branch and the two-span arc predicate, "so the
-/// split between the two arcs is one number". Those two were generation
-/// mechanisms keyed on the epoch; the flip took the epoch out of generation, so
-/// they read their own years now and this is the one 1700 left that the epoch
-/// reaches. The band is what the epoch names besides the calendar
-/// (INDUSTRIALISATION.md: "the epoch names a calendar and a recipe band"): a
-/// campaign-side roster mask the app applies AFTER generation, never an input
-/// to it, so it cannot move the generated world.
-inline constexpr int64_t industrial_band_from_year = 1700;
+// THE EPOCH NAMES NO BAND (BL-1101, Ben 2026-09-24). The 1700 threshold and the
+// year-to-band function lived here until then: the last place the campaign
+// epoch reached besides the calendar. The band is now a fact about the
+// HISTORY the world was generated with — `industrial` iff any living polity's
+// materials capacity sits at the Industrial rung at the 1960 fold, `ancient`
+// otherwise (`derive_campaign_band`, history_sim.hpp) — written once onto
+// `world::campaign_band` and read from there by the app and every harness. A
+// registry is banded from a world, never from a year.
 
-/// The band a campaign's epoch year belongs to: 1960 (the default) is
-/// industrial, 0 CE is ancient.
-inline era_band era_band_for_epoch(int64_t epoch_year)
+/// The band's name, for banners and manifests. Total over the enum.
+inline const char* era_band_name(era_band b)
 {
-    return (epoch_year < industrial_band_from_year) ? era_band::ancient : era_band::industrial;
+    switch (b)
+    {
+    case era_band::ancient:    return "ancient";
+    case era_band::industrial: return "industrial";
+    default:                   return "any";
+    }
 }
 
 /// Does an entry authored for band @p entry appear in a campaign running @p campaign?

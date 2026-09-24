@@ -71,8 +71,10 @@ struct world_params
     /// `industrialisation_stop_year`, and `settlement_stop_year` below), so the
     /// same params at any epoch build the same world, byte for byte. What the
     /// epoch decides is the tick calendar's day 0 (`ui::fmt::
-    /// set_campaign_epoch_year`) and the campaign's recipe band
-    /// (`era_band_for_epoch`, read by the app after generation, never by it).
+    /// set_campaign_epoch_year`) and nothing else: the campaign's recipe band
+    /// is the world's own (`world::campaign_band`, derived at the 1960 fold
+    /// from the history's industry state — BL-1101, Ben 2026-09-24), not the
+    /// year's.
     ///
     /// 1960 BY DEFAULT (Ben, 2026-09-08 and 2026-09-18): the year the
     /// Industrialisation span closes, so the calendar opens where the history
@@ -81,7 +83,8 @@ struct world_params
     /// do, which is what lets the default move without moving a mechanism.
     ///
     /// EPOCH 0 IS STILL A SUPPORTED START (Ben, 2026-09-24): the same world,
-    /// dated so play opens at 0 CE, on the ancient recipe band.
+    /// dated so play opens at 0 CE, on the band its history earned. Whether
+    /// that start may also name the ancient roster is NR-920's open call.
     int64_t         epoch_year = 1960;
 
     /// The year the settlement pass generates the map AT: regions the

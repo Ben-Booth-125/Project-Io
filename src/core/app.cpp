@@ -1450,17 +1450,19 @@ void app::load_economy()
     m_lua.load("scripts/economy.lua");
     m_registry.load_from_lua(m_lua);
 
-    // BL-433: gate the roster on the campaign's era band, derived from the epoch
-    // year the live world was actually built from. Must happen HERE, after the
-    // load (which resets the band to `any`) and before anything browses recipes —
-    // the default-recipe authoring below is the first such reader.
+    // BL-433: gate the roster on the campaign's era band. Must happen HERE, after
+    // the load (which resets the band to `any`) and before anything browses
+    // recipes — the default-recipe authoring below is the first such reader.
     //
-    // A 0 CE campaign therefore never sees the Launchpad or the petroleum,
-    // propellant and spacecraft chains; a 1960 one (the default since BL-1047)
-    // sees everything. Ids are untouched either way: the filter masks, it does
-    // not remove. The band is read HERE, after generation, and generation never
-    // reads it -- so the epoch that picks it moves no generated world.
-    m_registry.set_era(era_band_for_epoch(m_active_world_params.epoch_year));
+    // THE BAND IS THE WORLD'S OWN (BL-1101, Ben 2026-09-24): derived at the
+    // Industrialisation fold from the history's industry state and carried on
+    // `world::campaign_band`, never from the epoch. A world whose history
+    // never reached the Industrial rung opens on the ancient roster — no
+    // Launchpad, no petroleum, propellant or spacecraft chains — and one whose
+    // history did sees everything. Ids are untouched either way: the filter
+    // masks, it does not remove. `load_game_from` applies the same field, so a
+    // save opens on the band its world earned.
+    m_registry.set_era(m_world.campaign_band);
 
     // BL-323 S2b: mirror the reach budget onto ui_state so every placement surface
     // filters on the same number the authoritative gate uses. Done here, once, right
@@ -2041,6 +2043,13 @@ bool app::load_game_from(const std::string& path)
     // BL-705: a save carries the epoch its world was generated at, so the
     // calendar follows the loaded world rather than the process's --epoch flag.
     ui::fmt::set_campaign_epoch_year(static_cast<int>(env.params.epoch_year));
+    // BL-1101: and it carries the band its history earned (`world::campaign_band`,
+    // world_save v26), applied here exactly as load_economy applies it on a new
+    // game. Before this line a loaded save never set its band at all: the
+    // registry kept whatever the previous campaign — or the load-time default,
+    // `any` — had left in it, and a save could open on a roster its world did
+    // not earn.
+    m_registry.set_era(m_world.campaign_band);
 
     m_sim_loop.restore(env.sim_tick, env.day_tick, env.econ_tick, env.elapsed_days, env.speed);
     m_prev_speed     = (env.speed > 0) ? env.speed : 1;

@@ -19,9 +19,11 @@
 // Only recipe_registry.cpp pulls in the Lua state to populate the tables.
 class lua_state;
 
-// BL-433's era band — `era_band`, `era_band_count`, `era_band_for_epoch`,
+// BL-433's era band — `era_band`, `era_band_count`, `era_band_name`,
 // `era_permits` — lives in era_band.hpp (BL-744) so world_gen_config.hpp can
 // read it without this header's include set. Nothing here changed meaning.
+// (The year-to-band function lived there too until BL-1101 retired it: a
+// registry is banded from `world::campaign_band`, never from a year.)
 #include "era_band.hpp"
 
 /// BL-640: one era-banded tranche of a demand basket.

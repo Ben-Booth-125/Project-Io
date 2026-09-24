@@ -104,6 +104,12 @@ int main()
     if (qual_nation != null_entity)
         w.nations.at(qual_nation).qualification = 0.375f;
 
+    // BL-1101: the world's own recipe band (format v26). A `no_prehistory()`
+    // world never runs the Industrialisation fold, so it leaves the field at
+    // `any` (byte 0) and P1's byte-equality would pass over a reader that
+    // dropped it. Pin it to the value the fold writes on a crossed history.
+    w.campaign_band = era_band::industrial;
+
     // BL-614: same treatment for the building record's newest field — the
     // default is 0 everywhere (nothing sets a wage bid yet), so give one
     // building a distinctive bid before the round trip. Lowest building id.
@@ -222,6 +228,11 @@ int main()
               "P1 nation qualification (BL-613) round-trips at its written value");
     }
 
+    // BL-1101: the band survives by VALUE — a save opens on the band its world
+    // earned, which is the whole reason the field is persisted.
+    check(read_ok && loaded.campaign_band == era_band::industrial,
+          "P1 world campaign_band (BL-1101) round-trips at its written value");
+
     // BL-614: likewise for the wage bid.
     if (bid_building != null_entity)
     {
@@ -323,6 +334,17 @@ int main()
             const uint32_t wrong = world_save_version + 1;
             std::memcpy(&bad[4], &wrong, sizeof wrong);
             check(!from_bytes(bad, victim), "P3 a mismatched version is rejected");
+        }
+        {
+            // BL-1101 (format v26): the band byte sits directly after the
+            // allocator cursors — magic (4) + version (4) + three ids (12) +
+            // the belt's two floats (8) + four cursors (16) = offset 44. A
+            // value past `industrial` cannot have been written, so the reader
+            // refuses the whole stream rather than banding the world on a
+            // roster nobody authored.
+            std::string bad = bytes_once;
+            bad[44] = static_cast<char>(static_cast<uint8_t>(era_band::industrial) + 1);
+            check(!from_bytes(bad, victim), "P3 an out-of-range campaign_band byte (BL-1101) is rejected");
         }
         {
             // Sprint 16, BL-570: A v4 stream's `condition` records are one

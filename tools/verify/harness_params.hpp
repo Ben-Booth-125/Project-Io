@@ -364,7 +364,7 @@ inline void print_shipped_landscape(const shipped_landscape& s)
 #include "world/history_log.hpp"       // seed_genesis_history
 #include "world/market_clearing.hpp"   // clear_markets
 #include "world/nation_step.hpp"       // run_nation_step
-#include "world/recipe_registry.hpp"   // recipe_registry, era_band_for_epoch
+#include "world/recipe_registry.hpp"   // recipe_registry, era_band
 #include "world/standing.hpp"          // compute_corp_standings (phase 5, as app.cpp:1308)
 #include "world/supply_system.hpp"     // dispatch/advance/credit convoys
 #include "world/survey_system.hpp"     // init_survey_states
@@ -376,6 +376,21 @@ inline void print_shipped_landscape(const shipped_landscape& s)
 /// `app::validation_ticks` (app.hpp:746), restated because app.hpp brings SDL.
 /// If the app's number moves, this one moves with it.
 inline constexpr int k_app_validation_ticks = 12;
+
+/// BL-1101 — app::load_economy's band line, for every harness that mirrors the
+/// app: the registry is banded from the WORLD's own verdict
+/// (`world::campaign_band`, derived at the Industrialisation fold from the
+/// history's industry state), AFTER the world exists and before anything
+/// browses recipes. Never from an epoch, never from a probe descriptor, so a
+/// harness cannot band differently from the app. The band is also returned,
+/// for the banner or manifest that names it — a world that never ran the fold
+/// (a `no_prehistory()` fixture) is `any` and masks nothing, which the caller
+/// should say rather than imply.
+inline era_band band_registry_from_world(recipe_registry& reg, const world& w)
+{
+    reg.set_era(w.campaign_band); // app.cpp: m_registry.set_era(m_world.campaign_band)
+    return w.campaign_band;
+}
 
 /// Everything the app holds for one campaign start that the world was built
 /// from. Owned by the caller, so two starts (a reproduction check) never share
@@ -443,7 +458,7 @@ inline void build_app_base_world(lua_state& lua, const world_params& params,
     lua.load("scripts/recipes.lua");           // app.cpp:1153
     lua.load("scripts/economy.lua");           // app.cpp:1154
     out.reg.load_from_lua(lua);                // app.cpp:1155
-    out.reg.set_era(era_band_for_epoch(params.epoch_year)); // app.cpp:1165
+    band_registry_from_world(out.reg, out.w);  // app.cpp:1165 — the world's own band (BL-1101)
     // app.cpp:1176 ensure_works_loaded: already loaded above. app.cpp:1180-1181
     // (tech_tree.lua) and 1220-1228 (persona bench) write no world state, and
     // app.cpp:1209-1221 only reads it.

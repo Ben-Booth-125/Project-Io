@@ -563,7 +563,7 @@ void trailing_means(const corporation_component& cc, int n, float& out_net, floa
 /// Which of the two gates the acquisition actually fires on.
 enum class buy_mode { cheapest, priced };
 
-seed_row run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
+seed_row run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
                   const world_gen_config& gen_cfg, int search_quarters,
                   int after_quarters, buy_mode mode)
 {
@@ -579,6 +579,10 @@ seed_row run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
     // argument and it is parsed, not merely loaded. The background economy is the
     // landscape-search WINNER, not the seed candidate (BL-979).
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
+    // BL-1101: the band is the world's own, applied after generation as
+    // app::load_economy applies it — never a probe descriptor's epoch.
+    std::printf("  band: %s (the world's own, derived at the 1960 fold)\n",
+                era_band_name(band_registry_from_world(reg, w)));
     const shipped_landscape land = apply_shipped_landscape(w, reg, seed);
     print_shipped_landscape(land);
 
@@ -781,8 +785,9 @@ int main(int argc, char** argv)
         if (gen_cfg.kepler_base_price[i] > 0.0f)
             ++priced;
 
-    world_params probe;              // for the epoch year alone
-    reg.set_era(era_band_for_epoch(probe.epoch_year));
+    // The band is set per world inside run_seed (BL-1101), not here from a
+    // probe descriptor: it is the world's own verdict, and the world does not
+    // exist yet.
 
     // Vacuity guard: an empty registry would print every corp as equally poor
     // and diagnose nothing.

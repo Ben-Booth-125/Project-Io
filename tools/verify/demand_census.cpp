@@ -617,8 +617,12 @@ spread_stats summarise_spread(std::vector<double> v)
 
 struct band_result
 {
-    std::string band;
-    int64_t     epoch = 0;
+    std::string band;       ///< The band this census PINNED the registry to.
+    /// BL-1101: the world's own verdict, derived at the 1960 fold. Printed
+    /// beside the pinned band so a reading taken off the roster the world did
+    /// not earn says so on its face — this census pins both bands over ONE
+    /// generated world by design, and only one of them is the app's.
+    era_band    world_band = era_band::any;
 
     // world shape
     int   tiles = 0, markets = 0, centres = 0, buildings = 0, under_construction = 0;
@@ -691,29 +695,31 @@ struct band_result
     double                      pin_ratio = 0.0;   ///< the band the fraction was read at
 };
 
-band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
+band_result run_band(const char* band_name, era_band band, uint32_t seed,
                      int warm_ticks, bool prehistory, recipe_registry& reg,
                      const world_gen_config& gen_cfg)
 {
     band_result out;
-    out.band  = band_name;
-    out.epoch = epoch;
-
-    // Since the epoch flip (BL-1047) generation reads no epoch, so both bands
-    // census the SAME generated world; only the roster band set here differs.
-    reg.set_era(era_band_for_epoch(epoch));
+    out.band = band_name;
 
     world_params p;
-    p.seed       = seed;
-    p.epoch_year = epoch;
+    p.seed = seed;
     if (!prehistory)
-        p = no_prehistory(p);   // preserves seed and epoch_year
+        p = no_prehistory(p);   // preserves the seed
 
     // app::setup_world -> load_economy -> search_landscape -> apply the WINNER
     // -> assign_default_recipes, in that order (app.cpp § BL-770 PHASE 6). The
     // background economy is the search winner, not the seed candidate (BL-979;
     // apply_shipped_landscape in harness_params.hpp mirrors the app's sequence).
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
+    // Generation reads no epoch (BL-1047) and the band is the world's own
+    // (BL-1101), so both bands census the SAME generated world. This census
+    // PINS the band by name — it is an instrument over both rosters, like
+    // era_roster.cpp — and records the world's own verdict beside it rather
+    // than reading `band_registry_from_world`, which would collapse the two
+    // runs onto one roster.
+    out.world_band = w.campaign_band;
+    reg.set_era(band);
     print_shipped_landscape(apply_shipped_landscape(w, reg, seed));
 
     // 2026-09-01, found by BL-711: the app calls init_survey_states at campaign
@@ -1110,8 +1116,10 @@ void print_band(const band_result& b)
 {
     std::printf("\n======================================================================"
                 "=========================================\n");
-    std::printf("=== BAND %s (epoch %lld) ===\n", b.band.c_str(),
-                static_cast<long long>(b.epoch));
+    std::printf("=== BAND %s (pinned; the world's own band is %s%s) ===\n", b.band.c_str(),
+                era_band_name(b.world_band),
+                b.band == era_band_name(b.world_band) ? " — this is the app's roster"
+                                                      : " — NOT the roster the app opens on");
     std::printf("  world     : %d tiles, %d markets, %d centres (scale sum %.0f), "
                 "%d buildings (%d building), %d corps, %d units / %d heads\n",
                 b.tiles, b.markets, b.centres, b.centre_scale, b.buildings,
@@ -1430,9 +1438,9 @@ int main(int argc, char** argv)
     const bool want_industrial = (bands == "both" || bands == "industrial");
 
     if (want_ancient)
-        results.push_back(run_band("ancient", 0, seed, warm_ticks, prehistory, reg, gen_cfg));
+        results.push_back(run_band("ancient", era_band::ancient, seed, warm_ticks, prehistory, reg, gen_cfg));
     if (want_industrial)
-        results.push_back(run_band("industrial", 1960, seed, warm_ticks, prehistory, reg, gen_cfg));
+        results.push_back(run_band("industrial", era_band::industrial, seed, warm_ticks, prehistory, reg, gen_cfg));
 
     for (const band_result& b : results)
         print_band(b);

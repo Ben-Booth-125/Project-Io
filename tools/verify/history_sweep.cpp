@@ -454,6 +454,21 @@ struct sweep_row
     int mat_cap_max    = 0;
     int mat_cap_median = 0;
 
+    // --- BL-1101: the band, read at the 1960 fold ---------------------------
+    /// The band the generated world carries (`world::campaign_band`, the
+    /// Industrialisation fold's own verdict) and the polity reading it was
+    /// made from — the span's polities AS THEY CLOSED at 1960, off the
+    /// fixture's capture. NOT this sweep's own re-run above, which is the
+    /// Empires span (400 BCE -> 1200 CE) and whose `polities_crossed` /
+    /// `mat_cap_max` describe that earlier close. `fold_ran` false leaves every
+    /// field at its default and the band at `any`.
+    bool     fold_ran          = false;
+    int      fold_alive        = 0;
+    int      fold_at_rung      = 0;  ///< Living polities at the Industrial rung at 1960.
+    int      fold_ever_crossed = 0;  ///< Living polities carrying an `industrial_year`.
+    int      fold_mat_cap_max  = 0;
+    era_band campaign_band     = era_band::any;
+
     // --- BL-767 R2: does the rise-peak-fall shape occur? ------------------
     /// Polities that ROSE (peak holdings at least double their start, and at
     /// least three regions more), that FELL (ended at or below 60% of their own
@@ -886,10 +901,34 @@ int main(int argc, char** argv)
     int64_t epoch_year = 0;
     bool derive_from_generation = true;  // BL-900: generation's span is the default
     std::vector<param_override> overrides;
+    // BL-1101: `--seeds a,b,c` measures exactly these seeds in this order
+    // (exploration_sweep's BL-1026 flag, same grammar), so the sweep can run
+    // the curated library: `node tools/session/seed_library.js --seed-list`.
+    // Empty means 0..seed_count-1, the sweep's own default.
+    std::vector<uint32_t> seed_list;
 
     for (int a = 1; a < argc; ++a)
     {
         const std::string arg = argv[a];
+        if (arg == "--seeds" && a + 1 < argc)
+        {
+            const std::string list = argv[++a];
+            std::size_t at = 0;
+            while (at <= list.size())
+            {
+                const std::size_t comma = list.find(',', at);
+                const std::string tok = list.substr(at, comma == std::string::npos ? std::string::npos : comma - at);
+                if (tok.empty() || tok.find_first_not_of("0123456789") != std::string::npos)
+                {
+                    std::printf("FAIL  --seeds: '%s' is not a seed number\n", tok.c_str());
+                    return 2;
+                }
+                seed_list.push_back(static_cast<uint32_t>(std::strtoul(tok.c_str(), nullptr, 10)));
+                if (comma == std::string::npos) break;
+                at = comma + 1;
+            }
+            continue;
+        }
         if (arg == "--set" && a + 1 < argc)
         {
             const std::string kv = argv[++a];
@@ -964,6 +1003,7 @@ int main(int argc, char** argv)
         {
             std::printf("FAIL  unknown or malformed flag \"%s\".\n"
                         "      --epoch <year>   (the year is REQUIRED)\n"
+                        "      --seeds a,b,c    (exactly these seeds, in this order; BL-1101)\n"
                         "      --set <field>=<value>\n"
                         "      --struct-default (the 4000 BCE arc the game does NOT run)\n", arg.c_str());
             return 2;
@@ -971,6 +1011,9 @@ int main(int argc, char** argv)
         const int n = std::atoi(argv[a]);
         if (n > 0) seed_count = n;
     }
+    if (seed_list.empty())
+        for (int i = 0; i < seed_count; ++i) seed_list.push_back(static_cast<uint32_t>(i));
+    seed_count = static_cast<int>(seed_list.size());
 
     // THE PARAMS THIS SWEEP ACTUALLY RUNS — derived once, printed, then used
     // unchanged in the loop below. Hoisted out of the loop rather than
@@ -1100,7 +1143,7 @@ int main(int argc, char** argv)
         const auto t0 = std::chrono::steady_clock::now();
 
         world_params wp;
-        wp.seed = static_cast<uint32_t>(i);
+        wp.seed = seed_list[static_cast<std::size_t>(i)]; // BL-1101: --seeds, else 0..N-1
         // THE EPOCH REACHES GENERATION (BL-757 R1). Without this the sweep built
         // an ancient world and then ran an industrial span over its settlement,
         // which is a different world from the one --epoch names.
@@ -1122,7 +1165,7 @@ int main(int argc, char** argv)
             // The fixture's gate is the REAL one, settlement clause included. An
             // unran era would make every number below a struct default, which is
             // the exact failure this item exists to close — so say so and skip.
-            std::printf("  seed %d: THE ERA DID NOT RUN (fixture gate false) — skipped.\n", i);
+            std::printf("  seed %u: THE ERA DID NOT RUN (fixture gate false) — skipped.\n", wp.seed);
             continue;
         }
 
@@ -1135,6 +1178,25 @@ int main(int argc, char** argv)
         sweep_row row;
         row.seed            = wp.seed;
         row.regions_start = static_cast<int>(ss.regions.size());
+
+        // BL-1101: the band this world carries -- the fold's own verdict, read
+        // off `w` -- and the polity reading it was made from, off the
+        // fixture's Industrialisation capture (the span's polities as they
+        // closed at 1960). ONE derivation: `derive_campaign_band` is what the
+        // fold called, so this table cannot print a band the fold did not
+        // write. The BL-748 furnace columns further down are this sweep's own
+        // Empires re-run and describe the 1200 close, not this one.
+        row.campaign_band = w.campaign_band;
+        if (derive_from_generation && fx.industrialisation_ran)
+        {
+            const campaign_band_reading cb =
+                derive_campaign_band(fx.industrialisation_state.polities);
+            row.fold_ran          = true;
+            row.fold_alive        = cb.alive;
+            row.fold_at_rung      = cb.at_rung;
+            row.fold_ever_crossed = cb.ever_crossed;
+            row.fold_mat_cap_max  = cb.mat_cap_max;
+        }
 
         // `params` is now hoisted above the loop and PRINTED in the banner, so
         // what this sweep runs is visible rather than inferred. It is still the
@@ -3226,6 +3288,35 @@ int main(int argc, char** argv)
         // the loop started. What R1 asks of this table is that the spread be
         // WIDE: some worlds late, some never, rather than everything clustered
         // at the span boundary because the rung unlocks there.
+        // BL-1101 -- THE BAND, per world, off the 1960 fold. `at rung` is what
+        // names the band (living polities whose materials capacity sits at the
+        // Industrial rung at the close); `crossed` is the industrial_year count
+        // beside it, so a polity that crossed and fell back shows as a
+        // divergence rather than vanishing. A world deriving `ancient` is
+        // REPORTED here and never forced: it is the world its history made.
+        {
+            std::printf("\n--- BL-1101  THE BAND, per world (the 1960 fold; not the Empires re-run below) ---\n");
+            std::printf("  seed   fold   alive   at rung   crossed   mat cap max   band\n");
+            int n_ind = 0, n_anc = 0, n_unset = 0;
+            for (const sweep_row& r : rows)
+            {
+                if (r.campaign_band == era_band::industrial) ++n_ind;
+                else if (r.campaign_band == era_band::ancient) ++n_anc;
+                else ++n_unset;
+                if (!r.fold_ran)
+                    std::printf("  %4u   %-6s %s\n", r.seed, "no",
+                                r.campaign_band == era_band::any
+                                    ? "(the fold did not run; band unset)"
+                                    : era_band_name(r.campaign_band));
+                else
+                    std::printf("  %4u   %-6s %5d   %7d   %7d   %11d   %s\n", r.seed, "yes",
+                                r.fold_alive, r.fold_at_rung, r.fold_ever_crossed,
+                                r.fold_mat_cap_max, era_band_name(r.campaign_band));
+            }
+            std::printf("\n  BANDS DERIVED   industrial %d / ancient %d / unset %d   of %d world(s)\n",
+                        n_ind, n_anc, n_unset, static_cast<int>(rows.size()));
+        }
+
         std::printf("\n--- BL-748  THE FURNACE, per world ---\n");
         std::printf("  seed   polities  crossed  first cross   regions lit   first / median / last"
                     "   mat cap (max/med)\n");

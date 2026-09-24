@@ -261,7 +261,16 @@ inline constexpr uint32_t world_save_magic =
 /// which nothing would ever list, draw or absorb. Refused whole on the
 /// strict-equality contract; no migration. Claimed through
 /// `tools/session/next_save_version.js --claim`.
-inline constexpr uint32_t world_save_version = 25;
+/// Bumped to 26 by BL-1101 (band from history): the top-level scalars gain
+/// `world::campaign_band`, one byte directly after the allocator cursors, so
+/// every byte from the first component store onward shifts by one and a v25
+/// stream misreads its first body record. Refused whole on the strict-equality
+/// contract; no migration, and deliberately none — a pre-bump world carried no
+/// band at all (the app re-derived one from the epoch on every new game and
+/// never on a load, which is the hole this field closes), so there is nothing
+/// a v25 stream could say. Claimed through
+/// `tools/session/next_save_version.js --claim`.
+inline constexpr uint32_t world_save_version = 26;
 
 /// Write @p w as a complete world snapshot.
 ///

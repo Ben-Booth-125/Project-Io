@@ -447,7 +447,7 @@ struct seed_result
     double worst_recon_err = 0.0;
 };
 
-seed_result run_seed(uint32_t seed, const recipe_registry& reg,
+seed_result run_seed(uint32_t seed, recipe_registry& reg,
                      const world_gen_config& gen_cfg, bool prehistory, int extra)
 {
     seed_result out;
@@ -470,6 +470,10 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
     // load_from_lua; a harness must too. Loading world_gen.lua into the Lua state
     // is NOT sufficient — the table has to be parsed into this object and passed.
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
+    // BL-1101: the band is the world's own, applied after generation as
+    // app::load_economy applies it — never a probe descriptor's epoch.
+    std::printf("  band: %s (the world's own, derived at the 1960 fold)\n",
+                era_band_name(band_registry_from_world(reg, w)));
     // The landscape-search WINNER, as the app applies it — not the seed candidate
     // (BL-979; apply_shipped_landscape in harness_params.hpp).
     print_shipped_landscape(apply_shipped_landscape(w, reg, seed));
@@ -733,8 +737,8 @@ int main(int argc, char** argv)
     if (lua_cfg)
         gen_cfg.load_from_lua(lua);
 
-    world_params probe;
-    reg.set_era(era_band_for_epoch(probe.epoch_year));
+    // The band is set per world inside run_seed (BL-1101), not here from a
+    // probe descriptor: it is the world's own verdict.
 
     {
         int priced = 0;

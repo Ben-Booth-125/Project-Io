@@ -809,6 +809,11 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_u32(out, w.next_convoy_id);
     w_u32(out, w.next_order_id);
     w_u32(out, w.next_procurement_id);
+    // BL-1101 (format v26): the world's own recipe band, one byte. Written
+    // here with the other top-level scalars because it is one — a verdict the
+    // Industrialisation fold reached once, not live tick state — and read back
+    // by `app::load_game_from` so a save opens on the band its history earned.
+    w_enum(out, w.campaign_band);
 
     // --- component stores ---------------------------------------------------
     w_store(out, w.bodies, w_body);
@@ -955,6 +960,13 @@ bool read_world_snapshot(world& w, std::istream& in)
     s.next_convoy_id      = next_convoy;
     s.next_order_id       = next_order;
     s.next_procurement_id = next_proc;
+
+    // BL-1101 (format v26). A byte past `industrial` cannot have been written
+    // by the writer above, so the stream is corrupt rather than odd and is
+    // refused whole (the standing rejection contract; `s` is scratch, so the
+    // caller's world is untouched).
+    if (!r_enum(in, s.campaign_band, era_band::industrial))
+        return false;
 
     if (!r_store(in, s.bodies, r_body))
         return false;

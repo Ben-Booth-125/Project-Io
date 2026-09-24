@@ -134,7 +134,7 @@ int main()
         // identical expressions over the SAME function, so there is no
         // second implementation left to drift. Confirm the function is
         // total and consistent across both live era_band values (the only
-        // two values era_band_for_epoch ever produces).
+        // two the Industrialisation fold ever writes onto a world — BL-1101).
         recipe_registry reg_ancient;
         reg_ancient.set_era(era_band::ancient);
         recipe_registry reg_industrial;

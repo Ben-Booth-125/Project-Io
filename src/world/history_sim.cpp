@@ -10212,6 +10212,25 @@ industrialisation_output make_industrialisation_output(const settlement_state&  
     return o;
 }
 
+campaign_band_reading derive_campaign_band(const std::vector<polity>& polities)
+{
+    campaign_band_reading r;
+    for (const polity& q : polities)
+    {
+        if (!q.alive) continue;
+        ++r.alive;
+        // The SAME clamp and the SAME function the round's `mat_band` reads
+        // (the works table and the furnace), so this cannot name a rung the
+        // run could not build at.
+        const int m = std::clamp(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6);
+        if (m > r.mat_cap_max) r.mat_cap_max = m;
+        if (roster_band_for_capacity(m) == roster_band::industrial) ++r.at_rung;
+        if (q.industrial_year != k_never_industrialised) ++r.ever_crossed;
+    }
+    r.band = r.at_rung > 0 ? era_band::industrial : era_band::ancient;
+    return r;
+}
+
 bool industrialisation_output_valid(const industrialisation_output& o, std::string* why,
                                const creed_state*        live,
                                const exploration_output* from,
