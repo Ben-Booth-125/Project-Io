@@ -199,7 +199,19 @@ inline constexpr uint32_t save_game_magic =
 /// so it is refused whole on the same strict-equality contract. 21 and not 20
 /// because the generation lane holds 20 (the v6 note above: two layouts never
 /// share a number).
-inline constexpr uint32_t save_game_version = 21; // BL-1080, round 6 shows industry
+///
+/// LAYOUT 22 = LAYOUT 21 PLUS FOUR U32 IN THE DESCRIPTOR, DIRECTLY AFTER
+/// `era_seed` (BL-1083, one seed per span): `world_params::span_seed[0..3]`,
+/// the per-round reroll counters for the migration, Empires, Exploration and
+/// Industrialisation, written by `w_world_params` and read back in the same
+/// place by `r_world_params`. They decide WHICH history the descriptor
+/// rebuilds exactly as `era_seed` does, so a descriptor without them is a
+/// different world. A MID-RECORD insertion, so a v21 stream misreads
+/// everything from `abundance` on -- refused whole on the same strict-equality
+/// contract. Sprint 47's one envelope bump: claimed through
+/// `next_save_version.js --kind envelope`, and every sprint-47 lane that
+/// needs the envelope shares this number.
+inline constexpr uint32_t save_game_version = 22; // BL-1083, one seed per span
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

@@ -914,9 +914,18 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                       ? era_minus_one_sim_params(params).start_year
                                       : INT64_MAX;
 
+        // THE MIGRATION'S OWN SEED SLOT (world_params::span_seed, slot 0): the
+        // Culture round's reroll bumps `span_seed[0]` and this is the only
+        // fold that reads it, so a Culture reroll re-seeds the migration —
+        // and the rounds below it, which run on the ground this lays down.
+        // Additive, odd multiplier, zero-neutral: at 0 the seed is the bare
+        // `params.seed ^ 0x5E77EDu` it always was. `era_seed` is NOT folded
+        // here: it was always the Empires-onward term, and the migration
+        // never varied under it.
         kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
                                            kepler_tiles, home_grid_width, home_grid_height, budget,
-                                           /*seed=*/params.seed ^ 0x5E77EDu,
+                                           /*seed=*/(params.seed ^ 0x5E77EDu)
+                                               + params.span_seed[0] * 0x85EBCA6Bu,
                                            // BL-1047: generation's own year, never
                                            // the campaign epoch.
                                            /*stop_year=*/world_params::settlement_stop_year,

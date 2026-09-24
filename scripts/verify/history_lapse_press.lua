@@ -117,10 +117,11 @@ verify.frames(3)
 verify.capture("press_02_after_restart")
 
 -- A4 -- REROLL IS A REACHABLE PRESS and re-runs the pass rather than clearing
--- the round. Since 2026-09-09 it also advances world_params::era_seed, so it
--- plays the SAME ground through a different four thousand years; what it must
--- never do is disturb the planetology rounds above it, which is why the era got
--- a seed of its own rather than folding the roll into params.seed.
+-- the round. Since 2026-09-09 it also advances a seed of the round's own --
+-- world_params::span_seed[lapse_index] since 2026-09-24 (BL-1083), era_seed
+-- before that -- so it plays the SAME ground through a different four thousand
+-- years; what it must never do is disturb the rounds above it, which is why
+-- the span got a seed of its own rather than folding the roll into params.seed.
 verify.click(REROLL_X, REROLL_Y)
 verify.frames(6)
 verify.expect(verify.history_powers() > 0,

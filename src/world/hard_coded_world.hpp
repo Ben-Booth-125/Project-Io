@@ -41,26 +41,50 @@ struct world_params
 {
     uint32_t        seed       = 0;                         ///< Master seed, XOR-folded into each per-body seed. 0 reproduces the legacy world.
 
-    /// A SECOND SEED FOR THE ANCIENT ERA ALONE, so the same ground can be
-    /// played through twice and come out differently (Ben, 2026-09-09:
-    /// "reroll should produce differences regardless").
+    /// THE LEGACY HISTORY SEED. A second seed for the three history spans
+    /// together (Ben, 2026-09-09: "reroll should produce differences
+    /// regardless"), folded additively into the Empires, Exploration and
+    /// Industrialisation seeds alike and into nothing above them — folding a
+    /// roll into `params.seed` would re-draw the star and the surface, which
+    /// rounds-are-causal forbids in that direction.
     ///
-    /// THE PROBLEM IT SOLVES. `era_minus_one_sim_seed` folds `params.seed`, so
-    /// the era was a pure function of the master seed. The wizard's history
-    /// round could therefore re-RUN the pass on Reroll but could not vary it —
-    /// pressing Reroll reproduced the same history exactly. Folding the round's
-    /// roll into `params.seed` instead was the obvious repair and is the wrong
-    /// one: `seed` drives the planetology rounds ABOVE this one, so it would
-    /// re-draw the star, the world and its surface, and rounds-are-causal says
-    /// a round may only invalidate the rounds BELOW it.
+    /// NO CONTROL MOVES IT ANY MORE. The wizard's reroll bumps the one
+    /// `span_seed` its round owns (below); this stays as the term old saves,
+    /// fixtures and harnesses carry, so a descriptor that set it rebuilds the
+    /// same world it always did. Kept, not retired: retiring it would move
+    /// every world that ever set it, for no gain.
     ///
-    /// So the era gets a seed of its own. Rerolling the history round moves
-    /// this and nothing else: the same planet, a different four thousand years.
-    ///
-    /// DEFAULT 0 CHANGES NO WORLD. The fold below is an addition, so at 0 the
-    /// derivation is `params.seed ^ 0x415C1E17u` — exactly what it has always
+    /// DEFAULT 0 CHANGES NO WORLD. The fold is an addition, so at 0 each span's
+    /// derivation is its bare XOR of `params.seed` — exactly what it has always
     /// been. Every existing seed, golden and fixture is untouched.
     uint32_t        era_seed   = 0;
+
+    /// ONE SEED PER SPAN (Ben, 2026-09-24; STARTUP.md § Each pass round is
+    /// rerollable): [0] the migration, [1] Empires, [2] Exploration, [3]
+    /// Industrialisation — the four lapse rounds, in the order the wizard
+    /// visits them (`app::wizard_lapse_round_count`). A round-N reroll bumps
+    /// `span_seed[N]` and nothing else, so it re-seeds span N alone: the
+    /// rounds above keep the record they show, the rounds below are
+    /// invalidated and rerun on the changed ground.
+    ///
+    /// THE FOLD RULE, the same at all four sites. Each span's seed is
+    ///     (params.seed ^ <the span's own constant>)
+    ///       + era_seed     * 0x9E3779B9u      (the legacy term, above)
+    ///       + span_seed[k] * 0x85EBCA6Bu      (this span's counter, k fixed)
+    /// — ADDED, never XORed, and scaled by an odd multiplier first, so a
+    /// counter of 1, 2, 3... scatters across the whole word rather than
+    /// flipping low bits, and so a value of 0 contributes nothing. A span
+    /// reads ONLY its own slot: `span_seed[2]` cannot reach the Empires seed
+    /// by any path, which is what makes "earlier rounds are never re-rolled
+    /// under the record on screen" a property of the arithmetic rather than
+    /// of the UI. Sites: `run_settlement`'s seed in hard_coded_world.cpp
+    /// (slot 0), `era_minus_one_sim_seed` / `exploration_sim_seed` /
+    /// `industrialisation_sim_seed` in era_minus_one.cpp (slots 1-3).
+    ///
+    /// ALL ZERO IS THE UNREROLLED WORLD, digit for digit: every seed-library
+    /// world, golden and fixture built before the field existed is the world
+    /// it builds at {0, 0, 0, 0}.
+    uint32_t        span_seed[4] = {0u, 0u, 0u, 0u};
     abundance_level abundance  = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
 
     /// THE CAMPAIGN'S CALENDAR: the year play opens on (BL-1047, the epoch

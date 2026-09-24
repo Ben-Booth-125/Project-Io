@@ -300,19 +300,24 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
 
 uint32_t era_minus_one_sim_seed(const world_params& params)
 {
-    // `era_seed` lets the SAME ground be played through twice and come out
-    // differently — the wizard's history round rerolls it and nothing else, so
-    // the planetology rounds above it are untouched (world_params::era_seed).
+    // TWO ADDITIVE TERMS OVER THE BARE FOLD (world_params::span_seed carries
+    // the rule): `era_seed`, the legacy term every history span shares, and
+    // `span_seed[1]`, the Empires round's OWN counter — the one the wizard's
+    // reroll bumps on this round and no other. Neither reaches the planetology
+    // rounds above (folding a roll into `params.seed` would re-draw the star
+    // and the surface, which rounds-are-causal forbids in that direction), and
+    // this span reads no other round's slot.
     //
     // ADDED, NOT XORed, and multiplied by an odd constant first. XOR would let
-    // an era_seed that happened to equal a low bit pattern of the fold collapse
+    // a counter that happened to equal a low bit pattern of the fold collapse
     // two different rolls onto one history; the odd multiplier scatters
     // consecutive roll counters (1, 2, 3...) across the whole word, which is
     // what a reroll counter actually produces.
     //
-    // AT era_seed 0 THIS IS THE ORIGINAL EXPRESSION, digit for digit, so every
-    // existing world, golden and fixture is unmoved.
-    return (params.seed ^ 0x415C1E17u) + params.era_seed * 0x9E3779B9u;
+    // AT era_seed 0 AND span_seed[1] 0 THIS IS THE ORIGINAL EXPRESSION, digit
+    // for digit, so every existing world, golden and fixture is unmoved.
+    return (params.seed ^ 0x415C1E17u) + params.era_seed * 0x9E3779B9u
+         + params.span_seed[1] * 0x85EBCA6Bu;
 }
 
 // ---------------------------------------------------------------------------
@@ -378,8 +383,11 @@ history_sim_params exploration_sim_params(const world_params& params)
 uint32_t exploration_sim_seed(const world_params& params)
 {
     // Own constant, own additive fold — neither the Empires round's seed
-    // (`0x415C1E17u`) nor a bare re-use of the world seed.
-    return (params.seed ^ 0x3720A7E1u) + params.era_seed * 0x9E3779B9u;
+    // (`0x415C1E17u`) nor a bare re-use of the world seed. `span_seed[2]` is
+    // the Exploration round's own counter: a reroll of round 5 moves this
+    // seed and no earlier span's (world_params::span_seed).
+    return (params.seed ^ 0x3720A7E1u) + params.era_seed * 0x9E3779B9u
+         + params.span_seed[2] * 0x85EBCA6Bu;
 }
 
 // ---------------------------------------------------------------------------
@@ -442,6 +450,8 @@ uint32_t industrialisation_sim_seed(const world_params& params)
     // neither the Empires round's (`0x415C1E17u`) nor Exploration's
     // (`0x3720A7E1u`). The constant is the one BL-1036's fidelity harness
     // stood in with before this span existed, adopted so its reported
-    // "own seed" source means the same run before and after.
-    return (params.seed ^ 0x5D1C7A11u) + params.era_seed * 0x9E3779B9u;
+    // "own seed" source means the same run before and after. `span_seed[3]`
+    // is the Industrialisation round's own counter (world_params::span_seed).
+    return (params.seed ^ 0x5D1C7A11u) + params.era_seed * 0x9E3779B9u
+         + params.span_seed[3] * 0x85EBCA6Bu;
 }

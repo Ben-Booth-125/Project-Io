@@ -88,10 +88,17 @@ bool r_prefs(std::istream& i, world_preferences& p)
 // fields that decide WHICH history generation plays -- `era_seed`, the span
 // switches and the span years -- so the envelope's params rebuild the world
 // they describe. Keep r_world_params in step, field for field.
+//
+// save_game_version 22 (BL-1083): the four per-span reroll counters
+// (`world_params::span_seed`) follow `era_seed` -- same reason, one slot per
+// lapse round. A descriptor that dropped them would rebuild the unrerolled
+// world under a rerolled record.
 void w_world_params(std::ostream& o, const world_params& p)
 {
     w_u32(o, p.seed);
     w_u32(o, p.era_seed);
+    for (const uint32_t s : p.span_seed)
+        w_u32(o, s); // save_game_version 22 (BL-1083)
     w_enum(o, p.abundance);
     w_i64(o, p.epoch_year);
     w_int(o, p.prehistory_years);
@@ -108,8 +115,12 @@ void w_world_params(std::ostream& o, const world_params& p)
 
 bool r_world_params(std::istream& i, world_params& p)
 {
-    return r_u32(i, p.seed) && r_u32(i, p.era_seed)
-        && r_enum(i, p.abundance, max_abundance) && r_i64(i, p.epoch_year)
+    if (!(r_u32(i, p.seed) && r_u32(i, p.era_seed)))
+        return false;
+    for (uint32_t& s : p.span_seed) // save_game_version 22 (BL-1083)
+        if (!r_u32(i, s))
+            return false;
+    return r_enum(i, p.abundance, max_abundance) && r_i64(i, p.epoch_year)
         && r_int(i, p.prehistory_years)
         && r_i64(i, p.empires_start_year) && r_i64(i, p.empires_stop_year)
         && r_bool(i, p.exploration_sim_enabled) && r_i64(i, p.exploration_stop_year)

@@ -1057,6 +1057,26 @@ so ground rides its plate rather than sliding across a reshuffling partition.
 node tools/verify/build_harness.js continent_drift --run
 ```
 
+## span_seed_isolation — BL-1083, does a per-span reroll counter re-seed ONLY its own span?
+
+The wizard's reroll is per stage (STARTUP.md § Each pass round is rerollable): `world_params::span_seed[k]`
+is folded into exactly one span's seed — [0] the migration, [1] Empires, [2] Exploration, [3]
+Industrialisation — so a non-zero slot must change span k's record and every later span's, while every
+EARLIER span's record stays byte-identical. The harness builds `world_params{}` (or `--seed N`) once
+per variant — zero, zero again (the control), each slot at 1, and `era_seed` at 1 for the legacy term's
+reach — twice each, stopped after the migration and after the Industrialisation span, exactly as the
+wizard's rounds stop, and digests the four `era_timelapse` records field by field. **C1 is the control**:
+without it every "identical" row could be two builds agreeing by accident.
+
+S0's migration row is the one to read carefully. The colonisation walk consumes no seed
+(COLONISATION.md § No actor), so slot 0 reaches the daughters' names, tongue drift and aggression and the
+furnace lag — every later span moves, the Culture round's own record does not. The harness prints that
+reading under the rows when it sees it; whether the migration should carry dice is a design call.
+
+```
+node tools/verify/build_harness.js span_seed_isolation --run
+```
+
 ## Which builder?
 
 Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:
