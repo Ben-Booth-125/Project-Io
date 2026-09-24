@@ -516,6 +516,10 @@ bool same_world_params(const world_params& a, const world_params& b)
     const world_preferences& x = a.preferences;
     const world_preferences& y = b.preferences;
     return a.seed == b.seed && a.era_seed == b.era_seed && a.abundance == b.abundance
+        // BL-1083: the four per-span reroll counters. A held world built under
+        // a different one is a different history on one of its rounds.
+        && a.span_seed[0] == b.span_seed[0] && a.span_seed[1] == b.span_seed[1]
+        && a.span_seed[2] == b.span_seed[2] && a.span_seed[3] == b.span_seed[3]
         && a.epoch_year == b.epoch_year && a.prehistory_years == b.prehistory_years
         && a.empires_start_year == b.empires_start_year
         && a.empires_stop_year == b.empires_stop_year

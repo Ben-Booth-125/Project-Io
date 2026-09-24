@@ -451,8 +451,11 @@ void app::poll_wizard_history()
         if (world_slot && world_slot->ready)
         {
             m_wiz_world = std::move(world_slot);
-            std::printf("[wizard world] cached for Begin (seed %u, era seed %u)\n",
-                        m_wiz_world->params.seed, m_wiz_world->params.era_seed);
+            std::printf("[wizard world] cached for Begin (seed %u, era seed %u, "
+                        "span seeds %u/%u/%u/%u)\n",
+                        m_wiz_world->params.seed, m_wiz_world->params.era_seed,
+                        m_wiz_world->params.span_seed[0], m_wiz_world->params.span_seed[1],
+                        m_wiz_world->params.span_seed[2], m_wiz_world->params.span_seed[3]);
             std::fflush(stdout);
         }
 
@@ -1572,7 +1575,19 @@ void app::draw_generation_screen()
             case 3:
                 if (turbulence_row(pf.history_turbulence))
                 {
-                    m_wiz_dirty = true;
+                    // THE LEAN'S OWN DIRTY PATH (BL-1083; STARTUP.md § Each pass
+                    // round is rerollable: "a lean change on a round takes the
+                    // same path: it invalidates that round onward, relaunches
+                    // it at once, and touches nothing above"). NOT
+                    // `m_wiz_dirty`: that flag re-previews the planetology
+                    // chain and invalidates below round 1, which wiped all
+                    // four records — Culture's included — for a migration the
+                    // lean provably does not touch (`era_minus_one_sim_params`
+                    // is the only reader of `history_turbulence`, and the
+                    // migration runs before it). `pf` aliases
+                    // `m_pending_world_params.preferences`, so the worker
+                    // launched below already carries the new lean.
+                    //
                     // THIS ROUND'S OWN RECORD GOES TOO, which is why the
                     // argument is `m_wiz_round - 1` and not `m_wiz_round`. The
                     // setting is an INPUT to the pass this round runs, so a
@@ -1582,6 +1597,14 @@ void app::draw_generation_screen()
                     // wired ahead of the passes to prevent, one round earlier
                     // than the reroll button needs it.
                     invalidate_wizard_rounds_below(m_wiz_round - 1);
+                    // RELAUNCHED AT ONCE, on the same guard the reroll uses: a
+                    // run already in flight cannot be recalled, so it was marked
+                    // stale above and is dropped when it lands; a fresh one is
+                    // started only when the slot is free. The lean is not a
+                    // reroll — `span_seed[1]` is untouched — so the same lean
+                    // set twice rebuilds the same history.
+                    if (lapse_round && !m_wiz_history_future[lapse_index].valid())
+                        launch_wizard_history_run(lapse_index);
                 }
                 dim_text(kTurbulenceCaption);
                 break;
@@ -1638,13 +1661,22 @@ void app::draw_generation_screen()
                 if (lapse_round && !m_wiz_history_future[lapse_index].valid())
                 {
                     // A DIFFERENT AGE OVER THE SAME GROUND (Ben, 2026-09-09:
-                    // "reroll should produce differences regardless"). The era
-                    // carries its own seed now, so this moves the recorded age
-                    // without touching the planetology rounds above it — folding
-                    // the roll into `params.seed` would re-draw the star and the
-                    // surface, which rounds-are-causal forbids in that direction.
-                    // See world_params::era_seed.
-                    ++m_pending_world_params.era_seed;
+                    // "reroll should produce differences regardless"), AND ONLY
+                    // THIS ROUND'S AGE (Ben, 2026-09-24; STARTUP.md § Each pass
+                    // round is rerollable). Each span carries a seed of its
+                    // own, indexed exactly as the lapse rounds are — 0 the
+                    // migration, 1 Empires, 2 Exploration, 3 Industrialisation
+                    // — and a span folds only its own slot, so bumping this one
+                    // re-seeds span N alone: the rounds above keep the record
+                    // they show, the rounds below were invalidated just above
+                    // and rerun on the changed ground. The one shared term,
+                    // `era_seed`, is the legacy seed no control moves any more:
+                    // bumping it here re-seeded Empires, Exploration AND
+                    // Industrialisation together, so a round-5 reroll silently
+                    // replaced the history round 4 still showed, and a Culture
+                    // reroll changed nothing visible while forking every later
+                    // age. See world_params::span_seed for the fold rule.
+                    ++m_pending_world_params.span_seed[lapse_index];
                     m_wiz_history[lapse_index] = ui::history_lapse{};
                     launch_wizard_history_run(lapse_index);
                 }

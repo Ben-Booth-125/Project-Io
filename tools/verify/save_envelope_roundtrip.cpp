@@ -159,6 +159,13 @@ save_envelope make_envelope()
     // is non-default and distinct from its same-typed neighbours, so a
     // transposition among the four int64 years or the three bools shows.
     e.params.era_seed                       = 0x5EEDu;
+    // BL-1083 (save_game_version 22): the four per-span reroll counters, each
+    // distinct from its neighbours AND from era_seed, so a transposition among
+    // the five consecutive u32s shows.
+    e.params.span_seed[0]                   = 0x5A0Du;
+    e.params.span_seed[1]                   = 0x5A1Du;
+    e.params.span_seed[2]                   = 0x5A2Du;
+    e.params.span_seed[3]                   = 0x5A3Du;
     e.params.empires_start_year             = -777;
     e.params.empires_stop_year              = 1111;
     e.params.exploration_sim_enabled        = false;
@@ -453,6 +460,11 @@ int main()
                   && le.params.exploration_stop_year == 1555
                   && le.params.industrialisation_stop_year == 1888,
               "S3 era_seed and the four span years survive in their slots (BL-1047, v20)");
+        // BL-1083, pinned to literals: five consecutive u32s (era_seed then the
+        // four span seeds) are exactly the shape a symmetric transposition survives.
+        check(le.params.span_seed[0] == 0x5A0Du && le.params.span_seed[1] == 0x5A1Du
+                  && le.params.span_seed[2] == 0x5A2Du && le.params.span_seed[3] == 0x5A3Du,
+              "S3 the four per-span seeds survive in their slots (BL-1083, v22)");
         check(!le.params.exploration_sim_enabled
                   && le.params.industrialisation_span_enabled
                   && !le.params.resume_seeds_corridor_tier,
