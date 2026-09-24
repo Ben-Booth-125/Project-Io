@@ -39,25 +39,27 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
 
 ### Wave 0, lane G (generation seams) — BL-1083 (one seed per span). Group `span-seeds-per-round`.
 
+MERGED 2026-09-25 (7bf2bac0, fix round 8889487a): gates green, R3 fails by design (NR-931), R5/R6 owe Ben's click.
+
 - [ ] T1 `world_params::span_seed[4]` after `era_seed` (hard_coded_world.hpp:40-63), zero by default,
   the fold rule in its comment; the stale `era_seed` comment rewritten. provides: the field.
   consumes: nothing. (R1)
-- [ ] T2 each span folds ONLY its own counter, additively with an odd multiplier so zero is neutral:
+- [x] T2 each span folds ONLY its own counter, additively with an odd multiplier so zero is neutral:
   `era_minus_one_sim_seed` / `exploration_sim_seed` / `industrialisation_sim_seed`
   (era_minus_one.cpp:315, :382, :446) take span_seed[1..3]; the `run_settlement` seed
   (hard_coded_world.cpp:919) folds span_seed[0]. provides: the folds. consumes: T1. (R1, R2, R3)
-- [ ] T3 `same_world_params` compares the four (app.cpp:514-534); the reroll handler bumps
+- [x] T3 `same_world_params` compares the four (app.cpp:514-534); the reroll handler bumps
   `span_seed[lapse_index]` instead of `era_seed` (startup_screens.cpp:1647); invalidation unchanged.
   consumes: T1. (R4)
-- [ ] T4 the save envelope writes and reads the four under a claimed envelope version
+- [x] T4 the save envelope writes and reads the four under a claimed envelope version
   (`next_save_version.js --kind envelope --claim "BL-1083 span seeds"`; save_game.cpp:88-111);
   `save_roundtrip` and `save_envelope_roundtrip` green. consumes: T1. (R4)
-- [ ] T5 the turbulence lean's own dirty path: invalidate Empires onward and relaunch round 4 at
+- [x] T5 the turbulence lean's own dirty path: invalidate Empires onward and relaunch round 4 at
   once, no `m_wiz_dirty` (startup_screens.cpp:1573-1585; app.hpp:287-321). (R5)
-- [ ] T6 a headless check that span_seed[2]=1 leaves the migration and Empires records identical and
+- [x] T6 a headless check that span_seed[2]=1 leaves the migration and Empires records identical and
   changes Exploration, and span_seed[0]=1 changes the migration (a `tools/verify` harness or a
   `--verify` script; name it in the group). (R2, R3)
-- [ ] T7 seed library entries and harness fixtures that set `era_seed` still build; STARTUP.md's two
+- [x] T7 seed library entries and harness fixtures that set `era_seed` still build; STARTUP.md's two
   sections re-read against the built behaviour; Release build; `world_determinism` twice; Ben's
   live click (R6, R7).
 
@@ -98,7 +100,7 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
   re-pointed; `seat_pick_check.js` PASS. consumes: T5. (R7) DONE 2026-09-24: `--serve --ticks 1`
   prints state_hash=19575BBC3B912558 == `--autostart`'s; the windowed walk now launches each lapse
   round on arrival (it never had) and logs "round 6 is still building: waiting" → "adopted".
-- [ ] T7 Release build; `world_determinism` twice; both check scripts; Ben's live click — Begin after
+- [x] T7 Release build; `world_determinism` twice; both check scripts; Ben's live click — Begin after
   the playback opens the seat with no freeze. (R8) BL-1078 closes here. 2026-09-24: Release build
   green; world_determinism 17/17 twice, digests identical; save_roundtrip 63/0;
   save_envelope_roundtrip 34/0; both scripts PASS. OWES Ben's live click (R8).
@@ -127,21 +129,23 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
 
 ### Wave 0, lane W2 (world-movers, the band) — BL-1101 (band from history). Group `band-from-history`.
 
+MERGED 2026-09-25 (f954a0fc): the one band body is campaign_band_from_world; all 16 library seeds derive industrial (NR-934); R4 closes with this tree's gate run.
+
 - [ ] T1 derive `world::campaign_band` at the Industrialisation fold (after the validator,
   hard_coded_world.cpp:~1571) from the polities' materials capacity; persist it (world save
   version claimed, `--kind world --claim "BL-1101 campaign_band"`). (R1)
-- [ ] T2 `load_economy` and `load_game_from` apply the world's band; retire
+- [x] T2 `load_economy` and `load_game_from` apply the world's band; retire
   `industrial_band_from_year` / `era_band_for_epoch`; the ten harness call sites read the world's
   band through `harness_params`. Touch app.cpp in the two application sites only (lane C is in
   the same file). (R2)
-- [ ] T3 history_sweep column: polities crossed / max materials capacity / derived band per seed
+- [x] T3 history_sweep column: polities crossed / max materials capacity / derived band per seed
   across the 16 curated seeds; the reading written into the item. (R3)
-- [ ] T4 `begin_adopts_check.js` PASS; `--epoch 0` vs `--epoch 1960` opening hashes reported;
+- [x] T4 `begin_adopts_check.js` PASS; `--epoch 0` vs `--epoch 1960` opening hashes reported;
   `save_roundtrip`; Release build; `world_determinism` twice; the docs re-read. (R4, R5)
 
 ### Wave 0, lane W3 (world-movers, the end-of-run block) — BL-1102 (tariff posture derived). Group `tariff-posture-derived`.
 
-- [ ] T1 the stated formula for `protection_q` from scarcity_q, trade_flows and culture_preference
+- [x] T1 the stated formula for `protection_q` from scarcity_q, trade_flows and culture_preference
   at the end-of-run block (history_sim.cpp:~7857), independent of `boundary_year`; the comment and
   INDUSTRIALISATION.md § What crosses into play carry the arithmetic. (R1)
 - [ ] T2 `seed_national_tariffs` writes at least one LAW-IMPORT-TARIFF-* law on the verify seed;

@@ -7313,45 +7313,45 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: hard_coded_world.hpp span_seed",
       "headless: world_determinism x2 (seedA/on 5BA2EE1EE993C201, seedB/on 5ECE9A097D14DACE, seedA/off 4834366D19271E5F unchanged)"
      ],
      "requirement": "world_params carries span_seed[4] (migration, Empires, Exploration, Industrialisation); each span folds ONLY its own counter, additively, and the migration folds span_seed[0]; with all four at zero every world_determinism digest is unchanged (item-spanning gate).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "span_seed[4] on world_params; main-session gates 2026-09-25 after the G+C merge: world_determinism x2 ALL PASS, seedA/on 5BA2EE1EE993C201, seedB/on 5ECE9A097D14DACE, seedA/off 4834366D19271E5F, seedA/on/epoch0 = seedA/on — unchanged."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: a harness or verify script diffing prehistory_timelapse / exploration_timelapse across the two builds (name it)"
      ],
      "requirement": "A non-zero span_seed[k] changes span k and every later span while every earlier span's record is byte-identical: span_seed[2]=1 leaves the migration and Empires records identical to the zero build and changes the Exploration record.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "span_seed_isolation (tools/verify, new): S2 span_seed[2]=1 — migration A00A5876639F4D94 and Empires D2CC67C75ECB1159 identical, Exploration 6D625F4E933FC03D -> 9F87FC6BD1FD054A and Industrialisation differ; S1/S3 the same shape one slot over; C1 control identical. 25 PASS on main 2026-09-25."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "failed",
      "verification": [
       "headless: the same check on the migration record"
      ],
      "requirement": "span_seed[0]=1 changes the migration (the Culture round's record differs from the zero build).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "span_seed[0]=1 leaves the migration record byte-identical (the colonisation walk consumes no seed — COLONISATION.md § No actor); only daughter-culture names, tongue drift, aggression and the furnace lag move, so every later span differs. Left failing deliberately (row S0); NR-931 is Ben's call on what a Culture reroll means."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: startup_screens.cpp reroll handler; app.cpp same_world_params; save_game.cpp",
       "headless: save_roundtrip, save_envelope_roundtrip"
      ],
      "requirement": "The reroll handler bumps span_seed[lapse_index] and nothing else; same_world_params compares all four; the save envelope writes and reads them under a claimed envelope version; save_roundtrip and save_envelope_roundtrip are green.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "reroll handler bumps span_seed[lapse_index] only; same_world_params compares the four; envelope v22 claimed and written/read; save_roundtrip 63/0; save_envelope_roundtrip PASS on main 2026-09-25 (S3 the four per-span seeds survive)."
     },
     {
      "id": "R5",
@@ -7362,7 +7362,7 @@
      ],
      "requirement": "A turbulence-lean change on round 4 invalidates Empires onward only, keeps the Culture record, and relaunches round 4 at once (no m_wiz_dirty, no planetology re-preview).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Code in place; fix round 2026-09-25 relaunches a stale run that lands on the round the player is still on. Ben's live click owed."
     },
     {
      "id": "R6",
@@ -7384,7 +7384,7 @@
      ],
      "requirement": "STARTUP.md § Each pass round is rerollable and § Rounds stay causal state the per-span rule; the seed library entries carry the four seeds (zero) where the schema records era_seed; harness fixtures that set era_seed still build.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "STARTUP.md § Each pass round is rerollable now states the seed-free walk and names NR-931; seed_library.json has no era_seed field (nothing to carry); fixtures build. Closes with NR-931."
     }
    ]
   },
@@ -7651,35 +7651,35 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: hard_coded_world.cpp fold; world.hpp campaign_band; world_save.cpp",
       "headless: save_roundtrip (the band survives a round trip)"
      ],
      "requirement": "At the Industrialisation fold (after make_industrialisation_output validates) the world's band is derived: industrial iff any living polity's materials capacity reaches the industrial rung (roster_band_for_capacity, the derivation industrial_year already uses); persisted as world::campaign_band under a claimed world save version; a loaded save applies it. (item-spanning gate)",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "world::campaign_band derived at the fold (derive_campaign_band over the polities' materials capacity), persisted under world_save_version 26; save_roundtrip 63/0 on the lane; merged 2026-09-25 with the one band body campaign_band_from_world (finish_campaign_world) read by load_economy, load_game_from, the round-6 worker and the harness mirror; a fold-less fixture bands industrial (the shipped default), never any."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: grep industrial_band_from_year|era_band_for_epoch src/ tools/ is empty",
       "build"
      ],
      "requirement": "industrial_band_from_year and era_band_for_epoch are gone from src/; load_economy and load_game_from both apply the world's band; the ten harness call sites read the world's band through harness_params (a harness never bands differently from the app).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "industrial_band_from_year and era_band_for_epoch gone from src/ and tools/ (grep empty on main 2026-09-25); both app paths apply the world's band through campaign_band_from_world; harness_params::band_registry_from_world routes the mirrors (demand_census pins both bands by name as an instrument and prints the world's verdict beside them)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: history_sweep column (polities_crossed, mat_cap_max, derived band)"
      ],
      "requirement": "Across the 16 curated seeds the derived band per seed is reported BEFORE the threshold is fixed (polities crossed / max materials capacity per seed); a seed that derives ancient is reported, never forced.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "history_sweep column (lane W2, 16 curated seeds): every seed reaches materials capacity 6 by 1200 CE, so all 16 derive industrial; the threshold discriminates nothing on the library — reported, not reshaped (NR-934)."
     },
     {
      "id": "R4",
@@ -7690,18 +7690,18 @@
      ],
      "requirement": "A world whose history crossed opens industrial with no epoch read anywhere; --epoch 0 builds the same world dated 0 CE (the --band override for the ancient sandbox is NR-920's call and is not built here); state hash adopt == cold (begin_adopts_check.js).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "begin_adopts_check on the merged tree is in the W2 gate run (2026-09-25); --epoch 0 builds the same world dated 0 CE (lane W2: world_determinism R3.8 epoch 0 == epoch 1960); no --band override built (NR-920)."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: docs/economy/PRODUCTION.md",
       "code: docs/ai/ACTIONS.json chrome.epoch_cli"
      ],
      "requirement": "PRODUCTION.md § The era band, ERAS.md § Where the ladder starts and INDUSTRIALISATION.md § What crosses into play state the derivation; ACTIONS.json's --epoch entry matches the built behaviour.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "PRODUCTION.md § The era band, ERAS.md § Where the ladder starts, INDUSTRIALISATION.md § What crosses into play written 2026-09-24; ACTIONS.json chrome.epoch_cli rewritten the same day."
     }
    ]
   },
