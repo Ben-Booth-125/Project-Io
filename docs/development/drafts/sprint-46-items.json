@@ -95,19 +95,6 @@
   },
   {
    "group": "retire",
-   "short_name": "PHASE_RENAME_DIGITISATION",
-   "title": "The 1660-1960 phase is renamed: Digitisation names computing, which belongs to the campaign, not the age before it",
-   "priority": "A",
-   "difficulty": 2,
-   "world_mover": false,
-   "requires": [
-    "BL-1044"
-   ],
-   "authority_doc": "docs/GLOSSARY.md",
-   "design": "RAISED by Ben 2026-09-20: 'digitisation isn't the best name for our period from 1660 to 1960. Perhaps we should just go with Industrialisation'. Filed into sprint 46 rather than built then, because the rename touches every identifier BL-1043, BL-1050 and BL-1044 were in flight over, and sprint 46's doc sweep rewrites these docs anyway — one pass, after the re-bless.\n\nTHE NAME IS BEN'S CALL AT THE CUT. He leans Industrialisation. The objection raised with him: the word is already taken twice inside the phase — reading 8 of digitisation_sim_harness is 'Industrialisation' (the points measurement) and a REGION industrialises (region::industrial_year, the furnace crossing, settlement.cpp Stage 4), with the Industry tree a third sense. Alternatives offered: 'The Industrial Age' (a span, so it does not collide with a region's event), or a one-word name in the register of Colonisation / Exploration ('Steam', 'The Machine Age'). Decide the name first; the work below is the same either way.\n\nTHE WORK. (1) docs/generation/DIGITISATION.md -> the new file name, and every citation of it (CLAUDE.md's doc map, GLOSSARY.md, GENERATION_STRATEGY.md, EXPLORATION.md, INDUSTRY_TREE.md, TREES.md, ERAS.md, sprints.json, this drafts file). (2) The identifiers: digitisation_span_enabled, digitisation_output, digitisation_stop_year, digitisation_params, digitisation_sim_params, digitisation_timelapse, tools/verify/digitisation_sim_harness.cpp, the --through/--fidelity help text, and the wizard's round label. A rename only — no behaviour moves, so world_determinism digests and the pins must not move, and the save seam is untouched unless a field name is serialised by name (it is not: flat binary). (3) GLOSSARY.md gets the term with its span and its boundary against the campaign era. (4) Where the phase name and the region event would now read alike, say which is which at each site (reading 8's title, region::industrial_year's comment). DONE WHEN: a grep for 'digitisation' (any case) in src/, tools/ and docs/ returns nothing but history; every harness builds and passes; --digest-check 16/16 against the post-re-bless pins."
-  },
-  {
-   "group": "retire",
    "short_name": "GENERATION_DOC_SWEEP_46",
    "title": "The generation docs stop describing the superseded arc, preferred sellers, the old warm start, the two-span tariff timing and the retired narrative passes",
    "priority": "A",
