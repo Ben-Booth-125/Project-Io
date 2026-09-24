@@ -337,7 +337,8 @@ and a bridge are legible only against the terrain they cross.
 The wizard's "Begin", and the one and only generation call:
 
 1. Rebase the sim clock (fresh `sim_loop`; speed from the Lua config).
-2. `setup_world(m_pending_world_params)` — build the world; fills
+2. `setup_world(m_pending_world_params)` — build the world (or adopt the one the
+   wizard's last round built, § The world cache below); fills
    `m_generation_report` (presentation artefact, off the serialisation seam).
 3. `load_economy()` — recipes + economy constants from Lua.
 4. **The winner's validation run** (BL-978, warm start retired): seed the balance
@@ -358,6 +359,32 @@ The wizard's "Begin", and the one and only generation call:
 
 Play opens on the corporation's home planet — the Planetary rung, home body
 selected (CANVASES.md § Default state).
+
+### The world cache — Begin adopts the wizard's world
+
+The Industrialisation round's run is the whole build (§ Round 6), on the same params, the same
+world-gen config and the same works table Begin would use. So its world is **kept, not
+discarded**, and Begin takes it rather than building a second one (Ben, 2026-09-16, NR-811;
+2026-09-24: *"after pressing Begin, we just ignored all the previous steps and reload"*). With a
+held world, Begin moves it into play and goes straight to the tail — the prelude, the validation
+run, the seat; without one, it builds as step 2 above describes.
+
+- **Owner.** The app holds it, next to the round's record: one slot the round's worker fills
+  while it runs, and one landed cache Begin reads. The world is **moved** in and moved out, never
+  copied — a copied world does not iterate in its original's order, and it is large.
+- **Invalidation.** The cache goes with round 6's record, on every path that clears that record:
+  a reroll on any round (a reroll of round 6 itself starts a fresh build, which releases the old
+  world first), any planetology or lean change, and leaving the wizard for the menu. A run that
+  lands after its round went stale is dropped with its record. Begin then compares the held
+  world's params with the wizard's, field by field, and builds cold on any difference — the
+  invalidation rule is what keeps the cache honest, and this is the check that it did.
+- **Memory.** One world at most. It is released when invalidated or when Begin spends it; while a
+  stale run is still computing, its half-built world lives until that run lands, and then goes.
+  The cost is one homeworld-scale world held through the last round's lapse — the same world play
+  would hold a moment later.
+
+A cold build and an adopted world on the same settings open the campaign on the same state
+hash.
 
 ## The seat
 

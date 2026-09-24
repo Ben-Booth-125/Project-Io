@@ -501,6 +501,35 @@ int app::run(autostart_mode autostart)
 // config is loaded HERE, on the render thread, and only make_hard_coded_world —
 // which is pure C++ — goes to the worker.
 
+namespace {
+
+/// BL-1073: every field of `world_params`, compared. The guard behind the
+/// wizard's world cache: invalidation is what keeps the cache honest, and this
+/// is the check that it did. A new field on `world_params` must join this list,
+/// or a world built under a different value could be adopted.
+bool same_world_params(const world_params& a, const world_params& b)
+{
+    const world_preferences& x = a.preferences;
+    const world_preferences& y = b.preferences;
+    return a.seed == b.seed && a.era_seed == b.era_seed && a.abundance == b.abundance
+        && a.epoch_year == b.epoch_year && a.prehistory_years == b.prehistory_years
+        && a.industrial_years == b.industrial_years
+        && a.empires_stop_year == b.empires_stop_year
+        && a.exploration_sim_enabled == b.exploration_sim_enabled
+        && a.exploration_stop_year == b.exploration_stop_year
+        && a.industrialisation_span_enabled == b.industrialisation_span_enabled
+        && a.industrialisation_stop_year == b.industrialisation_stop_year
+        && a.resume_seeds_corridor_tier == b.resume_seeds_corridor_tier
+        && a.body_count == b.body_count
+        && x.star == y.star && x.world_size == y.world_size && x.interior == y.interior
+        && x.metal == y.metal && x.ocean == y.ocean && x.oxygen_story == y.oxygen_story
+        && x.coal_basins == y.coal_basins && x.drawdown == y.drawdown
+        && x.history_turbulence == y.history_turbulence
+        && x.roll[0] == y.roll[0] && x.roll[1] == y.roll[1] && x.roll[2] == y.roll[2];
+}
+
+} // namespace
+
 void app::begin_new_game()
 {
     m_lua.load("scripts/world_gen.lua");
@@ -509,6 +538,47 @@ void app::begin_new_game()
 
     m_worldgen_params = m_pending_world_params;
     m_generation_report = generation_report{};
+
+    // --- BL-1073: BEGIN ADOPTS THE WIZARD'S WORLD ----------------------------
+    //
+    // Round 6 already ran this exact build (STARTUP.md § The world cache), so a
+    // valid cache is MOVED into m_world and the loading screen goes straight to
+    // the tail -- the prelude, the validation run, the seat -- instead of
+    // building the same world a second time. A cache whose params differ from
+    // the pending ones is released and the build runs cold, as it always did.
+    if (m_wiz_world && m_wiz_world->ready
+        && !same_world_params(m_wiz_world->params, m_pending_world_params))
+        drop_wizard_world("its params no longer match the wizard's");
+    if (m_wiz_world && m_wiz_world->ready)
+    {
+        m_world             = std::move(m_wiz_world->w);
+        m_generation_report = std::move(m_wiz_world->report);
+        m_wiz_world.reset(); // one world at most: the cache is spent
+
+        // The wait surface reads a finished build: the outer bar full, the
+        // validation run's quarters to come on the inner bar.
+        m_worldgen_progress.begin_wait();
+        m_worldgen_progress.stage_count.store(1, std::memory_order_relaxed);
+        m_worldgen_progress.stage.store(1, std::memory_order_relaxed);
+        m_worldgen_progress.label.store(12, std::memory_order_relaxed); // "Finishing"
+        m_worldgen_progress.weight_total.store(1, std::memory_order_relaxed);
+        m_worldgen_progress.weight_done.store(1, std::memory_order_relaxed);
+        m_worldgen_progress.budget_ready.store(false, std::memory_order_relaxed);
+        m_worldgen_progress.grid_w.store(0, std::memory_order_relaxed); // no carve to draw
+        m_worldgen_progress.grid_h.store(0, std::memory_order_relaxed);
+        m_carve_view.clear();
+
+        std::printf("[begin] adopted the wizard's world (seed %u, era seed %u): "
+                    "make_hard_coded_world not called\n",
+                    m_pending_world_params.seed, m_pending_world_params.era_seed);
+        std::fflush(stdout);
+
+        m_worldgen_adopted = true;
+        m_screen           = app_screen::building;
+        return;
+    }
+    std::printf("[begin] no wizard world to adopt: building (make_hard_coded_world)\n");
+    std::fflush(stdout);
 
     // BL-1072: every field the wait reads, and the elapsed clock's start.
     m_worldgen_progress.begin_wait();
@@ -609,12 +679,18 @@ void app::poll_worldgen()
         return;
     }
 
-    if (!m_worldgen_future.valid())
+    // BL-1073: a world Begin adopted from the wizard is already in m_world, so
+    // there is no worker to wait for -- straight to the tail. (Its sink carries
+    // no budget, so the print below is skipped for it.)
+    const bool adopted = m_worldgen_adopted;
+    m_worldgen_adopted = false;
+    if (!adopted && !m_worldgen_future.valid())
         return;
-    if (m_worldgen_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+    if (!adopted && m_worldgen_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
         return;
 
-    m_world = m_worldgen_future.get();
+    if (!adopted)
+        m_world = m_worldgen_future.get();
 
     // BL-754: the generation budget, on the app's own console alongside the
     // `[start_new_game]` phase lines it already prints. Deliberately the same

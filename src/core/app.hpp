@@ -144,6 +144,13 @@ public:
     /// warm start had no automated coverage at all. Returns 0 on success.
     int run_autostart();
 
+    /// Headless (BL-1073, `--autostart-adopt`): run the wizard's last round's
+    /// own build, check an invalidation drops its cached world, then press
+    /// Begin on it and run the tail to play. Prints the opening state hash,
+    /// which `tools/verify/begin_adopts_check.js` compares against a cold
+    /// `--autostart` of the same params. Returns 0 on success.
+    int run_autostart_adopt();
+
 private:
     /// The shared core of run_verify / run_verify_all: one setup + API
     /// registration, then each script against a pristine-state restore.
@@ -298,6 +305,11 @@ private:
             else m_wiz_history[i] = ui::history_lapse{};
             m_wiz_history_playing[i] = false;
             m_wiz_history_paused[i]  = false;
+            // BL-1073: the last round's record is a world, and it goes with
+            // the record -- a held world that no longer matches the controls
+            // is worse than a slow one (STARTUP.md § The seat).
+            if (i == wizard_lapse_round_count - 1)
+                drop_wizard_world("a round above the world moved");
         }
     }
 
@@ -676,6 +688,42 @@ private:
     /// The planetology moved while a run was in flight, so what it returns is a
     /// history of a world that is gone. Discarded on arrival rather than shown.
     bool  m_wiz_history_stale[wizard_lapse_round_count]   = {};
+
+    // --- The wizard's world, kept for Begin (BL-1073) ------------------------
+    //
+    // STARTUP.md § The world cache. The last lapse round (Industrialisation)
+    // runs the FULL build -- the same `make_hard_coded_world` call Begin would
+    // make, on the same params, config and works -- so its world is kept here
+    // rather than discarded, and Begin adopts it instead of building a second.
+    //
+    // OWNER: the app. ONE world at most: `m_wiz_world_pending` is the slot the
+    // round-6 worker is filling (created at launch, filled on the worker, read
+    // only after its future lands -- the future is the synchronisation), and
+    // `m_wiz_world` is the landed, valid cache. On landing the slot moves into
+    // the cache; a stale landing drops it. Nothing is ever copied: a copied
+    // world does not iterate as its original (see harness_params.hpp's
+    // BL-1034 note), and a world is large -- it is MOVED in and moved out.
+    //
+    // INVALIDATION: every path that clears round 6's record drops the cache in
+    // the same breath (`invalidate_wizard_rounds_below`, a relaunch of round
+    // 6, a stale landing, leaving the wizard for the menu), and Begin checks
+    // the cached params against the pending ones field by field before it
+    // adopts (`drop_wizard_world` names why in the log).
+    struct wizard_world_cache
+    {
+        world             w;
+        generation_report report;
+        world_params      params{};
+        bool              ready = false; ///< Set by the worker as its last write.
+    };
+    std::shared_ptr<wizard_world_cache> m_wiz_world_pending;
+    std::shared_ptr<wizard_world_cache> m_wiz_world;
+    /// The world Begin moved into m_world came from the cache: poll_worldgen
+    /// skips the worker and runs the tail (prelude, validation run, seat).
+    bool m_worldgen_adopted = false;
+    /// Release the cached world (and any pending slot's claim on it), logging
+    /// @p why when there was one to release.
+    void drop_wizard_world(const char* why);
     float m_wiz_history_carry[wizard_lapse_round_count]   = {}; ///< Sub-year accumulator for the advance.
 
     /// BL-948 — THE AUTOPLAY DURATION, per round, in seconds of wall clock for
