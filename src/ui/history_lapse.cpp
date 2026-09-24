@@ -66,6 +66,9 @@ constexpr ImU32 col_trade_link = IM_COL32(110, 205, 150, 220);
 /// BL-1080: a region that has crossed the furnace — an ember square at its
 /// anchor, warm and saturated so it reads against every polity tint.
 constexpr ImU32 col_furnace = IM_COL32(255, 138, 48, 245);
+/// BL-1080: one spark of the industry heat — the furnace's hue, paler and
+/// smaller, so a crossing's ember square still reads as the stronger fact.
+constexpr ImU32 col_heat = IM_COL32(255, 196, 96, 230);
 
 /// The fill's opacity over the base. High enough that a colour reads as a
 /// colour on the board's swatch too; low enough that a mountain range and a
@@ -637,9 +640,16 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
         int32_t& y = h.region_lit_year[e.region];
         if (e.year < y) y = e.year;
     }
-    h.industry_recorded = false;
+    h.industry_recorded     = false;
+    h.industry_density_peak = 0.0;
     for (const polity_sample& s : h.lapse.samples)
-        if (s.industry_points > 0) { h.industry_recorded = true; break; }
+    {
+        if (s.industry_points <= 0) continue;
+        h.industry_recorded = true;
+        const double d = static_cast<double>(s.industry_points)
+                       / static_cast<double>(std::max<int>(1, s.regions));
+        h.industry_density_peak = std::max(h.industry_density_peak, d);
+    }
 
     // The Culture round's record carries a lineage palette (BL-919); its hue
     // families seed the slot walk so kin start near one another on the wheel.
@@ -1005,6 +1015,63 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             }
         }
         std::swap(row, above);
+    }
+
+    // ── 2b. THE INDUSTRY HEAT (BL-1080; map layer ruled by Ben, 2026-09-24).
+    //    Round 6's story is industry, and the span on an antiquity-epoch world
+    //    draws no furnace crossing, so the ember marks below stay empty while
+    //    the board's Ind column climbs. What the span DOES compute is industry
+    //    points, sampled per polity per step, so the heat is BY POLITY
+    //    TERRITORY: each realm's points per region held, over the record's
+    //    peak density (`lapse_industry_heat`).
+    //
+    //    DRAWN AS A STIPPLE, NOT A WASH. An ember wash over a 170-alpha polity
+    //    tint either buries the political colour or reads as one more polity
+    //    hue; sparks scattered over the ground leave the colour and the
+    //    frontier readable underneath and say "works here" in a different
+    //    idiom. One candidate spark per 3x3 tile cell (staggered), lit when a
+    //    fixed per-tile hash falls under the realm's heat — so the fraction of
+    //    a realm's ground that sparks IS its heat, and a spark lit at one heat
+    //    stays lit at every higher one: the heat grows across the span rather
+    //    than flickering. Empty on every record with no points. ──
+    if (h.industry_recorded && h.industry_density_peak > 0.0)
+    {
+        std::vector<float> heat_of; // owner -> heat this frame; -1 = not yet read
+        const float fade_in = 1.0f - carry_fade;
+        const float half    = std::clamp(scale * 0.40f, 1.0f, 2.4f);
+        constexpr int cell  = 3;
+        for (int r = 0; r < gh; r += cell)
+        {
+            const int stagger = ((r / cell) & 1) ? cell / 2 + 1 : 0;
+            for (int c = stagger; c < gw; c += cell)
+            {
+                const std::size_t i = static_cast<std::size_t>(r * gw + c);
+                const int32_t reg = h.tile_region[i];
+                if (reg < 0 || static_cast<std::size_t>(reg) >= slice.size()) continue;
+                const uint16_t o = slice[static_cast<std::size_t>(reg)];
+                if (o == owner_none) continue;
+                if (heat_of.size() <= o) heat_of.resize(static_cast<std::size_t>(o) + 1, -1.0f);
+                if (heat_of[o] < 0.0f) heat_of[o] = lapse_industry_heat(h, o, year) * fade_in;
+                const float heat = heat_of[o];
+                if (heat <= 0.0f) continue;
+                // A fixed hash of the tile, in [0, 1): presentation only, a
+                // function of the raster position and nothing else.
+                uint32_t k = static_cast<uint32_t>(i) * 2654435761u;
+                k ^= k >> 15; k *= 2246822519u; k ^= k >> 13;
+                const float t = static_cast<float>(k & 0xFFFFu) / 65536.0f;
+                if (t >= heat) continue;
+                const ImVec2 at{px(static_cast<float>(c)) + scale * 0.5f,
+                                py(static_cast<float>(r)) + scale * 0.5f};
+                // A dark ring under a bright core, as the ember marks and the
+                // seats wear: a spark must read on a yellow realm as well as a
+                // blue one, and a bare pale square vanished on the warm hues.
+                dl->AddRectFilled({at.x - half - 1.0f, at.y - half - 1.0f},
+                                  {at.x + half + 1.0f, at.y + half + 1.0f}, col_seat_ring);
+                dl->AddRectFilled({at.x - half, at.y - half}, {at.x + half, at.y + half},
+                                  col_heat);
+                prims += 2;
+            }
+        }
     }
 
     // ── 3. RIVERS, over the fill: a river is what a frontier stops at, so it
@@ -1429,6 +1496,21 @@ const char* polity_name_of(const history_lapse& h, uint16_t polity)
 }
 
 } // namespace
+
+float lapse_industry_heat(const history_lapse& h, uint16_t polity, int year)
+{
+    if (!h.industry_recorded || h.industry_density_peak <= 0.0) return 0.0f;
+    const polity_sample* s = sample_at_step(h, step_at_or_before(h.lapse, year), polity);
+    if (s == nullptr || s->industry_points <= 0) return 0.0f;
+    const double d = static_cast<double>(s->industry_points)
+                   / static_cast<double>(std::max<int>(1, s->regions));
+    // SQUARE-ROOTED: the density is heavily skewed (on the verify seed one
+    // realm stands near the peak and the mean realm near a tenth of it), so a
+    // linear heat lit one realm and left the rest of the industrial world
+    // dark. The root lifts the low end and keeps zero at zero and the order
+    // of any two realms, so growth across the span still reads as growth.
+    return static_cast<float>(std::sqrt(std::clamp(d / h.industry_density_peak, 0.0, 1.0)));
+}
 
 void draw_lapse_scoreboard(const history_lapse& h,
                            const std::vector<uint16_t>& slice,

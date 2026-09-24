@@ -246,11 +246,13 @@ verify.history_year(ind_mid)
 verify.frames(2)
 local at_mid = verify.history_powers()
 local lit_mid, pts_mid = verify.history_industry()
+local heat_n_mid, heat_mid = verify.history_industry_heat()
 verify.capture("press_08_round7_industrialisation_mid")
 verify.history_year(ind_last)
 verify.frames(2)
 local at_end = verify.history_powers()
 local lit_end, pts_end, crossings = verify.history_industry()
+local heat_n_end, heat_end, heat_peak_end = verify.history_industry_heat()
 verify.expect(at_mid > 0 and at_end > 0,
               "the Industrialisation span holds ground mid-span and at its close ("
               .. at_mid .. " -> " .. at_end .. " powers)")
@@ -290,6 +292,22 @@ verify.expect(pts_end > 0,
 verify.expect(lit_end >= lit_mid and pts_end > pts_mid,
               "industry grows across the span (" .. lit_mid .. " -> " .. lit_end .. " lit, "
               .. string.format("%.0f", pts_mid) .. " -> " .. string.format("%.0f", pts_end) .. " points)")
+-- A14b -- THE MAP HEATS INDUSTRY POINTS (BL-1080, map layer ruled by Ben
+-- 2026-09-24). The span on this seed draws no crossing, so the ember layer is
+-- empty; what the span computes is industry points, and the map stipples each
+-- realm's ground by its points per region over the record's peak density. By
+-- 1960 the heat is on the map (press_08b captures it) and it is HOTTER than at
+-- mid-span: the heat must grow across the span, as the board's column does.
+print("[history_lapse_press] industry heat mid " .. ind_mid .. ": " .. heat_n_mid
+      .. " regions heated, mean " .. string.format("%.3f", heat_mid) .. "; end " .. ind_last
+      .. ": " .. heat_n_end .. " regions heated, mean " .. string.format("%.3f", heat_end)
+      .. ", hottest realm " .. string.format("%.3f", heat_peak_end))
+verify.expect(heat_n_end > 0 and heat_end > 0,
+              "by 1960 the map heats industry points (" .. heat_n_end .. " regions, mean "
+              .. string.format("%.3f", heat_end) .. ")")
+verify.expect(heat_end > heat_mid,
+              "the heat grows across the span (mean " .. string.format("%.3f", heat_mid)
+              .. " -> " .. string.format("%.3f", heat_end) .. ")")
 -- Park on the LAST crossing the span recorded, so the ticker's newest line is
 -- a furnace lighting (kind 17 = furnace_lit, era_timelapse.hpp).
 local lit_year = verify.history_event_year(17)
