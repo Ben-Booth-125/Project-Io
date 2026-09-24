@@ -119,29 +119,6 @@
   },
   {
    "group": "wizard",
-   "short_name": "ROUND_SIX_PLAYS_SPAN",
-   "title": "Wizard round 6 plays the Digitisation span, 1660 to 1960, as a time-lapse round",
-   "priority": "S",
-   "difficulty": 3,
-   "world_mover": false,
-   "requires": [
-    "BL-1044"
-   ],
-   "authority_doc": "docs/ui/STARTUP.md",
-   "design": "RULED (Ben, 2026-09-18, NR-898 (6)); re-files BL-997 (archived unbuilt).\n\nWHY. Six rounds, two planetology (app.hpp:462-463), three lapse rounds (app.hpp:477, mirrored startup_screens.cpp:737-738), so every per-lapse array is sized 3 (app.hpp:628-688). Round headers startup_screens.cpp:791-823; loading labels stop at Exploration (:1301-1305); progress bars :1315-1344. Round 6 draws draw_pass_round_placeholder() (:838-854, called :1497). stop_after_digitisation exists (world_gen_config.hpp:109; handled hard_coded_world.cpp:1711-1717) but the UI never sets it (startup_screens.cpp:332-334). The span block is hard_coded_world.cpp:1343-1520, params era_minus_one.cpp:426-473; it runs only when Exploration ran, digitisation_span_enabled is on and stop_after_exploration is off (:1379-1380). It already feeds the live map and progress (:1431-1446, label 14), but no digitisation_timelapse is recorded on the report (:1498-1501) — adding one is a save-format change.\n\nTHE WORK. wizard_lapse_round_count to 4; 'Loading the Digitisation round'; a stop for lapse index 3 — or, better, round 6 runs the FULL build (no stop), which is what lets Begin adopt the world (the sibling item); be.digitisation_timelapse in the :1498 block with a save_game_version bump; lapse_from_report for index 3; delete the placeholder. Needs digitisation_span_enabled on, which BL-1044 does.\n\nDONE WHEN. A live click-through reaches round 6 and it plays 1660->1960 (a live check, not only a capture); a watched and an unwatched run are byte-identical; the placeholder is gone; save round-trip passes.",
-   "files": [
-    "src/ui/startup_screens.cpp",
-    "src/core/app.hpp",
-    "src/ui/history_lapse.hpp",
-    "src/ui/history_lapse.cpp",
-    "src/world/hard_coded_world.hpp",
-    "src/world/hard_coded_world.cpp",
-    "src/core/save_game.cpp",
-    "docs/ui/STARTUP.md"
-   ]
-  },
-  {
-   "group": "wizard",
    "short_name": "BEGIN_ADOPTS_WIZARD_WORLD",
    "title": "Begin starts the game on the world the wizard built, instead of rebuilding it",
    "priority": "S",

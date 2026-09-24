@@ -266,6 +266,32 @@
     "src/ui/startup_screens.cpp"
    ],
    "design": "NAMED (Ben, 2026-09-24): Industrialisation. The draft offered alternatives (The Industrial Age, Steam, The Machine Age) because the word is used three other ways inside the phase — reading 8 of the span harness, a region industrialising (region::industrial_year, settlement.cpp Stage 4), and the Industry tree — and Ben chose the plain word; step (4) below is how the collisions are kept legible. The draft required BL-1044, which is delivered; the digest pins are awaiting sprint 46 re-bless, so the rename’s check is that world_determinism digests are IDENTICAL before and after it.\n\n--- FROM THE SPRINT 46 DRAFT (2026-09-20) ---\nTHE WORK. (1) docs/generation/DIGITISATION.md -> the new file name, and every citation of it (CLAUDE.md's doc map, GLOSSARY.md, GENERATION_STRATEGY.md, EXPLORATION.md, INDUSTRY_TREE.md, TREES.md, ERAS.md, sprints.json, this drafts file). (2) The identifiers: digitisation_span_enabled, digitisation_output, digitisation_stop_year, digitisation_params, digitisation_sim_params, digitisation_timelapse, tools/verify/digitisation_sim_harness.cpp, the --through/--fidelity help text, and the wizard's round label. A rename only — no behaviour moves, so world_determinism digests and the pins must not move, and the save seam is untouched unless a field name is serialised by name (it is not: flat binary). (3) GLOSSARY.md gets the term with its span and its boundary against the campaign era. (4) Where the phase name and the region event would now read alike, say which is which at each site (reading 8's title, region::industrial_year's comment). DONE WHEN: a grep for 'digitisation' (any case) in src/, tools/ and docs/ returns nothing but history; every harness builds and passes; --digest-check 16/16 against the post-re-bless pins."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "author": "Ben (2026-09-18, NR-898 (6)); Claude (filed from the sprint 46 draft 2026-09-24, Ben asking to see the round)",
+   "requires": [
+    "BL-1067"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1068",
+   "short_name": "ROUND_SIX_PLAYS_SPAN",
+   "category": "UI",
+   "priority": "S",
+   "difficulty": 3,
+   "title": "Wizard round 6 plays the Industrialisation span, 1660 to 1960, as a time-lapse round",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/core/app.hpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/world_gen_config.hpp"
+   ],
+   "design": "FILED 2026-09-24: Ben opened the Release build and found round 6 still the placeholder ('PLACEHOLDER - this round is not built yet'). Built after BL-1067 (the rename to Industrialisation), so every new identifier and label takes the new name. File:line anchors below are 2026-09-18 and predate BL-1003/BL-995/BL-1066; re-read before trusting them.\n\n--- FROM THE SPRINT 46 DRAFT ---\nRULED (Ben, 2026-09-18, NR-898 (6)); re-files BL-997 (archived unbuilt).\n\nWHY. Six rounds, two planetology (app.hpp:462-463), three lapse rounds (app.hpp:477, mirrored startup_screens.cpp:737-738), so every per-lapse array is sized 3 (app.hpp:628-688). Round headers startup_screens.cpp:791-823; loading labels stop at Exploration (:1301-1305); progress bars :1315-1344. Round 6 draws draw_pass_round_placeholder() (:838-854, called :1497). stop_after_digitisation exists (world_gen_config.hpp:109; handled hard_coded_world.cpp:1711-1717) but the UI never sets it (startup_screens.cpp:332-334). The span block is hard_coded_world.cpp:1343-1520, params era_minus_one.cpp:426-473; it runs only when Exploration ran, digitisation_span_enabled is on and stop_after_exploration is off (:1379-1380). It already feeds the live map and progress (:1431-1446, label 14), but no digitisation_timelapse is recorded on the report (:1498-1501) — adding one is a save-format change.\n\nTHE WORK. wizard_lapse_round_count to 4; 'Loading the Digitisation round'; a stop for lapse index 3 — or, better, round 6 runs the FULL build (no stop), which is what lets Begin adopt the world (the sibling item); be.digitisation_timelapse in the :1498 block with a save_game_version bump; lapse_from_report for index 3; delete the placeholder. Needs digitisation_span_enabled on, which BL-1044 does.\n\nDONE WHEN. A live click-through reaches round 6 and it plays 1660->1960 (a live check, not only a capture); a watched and an unwatched run are byte-identical; the placeholder is gone; save round-trip passes."
   }
  ]
 }
