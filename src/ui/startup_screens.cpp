@@ -11,6 +11,7 @@
 #include "ui/detail_level.hpp"
 #include "ui/foldout_column.hpp"     // foldout_scroll_child — BL-904's wizard-column scroll verb
 #include "ui/generation_charts.hpp"
+#include "ui/generation_wait.hpp"      // BL-1072: the one wait surface
 #include "ui/generation_preview.hpp"
 #include "ui/history_lapse.hpp"      // BL-829/BL-830: round 4's map and its board
 #include "world/colonisation.hpp"   // colonisation_start_year -- the Culture round's own first year (BL-919)
@@ -284,12 +285,10 @@ void app::launch_wizard_history_run(int lapse_index)
     // The wait's own content. Cleared FIRST so no frame can read the previous
     // run's pass split as this one's — the same ordering begin_new_game keeps.
     generation_progress& prog = m_wiz_history_progress[lapse_index];
-    prog.stage.store(0, std::memory_order_relaxed);
-    prog.label.store(0, std::memory_order_relaxed);
+    // BL-1072: every field the wait reads, and the elapsed clock's start.
     // `stage_count` is published below, once this round's stop is known
     // (BL-1053): it is the stages the round's run will report, not a table size.
-    prog.sub_progress.store(0, std::memory_order_relaxed);
-    prog.sub_total.store(0, std::memory_order_relaxed);
+    prog.begin_wait();
     prog.lapse_tap = &tap; // BL-914: null-safe in run_history_sim/make_hard_coded_world.
 
     // UNDER --verify, ADOPT THE WORLD THE HARNESS ALREADY BUILT. run_verify opens
@@ -1304,35 +1303,14 @@ void app::draw_generation_screen()
                     ImGui::TextUnformatted(label);
 
                     // THE WAIT HAS A BAR (Ben, 2026-09-18: "wire in a progress bar
-                    // for 'Loading x round'"). The same pair the building screen
-                    // draws (app::draw_building_screen), from the round's own
-                    // `generation_progress`: the outer bar counts the passes this
-                    // run reports, so it only moves forward; the inner one is the
-                    // sim's year counter inside a span, drawn only while a span
-                    // reports it, and it restarts when a round runs a second span.
-                    // Still no pass captions — the 2026-09-16 ruling above stands:
-                    // the wait says it is a wait, and now how far along it is.
-                    const generation_progress& prog = m_wiz_history_progress[lapse_index];
-                    const int   done  = prog.stage.load(std::memory_order_relaxed);
-                    const int   total = std::max(1, prog.stage_count.load(std::memory_order_relaxed));
-                    const float bar_w = std::min(420.0f, w);
-                    const float bar_x = std::max(0.0f, (w - bar_w) * 0.5f);
-                    ImGui::Dummy({w, 10.0f});
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + bar_x);
-                    ImGui::ProgressBar(std::clamp(static_cast<float>(done) / static_cast<float>(total),
-                                                  0.0f, 1.0f),
-                                       {bar_w, 18.0f}, "");
-                    const int sub_total = prog.sub_total.load(std::memory_order_relaxed);
-                    if (sub_total > 0)
-                    {
-                        const int sub_done = prog.sub_progress.load(std::memory_order_relaxed);
-                        ImGui::Dummy({w, 4.0f});
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + bar_x);
-                        ImGui::ProgressBar(std::clamp(static_cast<float>(sub_done)
-                                                          / static_cast<float>(sub_total),
-                                                      0.0f, 1.0f),
-                                           {bar_w, 10.0f}, "");
-                    }
+                    // for 'Loading x round'"), AND SAYS WHAT IT IS DOING (Ben,
+                    // 2026-09-24, amending the 2026-09-16 "no captions"): the outer
+                    // bar weighted by what each step costs, an inner bar inside
+                    // every long step, a caption naming the step and an elapsed
+                    // count. It is the one wait surface the building screen draws
+                    // too (ui::draw_generation_wait, BL-1072): one wait, not two.
+                    ui::draw_generation_wait(m_wiz_history_progress[lapse_index], w,
+                                             nullptr, m_golden_dir.empty());
                 }
             }
             else if (rec.empty())

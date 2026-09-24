@@ -5,6 +5,9 @@
 
 #include <vector>
 
+// The loading screen's progress sink (BL-1072), passed by pointer only.
+struct generation_progress;
+
 // ---------------------------------------------------------------------------
 // Road-network generation (BL-146 — follow-on from the BL-077 logistics core)
 // ---------------------------------------------------------------------------
@@ -46,7 +49,11 @@
 // (logistics.cpp), so the follow-on dispatch path needs no change — it simply
 // finds the roaded corridors cheaper. Tuning (Ben, 2026-07-11): Track=1, Road=2,
 // Highway=3; major-centre threshold scale>=3, Town+ threshold scale>=2.
-void generate_roads(world& w, entity_id body);
+//
+// @param progress  Optional loading-screen sink (BL-1072): the village spur walk,
+//                  ~90% of this pass, is reported through `report_sub`. Write-only;
+//                  null (every caller but generation) publishes nothing.
+void generate_roads(world& w, entity_id body, generation_progress* progress = nullptr);
 
 // ---------------------------------------------------------------------------
 // Ancient roads, STAMPED FROM the history (BL-768)
@@ -102,4 +109,5 @@ void generate_roads(world& w, entity_id body);
 //                   no Era -1 pass) makes the whole call a no-op.
 void stamp_history_roads(world& w, entity_id body,
                          const std::vector<history_road_node>& nodes,
-                         const std::vector<history_corridor>&  corridors);
+                         const std::vector<history_corridor>&  corridors,
+                         generation_progress* progress = nullptr); // BL-1072: per corridor

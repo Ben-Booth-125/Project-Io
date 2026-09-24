@@ -9,6 +9,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono> // generation_progress::wait_began (BL-1072) -- render-thread only
 
 // Forward-declared rather than included (BL-321): this header is included very
 // widely, and the works table is only ever passed through it by pointer.
@@ -243,6 +244,85 @@ struct generation_progress
     std::atomic<int> sub_progress{0};
     std::atomic<int> sub_total{0};
 
+    // --- The weighted outer bar (BL-1072) -----------------------------------
+    //
+    // A WAIT NEVER LOOKS STOPPED (STARTUP.md, Ben 2026-09-24). Counting the
+    // passes as equals left the bar sitting on one step for as long as that
+    // step took, so generation publishes what each step COSTS, measured, and
+    // the reader draws `(weight_done + weight_now * sub fraction) /
+    // weight_total`. The worker knows the plan (which spans run, whether the
+    // setup passes run); the reader stays generic. Units are the measured
+    // Release milliseconds of `generation_step_cost_ms`, never a clock read,
+    // so a publish here is a constant and nothing below can vary the world.
+    // `weight_total == 0` means "unweighted": fall back to stage/stage_count.
+    // Same contract as above: worker writes, renderer reads, relaxed atomics.
+    std::atomic<int64_t> weight_total{0};
+    std::atomic<int64_t> weight_done{0}; ///< Steps finished, summed.
+    std::atomic<int64_t> weight_now{0};  ///< The step under way.
+
+    /// Measured wall clock per step label, for the log (BL-1072). Write-only
+    /// from the worker, filled as each step ends; NEVER read by generation.
+    std::array<std::atomic<int32_t>, 16> ms_step{};
+
+    // --- Render-thread only (BL-1072) ---------------------------------------
+    //
+    // Neither is ever touched by the worker: `wait_began` is set by
+    // `begin_wait` on the render thread BEFORE the worker starts (the
+    // `std::async` launch orders it), and `wait_shown` is the renderer's own
+    // high-water mark so the bar never steps back across a relaxed-order read.
+    std::chrono::steady_clock::time_point wait_began{};
+    float wait_shown = 0.0f;
+
+    /// Reset every field a wait reads, on the render thread, before a worker
+    /// is launched against this sink. `stage_count` is the caller's to set.
+    void begin_wait()
+    {
+        stage.store(0, std::memory_order_relaxed);
+        label.store(0, std::memory_order_relaxed);
+        sub_progress.store(0, std::memory_order_relaxed);
+        sub_total.store(0, std::memory_order_relaxed);
+        weight_total.store(0, std::memory_order_relaxed);
+        weight_done.store(0, std::memory_order_relaxed);
+        weight_now.store(0, std::memory_order_relaxed);
+        for (auto& m : ms_step) m.store(0, std::memory_order_relaxed);
+        wait_began = std::chrono::steady_clock::now();
+        wait_shown = 0.0f;
+    }
+
+    /// Worker side: progress WITHIN the step under way, for a pass whose loop
+    /// counts naturally (per tile row, per village, per corridor). Write-only;
+    /// the caller's loop never reads it back, so reporting cannot move a world.
+    void report_sub(int done, int total)
+    {
+        sub_progress.store(done, std::memory_order_relaxed);
+        sub_total.store(total, std::memory_order_relaxed);
+    }
+
+    /// The outer bar's fraction: weighted when generation published a plan,
+    /// by stage count otherwise. Pure read; the caller applies `wait_shown`.
+    float fraction() const
+    {
+        const int64_t total = weight_total.load(std::memory_order_relaxed);
+        const int     st    = sub_total.load(std::memory_order_relaxed);
+        const float   sub   = st > 0
+            ? static_cast<float>(sub_progress.load(std::memory_order_relaxed))
+                  / static_cast<float>(st)
+            : 0.0f;
+        const float subc = sub < 0.0f ? 0.0f : (sub > 1.0f ? 1.0f : sub);
+        float f;
+        if (total > 0)
+            f = (static_cast<float>(weight_done.load(std::memory_order_relaxed))
+                 + static_cast<float>(weight_now.load(std::memory_order_relaxed)) * subc)
+                / static_cast<float>(total);
+        else
+        {
+            const int n = stage_count.load(std::memory_order_relaxed);
+            f = static_cast<float>(stage.load(std::memory_order_relaxed))
+                / static_cast<float>(n > 0 ? n : 1);
+        }
+        return f < 0.0f ? 0.0f : (f > 1.0f ? 1.0f : f);
+    }
+
     // --- The live lapse tap (BL-914) ----------------------------------------
     //
     // A pass round's own record, published while it computes rather than
@@ -448,9 +528,12 @@ inline const char* const generation_stage_labels[] = {
     "Finishing",            // 12
     "Running the exploration age", // 13 — 1200 -> 1660, after the ancient era
     "Running the Industrialisation span", // 14 — 1660 -> 1960, after the exploration age (BL-1040)
+    "Tracing the old roads", // 15 — re-captions stage 10: the history's corridors stamped (BL-1072)
 };
 inline constexpr int generation_stage_label_count =
     static_cast<int>(sizeof(generation_stage_labels) / sizeof(generation_stage_labels[0]));
+static_assert(generation_stage_label_count <= 16,
+              "generation_progress::ms_step holds one slot per stage label");
 
 /// BL-1053: how many stages a `make_hard_coded_world` call on @p cfg will
 /// REPORT -- the number of times it advances `generation_progress::stage`,
@@ -461,6 +544,12 @@ inline constexpr int generation_stage_label_count =
 /// first line; a caller that publishes `stage_count` before the worker starts
 /// uses this so the two agree.
 int generation_stage_count(const world_gen_config& cfg);
+
+/// BL-1072: what step @p label_index (an index into `generation_stage_labels`)
+/// costs, in MEASURED Release milliseconds on the shipped arc -- the weight the
+/// loading bar gives it. A constant table, never a clock read: it is published
+/// to the progress sink and nothing in generation reads it back.
+int64_t generation_step_cost_ms(int label_index, const world_params& params);
 
 /// What the generation pass recorded about each body, for the staged generation
 /// screen and the planet report.

@@ -14,6 +14,7 @@
 #include "ui/charts.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/construction_panel.hpp"
+#include "ui/generation_wait.hpp" // BL-1072: the one wait surface
 #include "ui/acquisitions_ledger.hpp" // nav slot 5, the Acquisitions ledger + its profitability fold-out
 #include "ui/company_ledger.hpp"   // Company-lens click destination, no rail slot (BL-666)
 #include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
@@ -509,15 +510,13 @@ void app::begin_new_game()
     m_worldgen_params = m_pending_world_params;
     m_generation_report = generation_report{};
 
-    m_worldgen_progress.stage.store(0, std::memory_order_relaxed);
-    m_worldgen_progress.label.store(0, std::memory_order_relaxed);
+    // BL-1072: every field the wait reads, and the elapsed clock's start.
+    m_worldgen_progress.begin_wait();
     // BL-1053: the stages THIS run will report, never the label count --
     // generation publishes the same figure at its first line, and a total
     // taken from the label table left the bar short of its end.
     m_worldgen_progress.stage_count.store(generation_stage_count(m_worldgen_cfg),
                                           std::memory_order_relaxed);
-    m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
-    m_worldgen_progress.sub_total.store(0, std::memory_order_relaxed);
 
     // BL-754: the budget is a member too, so a second campaign start would
     // otherwise show the previous world's numbers for the whole of its wait.
@@ -637,6 +636,15 @@ void app::poll_worldgen()
                         std::memory_order_relaxed)),
                     static_cast<long long>(m_worldgen_progress.ms_after_era.load(
                         std::memory_order_relaxed)));
+        // BL-1072: the per-step split the loading bar's weights are read from
+        // (`generation_step_cost_ms`), label index : milliseconds -- the same
+        // line the harness tier prints, so a Release app run can re-weigh them.
+        std::printf("[gen steps]");
+        for (int l = 0; l < generation_stage_label_count; ++l)
+            if (const int32_t ms = m_worldgen_progress.ms_step[static_cast<std::size_t>(l)].load(
+                    std::memory_order_relaxed); ms > 0)
+                std::printf(" %d:%d", l, static_cast<int>(ms));
+        std::printf("\n");
         std::fflush(stdout);
     }
 
@@ -677,11 +685,6 @@ void app::draw_building_screen()
 
     if (ImGui::Begin("##building", nullptr, flags))
     {
-        const int done  = m_worldgen_progress.stage.load(std::memory_order_relaxed);
-        const int total = std::max(1, m_worldgen_progress.stage_count.load(std::memory_order_relaxed));
-        int li = m_worldgen_progress.label.load(std::memory_order_relaxed);
-        if (li < 0 || li >= generation_stage_label_count) li = 0;
-
         const char* title = "BUILDING THE WORLD";
         const float tw = ImGui::CalcTextSize(title).x;
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (420.0f - tw) * 0.5f);
@@ -690,48 +693,16 @@ void app::draw_building_screen()
         ImGui::PopStyleColor();
         ImGui::Dummy({420.0f, 10.0f});
 
-        // The bar is honest about being coarse: it advances a pass at a time, and
-        // one pass (the ancient era) is most of the wall clock. A smooth bar here
-        // would be a lie told at 60 Hz. Its total is the stages this run reports
-        // (`generation_stage_count`, BL-1053), so it ends full: the history is
-        // one stage whichever spans it runs, re-captioned per span.
-        const float frac = std::clamp(static_cast<float>(done) / static_cast<float>(total), 0.0f, 1.0f);
-        ImGui::ProgressBar(frac, {420.0f, 18.0f}, "");
-        ImGui::Dummy({420.0f, 6.0f});
-
-        // After generation the winner's validation run (BL-978) takes over the
-        // screen (m_validation_ticks_done >= 0): same bars, its own label and
-        // units.
+        // THE ONE WAIT SURFACE (BL-1072): the same bars, caption and elapsed
+        // count every wizard loading round draws -- the outer bar weighted by
+        // measured step cost, the inner bar inside every long step. After
+        // generation the winner's validation run (BL-978) takes over
+        // (m_validation_ticks_done >= 0): the outer bar is full, the inner bar
+        // counts its quarters, and the caption says what it is.
         const bool validating = (m_validation_ticks_done >= 0);
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(150, 158, 172, 255));
-        ImGui::TextUnformatted(validating ? "Proving the field"
-                                          : generation_stage_labels[li]);
-        if (!validating)
-        {
-            ImGui::SameLine();
-            ImGui::Text("(%d/%d)", done, total);
-        }
-        ImGui::PopStyleColor();
-
-        // The inner bar: progress WITHIN the current pass, drawn only while a
-        // pass is reporting it (the ancient era during generation, then the
-        // validation run). Same honesty rule as the outer bar — it tracks the
-        // sim's own counter, not an animation.
-        const int sub_total = m_worldgen_progress.sub_total.load(std::memory_order_relaxed);
-        if (sub_total > 0)
-        {
-            const int sub_done = m_worldgen_progress.sub_progress.load(std::memory_order_relaxed);
-            const float sub_frac = std::clamp(
-                static_cast<float>(sub_done) / static_cast<float>(sub_total), 0.0f, 1.0f);
-            ImGui::Dummy({420.0f, 4.0f});
-            ImGui::ProgressBar(sub_frac, {420.0f, 10.0f}, "");
-            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
-            if (validating)
-                ImGui::Text("quarter %d / %d", sub_done, sub_total);
-            else
-                ImGui::Text("%d / %d years", sub_done, sub_total);
-            ImGui::PopStyleColor();
-        }
+        ui::draw_generation_wait(m_worldgen_progress, 420.0f,
+                                 validating ? "Proving the field" : nullptr,
+                                 m_golden_dir.empty());
 
         ImGui::Dummy({420.0f, 8.0f});
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));

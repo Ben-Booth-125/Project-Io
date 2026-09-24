@@ -1265,8 +1265,13 @@ std::vector<entity_id> generate_nations(
     // injection any more.
     constexpr float ripple_radius = 8.0f;
 
+    // BL-1072: this walk (owned tiles x every centre) is most of the pass --
+    // 2-4 s Release on a 1960 world -- so the loading bar counts its rows.
+    // Write-only; the walk never reads it back.
     for (int idx = 0; idx < total; ++idx)
     {
+        if (progress != nullptr && gw > 0 && idx % gw == 0)
+            progress->report_sub(idx / gw, gh);
         const int ni = owner_map[static_cast<std::size_t>(idx)];
         if (ni < 0)
             continue;
@@ -1307,6 +1312,8 @@ std::vector<entity_id> generate_nations(
 
         tc.substrate_density = best_density;
     }
+    if (progress != nullptr && gh > 0)
+        progress->report_sub(gh, gh);
 
     return nation_ids;
 }
