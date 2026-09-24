@@ -632,6 +632,47 @@ int main(int argc, char* argv[])
             epoch_set  = true;
         }
 
+        // --seat <corp-id>  (BL-1076): the seat, picked at launch rather than on
+        // the selection canvas -- the route an agent takes to the pre-play act
+        // (the in-play agent hosts refuse `take_seat`). AN UNTRUSTED INPUT
+        // (io-standing-rules.md, AI-facing seam): parsed WIDE, the whole token
+        // must be digits, and the value is range-checked against entity_id's
+        // real domain before any narrowing -- a malformed or out-of-range id
+        // refuses the launch outright rather than truncating into some other
+        // firm. Whether the id names a RANKED SPECIALIST of the world is the
+        // tail's check (app::take_seat_pick), the only place that has the
+        // ranking; a refused pick seats nobody and a headless run fails.
+        bool      seat_set  = false;
+        long long seat_corp = -1;
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::string(argv[i]) != "--seat")
+                continue;
+            if (i + 1 >= argc)
+            {
+                std::fprintf(stderr, "ProjectIo: --seat needs a corporation id\n");
+                return 1;
+            }
+            const std::string arg  = argv[i + 1];
+            std::size_t       used = 0;
+            long long         v    = -1;
+            try                           { v = std::stoll(arg, &used); }
+            catch (const std::exception&) { used = 0; }
+            const long long id_max =
+                static_cast<long long>(std::numeric_limits<entity_id>::max());
+            if (arg.empty() || used != arg.size() || arg[0] == '-' || arg[0] == '+'
+                || v < 0 || v > id_max
+                || static_cast<entity_id>(v) == null_entity)
+            {
+                std::fprintf(stderr,
+                             "ProjectIo: --seat expects a corporation entity id in "
+                             "0..%lld (got \"%s\")\n", id_max, arg.c_str());
+                return 1;
+            }
+            seat_corp = v;
+            seat_set  = true;
+        }
+
         // --autostart: boot straight into a new campaign, headlessly, and exit.
         // Added 2026-08-12 to reproduce a crash that appears ONLY on the
         // interactive path: --verify calls setup_world directly and therefore
@@ -645,6 +686,7 @@ int main(int argc, char* argv[])
                 if (spectate)
                     a.spectate_session();
                 if (epoch_set) a.set_epoch_year(epoch_year);
+                if (seat_set) a.set_seat_pick(seat_corp);
                 return a.run(app::autostart_mode::smoke);
             }
 
@@ -662,6 +704,7 @@ int main(int argc, char* argv[])
                 if (spectate)
                     a.spectate_session();
                 if (epoch_set) a.set_epoch_year(epoch_year);
+                if (seat_set) a.set_seat_pick(seat_corp);
                 return a.run(app::autostart_mode::play);
             }
 
@@ -674,6 +717,7 @@ int main(int argc, char* argv[])
             {
                 app a;
                 if (epoch_set) a.set_epoch_year(epoch_year);
+                if (seat_set) a.set_seat_pick(seat_corp);
                 return a.run_autostart_adopt();
             }
 
@@ -687,6 +731,7 @@ int main(int argc, char* argv[])
                 if (spectate)
                     a.spectate_session();
                 if (epoch_set) a.set_epoch_year(epoch_year);
+                if (seat_set) a.set_seat_pick(seat_corp);
                 return a.run_autostart();
             }
 
@@ -704,6 +749,7 @@ int main(int argc, char* argv[])
             if (spectate)
                 a.spectate_session();
             if (epoch_set) a.set_epoch_year(epoch_year);
+            if (seat_set) a.set_seat_pick(seat_corp);
             if (!load_path.empty())
                 a.open_save(load_path);
             return a.run();

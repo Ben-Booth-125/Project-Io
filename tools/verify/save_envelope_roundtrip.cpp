@@ -266,6 +266,12 @@ save_envelope make_envelope()
     ps1.cap_military = 6; ps1.cap_materials = 1;
     polity_sample ps2; ps2.population = 550021; ps2.polity = 3; ps2.regions = 29;
     ps2.cap_military = 4; ps2.cap_materials = 3;
+    // BL-1080, save_game_version 21 -- the industry points at the sample's
+    // tail. Distinct per sample, one of them past 2^32 so a narrowing on either
+    // side of the wire is visible, and one zero (the pre-span case).
+    ps0.industry_points = 0;
+    ps1.industry_points = 7340031;
+    ps2.industry_points = 9876543210123LL;
     be.prehistory_timelapse.samples.push_back(ps0);
     be.prehistory_timelapse.samples.push_back(ps1);
     be.prehistory_timelapse.samples.push_back(ps2);
@@ -299,6 +305,17 @@ save_envelope make_envelope()
     be.industrialisation_timelapse.changes.push_back(owner_change{1661, 1, 4});
     be.industrialisation_timelapse.changes.push_back(owner_change{1873, 0, 9});
     be.industrialisation_timelapse.events.push_back(lapse_event{1914, 1, 1, 9, 6});
+    // BL-1080, save_game_version 21 -- a furnace crossing (kind 17, the
+    // highest kind: the reader's range check must admit it) and an industry
+    // sample on the round the industry belongs to.
+    be.industrialisation_timelapse.events.push_back(
+        lapse_event{1931, static_cast<uint8_t>(lapse_event_kind::furnace_lit), 0, 4, lapse_event_none});
+    be.industrialisation_timelapse.steps.push_back(timelapse_step{1931, 0, 1});
+    {
+        polity_sample ip; ip.population = 3100000; ip.polity = 4; ip.regions = 2;
+        ip.cap_military = 3; ip.cap_materials = 6; ip.industry_points = 41250000;
+        be.industrialisation_timelapse.samples.push_back(ip);
+    }
 
     e.report.bodies.push_back(be);
     e.report.industrialisation_years     = 300;
@@ -495,7 +512,8 @@ int main()
                        && t.samples[i].polity == o.samples[i].polity
                        && t.samples[i].regions == o.samples[i].regions
                        && t.samples[i].cap_military == o.samples[i].cap_military
-                       && t.samples[i].cap_materials == o.samples[i].cap_materials;
+                       && t.samples[i].cap_materials == o.samples[i].cap_materials
+                       && t.samples[i].industry_points == o.samples[i].industry_points;
             for (std::size_t i = 0; play_ok && i < o.culture_changes.size(); ++i)
             {
                 play_ok = t.culture_changes[i].year == o.culture_changes[i].year
@@ -530,9 +548,16 @@ int main()
                 const era_timelapse& o = env.report.bodies[0].industrialisation_timelapse;
                 ind_ok = t.region_stride == 2 && t.start_year == 1660 && t.years == 300
                       && t.changes.size() == o.changes.size()
-                      && t.events.size() == 1 && t.events[0].year == 1914
+                      && t.events.size() == 2 && t.events[0].year == 1914
                       && t.events[0].region == 1 && t.events[0].polity == 9
-                      && t.events[0].other == 6;
+                      && t.events[0].other == 6
+                      // BL-1080: the furnace crossing and the industry sample.
+                      && t.events[1].year == 1931
+                      && t.events[1].kind == static_cast<uint8_t>(lapse_event_kind::furnace_lit)
+                      && t.events[1].region == 0 && t.events[1].polity == 4
+                      && t.events[1].other == lapse_event_none
+                      && t.samples.size() == 1 && t.samples[0].industry_points == 41250000
+                      && t.samples[0].cap_materials == 6;
                 for (std::size_t i = 0; ind_ok && i < o.changes.size(); ++i)
                     ind_ok = t.changes[i].year == o.changes[i].year
                           && t.changes[i].region == o.changes[i].region

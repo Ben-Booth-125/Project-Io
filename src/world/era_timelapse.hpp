@@ -131,6 +131,14 @@ struct polity_sample
     uint16_t regions      = 0; ///< Regions held at this step.
     uint8_t  cap_military = 0; ///< `polity::capacity[military]`, band 1-6.
     uint8_t  cap_materials= 0; ///< `polity::capacity[materials]`, band 1-6.
+    /// BL-1080 — the industry points standing on every region this polity
+    /// holds at this step (`region::industry_points`, summed). What the
+    /// Industrialisation span actually computes about industry, recorded as it
+    /// stands: it is credited only inside that span (INDUSTRIALISATION.md
+    /// § Beat 1), so it is zero on every step of the three earlier records. A
+    /// READ of the sim like every other field here, never read back by it.
+    /// save_game_version 21.
+    int64_t  industry_points = 0;
 };
 
 /// One recorded step: a year, and the half-open span of `samples` taken at it.
@@ -190,6 +198,7 @@ enum class lapse_event_kind : uint8_t
     subject_bound       = 14, ///< BL-934: `polity` = the native subject, `other` = its new overlord.
     subject_freed       = 15, ///< BL-934: a subject refused renewal; `polity` = the subject, `other` = the former overlord.
     schism              = 16, ///< BL-944: a reasserted people broke away over creed, not reach; `other` = the parent polity.
+    furnace_lit         = 17, ///< BL-1080: a region crossed the furnace (`region::industrial_year`); `polity` = its holder. A resumed span notes the crossings it inherits, dated at their own (earlier) year, ahead of its first event (save_game_version 21).
     count
 };
 

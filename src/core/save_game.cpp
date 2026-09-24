@@ -437,6 +437,7 @@ void w_timelapse(std::ostream& o, const era_timelapse& t)
         w_u16(s, v.regions);
         w_u8(s, v.cap_military);
         w_u8(s, v.cap_materials);
+        w_i64(s, v.industry_points); // save_game_version 21 (BL-1080)
     });
     w_vec(o, t.culture_changes, [](std::ostream& s, const culture_change& v) {
         w_i32(s, v.year);
@@ -482,8 +483,12 @@ bool r_timelapse(std::istream& i, era_timelapse& t)
     if (!r_vec(i, t.samples, [](std::istream& s, polity_sample& v) {
             uint8_t cm = 0, cx = 0;
             if (!(r_i64(s, v.population) && r_u16(s, v.polity) && r_u16(s, v.regions)
-                  && r_u8(s, cm) && r_u8(s, cx)))
+                  && r_u8(s, cm) && r_u8(s, cx)
+                  && r_i64(s, v.industry_points))) // save_game_version 21 (BL-1080)
                 return false;
+            // A stock is never negative (history_sim.cpp saturates the sum at
+            // INT64_MAX and credits nothing below zero): a negative is corrupt.
+            if (v.industry_points < 0) return false;
             v.cap_military  = cm;
             v.cap_materials = cx;
             return true;

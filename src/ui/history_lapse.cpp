@@ -63,6 +63,9 @@ constexpr ImU32 col_bridge     = IM_COL32(240, 240, 235, 255);
 /// inside one realm) never does, and the two facts should not read as one
 /// idiom repainted. A cool green against the road's warm ochre.
 constexpr ImU32 col_trade_link = IM_COL32(110, 205, 150, 220);
+/// BL-1080: a region that has crossed the furnace — an ember square at its
+/// anchor, warm and saturated so it reads against every polity tint.
+constexpr ImU32 col_furnace = IM_COL32(255, 138, 48, 245);
 
 /// The fill's opacity over the base. High enough that a colour reads as a
 /// colour on the board's swatch too; low enough that a mountain range and a
@@ -621,6 +624,23 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
         }
     }
 
+    // --- The industry layer (BL-1080), baked once ------------------------------
+    //
+    // A region's first `furnace_lit` is its crossing; the list is ascending, so
+    // the first seen is the earliest. Industry points are read off the samples
+    // at draw time (they are a series, not a bake); here only whether any exist.
+    h.region_lit_year.assign(h.region_col.size(), INT32_MAX);
+    for (const lapse_event& e : h.lapse.events)
+    {
+        if (e.kind != static_cast<uint8_t>(lapse_event_kind::furnace_lit)) continue;
+        if (e.region == lapse_event_none || e.region >= h.region_lit_year.size()) continue;
+        int32_t& y = h.region_lit_year[e.region];
+        if (e.year < y) y = e.year;
+    }
+    h.industry_recorded = false;
+    for (const polity_sample& s : h.lapse.samples)
+        if (s.industry_points > 0) { h.industry_recorded = true; break; }
+
     // The Culture round's record carries a lineage palette (BL-919); its hue
     // families seed the slot walk so kin start near one another on the wheel.
     assign_polity_colours(h, h.culture_family.empty() ? nullptr : &h.culture_family);
@@ -1128,6 +1148,31 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         }
     }
 
+    // ── 3e. THE FURNACES (BL-1080): every region that has crossed the furnace
+    //    by the playhead year carries an ember mark at its anchor, from its
+    //    crossing year on — so the Industrialisation round visibly
+    //    industrialises, region by region, instead of animating borders over
+    //    ground whose story is industry. A STATE mark, not an event ping (the
+    //    2026-09-16 ruling below retired the pings): it appears at the
+    //    crossing and stays. Drawn under the seats, so a seat reads over it.
+    //    Empty on the three earlier rounds, whose records carry no crossing. ──
+    if (!h.region_lit_year.empty())
+    {
+        const float r_out = std::clamp(scale * 0.55f, 1.6f, 3.4f);
+        for (std::size_t ri = 0; ri < h.region_lit_year.size() && ri < h.region_col.size(); ++ri)
+        {
+            if (h.region_lit_year[ri] > year) continue;
+            if (ri < slice.size() && slice[ri] == owner_none) continue; // nobody's ground: no works
+            const ImVec2 at{px(static_cast<float>(h.region_col[ri]) + 0.5f),
+                            py(static_cast<float>(h.region_row[ri]) + 0.5f)};
+            dl->AddRectFilled({at.x - r_out - 1.0f, at.y - r_out - 1.0f},
+                              {at.x + r_out + 1.0f, at.y + r_out + 1.0f}, col_seat_ring);
+            dl->AddRectFilled({at.x - r_out, at.y - r_out}, {at.x + r_out, at.y + r_out},
+                              col_furnace);
+            prims += 2;
+        }
+    }
+
     // ── 4. SEATS: one dot per polity HOLDING GROUND in this slice, at the
     //    region it first held. Seats only, not every region — the in-game Ages
     //    view draws a dot per region, and at blob granularity that is a rash;
@@ -1355,6 +1400,16 @@ void fmt_population(char* buf, std::size_t n, int64_t pop)
     else                    std::snprintf(buf, n, "%lld", static_cast<long long>(pop));
 }
 
+/// BL-1080: industry points, compact for a 44 px column (a realm's stock runs
+/// from a handful to billions): at most five glyphs and a unit.
+void fmt_points(char* buf, std::size_t n, int64_t v)
+{
+    if (v >= 1000000000)    std::snprintf(buf, n, "%.1fG", static_cast<double>(v) / 1e9);
+    else if (v >= 1000000)  std::snprintf(buf, n, "%.1fM", static_cast<double>(v) / 1e6);
+    else if (v >= 1000)     std::snprintf(buf, n, "%.0fk", static_cast<double>(v) / 1e3);
+    else                    std::snprintf(buf, n, "%lld", static_cast<long long>(v));
+}
+
 /// A region's generated name, or an honest placeholder — never an Earth name.
 const char* region_name_of(const history_lapse& h, uint16_t region)
 {
@@ -1421,7 +1476,15 @@ void draw_lapse_scoreboard(const history_lapse& h,
     // than a deferral: research points accrue from population (BL-822), so the
     // column would restate population under a second name and show a correlation
     // it never measured — on the board Ben is judging the research levers with.
-    if (!ImGui::BeginTable("##lapse_board", 6,
+    //
+    // AN INDUSTRY COLUMN, ON THE ROUND THAT HAS INDUSTRY (BL-1080). The
+    // Industrialisation span credits industry points (INDUSTRIALISATION.md
+    // § Beat 1) and the record samples them per polity per step, so the board
+    // shows who is building works as the centuries pass. Only when the record
+    // carries any: the three earlier rounds keep their six columns. It is a
+    // column, not the rank — the board still orders by people.
+    const bool ind_col = h.industry_recorded;
+    if (!ImGui::BeginTable("##lapse_board", ind_col ? 7 : 6,
                            ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
         return;
 
@@ -1435,6 +1498,8 @@ void draw_lapse_scoreboard(const history_lapse& h,
     ImGui::TableSetupColumn("Land",   ImGuiTableColumnFlags_WidthFixed, 48.0f);
     ImGui::TableSetupColumn("Pop",    ImGuiTableColumnFlags_WidthFixed, 46.0f);
     ImGui::TableSetupColumn("Mt",     ImGuiTableColumnFlags_WidthFixed, 24.0f);
+    if (ind_col)
+        ImGui::TableSetupColumn("Ind", ImGuiTableColumnFlags_WidthFixed, 44.0f);
     ImGui::TableHeadersRow();
 
     const int shown = std::min(k_board_rows, static_cast<int>(now.size()));
@@ -1545,6 +1610,24 @@ void draw_lapse_scoreboard(const history_lapse& h,
             ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
             ImGui::TextUnformatted("-");
             ImGui::PopStyleColor();
+        }
+        if (ind_col)
+        {
+            // Industry points standing on this polity's ground at the step,
+            // compact; a dash where it holds none yet.
+            ImGui::TableSetColumnIndex(6);
+            if (smp != nullptr && smp->industry_points > 0)
+            {
+                char ind[24];
+                fmt_points(ind, sizeof ind, smp->industry_points);
+                ImGui::TextUnformatted(ind);
+            }
+            else
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+                ImGui::TextUnformatted("-");
+                ImGui::PopStyleColor();
+            }
         }
     }
     ImGui::EndTable();
@@ -1820,6 +1903,14 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
     case lapse_event_kind::subject_bound:
         std::snprintf(buf, sizeof buf, "%s falls under the overlordship of %s.",
                       polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    case lapse_event_kind::furnace_lit:
+        // BL-1080: the crossing, named by region and by the realm that holds it.
+        if (e.polity == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "%s lights its furnaces.", R);
+        else
+            std::snprintf(buf, sizeof buf, "%s, in the realm of %s, lights its furnaces.",
+                          R, polity_name_of(h, e.polity));
         break;
     case lapse_event_kind::subject_freed:
         std::snprintf(buf, sizeof buf, "%s refuses renewal and breaks from %s.",

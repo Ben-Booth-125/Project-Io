@@ -1939,6 +1939,27 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
             return corp_command_result::applied;
         }
+
+        case corp_verb::take_seat:
+        {
+            // BL-1076, STARTUP.md § The seat: the player chooses the corporation
+            // they are. `corp` (already proven to exist above) is the firm; no
+            // other field is read. THE WORLD HALF of the validation — the phase
+            // half (pre-play only) is the host's, see the enum's note.
+            //
+            // A background firm is the world's furniture, never a seat
+            // (spawn_seat.cpp § the specialist pool): refused whole, nothing
+            // touched. A pick of the corp the generator provisionally flagged is
+            // legitimate and applies as a no-op re-point — the provisional flag
+            // is not a seat anybody chose.
+            if (w.corporations.at(cmd.corp).is_background)
+                return corp_command_result::rejected_invalid;
+            for (auto& [id, cc] : w.corporations)
+                cc.is_player = false;
+            w.corporations.at(cmd.corp).is_player = true;
+            w.player_entity                        = cmd.corp;
+            return corp_command_result::applied;
+        }
     }
     return corp_command_result::rejected_invalid;
 }

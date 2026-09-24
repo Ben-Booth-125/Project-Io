@@ -2442,6 +2442,27 @@
    "reason_to_select": "Buy a whole competitor rather than out-build it: its holdings, stock, cash and production arrive in one step, priced off a record it published itself. A firm whose filed returns read badly is cheap by exactly the amount the ledger says it is losing — so the verb rewards reading the Profitability ledger before anyone else does. Note that a firm earning through mercenary or procurement contracts reads as less profitable than it is (a filed return sees the money loop only), so it prices below what it is worth."
   },
   {
+   "id": "gameplay.take_seat",
+   "family": "gameplay",
+   "surface": "The corporation selection canvas at Begin (STARTUP.md § The seat): the ranked list of every specialist beside a map of the home body, a firm's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which corporation the player IS - so an agent must be able to make it. It is a corp_verb (29), but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <corp-id>` (every new-campaign path, --autostart included). NOTE FOR A PLANNER: the list order is the static landscape score (the ground a firm's holdings stand on), and firms below the viability floor are MARKED but offered; a marked firm is a harder opening, never an illegal one.",
+   "press": "Hover a row to point the map at that firm (its HQ, its works, its home market's catchment) and read its card; press the row to open its briefing; press Confirm. Back (or pressing the same row again) closes the briefing with nothing changed. At launch: `ProjectIo --seat <corp-id>` (the id is the corporation's entity id, as the `[seat]` log line and the blackboard print it).",
+   "args": [
+    {
+     "name": "corp",
+     "type": "entity_id",
+     "meaning": "The corporation to become. Must be a SPECIALIST of this world - one of the ranked rows the canvas offers - never a background firm (a company)."
+    }
+   ],
+   "preconditions": [
+    "Before play: the validation run is over and no seat has been taken. In play the verb is refused whole (rejected_state) by every agent host, before the seam.",
+    "`corp` names a real corporation (rejected_no_corp otherwise). `--seat` range-checks the id against entity_id's domain before any narrowing and refuses the launch outright on a malformed, negative or out-of-range token - never truncated into some other firm.",
+    "`corp` is a ranked specialist: not a background firm, and one the canvas offers (rejected_invalid otherwise). A firm below the viability floor IS offered and IS pickable.",
+    "A refused pick mutates nothing and seats nobody: a headless run with a refused `--seat` fails rather than falling back to the draw; the interactive path opens the canvas instead."
+   ],
+   "expected_output": "`is_player` and `world::player_entity` re-point onto `corp` (every other corporation's flag cleared), the player-scoped balance series is rebuilt from that corporation's own filed returns, and play opens framed on its holdings. Nothing else moves: the same world and the same pick give the same player and the same state hash (reproducible from (seed, pick); scripts/verify/seat_pick.lua S5, tools/verify/seat_pick_check.js). world::state_hash does not fold the seat itself, so the seat is read as world::player_entity beside it. Picking the corporation the weighted draw would have chosen gives exactly the state the draw gives. The log prints `[seat] picked <id> (take_seat)`; a path with no player to ask prints `[seat] drawn <id> - <why>`.",
+   "reason_to_select": "Choose the opening position rather than be dealt one: the card shows what the firm makes and what its home market pays for it, what it holds and owes, and whose law it trades under - so a planner can prefer depth (a processor near population), a debt-free book, or a friendly nation, or knowingly take a marked firm as a harder game."
+  },
+  {
    "id": "chrome.quick_save_key",
    "family": "chrome",
    "surface": "Keyboard.",

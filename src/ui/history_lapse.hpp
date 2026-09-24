@@ -341,6 +341,26 @@ struct history_lapse
     /// `trade_link_closed` events.
     std::vector<lapse_trade_seg> trade_segs;
 
+    // --- The industry layer (BL-1080), baked once at record time ------------
+    //
+    // ROUND 6's STORY IS INDUSTRY, and until this layer the round drew only
+    // borders and seats. Two facts the Industrialisation span actually
+    // computes, both carried by the record: a region's furnace crossing
+    // (`lapse_event_kind::furnace_lit`, with the crossings the span inherited
+    // noted at their own earlier years) and each polity's industry points
+    // (`polity_sample::industry_points`). Railways are NOT drawn: the span
+    // lays no rail of its own (INDUSTRIALISATION.md's rail sink is not a pass
+    // that runs), so a rail layer would be invented. Empty / false on the
+    // three earlier rounds, whose records carry neither.
+
+    /// Region -> the calendar year it crossed the furnace, or INT32_MAX for
+    /// never. The map marks a region from this year on.
+    std::vector<int32_t> region_lit_year;
+
+    /// True when any sample carries industry points — the board's industry
+    /// column is drawn only then, so the three earlier rounds keep their board.
+    bool industry_recorded = false;
+
     /// The map prints its primitive count to stderr ONCE per record, so the
     /// draw-index bound is a measured number in every capture log. Mutable
     /// because the draw takes the record by const reference and this is not
