@@ -21,10 +21,6 @@
 // `aggression_q`, below, survives unchanged as the temperament reading the
 // Era -1 sim consumes as doctrine — it prices how a polity fights once it
 // exists, and stops setting the nation count.
-//
-// Globalisation closes the pass: at the end of generation a common trade
-// tongue spreads, rendered as the player's own language (English for now —
-// Ben, 2026-07-31). Proper names stay native; prose goes common.
 // ---------------------------------------------------------------------------
 
 #include "history_ladder.hpp"
@@ -230,15 +226,6 @@ creed_state run_creeds(const planetology_state& pl,
 /// shares, with nothing left to roll.
 void record_cultural_contact(history_ladder_state& hl,
                              const std::vector<int>& region_mix_q);
-
-/// The globalisation event that closes generation: a common trade tongue
-/// spreads through every realm. From this point the record is rendered in the
-/// player's language; the gods keep their native names. Appends one line.
-///
-/// Counts the surviving realms itself (the same sorted walk
-/// record_institutional_history uses), so the caller passes the world rather
-/// than re-deriving a number two functions already agree on.
-void record_globalisation(creed_state& cs, const world& w, entity_id body_id);
 
 // ---------------------------------------------------------------------------
 // Culture relations (BL-870; CIVILISATION.md § Culture relations)

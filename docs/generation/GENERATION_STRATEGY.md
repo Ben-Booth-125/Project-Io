@@ -59,7 +59,6 @@ tiles → rivers                                           (Kepler, the homeworl
   → population centres → nations → national character
   → grudge sentiment → national tariffs → national coverage centres
   → centre naming → urban land use
-  → ruptures                                             (1700+ epoch only)
   → history merge → provinces → anchor centres → roads
   → corporations (specialists) → market carving → endemic demand
 tiles                                                    (Selene, then the asteroids)
@@ -315,11 +314,10 @@ through what it produced.
 | 9 | Settlement & industrialisation | `generation_report.settlement`; History ledger | **Owed** — regions are the anchors the carve grows from and have no map surface of their own |
 | 10 | **Nation carve (Voronoi BFS)** | **Loading screen, live**; Country lens in play | Watched |
 | 11 | National character derivation | Nation detail in the Selection band | Watched |
-| 12 | Historical ruptures | Checkpoints + lacunae in the History ledger | Watched (as text) |
-| 13 | Institutional history / exploration | Biography lines | Watched (as text) |
-| 14 | Roads | Road tiers on the planetary canvas | Watched |
-| 15 | Pre-authored homeworld installations | On-canvas buildings | Invisible by design — two authored stubs, not a generated fact |
-| 16 | **Corporations (placement + finance)** | **Loading screen, live** — map markers + charter ledger | Watched |
+| 12 | Exploration | Biography lines | Watched (as text) |
+| 13 | Roads | Road tiers on the planetary canvas | Watched |
+| 14 | Pre-authored homeworld installations | On-canvas buildings | Invisible by design — two authored stubs, not a generated fact |
+| 15 | **Corporations (placement + finance)** | **Loading screen, live** — map markers + charter ledger | Watched |
 | 17 | Market carving | Market lens; market ledger | Watched (outcome) / **Owed** (*why* a nation fractured into N markets is nowhere) |
 | 18 | Prototype laws | Law panel | Watched |
 | 19 | Background firms | Corporations panel, in play | **Owed** — runs on the main thread *after* the worker, so the loading screen cannot show it; the one generation pass with no live surface at all |
@@ -573,7 +571,7 @@ The pieces and who owns them:
 | Slice | Owner |
 |---|---|
 | Continents/Drift — plates from Engine output, height bias into tile Pass 1; the Continent lens | `CONTINENTS.md`; BL-226 (Continent lens) |
-| Settlement Stages 0–2 — cradles, charter, border accord; the ladder drives the nation seed budget | BL-221 (pre-national ladder); `../lore/HISTORY.md` § Implementation |
+| Settlement Stages 0–2 — cradles and fragmentation; the ladder drives the nation seed budget | BL-221 (pre-national ladder); `../lore/HISTORY.md` § Implementation |
 | Full S1–S4 continents simulation, replacing the remaining noise machinery | BL-210 (oral-history pivot) |
 | Industrialisation / later ladder stages | BL-222 (industrial ladder), BL-223 (averted rupture) |
 | Branch checkpoints (historical-extinction analogues) + lean × branch sweep | BL-210 (oral-history pivot) |
@@ -798,7 +796,7 @@ target.
 
 | Pass | Engine | Span | Produces |
 |---|---|---|---|
-| **1 — Ancient** | The polity sim (`history_sim`), Classical and Medieval bands | The prehistory span to the **boundary year** | Ancient borders, cultural doctrines, the lacunae — who walked where |
+| **1 — Ancient** | The polity sim (`history_sim`), Classical and Medieval bands | The prehistory span to the **boundary year** | Ancient borders, cultural doctrines — who walked where |
 | **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | **1560 → 1960** (Ben, 2026-09-08) | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
 | **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which firms exist, what each market can close, the price field |
 

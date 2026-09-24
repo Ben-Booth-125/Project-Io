@@ -167,7 +167,16 @@ inline constexpr uint32_t save_game_magic =
 /// not 17 because an unmerged branch (worktree-agent-a56fcafdff713aafe, BL-841)
 /// already carries a v17 layout of its own -- two layouts must never share a
 /// number (the v6 note above), so the later claim skips it.
-inline constexpr uint32_t save_game_version = 18; // BL-1068, the Industrialisation record
+///
+/// LAYOUT 19 = LAYOUT 18 MINUS TWO SETTLEMENT FIELDS, WITH A NARROWER RUNG
+/// (BL-1074, the superseded arc's narrative passes deleted): `w_settlement` no
+/// longer writes `checkpoints` (a vector) or `lacunae` (an int) between the
+/// history and `median_industrial_year` -- their only writer was the rupture
+/// pass -- and `max_rung` falls from `borders` to `surplus`, the Charter Act
+/// and border-accord rungs having gone with their pass. A v18 stream carries
+/// bytes this reader no longer consumes, so it is refused whole on the same
+/// strict-equality contract as every prior bump.
+inline constexpr uint32_t save_game_version = 19; // BL-1074, the narrative passes retired
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

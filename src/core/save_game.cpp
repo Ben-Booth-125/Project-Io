@@ -24,7 +24,7 @@ constexpr auto max_lean        = lean::high;
 constexpr auto max_archetype   = body_archetype::ferrotroph_world;
 constexpr auto max_chain_stage = chain_stage::count;
 constexpr auto max_life_stage  = life_stage::civilised;
-constexpr auto max_rung        = ladder_rung::borders;
+constexpr auto max_rung        = ladder_rung::surplus; // save_game_version 19 (BL-1074)
 constexpr auto max_region_cls  = region_class::port;
 constexpr auto max_region_dom  = region_domain::open_ocean;
 constexpr auto max_temp        = temperature_class::frozen;
@@ -385,8 +385,8 @@ void w_settlement(std::ostream& o, const settlement_state& s)
 {
     w_vec(o, s.regions, w_region);
     w_vec(o, s.history, w_history_event);
-    w_vec(o, s.checkpoints, w_checkpoint);
-    w_int(o, s.lacunae);
+    // save_game_version 19 (BL-1074): the rupture checkpoints and lacunae
+    // count that sat here are gone with the pass that wrote them.
     w_i64(o, s.median_industrial_year);
     w_bool(o, s.urban_map_drawn); // save_game_version 5 (BL-766)
 }
@@ -394,8 +394,7 @@ void w_settlement(std::ostream& o, const settlement_state& s)
 bool r_settlement(std::istream& i, settlement_state& s)
 {
     return r_vec(i, s.regions, r_region) && r_vec(i, s.history, r_history_event)
-        && r_vec(i, s.checkpoints, r_checkpoint) && r_int(i, s.lacunae)
-        && r_i64(i, s.median_industrial_year)
+        && r_i64(i, s.median_industrial_year) // save_game_version 19 (BL-1074)
         && r_bool(i, s.urban_map_drawn); // save_game_version 5 (BL-766)
 }
 

@@ -26,9 +26,11 @@
 //       in order.
 //
 //   H5  FAILURE CASES ARE OUTPUT, NOT DEFECTS. A world below a land biosphere
-//       produces NO ladder at all and no padded lines; a world that unified
-//       reports the hegemon rather than hiding it. Ben asked to see failure
-//       cases, so the harness pins that they are reachable and named.
+//       produces NO ladder at all and no padded lines.
+//
+//   H6  STAGES 1-2 ARE NOT PRE-WRITTEN. No 1960-epoch biography carries a
+//       Charter Act, border-accord or hegemon line: those institutions are the
+//       live sims' to produce, and a pass that narrates them again is caught.
 //
 // HONEST SCOPE NOTE: two of Stage 0's designed inputs do not exist in src/ yet
 // (river connectivity, BL-170; domesticable clades, BL-217). The score stands
@@ -132,8 +134,8 @@ int main()
     // --- Generate the real world twice --------------------------------------
     world_params wp;
     wp.seed = 0xB221u;
-    // See creeds_harness: the ladder stages under test are 1960-era, and the
-    // default epoch is now 0 CE. Ask for the era explicitly (NR-177).
+    // The 1960 epoch is the longest generation run; the default epoch is now
+    // 0 CE (NR-177), so ask for it explicitly.
     wp.epoch_year = 1960;
     generation_report r1, r2;
     const world w1 = make_hard_coded_world(no_prehistory(wp), &r1);
@@ -192,64 +194,25 @@ int main()
                 ordered = false;
         check(ordered, "H4 the ladder lines sort into the biography, oldest first");
 
-        // Stage 0 must predate Stages 1-2 — a charter cannot precede the farms.
+        // The ladder's own line is found STRUCTURALLY, by its `ladder_rung`
+        // (planetology.hpp, BL-285), never by matching its text — rewording a
+        // biography line must not silently change what H4 asserts over.
         //
-        // NARROWED 2026-08-02 (BL-218). This used to demand that EVERY line in
-        // the recorded-history window be strictly older than the next, which
-        // only held while the ladder owned that window alone. It no longer
-        // does: the creeds (BL-235) and now the settlement pass (BL-218) write
-        // into the same window, and two regions founded in the same year are
-        // a fact about the world, not a stage-ordering violation. The
-        // whole-biography ORDER is already asserted just above; what belongs
-        // here is the ladder's own causal claim, so it is asserted directly on
-        // the three stage lines.
-        //
-        // UN-NARROWED 2026-08-09 (BL-285 task 2). These three used to be found
-        // by matching line TEXT — "granary", "Charter Act", "Great Accord" —
-        // so rewording any biography line silently changed what H4 asserted
-        // over, which is the failure mode a golden is supposed to catch rather
-        // than exhibit. Each ladder line now carries its own `ladder_rung`
-        // (planetology.hpp), so the selection is structural: reword freely,
-        // and the check still asserts the same causal claim. Stage 2 writes
-        // either the accord or the hegemon line and both tag `borders`, so
-        // either satisfies the ordering — H5 below is what pins which.
-        const history_event* granary = nullptr;
-        const history_event* charter = nullptr;
-        const history_event* accord  = nullptr;
-        for (const history_event* h : ladder)
-        {
-            if (!granary && h->rung == ladder_rung::surplus) granary = h;
-            if (!charter && h->rung == ladder_rung::charter) charter = h;
-            if (!accord  && h->rung == ladder_rung::borders) accord  = h;
-        }
-        check(granary && charter && accord,
-              "H4 all three ladder stages emitted their line");
-
-        // Each rung is written EXACTLY once. This is what stops the tag from
-        // rotting the way the text match did: a future emitter that tags a
-        // second line with an existing rung would otherwise leave the three
-        // lookups above silently picking whichever came first, and every
-        // assertion here would still pass. Note the window this scans is the
-        // recorded-history window, not the ladder alone — creeds (BL-235) and
-        // settlement (BL-218) write into it too, and their lines correctly
-        // carry `ladder_rung::none`, so counting tagged lines is the only
-        // exhaustiveness claim that is actually true here.
-        int n_surplus = 0, n_charter = 0, n_borders = 0;
+        // Stage 0 is the only rung the ladder writes. Counting tagged lines is
+        // the exhaustiveness claim: the recorded-history window also carries
+        // the creeds' and the settlement pass's lines, which correctly tag
+        // `ladder_rung::none`, and a future emitter that tagged a second line
+        // `surplus` would otherwise leave the lookup picking whichever came
+        // first.
+        int n_surplus = 0, n_other = 0;
         for (const history_event* h : ladder)
         {
             if (h->rung == ladder_rung::surplus) ++n_surplus;
-            if (h->rung == ladder_rung::charter) ++n_charter;
-            if (h->rung == ladder_rung::borders) ++n_borders;
+            else if (h->rung != ladder_rung::none) ++n_other;
         }
-        std::printf("      rung counts: surplus=%d charter=%d borders=%d\n",
-                    n_surplus, n_charter, n_borders);
-        check(n_surplus == 1 && n_charter == 1 && n_borders == 1,
-              "H4 each ladder rung is tagged exactly once (BL-285)");
-        const bool staged =
-            (!granary || !charter || granary->years_before_epoch > charter->years_before_epoch)
-         && (!charter || !accord  || charter->years_before_epoch > accord->years_before_epoch);
-        check(staged,
-              "H4 the stages are strictly ordered: surplus, then charter, then borders");
+        std::printf("      rung counts: surplus=%d other=%d\n", n_surplus, n_other);
+        check(n_surplus == 1 && n_other == 0,
+              "H4 the Stage 0 rung is tagged exactly once, and no other rung is (BL-285)");
     }
 
     // --- H5 failure cases are reachable and named ---------------------------
@@ -266,27 +229,20 @@ int main()
             check(none.cradles.empty() && none.history.empty(),
                   "H5 a world below a land biosphere emits no ladder and no padding");
         }
-
-        // The hegemon line is the named failure case, not a rejection.
-        bool has_accord = false, has_hegemon = false;
-        for (const history_event* h : ladder)
-        {
-            if (h->event.find("realms confirm mutual borders") != std::string::npos) has_accord = true;
-            if (h->event.find("absorbed the rest") != std::string::npos) has_hegemon = true;
-        }
-        check(has_accord || has_hegemon,
-              "H5 Stage 2 reports its outcome either way - accord or hegemon");
-        std::printf("      Kepler's Stage 2 outcome: %s\n",
-                    has_accord ? "multipolar accord" : (has_hegemon ? "HEGEMON (a data point, not a defect)" : "none"));
     }
 
-    // --- Cross-seed spread: both Stage 2 outcomes must be reachable ---------
+    // --- H6 Stages 1-2 are not pre-written -----------------------------------
+    // The ladder writes no dated line for the Charter Act or the border accord
+    // (history_ladder.hpp): those institutions are the live sims' to produce.
+    // Asserted across a spread of 1960-epoch worlds — the longest generation
+    // run, and the only one on which a pre-written Stage 1-2 line ever
+    // appeared — so a pass that starts narrating them again is caught.
     {
-        int accord = 0, hegemon = 0, seeds = 0;
+        int seeds = 0, narrated = 0;
         for (uint32_t s = 0; s < 12; ++s)
         {
             world_params p; p.seed = 0xB2210000u + s * 0x9E37u;
-            p.epoch_year = 1960; // the ladder era under test, not the campaign default
+            p.epoch_year = 1960;
 
             generation_report rr;
             make_hard_coded_world(no_prehistory(p), &rr);
@@ -296,14 +252,16 @@ int main()
                 ++seeds;
                 for (const history_event& h : b.state.history)
                 {
-                    if (h.event.find("realms confirm mutual borders") != std::string::npos) ++accord;
-                    if (h.event.find("absorbed the rest") != std::string::npos) ++hegemon;
+                    if (h.event.find("Charter Act") != std::string::npos
+                     || h.event.find("realms confirm mutual borders") != std::string::npos
+                     || h.event.find("absorbed the rest") != std::string::npos)
+                        ++narrated;
                 }
             }
         }
-        std::printf("      across %d seeds: %d accord, %d hegemon\n", seeds, accord, hegemon);
-        check(accord + hegemon == seeds,
-              "H5 every seed records a Stage 2 outcome, none silently omits one");
+        std::printf("      across %d seeds: %d pre-written Stage 1-2 lines\n", seeds, narrated);
+        check(seeds > 0 && narrated == 0,
+              "H6 no 1960-epoch biography carries a pre-written charter or border-accord line");
     }
 
     std::printf("\n=== %s ===\n", g_fail == 0 ? "ALL PASS" : "FAILURES PRESENT");

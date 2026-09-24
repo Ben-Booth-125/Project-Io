@@ -429,8 +429,6 @@ struct sweep_row
     int64_t peak_year        = 0;
     int64_t epoch_population = 0;
 
-    int lacunae = 0;
-
     int64_t industrial_first  = 0;
     int64_t industrial_median = 0;
     int64_t industrial_last   = 0;
@@ -1151,7 +1149,6 @@ int main(int argc, char** argv)
         sweep_row row;
         row.seed            = wp.seed;
         row.regions_start = static_cast<int>(ss.regions.size());
-        row.lacunae         = k->settlement.lacunae;
 
         // `params` is now hoisted above the loop and PRINTED in the banner, so
         // what this sweep runs is visible rather than inferred. It is still the
@@ -3775,7 +3772,7 @@ int main(int argc, char** argv)
                 "\"powers_start\": %d, \"powers_end\": %d, \"top_share_q\": %d, "
                 "\"peak_share_q\": %d, \"smallest_holding\": %d, \"hegemony_year\": %lld, \"battles\": %lld, "
                 "\"conquests\": %lld, \"foundings\": %lld, \"peak_population\": %lld, "
-                "\"peak_year\": %lld, \"epoch_population\": %lld, \"lacunae\": %d, "
+                "\"peak_year\": %lld, \"epoch_population\": %lld, "
                 "\"industrial_first\": %lld, \"industrial_median\": %lld, "
                 "\"industrial_last\": %lld, \"ms\": %lld,\n",
                 r.seed, r.regions_start, r.regions_end, r.powers_start, r.powers_end,
@@ -3784,7 +3781,7 @@ int main(int argc, char** argv)
                 static_cast<long long>(r.battles), static_cast<long long>(r.conquests),
                 static_cast<long long>(r.foundings), static_cast<long long>(r.peak_population),
                 static_cast<long long>(r.peak_year), static_cast<long long>(r.epoch_population),
-                r.lacunae, static_cast<long long>(r.industrial_first),
+                static_cast<long long>(r.industrial_first),
                 static_cast<long long>(r.industrial_median),
                 static_cast<long long>(r.industrial_last), static_cast<long long>(r.ms));
 

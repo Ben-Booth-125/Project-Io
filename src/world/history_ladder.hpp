@@ -28,12 +28,9 @@
 //   run_history_ladder            ->    cradles, fragmentation, Stage 0 line
 //   nation_params_from_ladder     ->    fragmentation drives the seed budget
 //   generate_nations                    polities grow
-//   record_institutional_history  ->    Stages 1-2, which NEED the outcome
 //
-// Stages 1 and 2 cannot be written in the first call: the Charter Act names a
-// nation and the border accord counts them, and neither exists until the
-// political pass has run. That is why this pass has two entry points rather
-// than one.
+// The ladder writes no dated line for Stages 1-2: the institutions those
+// stages name are produced live by the year-tick sim, not pre-computed here.
 //
 // DETERMINISM. All scoring is INTEGER with an explicit tie-break by tile index
 // — a float argmax over terrain would be a portability hazard and a tie-break
@@ -98,8 +95,7 @@ struct history_ladder_state
 };
 
 /// Run Stage 0 (agrarian surplus) and Stage 2's terrain half over a finished
-/// tile map. Emits the Stage 0 history line; Stages 1-2 come later, from
-/// `record_institutional_history`, because they need the political outcome.
+/// tile map. Emits the Stage 0 history line.
 ///
 /// Pure deterministic function of (@p pl, @p w tiles, @p tile_ids, @p gw,
 /// @p gh, @p seed).
@@ -125,20 +121,3 @@ history_ladder_state run_history_ladder(const planetology_state& pl,
 /// supplies the body-specific defaults this modulates.
 struct nation_params nation_params_from_ladder(const history_ladder_state& hl,
                                                const struct nation_params& base);
-
-/// Emit Stages 1-2 once nations exist: the Charter Act (attributed to the
-/// nation holding the charter cradle) and the border accord (which counts the
-/// realms that actually survived the merge pass).
-///
-/// Appends to @p hl.history so the caller merges one list, not three.
-///
-/// @param hl           The ladder state from run_history_ladder; receives the lines.
-/// @param w            World holding the generated nations and tile ownership.
-/// @param body_id      The body whose political map was just generated.
-/// @param tile_ids     Raster-order tile IDs, as above.
-/// @param gw           Grid width, for locating the charter cradle's owner.
-void record_institutional_history(history_ladder_state& hl,
-                                  const world& w,
-                                  entity_id body_id,
-                                  const std::vector<entity_id>& tile_ids,
-                                  int gw);

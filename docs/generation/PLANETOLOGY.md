@@ -930,18 +930,18 @@ does much less work than it appears to, and the bands do all of it.
 **Settled 2026-08-02.** Preferences narrow a *sampling range* within one round; they never touch
 *which branch a checkpoint proposes*. The checkpoint model is BL-217 (checkpoint branch model): it
 generalises the mechanism so a lean can also narrow the **candidate set** at a genuine branch
-point — the S5–S8 biological die-offs, and the settlement-stage historical rupture (BL-218,
-settlement rewrite) — while keeping the same reject-and-reroll discipline as the homeworld rule.
+point — the S5–S8 biological die-offs — while keeping the same reject-and-reroll discipline as the homeworld rule.
 
 **What counts as a checkpoint, and what does not.** A checkpoint is a point where the chain's
 *outcome distribution genuinely branches* — two runs from the same prior state can diverge into
 materially different worlds. It is **not** every point where something narratively interesting
 happens. An interesting event that does not change what the world *can become* is a history-log
 entry (BL-208, world history log), not a checkpoint. Applying that rule: the S5–S8 mass-extinction
-die-offs qualify (Sterile vs. Microbial vs. Mat World are different worlds); a settlement-stage
-collapse/war/revolution qualifies (BL-218's class); a body's day-length or axial tilt rolling one
-way or another does not, because nothing downstream reads it as a fork. Exactly **two** checkpoint
-classes exist — **biological mass-extinction** and **historical rupture** — and no third is needed.
+die-offs qualify (Sterile vs. Microbial vs. Mat World are different worlds); a body's day-length
+or axial tilt rolling one way or another does not, because nothing downstream reads it as a fork.
+Generation resolves one checkpoint class — **biological mass-extinction**. A polity's collapse,
+war or revolution is not pre-resolved as a checkpoint over a finished map; it is the Era −1 sim's
+own output (`../lore/HISTORY.md` § The epoch and the run).
 
 **The record.** `checkpoint_record { stage_id, branch_taken, seed_used, viability_result }`
 (`src/world/planetology.hpp`), held in an **append-only, ordered** `planetology_state::checkpoints`
@@ -965,9 +965,8 @@ a template so it stays class-agnostic) takes a `propose` callback (builds this a
 list), an `apply` callback (mutates caller-owned state), and a `floor_ok` predicate — the
 checkpoint class's own viability floor, evaluated *after* `apply`, reroll on false. This generalises
 `homeworld_viability` exactly: one global floor cannot work, because a biological extinction's
-question ("can this biosphere still reach sapience?") and a historical rupture's ("is there still a
-civilisation left to industrialise?") are not the same question, so each checkpoint class supplies
-its own — but the *mechanism* invoking them is one function, uniform across classes. The homeworld
+question ("can this biosphere still reach sapience?") is not the question any other class would
+ask, so each checkpoint class supplies its own — but the *mechanism* invoking them is one function, uniform across classes. The homeworld
 rule still governs throughout: a floor rejects and rerolls; it never edits a result into viability.
 
 **The S5–S8 checkpoints are legibility only.** They do not change the biology — `run_planetology`
@@ -1097,7 +1096,5 @@ Recorded so nobody later mistakes design choices for derived physics.
 - **`DISCOVERY.md`** — the survey fog is the natural gate on the planet report (§ Open calls 2).
 - **BL-217 (checkpoint branch model)** — § Checkpoints; the S5–S8 mass-extinction retrofit is its
   first checkpoint class.
-- **BL-218 (settlement rewrite)** — the settlement-stage historical-rupture checkpoint, the
-  mechanism's second class.
 - **BL-208 (world history log)** — `checkpoint_record`'s append-only, ordered shape is
   deliberately identical to the log's, so migrating checkpoints into it is a move, not a rewrite.

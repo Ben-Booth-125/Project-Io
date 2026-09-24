@@ -54,7 +54,7 @@ static std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 //
 // So: an exclave sitting on a SEEDED landmass (one holding at least one region
 // anchor) is emergent — the sim itself produced it, either by a front stalling
-// or by a rival cutting it off, plus whatever the ruptures later redrew. An
+// or by a rival cutting it off. An
 // exclave on a SEEDLESS landmass was authored by Pass 2b's cleanup and is not
 // evidence for BL-218's argument.
 struct frag_stats

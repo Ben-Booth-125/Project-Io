@@ -2,8 +2,7 @@
 
 > **Settles:** how a nation comes to exist — where a seed is placed, how territory expands,
 > what the size floor merges away · how a resource profile and a political character are
-> derived from the ground a nation holds · how history's ruptures redraw the carve · how a
-> nation is named · what treasury and substrate density it opens with · how settlements are
+> derived from the ground a nation holds · how a nation is named · what treasury and substrate density it opens with · how settlements are
 > placed alongside.
 > **Not here:** what a nation *does* once the campaign runs (../politics/NATIONS) · how
 > corporations attach to one (CORPORATION_GENERATION) · which ladder produced the history it
@@ -186,8 +185,7 @@ The attribution is exact rather than heuristic, and it turns on Pass 2 being wat
   nation in a single act.
 
 So an exclave on a **seeded** landmass (one holding at least one region anchor) is **emergent** —
-produced by the sim, whether by a stalled front, a rival cutting it off, or a Pass 4b rupture
-redrawing the border. An exclave on a **seedless** landmass is **Pass 2b** cleanup and is not
+produced by the sim, whether by a stalled front or a rival cutting it off. An exclave on a **seedless** landmass is **Pass 2b** cleanup and is not
 evidence for the claim.
 
 **What the measurement says** (seeds 0–5): 196 exclaves, **60 emergent** and 136 from
@@ -221,38 +219,6 @@ settlement pass.
 
 None of the three needs a new roll — each is computable from the run's own record, which is the
 standing requirement that generation produces consequences rather than dice.
-
-### Pass 4b — The historical ruptures
-
-`resolve_historical_ruptures` then fires a bounded set of ruptures over the most-contested
-nations, reusing `planetology.hpp`'s class-agnostic `resolve_checkpoint` rather than inventing a
-second branch mechanism — the second checkpoint class of BL-217 (branch checkpoints). Branch
-eligibility is a **filter, never a weight** (BL-217's rule): a
-nation with no land neighbour cannot go to war, a single-region nation cannot collapse. Every
-attempt appends a `checkpoint_record`, failures included.
-
-Each branch is a **transform on state**; the line it appends is a *record of* the transform, never
-a substitute for it:
-
-- **Collapse** — the two most peripheral regions pass to a bordering neighbour and their
-  industrial clock resets; abundance falls 20%. Ideology unchanged.
-- **War** — the contested border redraws toward the stronger (bounded at a quarter of the loser's
-  territory, so the non-hegemony invariant — BL-224 — is respected rather than spent); the loser's
-  posture rises to aggressive (grievance is the point of the axis); both lose abundance; **the
-  victor's gods travel with the border**, and part of the loser's record is **destroyed** — see
-  below.
-- **Revolution** — territory untouched, the ideology axis flips, abundance takes a one-off hit.
-  The cheapest transform and the one that most changes how the nation later behaves.
-
-**The record is not safe.** Where a war takes a region, the lines naming it are erased and a
-dated **lacuna** is left in their place — "what the *X* wrote of itself does not survive the *Y*
-occupation", with a count of the lines lost. The hole is visible rather than silent, which is the
-difference between a history that was fought over and one that was merely written. A conquered
-region keeps its founders in `founding_culture` and its conquerors in `culture`, so the erasure
-is of the *record*, never of the fact — which is exactly the pair a later religion or population
-layer needs to describe a grievance.
-
-Across a six-seed spread, four worlds lost part of their record to a war.
 
 ---
 

@@ -243,7 +243,6 @@ save_envelope make_envelope()
     r1.army_stock           = 941;
     be.settlement.regions.push_back(r0);
     be.settlement.regions.push_back(r1);
-    be.settlement.lacunae                = 6;
     be.settlement.median_industrial_year = 1843;
     be.settlement.urban_map_drawn        = true;
 
@@ -547,7 +546,6 @@ int main()
                   "whole (BL-1068)");
         }
         check(le.report.bodies.size() == 1
-                  && le.report.bodies[0].settlement.lacunae == 6
                   && le.report.bodies[0].settlement.median_industrial_year == 1843
                   && le.report.bodies[0].settlement.urban_map_drawn,
               "S3 settlement_state's own scalars survive, urban_map_drawn included");
