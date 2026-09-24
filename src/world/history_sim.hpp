@@ -2571,15 +2571,18 @@ struct polity
     /// the run already accumulated, and read at the handoff by
     /// `derive_national_protection` -> `seed_national_tariffs`.
     ///
-    /// NOTHING IN THE SIM WRITES IT (BL-1075). Its one derivation — the share
-    /// of surviving polities that lit a furnace ahead of this one, times how far
-    /// behind the world's first furnace it lit — read industrialisation timing,
-    /// a fact only the superseded two-span arc's industrial span produced, and
-    /// it was deleted with that arc. The scalar is Industrialisation's to write
-    /// from scarcity, flows and preference (INDUSTRIALISATION.md § The
-    /// boundary). The FIELD and its broadcast onto regions stay, because they
-    /// are the seam `seed_national_tariffs` reads; a zero is the honest tariff
-    /// posture of a world nothing has yet given one.
+    /// WRITTEN ONCE, AT THE CLOSE (BL-1102; Ben, 2026-09-24, sprint 47 R18;
+    /// INDUSTRIALISATION.md § The boundary). The end-of-run block of
+    /// `run_history_sim` derives it from the three inputs that already cross
+    /// -- the capital market's unmet `scarcity_q`, the `trade_flows` table and
+    /// the `culture_preference` -- as they stand at the close: over the four
+    /// goods, the preference-weighted unmet want (`polity_good_want_q`) plus
+    /// the volume flowing in, less the volume flowing out, averaged over the
+    /// four and clamped to 0-1000. The arithmetic and its reading are in that
+    /// block. A span whose upkeep never ran (the Empires span: no signal, no
+    /// flows) writes 0, which is the honest posture of a world that trades
+    /// nothing. The earlier derivation -- furnace timing, a fact only the
+    /// superseded two-span arc produced -- went with that arc (BL-1075).
     int protection_q = 0;
 
     /// True for a seeded great power (BL-299). Majors start with more ground

@@ -429,6 +429,24 @@ struct seed_row
     int64_t span_foundings = 0;
     int64_t span_ms        = 0; ///< the span's run_history_sim call, wall clock (reported only)
 
+    // --- BL-1102: the tariff posture at the close (span mode) ---------------
+    // Read at POLITY grain off the span's own 1960 close
+    // (`fx.industrialisation_handoff.polities[].protection_q`: the derived
+    // scalar, before its broadcast onto regions), and the laws it banded to off
+    // the GENERATED world (`w.laws`, the enactment seam `seed_national_tariffs`
+    // writes) -- two grains, one path. Evidence for the spread, never a verdict.
+    int posture_alive    = 0;  ///< living polities at the close
+    int posture_marketed = 0;  ///< ... whose capital stands a market (the only ones that can read nonzero)
+    int posture_q[5]     = {}; ///< protection_q min / p25 / med / p75 / max over the living (nearest rank)
+    int posture_nonzero  = 0;  ///< living polities reading > 0
+    int posture_distinct = 0;  ///< distinct protection_q values over the living
+    int posture_band[4]  = {}; ///< living polities under the floor / 5% / 10% / 20% (`tariff_rate_for_protection`, shipped bands)
+    int flow_importers   = 0;  ///< living polities with any inbound flow at the close
+    int flow_exporters   = 0;  ///< ... with any outbound flow
+    int nations_total    = 0;  ///< nations on the generated world
+    int laws_tariff      = 0;  ///< enacted LAW-IMPORT-TARIFF-* laws on the generated world
+    int laws_band[3]     = {}; ///< ... by rate: 5% / 10% / 20%
+
     // --- BL-1051: the span-open survey and the Fuel Doctrine (span mode) ----
     // The survey is read off the table the span OPENED on
     // (`era_minus_one_fixture::industrialisation_open_regions`); the doctrine and
@@ -2569,6 +2587,54 @@ int main(int argc, char** argv)
             row.span_foundings = fx.industrialisation_state.foundings;
             row.span_ms        = fx.ms_industrialisation;
 
+            // ---- BL-1102: the tariff posture at the close, and the laws ----
+            {
+                const exploration_output& close = fx.industrialisation_handoff;
+                std::vector<bool> any_in(close.polities.size(), false), any_out(close.polities.size(), false);
+                for (const trade_flow& f : close.trade_flows)
+                {
+                    if (f.buyer  < close.polities.size()) any_in[f.buyer]   = true;
+                    if (f.seller < close.polities.size()) any_out[f.seller] = true;
+                }
+                const tariff_bands bands; // the shipped defaults; the seeder's own
+                std::vector<int> pq;
+                std::set<int>    distinct;
+                for (std::size_t i = 0; i < close.polities.size(); ++i)
+                {
+                    const polity& q = close.polities[i];
+                    if (!q.alive) continue;
+                    ++row.posture_alive;
+                    if (q.capital >= 0 && static_cast<std::size_t>(q.capital) < close.regions.size()
+                     && close.regions[static_cast<std::size_t>(q.capital)].has_market)
+                        ++row.posture_marketed;
+                    pq.push_back(q.protection_q);
+                    distinct.insert(q.protection_q);
+                    if (q.protection_q > 0) ++row.posture_nonzero;
+                    const float rate = tariff_rate_for_protection(q.protection_q, bands);
+                    const int band = rate <= 0.0f ? 0 : rate >= bands.rate_high ? 3 : rate >= bands.rate_mid ? 2 : 1;
+                    ++row.posture_band[band];
+                    if (any_in[i])  ++row.flow_importers;
+                    if (any_out[i]) ++row.flow_exporters;
+                }
+                std::sort(pq.begin(), pq.end());
+                const auto rank_q = [&pq](int pct) {
+                    if (pq.empty()) return 0;
+                    return pq[static_cast<std::size_t>((pct * (static_cast<int>(pq.size()) - 1) + 50) / 100)];
+                };
+                const int pcts[5] = { 0, 25, 50, 75, 100 };
+                for (int k = 0; k < 5; ++k) row.posture_q[k] = rank_q(pcts[k]);
+                row.posture_distinct = static_cast<int>(distinct.size());
+                row.nations_total    = static_cast<int>(w.nations.size());
+                for (const law& l : w.laws)
+                {
+                    if (!l.enacted || l.effect != law_effect_kind::import_tariff) continue;
+                    ++row.laws_tariff;
+                    if      (l.rate >= bands.rate_high) ++row.laws_band[2];
+                    else if (l.rate >= bands.rate_mid)  ++row.laws_band[1];
+                    else                                ++row.laws_band[0];
+                }
+            }
+
             // ---- BL-1051: the span-open survey, and who took which fuel ----
             const std::vector<region>& open_t = fx.industrialisation_open_regions;
             row.survey_ran     = !open_t.empty();
@@ -3191,6 +3257,38 @@ int main(int argc, char** argv)
         if (!ms.empty())
             std::printf("  SPAN COST per seed: median %.0f ms, max %.0f ms, over %zu seeds (this harness build, serial)\n",
                         median_of(ms), *std::max_element(ms.begin(), ms.end()), ms.size());
+    }
+
+    // ============ BL-1102: the tariff posture at the close ===================
+    if (span_mode)
+    {
+        std::printf("\n=== THE TARIFF POSTURE, per seed - derived at the span's close, enacted at world setup (BL-1102) ===\n");
+        std::printf("  posture = protection_q over the LIVING polities at the close (polity grain, before the broadcast):\n"
+                    "  min / p25 / med / p75 / max, how many read > 0, how many distinct values, and the shipped bands\n"
+                    "  (tariff_bands: none < 300 <= 5%% < 500 <= 10%% < 700 <= 20%%); mkt = living polities whose capital\n"
+                    "  stands a market; in / out = living polities with any inbound / outbound flow at the close;\n"
+                    "  laws = enacted LAW-IMPORT-TARIFF-* on the GENERATED world, by band. Evidence, not a verdict.\n");
+        std::printf("  seed | alive  mkt | posture min  p25  med  p75  max |  >0  distinct | none   5%%  10%%  20%% |  in  out | nations  laws  5%%/10%%/20%%\n");
+        std::size_t ran_n = 0, with_law = 0, spread_n = 0;
+        int laws_total = 0;
+        for (const seed_row& r : rows)
+        {
+            if (!r.span_ran) { std::printf("  %4u | (the span did not run)\n", r.seed); continue; }
+            ++ran_n;
+            if (r.laws_tariff > 0)      ++with_law;
+            if (r.posture_distinct > 1) ++spread_n;
+            laws_total += r.laws_tariff;
+            std::printf("  %4u | %5d  %3d | %11d  %3d  %3d  %3d  %3d | %3d  %8d | %4d  %3d  %3d  %3d | %3d  %3d | %7d  %4d  %d/%d/%d\n",
+                        r.seed, r.posture_alive, r.posture_marketed,
+                        r.posture_q[0], r.posture_q[1], r.posture_q[2], r.posture_q[3], r.posture_q[4],
+                        r.posture_nonzero, r.posture_distinct,
+                        r.posture_band[0], r.posture_band[1], r.posture_band[2], r.posture_band[3],
+                        r.flow_importers, r.flow_exporters, r.nations_total, r.laws_tariff,
+                        r.laws_band[0], r.laws_band[1], r.laws_band[2]);
+        }
+        std::printf("  WORLDS WITH ANY TARIFF LAW  %zu / %zu  |  worlds whose posture is not all one value  %zu / %zu  |  laws over all seeds  %d\n",
+                    with_law, ran_n, spread_n, ran_n, laws_total);
+        std::printf("  (a world whose polities all sit under the floor enacts nothing, which is a legitimate outcome)\n");
     }
 
     // ============ BL-1051: the span-open survey and the Fuel Doctrine ========

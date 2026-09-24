@@ -7863,7 +7863,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         cap.has_market = true;
     }
 
-    // --- THE TARIFF POSTURE (BL-750) --------------------------------------
+    // --- THE TARIFF POSTURE (BL-750; the derivation is BL-1102) -----------
     //
     // A DERIVED OUTPUT READ AT HANDOFF, NEVER A SCORED VERB (Ben, 2026-09-06;
     // NATIONS.md sec 4 Tariffs). Nothing in the decision loop above reads
@@ -7872,18 +7872,89 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // RNG draw ever touches. A run with this block deleted would take every
     // decision it takes with it.
     //
-    // The formula and the reason for its shape are on `polity::protection_q`.
-    // Integer throughout, walked in polity-id order over a vector, so it is
-    // byte-identical from a seed like everything else in this file.
+    // THE DERIVATION (Ben, 2026-09-24, sprint 47 ruling R18; INDUSTRIALISATION.md
+    // sec The boundary and sec What crosses into play). The close derives each
+    // living polity's posture from the three inputs that already cross -- the
+    // scarcity signal, the trade flows and the cultural preference -- as they
+    // stand at the close, and from nothing else. Per living polity P with a
+    // capital market, over the four goods g (farm, ore, energy, port):
     //
-    // THE DERIVATION IS GONE (BL-1075). It read industrialisation timing, a
-    // fact only the superseded two-span arc's industrial span produced, and
-    // was deleted with that arc; on the span-on world the scalar is
-    // Industrialisation's to write from scarcity, flows and preference
-    // (INDUSTRIALISATION.md § The boundary). The broadcast below stays: it is
-    // the seam `derive_national_protection` reads, and a zero field is the
-    // honest tariff posture of a world nothing has yet given one.
+    //   short_g = polity_good_want_q(P, g)
+    //             the capital market's UNMET `scarcity_q[g]`, weighted by its
+    //             people's preference: scarcity * (500 + weight_q / 2) / 1000
+    //   in_g    = sum of `volume_q` over `trade_flows` with buyer  == P, good == g
+    //   out_g   = sum of `volume_q` over `trade_flows` with seller == P, good == g
+    //
+    //   protection_q = clamp( sum_g (short_g + in_g - out_g) / 4, 0, 1000 )
+    //
+    // Read it as: what its people run short of (sharpened by what they
+    // prefer), plus what it takes in, less what it sends out, averaged over
+    // the four goods. A polity that imports what it wants arrives protective;
+    // one that sells arrives open; one short of nothing and trading nothing
+    // arrives at 0. Every term is on the signal's own 0-1000 scale --
+    // `short_g + in_g` never exceeds the raw want (the upkeep floors the unmet
+    // signal at raw less inbound, and the flow spend-down caps inbound at raw)
+    // and `out_g` never exceeds a holding -- so the average is 0-1000 by
+    // construction and the clamp only ever lifts a net exporter's negative to 0.
+    //
+    // INDEPENDENT OF `boundary_year` (the two-span arc's field, which no span
+    // sets). Gated instead on `exploration_upkeep_enabled`, the switch under
+    // which `refresh_market_scarcity` and `compute_trade_flows` run at all: the
+    // Empires span carries neither signal nor flow, so it writes 0 there
+    // exactly as the arithmetic would, and stays byte-identical.
+    // `derive_national_protection` -> `seed_national_tariffs` (law.cpp) then
+    // bands the broadcast value into an `import_tariff` law; the Era -1 sim
+    // carries no other tariff derivation.
+    //
+    // Integer throughout, walked in polity-id order over vectors (the flow
+    // table is sorted (seller, buyer, good); the preference table ascending
+    // (culture, good)), so it is byte-identical from a seed like everything
+    // else in this file.
     {
+        if (params.exploration_upkeep_enabled)
+        {
+            // The preference AS IT STANDS AT THE CLOSE -- re-derived over the
+            // final ground rather than read off `round_prefs`, which the last
+            // round derived before its own conquests moved ownership. The same
+            // fold, on the same inputs, that `make_industrialisation_output`
+            // hands forward as `culture_preference`.
+            const std::vector<culture_good_preference> close_prefs =
+                derive_culture_preference(ss.regions, out.contacts, out.polities, want_culture_count);
+
+            constexpr int good_count = 4;
+            const region_class goods[good_count] =
+                { region_class::farm, region_class::ore, region_class::energy, region_class::port };
+
+            // in_g / out_g per polity, from the sim's own flow table -- the one
+            // the last decision round rebuilt (`out.trade_flows`).
+            std::vector<std::array<int64_t, good_count>> in_q(out.polities.size());
+            std::vector<std::array<int64_t, good_count>> out_q(out.polities.size());
+            for (auto& row : in_q)  row.fill(0);
+            for (auto& row : out_q) row.fill(0);
+            for (const trade_flow& f : out.trade_flows)
+            {
+                if (f.good >= good_count || f.volume_q <= 0) continue;
+                if (f.buyer  < out.polities.size()) in_q[f.buyer][f.good]   += f.volume_q;
+                if (f.seller < out.polities.size()) out_q[f.seller][f.good] += f.volume_q;
+            }
+
+            for (std::size_t pi = 0; pi < out.polities.size(); ++pi)
+            {
+                polity& q = out.polities[pi];
+                q.protection_q = 0; // this close's value, never a resumed one's
+                if (!q.alive) continue;
+                int64_t net = 0;
+                for (int g = 0; g < good_count; ++g)
+                {
+                    const std::size_t gi = static_cast<std::size_t>(g);
+                    const int short_q = polity_good_want_q(ss.regions, out.polities, close_prefs,
+                                                           static_cast<int>(pi), goods[gi]);
+                    net += static_cast<int64_t>(short_q) + in_q[pi][gi] - out_q[pi][gi];
+                }
+                q.protection_q = static_cast<int>(clampi64(net / good_count, 0, 1000));
+            }
+        }
+
         // Broadcast onto the ground, the way `contest_q` is broadcast in
         // `derive_national_character`: the settlement state is the handoff
         // object, and the political pass reads regions, not polities.
