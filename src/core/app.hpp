@@ -7,7 +7,9 @@
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
 #include "world/body_names.hpp"
+#include "world/campaign_settle.hpp"        // BL-1085: k_campaign_settle_ticks, the one tick
 #include "world/economy_system.hpp"
+#include "world/finish_campaign_world.hpp"  // BL-1085: what round 6 / the cold worker leave for Begin
 #include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/spawn_seat.hpp"      // BL-630: the spawn shortlist and the seat
@@ -358,22 +360,21 @@ private:
     /// pure, and cheap enough to call freely.
     void refresh_wizard_preview();
 
-    /// Actually start the campaign, from the params the wizard settled: rebase the
-    /// sim clock, build the world, load the economy, search the landscape and run
-    /// the winner's validation ticks, and hand over to play. The wizard's "Begin"
-    /// button.
-    ///
-    /// `start_new_game_prelude` does the main-thread setup, then poll_worldgen
-    /// runs the `validation_ticks` (BL-978, warm start retired) in time-boxed
-    /// batches — one per loading-screen frame, so the window keeps repainting
-    /// and Windows never judges the app hung (the 2026-08-12 AppHangB1 stall) —
-    /// seats the player, and `finish_new_game` rebases the clock and enters play.
+    /// Actually start the campaign, from the params the wizard settled. The
+    /// wizard's "Begin" button -- and, since BL-1085, ONLY the presentation
+    /// half of it (STARTUP.md § Handoff): the world is built, searched and
+    /// settled inside round 6's worker (or the cold worker), and Begin adopts
+    /// it. `start_new_game_prelude` rebases the sim clock and sets up the
+    /// presentation on the adopted world; poll_worldgen then seats the player
+    /// and `finish_new_game` rebases the clock again and enters play.
     void start_new_game_prelude();
     void finish_new_game();
-    /// Kick generation onto a worker and switch to the loading screen. Loads the
-    /// Lua world-gen config first, on this thread — sol2 is not thread-safe.
+    /// The Begin press: wait on round 6's worker if it is still running, adopt
+    /// its world if it landed, or build cold. Loads the Lua world-gen config
+    /// first, on this thread — sol2 is not thread-safe.
     void begin_new_game();
-    /// Poll the worker; on completion finish setup and enter the campaign.
+    /// Poll the wait; once a finished world is in hand, run the tail and enter
+    /// the campaign.
     void poll_worldgen();
     /// The loading screen: a progress bar over generation_progress.
     void draw_building_screen();
@@ -609,8 +610,12 @@ private:
     std::future<ui::wizard_surface> m_wiz_surface_future;
 
     // --- Async world generation (2026-08-12) --------------------------------
-    /// The worker running make_hard_coded_world. Valid only while `building`.
-    std::future<world>  m_worldgen_future;
+    struct wizard_world_cache; // declared with the wizard's cache below
+    /// The COLD worker (menu -> Begin with no wizard behind it, `--autostart`):
+    /// make_hard_coded_world, then `finish_campaign_world` -- the same call in
+    /// the same order round 6's worker makes (BL-1085) -- into a slot of the
+    /// same shape Begin adopts from the wizard. Valid only while `building`.
+    std::future<std::shared_ptr<wizard_world_cache>> m_worldgen_future;
     /// Read every frame by the loading screen; written by the worker.
     generation_progress m_worldgen_progress;
     /// The config the worker was launched with — Lua is loaded on the MAIN
@@ -705,12 +710,14 @@ private:
     /// history of a world that is gone. Discarded on arrival rather than shown.
     bool  m_wiz_history_stale[wizard_lapse_round_count]   = {};
 
-    // --- The wizard's world, kept for Begin (BL-1073) ------------------------
+    // --- The wizard's world, kept for Begin (BL-1073, BL-1085) ---------------
     //
     // STARTUP.md § The world cache. The last lapse round (Industrialisation)
     // runs the FULL build -- the same `make_hard_coded_world` call Begin would
-    // make, on the same params, config and works -- so its world is kept here
-    // rather than discarded, and Begin adopts it instead of building a second.
+    // make, on the same params, config and works -- AND FINISHES IT
+    // (`finish_campaign_world`: the search, the winner, the settle; BL-1085),
+    // so its world is kept here rather than discarded, and Begin adopts it
+    // instead of building a second.
     //
     // OWNER: the app. ONE world at most: `m_wiz_world_pending` is the slot the
     // round-6 worker is filling (created at launch, filled on the worker, read
@@ -719,6 +726,10 @@ private:
     // the cache; a stale landing drops it. Nothing is ever copied: a copied
     // world does not iterate as its original (see harness_params.hpp's
     // BL-1034 note), and a world is large -- it is MOVED in and moved out.
+    // The REGISTRY is the one copy: loaded from Lua on the main thread before
+    // the launch (sol2 is not thread-safe), copied into the slot, banded by the
+    // worker from the world it built, and moved into `m_registry` at Begin --
+    // so play runs on the registry the settle ran on.
     //
     // INVALIDATION: every path that clears round 6's record drops the cache in
     // the same breath (`invalidate_wizard_rounds_below`, a relaunch of round
@@ -727,19 +738,58 @@ private:
     // adopts (`drop_wizard_world` names why in the log).
     struct wizard_world_cache
     {
-        world             w;
-        generation_report report;
-        world_params      params{};
-        bool              ready = false; ///< Set by the worker as its last write.
+        world                  w;
+        generation_report      report;
+        world_params           params{};
+        recipe_registry        registry; ///< The worker's banded copy; play's registry after Begin.
+        finish_campaign_result finish;   ///< The search's winner score (the seat reads it), the charter report.
+        bool                   ready = false; ///< Set by the worker as its last write.
     };
     std::shared_ptr<wizard_world_cache> m_wiz_world_pending;
     std::shared_ptr<wizard_world_cache> m_wiz_world;
-    /// The world Begin moved into m_world came from the cache: poll_worldgen
-    /// skips the worker and runs the tail (prelude, validation run, seat).
+    /// The slot Begin adopted from the wizard, consumed by poll_worldgen on
+    /// its next call: the world, report, registry and finish move into play
+    /// and the tail (the presentation half, the seat) runs.
+    std::shared_ptr<wizard_world_cache> m_worldgen_slot;
+    /// Set by an adopt: poll_worldgen takes `m_worldgen_slot` rather than
+    /// waiting on the cold worker's future.
     bool m_worldgen_adopted = false;
+    /// BEGIN PRESSED WHILE ROUND 6'S WORKER RUNS (STARTUP.md § Handoff, item
+    /// 1): the press waits on that future behind the wait surface -- it never
+    /// starts a second build (BL-1078's memory-pressure case). poll_worldgen
+    /// keeps polling the wizard's futures until the round lands, then adopts
+    /// (or, if the landing was stale, builds cold).
+    bool m_begin_waits_round6 = false;
     /// Release the cached world (and any pending slot's claim on it), logging
     /// @p why when there was one to release.
     void drop_wizard_world(const char* why);
+    /// Begin, once no round-6 worker is running: adopt a valid cache into
+    /// `m_worldgen_slot` (true), or report why not (false).
+    bool try_adopt_wizard_world();
+    /// Begin with nothing to adopt: the cold worker (build + finish).
+    void launch_cold_build();
+    /// The sink the building screen draws: round 6's while Begin waits on it,
+    /// the cold build's otherwise.
+    generation_progress& building_sink();
+    /// scripts/recipes.lua + scripts/economy.lua into `m_registry`, on this
+    /// thread. The load resets the band to `any`; the caller bands.
+    void load_recipe_registry();
+    /// The presentation half of the economy load (the reach budget mirrored
+    /// onto ui_state, the works and tech tables, the unpriced-basket report,
+    /// the persona bench) -- everything in `load_economy` that is not the
+    /// registry, its band or the recipe pass. Begin runs it on the registry
+    /// the worker handed over; `load_economy` (the verify path) after its own.
+    void finish_economy_presentation();
+    /// The presentation half of `setup_world`: the epoch formatter, the chat
+    /// line, the solar zoom, the launch view and lens. World-free.
+    void setup_presentation(const world_params& params);
+    /// BL-1108: join every in-flight worker -- the cold build, the four
+    /// wizard rounds, the surface build -- before anything they read (the
+    /// progress sinks, the works table) is destroyed. Called at the end of
+    /// run() with the window still up (@p on_screen draws "finishing the build
+    /// before quitting" while it waits) and again at the top of ~app for the
+    /// paths that never ran the frame loop.
+    void join_workers(bool on_screen);
     float m_wiz_history_carry[wizard_lapse_round_count]   = {}; ///< Sub-year accumulator for the advance.
 
     /// BL-948 — THE AUTOPLAY DURATION, per round, in seconds of wall clock for
@@ -850,37 +900,18 @@ private:
     /// serialised, overwritten by the next search.
     landscape_score m_landscape_winner_score;
 
-    /// The winner's VALIDATION RUN (BL-978, warm start retired): the one short
-    /// tick-simulation phase 6 runs on the searched landscape to confirm the
-    /// static proxy held — GENERATION_STRATEGY.md § Three passes, ERAS.md § the
-    /// opening position. It is the settle that hands play its opening position;
-    /// there is no other pre-game tick loop, and the eighty-tick warm start it
-    /// replaces is gone.
-    ///
-    /// The length is MEASURED, not round (ERAS.md § The opening position carries
-    /// the series): `haulage_measure 5 80 --per-tick`, pooled over five seeds,
-    /// shows the per-tick convoy dispatch count climb from zero and settle; this
-    /// is the first tick at which both its 4-tick and 8-tick trailing means sit
-    /// within 5% of the 80-tick level, so a longer run buys nothing the player
-    /// can see. The seat is NOT read off this run's returns: its floor is the
-    /// static landscape score (BL-1020), because twelve ticks over a ramping
-    /// field file no trading record a viability verdict could stand on. The
-    /// trailing figures the run files reach the seat card as information only.
-    static constexpr int validation_ticks = 12;
-    /// Validation ticks completed so far, or -1 when no validation run is in
-    /// progress. >= 0 marks the batched phase between generation finishing and
-    /// play starting: poll_worldgen runs a time-boxed batch per call and the
-    /// loading screen draws its inner bar from it. Batched because a tick on a
-    /// searched landscape costs ~0.9 s in Release (2026-09-03), so the whole run
-    /// in one frame would trip the AppHangB1 kill (2026-08-12).
-    int m_validation_ticks_done = -1;
-    /// True while the validation ticks run. step_economy reads it for two
-    /// things: nobody is seated yet, so every corp is scorer-driven (BL-630);
-    /// and the persona counsel and battle dispatches are suppressed — advisory
-    /// chat for pre-game quarters the player never saw, and ~1.05 s/tick besides
-    /// (measured 2026-08-12).
-    bool m_validation_run = false;
-    std::chrono::steady_clock::time_point m_validation_begin; ///< Validation-run wall-clock start, for the timing report.
+    /// THE SETTLE (BL-978, warm start retired; BL-1085, Begin retired into
+    /// round six): the one short tick-simulation phase 6 runs on the searched
+    /// landscape to confirm the static proxy held -- GENERATION_STRATEGY.md
+    /// § Three passes, ERAS.md § The opening position. It runs INSIDE THE
+    /// WORKER that built the world (`finish_campaign_world`: round 6's, or the
+    /// cold build's), never on this thread and never batched across frames;
+    /// its length is `k_campaign_settle_ticks` (world/campaign_settle.hpp,
+    /// where the measurement behind twelve is recorded). The seat is NOT read
+    /// off its returns: its floor is the static landscape score (BL-1020),
+    /// because twelve ticks over a ramping field file no trading record a
+    /// viability verdict could stand on; the trailing figures reach the seat
+    /// card as information only. There is no other pre-game tick loop.
 
     ui_state        m_ui;
     ground_layer    m_ground;            ///< BL-732: baked painterly ground for the Planetary canvas.
@@ -896,10 +927,12 @@ private:
     std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
     std::unordered_map<entity_id, int> m_counsel_channel; ///< corp -> its lazily-created Counsel chat_channel index.
     uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
-    /// Count of step_economy() calls this campaign — validation run included —
-    /// and the value mirrored onto world::current_econ_tick before each step.
-    /// The cadence key (BL-568). On load it resumes at validation_ticks +
-    /// envelope econ_tick, so a loaded campaign rotates exactly as an unsaved one.
+    /// Count of economy ticks this campaign -- the settle's twelve (run inside
+    /// the worker, so Begin sets this to `k_campaign_settle_ticks`) plus every
+    /// step_economy() since -- and the value mirrored onto
+    /// world::current_econ_tick before each step. The cadence key (BL-568). On
+    /// load it resumes at k_campaign_settle_ticks + envelope econ_tick, so a
+    /// loaded campaign rotates exactly as an unsaved one.
     uint64_t        m_econ_steps = 0;
     std::vector<float> m_balance_history;      ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
     std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds the Budget ledger's profit chart.

@@ -18,6 +18,13 @@
 // the log proof that Begin never called make_hard_coded_world), the cold run
 // DID print it, and the two opening state hashes are EQUAL.
 //
+// BL-1085 (Begin retired into round six) re-points the proof at the finish:
+// `[finish_campaign_world]` is the line the search-and-settle prints ONCE per
+// world, so the adopt run must print it exactly once and BEFORE `[begin]`
+// (round 6's worker did it), the cold run exactly once and AFTER `[begin] no
+// wizard world to adopt` (the cold worker did it), and neither may print it
+// twice -- a second finish would be a second build.
+//
 // Default exe: build_rel/ProjectIo.exe (Release; a Debug world build is many
 // minutes), falling back to build/ProjectIo.exe.
 
@@ -59,6 +66,11 @@ function run(flag) {
 const adopt = run('--autostart-adopt');
 const cold  = run('--autostart');
 
+// BL-1085: where the finish ran, read off the log's order. One finish per
+// world; in the adopt run it precedes Begin, in the cold run it follows it.
+const finishes = (s) => (s.match(/\[finish_campaign_world\]/g) || []).length;
+const before = (s, a, b) => { const i = s.indexOf(a), j = s.indexOf(b); return i >= 0 && j >= 0 && i < j; };
+
 const checks = [
   ['adopt run exited 0', adopt.rc === 0],
   ['round 6 cached its world', /\[autostart-adopt\] CACHED/.test(adopt.out)],
@@ -66,8 +78,12 @@ const checks = [
   ['a planetology move drops the cache', /PASS  a planetology move drops the cache/.test(adopt.out)],
   ['Begin adopted (logged)', /\[begin\] adopted the wizard's world/.test(adopt.out)],
   ['Begin never built: no [gen budget] in the adopt run', !/\[gen budget\]/.test(adopt.out)],
+  ['adopt run finished ONCE, inside round 6 (before Begin)',
+   finishes(adopt.out) === 1 && before(adopt.out, '[finish_campaign_world]', '[begin] adopted')],
   ['cold run exited 0', cold.rc === 0],
   ['cold run built (logged)', /\[begin\] no wizard world to adopt/.test(cold.out) && /\[gen budget\]/.test(cold.out)],
+  ['cold run finished ONCE, inside the cold worker (after Begin)',
+   finishes(cold.out) === 1 && before(cold.out, '[begin] no wizard world to adopt', '[finish_campaign_world]')],
   ['both runs printed a state hash', !!adopt.hash && !!cold.hash],
   ['adopted == cold state hash', !!adopt.hash && adopt.hash === cold.hash],
 ];

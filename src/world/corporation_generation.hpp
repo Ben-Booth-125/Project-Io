@@ -49,8 +49,8 @@ struct corporation_params
     /// deliberate "model every corp as a new charter — capital is *earned*, not
     /// granted" steer, and the earning half of it still holds: the opening balance
     /// is still overwhelmingly the pre-game ticks' doing (the eighty-quarter warm
-    /// start when this was measured; now the winner's validation run,
-    /// `app::validation_ticks`, BL-978 — against the generation-time asset
+    /// start when this was measured; now the winner's twelve-tick settle,
+    /// `k_campaign_settle_ticks` in world/campaign_settle.hpp, BL-978 — against the generation-time asset
     /// placement). What the zero did NOT anticipate is what a zero buffer does when
     /// combined with compounding debt interest.
     ///

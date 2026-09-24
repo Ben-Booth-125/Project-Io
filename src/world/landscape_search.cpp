@@ -1,6 +1,7 @@
 #include "landscape_search.hpp"
 
 #include "corporation_generation.hpp"
+#include "hard_coded_world.hpp" // generation_progress — the inner bar's write-only tap (BL-1085)
 #include "logistics.hpp"
 #include "planetology.hpp"   // checkpoint_rng — the project's one splitmix64 sub-stream
 #include "recipe_registry.hpp"
@@ -364,6 +365,16 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
                     p.budget->points().size(),
                     static_cast<long long>(p.budget->total()));
 
+    // BL-1085: the inner bar -- evaluations done over evaluations planned (the
+    // seed, then per round one proposal per live axis). A write-only tap;
+    // `out.evaluations` is the count the walk keeps anyway.
+    const int planned_evaluations =
+        1 + std::max(0, p.rounds) * (budget_world ? landscape_axis_count - 1 : landscape_axis_count);
+    const auto report_progress = [&](int done) {
+        if (p.progress != nullptr)
+            p.progress->report_sub(done, planned_evaluations);
+    };
+
     using clock = std::chrono::steady_clock;
     const auto ms_since = [](clock::time_point t0)
     {
@@ -380,6 +391,7 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
         out.winner       = s.cand;
         out.winner_score = s.score;
         out.evaluations  = 1;
+        report_progress(out.evaluations);
         out.round_ms.push_back(ms_since(t0));
         if (p.print_rounds)
             std::printf("[landscape_search] seed   corps=%d placement=%08X tier=%u  "
@@ -425,8 +437,12 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
         // race and an ordering hazard (landscape_score.hpp § the consequence).
         if (threads <= 1)
         {
+            int scored_this_round = 0;
             for (const std::size_t i : live)
+            {
                 score_one(base, reg, p, props[i]);
+                report_progress(out.evaluations + ++scored_this_round);
+            }
         }
         else
         {
@@ -446,6 +462,7 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
                 th.join();
         }
         out.evaluations += static_cast<int>(live.size());
+        report_progress(out.evaluations); // the threaded path reports per round
 
         // --- argmax over the proposals, by the TOTAL order -------------------
         // Proposal-vs-proposal ties are broken by `candidate_key_less`, so an

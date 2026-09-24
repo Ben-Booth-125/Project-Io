@@ -63,28 +63,45 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
 
 ### Wave 0, lane C (core / Begin) — BL-1085 (Begin retired into round six). Group `begin-retired-into-round-six`.
 
-- [ ] T1 promote the settle tick body from `tools/verify/harness_params.hpp:569-639` into
+- [x] T1 promote the settle tick body from `tools/verify/harness_params.hpp:569-639` into
   `src/world/campaign_settle.{hpp,cpp}` (`run_settle_tick`, `run_settle`); `app::step_economy`'s
   world half and the harness mirror call it; `begin_adopts_check.js` PASS and the 16-seed
   `--digest-check` unchanged before anything else moves. provides: the one settle function. (R1)
-- [ ] T2 `src/world/finish_campaign_world.{hpp,cpp}`: the world-only setup halves, the band (from the
+  DONE 2026-09-24: `run_settle_tick` / `run_settle` (k_campaign_settle_ticks = 12); step_economy,
+  run_app_validation_tick, run_app_live_window all call it; begin_adopts_check 12/12 PASS. The
+  `--digest-check` is OWED to the main session (the brief bars player_seed_sweep in a lane).
+- [x] T2 `src/world/finish_campaign_world.{hpp,cpp}`: the world-only setup halves, the band (from the
   epoch until BL-1101 lands), `assign_default_recipes`, the stockpile budget, the search, the winner
   apply, the recipe pass, the twelve-tick settle; returns the winner score and the charter report.
-  consumes: T1. (R2)
-- [ ] T3 the registry loaded from Lua on the main thread before the round-6 launch (the `m_works`
+  consumes: T1. (R2) DONE 2026-09-24: `finish_campaign_world(w, report, reg, params, cfg, progress)`
+  — the report is a sixth argument (seed_genesis_history reads it); `campaign_band_from_epoch` is
+  the one band body BL-1101 replaces; `campaign_search_params` is the search's one keying.
+- [x] T3 the registry loaded from Lua on the main thread before the round-6 launch (the `m_works`
   pattern) and a copy handed to the worker; `wizard_world_cache` carries the banded copy, the score
-  and the report; Begin moves them out. consumes: T2. (R3)
-- [ ] T4 the round-6 lambda calls `finish_campaign_world` after `make_hard_coded_world`; the label
+  and the report; Begin moves them out. consumes: T2. (R3) DONE 2026-09-24: `load_recipe_registry`
+  + `slot->registry = m_registry` at both launches; seat_pick_check 13/13 PASS on 19575BBC3B912558.
+- [x] T4 the round-6 lambda calls `finish_campaign_world` after `make_hard_coded_world`; the label
   table widened past 16 with "Searching the landscape" / "Proving the field" and measured weights
   (re-measure the search in Release first and write the number into the item). consumes: T2. (R6)
-- [ ] T5 Begin: waits on round 6's future (never a second build); adopt path moves everything;
+  DONE 2026-09-24: labels 16/17, `generation_step_slot_count` 18, `weight_after` on the sink;
+  `gen_step_costs --finish 0 28` (Release): search 28,801 / 12,623 ms, settle 113,922 / 68,832 ms
+  → weights 20,000 / 90,000; the search reports per evaluation on the inner bar. ONE settle tick
+  (tick 1) runs 44-62 s on seed 0 — the bar holds still through it (NEEDS_REVIEW, main session).
+- [x] T5 Begin: waits on round 6's future (never a second build); adopt path moves everything;
   the cold worker calls the same function; the twelve ticks' presentation half dropped;
   `m_econ_steps = 12`; STARTUP.md § Handoff re-read against it. consumes: T3. (R4, R5)
-- [ ] T6 `run_serve` adopts; `run_verify` unchanged; `--autostart-windowed` waits on the future;
+  DONE 2026-09-24: `m_begin_waits_round6`, `try_adopt_wizard_world`, `launch_cold_build`; the
+  balance series is seeded from the seated corp's filed returns in finish_new_game; the validation
+  members and the `[validation phases]` print are gone; the doc reads as built.
+- [x] T6 `run_serve` adopts; `run_verify` unchanged; `--autostart-windowed` waits on the future;
   `harness_params.hpp` mirrors call the promoted functions; `begin_adopts_check.js`'s log proof
-  re-pointed; `seat_pick_check.js` PASS. consumes: T5. (R7)
+  re-pointed; `seat_pick_check.js` PASS. consumes: T5. (R7) DONE 2026-09-24: `--serve --ticks 1`
+  prints state_hash=19575BBC3B912558 == `--autostart`'s; the windowed walk now launches each lapse
+  round on arrival (it never had) and logs "round 6 is still building: waiting" → "adopted".
 - [ ] T7 Release build; `world_determinism` twice; both check scripts; Ben's live click — Begin after
-  the playback opens the seat with no freeze. (R8) BL-1078 closes here.
+  the playback opens the seat with no freeze. (R8) BL-1078 closes here. 2026-09-24: Release build
+  green; world_determinism 17/17 twice, digests identical; save_roundtrip 63/0;
+  save_envelope_roundtrip 34/0; both scripts PASS. OWES Ben's live click (R8).
 
 ### Wave 0, lane W1 (world-movers, the subjection block) — BL-1096 (purchase verb) then BL-1097 (sea legs recorded). Groups `purchase-verb`, `sea-legs-recorded`.
 
@@ -133,10 +150,13 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
 
 ### Wave 0, Light — BL-1108 (quit during a build crashes). Folded into lane C (same file).
 
-- [ ] T1 join every in-flight worker at the top of `~app` (and on the quit path) with a
+- [x] T1 join every in-flight worker at the top of `~app` (and on the quit path) with a
   "finishing the build before quitting" line on the wait surface. Verification: start a cold Begin
   build in a Release run and close the window mid-build — exit 0, no exception line; the same during
-  a wizard round's wait.
+  a wizard round's wait. DONE 2026-09-24: `app::join_workers` (all six futures) at the end of
+  `run()` with the line drawn, and first in `~app`; WM_CLOSE at +25 s of `--autostart-play`:
+  cold build — exit 0, "workers joined after 131961 ms"; a wizard round's wait — exit 0,
+  "workers joined after 115675 ms"; no exception line either time.
 
 ## Drained 2026-09-16
 

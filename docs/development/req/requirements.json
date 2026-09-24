@@ -7402,81 +7402,81 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: src/world/campaign_settle.*; tools/verify/harness_params.hpp calls it",
       "headless: begin_adopts_check.js PASS",
       "headless: player_seed_sweep --digest-check 16/16 (D_settle/D_seat unchanged before the band change lands)"
      ],
      "requirement": "ONE settle function in src/world (run_settle_tick / run_settle) is called by app::step_economy's world half, by the worker and by every harness that mirrored it; harness_params.hpp no longer restates the tick body; D_settle and D_seat pins are unchanged by the promotion alone (item-spanning gate: begin_adopts_check.js PASS, adopt hash == cold hash).",
-     "notes": "",
-     "result_metric": ""
+     "notes": "2026-09-24 (lane C worktree): the 16-seed --digest-check is OWED to the main session on merge -- the lane brief bars player_seed_sweep in a worktree (memory). The tick body moved verbatim (same calls, same order); run_app_validation_tick, run_app_validation_settle and run_app_live_window are wrappers over run_settle_tick.",
+     "result_metric": "begin_adopts_check.js 12/12 PASS on build_rel (worktree Release): adopt 19575BBC3B912558 == cold 19575BBC3B912558 (231 s / 221 s); world_determinism 17/17 PASS twice, digests identical (5BA2EE1EE993C201 / 5ECE9A097D14DACE / 4834366D19271E5F)"
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: src/world/finish_campaign_world.*; startup_screens.cpp round-6 lambda; app.cpp cold worker"
      ],
      "requirement": "finish_campaign_world(world&, recipe_registry&, const world_params&, const world_gen_config&, generation_progress*) exists in src/world and does, in order: the world-only setup halves, the band, assign_default_recipes, the stockpile budget, the landscape search, the winner apply, the recipe pass, the twelve-tick settle; it is called by the round-6 worker after make_hard_coded_world and by Begin's cold worker, same order.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "2026-09-24: the signature carries the generation_report as a second argument (seed_genesis_history reads it) -- finish_campaign_world(world&, const generation_report&, recipe_registry&, const world_params&, const world_gen_config&, generation_progress*). campaign_band_from_epoch(w, params) is the one band body (BL-1101 replaces it); campaign_search_params(seed, count) is the one search keying (harness_params' shipped_search_params calls it).",
+     "result_metric": "src/world/finish_campaign_world.{hpp,cpp}; called at startup_screens.cpp launch_wizard_history_run (round-6 lambda, after make_hard_coded_world) and app.cpp launch_cold_build (same order); begin_adopts_check.js: adopt run finished ONCE before Begin, cold run finished ONCE after Begin, hashes equal"
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: app.cpp / startup_screens.cpp registry hand-off",
       "headless: seat_pick_check.js PASS ((seed, pick) reproduces the seat)"
      ],
      "requirement": "The recipe registry is loaded from Lua on the main thread before the round-6 launch and a COPY is handed to the worker; Begin moves the worker's banded copy into m_registry; play runs on the registry the settle ran on.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "2026-09-24: app::load_recipe_registry (Lua on the main thread) then slot->registry = m_registry at both launches (startup_screens.cpp round 6; app.cpp launch_cold_build); the worker bands it inside finish_campaign_world; poll_worldgen moves it into m_registry before the presentation half.",
+     "result_metric": "seat_pick_check.js 13/13 PASS on build_rel: draw 61248 / pick 61248 / pick 61231 x2 all on 19575BBC3B912558; a pick naming no ranked firm fails and seats nobody"
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: begin_new_game",
       "headless: begin_adopts_check.js (adopt and cold runs)",
       "visual: live click - press Begin during round 6's wait"
      ],
      "requirement": "Begin pressed while round 6's worker runs WAITS on it behind the wait surface; there is never a second concurrent build; with no cache (menu -> Begin, --autostart) the cold worker builds and calls the same function.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "2026-09-24: begin_new_game -> m_begin_waits_round6 while round 6's future is valid (poll_worldgen keeps polling the wizard's futures and draws round 6's sink), try_adopt_wizard_world on landing, launch_cold_build only when nothing landed. The windowed walk (--autostart-windowed) is the scripted press-during-the-wait: it now launches each lapse round on arrival as the Next press does (it never had), so Begin finds round 6 running. Ben's live press is R8's click.",
+     "result_metric": "--autostart-windowed log: '[begin] round 6 is still building: waiting on its worker (no second build)' -> '[wizard world] cached for Begin' -> '[begin] round 6 landed' -> '[begin] adopted the wizard's world' -> 'OK 120 in-game frames'; one [finish_campaign_world] line in the run; begin_adopts_check.js cold half: '[begin] no wizard world to adopt: building' then one finish, hash equal"
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: app.cpp poll_worldgen / finish_seat",
       "doc: docs/ui/STARTUP.md § Handoff"
      ],
      "requirement": "What stays at Begin is exactly: the presentation half of setup, m_econ_steps = 12, the tech tree and persona bench, the balance series from filed returns, the seat, the clock rebase; the presentation half of the twelve pre-game ticks is dropped and STARTUP.md says so.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "2026-09-24: start_new_game_prelude = setup_presentation + finish_economy_presentation; poll_worldgen sets m_econ_steps = k_campaign_settle_ticks; finish_new_game seeds the balance/income/expenditure series from the SEATED corp's filed returns (opening capital, then each settle quarter) and rebases the clock; the batched validation run, m_validation_* and the [validation phases] print are gone. STARTUP.md § Handoff read against the build: matches; ERAS.md's app::validation_ticks citations re-pointed at k_campaign_settle_ticks (a doc-truth fix).",
+     "result_metric": "app.cpp: start_new_game_prelude 2 calls (setup_presentation, finish_economy_presentation); grep m_validation across src = 0 hits; m_econ_steps = k_campaign_settle_ticks (12) at poll_worldgen; load resumes at k_campaign_settle_ticks + env.econ_tick"
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: hard_coded_world.hpp generation_stage_labels / step costs",
       "visual: live click - the caption names each step and the bar moves"
      ],
      "requirement": "The wait's caption and bar carry \"Searching the landscape\" and \"Proving the field\" with measured weights (the label table widened past 16); the search is re-measured in Release before the weights are set and the number is written into the item.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "2026-09-24: labels 16/17; generation_step_slot_count = 18 (ms_step and the static_assert read it); generation_progress::weight_after carries the finish's weight into generation's plan so the bar never reaches its end early; the search reports evaluations done/planned on the inner bar (landscape_search_params::progress, write-only). THE SETTLE'S OWN STILL: one tick (tick 1) runs 44-62 s on seed 0 with no inner count -- the bar holds still through it (gen_step_costs: LONGEST STILL 90.9 s / 53.6 s under Proving the field). Not this lane's to fix (a tick has no progress tap); flagged for the main session / NEEDS_REVIEW. The caption itself was seen on the wait via the label table; Ben's eye is R8.",
+     "result_metric": "gen_step_costs --finish 0 28 (Release, worktree, 2026-09-24): seed 0 build 84.61 s, search 28801 ms (13 evaluations), settle 113922 ms; seed 28 build 68.93 s, search 12623 ms, settle 68832 ms; weights set 16: 20000, 17: 90000; plan total 83911 -> 'Searching the landscape' enters at 63.1%, 'Proving the field' at 86.9%, final fraction 1.000"
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: --serve vs --autostart state hash",
       "code: main.cpp; verify_api.cpp; tools/verify/begin_adopts_check.js"
      ],
      "requirement": "run_serve adopts the searched+settled world (its state hash equals --autostart's on the same params); run_verify keeps the unsearched seed-candidate world; --autostart-windowed waits on round 6's future; begin_adopts_check.js's log proof is re-pointed to the new phase lines.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "2026-09-24: run_serve builds from world_gen.lua's parsed config and the works table, then finish_campaign_world, and prints '[serve] ... state_hash=' to stderr before its warm-up ticks; run_verify untouched (setup_world + load_economy + the seed-candidate spend); run_autostart's hang deadline raised 300 -> 1800 s (the cold worker now runs build + search + settle, ~230 s on seed 0); begin_adopts_check.js adds 'finished ONCE inside round 6 (before Begin)' / 'finished ONCE inside the cold worker (after Begin)' on the [finish_campaign_world] line and keeps the [gen budget] proof.",
+     "result_metric": "--serve --ticks 1: state_hash=19575BBC3B912558 seed=0 == --autostart 19575BBC3B912558 (begin_adopts_check cold half) == --autostart-adopt; --autostart-windowed: 'round 6 is still building: waiting' then adopted, exit 0"
     },
     {
      "id": "R8",
@@ -7485,8 +7485,8 @@
       "visual: Ben's live click on the Release build"
      ],
      "requirement": "LIVE: after round 6's playback, Begin opens the seat canvas with no freeze; the seat list is the firms of the world round 6 closed on; BL-1078's symptom is gone.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "2026-09-24: OWES Ben's live click (a lane agent cannot take it). What the scripted paths show: Begin after round 6 lands does no world work on the UI thread (poll_worldgen moves the slot, runs the presentation half, seats); the seat canvas ranks the finished world's specialists (seat_pick_check: 'the ranking is printed'). BL-1108's close-mid-build check on the same build: exit 0 both instances.",
+     "result_metric": "pending Ben's click on the Release build"
     }
    ]
   },

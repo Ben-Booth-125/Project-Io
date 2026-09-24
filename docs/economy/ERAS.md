@@ -76,7 +76,9 @@ spends in simulated quarters, the clock is **rebased at the handoff**, so play a
 load-bearing half of this paragraph and it does not depend on which pass does the settling: the
 opening position owes the calendar nothing.
 
-**The validation run is twelve quarterly econ ticks** (`app::validation_ticks`), run on the winner
+**The validation run is twelve quarterly econ ticks** (`k_campaign_settle_ticks`,
+`src/world/campaign_settle.hpp` — the one tick and settle the app, the worker and every harness
+call), run on the winner
 inside the Industrialisation round's worker as generation's last act — the round hands Begin a
 world already proved, and a cold Begin with no wizard makes the same call in the same order (Ben,
 2026-09-24) — under spectate with nobody seated, with the persona counsel and battle dispatches
@@ -103,7 +105,7 @@ market-to-market** share of those convoys drifts upward slowly, from ≈80 % of 
 at tick 12 to within 5 % only around tick 40, inside ±15 % quarter-to-quarter noise. That is a
 slow composition drift in the trade mix, not the cold-start transient the settle exists to
 absorb; buying it would cost half the eighty-tick warm start this replaces. If a future reading
-needs that share settled at the handoff, the number to move is `app::validation_ticks` and the
+needs that share settled at the handoff, the number to move is `k_campaign_settle_ticks` and the
 measurement to re-run is the one above.
 
 **What settles it is a search, not a settle.** The third pass of simulated history is phase 6 — a
