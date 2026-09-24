@@ -442,7 +442,7 @@ double median_of(std::vector<double> v)
     return v[v.size() / 2];
 }
 
-seed_result run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
+seed_result run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
                     const world_gen_config& gen_cfg)
 {
     seed_result out;
@@ -470,6 +470,10 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
     // world. app.cpp:488-490 loads AND parses AND passes; a harness must do all
     // three or it is not measuring the shipped spawn.
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
+    // BL-1101: the band is the world's own, applied after generation as
+    // app::load_economy applies it — never a probe descriptor's epoch.
+    std::printf("  band: %s (the world's own, derived at the 1960 fold)\n",
+                era_band_name(band_registry_from_world(reg, w)));
     assign_default_recipes(w, reg);
     generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
     assign_default_recipes(w, reg);
@@ -643,8 +647,8 @@ int main(int argc, char** argv)
     world_gen_config gen_cfg{};
     gen_cfg.load_from_lua(lua);
 
-    world_params probe;              // for the epoch year alone
-    reg.set_era(era_band_for_epoch(probe.epoch_year));
+    // The band is set per world inside run_seed (BL-1101), not here from a
+    // probe descriptor: it is the world's own verdict.
 
     // Vacuity guard (the standing lesson from interbody_pull_harness): an empty
     // registry would print every corp as equally poor and diagnose nothing.

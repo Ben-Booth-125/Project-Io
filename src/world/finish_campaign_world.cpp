@@ -62,12 +62,19 @@ void report_step_ms(generation_progress* p, int label, std::int64_t ms)
 
 } // namespace
 
-era_band campaign_band_from_epoch(const world& w, const world_params& params)
+era_band campaign_band_from_world(const world& w)
 {
-    // BL-433: the band the epoch year names. The world is the argument the
-    // BL-1101 derivation (band from history) reads in this body's place.
-    (void)w;
-    return era_band_for_epoch(params.epoch_year);
+    // THE BAND IS THE WORLD'S OWN (BL-1101, Ben 2026-09-24): derived once at
+    // the Industrialisation fold from the history's industry state
+    // (`derive_campaign_band`, history_sim.hpp) and carried on
+    // `world::campaign_band`, never from the epoch. A world whose fold never ran
+    // -- a harness fixture built without the prehistory, or a descriptor with
+    // the span switched off -- carries `any`, which would ADMIT both rosters at
+    // once; it bands as the shipped 1960 default, `industrial`, so a fixture
+    // never sees a roster no campaign can (the review's fix round on BL-1101).
+    // The shipped descriptor always runs the fold, so the fallback is a
+    // harness fact, not a design one.
+    return w.campaign_band == era_band::any ? era_band::industrial : w.campaign_band;
 }
 
 landscape_search_params campaign_search_params(std::uint32_t world_seed, int corporation_count)
@@ -106,7 +113,7 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     //    before anything browses recipes; the default-recipe pass below is the
     //    first such reader. Ids are untouched: the filter masks, it does not
     //    remove.
-    reg.set_era(campaign_band_from_epoch(w, params));
+    reg.set_era(campaign_band_from_world(w));
 
     // 3. Author processing recipes onto the generated assets. The recipe id is
     //    a registry index, unknown at generation time, so it is assigned once

@@ -9,3 +9,4 @@
 {"version":20,"kind":"envelope","owner":"BL-1047 epoch flip gates","ts":"2026-09-24T16:00:43.317Z","branch":"main"}
 {"version":21,"kind":"envelope","owner":"BL-1080 round six shows industry","ts":"2026-09-24T16:01:25.717Z","branch":"main"}
 {"version":22,"kind":"envelope","owner":"BL-1083 span seeds","ts":"2026-09-24T21:06:03.271Z","branch":"worktree-wf_ce38c127-8da-1"}
+{"version":26,"kind":"world","owner":"BL-1101 campaign_band","ts":"2026-09-24T21:07:12.230Z","branch":"worktree-wf_ce38c127-8da-4"}

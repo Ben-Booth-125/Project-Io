@@ -114,7 +114,8 @@ int main(int argc, char** argv)
     reg.load_from_lua(lua);
     world_gen_config gen_cfg;
     gen_cfg.load_from_lua(lua);
-    reg.set_era(era_band_for_epoch(epoch));
+    // The band is set after the world exists (BL-1101, below): it is the
+    // world's own verdict, and --epoch names the calendar only.
 
     if (reg.recipe_count() == 0)
     {
@@ -126,6 +127,10 @@ int main(int argc, char** argv)
     p.seed       = seed;
     p.epoch_year = epoch;
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
+    // BL-1101: the band is the world's own, applied after generation as
+    // app::load_economy applies it.
+    std::printf("band: %s (the world's own, derived at the 1960 fold)\n",
+                era_band_name(band_registry_from_world(reg, w)));
     // The landscape-search WINNER, as the app applies it — not the seed candidate
     // (BL-979; apply_shipped_landscape in harness_params.hpp).
     print_shipped_landscape(apply_shipped_landscape(w, reg, seed));

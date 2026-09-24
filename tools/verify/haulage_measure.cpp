@@ -488,7 +488,7 @@ struct far_seed_result
     int  play_quarters  = 0;
 };
 
-far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const recipe_registry& reg,
+far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, recipe_registry& reg,
                              const world_gen_config& gen_cfg, const works_registry& works)
 {
     far_seed_result out;
@@ -502,6 +502,12 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
     if (o.fast)
         p = no_prehistory(p);
     world w = make_hard_coded_world(p, nullptr, gen_cfg, nullptr, &works);
+    // BL-1101: the band is the world's own, applied after generation as
+    // app::load_economy applies it — never --epoch's. Under --fast the fold
+    // never ran, the band is `any` and nothing is masked; the line says so.
+    std::printf("band: %s (the world's own, derived at the 1960 fold%s)\n",
+                era_band_name(band_registry_from_world(reg, w)),
+                w.campaign_band == era_band::any ? "; UNSET — the fold did not run" : "");
     print_shipped_landscape(apply_shipped_landscape(w, reg, seed));
     out.markets = static_cast<int>(w.markets.size());
 
@@ -773,7 +779,8 @@ int run_far_trade(int argc, char** argv)
     lua.load("scripts/world_gen.lua");
     recipe_registry reg;
     reg.load_from_lua(lua);
-    reg.set_era(era_band_for_epoch(o.epoch));
+    // The band is set per world inside run_far_seed (BL-1101): the world's
+    // own verdict, never --epoch's, which names the calendar only.
     world_gen_config gen_cfg;
     gen_cfg.load_from_lua(lua);
     lua.load("scripts/works.lua");
@@ -787,10 +794,10 @@ int run_far_trade(int argc, char** argv)
 
     std::printf("=== haulage_measure --far-trade (BL-1006) — delivered volume sold at its "
                 "destination ===\n");
-    std::printf("seeds %u..%u; epoch %lld (%s band); pre-history %s; works rows %zu\n",
+    std::printf("seeds %u..%u; epoch %lld (calendar only; the band is each world's own, printed per seed); "
+                "pre-history %s; works rows %zu\n",
                 o.first_seed, o.first_seed + static_cast<std::uint32_t>(o.seeds) - 1,
                 static_cast<long long>(o.epoch),
-                era_band_for_epoch(o.epoch) == era_band::ancient ? "ANCIENT" : "INDUSTRIAL",
                 o.fast ? "OFF (--fast: NOT the app's world)" : "ON (the app's world)",
                 works.size());
     std::printf("opening position: %d validation ticks (app::validation_ticks), spectated\n",

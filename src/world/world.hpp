@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "campaign_battle.hpp" // active_battle (BL-467 battle state, below)
 #include "corp_command.hpp" // corp_decision_ring (BL-202 strategic decision log)
+#include "era_band.hpp"     // era_band (BL-1101: the world's own recipe band, below)
 #include "faithful_unordered_map.hpp" // every unordered store below (BL-1034: copies tick as their source)
 #include "law.hpp"          // law (BL-343 enacted-law list, below)
 #include "modifier_set.hpp" // scalar_modifier (BL-479 per-corp tech effects, below)
@@ -212,6 +213,31 @@ struct world
     /// The system's asteroid belt (a band, not a body). belt.present() is false
     /// when the system has no belt.
     asteroid_belt belt;
+
+    /// BL-1101 — THE CAMPAIGN'S RECIPE BAND, a fact about the history this world
+    /// was generated with (docs/economy/PRODUCTION.md § The era band; ERAS.md
+    /// § Where the ladder starts). Written ONCE, at the Industrialisation fold
+    /// in `make_hard_coded_world`: `industrial` iff any living polity's
+    /// materials capacity sits at the Industrial rung at the 1960 close
+    /// (`derive_campaign_band`, history_sim.hpp — the same
+    /// `roster_band_for_capacity` derivation that dates `industrial_year`),
+    /// `ancient` otherwise. A seed whose history never crosses is an
+    /// ancient-band campaign; the sim is never reshaped to force the other
+    /// answer. The epoch names the calendar only.
+    ///
+    /// READ, NEVER RE-DERIVED: `app::load_economy` and `app::load_game_from`
+    /// both band the registry from this field, and every harness that mirrors
+    /// the app bands from it too (`band_registry_from_world`, harness_params.hpp)
+    /// — so a save never opens on a band its world did not earn and a harness
+    /// never bands differently from the app.
+    ///
+    /// `any` means the fold never wrote it: a hand-built fixture, or a run whose
+    /// Industrialisation span was switched off by a harness knob (the shipped
+    /// descriptor always runs it). Such a world applies no mask, exactly as a
+    /// registry whose band was never set — the harness default this enum was
+    /// built around. SERIALISED (world_save.cpp, world_save_version 26); a byte
+    /// outside the enum refuses the whole stream.
+    era_band campaign_band = era_band::any;
 
     // --- component stores ---
     // Every unordered store on `world` is a `faithful_unordered_map`: exactly

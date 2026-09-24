@@ -377,6 +377,7 @@ struct rollout_result
     std::string debt_csv;               ///< BL-745: one row per debt entry in the window.
     int         debt_entries  = 0;
     double      phase_residual_max = 0.0; ///< max |delta - sum of phases| seen (must be ~0).
+    era_band    band = era_band::any;   ///< BL-1101: the world's own band, for the manifest.
 };
 
 void appendf(std::string& s, const char* fmt, ...)
@@ -389,7 +390,7 @@ void appendf(std::string& s, const char* fmt, ...)
     s += buf;
 }
 
-rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
+rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
                            const world_gen_config& gen_cfg)
 {
     const auto t0 = std::chrono::steady_clock::now();
@@ -410,6 +411,10 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
     // The shipped spawn's own order: the landscape-search WINNER, not the seed
     // candidate (BL-979 — see apply_shipped_landscape in harness_params.hpp).
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
+    // BL-1101: the band is the world's own, applied after generation as
+    // app::load_economy applies it — never the epoch's. Carried out on the
+    // result so the manifest names the band this rollout actually ran on.
+    out.band = band_registry_from_world(reg, w);
     print_shipped_landscape(apply_shipped_landscape(w, reg, lp.seed));
 
     // The corp index, once — ids and identities never change mid-campaign.
@@ -722,9 +727,9 @@ bool load_data(data_layer& d, const lapse_params& lp)
     d.reg.load_from_lua(lua);
     d.gen_cfg.load_from_lua(lua);
 
-    world_params probe;
-    const int epoch = lp.epoch_year != 0 ? lp.epoch_year : probe.epoch_year;
-    d.reg.set_era(era_band_for_epoch(epoch));
+    // The band is set per world inside run_rollout (BL-1101), not here from
+    // the epoch: it is the world's own verdict, and the world does not exist
+    // yet. --epoch names the calendar only.
 
     // Overrides: last word, echoed in the manifest, authored Lua untouched.
     if (lp.pop_scale != 1.0f)
@@ -872,16 +877,16 @@ int main(int argc, char** argv)
     appendf(manifest, "seed=%u\nsettle_ticks=%d\nmeasured_ticks=%d\nprehistory=%s\n",
             lp.seed, lp.settle_ticks, lp.ticks,
             lp.prehistory ? "ON (the shipped spawn)" : "OFF (--fast, NOT the spawn)");
-    // The band is NAMED, never implied: the world_params default epoch is 0
-    // (the ancient 0 CE arc), and a whole session's sweeps once ran the wrong
-    // band because the manifest said only "(default)" (2026-09-01).
+    // The band is NAMED, never implied: a whole session's sweeps once ran the
+    // wrong band because the manifest said only "(default)" (2026-09-01). It is
+    // the WORLD's own verdict now (BL-1101), read back off the rollout, and the
+    // epoch beside it names the calendar only.
     {
         world_params probe;
         const int epoch = lp.epoch_year != 0 ? lp.epoch_year
                                              : static_cast<int>(probe.epoch_year);
-        appendf(manifest, "epoch_year=%d  band=%s\n", epoch,
-                era_band_for_epoch(epoch) == era_band::ancient ? "ANCIENT"
-                                                              : "INDUSTRIAL");
+        appendf(manifest, "epoch_year=%d (calendar only)  band=%s (the world's own, derived at the 1960 fold)\n",
+                epoch, era_band_name(r.band));
     }
     appendf(manifest, "abundance=%s\n",
             lp.abundance == abundance_level::sparse ? "sparse"

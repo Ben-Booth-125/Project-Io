@@ -19,7 +19,7 @@
 //
 //   1. the world-only halves of setup: the genesis history bridged from the
 //      report (once, not idempotent), the survey states;
-//   2. the recipe band, from `campaign_band_from_epoch` (below);
+//   2. the recipe band, from `campaign_band_from_world` (below);
 //   3. `assign_default_recipes` -- the first pass, before the search reads
 //      recipe outputs;
 //   4. the stockpile budget, then THE LANDSCAPE SEARCH (phase 6, GENERATION_
@@ -56,18 +56,20 @@ struct world;
 struct world_gen_config;
 struct world_params;
 
-/// THE CAMPAIGN'S RECIPE BAND for a built world. Today it is read from the
-/// epoch year alone (`era_band_for_epoch`, BL-433): a 0 CE campaign never sees
-/// the Launchpad or the petroleum, propellant and spacecraft chains; a 1960 one
-/// sees everything. Generation never reads it, so the epoch that picks it moves
-/// no generated world.
+/// THE CAMPAIGN'S RECIPE BAND for a built world: the world's own
+/// (`world::campaign_band`, BL-1101, Ben 2026-09-24), derived once at the
+/// Industrialisation fold from the history's industry state -- `industrial`
+/// iff a living polity's materials capacity sits at the Industrial rung at the
+/// 1960 close, `ancient` otherwise -- never from the epoch year, which names the
+/// calendar alone. A world whose fold never ran (a harness fixture without the
+/// prehistory) carries `any` and bands here as the shipped default,
+/// `industrial`, so no fixture admits both rosters at once.
 ///
 /// ONE FUNCTION, ON PURPOSE: the round-6 worker bands its registry copy here,
-/// the app's `load_economy` bands the verify path here, and the harness mirror
-/// bands its registry here. When the band is derived from the history's own
-/// industry state (BL-1101, band from history), THIS body changes and nothing
-/// else -- @p w is the argument that derivation reads.
-era_band campaign_band_from_epoch(const world& w, const world_params& params);
+/// the app's `load_economy` and `load_game_from` band here, and the harness
+/// mirror bands its registry here -- so a save opens on the band its world
+/// earned and a harness never bands differently from the app.
+era_band campaign_band_from_world(const world& w);
 
 /// The search params the campaign passes, keyed from the world seed exactly
 /// as Begin always keyed them: `regenerate_specialists` (every candidate

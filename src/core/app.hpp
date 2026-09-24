@@ -87,17 +87,21 @@ public:
     /// BL-705: override `world_params::epoch_year` for every world this process
     /// generates (`--epoch <year>`). Absent = the struct's own default.
     ///
-    /// WHAT IT MOVES (BL-1047, the epoch flip): the calendar and the recipe
-    /// band, nothing else. The default is 1960; `--epoch 0` opens the SAME
-    /// generated world dated 0 CE on the ancient band (`era_band_for_epoch`).
-    /// Generation reads no epoch, so no history, span or settlement year moves
-    /// with it. Both starts are supported (`docs/economy/ERAS.md` § Where the
-    /// ladder starts), so selecting between them belongs at the command line.
+    /// WHAT IT MOVES (BL-1047, the epoch flip; BL-1101, band from history): the
+    /// calendar and nothing else. The default is 1960; `--epoch 0` opens the
+    /// SAME generated world dated 0 CE, on the SAME band — the band is the
+    /// world's own, derived at the 1960 fold from its history's industry state
+    /// (`world::campaign_band`), never from the year. Generation reads no epoch,
+    /// so no history, span or settlement year moves with it. Both starts are
+    /// supported (`docs/economy/ERAS.md` § Where the ladder starts), so selecting
+    /// between them belongs at the command line. Whether a 0 CE start may ALSO
+    /// ask for the ancient roster as a sandbox is Ben's open call (NR-920); no
+    /// band override exists.
     ///
     /// Applies to a NEW world only; a save carries its own epoch and the load
     /// path is not overridden. Call before run() / run_autostart().
     ///
-    /// @param year Calendar year play opens on (below 1700: the ancient band).
+    /// @param year Calendar year play opens on.
     void set_epoch_year(std::int64_t year)
     {
         m_epoch_year_override = year;

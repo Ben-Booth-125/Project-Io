@@ -71,7 +71,9 @@
 //      works_registry (app::begin_new_game), then make_hard_coded_world at
 //      `world_params{}` with only the seed set — epoch 1960, the shipped default (BL-1047);
 //   2. scripts/recipes.lua + scripts/economy.lua -> recipe_registry, and
-//      `set_era(era_band_for_epoch(epoch))` (app::load_economy);
+//      `set_era(w.campaign_band)` — the WORLD's own band, derived at the 1960
+//      fold from its history (BL-1101; app::load_economy) — per seed, after
+//      the world exists;
 //   3. `apply_shipped_landscape` (harness_params.hpp), which mirrors
 //      app::start_new_game_prelude's search and winner.
 // NOT MIRRORED, AND SAID ON THE FACE: the winner's 12-tick validation run
@@ -413,6 +415,10 @@ std::map<uint32_t, library_fingerprint> library_fingerprints(const char* path)
 struct seed_row
 {
     uint32_t seed = 0;
+    /// BL-1101: the band this world derived at its 1960 fold (`any` = the fold
+    /// did not run), and the tier-3 recipes that band admits.
+    era_band band           = era_band::any;
+    int      tier3_admitted = 0;
     bool     era_ran  = false; ///< The Empires round ran (fx.ran).
     bool     expl_ran = false; ///< The Exploration span ran, so the 1660 handoff exists.
     /// The close this run reads exists: in span mode the Industrialisation span
@@ -2417,20 +2423,26 @@ int main(int argc, char** argv)
         return fidelity::run_resume_tier(seeds, cfg, works);
 
     const world_params shipped_descriptor{};
-    const era_band band = era_band_for_epoch(shipped_descriptor.epoch_year);
-    int band_tier3_recipes = 0;
-    {
-        reg.set_era(band);
+    // BL-1101: the band is each WORLD's own, derived at the 1960 fold from its
+    // history and read off `w.campaign_band` after generation (below, per
+    // seed). The tier-3 count the R3 reading is guarded by is taken under the
+    // band each world actually derived, and `band_tier3_recipes` is the MIN
+    // across seeds — a structural zero on any one world is a structural zero.
+    const auto tier3_under = [&](era_band band) {
+        int n = 0;
         for (std::size_t id = 0; id < reg.recipe_count(); ++id)
         {
             const recipe* rc = reg.get_recipe(static_cast<uint16_t>(id));
             if (rc != nullptr && recipe_makes_tier3(*rc) && era_permits(band, rc->era))
-                ++band_tier3_recipes;
+                ++n;
         }
-    }
-    std::printf("epoch_year %lld (world_params default, the shipped descriptor) -> era band %s\n\n",
-                static_cast<long long>(shipped_descriptor.epoch_year),
-                band == era_band::ancient ? "ancient" : (band == era_band::industrial ? "industrial" : "any"));
+        return n;
+    };
+    int band_tier3_recipes = -1; // -1 until the first world names its band
+    int bands_seen[era_band_count] = {0, 0, 0};
+    std::printf("epoch_year %lld (world_params default, the shipped descriptor; the calendar only) -> "
+                "era band: each world's own, derived at the 1960 fold (printed per seed)\n\n",
+                static_cast<long long>(shipped_descriptor.epoch_year));
     std::fflush(stdout);
 
     std::vector<seed_row> rows;
@@ -2462,7 +2474,18 @@ int main(int argc, char** argv)
         era_minus_one_fixture fx;
         world w = make_hard_coded_world(wp, &rep, cfg, /*progress=*/nullptr, &works, &fx);
 
-        reg.set_era(era_band_for_epoch(wp.epoch_year)); // app::load_economy
+        // app::load_economy — the world's own band (BL-1101). `any` here means
+        // the fold never ran (the span switched off by --through/--continued
+        // modes), which masks nothing; the per-seed line says which.
+        const era_band world_band     = band_registry_from_world(reg, w);
+        const int      world_tier3    = tier3_under(world_band);
+        ++bands_seen[static_cast<std::size_t>(world_band)];
+        band_tier3_recipes = band_tier3_recipes < 0 ? world_tier3
+                                                    : std::min(band_tier3_recipes, world_tier3);
+        std::printf("seed %u: band %s%s (tier-3 recipes admitted %d)\n", seed,
+                    era_band_name(world_band),
+                    world_band == era_band::any ? " [UNSET: the 1960 fold did not run]" : "",
+                    world_tier3);
         // BL-1042: no budget handed in, so the mirror builds the stockpile's,
         // as the app does; the winner's charter report comes back here.
         charter_spend_report charter_rep;
@@ -2541,6 +2564,8 @@ int main(int argc, char** argv)
 
         seed_row row;
         row.seed     = seed;
+        row.band           = world_band;  // BL-1101
+        row.tier3_admitted = world_tier3;
         // BL-1042: the budget the landscape was laid from.
         row.sp_points     = sp.points_total;
         row.sp_to_centres = sp.points_to_centres;
@@ -3491,19 +3516,23 @@ int main(int argc, char** argv)
     }
 
     // ---- 3 ------------------------------------------------------------------
-    const bool r3_structural_zero = band_tier3_recipes == 0;
+    const bool r3_structural_zero = band_tier3_recipes <= 0;
     {
         if (r3_structural_zero)
-            std::printf("[ 3] Advanced chains - STRUCTURAL ZERO on the campaign world: the shipped descriptor's era\n"
-                        "     band (it follows epoch_year, which stays 0 however far the span runs) admits no tier-3\n"
-                        "     recipe, so no installation can make machinery, alloys or electronics on any seed. The\n"
-                        "     counts below are the band, not a finding; the reading moves only when the epoch flip\n"
-                        "     decouples the arc from the recipe band.\n");
+            std::printf("[ 3] Advanced chains - STRUCTURAL ZERO on at least one campaign world: the band that world\n"
+                        "     derived at its 1960 fold (BL-1101: ancient, because no living polity's materials\n"
+                        "     capacity reached the Industrial rung) admits no tier-3 recipe, so no installation can\n"
+                        "     make machinery, alloys or electronics there. The counts below are the band, not a\n"
+                        "     finding, on those seeds; the reading is the history's verdict, never forced.\n");
         else
             std::printf("[ 3] Advanced chains - MEASURED on the campaign world (installations running a recipe that\n"
                         "     makes machinery, alloys or electronics - INDUSTRIALISATION.md sec 2's tier-3 goods; the\n"
                         "     wealth-to-production force that is meant to place them does not exist)\n");
-        std::printf("     tier-3 recipes the campaign's era band admits: %d\n", band_tier3_recipes);
+        std::printf("     tier-3 recipes the campaign's era band admits: %d (the minimum across seeds; bands derived: "
+                    "industrial %d, ancient %d, unset %d)\n",
+                    band_tier3_recipes, bands_seen[static_cast<std::size_t>(era_band::industrial)],
+                    bands_seen[static_cast<std::size_t>(era_band::ancient)],
+                    bands_seen[static_cast<std::size_t>(era_band::any)]);
         print_spread("installations making a tier-3 good",
                      collect([](const seed_row& r) { return static_cast<double>(r.advanced); }));
         std::size_t realised = 0;
@@ -3925,9 +3954,11 @@ int main(int argc, char** argv)
             for (std::size_t i = 0; i < rows.size(); ++i)
             {
                 const seed_row& r = rows[i];
-                std::fprintf(f, "  {\"seed\": %u, \"era_ran\": %s, \"expl_ran\": %s, \"handoff_ok\": %s, "
+                std::fprintf(f, "  {\"seed\": %u, \"band\": \"%s\", \"tier3_admitted\": %d, "
+                                "\"era_ran\": %s, \"expl_ran\": %s, \"handoff_ok\": %s, "
                                 "\"has_fingerprint\": %s, \"prefix_matches\": %s, \"control_battles\": %lld,\n",
-                             r.seed, r.era_ran ? "true" : "false", r.expl_ran ? "true" : "false",
+                             r.seed, era_band_name(r.band), r.tier3_admitted,
+                             r.era_ran ? "true" : "false", r.expl_ran ? "true" : "false",
                              r.handoff_ok ? "true" : "false", r.has_fingerprint ? "true" : "false",
                              r.prefix_matches ? "true" : "false", (long long)r.control_battles);
                 std::fprintf(f, "   \"close_ran\": %s, \"span_ran\": %s, \"span_start\": %lld, \"span_stop\": %lld, "

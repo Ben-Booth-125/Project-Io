@@ -50,6 +50,7 @@
 // would not be.
 
 #include "combat.hpp"
+#include "era_band.hpp"       // era_band (BL-1101: derive_campaign_band, below)
 #include "era_timelapse.hpp"  // owner_change / owner_none / era_timelapse
 #include "creeds.hpp"
 #include "settlement.hpp"
@@ -5141,6 +5142,33 @@ struct industrialisation_output : exploration_output
 industrialisation_output make_industrialisation_output(const settlement_state&  ss,
                                              const history_sim_state& hs,
                                              const creed_state*       cs);
+
+/// BL-1101 — THE CAMPAIGN'S RECIPE BAND, read off a close's polities. What the
+/// fold writes onto `world::campaign_band`, and what the history sweep prints
+/// per seed; ONE derivation, two readers, so the sweep can never report a band
+/// the fold did not write (docs/economy/PRODUCTION.md § The era band).
+struct campaign_band_reading
+{
+    int alive        = 0; ///< Polities alive at the close.
+    /// Living polities whose MATERIALS capacity sits at the Industrial rung at
+    /// the close — `roster_band_for_capacity`, the derivation `industrial_year`
+    /// uses (materials, not military: a Blast Works turns over with
+    /// metallurgy). This count, not `ever_crossed`, is what names the band.
+    int at_rung      = 0;
+    /// Living polities carrying an `industrial_year` — crossed at some round of
+    /// the run. Reported beside `at_rung` so a divergence (a polity that
+    /// crossed and later fell back down the ladder) is visible, never hidden.
+    int ever_crossed = 0;
+    int mat_cap_max  = 0; ///< The highest materials capacity any living polity holds.
+    era_band band    = era_band::ancient; ///< `industrial` iff `at_rung > 0`.
+};
+
+/// Pure over @p polities: `industrial` iff any LIVING polity's materials
+/// capacity reaches the Industrial rung, `ancient` otherwise. A dead polity
+/// counts for nothing — its ground is somebody else's now. Never reads
+/// `region::industrialised` or `median_industrial_year`, which the generated
+/// world leaves at zero.
+campaign_band_reading derive_campaign_band(const std::vector<polity>& polities);
 
 /// The enforcement half of `industrialisation_output`. Every rule
 /// `exploration_output_valid` holds (the tables, the overlord graph, the
