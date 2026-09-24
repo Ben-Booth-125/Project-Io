@@ -10,6 +10,51 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-24 (evening) — Sprint 47 cut: one history, told through the rounds
+
+**Runtime:** ~6 h so far (the design pass, the cut, wave 0 launched; the lanes run on). Design → Full
+(the cut); Fable with ultracode — four reader workflows (7 + 5 + 10 + 4 agents) and one lane
+workflow (5 + 5).
+
+### What landed
+- **The design form.** The survey's twelve questions amended by two reader workflows (seven
+  scoping readers over the seams, colour carry, per-round visual data and naming; five design-prep
+  readers over the world-once, Begin-retired, mid-span-chartering, band-from-history and
+  purchase-verb rulings). Twenty-seven groups; Ben answered every one. His picks went deeper than
+  the recommendations on six: the whole world moves (not the sim close), hard borders by a share
+  threshold with hysteresis, the purchase verb and sea-lane tier now, the band from the history,
+  mid-span works events, the search inside the round's wait. No per-round close, no prebuild.
+- **The rulings record** `drafts/sprint-47-rulings.md` (R1-R25) and the rulings written into
+  twenty-seven docs by ten writers in place, then a four-lens cold review (50 findings, ~30 distinct)
+  and a five-fixer pass. `df44d903` (the cut), `c4eb810c` (wave-0 filing).
+- **Filed** BL-1083..BL-1109 (23 in the sprint, 4 for later), NR-918..NR-930 (delegated readings, two
+  open calls: NR-920 `--epoch 0`, NR-921 sea legs in the later spans), sprint 47 opened with four
+  waves, six requirement groups, REFINED.md lanes G / C / W1-W3.
+- **Wave 0 launched** as one workflow, five worktree lanes each followed by a cold code review:
+  BL-1083 (one seed per span) → BL-1084 next; BL-1085 (Begin retired into round six) + BL-1108;
+  BL-1096 → BL-1097 (purchase verb, sea legs); BL-1101 (band from history); BL-1102 (tariff posture).
+  Merge, Release build, `world_determinism` ×2, the round trips and the live click stay in the main
+  session.
+
+### What the measurement said
+- The recalculation Ben's brief targets is small: 0.5 s (stages 0-7), 2.1 s (+Empires), 3.6 s
+  (+Exploration) per seam in Release; of round 6's ~55 s wait, ~47 s is the tail after the 1960 close
+  (roads 38 s alone). So the seam item is continuity, and the wait item is landing the record at the
+  close — which is what Ben chose.
+- Deposits already land at stage 4, downstream of S8/S9: "materials at the Life gate" is a change of
+  ownership (the world is built once and moved), not of pass order.
+- **Quitting during a build crashes on exit** (0xC0000005, both the cold Begin build and a wizard
+  round): `~app` never joins the workers and their progress/works objects die first. BL-1108.
+
+### Open
+- Ben's five live clicks (BL-1068, 1072, 1073, 1076, 1080) — he opened the Release build and walked into
+  round 4 but did not file the answers on the form.
+- The lanes' returns, their fix rounds, the merges, the re-bless once after wave 0's world-movers.
+- NR-918..NR-930 for Ben; the header_graph tool is polluted by 14 stale `.claude/worktrees/agent-*`
+  copies (its counts are not comparable to the baseline until they are pruned) — `worktree_prune.js`.
+
+---
+
 ## 2026-09-22 — Beat 1 ships: the span and the charter budget on by default, one re-bless
 
 **Runtime:** ~11 h (08:30 to ~19:30, the measurement unattended through the day). Delivery — Full
