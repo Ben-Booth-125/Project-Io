@@ -595,7 +595,7 @@
     "src/world/history_sim.cpp",
     "src/core/save_game.cpp"
    ],
-   "design": "RULED (Ben, 2026-09-24). Found watching BL-1068's round 6: it animates borders and seats, but the phase's story is industry, and none of it shows — on the verify seed the map barely changes 1810-1960. INDUSTRIALISATION.md § Beat 1 owns what industrialises (industry points; a region's furnace crossing, region::industrial_year; the Industry tree).\n\nTHE WORK (a reading to confirm at the live click, not a closed design). (1) The span's timelapse records, per sampled year, the industry the round is about: which regions have crossed the furnace (by year), each polity's industry points, and the railway/road corridors the span lays if it lays any — whatever the span actually computes; do not invent a quantity it lacks. (2) The map: a region that has crossed the furnace is marked (tinted or glyphed) from its crossing year on, so the lapse visibly industrialises. (3) The board gains an industry column (industry points) beside People/Land/Pop. (4) The ticker carries crossings ('X's heartland lights its furnaces, 1782') beside treaties. (5) The record is save-format state (envelope version; claim it through the ledger BL-1081 adds, or by the scan if that has not landed). Watched and unwatched runs byte-identical; world_determinism digests unchanged.\n\nDONE WHEN. A live Release click-through of round 6 where industry visibly spreads across the span, the board ranks industry, and the ticker names crossings."
+   "design": "RULED (Ben, 2026-09-24). Found watching BL-1068's round 6: it animates borders and seats, but the phase's story is industry, and none of it shows — on the verify seed the map barely changes 1810-1960. INDUSTRIALISATION.md § Beat 1 owns what industrialises (industry points; a region's furnace crossing, region::industrial_year; the Industry tree).\n\nTHE WORK (a reading to confirm at the live click, not a closed design). (1) The span's timelapse records, per sampled year, the industry the round is about: which regions have crossed the furnace (by year), each polity's industry points, and the railway/road corridors the span lays if it lays any — whatever the span actually computes; do not invent a quantity it lacks. (2) The map: a region that has crossed the furnace is marked (tinted or glyphed) from its crossing year on, so the lapse visibly industrialises. (3) The board gains an industry column (industry points) beside People/Land/Pop. (4) The ticker carries crossings ('X's heartland lights its furnaces, 1782') beside treaties. (5) The record is save-format state (envelope version; claim it through the ledger BL-1081 adds, or by the scan if that has not landed). Watched and unwatched runs byte-identical; world_determinism digests unchanged.\n\nDONE WHEN. A live Release click-through of round 6 where industry visibly spreads across the span, the board ranks industry, and the ticker names crossings.\n\nMAP LAYER RULED (Ben, 2026-09-24): the built map layer marks furnace crossings, but the span world never draws them (settlement's Stage 4 runs only on worlds that start at 1700+; CORPORATION_GENERATION.md: antiquity worlds skip Stage 4) — on the verify seed the map and ticker stay empty while the board's Ind column rises 17.2M -> 31.4M. Ben's call: the map shows INDUSTRY POINTS as a heat — by region where the span records points per region, else by polity territory — because that is what the span computes. The furnace marks and crossing ticker lines stay, inert until a world draws crossings. Live click owed after the heat lands."
   },
   {
    "status": "complete",
@@ -619,6 +619,30 @@
    ],
    "design": "RULED (Ben, 2026-09-24). Two agents bumped save_game_version (the envelope, save_game.cpp) in one day (BL-1068 to 18, BL-1074 to 19) with no ledger: next_save_version.js reads only world_save_version, and an envelope line in the ledger made it report a false collision. THE WORK: the tool reads both constants and every ref, the ledger records which version a claim is for (world or envelope), and it reports the next safe number of each. DONE WHEN: `node tools/session/next_save_version.js` prints both and the ledger's existing rows parse unchanged.",
    "resolved": "2026-09-24"
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "author": "Ben (2026-09-24, yes at the re-bless); Claude (found by BL-1076's reproducibility check)",
+   "requires": [
+    "BL-1076"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1082",
+   "short_name": "STATE_HASH_FOLDS_SEAT",
+   "category": "Engine",
+   "priority": "B",
+   "difficulty": 1,
+   "title": "The world state hash folds in the seat, so two different picks no longer hash alike",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "src/world/world.cpp",
+    "tools/verify/seat_pick_check.js"
+   ],
+   "design": "RULED (Ben, 2026-09-24): fold is_player / player_entity into world::state_hash, AT THE SPRINT 46 RE-BLESS (it moves every pinned hash, so it rides the one re-bless rather than forcing a second). Found by BL-1076: seat_pick_check had to read the player id beside the hash because two different picks hashed alike. DONE WHEN: the hash differs for two picks on one world; seat_pick_check asserts that from the hash alone; the moved pins are part of the re-bless's recorded old -> new."
   }
  ]
 }

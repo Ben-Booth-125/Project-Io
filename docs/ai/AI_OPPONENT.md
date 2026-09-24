@@ -734,6 +734,14 @@ above. This is deliberate triple-duty:
 - **Out-of-process policies (C/D)**: an external policy consumes the state export and returns
   commands — the same contract, across a process boundary.
 
+**A command may be legal only before play (Ben, 2026-09-24).** Choosing the corporation to play
+(`take_seat`) is a game act, so it is a `corp_command` like any other and an agent can make it;
+but it means nothing once play has begun. The **host** checks the phase — the in-play hosts
+(`--serve`, the live agent seam) refuse a pre-play verb as `rejected_state` — and the seam
+validates its arguments as untrusted input like every other verb. This is the pattern for any
+act that belongs to setting up a game rather than playing it: one verb, one dictionary entry,
+the phase gate at the host, never a second command path.
+
 **State export** (`export_corp_blackboard`, `--export-blackboard <corp|all>`; BL-206, blackboard
 export). A compact, tick-tagged, per-corp view of `corp_fact` records — `(tick, subject,
 predicate, value, confidence, provenance)`, schema-versioned, deterministically ordered

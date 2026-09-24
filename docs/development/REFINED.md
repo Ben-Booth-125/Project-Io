@@ -177,7 +177,8 @@ adopts the wizard's world. The economy thread (BL-1066 and the steel collapse) r
 
 **The one re-bless** (Ben, 2026-09-24: "Ok"): authorised in principle, taken ONCE after sprint 46's
 world-movers have landed (BL-1003, BL-995, BL-1066's slices, BL-1049, the epoch flip). Until then every
-digest movement is reported old -> new in its commit and nothing is re-pinned.
+digest movement is reported old -> new in its commit and nothing is re-pinned. BL-1082 (the hash folds in
+the seat) lands in the same re-bless.
 
 - [ ] **BL-1067 (rename to Industrialisation)** — agent in a worktree; digests must not move.
 - [ ] **BL-1068 (round 6 plays the span)** — after BL-1067; a live click-through is its done-when.
