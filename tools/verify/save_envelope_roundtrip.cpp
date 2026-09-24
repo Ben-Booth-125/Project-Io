@@ -291,7 +291,21 @@ save_envelope make_envelope()
     be.prehistory_timelapse.events.push_back(lapse_event{-1200, 2, 1, 7, 3});
     be.prehistory_timelapse.events.push_back(lapse_event{-1150, 5, 0, 2, 1});
 
+    // BL-1068, save_game_version 18 -- the Industrialisation span's own
+    // record, written AFTER exploration_timelapse. Distinct from the
+    // prehistory record in every field a misplaced read would land on.
+    be.industrialisation_timelapse.region_stride = 2;
+    be.industrialisation_timelapse.start_year    = 1660;
+    be.industrialisation_timelapse.years         = 300;
+    be.industrialisation_timelapse.changes.push_back(owner_change{1661, 1, 4});
+    be.industrialisation_timelapse.changes.push_back(owner_change{1873, 0, 9});
+    be.industrialisation_timelapse.events.push_back(lapse_event{1914, 1, 1, 9, 6});
+
     e.report.bodies.push_back(be);
+    e.report.industrialisation_years     = 300;
+    e.report.industrialisation_battles   = 417;
+    e.report.industrialisation_conquests = 63;
+    e.report.industrialisation_foundings = 29;
 
     // BL-768's three report counters, at DISTINCT non-default values.
     //
@@ -505,6 +519,32 @@ int main()
                      && t.events[i].other  == o.events[i].other;
             check(ev_ok && o.events.size() == 3,
                   "S3 the event layer survives whole, field for field, sentinel included (BL-916)");
+        }
+        // BL-1068, save_game_version 18 -- the Industrialisation span's own
+        // record and counters, field for field, and NOT the prehistory
+        // record read into the wrong slot.
+        {
+            bool ind_ok = le.report.bodies.size() == 1;
+            if (ind_ok)
+            {
+                const era_timelapse& t = le.report.bodies[0].industrialisation_timelapse;
+                const era_timelapse& o = env.report.bodies[0].industrialisation_timelapse;
+                ind_ok = t.region_stride == 2 && t.start_year == 1660 && t.years == 300
+                      && t.changes.size() == o.changes.size()
+                      && t.events.size() == 1 && t.events[0].year == 1914
+                      && t.events[0].region == 1 && t.events[0].polity == 9
+                      && t.events[0].other == 6;
+                for (std::size_t i = 0; ind_ok && i < o.changes.size(); ++i)
+                    ind_ok = t.changes[i].year == o.changes[i].year
+                          && t.changes[i].region == o.changes[i].region
+                          && t.changes[i].owner == o.changes[i].owner;
+            }
+            check(ind_ok && le.report.industrialisation_years == 300
+                      && le.report.industrialisation_battles == 417
+                      && le.report.industrialisation_conquests == 63
+                      && le.report.industrialisation_foundings == 29,
+                  "S3 the Industrialisation span's record and its four counters survive "
+                  "whole (BL-1068)");
         }
         check(le.report.bodies.size() == 1
                   && le.report.bodies[0].settlement.lacunae == 6

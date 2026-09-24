@@ -156,7 +156,18 @@ inline constexpr uint32_t save_game_magic =
 /// bump. Serialised at all because the Generation Ledger replays a body's tiles
 /// from the saved record, and the Life phase's palaeo pre-pass now reads the
 /// series; a replay without it would place coal and petroleum from the present.
-inline constexpr uint32_t save_game_version = 16; // BL-961, the thermal series
+///
+/// LAYOUT 18 = LAYOUT 16 PLUS ONE `era_timelapse` PER BODY ENTRY, PLUS FOUR
+/// REPORT-LEVEL COUNTERS (BL-1068, the Industrialisation span's own record):
+/// `generation_report::body_entry::industrialisation_timelapse`, written by
+/// `w_body_entry` right after `exploration_timelapse`, and
+/// `industrialisation_years/battles/conquests/foundings`, written by `w_report`
+/// at its tail after the handoff verdict. The BL-946 shape one span later, and
+/// the same strict-equality refusal: a v16 stream has no bytes there. 18 and
+/// not 17 because an unmerged branch (worktree-agent-a56fcafdff713aafe, BL-841)
+/// already carries a v17 layout of its own -- two layouts must never share a
+/// number (the v6 note above), so the later claim skips it.
+inline constexpr uint32_t save_game_version = 18; // BL-1068, the Industrialisation record
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.
