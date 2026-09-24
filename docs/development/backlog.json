@@ -364,6 +364,59 @@
     "src/world/corp_ai.cpp"
    ],
    "design": "RULED IN DIRECTION (Ben, 2026-09-24: 'goods should move'); the MECHANISM is open. FOUND on BL-1066: auto-surplus sells every unit above processor reservation to the local market (the market is buyer of last resort), and market inventory has no owner, so nothing hauls it — on the epoch-0 verify world ~3,300 steel sat on 13 of 255 shelves while construction sites elsewhere paused for it. BL-995 (trade reaches for price) makes a SELLER haul before it sells; stock already on a shelf still cannot move.\n\nMECHANISM OPTIONS (Ben's call, then written into SUPPLY.md and MARKETS.md): (a) any corporation may BUY shelf stock at the shelf's price and haul it under the same net-price rule — a merchant is just a corp acting on a gap, one rule for every corp; (b) the market itself exports its surplus shelf stock by the net-price rule, the haul paid from the sale; (c) a construction site or processor may buy from the nearest stocked shelf across markets, paying the haul (narrow: fixes consumers, not trade).\n\nDONE WHEN. A shelf holding a good that another market prices above landed cost is drawn down by hauls, measured by haulage_measure --far-trade and steel_chain_probe's shelf geography."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1072",
+   "short_name": "LOADING_WAIT_SAYS_WHAT",
+   "requires": [
+    "BL-1068"
+   ],
+   "author": "Ben (2026-09-24, watching round 6 load); Claude",
+   "category": "UI",
+   "priority": "S",
+   "difficulty": 2,
+   "title": "A wizard wait never looks stopped: a caption names the step, every long pass moves the bar, and an elapsed count shows it is alive",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/hard_coded_world.hpp",
+    "src/world/corporation_generation.cpp",
+    "src/core/app.cpp"
+   ],
+   "design": "RULED (Ben, 2026-09-24): option B with A — STARTUP.md § A wait never looks stopped owns it. Found watching BL-1068's round 6 load in the Release build: after the span's year bar completes, the full build runs borders, roads, companies and finishing with no progress inside any of them (post-era ~10.7 s Release in world_determinism's pass split), so the outer bar sits on one step and the screen reads as frozen.\n\nTHE WORK. (1) MEASURE each post-span pass in Release (the BL-754 generation budget reports per-pass wall clock) and weight the outer bar's steps by it. (2) Sub-progress inside every pass over ~1 s (drawing borders, laying roads, placing companies, finishing; per nation / per centre / per candidate as the loop allows) through generation_progress's sub_progress/sub_total. (3) A caption under the bar from generation_stage_labels naming the step under way. (4) An elapsed-seconds count under it. (5) The same wait surface on every loading round and the building screen (app::draw_building_screen), so there is one wait, not two. generation_progress is written from the worker thread: atomics only, and reporting must not change what the build computes (world_determinism digests unchanged).\n\nDONE WHEN. On a live Release load of round 6 the bar never holds still for more than ~1 s, the caption names each step, and the digests are unchanged."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1073",
+   "short_name": "BEGIN_ADOPTS_WIZARD_WORLD",
+   "requires": [
+    "BL-1068",
+    "BL-1072"
+   ],
+   "author": "Ben (2026-09-18, NR-898 (5)); Claude (filed from the sprint 46 draft 2026-09-24 — Ben: 'after pressing Begin, we just ignored all the previous steps and reload')",
+   "category": "UI",
+   "priority": "S",
+   "difficulty": 4,
+   "title": "Begin starts the game on the world the wizard built, instead of rebuilding it",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/core/app.cpp",
+    "src/core/app.hpp"
+   ],
+   "design": "FILED 2026-09-24 after Ben saw Begin discard the wizard's world and reload. BL-1068 made round 6 run the FULL build (no stop flag), so the world Begin needs now exists at the end of the wizard. File:line anchors below are 2026-09-18; re-read them.\n\n--- FROM THE SPRINT 46 DRAFT ---\nRULED (Ben, 2026-09-18, NR-898 (5)); re-files BL-1025 (archived unbuilt).\n\nWHY. The wizard's worker calls make_hard_coded_world with a stop flag (chosen :335-338), keeps only the record and discards the world (startup_screens.cpp:345-353); a world stopped at a round has no nations, roads or corporations (:325-327; returns hard_coded_world.cpp:1688-1717). Begin (startup_screens.cpp:1648-1651, :1806) calls app::begin_new_game (app.cpp:502-561), which reloads config and rebuilds (:553-558); poll_worldgen (:617) then runs start_new_game_prelude (:653, defined :985): setup_world (:1019), economy, landscape search (:1057-1076). Invalidation already exists: m_wiz_history_stale (startup_screens.cpp:380-388), invalidate_wizard_rounds_below (app.hpp:274-287, called :971). Under --verify the wizard adopts the harness report (:292-303).\n\nTHE WORK. Measure the Release build cost first (BL-1025's 73 s was Debug). Round 6's run is the full build; keep the finished world and its report. begin_new_game moves a valid cached world into m_world and jumps to the poll_worldgen tail (prelude, validation run, seat); otherwise the async build. Any world-changing control drops the cache via the stale flag. STARTUP.md states the cache's owner, invalidation rule and memory cost (a world is large; memory caps this machine).\n\nDONE WHEN. With a valid cache Begin never calls make_hard_coded_world (log); a reroll on any round drops it; an adopted world and a cold rebuild with the same settings have the same state hash; checked live."
   }
  ]
 }

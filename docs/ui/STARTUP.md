@@ -278,6 +278,15 @@ The calculation is fast and jerky; the lapse is paced and readable; showing the 
 it were the second made the second impossible to follow, and hid the hand-over between rounds
 entirely. Accepting moves to the next round; rerolling runs it again.
 
+**A wait never looks stopped, and it says what it is doing (Ben, 2026-09-24, amending the above).**
+The Industrialisation round's wait runs the rest of the world build after its span — borders,
+roads, companies — and the bar sat on one step for the length of those passes, reading as a
+wait on nothing. So: **a caption under the bar names the step under way** ("Drawing borders",
+"Placing companies"), **every long pass reports progress within itself**, so the bar moves for
+as long as the wait lasts, and **an elapsed-seconds count** under it shows the run is alive. The
+outer bar's steps are weighted by what each pass costs, measured, not counted as equals. The
+surface is otherwise as above: one line, the bars, no map, no board.
+
 **There is no Run button (Ben, 2026-09-09).** Arriving on the round IS the instruction
 to run it, so the press that moves onto a pass round starts its pass — it is already
 under way while the round's first frame draws. A button here asked a question with one

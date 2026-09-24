@@ -119,25 +119,6 @@
   },
   {
    "group": "wizard",
-   "short_name": "BEGIN_ADOPTS_WIZARD_WORLD",
-   "title": "Begin starts the game on the world the wizard built, instead of rebuilding it",
-   "priority": "S",
-   "difficulty": 3,
-   "world_mover": false,
-   "requires": [
-    "ROUND_SIX_PLAYS_SPAN"
-   ],
-   "authority_doc": "docs/ui/STARTUP.md",
-   "design": "RULED (Ben, 2026-09-18, NR-898 (5)); re-files BL-1025 (archived unbuilt).\n\nWHY. The wizard's worker calls make_hard_coded_world with a stop flag (chosen :335-338), keeps only the record and discards the world (startup_screens.cpp:345-353); a world stopped at a round has no nations, roads or corporations (:325-327; returns hard_coded_world.cpp:1688-1717). Begin (startup_screens.cpp:1648-1651, :1806) calls app::begin_new_game (app.cpp:502-561), which reloads config and rebuilds (:553-558); poll_worldgen (:617) then runs start_new_game_prelude (:653, defined :985): setup_world (:1019), economy, landscape search (:1057-1076). Invalidation already exists: m_wiz_history_stale (startup_screens.cpp:380-388), invalidate_wizard_rounds_below (app.hpp:274-287, called :971). Under --verify the wizard adopts the harness report (:292-303).\n\nTHE WORK. Measure the Release build cost first (BL-1025's 73 s was Debug). Round 6's run is the full build; keep the finished world and its report. begin_new_game moves a valid cached world into m_world and jumps to the poll_worldgen tail (prelude, validation run, seat); otherwise the async build. Any world-changing control drops the cache via the stale flag. STARTUP.md states the cache's owner, invalidation rule and memory cost (a world is large; memory caps this machine).\n\nDONE WHEN. With a valid cache Begin never calls make_hard_coded_world (log); a reroll on any round drops it; an adopted world and a cold rebuild with the same settings have the same state hash; checked live.",
-   "files": [
-    "src/ui/startup_screens.cpp",
-    "src/core/app.cpp",
-    "src/core/app.hpp",
-    "docs/ui/STARTUP.md"
-   ]
-  },
-  {
-   "group": "wizard",
    "short_name": "PLAY_HANDOFF_CONTRACT",
    "title": "One play-handoff struct carries every row of What crosses into play, each carried or stated deferred, and world setup reads only it",
    "priority": "S",
