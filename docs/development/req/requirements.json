@@ -8122,6 +8122,339 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "from-life-to-people",
+   "title": "BL-1091 - The Life round hands a named world and its cradles to Culture",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1091 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: generation_charts.cpp chain table; startup_screens.cpp lean rows",
+      "visual: scripts/verify/<name>.lua (name it)"
+     ],
+     "requirement": "The chart chain table gives Life = water..legacy with Spend parked in a third group captioned for the History ledger alone (no Inheritance question); the Legacy panel is the Life round's closing fold; the Drawdown lean row sits on the Life round under that fold and changing it re-runs the Life-gate world. (item-spanning gate: a verify script capturing the Life round's last fold and the Culture round's first frame)",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: settlement.hpp records; hard_coded_world.cpp build_migration_timelapse; era_timelapse.hpp",
+      "headless: world_determinism x2; save_envelope_roundtrip"
+     ],
+     "requirement": "A cradle lapse kind (region = the cradle seat, dated -2400; append-only; the envelope bump) is emitted per people, with cradle names and packages retained as two pure-output records on settlement_state and resolved read-side; the Culture ticker's first lines name each cradle and its package; digests unmoved.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: startup_screens.cpp wait/cross-fade; history_lapse.cpp header",
+      "visual: capture at the fade"
+     ],
+     "requirement": "The globe holds in the pane during the Culture wait and cross-fades into the map under a 2400 BCE stamp; no blank pane on Next from Life; the body name sits on every lapse header (rounds 3-6).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "doc: docs/generation/PLANETOLOGY.md",
+      "visual: capture of the History ledger Chain view"
+     ],
+     "requirement": "PLANETOLOGY.md § S8 Legacy / § Preferences, COLONISATION.md § The domestication package and STARTUP.md § Rounds match the built behaviour; the History ledger still shows Spend.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "visual: Ben's live click"
+     ],
+     "requirement": "LIVE: Ben's click — Next on Life dissolves the globe into the map; the ticker names the cradles; the header carries the world's name; the Drawdown lean sits on Life.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "routes-and-splits-on-the-map",
+   "title": "BL-1092 - The migration shows its roads",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1092 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: history_lapse.cpp arrow bake",
+      "visual: capture at the hop year"
+     ],
+     "requirement": "Each founding bakes a fading line from its people's previous region (owner_change + culture_split parent), dashed where lapse_corridor_over_water says so; on a seed with an overseas hop a dashed line is visible at its year. (item-spanning gate)",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: hard_coded_world.cpp fold",
+      "headless: world_determinism x2",
+      "visual: capture at a split year"
+     ],
+     "requirement": "build_migration_timelapse emits parent-then-daughter changes for every culture_recultured entry so a recultured range changes hue at the ticker's split line, not before; report-side, digests unmoved.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: history_lapse.cpp board",
+      "visual: capture of the Culture board"
+     ],
+     "requirement": "Folded daughters leave the ticker; the board carries a peoples coined / folded census and a migration counter; the board reads peoples / Homeland with no battle cells (shared with BL-1106).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: startup_screens.cpp clamp",
+      "visual: capture on an overrun seed (name the seed)"
+     ],
+     "requirement": "A presentation clamp holds the round-3 playhead at 400 BCE with the caption 'the migration ran N years past 400 BCE' on an overrun seed, and round 4 opens at 400 BCE; the record is untouched (BL-947).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "visual: Ben's live click"
+     ],
+     "requirement": "LIVE: Ben's click on the Culture round.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "fleets-and-ties",
+   "title": "BL-1095 - The Exploration round shows fleets that are there",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1095 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: history_sim.cpp sampling and note; era_timelapse.hpp",
+      "headless: world_determinism x2; save_envelope_roundtrip"
+     ],
+     "requirement": "navy_stock and the capital's port_stock_q are series fields on polity_sample (record-only writes; digests unmoved) and one sea_leg_campaign event (region = target, polity = attacker, other = staging hub; append-only; the envelope bump) is noted at the wet campaign launch. (item-spanning gate)",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: history_lapse.cpp ties and arcs",
+      "visual: capture at a subject_bound line"
+     ],
+     "requirement": "Round 5 bakes dashed overlord -> subject ties from subject_bound / subject_freed / realm_ended (fading to a trade line where a trade_access treaty follows) and treaty arcs between party capitals that snap at treaty_broken, endpoints from the capital-at-year fold (BL-1088; the seat region until it lands).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: history_lapse.cpp glyphs",
+      "visual: captures"
+     ],
+     "requirement": "A hull glyph at each capital scaled by navy_stock; a harbour mark that grows and silts with port_stock_q; a sail crossing the water on each sea_leg_campaign; an over-water seat_captured drawn as a landing (water sampler); the lane line (BL-1097) stays its own layer.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "visual: Ben's live click"
+     ],
+     "requirement": "LIVE: Ben's click — a tie appears at 'falls under the overlordship of' and vanishes or fades at 'breaks from'; a hull shrinks when the fleet lapses; a sail crosses; a landing shows.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "works-chartered-events",
+   "title": "BL-1099 - Company creation flashes and the seat briefing's origin sentence",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1099 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: history_sim.cpp span loop; era_timelapse.hpp",
+      "headless: industrialisation_sim_harness (f=0 control equality; event count bounded and monotone in stock)"
+     ],
+     "requirement": "A works_chartered kind (region, polity = holder, other = focus; append-only; the envelope bump) fires in the span loop after the year's accrual when a region's industry_points crosses the next multiple of f x the RUNNING price (world stock so far / the charter divisor), from a loop-local per-region counter, capped per region per round, on the same switches that let the span record points; f a validated history_sim_params field, 0 disabling; a suppressed run is bit-identical on every other output; points are not debited. (item-spanning gate)",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: industrialisation_sim_harness column"
+     ],
+     "requirement": "f is read off the harness (works events vs 1960 firm count per seed on the 16 curated seeds) before it is pinned, starting at 1; the reading is written into the item.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: components.hpp; world_save.cpp; corporation_generation.cpp; seat_screen.cpp",
+      "headless: save_roundtrip",
+      "visual: capture of the briefing"
+     ],
+     "requirement": "corporation_component gains founded_year and origin_region (world save bump, claimed), set in charter_web_from_budget; the seat briefing carries one origin sentence from the firm's fields and owner_slice_at: 'Chartered from <city>'s industry, in <region>, under <nation>, the realm of <X> since <year>'.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: history_lapse.cpp flash; the close hand-off from the charter report",
+      "visual: capture of the closing frame and the seat list"
+     ],
+     "requirement": "Round 6 flashes each works at its dated moment (the round-6 marker per BL-1094's rules) and, once the search runs inside the round (BL-1085), the final frame flashes the REAL charters richest-centre-first at their anchor tiles, each dated by pairing a region's k-th firm with its k-th crossing (furnace_lit year where none; 1960 where never); the world-gen roster is never flashed; the flashes are exactly the firms the seat list offers.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "visual: Ben's live click"
+     ],
+     "requirement": "LIVE: Ben's click on round 6 and the briefing.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "rung-crossed-narrated",
+   "title": "BL-1100 - The polity's crossing into the industrial rung is noted and narrated",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1100 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: history_sim.cpp note; history_lapse.cpp",
+      "headless: world_determinism x2; the crossings per seed reported on the 16 seeds"
+     ],
+     "requirement": "The polity crossing (industrial_year at the industrial materials rung, history_sim.cpp:~7025-7030) is noted as a record-only event (furnace_lit with region = capital, or a rung_crossed kind — one choice, documented on the enum); the ticker names it; the ember layer marks the capital from its year; on a seed where none crosses the layer is empty and no line fires; digests unchanged. (item-spanning gate)",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: Ben's live click"
+     ],
+     "requirement": "LIVE: Ben's click — a ticker line names the first realm to cross and its capital shows the mark.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "culture-record-saved",
+   "title": "BL-1104 - The Culture round's record is written on every full run and saved",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1104 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: hard_coded_world.cpp; save_game.cpp",
+      "headless: save_envelope_roundtrip; world_determinism x2"
+     ],
+     "requirement": "body_entry::migration_timelapse is written on every full run from the same build_migration_timelapse fold (not only on the wizard's stop path) and serialised in the sprint's envelope bump; nothing at world setup reads it; a watched and an unwatched build are the same build. (item-spanning gate)",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: save_envelope_roundtrip",
+      "code: next_save_version.js ledger shows one envelope claim for sprint 47"
+     ],
+     "requirement": "Begin on the adopted path, save, load: the envelope carries the migration record; save_game_version moved exactly once for the sprint.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

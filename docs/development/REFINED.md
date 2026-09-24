@@ -175,6 +175,50 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
   other kind marks; STARTUP.md § Identity across the rounds matches. (1094 R1, R2)
 - [ ] T4 captures per kind on a library seed; Release build; cold review; Ben's live click. (R3s)
 
+### Wave 2 (opens as wave 1's lanes land), lane F1 (Culture) — BL-1091 (from Life to people) → BL-1092 (routes and splits). Groups `from-life-to-people`, `routes-and-splits-on-the-map`.
+
+- [ ] T1 (1091) the chain table: Life = water..legacy, Spend alone in a third group captioned for the
+  History ledger (generation_charts.cpp:~30-43); the Legacy panel as the round's closing fold; the
+  Drawdown lean row moves from Culture (startup_screens.cpp:~1555-1558) to Life under it. (1091 R1)
+- [ ] T2 (1091) `cradle` on the enum (append-only; the envelope bump); cradle names and packages as
+  two pure-output records on `settlement_state` (settlement.cpp:~859-875 coins them), resolved
+  read-side in `build_migration_timelapse`; the ticker's opening lines. (1091 R2)
+- [ ] T3 (1091) the globe held through the Culture wait and cross-faded into the map under a 2400 BCE
+  stamp (startup_screens.cpp wait branch ~:1325-1365 and the carry gate ~:473); the body name on
+  every lapse header. (1091 R3)
+- [ ] T4 (1092) region-grain kin arrows baked from the change list and `culture_split` parents,
+  dashed over water (`lapse_corridor_over_water`); parent-then-daughter changes per
+  `culture_recultured` entry in the fold; the board census in place of folded-daughter lines; the
+  400 BCE playhead clamp and caption. (1092 R1-R4)
+- [ ] T5 the verify captures named in the groups; Release build; `world_determinism` twice;
+  `save_envelope_roundtrip`; cold review; Ben's live click. (R5s)
+
+### Wave 2, lane F2 (Exploration) — BL-1095 (fleets and ties). Group `fleets-and-ties`.
+
+- [ ] T1 `navy_stock` and the capital's `port_stock_q` sampled onto `polity_sample`; `sea_leg_campaign`
+  at the wet launch (history_sim.cpp:~5695-5708; append-only; the envelope bump). (R1)
+- [ ] T2 ties and treaty arcs baked from events with endpoints from the capital fold (BL-1088, else the
+  seat region); the hull glyph, the harbour mark, the sail crossing, the landing for an over-water
+  `seat_captured`; the lane line (BL-1097) kept as its own layer. (R2, R3)
+- [ ] T3 captures; Release build; `world_determinism` twice; cold review; Ben's live click. (R4)
+
+### Wave 2, lane F3 (Industrialisation) — BL-1099 (works chartered) with BL-1100 (rung crossing) and BL-1104 (Culture record saved). Groups `works-chartered-events`, `rung-crossed-narrated`, `culture-record-saved`.
+
+- [ ] T1 (1099) `works_chartered` in the span loop after the accrual (history_sim.cpp:~3532-3546
+  region), the running price from the world stock so far over the charter divisor, a loop-local
+  per-region counter, the per-round cap, `works_event_fraction_q` validated and zero-disabled;
+  the harness rows (control equality, bounded/monotone count, events vs firms per seed). (1099 R1, R2)
+- [ ] T2 (1099) `founded_year` / `origin_region` on `corporation_component` (world save bump), set in
+  `charter_web_from_budget`; the briefing's origin sentence (seat_screen.cpp:~478-512). (1099 R3)
+- [ ] T3 (1099) the in-span flash marker and, on BL-1085's charter report, the closing-frame flash of
+  the real charters dated by pairing. (1099 R4)
+- [ ] T4 (1100) the polity crossing noted at history_sim.cpp:~7029 and narrated; the ember layer marks
+  the capital; crossings per seed reported. (1100 R1)
+- [ ] T5 (1104) `body_entry::migration_timelapse` on every full run (hard_coded_world.cpp:~1134 vs
+  ~1670-1673), serialised in the envelope bump. (1104 R1, R2)
+- [ ] T6 harness rows; captures; Release build; `world_determinism` twice; the round trips; cold review;
+  Ben's live click. (R5, R2)
+
 ### Wave 1, lane I3 (voice) — BL-1106 (names and voice). Group `names-and-voice`.
 
 - [ ] T1 the Culture board 'peoples / Homeland', no battle cells; the civilisation/creed name table on
