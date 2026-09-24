@@ -18,54 +18,6 @@
  "items": [
   {
    "group": "retire",
-   "short_name": "TWO_SPAN_ARC_RETIRED",
-   "title": "The superseded 1560->1960 two-span arc and its sim machinery are deleted outright",
-   "priority": "S",
-   "difficulty": 3,
-   "world_mover": false,
-   "requires": [
-    "BL-1047"
-   ],
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-   "design": "RULED (Ben, 2026-09-18, NR-898 (2)): retire outright, no legacy field.\n\nWHY. The arc is chosen at era_minus_one.cpp:25-36 and built at 298-315 (stop = epoch, boundary = epoch - industrial_years, span1_band_ceiling = medieval, two tick bands). Machinery only it uses: history_sim_params::boundary_year and span1_band_ceiling (history_sim.hpp:182-192); sim_band_ceiling (history_sim.hpp:4288-4289; history_sim.cpp:249-258) and the ceiling argument threaded through build_stack (history_sim.cpp:289-300, 4281, 4286, 5762, 5799); the furnace-before-boundary note (history_sim.cpp:6980-6995); the two-span half of BL-976's protection derivation (~7849-7916 — the broadcast half STAYS, seed_national_tariffs reads it at hard_coded_world.cpp:1808-1821); world_params::industrial_years (hard_coded_world.hpp:96-100).\n\nTHE WORK. Delete era_minus_one_has_industrial_span, the two-span branch, industrial_years, boundary_year, span1_band_ceiling, sim_band_ceiling and the ceiling parameter; keep the protection field and broadcast. Harnesses that build the arc are rewritten or retired by the harness item: world_determinism R4 (636-685, digest '1960/two-span' at :666), era_world_harness R5 (113-118, 250-272), history_sweep's two-span reporting (1037-1075, the BL-760 section from 2159, 2509-2520, 3317), ownership_class.cpp:534, demand_census.cpp:1436, haulage_measure.cpp:178.\n\nDONE WHEN. grep industrial_years|boundary_year|span1_band_ceiling|has_industrial_span is empty in src/ and tools/; the '1960/two-span' digest is gone; the epoch-0 digests are unchanged.",
-   "files": [
-    "src/world/era_minus_one.cpp",
-    "src/world/era_minus_one.hpp",
-    "src/world/history_sim.hpp",
-    "src/world/history_sim.cpp",
-    "src/world/hard_coded_world.hpp",
-    "tools/verify/world_determinism.cpp",
-    "tools/verify/era_world_harness.cpp",
-    "tools/verify/history_sweep.cpp"
-   ]
-  },
-  {
-   "group": "retire",
-   "short_name": "NARRATIVE_PASSES_RETIRED",
-   "title": "The three narrative passes that ran only on the superseded arc are deleted: ruptures, the Charter Act and border accord, the 1951 common tongue",
-   "priority": "A",
-   "difficulty": 2,
-   "world_mover": false,
-   "requires": [],
-   "authority_doc": "docs/lore/HISTORY.md",
-   "design": "RULED (Ben, 2026-09-18, NR-898 (3)).\n\nWHY. Every call sits behind !antiquity_start (hard_coded_world.cpp:1854), so only the 1960 arc reaches them. Ruptures: settlement.cpp 1714-2128 (helpers transfer_tile, scale_abundance, flip, redact at 1719-1782), tag_rupture :189, declared settlement.hpp:1111-1136, called hard_coded_world.cpp:1860-1863; writes settlement_state::checkpoints and lacunae (settlement.hpp:801-805), saved at save_game.cpp:388-397, read by history_log.cpp:156-161 and history_sweep.cpp:1154, 3787. Charter Act and border accord: history_ladder.cpp 390-471, history_ladder.hpp:129-145, called :1868-1869; ladder_rung::charter and borders (planetology.hpp:325-326), max_rung saved at save_game.cpp:27. Common tongue: creeds.cpp 278-309 (the dated line :305), creeds.hpp:239-241, called :1875-1876. Tests: settlement_harness S5b, S6a, S6b, S8b (268-295, 355-380); era_world_harness :269; history_ladder_harness :137, 208-251, 277-305; creeds_harness C4 (170-194).\n\nTHE WORK. Delete the three functions, their calls and the antiquity_start flag. DECIDE AT THE CUT (unsure in the read): lacunae has no other writer, so it goes; checkpoints has one other writer, resolve_plague_event (settlement.cpp:2502), whose only callers found were in demography_harness — keep or drop the field and its save record. Whether ladder_rung::charter and borders go (the save's max_rung moves with them). Fix the comments at hard_coded_world.cpp:1849-1853 and :1883. Remove or rewrite C4, the charter/accord checks, S6, S8b and R5's rupture check.\n\nDONE WHEN. grep resolve_historical_ruptures|record_institutional_history|record_globalisation is empty; the harness gate is green; the epoch-0 digests are unchanged.",
-   "files": [
-    "src/world/settlement.cpp",
-    "src/world/settlement.hpp",
-    "src/world/history_ladder.cpp",
-    "src/world/history_ladder.hpp",
-    "src/world/creeds.cpp",
-    "src/world/creeds.hpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/planetology.hpp",
-    "src/core/save_game.cpp",
-    "tools/verify/settlement_harness.cpp",
-    "tools/verify/history_ladder_harness.cpp",
-    "tools/verify/creeds_harness.cpp"
-   ]
-  },
-  {
-   "group": "retire",
    "short_name": "HARNESSES_ON_BUILT_WORLDS",
    "title": "Every harness measures a world the game builds, and every calibration constant names a measurement on one",
    "priority": "A",

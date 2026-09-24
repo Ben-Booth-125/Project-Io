@@ -417,6 +417,62 @@
     "src/core/app.hpp"
    ],
    "design": "FILED 2026-09-24 after Ben saw Begin discard the wizard's world and reload. BL-1068 made round 6 run the FULL build (no stop flag), so the world Begin needs now exists at the end of the wizard. File:line anchors below are 2026-09-18; re-read them.\n\n--- FROM THE SPRINT 46 DRAFT ---\nRULED (Ben, 2026-09-18, NR-898 (5)); re-files BL-1025 (archived unbuilt).\n\nWHY. The wizard's worker calls make_hard_coded_world with a stop flag (chosen :335-338), keeps only the record and discards the world (startup_screens.cpp:345-353); a world stopped at a round has no nations, roads or corporations (:325-327; returns hard_coded_world.cpp:1688-1717). Begin (startup_screens.cpp:1648-1651, :1806) calls app::begin_new_game (app.cpp:502-561), which reloads config and rebuilds (:553-558); poll_worldgen (:617) then runs start_new_game_prelude (:653, defined :985): setup_world (:1019), economy, landscape search (:1057-1076). Invalidation already exists: m_wiz_history_stale (startup_screens.cpp:380-388), invalidate_wizard_rounds_below (app.hpp:274-287, called :971). Under --verify the wizard adopts the harness report (:292-303).\n\nTHE WORK. Measure the Release build cost first (BL-1025's 73 s was Debug). Round 6's run is the full build; keep the finished world and its report. begin_new_game moves a valid cached world into m_world and jumps to the poll_worldgen tail (prelude, validation run, seat); otherwise the async build. Any world-changing control drops the cache via the stale flag. STARTUP.md states the cache's owner, invalidation rule and memory cost (a world is large; memory caps this machine).\n\nDONE WHEN. With a valid cache Begin never calls make_hard_coded_world (log); a reroll on any round drops it; an adopted world and a cold rebuild with the same settings have the same state hash; checked live."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "difficulty": 3,
+   "id": "BL-1074",
+   "short_name": "NARRATIVE_PASSES_RETIRED",
+   "requires": [],
+   "author": "Ben (2026-09-18, NR-898 (3)); Claude (filed from the sprint 46 draft 2026-09-24, Ben: start the retirement)",
+   "priority": "A",
+   "title": "The three narrative passes that ran only on the superseded arc are deleted: ruptures, the Charter Act and border accord, the common tongue",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/history_ladder.cpp",
+    "src/world/creeds.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/core/save_game.cpp"
+   ],
+   "design": "FILED 2026-09-24 (Ben: 'start the retirement'). File:line anchors below are 2026-09-18 and predate sprint 45's close and BL-1067's rename; re-read them.\n\n--- FROM THE SPRINT 46 DRAFT ---\nRULED (Ben, 2026-09-18, NR-898 (3)).\n\nWHY. Every call sits behind !antiquity_start (hard_coded_world.cpp:1854), so only the 1960 arc reaches them. Ruptures: settlement.cpp 1714-2128 (helpers transfer_tile, scale_abundance, flip, redact at 1719-1782), tag_rupture :189, declared settlement.hpp:1111-1136, called hard_coded_world.cpp:1860-1863; writes settlement_state::checkpoints and lacunae (settlement.hpp:801-805), saved at save_game.cpp:388-397, read by history_log.cpp:156-161 and history_sweep.cpp:1154, 3787. Charter Act and border accord: history_ladder.cpp 390-471, history_ladder.hpp:129-145, called :1868-1869; ladder_rung::charter and borders (planetology.hpp:325-326), max_rung saved at save_game.cpp:27. Common tongue: creeds.cpp 278-309 (the dated line :305), creeds.hpp:239-241, called :1875-1876. Tests: settlement_harness S5b, S6a, S6b, S8b (268-295, 355-380); era_world_harness :269; history_ladder_harness :137, 208-251, 277-305; creeds_harness C4 (170-194).\n\nTHE WORK. Delete the three functions, their calls and the antiquity_start flag. DECIDE AT THE CUT (unsure in the read): lacunae has no other writer, so it goes; checkpoints has one other writer, resolve_plague_event (settlement.cpp:2502), whose only callers found were in demography_harness — keep or drop the field and its save record. Whether ladder_rung::charter and borders go (the save's max_rung moves with them). Fix the comments at hard_coded_world.cpp:1849-1853 and :1883. Remove or rewrite C4, the charter/accord checks, S6, S8b and R5's rupture check.\n\nDONE WHEN. grep resolve_historical_ruptures|record_institutional_history|record_globalisation is empty; the harness gate is green; the epoch-0 digests are unchanged."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "difficulty": 3,
+   "id": "BL-1075",
+   "short_name": "TWO_SPAN_ARC_RETIRED",
+   "requires": [
+    "BL-1047",
+    "BL-1074"
+   ],
+   "author": "Ben (2026-09-18, NR-898 (2)); Claude (filed from the sprint 46 draft 2026-09-24)",
+   "priority": "A",
+   "title": "The superseded 1560->1960 two-span arc and its sim machinery are deleted outright",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/world/era_minus_one.cpp",
+    "src/world/era_minus_one.hpp",
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.hpp",
+    "tools/verify/world_determinism.cpp",
+    "tools/verify/era_world_harness.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "design": "FILED 2026-09-24. After BL-1047 (the epoch flip): the old arc is today's only route to a 1960 world, so it goes once the flip gives the span world that route. File:line anchors below are 2026-09-18; re-read them.\n\n--- FROM THE SPRINT 46 DRAFT ---\nRULED (Ben, 2026-09-18, NR-898 (2)): retire outright, no legacy field.\n\nWHY. The arc is chosen at era_minus_one.cpp:25-36 and built at 298-315 (stop = epoch, boundary = epoch - industrial_years, span1_band_ceiling = medieval, two tick bands). Machinery only it uses: history_sim_params::boundary_year and span1_band_ceiling (history_sim.hpp:182-192); sim_band_ceiling (history_sim.hpp:4288-4289; history_sim.cpp:249-258) and the ceiling argument threaded through build_stack (history_sim.cpp:289-300, 4281, 4286, 5762, 5799); the furnace-before-boundary note (history_sim.cpp:6980-6995); the two-span half of BL-976's protection derivation (~7849-7916 — the broadcast half STAYS, seed_national_tariffs reads it at hard_coded_world.cpp:1808-1821); world_params::industrial_years (hard_coded_world.hpp:96-100).\n\nTHE WORK. Delete era_minus_one_has_industrial_span, the two-span branch, industrial_years, boundary_year, span1_band_ceiling, sim_band_ceiling and the ceiling parameter; keep the protection field and broadcast. Harnesses that build the arc are rewritten or retired by the harness item: world_determinism R4 (636-685, digest '1960/two-span' at :666), era_world_harness R5 (113-118, 250-272), history_sweep's two-span reporting (1037-1075, the BL-760 section from 2159, 2509-2520, 3317), ownership_class.cpp:534, demand_census.cpp:1436, haulage_measure.cpp:178.\n\nDONE WHEN. grep industrial_years|boundary_year|span1_band_ceiling|has_industrial_span is empty in src/ and tools/; the '1960/two-span' digest is gone; the epoch-0 digests are unchanged."
   }
  ]
 }
