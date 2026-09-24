@@ -176,7 +176,18 @@ inline constexpr uint32_t save_game_magic =
 /// and border-accord rungs having gone with their pass. A v18 stream carries
 /// bytes this reader no longer consumes, so it is refused whole on the same
 /// strict-equality contract as every prior bump.
-inline constexpr uint32_t save_game_version = 19; // BL-1074, the narrative passes retired
+///
+/// LAYOUT 21 = LAYOUT 19 PLUS ONE INT64 AT THE TAIL OF EVERY POLITY SAMPLE, AND
+/// ONE MORE EVENT KIND (BL-1080, the Industrialisation round shows industry):
+/// `polity_sample::industry_points`, written by `w_timelapse` after
+/// `cap_materials` in all four time-lapse records and read back in the same
+/// place by `r_timelapse` (a negative is corrupt); and
+/// `lapse_event_kind::furnace_lit`, which moves `lapse_event_kind::count` and so
+/// the event-kind range check. A v19 stream is eight bytes short per sample,
+/// so it is refused whole on the same strict-equality contract. 21 and not 20
+/// because the generation lane holds 20 (the v6 note above: two layouts never
+/// share a number).
+inline constexpr uint32_t save_game_version = 21; // BL-1080, round 6 shows industry
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

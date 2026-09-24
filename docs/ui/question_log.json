@@ -787,31 +787,34 @@
   "wizard_round_substrate": {
    "surface": "New World wizard - round 7, Industrialisation",
    "answers": "What does that ground produce, and who trades it?",
-   "because": "Rounds 4, 5 and 6 settle who reached this ground, who then held it, and who reached beyond it; what that ground PRODUCES is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Named Industrialisation (BL-946, BL-1067) as the honest label for 1660 -> 1960 CE. BL-1068 (round six plays the span) retires the labelled placeholder: the round is a LAPSE ROUND like the three before it, because its subject - cities lighting, rail spreading, people moving, subjects breaking away - happens across a span, and a map that moves shows it where a still page cannot. Its run is the FULL build with no stop (the world Begin builds), and it replays its own recorded span (`generation_report::body_entry::industrialisation_timelapse`, with its own battle/conquest/founding counters) on the same map, board, ticker and transport as rounds 3-5, carrying Exploration's last frame in under its opening tenth.",
+   "because": "Rounds 4, 5 and 6 settle who reached this ground, who then held it, and who reached beyond it; what that ground PRODUCES is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Named Industrialisation (BL-946, BL-1067) as the honest label for 1660 -> 1960 CE. BL-1068 (round six plays the span) retires the labelled placeholder: the round is a LAPSE ROUND like the three before it, because its subject - cities lighting, rail spreading, people moving, subjects breaking away - happens across a span, and a map that moves shows it where a still page cannot. Its run is the FULL build with no stop (the world Begin builds), and it replays its own recorded span (`generation_report::body_entry::industrialisation_timelapse`, with its own battle/conquest/founding counters) on the same map, board, ticker and transport as rounds 3-5, carrying Exploration's last frame in under its opening tenth. BL-1080 (round six shows industry; Ben, 2026-09-24): watching BL-1068's round showed borders and seats moving while the phase's story - industry - did not show at all, and on the verify seed the map barely changed 1810-1960. So the record carries what the span actually computes about industry - each region's furnace crossing (with the crossings it inherited, at their own years) and each polity's industry points per step - and the round draws it three ways: an ember mark on every region that has crossed, from its crossing year on; an industry column on the board, only on a record that carries points; and each crossing named in the ticker. Rail is not drawn, because the span lays none of its own.",
    "backlog_item": [
     "BL-816",
     "BL-819",
     "BL-824",
     "BL-860",
     "BL-946",
-    "BL-1068"
+    "BL-1068",
+    "BL-1080"
    ],
    "files": [
     "src/ui/startup_screens.cpp",
-    "src/ui/history_lapse.cpp"
+    "src/ui/history_lapse.cpp",
+    "src/world/history_sim.cpp"
    ],
    "status": "drafted"
   },
   "wizard_round_history_board": {
    "surface": "New World wizard - the lapse rounds' top-sixteen board",
    "answers": "Which powers are rising and which are falling as the centuries pass?",
-   "because": "Ordered and capped is the design, not a display convenience: sixteen rows re-ranking is the surface that shows RISE AND FALL, and an uncapped list of everything would show none of it. It orders by SHARE OF PEOPLE (BL-1000; Ben, 2026-09-15, NR-876): a polity's sampled population over every living polity's at the recorded step at or before the playhead - history_sweep's own arithmetic, so a figure on the board is the figure the sweep prints. Share of LAND was the honest default while the ownership record was all there was (BL-830), but it measures founding as much as conquest - by population the largest realms are two to five points MORE concentrated and most region-count risers were founding empty ground - so land stays as the second, qualifying column and the tie-break, and the region COUNT column went to pay for it. Where a step has no samples (the opening years; the whole Culture round) every row holds no one and the board falls back to land order. Rows are POLITIES, not settlements, because a settlement cannot rise and fall against a rival. Drawn on EVERY lapse round (BL-946 added the third, BL-1068 the fourth) from that round's own record, rather than once on a fused round. Pop (the headcount) and Might (the military capacity band, 1-6) are drawn from BL-817's per-polity sample series at the same step, so the board and the map show one instant. The arc readout under the board prints its peak on the same people column, as the sweep's peak_share_pop_q. A RESEARCH column is refused outright, because research points accrue from population under BL-822 and the column would show a correlation it never measured - on the board Ben is judging the research levers with.",
+   "because": "Ordered and capped is the design, not a display convenience: sixteen rows re-ranking is the surface that shows RISE AND FALL, and an uncapped list of everything would show none of it. It orders by SHARE OF PEOPLE (BL-1000; Ben, 2026-09-15, NR-876): a polity's sampled population over every living polity's at the recorded step at or before the playhead - history_sweep's own arithmetic, so a figure on the board is the figure the sweep prints. Share of LAND was the honest default while the ownership record was all there was (BL-830), but it measures founding as much as conquest - by population the largest realms are two to five points MORE concentrated and most region-count risers were founding empty ground - so land stays as the second, qualifying column and the tie-break, and the region COUNT column went to pay for it. Where a step has no samples (the opening years; the whole Culture round) every row holds no one and the board falls back to land order. Rows are POLITIES, not settlements, because a settlement cannot rise and fall against a rival. Drawn on EVERY lapse round (BL-946 added the third, BL-1068 the fourth) from that round's own record, rather than once on a fused round. Pop (the headcount) and Might (the military capacity band, 1-6) are drawn from BL-817's per-polity sample series at the same step, so the board and the map show one instant. The arc readout under the board prints its peak on the same people column, as the sweep's peak_share_pop_q. A RESEARCH column is refused outright, because research points accrue from population under BL-822 and the column would show a correlation it never measured - on the board Ben is judging the research levers with. BL-1080: on the Industrialisation round the board carries a seventh column, industry points at the step, because that round's rise and fall is industrial; it is a column, never the rank, and the earlier rounds keep six.",
    "backlog_item": [
     "BL-830",
     "BL-860",
     "BL-916",
     "BL-946",
-    "BL-1000"
+    "BL-1000",
+    "BL-1080"
    ],
    "files": [
     "src/ui/history_lapse.cpp"

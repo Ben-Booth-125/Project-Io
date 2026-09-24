@@ -218,6 +218,15 @@ the phase's three beats as they occur:
 - **Decolonisation** — subjects refuse renewal and stand as their own polities; wars over
   empire flare, and on some worlds one becomes general.
 
+**The round shows industry, not only borders (Ben, 2026-09-24).** The record carries what the span
+actually computes about industry, and the round draws it three ways. **The map** marks every region
+that has crossed the furnace with an ember square at its anchor, from its crossing year on; a
+crossing the span inherited from an earlier span is marked from the first frame. **The board** gains
+an industry column: each polity's industry points at the step, beside People, Land, Pop and Might,
+and only on a record that carries points, so the earlier rounds keep their board. **The ticker**
+names each crossing (*"X, in the realm of Y, lights its furnaces"*). Rail is drawn only if the span
+lays it; the span's corridors are the road ladder the earlier rounds already draw.
+
 **Its run is the whole build (BL-1068, round six plays the span).** Rounds 3–5 each stop
 generation at their own close. Round 6 sets no stop: it runs the Industrialisation span and
 then everything after it — borders, roads, companies — which is the world Begin builds. Its

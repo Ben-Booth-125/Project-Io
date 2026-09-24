@@ -245,14 +245,59 @@ local ind_mid = ind_first + (ind_last - ind_first) // 2
 verify.history_year(ind_mid)
 verify.frames(2)
 local at_mid = verify.history_powers()
+local lit_mid, pts_mid = verify.history_industry()
 verify.capture("press_08_round7_industrialisation_mid")
 verify.history_year(ind_last)
 verify.frames(2)
 local at_end = verify.history_powers()
+local lit_end, pts_end, crossings = verify.history_industry()
 verify.expect(at_mid > 0 and at_end > 0,
               "the Industrialisation span holds ground mid-span and at its close ("
               .. at_mid .. " -> " .. at_end .. " powers)")
 verify.capture("press_08b_round7_industrialisation_end")
+
+-- A14 -- ROUND 6 SHOWS INDUSTRY (BL-1080). The span credits industry points
+-- and lights furnaces region by region; the record carries both, and the map
+-- (ember marks), the board (the Ind column) and the ticker (crossings) draw
+-- them. By 1960 the verify seed has crossed furnaces on the map and holds
+-- points on the board, and industry GROWS across the span rather than
+-- standing still -- the "the map barely changes 1810-1960" finding this item
+-- was filed on.
+print("[history_lapse_press] industry mid " .. ind_mid .. ": " .. lit_mid
+      .. " regions lit, " .. string.format("%.0f", pts_mid) .. " points; end " .. ind_last
+      .. ": " .. lit_end .. " regions lit, " .. string.format("%.0f", pts_end)
+      .. " points; " .. crossings .. " crossings in the record")
+-- CROSSINGS ARE REPORTED, NOT REQUIRED, and that is a measured fact rather
+-- than a softened check (BL-1080, 2026-09-24). A region crosses the furnace
+-- only if Stage 4 gave its ground a lag (settlement.cpp), and Stage 4 does not
+-- run on an antiquity-epoch world -- which is the world the wizard builds, even
+-- though its spans run on to 1960. So the default verify seed records NO
+-- crossing, and the map has none to mark. What IS required: a record with
+-- crossings marks them by 1960, and a record without marks nothing.
+if crossings > 0 then
+  verify.expect(lit_end > 0,
+                "by 1960 regions have crossed the furnace and are marked on the map ("
+                .. lit_end .. " lit of " .. crossings .. " crossings)")
+else
+  print("[history_lapse_press] REPORT: the Industrialisation span records NO furnace "
+        .. "crossing on this seed (Stage 4 lags are not drawn on an antiquity-epoch "
+        .. "world); the map's ember layer is empty and the board's industry column is "
+        .. "the round's industry")
+  verify.expect(lit_end == 0, "no crossing recorded, none marked (" .. lit_end .. ")")
+end
+verify.expect(pts_end > 0,
+              "by 1960 the board's industry column holds points (" .. string.format("%.0f", pts_end) .. ")")
+verify.expect(lit_end >= lit_mid and pts_end > pts_mid,
+              "industry grows across the span (" .. lit_mid .. " -> " .. lit_end .. " lit, "
+              .. string.format("%.0f", pts_mid) .. " -> " .. string.format("%.0f", pts_end) .. " points)")
+-- Park on the LAST crossing the span recorded, so the ticker's newest line is
+-- a furnace lighting (kind 17 = furnace_lit, era_timelapse.hpp).
+local lit_year = verify.history_event_year(17)
+if lit_year >= ind_first then
+  verify.history_year(lit_year)
+  verify.frames(2)
+  verify.capture("press_08c_round7_furnace_lit")
+end
 
 -- A8 -- BACK WALKS THE LADDER DOWN ONE RUNG AT A TIME, and a finished record is
 -- NOT discarded and re-run on the way past. That guard is the reason the

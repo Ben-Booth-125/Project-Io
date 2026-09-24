@@ -2743,6 +2743,36 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // ago as founded at this span's open put a ghost on the replay. The event
     // layer only -- `note_event` is read by nothing in the sim and is off
     // under `record_playback == false`, so no decision and no digest moves.
+    // BL-1080 -- THE FURNACES THIS SPAN INHERITS. A region that crossed the
+    // furnace in an earlier span is industrial from this span's first frame,
+    // and the record would otherwise not know it: crossings are noted where
+    // they happen (the rung block in the decision loop), and those happened
+    // in a record this span does not carry. So each is noted here, AT ITS OWN
+    // YEAR -- earlier than this span's start, and ascending (year, then region
+    // index), so the list stays ascending ahead of the founded notes below.
+    // The event layer only: read by nothing in the sim, off under
+    // `record_playback == false`, so no decision and no digest moves.
+    if (params.record_playback)
+    {
+        std::vector<std::pair<int64_t, int>> lit;
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+        {
+            const region& r = ss.regions[i];
+            if (r.industrialised && r.industrial_year < params.start_year)
+                lit.emplace_back(r.industrial_year, static_cast<int>(i));
+        }
+        std::sort(lit.begin(), lit.end());
+        const int64_t year_before = event_year;
+        for (const auto& [yr, ri] : lit)
+        {
+            event_year = yr;
+            note_event(lapse_event_kind::furnace_lit, ri,
+                       ri < static_cast<int>(owner.size()) ? owner[static_cast<std::size_t>(ri)] : -1,
+                       -1);
+        }
+        event_year = year_before;
+    }
+
     for (const polity& q : out.polities)
     {
         if (params.resume_polities != nullptr && !q.alive) continue;
@@ -2795,6 +2825,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // comment is worth more than no comment only while it is true.
     std::vector<int64_t> step_pop(out.polities.size(), 0);
     std::vector<int32_t> step_regions(out.polities.size(), 0);
+    // BL-1080: industry points standing on each polity's ground at the step.
+    std::vector<int64_t> step_industry(out.polities.size(), 0);
 
     const auto record_step = [&](int64_t y_now) {
         if (!params.record_playback) return;
@@ -2803,10 +2835,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
         {
             step_pop.resize(out.polities.size(), 0);
             step_regions.resize(out.polities.size(), 0);
+            step_industry.resize(out.polities.size(), 0);
         }
 
         std::fill(step_pop.begin(), step_pop.end(), 0);
         std::fill(step_regions.begin(), step_regions.end(), 0);
+        std::fill(step_industry.begin(), step_industry.end(), 0);
 
         const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
         if (last_shares.size() < ss.regions.size())
@@ -2831,6 +2865,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
             {
                 step_pop[static_cast<std::size_t>(o)] += r.population;
                 ++step_regions[static_cast<std::size_t>(o)];
+                // Saturating: a region's stock is bounded by
+                // industry_points_ceiling (2^60), so a sum over a realm's
+                // regions is held below INT64_MAX rather than trusted to fit.
+                int64_t& ind = step_industry[static_cast<std::size_t>(o)];
+                ind = (r.industry_points > INT64_MAX - ind) ? INT64_MAX
+                                                            : ind + std::max<int64_t>(0, r.industry_points);
             }
 
             if (!shares_seen[i] || last_shares[i] != r.culture)
@@ -2864,6 +2904,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 out.polities[pi].capacity[static_cast<int>(sim_domain::military)], 0, 255));
             smp.cap_materials = static_cast<uint8_t>(clampi(
                 out.polities[pi].capacity[static_cast<int>(sim_domain::materials)], 0, 255));
+            smp.industry_points = step_industry[pi];
             out.samples.push_back(smp);
         }
 
@@ -7033,6 +7074,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         p.industrialised  = true;
                         p.industrial_year = y;
                         ++out.regions_industrialised;
+                        // BL-1080: the crossing, on the record the round
+                        // plays. Event layer only -- read by nothing here.
+                        note_event(lapse_event_kind::furnace_lit, hi, q.id, -1);
                     }
                 }
             }

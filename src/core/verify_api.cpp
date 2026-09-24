@@ -1353,6 +1353,47 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return std::make_tuple(total, ended, broke);
     });
 
+    // BL-1080: THE INDUSTRY LAYER on the CURRENT lapse round, at the playhead:
+    // (regions whose furnace crossing falls at or before it -- the map's ember
+    // marks, inherited crossings included; industry points summed over every
+    // living polity's sample at the step at or before it -- the board's column;
+    // crossings the record carries in all). Counts only, like history_events:
+    // it lets a script claim round 6 SHOWS industry rather than hoping a
+    // capture does.
+    v.set_function("history_industry", [this]() {
+        const int i = wizard_lapse_index();
+        int lit = 0, crossings = 0;
+        long long points = 0;
+        if (!m_wiz_history[i].empty())
+        {
+            const era_timelapse& t = m_wiz_history[i].lapse;
+            const int year = m_wiz_history_year[i];
+            std::vector<int32_t> first(static_cast<std::size_t>(std::max(0, t.region_stride)),
+                                       INT32_MAX);
+            for (const lapse_event& e : t.events)
+            {
+                if (e.kind != static_cast<uint8_t>(lapse_event_kind::furnace_lit)) continue;
+                ++crossings;
+                if (e.region < first.size() && e.year < first[e.region]) first[e.region] = e.year;
+            }
+            for (const int32_t y : first)
+                if (y <= year) ++lit;
+            int step = -1;
+            for (std::size_t s = 0; s < t.steps.size(); ++s)
+                if (t.steps[s].year <= year) step = static_cast<int>(s);
+            if (step >= 0)
+            {
+                const timelapse_step& st = t.steps[static_cast<std::size_t>(step)];
+                for (int k = 0; k < st.sample_count; ++k)
+                {
+                    const std::size_t idx = static_cast<std::size_t>(st.first_sample + k);
+                    if (idx < t.samples.size()) points += t.samples[idx].industry_points;
+                }
+            }
+        }
+        return std::make_tuple(lit, static_cast<double>(points), crossings);
+    });
+
     // BL-916: the year of the LAST recorded event of one kind (the wire byte
     // of `lapse_event_kind`) on the current lapse round, or a year before the
     // span when there is none. It lets a script PARK on the moment a realm
