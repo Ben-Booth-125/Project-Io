@@ -7489,6 +7489,276 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "purchase-verb",
+   "title": "BL-1096 - A polity can BUY a province across water instead of taking it",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1096 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: history_sim.cpp purchase_price_q; the BL-934 block",
+      "headless: exploration_sim_harness (new case: a coastal affordable native is bought, an inland or unaffordable one is taken)"
+     ],
+     "requirement": "Inside the subjection block, when the native seat carries a port window (port_q > 0) and the arriver's seat treasury covers price = max(subjection_purchase_floor, native seat treasury x subjection_purchase_rate_q / 1000), the province is BOUGHT: the buyer's seat is debited and the native's seat credited (clamped as tribute is), subject_kind = 0, no ground_taken grudge is written, culture shares are untouched, a province_bought event is noted (polity = the native, other = the buyer); otherwise the native is TAKEN as today. subject_kind means the verb taken. (item-spanning gate: exploration_sim_harness's new price-fork case)",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: history_sim_params validation",
+      "headless: exploration_sim_harness control equality"
+     ],
+     "requirement": "Both params are validated in-domain and rejected (never clamped) on violation; with both at zero a run is byte-identical to a run without the change (the control).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep over the seed library, the reading written into the item"
+     ],
+     "requirement": "Counters provinces_bought and treasury_spent_on_purchases cross on exploration_output; exploration_sweep reports the bought/taken split per seed; on the 16 curated seeds the split is non-degenerate on at least 4 seeds and the treasury spread is reported (constants MEASURED before they are pinned; never tuned to make one seed buy).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: era_timelapse.hpp; history_lapse.cpp caption",
+      "headless: save_envelope_roundtrip"
+     ],
+     "requirement": "Round 5's ticker distinguishes 'X buys Y's province' from 'falls under the overlordship of' (a caption for province_bought); the new kind is append-only on lapse_event_kind and rides the sprint's envelope bump.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "doc: docs/generation/EXPLORATION.md",
+      "code: history_sim.hpp comment"
+     ],
+     "requirement": "EXPLORATION.md § Two ways to claim ground across water and § A colony is a subject state the built rule (price, fork, label); the sim's header comment at history_sim.hpp (subject_kind) no longer says it is derived from port_q; AI_OPPONENT.md § 11 cites EXPLORATION.md as the owner.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "build",
+      "headless: world_determinism x2"
+     ],
+     "requirement": "Release build; world_determinism twice on the same params (bit-identical to itself); digests move only against the pre-change pins and are recorded for the sprint's single re-bless.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "sea-legs-recorded",
+   "title": "BL-1097 - The sim records every sea leg it walks and round 5 draws the lanes that earn a tier",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1097 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: history_sim.cpp note_sea_leg; the three sites",
+      "headless: exploration_sim_harness (leg table non-empty on a seed with subjects; land corridors unchanged)"
+     ],
+     "requirement": "A sea_leg{a, b, uses} table on history_sim_state, folded (sorted, validated like surviving_corridors) onto exploration_output and industrialisation_output, is appended by note_sea_leg at three sites: the wet campaign launch (beside the existing land note so the land record is unchanged), the purchase crossing (BL-1096), and once per decision round per standing tribute clause (overlord capital -> subject seat). (item-spanning gate)",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: era_timelapse.hpp; history_sim.cpp",
+      "headless: save_envelope_roundtrip"
+     ],
+     "requirement": "A sea_lane_opened event (region/other = the ends, polity = the tier) is noted when a leg's uses cross sea_lane_tier1_uses (default 4, mirroring road_tier1_uses); the kind is append-only and rides the envelope bump.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: history_lapse.cpp lane bake and draw",
+      "visual: Ben's live click - a lane appears and persists on a seed with subjects"
+     ],
+     "requirement": "Round 5 bakes a persistent lane line from the events, drawn as its own water layer distinct from a colonial tie, present from the frame the leg earns the tier to the round's end.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep column"
+     ],
+     "requirement": "On the 16 curated seeds the leg-table size and the number of legs over the tier are reported per seed; the reading is written into the item (with the note that the later spans run sea legs off, NR-921).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "doc: docs/generation/EXPLORATION.md",
+      "headless: industrialisation_sim_harness --fidelity"
+     ],
+     "requirement": "EXPLORATION.md § The colonial tie is a sea lane names the three sites and the tier threshold; the industrialisation resume carries the table (fidelity mode compares it).",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "band-from-history",
+   "title": "BL-1101 - The recipe band is derived from the history's industry state at the 1960 fold and persisted on the world",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1101 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: hard_coded_world.cpp fold; world.hpp campaign_band; world_save.cpp",
+      "headless: save_roundtrip (the band survives a round trip)"
+     ],
+     "requirement": "At the Industrialisation fold (after make_industrialisation_output validates) the world's band is derived: industrial iff any living polity's materials capacity reaches the industrial rung (roster_band_for_capacity, the derivation industrial_year already uses); persisted as world::campaign_band under a claimed world save version; a loaded save applies it. (item-spanning gate)",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: grep industrial_band_from_year|era_band_for_epoch src/ tools/ is empty",
+      "build"
+     ],
+     "requirement": "industrial_band_from_year and era_band_for_epoch are gone from src/; load_economy and load_game_from both apply the world's band; the ten harness call sites read the world's band through harness_params (a harness never bands differently from the app).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep column (polities_crossed, mat_cap_max, derived band)"
+     ],
+     "requirement": "Across the 16 curated seeds the derived band per seed is reported BEFORE the threshold is fixed (polities crossed / max materials capacity per seed); a seed that derives ancient is reported, never forced.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: begin_adopts_check.js PASS",
+      "headless: --autostart --epoch 0 vs --epoch 1960 opening hashes differ only by the calendar (report both)"
+     ],
+     "requirement": "A world whose history crossed opens industrial with no epoch read anywhere; --epoch 0 builds the same world dated 0 CE (the --band override for the ancient sandbox is NR-920's call and is not built here); state hash adopt == cold (begin_adopts_check.js).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "doc: docs/economy/PRODUCTION.md",
+      "code: docs/ai/ACTIONS.json chrome.epoch_cli"
+     ],
+     "requirement": "PRODUCTION.md § The era band, ERAS.md § Where the ladder starts and INDUSTRIALISATION.md § What crosses into play state the derivation; ACTIONS.json's --epoch entry matches the built behaviour.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "tariff-posture-derived",
+   "title": "BL-1102 - The Industrialisation span derives each nation's tariff posture at the 1960 close",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1102 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: history_sim.cpp end-of-run block",
+      "doc: docs/generation/INDUSTRIALISATION.md § What crosses into play"
+     ],
+     "requirement": "protection_q is derived at the span's end-of-run block from scarcity_q, trade_flows and culture_preference by a STATED formula (named inputs, named arithmetic, in the code comment and in INDUSTRIALISATION.md), independent of boundary_year; the broadcast feeds derive_national_protection unchanged. (item-spanning gate)",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: a harness or the app log listing the tariff laws on the verify seed"
+     ],
+     "requirement": "On a 1960 world at least one LAW-IMPORT-TARIFF-* law exists at setup (seed_national_tariffs no longer skips every nation).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: industrialisation_sim_harness or history_sweep column"
+     ],
+     "requirement": "Across the 16 curated seeds the posture spread is reported and is not all one value; the reading is written into the item.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism x2"
+     ],
+     "requirement": "Digests move only where a law is written; recorded for the sprint's single re-bless; world_determinism twice bit-identical to itself.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

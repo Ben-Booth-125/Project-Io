@@ -57,7 +57,7 @@ On the form Ben answered Scope with "presentation plus record-only kinds and fie
 ### NR-920 — CALL: what --epoch 0 means once the recipe band is derived from the history, and whether the ancient-roster sandbox keeps an explicit --band override
 *question · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
 
-Ben ruled the band comes from the history's industry state (BL-1101). The epoch then names the calendar only. Today --epoch 0 also selected the ancient roster through industrial_band_from_year; era_roster.cpp and INDUSTRIALISATION.md § Epoch 0 (ruled 2026-09-24) describe that sandbox.
+Ben ruled the band comes from the history's industry state (BL-1101). The epoch then names the calendar only. Today --epoch 0 also selected the ancient roster through industrial_band_from_year; era_roster.cpp and INDUSTRIALISATION.md § The boundary (the epoch and the band) (ruled 2026-09-24) describe that sandbox.
 
 **Why it matters.** Every harness and the seed library run with an epoch; a derived band can also come out ancient on a seed whose history never crossed the rung, which is a different thing from asking for the ancient roster.
 
@@ -65,7 +65,7 @@ Ben ruled the band comes from the history's industry state (BL-1101). The epoch 
 - B: calendar plus an explicit --band ancient|industrial override kept for the sandbox
 - C: retire epoch 0
 
-> **Recommendation:** B, if the sandbox is still wanted; A otherwise. Either way INDUSTRIALISATION.md § Epoch 0 is rewritten.
+> **Recommendation:** B, if the sandbox is still wanted; A otherwise. Either way INDUSTRIALISATION.md § The boundary (the epoch and the band) is rewritten.
 
 *Files: `src/world/era_band.hpp`, `src/core/app.hpp`, `docs/generation/INDUSTRIALISATION.md`*
 

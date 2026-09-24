@@ -86,7 +86,52 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
 - [ ] T7 Release build; `world_determinism` twice; both check scripts; Ben's live click — Begin after
   the playback opens the seat with no freeze. (R8) BL-1078 closes here.
 
-### Wave 0, Light — BL-1108 (quit during a build crashes).
+### Wave 0, lane W1 (world-movers, the subjection block) — BL-1096 (purchase verb) then BL-1097 (sea legs recorded). Groups `purchase-verb`, `sea-legs-recorded`.
+
+- [ ] T1 `purchase_price_q(native_seat, params)` beside `choose_subjection_native`; params
+  `subjection_purchase_rate_q` / `subjection_purchase_floor` on `history_sim_params`, validated,
+  zero-disabled. (1096 R1, R2)
+- [ ] T2 the fork inside the BL-934 block (history_sim.cpp:3817-3918): BUY when the native seat
+  has a port window and the price is affordable — debit/credit, `subject_kind = 0`, no grudge,
+  shares untouched, `province_bought` noted, counters; else TAKE as today; the header comment at
+  history_sim.hpp:2718-2731 rewritten. (1096 R1, R3, R4)
+- [ ] T3 `province_bought` on `lapse_event_kind` (append-only) and its ticker caption; the
+  envelope bump claimed (`next_save_version.js --kind envelope --claim "BL-1096/1097 kinds"`) or
+  shared with BL-1083's claim if it landed first. (1096 R4)
+- [ ] T4 exploration_sim_harness: the price-fork case and the control equality; exploration_sweep:
+  the bought/taken split; the 16-seed reading written into the item. (1096 R2, R3)
+- [ ] T5 `sea_leg{a,b,uses}` on the sim state and the two span outputs (folded, sorted, validated);
+  `note_sea_leg` at the three sites; `sea_lane_opened` at `sea_lane_tier1_uses` (default 4).
+  (1097 R1, R2)
+- [ ] T6 round 5's lane bake and draw, its own water layer; the sweep column; EXPLORATION.md re-read
+  against the build. (1097 R3, R4, R5)
+- [ ] T7 Release build; `world_determinism` twice; `save_envelope_roundtrip`;
+  `industrialisation_sim_harness --fidelity`; cold review; Ben's live click on the lane line.
+
+### Wave 0, lane W2 (world-movers, the band) — BL-1101 (band from history). Group `band-from-history`.
+
+- [ ] T1 derive `world::campaign_band` at the Industrialisation fold (after the validator,
+  hard_coded_world.cpp:~1571) from the polities' materials capacity; persist it (world save
+  version claimed, `--kind world --claim "BL-1101 campaign_band"`). (R1)
+- [ ] T2 `load_economy` and `load_game_from` apply the world's band; retire
+  `industrial_band_from_year` / `era_band_for_epoch`; the ten harness call sites read the world's
+  band through `harness_params`. Touch app.cpp in the two application sites only (lane C is in
+  the same file). (R2)
+- [ ] T3 history_sweep column: polities crossed / max materials capacity / derived band per seed
+  across the 16 curated seeds; the reading written into the item. (R3)
+- [ ] T4 `begin_adopts_check.js` PASS; `--epoch 0` vs `--epoch 1960` opening hashes reported;
+  `save_roundtrip`; Release build; `world_determinism` twice; the docs re-read. (R4, R5)
+
+### Wave 0, lane W3 (world-movers, the end-of-run block) — BL-1102 (tariff posture derived). Group `tariff-posture-derived`.
+
+- [ ] T1 the stated formula for `protection_q` from scarcity_q, trade_flows and culture_preference
+  at the end-of-run block (history_sim.cpp:~7857), independent of `boundary_year`; the comment and
+  INDUSTRIALISATION.md § What crosses into play carry the arithmetic. (R1)
+- [ ] T2 `seed_national_tariffs` writes at least one LAW-IMPORT-TARIFF-* law on the verify seed;
+  the posture spread across the 16 seeds reported and written into the item. (R2, R3)
+- [ ] T3 Release build; `world_determinism` twice; digests recorded for the re-bless. (R4)
+
+### Wave 0, Light — BL-1108 (quit during a build crashes). Folded into lane C (same file).
 
 - [ ] T1 join every in-flight worker at the top of `~app` (and on the quit path) with a
   "finishing the build before quitting" line on the wait surface. Verification: start a cold Begin
