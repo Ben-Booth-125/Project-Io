@@ -311,7 +311,7 @@ unspent points was measured and reversed the same day (`INDUSTRIALISATION.md` §
 
 **Pre-game operating history.** Corporations do not open cold. At campaign start the economy
 is run forward a fixed number of **pre-game ticks** — phase 6's single validation run of the
-winning landscape (`app::validation_ticks`; the length and its measurement are
+winning landscape (`k_campaign_settle_ticks` (`src/world/campaign_settle.hpp`); the length and its measurement are
 `../economy/ERAS.md` § The opening position; BL-978, warm start retired, owns the work) — so
 every corporation enters turn one with a **multi-tick operating history**: warm stockpile pools
 and a balance already moved by production, wages, and trade, rather than the seeded capital

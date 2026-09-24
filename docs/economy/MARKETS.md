@@ -496,7 +496,7 @@ corporations).
 
 **The background economy is the landscape phase 6 selected** — not a separate injection pass bolted
 on after generation. The settle that hands play its opening position is phase 6's single
-validation run of the winner — twelve quarterly econ ticks, `app::validation_ticks`, a length
+validation run of the winner — twelve quarterly econ ticks, `k_campaign_settle_ticks` (`src/world/campaign_settle.hpp`), a length
 measured on the per-tick convoy dispatch count rather than chosen (`../economy/ERAS.md` § The
 opening position; BL-978, warm start retired, owns the work). There is no other pre-game tick
 loop: the prices play opens on are the ones those twelve clearings leave. Generation scores candidate corporate landscapes

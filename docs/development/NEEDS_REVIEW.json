@@ -759,6 +759,129 @@
     "docs/generation/EXPLORATION.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-931",
+   "title": "CALL: what does the Culture round's reroll re-roll, when the migration walk is seed-free by design?",
+   "raised": "2026-09-24",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1083 lane G (span seeds), its harness span_seed_isolation row S0 and the cold review, 2026-09-24",
+   "what": "span_seed[0] is folded into run_settlement's seed as ruled, but the migration record is byte-identical under any value of it (span_seed_isolation: migration digest A00A5876639F4D94 with slot 0 at 0 and at 1) while the Empires, Exploration and Industrialisation records all change. The reason is design, not a defect: the colonisation walk consumes no randomness — where people go is a deterministic consequence of the ground (COLONISATION.md § No actor, and no infrastructure; memory: consequences, not simulation). What the seed reaches is derive_daughter_culture (tongue drift, coined names, aggression_q) and the furnace lag. So a round-3 reroll re-coins the peoples and forks every later age while the ownership map stays identical. STARTUP.md § Each pass round is rerollable now says so and names this call.",
+   "why_it_matters": "The item's headline half — \"the Culture round can reroll at all\" — is not delivered as written, and Ben ruled rerolls are per stage. Either the round's reroll means labels only, or the walk takes dice (against Ben's own principle), or the Culture round carries no reroll and rejecting a migration is the Life round's reroll (the world's).",
+   "options": [
+    "A: accept — a Culture reroll re-coins the peoples (names, tongues, temper) and forks later ages; the doc says so (already written)",
+    "B: give the walk a seeded roll (a design change to COLONISATION.md and a re-bless; contradicts \"consequences not simulation\")",
+    "C: remove the Culture round's Reroll; the migration is the world's consequence and the Life round's reroll is how a player rejects it; span_seed[0] stays folded (zero-neutral) or is dropped"
+   ],
+   "recommendation": "C. A reroll button that moves labels and nothing on the map is a button that lies; the honest control is the Life round's. If Ben wants A, the doc already reads that way.",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "docs/ui/STARTUP.md",
+    "docs/generation/COLONISATION.md",
+    "tools/verify/span_seed_isolation.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-932",
+   "title": "OBSERVATION → CALL: one settle tick is pathological — tick 1 runs 44-62 s of a 69-114 s settle on seed 0",
+   "raised": "2026-09-24",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1085 lane C (Begin retired into round six), gen_step_costs --finish 0 28 in Release, 2026-09-24",
+   "what": "Inside the twelve-tick settle that now runs in round 6's worker, tick 1 costs 44-62 s while the other eleven cost ~1.5 s each (seed 0: settle 113,922 ms, slowest tick 1 56,881 ms; seed 28: 68,832 ms). It was hidden inside the old on-thread validation run. The wait's bar holds still through it because a tick has no progress tap; the round-6 wait grew by ~100 s in total with the search and the settle inside it, as Ben accepted, but most of that is one tick.",
+   "why_it_matters": "The longest still in the wizard is now this tick (LONGEST STILL 90.91 s on seed 0), which is the \"a wait never looks stopped\" rule (BL-1072) failing by construction; and a first tick 30-40x the others is a cost shape NR-915 (the tick tail) may already own.",
+   "options": [
+    "A: instrument tick 1 (which phase — the first clearing over cold pools? the first dispatch?) and file the finding under NR-915 / BL-1066's economy work",
+    "B: give the settle a per-tick progress tap so the bar moves and accept the cost",
+    "C: both"
+   ],
+   "recommendation": "C: the tap is cheap and honest; the cause is economy work for the economy lane, not this sprint.",
+   "files": [
+    "src/world/campaign_settle.cpp",
+    "src/world/finish_campaign_world.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-933",
+   "title": "DECISION TAKEN: the purchase constants — rate 2000 per mille of the seller's chest, floor as measured — pinned at the first grid point where the purse, not the coast alone, decides",
+   "raised": "2026-09-24",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1096 lane W1 (purchase verb), exploration_sweep over the 16 curated seeds at rates 1000 / 2000 / 4000 per mille, 2026-09-24",
+   "what": "Measured bought/taken splits (bought/taken over the library): 1000‰ → 62/48, 2000‰ → the pinned point, 4000‰ → 36/74. At 1000 the coast alone decides (nearly everything coastal is bought); at 4000 few can afford it. 2000 was taken as the first point where the treasury discriminates. Digests moved on 2 of 16 library seeds (25, 38); exploration_sim_harness's R3b regression pin moved by exactly one purchase (+400 tribute) and is left failing for the sprint's single re-bless. A purchase recoups itself through tribute in ~7 rounds at 2000 (read, not hidden).",
+   "why_it_matters": "The number shapes how many colonies arrive at 1660 \"bought\" rather than \"taken\", which is what the round-5 map and the culture shares read.",
+   "options": [
+    "A: keep 2000‰ (taken)",
+    "B: 1000‰ (more purchases; the coast decides)",
+    "C: 4000‰ (purchases rare)"
+   ],
+   "recommendation": "A; re-measure with --set subjection_purchase_rate_q if Ben wants a different feel (~2.5 min a run).",
+   "files": [
+    "src/world/history_sim.hpp",
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-934",
+   "title": "OBSERVATION → CALL: the ruled band threshold discriminates nothing on the library — every curated seed reaches materials capacity 6 by 1200 CE, so all 16 derive industrial",
+   "raised": "2026-09-24",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1101 lane W2 (band from history), history_sweep over the 16 curated seeds, 2026-09-24",
+   "what": "The band derives per world as ruled (industrial iff a living polity's materials capacity reaches the industrial rung at the 1960 fold). On all 16 seeds the verdict is industrial, and the rung is already reached by 1200 CE on every one. The ancient-band campaign is reachable by the rule but not observed on the library; nothing was reshaped. Side finding: on seeds 0, 12 and 37 one living polity sits at the rung at the fold without a recorded industrial_year (at-rung exceeds ever-crossed by one) — the band is unaffected; the cause was not chased.",
+   "why_it_matters": "Ben asked for the reading before any threshold is fixed. A rule that always says industrial is honest but says nothing; whether that is fine, or the rung should be later (the Industry spire ring, or capacity at 1960 rather than \"ever\"), is his.",
+   "options": [
+    "A: fine — the band is the history's and the library is industrial; keep the rung",
+    "B: name a later rung (e.g. the Industry spire's second ring) so a quiet world can open ancient",
+    "C: keep the rung and add the per-nation grain through campaign tech (BL-1109) as planned"
+   ],
+   "recommendation": "A now, C as planned; B only if Ben wants ancient openings to exist on the shipped library.",
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-935",
+   "title": "CALL: the tariff bands (300 / 500 / 700) were authored for the retired furnace scalar; under the derived posture the floor cuts the field near its median",
+   "raised": "2026-09-24",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1102 lane W3 (tariff posture derived), industrialisation_sim_harness over the 16 curated seeds, 2026-09-24",
+   "what": "With protection_q derived from scarcity, flows and preference at the close, the per-seed median posture sits 285-376 against law.hpp's tariff_bands 300/500/700: 61% of nations enact a tariff, 80% of the laws are the 5% band, the 20% band is reached on 3 of 16 worlds. The bands were deliberately not moved (the lane was told to measure, not tune). Every curated seed now writes laws, so all 16 --digest-check pins move at the re-bless. The derivation also runs at the Exploration close (gated on exploration_upkeep_enabled), so a world run with the Industrialisation span switched off would enact the 1660 posture — harmless on the shipped path.",
+   "why_it_matters": "Whether \"most nations tariff, almost all at 5%\" is the intended feel of the 1960 map is a design reading, not a constant.",
+   "options": [
+    "A: keep the bands; the reading is the map",
+    "B: re-author the bands against the new posture distribution (e.g. terciles of the library's postures)",
+    "C: keep the bands, raise the floor so only the protective third tariffs"
+   ],
+   "recommendation": "B, measured from the library's distribution, in the same re-bless.",
+   "files": [
+    "src/world/law.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-936",
+   "title": "OBSERVATION: the wizard's Next press does not wait for the running round, so a fast player can have rounds 3-6 building at once",
+   "raised": "2026-09-24",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-1085 lane C and its cold review, 2026-09-24 (the autostart walk was made player-shaped in the fix round; the press itself was not gated)",
+   "what": "Next on a lapse round launches the next round's worker whether or not the current one has landed; four concurrent world builds plus the surface build is the peak memory now, the memory-pressure shape BL-1078 was filed on. Begin never starts a second build, so the adopt path is safe; the concern is the peak. BL-1084 (the world built once and moved) changes what each worker holds and is the natural place to decide whether Next waits.",
+   "why_it_matters": "A note for BL-1084's design, not a defect to fix in isolation.",
+   "options": [],
+   "recommendation": "Fold into BL-1084: with one world moved forward, round N+1 cannot start before round N lands anyway.",
+   "files": [
+    "src/ui/startup_screens.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

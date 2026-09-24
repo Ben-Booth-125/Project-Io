@@ -308,7 +308,7 @@ int app::run_autostart()
     // worker now runs the search and the twelve-tick settle after its build —
     // measured 2026-09-24 in Release at 85 s + 29 s + 114 s on seed 0 — and
     // the 300 s this once allowed reported that as a hang.
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1800);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(900);
     while (m_screen != app_screen::in_game && !m_seat_pick_failed
            && std::chrono::steady_clock::now() < deadline)
     {
@@ -363,7 +363,7 @@ int app::run_autostart_adopt()
     std::printf("[autostart-adopt] step 1: round 6's own build (async worker)\n");
     std::fflush(stdout);
     launch_wizard_history_run(last);
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1800);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(900);
     while (m_wiz_history_future[last].valid() && std::chrono::steady_clock::now() < deadline)
     {
         poll_wizard_history();
@@ -402,7 +402,7 @@ int app::run_autostart_adopt()
         std::printf("[autostart-adopt] FAILED: Begin did not adopt the cached world\n");
         return 1;
     }
-    const auto deadline2 = std::chrono::steady_clock::now() + std::chrono::seconds(1800);
+    const auto deadline2 = std::chrono::steady_clock::now() + std::chrono::seconds(900);
     while (m_screen != app_screen::in_game && !m_seat_pick_failed
            && std::chrono::steady_clock::now() < deadline2)
     {

@@ -464,6 +464,21 @@ void app::poll_wizard_history()
                 std::printf("[wizard world] dropped on landing: its round went stale mid-run\n");
                 std::fflush(stdout);
             }
+            // RELAUNCHED ON LANDING (BL-1083, the review's fix round): the stale
+            // run was the one a lean change or a reroll asked to replace, and it
+            // could not be recalled while in flight. Its slot is free now, so the
+            // fresh run the player already asked for starts here if they are still
+            // on this round -- otherwise the round sat empty until they left and
+            // came back, which read as the lean doing nothing.
+            if (m_screen == app_screen::generating
+                && i == m_wiz_round - wizard_planetology_round_count
+                && !m_wiz_history_future[i].valid())
+            {
+                std::printf("[wizard] relaunching round %d after its stale run landed\n",
+                            i + wizard_planetology_round_count + 1);
+                std::fflush(stdout);
+                launch_wizard_history_run(i);
+            }
             continue;
         }
         m_wiz_history[i] = std::move(landed);
@@ -1877,7 +1892,21 @@ void app::draw_generation_screen()
         }
         if (m_autostart_wizard % 20 == 0)
         {
-            if (m_wiz_round < wizard_round_count - 1)
+            // A PLAYER-SHAPED WALK (BL-1085, the review's fix round): the walk
+            // dwells on a lapse round until its run has landed before pressing
+            // Next, as a player watching the round would. Advancing every 20
+            // frames regardless launched rounds 3-6 within ~60 frames -- four
+            // world builds plus the surface build at once, the memory-pressure
+            // shape BL-1078 was filed on -- and this walk is the scripted proof
+            // the adopt path rests on, so its peak should be a player's peak.
+            const int cur = m_wiz_round - wizard_planetology_round_count;
+            const bool round_building = cur >= 0 && cur < wizard_lapse_round_count
+                                        && m_wiz_history_future[cur].valid();
+            if (round_building)
+            {
+                // Still building: try again on the next multiple of 20.
+            }
+            else if (m_wiz_round < wizard_round_count - 1)
             {
                 ++m_wiz_round;
                 // Dirty on the PLANETOLOGY rounds only, as the walk always

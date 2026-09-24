@@ -645,6 +645,11 @@ void app::begin_new_game()
         std::printf("[begin] round 6 is still building: waiting on its worker "
                     "(no second build)\n");
         std::fflush(stdout);
+        // The building screen draws round 6's bars from building_sink() while we
+        // wait, but its budget panel reads m_worldgen_progress; a previous cold
+        // build's figures would otherwise show under a different world's wait
+        // (the review's fix round on BL-1085). Cleared here, never a stale split.
+        m_worldgen_progress.budget_ready.store(false, std::memory_order_relaxed);
         m_screen = app_screen::building;
         return;
     }

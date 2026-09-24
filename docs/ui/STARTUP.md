@@ -350,7 +350,11 @@ were assigned. **A reroll is per stage (Ben, 2026-09-24):** rerolling round N re
 and nothing else. Each span carries a seed of its own — `world_params::span_seed[4]`, one
 each for the migration, Empires, Exploration and Industrialisation, folded into that span's
 own seed so that all zeros is the unrerolled world (`era_seed` stays as the legacy term) — so a
-Culture reroll changes the migration, and a later reroll leaves the migration alone. The
+Culture reroll re-coins the peoples — their names, tongues and temper — and forks every age after
+it, while the walk itself is seed-free by design (COLONISATION.md § No actor, and no infrastructure:
+where people go is a consequence of the ground, never a roll), so the ownership map does not move;
+whether that is the Culture round's reroll, or the round carries none, is an open call (NR-931).
+A later reroll leaves the migration alone. The
 rounds above the rerolled one are untouched; the rounds below it are invalidated; the reroll
 starts from the closing world of the round before it (§ The world cache), which is why nothing
 a round shows is ever a calculation a later round contradicts. A lean change on a round takes

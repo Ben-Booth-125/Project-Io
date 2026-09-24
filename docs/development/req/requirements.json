@@ -7402,14 +7402,14 @@
    "rows": [
     {
      "id": "R1",
-     "status": "complete",
+     "status": "pending",
      "verification": [
       "code: src/world/campaign_settle.*; tools/verify/harness_params.hpp calls it",
       "headless: begin_adopts_check.js PASS",
       "headless: player_seed_sweep --digest-check 16/16 (D_settle/D_seat unchanged before the band change lands)"
      ],
      "requirement": "ONE settle function in src/world (run_settle_tick / run_settle) is called by app::step_economy's world half, by the worker and by every harness that mirrored it; harness_params.hpp no longer restates the tick body; D_settle and D_seat pins are unchanged by the promotion alone (item-spanning gate: begin_adopts_check.js PASS, adopt hash == cold hash).",
-     "notes": "2026-09-24 (lane C worktree): the 16-seed --digest-check is OWED to the main session on merge -- the lane brief bars player_seed_sweep in a worktree (memory). The tick body moved verbatim (same calls, same order); run_app_validation_tick, run_app_validation_settle and run_app_live_window are wrappers over run_settle_tick.",
+     "notes": "2026-09-24 (lane C worktree): the 16-seed --digest-check is OWED to the main session on merge -- the lane brief bars player_seed_sweep in a worktree (memory). The tick body moved verbatim (same calls, same order); run_app_validation_tick, run_app_validation_settle and run_app_live_window are wrappers over run_settle_tick. REVIEW 2026-09-24: the 16-seed player_seed_sweep --digest-check named as the gate was not run in the lane; pending until the main session records 16/16 on the merged tree. The harness_params.hpp mirror still restates steps 1-5 (search-and-apply, the setup halves) deliberately so the D_search / D_land pins keep their seams; the settle half calls the promoted run_settle_tick.",
      "result_metric": "begin_adopts_check.js 12/12 PASS on build_rel (worktree Release): adopt 19575BBC3B912558 == cold 19575BBC3B912558 (231 s / 221 s); world_determinism 17/17 PASS twice, digests identical (5BA2EE1EE993C201 / 5ECE9A097D14DACE / 4834366D19271E5F)"
     },
     {
@@ -7435,14 +7435,14 @@
     },
     {
      "id": "R4",
-     "status": "complete",
+     "status": "pending",
      "verification": [
       "code: begin_new_game",
       "headless: begin_adopts_check.js (adopt and cold runs)",
       "visual: live click - press Begin during round 6's wait"
      ],
      "requirement": "Begin pressed while round 6's worker runs WAITS on it behind the wait surface; there is never a second concurrent build; with no cache (menu -> Begin, --autostart) the cold worker builds and calls the same function.",
-     "notes": "2026-09-24: begin_new_game -> m_begin_waits_round6 while round 6's future is valid (poll_worldgen keeps polling the wizard's futures and draws round 6's sink), try_adopt_wizard_world on landing, launch_cold_build only when nothing landed. The windowed walk (--autostart-windowed) is the scripted press-during-the-wait: it now launches each lapse round on arrival as the Next press does (it never had), so Begin finds round 6 running. Ben's live press is R8's click.",
+     "notes": "2026-09-24: begin_new_game -> m_begin_waits_round6 while round 6's future is valid (poll_worldgen keeps polling the wizard's futures and draws round 6's sink), try_adopt_wizard_world on landing, launch_cold_build only when nothing landed. The windowed walk (--autostart-windowed) is the scripted press-during-the-wait: it now launches each lapse round on arrival as the Next press does (it never had), so Begin finds round 6 running. Ben's live press is R8's click. REVIEW 2026-09-24: carries a live-click clause not yet taken; pending with R8 until Ben's click.",
      "result_metric": "--autostart-windowed log: '[begin] round 6 is still building: waiting on its worker (no second build)' -> '[wizard world] cached for Begin' -> '[begin] round 6 landed' -> '[begin] adopted the wizard's world' -> 'OK 120 in-game frames'; one [finish_campaign_world] line in the run; begin_adopts_check.js cold half: '[begin] no wizard world to adopt: building' then one finish, hash equal"
     },
     {
@@ -7458,13 +7458,13 @@
     },
     {
      "id": "R6",
-     "status": "complete",
+     "status": "pending",
      "verification": [
       "code: hard_coded_world.hpp generation_stage_labels / step costs",
       "visual: live click - the caption names each step and the bar moves"
      ],
      "requirement": "The wait's caption and bar carry \"Searching the landscape\" and \"Proving the field\" with measured weights (the label table widened past 16); the search is re-measured in Release before the weights are set and the number is written into the item.",
-     "notes": "2026-09-24: labels 16/17; generation_step_slot_count = 18 (ms_step and the static_assert read it); generation_progress::weight_after carries the finish's weight into generation's plan so the bar never reaches its end early; the search reports evaluations done/planned on the inner bar (landscape_search_params::progress, write-only). THE SETTLE'S OWN STILL: one tick (tick 1) runs 44-62 s on seed 0 with no inner count -- the bar holds still through it (gen_step_costs: LONGEST STILL 90.9 s / 53.6 s under Proving the field). Not this lane's to fix (a tick has no progress tap); flagged for the main session / NEEDS_REVIEW. The caption itself was seen on the wait via the label table; Ben's eye is R8.",
+     "notes": "2026-09-24: labels 16/17; generation_step_slot_count = 18 (ms_step and the static_assert read it); generation_progress::weight_after carries the finish's weight into generation's plan so the bar never reaches its end early; the search reports evaluations done/planned on the inner bar (landscape_search_params::progress, write-only). THE SETTLE'S OWN STILL: one tick (tick 1) runs 44-62 s on seed 0 with no inner count -- the bar holds still through it (gen_step_costs: LONGEST STILL 90.9 s / 53.6 s under Proving the field). Not this lane's to fix (a tick has no progress tap); flagged for the main session / NEEDS_REVIEW. The caption itself was seen on the wait via the label table; Ben's eye is R8. REVIEW 2026-09-24: carries a live-click clause not yet taken; pending with R8 until Ben's click.",
      "result_metric": "gen_step_costs --finish 0 28 (Release, worktree, 2026-09-24): seed 0 build 84.61 s, search 28801 ms (13 evaluations), settle 113922 ms; seed 28 build 68.93 s, search 12623 ms, settle 68832 ms; weights set 16: 20000, 17: 90000; plan total 83911 -> 'Searching the landscape' enters at 63.1%, 'Proving the field' at 86.9%, final fraction 1.000"
     },
     {
