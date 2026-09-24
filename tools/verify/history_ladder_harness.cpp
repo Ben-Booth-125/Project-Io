@@ -134,8 +134,8 @@ int main()
     // --- Generate the real world twice --------------------------------------
     world_params wp;
     wp.seed = 0xB221u;
-    // The 1960 epoch is the longest generation run; the default epoch is now
-    // 0 CE (NR-177), so ask for it explicitly.
+    // The default epoch (1960 since the flip, BL-1047), restated explicitly.
+    // Generation reads no epoch, so this is the same world at any calendar.
     wp.epoch_year = 1960;
     generation_report r1, r2;
     const world w1 = make_hard_coded_world(no_prehistory(wp), &r1);
@@ -234,9 +234,9 @@ int main()
     // --- H6 Stages 1-2 are not pre-written -----------------------------------
     // The ladder writes no dated line for the Charter Act or the border accord
     // (history_ladder.hpp): those institutions are the live sims' to produce.
-    // Asserted across a spread of 1960-epoch worlds — the longest generation
-    // run, and the only one on which a pre-written Stage 1-2 line ever
-    // appeared — so a pass that starts narrating them again is caught.
+    // Asserted across a spread of 1960-epoch worlds — the epoch on which a
+    // pre-written Stage 1-2 line once appeared (the superseded arc, retired by
+    // the flip, BL-1047) — so a pass that starts narrating them again is caught.
     {
         int seeds = 0, narrated = 0;
         for (uint32_t s = 0; s < 12; ++s)

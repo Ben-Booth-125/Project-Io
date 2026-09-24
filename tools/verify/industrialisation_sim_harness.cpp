@@ -12,13 +12,14 @@
 // that is supposed to produce it exists.
 //
 // WHAT "AT 1960" READS (BL-1040; BL-1029 before it). With `--through 1960` the
-// harness generates the SHIPPED world (epoch_year 0) with the INDUSTRIALISATION SPAN
+// harness generates the SHIPPED world (any epoch: generation reads none, BL-1047) with the INDUSTRIALISATION SPAN
 // switched on (world_params::industrialisation_span_enabled): Exploration closes at
 // 1660 as shipped, and the span runs as its own call from the 1660
 // `exploration_output` to 1960 — 75 rounds, the span's own seed, the Industry
-// tree open — before world setup builds the campaign world on its close. Never
-// epoch_year 1960, which selects the superseded 1160 -> 1560 -> 1960 two-span
-// arc with Exploration (and so this span) off (INDUSTRIALISATION.md's opening).
+// tree open — before world setup builds the campaign world on its close. The
+// epoch once chose a history (1960 selected the superseded two-span arc, with
+// Exploration and so this span off); since the flip (BL-1047) it is the
+// calendar alone (INDUSTRIALISATION.md's opening).
 // Every reading is taken off one of three surfaces, and each printed line
 // names its surface and its year:
 //   * the CAMPAIGN WORLD as the app builds it on that close, up to the applied
@@ -68,7 +69,7 @@
 // GENERATION PARITY (BL-1007). Mirrors the shipped start in app order:
 //   1. scripts/world_gen.lua -> world_gen_config, scripts/works.lua ->
 //      works_registry (app::begin_new_game), then make_hard_coded_world at
-//      `world_params{}` with only the seed set — epoch 0, the shipped default;
+//      `world_params{}` with only the seed set — epoch 1960, the shipped default (BL-1047);
 //   2. scripts/recipes.lua + scripts/economy.lua -> recipe_registry, and
 //      `set_era(era_band_for_epoch(epoch))` (app::load_economy);
 //   3. `apply_shipped_landscape` (harness_params.hpp), which mirrors
@@ -2364,15 +2365,15 @@ int main(int argc, char** argv)
     {
         std::printf("=== industrialisation_sim_harness (BL-982) - the thirteen Industrialisation readings ===\n");
         if (span_mode)
-            std::printf("close: %lld CE - the shipped world (epoch_year 0) with the INDUSTRIALISATION SPAN on: its own call,\n"
+            std::printf("close: %lld CE - the shipped world (default epoch 1960) with the INDUSTRIALISATION SPAN on: its own call,\n"
                         "resumed from the 1660 exploration_output, 1660 -> %lld (BL-1040);\n",
                         static_cast<long long>(through_year), static_cast<long long>(through_year));
         else if (continued_mode)
-            std::printf("close: %lld CE - A 1200-NETWORK RUN: the shipped world (epoch_year 0) with Exploration's own\n"
+            std::printf("close: %lld CE - A 1200-NETWORK RUN: the shipped world (default epoch 1960) with Exploration's own\n"
                         "call continued to %lld, pricing on the network it inherited at 1200 (BL-1029's run, not the span);\n",
                         static_cast<long long>(through_year), static_cast<long long>(through_year));
         else
-            std::printf("close: 1660 CE - the shipped world (epoch_year 0), no span: close and control are one world;\n");
+            std::printf("close: 1660 CE - the shipped world (default epoch 1960), no span: close and control are one world;\n");
         std::printf("control: the 1660 handoff, re-run from the fixture and held to the seed library fingerprint\n");
     }
     std::printf("seeds (%s, %zu):", seeds_from_args ? "--seeds" : "docs/generation/seed_library.json",
@@ -3411,7 +3412,7 @@ int main(int argc, char** argv)
                 " library fingerprint: %zu checked, %zu mismatched. Handoff violations: %zu.)\n",
                 generated, N, handoffs, prefix_checked, prefix_failed, violations);
     if (span_mode)
-        std::printf("WHAT 'AT %lld' READS: the INDUSTRIALISATION SPAN's close. The shipped world (epoch 0) with the span\n"
+        std::printf("WHAT 'AT %lld' READS: the INDUSTRIALISATION SPAN's close. The shipped world (default epoch 1960) with the span\n"
                     "switched on: Exploration closes at 1660 as shipped, the span runs 1660 -> %lld as its own call\n"
                     "from the 1660 exploration_output (the span's own seed, Exploration's forces plus the Industry\n"
                     "tree), then world setup and the applied landscape search winner build on its close (the 12-tick\n"
@@ -3419,7 +3420,7 @@ int main(int argc, char** argv)
                     "junction markets and treasuries (BL-1053; the SETUP-DIFF lines above). Each line names its\n"
                     "surface and year.\n\n", T, T);
     else if (continued_mode)
-        std::printf("WHAT 'AT %lld' READS: A 1200-NETWORK RUN, NOT THE SPAN. The shipped world (epoch 0) with\n"
+        std::printf("WHAT 'AT %lld' READS: A 1200-NETWORK RUN, NOT THE SPAN. The shipped world (default epoch 1960) with\n"
                     "Exploration's own call continued to %lld - Exploration's forces only, pricing corridor income and\n"
                     "land trade on the network it inherited at 1200 - plus world setup and the applied landscape\n"
                     "search winner (the 12-tick validation run is not mirrored). A comparison for the span, never the\n"
@@ -3601,8 +3602,8 @@ int main(int argc, char** argv)
         std::printf("     worlds with at least one far flow at the close: %zu of %zu with a usable handoff;\n"
                     "     unreadable flows %zu\n", any_far, handoffs, unreadable);
         std::printf("     NOT THIS READING'S SECOND HALF: haulage_measure's far-trade reading (BL-1006) ticks a year\n"
-                    "     of play on epoch_year 1960, which is the superseded two-span arc with Exploration off; it\n"
-                    "     moves with the epoch flip, not with --through.\n\n");
+                    "     of play on the default 1960 world, which since the epoch flip (BL-1047) is this span's\n"
+                    "     world; it is read there, not with --through.\n\n");
     }
 
     // ---- 8 ------------------------------------------------------------------
@@ -3724,7 +3725,7 @@ int main(int argc, char** argv)
                          span_collect([](const seed_row& r) { return static_cast<double>(r.ns_points) / 1.0e6; }));
         }
         std::printf("     region half - STRUCTURAL ZERO: Stage 4's per-region lag is computed only for a settlement\n"
-                    "     stop at or after 1700, and the shipped world's settlement stops at epoch 0, so no region can\n"
+                    "     stop at or after 1700, and the shipped world's settlement stops at 0 CE, so no region can\n"
                     "     light a furnace however far the span runs. Regions industrialised, summed over the spread:\n"
                     "     1660 control %zu, close %zu.\n", lit_1660, lit_close);
         std::printf("     polity half - evidence, not the reading: living polities whose materials band crossed\n"
@@ -3914,7 +3915,7 @@ int main(int argc, char** argv)
                              h.alive_polities, h.polities_industry_nodes, h.industry_nodes, tail);
             };
             std::fprintf(f, "{\n \"_note\": \"BL-1029/BL-1040 industrialisation_sim_harness per-seed table. mode 'span' (BL-1040): "
-                            "close = the shipped world (epoch_year 0) with the Industrialisation span run as its own call from the "
+                            "close = the shipped world (default epoch 1960) with the Industrialisation span run as its own call from the "
                             "1660 exploration_output to through_year; mode 'continued': a 1200-network run, Exploration's call "
                             "continued to through_year (BL-1029), a comparison and not the span; mode 'none': no span, close = "
                             "control. Control = the 1660 handoff re-run from the fixture and held to the seed library "

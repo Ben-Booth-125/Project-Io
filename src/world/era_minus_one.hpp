@@ -73,10 +73,8 @@ class works_registry;
 /// THE EPOCH NO LONGER DECIDES THIS (BL-747). It used to: an `epoch_year`
 /// at or above 1700 skipped the pass outright, on the reasoning that the
 /// settlement pass had already pre-computed that history and the era had
-/// nothing left to simulate. The two-span design replaces that — the epoch
-/// now decides only whether the run has a SECOND span, not whether it runs at
-/// all, so a 1960 arc plays the same engine across an ancient span and then
-/// an industrial one (docs/lore/HISTORY.md § The epoch and the run).
+/// nothing left to simulate. Generation reads no epoch now (BL-1047;
+/// docs/lore/HISTORY.md § The epoch and the run).
 ///
 /// What remains is the SCOPE KNOB: `prehistory_years == 0` skips the pass, and
 /// that is how the harnesses that do not test the era avoid paying its cost
@@ -86,13 +84,6 @@ class works_registry;
 /// not a question about params, so it stays at the call site. Ask
 /// `era_minus_one_fixture::ran` for the answer that includes it.
 bool era_minus_one_enabled(const world_params& params);
-
-/// Does this epoch carry an INDUSTRIAL span? Above 1700 the sim plays the
-/// run-up to an industrial start, so the boundary sits `industrial_years`
-/// before the epoch and the higher bands unlock there. At an ancient epoch
-/// there is no second span and the derivation below leaves every new field
-/// at its inert default.
-bool era_minus_one_has_industrial_span(const world_params& params);
 
 /// The `history_sim_params` generation runs the era on.
 ///
@@ -121,10 +112,8 @@ uint32_t era_minus_one_sim_seed(const world_params& params);
 // ---------------------------------------------------------------------------
 
 /// Does generation run the Exploration span for these params? Requires the
-/// Empires round itself to be enabled and single-span
-/// (`!era_minus_one_has_industrial_span`) — see `world_params::
-/// exploration_sim_enabled`'s comment for why a two-span epoch is out of
-/// scope here — plus the opt-in flag itself.
+/// Empires round itself to be enabled, plus the switch itself
+/// (`world_params::exploration_sim_enabled`, on by default).
 bool exploration_sim_enabled(const world_params& params);
 
 /// The `history_sim_params` the Exploration span runs on: `start_year =

@@ -85,18 +85,17 @@ public:
     /// BL-705: override `world_params::epoch_year` for every world this process
     /// generates (`--epoch <year>`). Absent = the struct's own default.
     ///
-    /// WHY A FLAG EXISTS AT ALL. The 1960s industrial start is a live branch —
-    /// `era_band_for_epoch` puts the recipe registry on the industrial band, and
-    /// `era_minus_one` skips the antiquity prehistory above 1700 — but nothing
-    /// in `src/` ever *set* the field, so reaching it meant editing a source
-    /// default. Both starts are supported (`docs/economy/ERAS.md` § Where the
+    /// WHAT IT MOVES (BL-1047, the epoch flip): the calendar and the recipe
+    /// band, nothing else. The default is 1960; `--epoch 0` opens the SAME
+    /// generated world dated 0 CE on the ancient band (`era_band_for_epoch`).
+    /// Generation reads no epoch, so no history, span or settlement year moves
+    /// with it. Both starts are supported (`docs/economy/ERAS.md` § Where the
     /// ladder starts), so selecting between them belongs at the command line.
     ///
     /// Applies to a NEW world only; a save carries its own epoch and the load
     /// path is not overridden. Call before run() / run_autostart().
     ///
-    /// @param year Calendar year the generated world begins at (< 1700 takes
-    ///             the antiquity branch).
+    /// @param year Calendar year play opens on (below 1700: the ancient band).
     void set_epoch_year(std::int64_t year)
     {
         m_epoch_year_override = year;

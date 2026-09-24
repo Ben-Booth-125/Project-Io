@@ -426,7 +426,7 @@ colonisation_field run_colonisation(const colonisation_input& in,
     f.culture.assign(n, -1);
     f.ground.assign(n, farm_class::steppe);
     f.farmable.assign(n, 0u);
-    f.last_arrival_year = in.boundary_year; // Overwritten by the first landing.
+    f.last_arrival_year = in.backstop_year; // Overwritten by the first landing.
     bool any_arrival = false;
 
     const auto cover_at = [&](std::size_t i) {
@@ -472,7 +472,7 @@ colonisation_field run_colonisation(const colonisation_input& in,
                                f.ground[static_cast<std::size_t>(s.tile)]});
     }
 
-    const int64_t boundary_cy = static_cast<int64_t>(in.boundary_year) * 100;
+    const int64_t boundary_cy = static_cast<int64_t>(in.backstop_year) * 100;
 
     // THE DAUGHTER-CULTURE ALLOCATOR (BL-856). Ids run upward from one past the
     // last cradle culture, handed out in ARRIVAL order because the heap pops in

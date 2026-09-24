@@ -449,9 +449,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // --- The generation budget (BL-754) -------------------------------------
     //
-    // Per-pass wall clock, REPORTED and never asserted. Ben's question for the
-    // sprint is what the two-span era costs against the single-span one, and
-    // that is not a number any check can own: it varies with the machine, the
+    // Per-pass wall clock, REPORTED and never asserted. What a pass costs is
+    // not a number any check can own: it varies with the machine, the
     // build type and what else is running. So it is measured, handed to the
     // fixture (which has no save-seam presence — see era_minus_one.hpp) and
     // printed once; nothing reads it back.
@@ -918,7 +917,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
         kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
                                            kepler_tiles, home_grid_width, home_grid_height, budget,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
-                                           /*stop_year=*/params.epoch_year,
+                                           // BL-1047: generation's own year, never
+                                           // the campaign epoch.
+                                           /*stop_year=*/world_params::settlement_stop_year,
                                            /*sim_start_year=*/sim_start);
         t_settlement_end = gen_clock::now(); // BL-754
 
@@ -1456,8 +1457,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // THE RUN PREDICATE IS THIS BLOCK'S NESTING. It sits inside
                 // the block that ran Exploration, so it runs if and only if
                 // Exploration ran (Ben, 2026-09-18) -- never on an epoch test
-                // of its own; on the superseded arc (epoch >= 1700) Exploration
-                // is off and this never opens. Its own gates are the switch
+                // of its own. Its own gates are the switch
                 // (on by default since BL-1044) and `stop_after_exploration`,
                 // which must stop BEFORE this span: that knob's own return
                 // sits below population centres, past this call, so it is
@@ -1938,9 +1938,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // A world whose polities never industrialised enacts NOTHING here, and that
     // is a legitimate outcome rather than a gap — see `polity::protection_q`.
     // THIS IS THE ENACTMENT SEAM, NOT THE DERIVATION (BL-976): the Era -1 sim
-    // writes `protection_q` only on the two-span arc, and Industrialisation owns the
-    // derivation on the shipped arc (INDUSTRIALISATION.md § The boundary). The call
-    // stays so that whatever writes the field is read by one path.
+    // no longer writes `protection_q` (its derivation went with the two-span
+    // arc, BL-1075), and Industrialisation owns the derivation
+    // (INDUSTRIALISATION.md § The boundary). The call stays so that whatever
+    // writes the field is read by one path.
     seed_national_tariffs(w, kepler_nations,
                           derive_national_protection(
                               kepler_settlement, static_cast<int>(kepler_nations.size())));
@@ -2772,15 +2773,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
             std::fprintf(stderr,
                          "[gen budget] total %lld ms  (pre-settlement %lld, settlement %lld, "
-                         "era-1 %lld, post-era %lld)  epoch=%lld ancient=%d industrial=%d\n",
+                         "era-1 %lld, post-era %lld)  epoch=%lld prehistory=%d\n",
                          static_cast<long long>(ms_total),
                          static_cast<long long>(ms_before),
                          static_cast<long long>(ms_settlement),
                          static_cast<long long>(ms_era),
                          static_cast<long long>(ms_after),
                          static_cast<long long>(params.epoch_year),
-                         params.prehistory_years,
-                         era_minus_one_has_industrial_span(params) ? params.industrial_years : 0);
+                         params.prehistory_years);
             // BL-1072: the per-step split the loading bar's weights are read from.
             std::fprintf(stderr, "[gen steps]");
             for (int l = 0; l < generation_stage_label_count; ++l)

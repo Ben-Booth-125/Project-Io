@@ -1040,8 +1040,10 @@ void survey_regions_at_span_open(const world& w, const std::vector<entity_id>& i
 ///                  own seed budget, so the two agree by construction. Clamped
 ///                  to what the land can actually hold at the separation rule.
 /// @param seed      Per-body seed, already folded with the campaign seed.
-/// @param stop_year Calendar year the pass generates AT (BL-271). 1960 runs the
-///                  full arc. Below 1700: regions founded after it are dropped
+/// @param stop_year Calendar year the pass generates AT (BL-271). Generation
+///                  passes `world_params::settlement_stop_year` (0 CE), never
+///                  the campaign epoch (BL-1047). 1960 runs the full dating
+///                  arc. Below 1700: regions founded after it are dropped
 ///                  (not yet founded), Stage 4 never runs (no furnace has lit by
 ///                  antiquity), and demography is seeded at founding then grown
 ///                  to `stop_year` (the graduation path the region struct

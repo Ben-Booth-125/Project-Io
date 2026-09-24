@@ -174,7 +174,7 @@ struct far_options
     int           seeds      = 3;
     std::uint32_t first_seed = 0;
     int           years      = 1;    ///< The second window opens after 4 x years quarters of play.
-    std::int64_t  epoch      = 1960; ///< The live product's campaign epoch (CONCEPT.md § Eras).
+    std::int64_t  epoch      = 1960; ///< The live product's campaign epoch (CONCEPT.md § Eras): the default world since the flip (BL-1047), on the industrial band.
     bool          fast       = false;///< Zero the pre-history: NOT the app's world; the output says so.
     int           tail_cap   = 16;   ///< Extra quarters allowed for window cargo to arrive and sell.
 };

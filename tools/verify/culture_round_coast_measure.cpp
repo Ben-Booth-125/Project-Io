@@ -40,9 +40,9 @@ int main()
     {
         world_params p;
         p.seed = 0xC001D00Du + static_cast<uint32_t>(i) * 0x9E3779B9u;
-        // Defaults: epoch_year = 0, prehistory_years = 400 -> the Empires
-        // round's own start is -400 (400 BCE), exactly the boundary
-        // CIVILISATION.md names.
+        // Defaults: empires_start_year = -400 -> the Empires round's own
+        // start is 400 BCE, exactly the boundary CIVILISATION.md names (a
+        // fixed field since BL-1047, no longer derived from the epoch).
         const int64_t boundary = era_minus_one_sim_params(p).start_year;
 
         generation_report rep;

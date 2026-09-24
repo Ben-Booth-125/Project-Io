@@ -30,10 +30,10 @@ The subject docs:
 - **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map,
   driven by the pre-national history ladder.
 - **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
-  market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the
-  ancient arc's epoch (Ben, 2026-08-12, NR-177). The default flips to 1960 once the Industrialisation
-  span runs by default, and the superseded 1560 → 1960 arc is retired, so `epoch_year` names a
-  calendar and never chooses a history (Ben, 2026-09-18; `INDUSTRIALISATION.md`)** — § Pass 2 is the economy
+  market-based and non-hegemonic. **The campaign epoch is 1960 (Ben, 2026-09-08), and `epoch_year`
+  names a calendar and a recipe band, never a history (Ben, 2026-09-18; `INDUSTRIALISATION.md`):
+  generation reads no epoch, and 0 CE is the same world dated 0 CE on the ancient band (Ben,
+  2026-09-24)** — § Pass 2 is the economy
   pass owns the calendar, and the clock rebases at the handoff (`../economy/ERAS.md`) — and
   generation runs a stepped pre-campaign history whose span § Pass 2 is the economy pass states
   (3,600 years, 2400 BCE → 1200 CE, divided at 400 BCE — Ben, 2026-09-09), followed by the
@@ -51,10 +51,9 @@ tiles                                                    (Cinder)
 tiles → rivers                                           (Kepler, the homeworld — homeworld only
                                                           from here to the province line)
   → history ladder → creeds → settlement → migration time-lapse
-  → history sim, Empires span (2400 BCE → 1200 CE)       (one call; a 1700+ epoch appends the
-                                                          industrial span to the same call)
-  → history sim, Exploration span (1200 → 1660)          (whenever Empires ran and there is
-                                                          no industrial span)
+  → history sim, Empires span (2400 BCE → 1200 CE)       (one call)
+  → history sim, Exploration span (1200 → 1660)          (whenever Empires ran)
+  → history sim, Industrialisation span (1660 → 1960)    (whenever Exploration ran)
   → markets standing at the close (one per `region::has_market`)
   → population centres → nations → national character
   → grudge sentiment → national tariffs → national coverage centres
@@ -247,8 +246,10 @@ the world's serialisation seam; the save file records it so a load rebuilds the 
 |---|---|---|
 | `seed` (`uint32_t`) | XOR-folded into each **per-body seed literal** (`params.seed ^ 0xC1D0001u`, …). Seed `0` yields the bare literals, so the **default descriptor is the reference world**. | cheap |
 | `abundance` (`sparse`/`lean`/`standard`) | A **deposit-density scalar** applied as a pure post-multiply in `generate_body_tiles` Pass 6 (`0.40` / `0.65` / `1.00`). Consumes no RNG, so `standard` (1.0) is bit-identical to the unscaled surface. | cheap, isolated |
-| `epoch_year` (`int64_t`) | The campaign epoch: its calendar and its recipe band. It chooses no history — the arc that once keyed on it is retired (Ben, 2026-09-18). | cheap |
-| `prehistory_years` (`int`) | Years of year-tick prehistory the antiquity branch simulates before the epoch (400, at 4 years a tick). A **scope knob, not a tuning dial**: `0` skips the pass, which is how harnesses that do not test the era avoid paying for it. Part of the params, so determinism is untouched. | the most expensive pass |
+| `epoch_year` (`int64_t`) | The campaign epoch, 1960 by default: its calendar and its recipe band, both applied after generation. Generation reads none of it, so every epoch builds the same world — the arc that once keyed on it is retired (Ben, 2026-09-18). | cheap |
+| `prehistory_years` (`int`) | The era's **scope knob, not a tuning dial**: any positive value runs the year-tick history sim, `0` skips it, which is how harnesses that do not test the era avoid paying for it. Not a span length — the spans are the fixed years below. Part of the params, so determinism is untouched. | the most expensive pass |
+| `empires_start_year`, `empires_stop_year`, `exploration_stop_year`, `industrialisation_stop_year` (`int64_t`) | The spans' own calendar: 400 BCE → 1200 CE → 1660 → 1960 (`CIVILISATION.md`, `EXPLORATION.md`, `INDUSTRIALISATION.md`). Fixed years, never derived from the epoch; a harness binds a shorter span by moving one. | — |
+| `exploration_sim_enabled`, `industrialisation_span_enabled`, `resume_seeds_corridor_tier` (`bool`) | Which spans run and how a resumed span reopens its corridors — on by default; off builds the legacy arcs instruments pin. With `era_seed`, these choose the history, so the save records them. | — |
 | `body_count` (`int`) | **Reserved.** The body set is hand-authored prototype *profiles* (hot inner planet / homeworld / moon / metallic asteroid — their **names** are generated per seed, BL-257, body naming); a true count knob needs the generator to synthesise variable body profiles. The field exists so the descriptor is forward-shaped. | heaviest |
 | `preferences` (`world_preferences`) | The New World wizard's input: eight **leans** (`any`/`low`/`mid`/`high`), resolved against the seed by `resolve_preferences` with reject-and-reroll until the homeworld clears the strict Earth-like floor. Preferences, not parameters — see `PLANETOLOGY.md` § Preferences, not parameters. | cheap |
 
@@ -796,23 +797,22 @@ target.
 
 | Pass | Engine | Span | Produces |
 |---|---|---|---|
-| **1 — Ancient** | The polity sim (`history_sim`), Classical and Medieval bands | The prehistory span to the **boundary year** | Ancient borders, cultural doctrines — who walked where |
-| **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | **1560 → 1960** (Ben, 2026-09-08) | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
+| **1 — Ancient** | The polity sim (`history_sim`), the Empires round | **400 BCE → 1200 CE** | Ancient borders, cultural doctrines — who walked where |
+| **2 — Exploration and Industrialisation** | The same polity sim, two further calls each resumed from the last handoff, sea legs open | **1200 → 1660 → 1960** | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
 | **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which firms exist, what each market can close, the price field |
 
 **Pass 1 and pass 2 are one engine, not two.** The works roster is cumulative across its four
-bands and the unit roster is era-keyed, so the second span is the first span continued with more
-rows offered, not a second mechanism. What pass 2 adds is **reach across water** — a campaign or
+bands and the unit roster is era-keyed, so each later span is the first continued with more rows
+offered, not a second mechanism. What pass 2 adds is **reach across water** — a campaign or
 settle target across a sea leg, staged from harbour works — because colonisation by a major is
 reach played overseas, and it falls as every major does (`CIVILISATION.md` § How an empire actually falls).
 The epoch still arrives multipolar; the non-hegemony invariant is not relaxed for the sea.
 
-**The boundary year is a parameter with a default, not a fact.** The default is 400 years before
-the epoch, so that on a 1960 arc pass 2 is 1560 → 1960 and pass 1 is whatever
-`prehistory_years` leaves before it. A derived boundary — the year the first polity lights a
-furnace — is the better-founded alternative and is open; both are consequences of upstream
-scalars, and neither is a roll. On an ancient epoch there is no pass 2: the boundary falls past
-the epoch and the sim stops where it stops today.
+**The spans' years are fields, not facts, and none is the epoch.** Each span opens and closes on
+its own `world_params` year (§ The world descriptor), so the campaign calendar moves no span. The
+earlier single-call design put a **boundary year** 400 years before the epoch and capped the span
+before it at the Medieval band; that design is superseded and retired outright, with no legacy
+switch (Ben, 2026-09-18, NR-898).
 
 ### Pass 2 is the economy pass, and it is TWO phases (Ben, 2026-09-11)
 

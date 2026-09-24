@@ -74,7 +74,7 @@ inline constexpr uint32_t save_game_magic =
 /// `read_save_game` compares this constant for equality and rejects on any
 /// mismatch. There is no upgrade path to write, and adding one for a single
 /// raster would be inventing a scheme this file does not have.
-/// Bumped to 4 when `world_params` gained `industrial_years` (BL-747, the
+/// Bumped to 4 when `world_params` gained the industrial span's years (BL-747, the
 /// two-span prehistory): `w_world_params` gains one int between
 /// `prehistory_years` and `body_count`. A MID-RECORD gap again, so a v3
 /// stream's world-params record misreads `body_count` and the preferences
@@ -177,13 +177,25 @@ inline constexpr uint32_t save_game_magic =
 /// bytes this reader no longer consumes, so it is refused whole on the same
 /// strict-equality contract as every prior bump.
 ///
-/// LAYOUT 21 = LAYOUT 19 PLUS ONE INT64 AT THE TAIL OF EVERY POLITY SAMPLE, AND
+/// LAYOUT 20 = LAYOUT 19 WITH A RE-CUT `world_params` RECORD (BL-1047, the
+/// epoch flip): `w_world_params` drops the industrial span's years (the superseded
+/// two-span arc's scope, retired) and gains `era_seed` after `seed`, then
+/// `empires_start_year`, `empires_stop_year`, `exploration_sim_enabled`,
+/// `exploration_stop_year`, `industrialisation_span_enabled`,
+/// `industrialisation_stop_year` and `resume_seeds_corridor_tier` after
+/// `prehistory_years`. Once the epoch stopped choosing the history, these are
+/// what choose it, and a descriptor without them rebuilds a different world.
+/// A MID-RECORD re-cut, so a v19 stream misreads everything from `abundance`
+/// on -- refused whole on the same strict-equality contract. 20 is this
+/// lane's claim; 21 is held by another lane and 17 by BL-841's branch.
+///
+/// LAYOUT 21 = LAYOUT 20 PLUS ONE INT64 AT THE TAIL OF EVERY POLITY SAMPLE, AND
 /// ONE MORE EVENT KIND (BL-1080, the Industrialisation round shows industry):
 /// `polity_sample::industry_points`, written by `w_timelapse` after
 /// `cap_materials` in all four time-lapse records and read back in the same
 /// place by `r_timelapse` (a negative is corrupt); and
 /// `lapse_event_kind::furnace_lit`, which moves `lapse_event_kind::count` and so
-/// the event-kind range check. A v19 stream is eight bytes short per sample,
+/// the event-kind range check. A v20 stream is eight bytes short per sample,
 /// so it is refused whole on the same strict-equality contract. 21 and not 20
 /// because the generation lane holds 20 (the v6 note above: two layouts never
 /// share a number).

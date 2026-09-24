@@ -517,7 +517,7 @@ bool same_world_params(const world_params& a, const world_params& b)
     const world_preferences& y = b.preferences;
     return a.seed == b.seed && a.era_seed == b.era_seed && a.abundance == b.abundance
         && a.epoch_year == b.epoch_year && a.prehistory_years == b.prehistory_years
-        && a.industrial_years == b.industrial_years
+        && a.empires_start_year == b.empires_start_year
         && a.empires_stop_year == b.empires_stop_year
         && a.exploration_sim_enabled == b.exploration_sim_enabled
         && a.exploration_stop_year == b.exploration_stop_year
@@ -1456,8 +1456,10 @@ void app::load_economy()
     // the default-recipe authoring below is the first such reader.
     //
     // A 0 CE campaign therefore never sees the Launchpad or the petroleum,
-    // propellant and spacecraft chains; a 1960 one sees everything. Ids are
-    // untouched either way: the filter masks, it does not remove.
+    // propellant and spacecraft chains; a 1960 one (the default since BL-1047)
+    // sees everything. Ids are untouched either way: the filter masks, it does
+    // not remove. The band is read HERE, after generation, and generation never
+    // reads it -- so the epoch that picks it moves no generated world.
     m_registry.set_era(era_band_for_epoch(m_active_world_params.epoch_year));
 
     // BL-323 S2b: mirror the reach budget onto ui_state so every placement surface

@@ -694,7 +694,7 @@ struct colonisation_input
     /// its own when its frontier is exhausted, and `last_arrival_year` reports
     /// when that was; this only stops an arrival year running to an absurd
     /// value on a pathological map.
-    int64_t boundary_year = 0;
+    int64_t backstop_year = 0;
 
     /// The first id the walk may allocate to a culture it coins — one past the
     /// last cradle culture. Below it are the cultures that already exist.

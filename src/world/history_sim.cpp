@@ -243,25 +243,8 @@ doctrine_row doctrine_for(const polity& p)
     return d;
 }
 
-/// Which span a year falls in (BL-760 (1)): 0 = the ancient span, 1 = industrial.
-///
-/// A SINGLE-SPAN RUN REPORTS EVERYTHING AS SPAN 0, which is the reading that
-/// matches the design rather than the sentinel. `boundary_year` defaults to
-/// INT64_MIN so that "no year is before it" leaves a one-span arc inert — but
-/// read naively that puts an ancient arc's whole history in span 1, i.e. in the
-/// industrial span it does not have. The explicit sentinel test is what keeps
-/// the ancient-arc rows readable.
-int span_index(const history_sim_params& params, int64_t y)
-{
-    if (params.boundary_year == INT64_MIN)
-        return 0;
-    return y >= params.boundary_year ? 1 : 0;
-}
-
-/// Count a fielded stack into the per-band and per-span rows.
+/// Count a fielded stack into the per-band rows.
 void note_units_fielded(history_sim_state&        out,
-                        const history_sim_params& params,
-                        int64_t                   y,
                         roster_band               band,
                         const std::vector<army_stack_entry>& stack)
 {
@@ -271,8 +254,7 @@ void note_units_fielded(history_sim_state&        out,
     const int b = static_cast<int>(band);
     if (b < 0 || b >= roster_band_count)
         return;
-    out.units_by_span_band[static_cast<std::size_t>(span_index(params, y))]
-                          [static_cast<std::size_t>(b)] += n;
+    out.units_by_band[static_cast<std::size_t>(b)] += n;
 }
 
 /// Turn raised manpower into a typed stack via the era-keyed roster (BL-274),
@@ -286,32 +268,27 @@ void note_units_fielded(history_sim_state&        out,
 /// `readiness_q` is the caller-side lever the winter-campaign candidate uses
 /// against a defender (history_sim.hpp § season).
 ///
-/// `ceiling` is the two-span band cap (BL-747). It carried a
-/// `= roster_band::industrial` default — no restriction — which BOTH call sites
-/// already override with `sim_band_ceiling(params, y)`. The default was therefore
-/// dead, and dead in the dangerous direction: a new in-TU caller that omitted the
-/// argument would silently un-apply the span cap, with no diagnostic and no
-/// harness able to see it (BL-760 (3)). Required rather than defaulted, so
-/// forgetting it is a compile error.
+/// There is no band ceiling (BL-1075): the superseded two-span arc capped its
+/// first span at medieval, and that arc is deleted, so the band is the owner's
+/// military capacity rung and nothing else.
 ///
 /// @p allow_naval carries NR-794 (Ben, 2026-09-07): ships are composed only into
-/// a stack whose campaign actually crosses water. Required for the same reason
-/// @p ceiling is — an omitted argument would silently re-admit fleets to land
+/// a stack whose campaign actually crosses water. Required rather than
+/// defaulted — an omitted argument would silently re-admit fleets to land
 /// battles, and nothing downstream could tell.
 std::vector<army_stack_entry> build_stack(int64_t manpower,
                                           const region& home,
                                           const polity&   owner,
                                           int             readiness_q,
-                                          roster_band     ceiling,
                                           bool            allow_naval,
                                           roster_band*    band_out)
 {
     const int band_index = clampi(owner.capacity[static_cast<int>(sim_domain::military)], 1, 6);
-    const roster_band band = min_band(roster_band_for_capacity(band_index), ceiling);
+    const roster_band band = roster_band_for_capacity(band_index);
     // BL-760 (1): the band is computed HERE and nowhere else, so the counter
     // reads the value the stack was actually built from. Re-deriving it at the
-    // call site would be a second copy of the min_band rule, free to drift from
-    // this one — the divergence class this file's own header warns about.
+    // call site would be a second copy of the rule, free to drift from this
+    // one — the divergence class this file's own header warns about.
     if (band_out != nullptr)
         *band_out = band;
 
@@ -4334,15 +4311,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // and read by the BL-778 legality gate to ask whether this polity
             // can field anything that may hold open ocean. Same one-derivation
             // discipline as `mat_band` immediately below.
-            const roster_band mil_band = min_band(
-                roster_band_for_capacity(
-                    clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6)),
-                sim_band_ceiling(params, y));
+            const roster_band mil_band = roster_band_for_capacity(
+                clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6));
 
-            const roster_band mat_band = min_band(
-                roster_band_for_capacity(
-                    clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6)),
-                sim_band_ceiling(params, y));
+            const roster_band mat_band = roster_band_for_capacity(
+                clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6));
 
             // THE BURDEN OF BREADTH (BL-314 S3). Every region held past
             // `free_holdings` costs supply on every campaign this polity runs.
@@ -5818,9 +5791,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 roster_band atk_band = roster_band::classical;
                 std::vector<army_stack_entry> atk =
-                    build_stack(raised, home, q, atk_ready, sim_band_ceiling(params, y),
-                                !exec_dry, &atk_band);
-                note_units_fielded(out, params, y, atk_band, atk);
+                    build_stack(raised, home, q, atk_ready, !exec_dry, &atk_band);
+                note_units_fielded(out, atk_band, atk);
                 // BL-835 — THE EMERGENCY LEVY. A province being invaded calls
                 // up its own people, now, rather than at the 25%-a-year pace of
                 // the peacetime muster: `muster_rate_q` of 1000 fills the
@@ -5855,9 +5827,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int64_t def_men = tgt.army_stock;
                 roster_band def_band = roster_band::classical;
                 std::vector<army_stack_entry> def =
-                    build_stack(def_men, tgt, dq ? *dq : q, def_ready, sim_band_ceiling(params, y),
-                                !exec_dry, &def_band);
-                note_units_fielded(out, params, y, def_band, def);
+                    build_stack(def_men, tgt, dq ? *dq : q, def_ready, !exec_dry, &def_band);
+                note_units_fielded(out, def_band, def);
 
                 const prof_clock::time_point prof_bat0 = prof_clock::now(); // BL-825
                 const battle_outcome bo = resolve_battle(
@@ -6902,8 +6873,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     const int b = static_cast<int>(r->band);
                     if (b >= 0 && b < roster_band_count)
-                        ++out.works_by_span_band[static_cast<std::size_t>(span_index(params, y))]
-                                                [static_cast<std::size_t>(b)];
+                        ++out.works_by_band[static_cast<std::size_t>(b)];
                 }
                 out.history.push_back(history_event{
                     years_from_calendar_year(y), chain_stage::legacy,
@@ -7030,10 +7000,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // ---- THE FURNACE (BL-748) ------------------------------------
             //
             // Stage 4's date used to be `run_settlement`'s, fixed before this
-            // loop started. Under an industrial epoch that is backwards — the
-            // SECOND SPAN is where industrialisation happens — so the date is
-            // now the year a polity's materials capacity crosses the Industrial
-            // rung INSIDE the run, plus the lag its ground imposes.
+            // loop started. That is backwards — the run is where
+            // industrialisation happens — so the date is now the year a
+            // polity's materials capacity crosses the Industrial rung INSIDE
+            // the run, plus the lag its ground imposes.
             //
             // TWO HALVES, EACH OWNED WHERE IT BELONGS. The endowment gate and
             // the per-region lag are `run_settlement`'s (settlement.cpp § Stage
@@ -7045,11 +7015,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             //
             // Read through `mat_band`, so the rung is the same derivation the
             // works table uses and a polity cannot light a furnace at a band it
-            // could not build at. On a two-span run that means no furnace
-            // before the boundary year, because `sim_band_ceiling` caps span 0
-            // at medieval. On a single-span ancient arc the ceiling is inert —
-            // and no region there carries a lag at all (Stage 4 does not run
-            // below 1700), so the 0 CE world lights nothing, exactly as before.
+            // could not build at. No generated region carries a lag at all
+            // (the settlement pass stops at 0 CE, below Stage 4's 1700), so the
+            // generated world lights nothing here, exactly as before BL-1075.
             //
             // Placed AFTER the verb executes so a crossing bought by this
             // round's Invest is visible this round rather than next.
@@ -7908,68 +7876,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // Integer throughout, walked in polity-id order over a vector, so it is
     // byte-identical from a seed like everything else in this file.
     //
-    // TWO-SPAN ARC ONLY (BL-976). Industrialisation timing is a fact of the
-    // industrial span, and only the two-span arc (`boundary_year` set by
-    // `era_minus_one_sim_params`) runs one. The single-span arc closes at
-    // 1200 CE with no furnace lit on any seed, so this derivation had nothing
-    // to read there and computed a number nothing could use; on that arc the
-    // scalar is Industrialisation's to write from scarcity, flows and preference
-    // (INDUSTRIALISATION.md § The boundary). The broadcast below runs on both arcs:
-    // it is the seam `derive_national_protection` reads, and a zero field is
-    // the single-span world's honest tariff posture.
+    // THE DERIVATION IS GONE (BL-1075). It read industrialisation timing, a
+    // fact only the superseded two-span arc's industrial span produced, and
+    // was deleted with that arc; on the span-on world the scalar is
+    // Industrialisation's to write from scarcity, flows and preference
+    // (INDUSTRIALISATION.md § The boundary). The broadcast below stays: it is
+    // the seam `derive_national_protection` reads, and a zero field is the
+    // honest tariff posture of a world nothing has yet given one.
     {
-        const bool industrial_span_ran = params.boundary_year != INT64_MIN;
-
-        std::vector<int> alive_ids;
-        if (industrial_span_ran)
-            for (const polity& q : out.polities)
-                if (q.alive) alive_ids.push_back(q.id);
-
-        // The world's FIRST furnace, among the polities that survived to be
-        // handed over. A polity that lit and was then eliminated is not part of
-        // the field the campaign inherits.
-        int64_t lead = k_never_industrialised;
-        for (int qi : alive_ids)
-        {
-            const int64_t yr = out.polities[static_cast<std::size_t>(qi)].industrial_year;
-            if (yr == k_never_industrialised) continue;
-            if (lead == k_never_industrialised || yr < lead) lead = yr;
-        }
-
-        if (industrial_span_ran && lead != k_never_industrialised && alive_ids.size() > 1)
-        {
-            const int64_t span = std::max<int64_t>(1, params.stop_year - lead);
-            for (int qi : alive_ids)
-            {
-                polity& q = out.polities[static_cast<std::size_t>(qi)];
-
-                // Strictly before: a tie is not "ahead", so two polities that
-                // lit the same year neither protect against each other.
-                int ahead = 0;
-                for (int pi : alive_ids)
-                {
-                    if (pi == qi) continue;
-                    const int64_t py = out.polities[static_cast<std::size_t>(pi)].industrial_year;
-                    if (py == k_never_industrialised) continue;
-                    if (q.industrial_year == k_never_industrialised
-                        || py < q.industrial_year)
-                        ++ahead;
-                }
-                const int share_ahead_q =
-                    (ahead * 1000) / (static_cast<int>(alive_ids.size()) - 1);
-
-                // A polity that never lit is behind by the WHOLE remaining
-                // span, which is the continuous reading of the sentinel rather
-                // than a second branch downstream.
-                const int64_t my_year = q.industrial_year == k_never_industrialised
-                                      ? params.stop_year : q.industrial_year;
-                const int lag_q = clampi(
-                    static_cast<int>(((my_year - lead) * 1000) / span), 0, 1000);
-
-                q.protection_q = clampi((share_ahead_q * lag_q) / 1000, 0, 1000);
-            }
-        }
-
         // Broadcast onto the ground, the way `contest_q` is broadcast in
         // `derive_national_character`: the settlement state is the handoff
         // object, and the political pass reads regions, not polities.
@@ -9728,7 +9642,7 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
     // hand-built value can.
     o.culture_count       = cs != nullptr ? static_cast<int>(cs->cultures.size()) : 0;
     if (cs != nullptr) o.cultures = cs->cultures;
-    o.works_by_span_band  = hs.works_by_span_band;
+    o.works_by_band       = hs.works_by_band;
     o.grudges             = hs.grudges;
     o.contacts            = hs.contacts;
 

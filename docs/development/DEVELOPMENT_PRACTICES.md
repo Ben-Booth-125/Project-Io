@@ -77,7 +77,7 @@ here. Only a red the code or the world is responsible for is a baseline.
 
 | Harness | Row | Cause |
 |---|---|---|
-| `era_world_harness` | R5 "the 1960 arc still industrialises (reachable across the seed sweep)" | No living polity's capacity passes 4 in any domain by 1960; the Industrial rung needs 5, so no furnace lights on any of the four swept worlds (BL-1010, measured 2026-09-16; the capacity reading holds under both default and shipped generation inputs). A fix moves the 1960 world, and whether the industrial arc must industrialise by its epoch is Ben's call. |
+| — | — | No harness carries a named baseline. |
 
 ### Measuring a generated system
 

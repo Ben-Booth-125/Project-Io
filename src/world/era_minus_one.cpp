@@ -10,11 +10,8 @@ bool era_minus_one_enabled(const world_params& params)
     // THE EPOCH CLAUSE IS GONE (BL-747). It read
     // `params.epoch_year < 1700 && params.prehistory_years > 0`, on the
     // reasoning that above 1700 the settlement pass had already pre-computed
-    // the history and the era had nothing left to simulate. The two-span
-    // design says otherwise: the same engine plays an ancient span and then an
-    // industrial one, so a 1960 arc runs the sim too — the epoch decides only
-    // whether there IS a second span, which is
-    // `era_minus_one_has_industrial_span`'s question, not this one's.
+    // the history and the era had nothing left to simulate. Generation reads
+    // no epoch at all now (BL-1047), so the question is the scope knob alone.
     //
     // `prehistory_years == 0` is a SCOPE KNOB, not a tuning dial: it skips the
     // pass outright, which is how the harnesses that do not test the era avoid
@@ -22,34 +19,20 @@ bool era_minus_one_enabled(const world_params& params)
     return params.prehistory_years > 0;
 }
 
-bool era_minus_one_has_industrial_span(const world_params& params)
-{
-    // The same 1700 the gate used to turn on, now asking a different question.
-    //
-    // `industrial_years > 0` is the second clause for the same reason
-    // `prehistory_years > 0` is one on the gate above: the field is a SCOPE
-    // KNOB, and its own doc-comment promises that zero means no industrial
-    // span. Without this clause a zero would instead put the boundary AT the
-    // epoch, which leaves the ancient span running the whole way with the
-    // medieval ceiling on — the opposite of what the knob says it does.
-    return params.epoch_year >= 1700 && params.industrial_years > 0;
-}
-
 history_sim_params era_minus_one_sim_params(const world_params& params)
 {
     history_sim_params hp;
 
-    // THE STOP YEAR SPLITS ON SHAPE (BL-906). A two-span epoch's industrial
-    // arc still closes AT the epoch — that half is unchanged and untouched by
-    // this item. A single-span (ancient-only) epoch used to close at the epoch
-    // too, which coupled the Empires round's own end to a field that names the
-    // CAMPAIGN's calendar start, not this round's close: the campaign opens at
-    // `epoch_year == 0`, so the round ran 400 BCE -> 0 CE (400 years) against
-    // the 400 BCE -> 1200 CE (1,600 years) `docs/generation/CIVILISATION.md`
-    // § "The closure of the Empire era" specifies. `empires_stop_year`
-    // (default 1200) is now that round's own close, set below in the branch
-    // that actually applies.
-    const bool two_span = era_minus_one_has_industrial_span(params);
+    // ONE SPAN, ITS OWN YEARS (BL-906, BL-1047, BL-1075). The round used to
+    // close at the epoch, which coupled its end to a field that names the
+    // CAMPAIGN's calendar start: at `epoch_year == 0` it ran 400 BCE -> 0 CE
+    // (400 years) against the 400 BCE -> 1200 CE (1,600 years)
+    // `docs/generation/CIVILISATION.md` § "The closure of the Empire era"
+    // specifies. Both ends are the round's own fields now, set below. The
+    // superseded two-span arc (an ancient span capped at medieval, then an
+    // industrial one to 1960 on the same call) is deleted outright (Ben,
+    // 2026-09-18, NR-898 (2)); Exploration and Industrialisation are their own
+    // calls.
 
     // SETTLE IS RE-SETTLEMENT IN GENERATION'S OWN ROUND (BL-894; Ben,
     // 2026-09-11). This is the Empires round -- the land is already settled
@@ -295,39 +278,13 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
         default:         hp.turbulence_lean =  0; break; // ordinary
     }
 
-    if (two_span)
-    {
-        // 1160 -> 1560 -> 1960 at the defaults. The ancient span is
-        // `prehistory_years` long and capped at the medieval band; the
-        // industrial span is `industrial_years` long with the ladder
-        // unrestricted. Both bands tick at 4 years, as the single-span run
-        // always has — the clock is not what changes between the spans, the
-        // roster ceiling is.
-        // The two-span industrial arc's own stop is `epoch_year`, unchanged by
-        // BL-906 — see the header comment on `world_params::empires_stop_year`.
-        hp.stop_year          = params.epoch_year;
-        hp.boundary_year      = params.epoch_year - params.industrial_years;
-        hp.start_year         = hp.boundary_year - params.prehistory_years;
-        hp.span1_band_ceiling = roster_band::medieval;
-        hp.tick_bands[0]      = {hp.boundary_year, 4};
-        hp.tick_bands[1]      = {params.epoch_year, 4};
-        hp.tick_band_count    = 2;
-    }
-    else
-    {
-        // BL-906: the single-span (ancient-only) run closes at its OWN stop
-        // year, `empires_stop_year` (default 1200 CE), rather than at
-        // `epoch_year` (the campaign's calendar start, 0 CE). `boundary_year`
-        // and `span1_band_ceiling` stay at their struct defaults (INT64_MIN
-        // and `industrial`), exactly as before this item: the ceiling is
-        // inert twice over — no year is before the boundary, AND the clamp is
-        // the identity — so nothing about the SHAPE of this branch changed,
-        // only the year it now runs to.
-        hp.stop_year       = params.empires_stop_year;
-        hp.start_year      = params.epoch_year - params.prehistory_years;
-        hp.tick_bands[0]   = {hp.stop_year, 4};
-        hp.tick_band_count = 1;
-    }
+    // The start is `empires_start_year` (400 BCE), not `epoch_year -
+    // prehistory_years` — at the old 0 CE epoch the two were the same number,
+    // which is why the flip moved nothing here (BL-1047).
+    hp.stop_year       = params.empires_stop_year;
+    hp.start_year      = params.empires_start_year;
+    hp.tick_bands[0]   = {hp.stop_year, 4};
+    hp.tick_band_count = 1;
 
     // NO reach-cost override here, deliberately.
     //
@@ -365,8 +322,7 @@ uint32_t era_minus_one_sim_seed(const world_params& params)
 bool exploration_sim_enabled(const world_params& params)
 {
     return params.exploration_sim_enabled
-        && era_minus_one_enabled(params)
-        && !era_minus_one_has_industrial_span(params);
+        && era_minus_one_enabled(params);
 }
 
 history_sim_params exploration_sim_params(const world_params& params)
@@ -438,7 +394,8 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // Never `era_minus_one_sim_params` -- that is the Empires round's verb set.
     history_sim_params hp = exploration_sim_params(params);
 
-    // THE SPAN. It opens where Exploration closed and runs to the epoch, on
+    // THE SPAN. It opens where Exploration closed and runs to its own close
+    // year (the default campaign epoch, never read from it -- BL-1047), on
     // Exploration's own 4-year band (Ben, 2026-09-17, NR-888): at the defaults
     // 1660 -> 1960, 75 decision rounds (1660, 1664, ... 1956).
     hp.start_year      = params.exploration_stop_year;

@@ -164,8 +164,8 @@ bool same_except_record(const history_sim_state& a, const history_sim_state& b,
      || a.start_year != b.start_year)
         return false;
     if (a.battles_per_century != b.battles_per_century) return false;
-    if (a.works_by_span_band != b.works_by_span_band) return false;
-    if (a.units_by_span_band != b.units_by_span_band) return false;
+    if (a.works_by_band != b.works_by_band) return false;
+    if (a.units_by_band != b.units_by_band) return false;
 
     // THE SETTLEMENT STATE IS AN OUTPUT TOO - the sim mutates it in place, and
     // it is the half generation actually carries forward.

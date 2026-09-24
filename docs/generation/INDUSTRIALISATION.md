@@ -46,10 +46,9 @@
 instant Exploration closes and ends at the epoch, so the world it produces is the world the
 campaign opens on (`GENERATION_STRATEGY.md` § Pass 2).
 
-**The default epoch flips to 1960 as this phase's done-when (Ben, 2026-09-15, NR-869).** The
-campaign epoch is 1960 (Ben, 2026-09-08), and the default world descriptor selects that arc when
-this phase lands — never before, because a 1960 world with no Industrialisation opens on a 300-year gap
-the sim did not simulate.
+**The default epoch is 1960 (Ben, 2026-09-08; the flip, NR-869).** The campaign opens in the year
+this span closes, because a 1960 calendar over a world the sim stopped at 1660 would open on a
+300-year gap nobody simulated.
 
 **SETTLED (Ben, 2026-09-18, sprint 46 form, re-timing NR-869): the flip does not wait for Beats 2
 and 3.** It lands once this span runs by default and the superseded arc is retired, so that no
@@ -57,10 +56,22 @@ reading of `epoch_year` chooses a history. The superseded 1560 → 1960 arc and 
 passes that ran only on it (the ruptures, the Charter Act, the 1951 common tongue) are retired
 outright.
 
-**A 1960 epoch names a calendar, not a history.** The arc the flip selects is Exploration's handoff
+**A 1960 epoch names a calendar, not a history.** The world at 1960 is Exploration's handoff
 continued through this span — never the single 1560 → 1960 industrial pass, which is superseded
 and runs no Exploration, and so hands this phase none of its inputs (`GENERATION_STRATEGY.md`
 § Pass 2).
+
+**Generation reads no epoch.** Every span runs on its own fixed years — the settlement pass stops
+at 0 CE, Empires runs 400 BCE → 1200 CE, Exploration to 1660, this span to 1960 — so the same seed
+builds the same world, byte for byte, whatever epoch is asked for. The epoch decides two things,
+both after generation: the tick calendar's day 0, and the campaign's recipe band
+(`../economy/ERAS.md` § Three things that say "era" in code).
+
+**Epoch 0 stays a supported start (Ben, 2026-09-24).** It is the same generated world, dated so
+play opens at 0 CE, on the ancient recipe band: the Launchpad and the petroleum, propellant and
+spacecraft chains are masked from the roster. It is not the pre-flip ancient product — that world
+stopped its history at 1200 or 1660 and is no longer built by any epoch. What epoch 0 buys is the
+ancient roster over the 1960 map, which is a sandbox, not a second arc.
 
 **SETTLED (Ben, 2026-09-17, NR-888): the span runs on Exploration's 4-year band.** One decision
 round every four years, 75 rounds from 1660 to 1960. Measured on Exploration's forces alone, that
@@ -139,8 +150,9 @@ That list is the contract: a struct, not a promise.
 arrive in `exploration_output`; the derivation of `polity::protection_q` from them is owed to this
 phase (BL-976, tariff derivation hands to Industrialisation), and `derive_national_protection` →
 `seed_national_tariffs` is the enactment seam that reads whatever this phase writes. The Era −1
-sim derives the scalar only on the two-span arc, from industrialisation timing; a single-span world
-carries no tariff, which is a legitimate outcome rather than a gap.
+sim derives no tariff scalar of its own — its one derivation, from industrialisation timing, ran
+on the retired two-span arc — so until this phase writes one a world carries no tariff, which is a
+legitimate outcome rather than a gap.
 
 ---
 
