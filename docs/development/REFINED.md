@@ -133,6 +133,58 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
 
 ### Wave 0, Light — BL-1108 (quit during a build crashes). Folded into lane C (same file).
 
+### Wave 1 (opens when BL-1083 lands), lane I1 (identity) — BL-1087 (colour) → BL-1088 (name) → BL-1089 (nation). Groups `realm-keeps-its-colour`, `realm-keeps-its-name`, `realm-becomes-nation`.
+
+- [ ] T1 (1087) pinned slots on the record and in `assign_polity_colours` (history_lapse.cpp:~640-760):
+  pins set at launch from the predecessor's slots and re-pinned at its landing; greedy for the
+  rest; the clash and dead-slot rules; a history_sweep column counting pinned clashes on the 16
+  seeds, read before the rules are fixed. (1087 R1, R5)
+- [ ] T2 (1087) the lineage palette built for every lapse (startup_screens.cpp:~181-224); polity hue
+  from the founding family's wedge with a greedy within-wedge offset (presentation.cpp:~416-447
+  replaced); the polity's culture from the founded region's plurality; the CVD check recorded.
+  (1087 R2, R5)
+- [ ] T3 (1087) the culture base under the fill on rounds 4-6 from `culture_changes` plurality; the
+  carry fade lands on it; the shade ratchet (civilisation_formed / ROSE) carried by id. (1087 R3, R4)
+- [ ] T4 (1088) `polity::name` coined at `founded` via `coin_lexicon` over the founding region's
+  speech; a `polity_name` table on the record beside `region_name`, carried by id; board and ticker
+  print it. (1088 R1, R2)
+- [ ] T5 (1088) the UI-side capital-at-year fold (founded + capital_moved) placing the seat dot and
+  the 1200 burst; the resume re-emit → a ticker-silent `inherited` kind (append-only; the envelope
+  bump); 'A people settle at X' for an ownerless founding. (1088 R3, R4, R5)
+- [ ] T6 (1089) `polity_names` on `nation_params`; Pass 5 follows the fold representative through
+  the Pass 2c merge and inherits the realm's name; merge rule A; ownerless ground coined; the
+  headless check that every nation with a founding realm carries its name. (1089 R1)
+- [ ] T7 (1089) the per-world nation → slot table set at Begin/load from the saved report and read in
+  `nation_colour` (hash as fallback): the border band, the seat map, the carve and the Ages view
+  agree; the seat card lists absorbed realms and cites the city's region; the nation-count line.
+  (1089 R2, R3)
+- [ ] T8 Release build; `world_determinism` twice; `save_envelope_roundtrip`; `begin_adopts_check.js`;
+  the verify captures named in the groups; cold review; Ben's live click across the 1200/1660 seams
+  and into the seat. (all R6/R5)
+
+### Wave 1, lane I2 (frontier and marks) — BL-1090 (hard borders) then BL-1094 (marks). Groups `hard-borders-by-people-share`, `marks-that-earn-their-place`.
+
+- [ ] T1 (1090) history_sweep column: the people-share distribution per world on the 16 seeds and the
+  count a candidate threshold bolds; the threshold and hysteresis fixed from it and written into the
+  item. (1090 R1)
+- [ ] T2 (1090) the per-owner hard flag with hysteresis; both frontier passes (history_lapse.cpp:~979-985,
+  ~1000-1013) draw 2 px dark + 1 px inner stroke in the realm's colour; the board bolds; the flag
+  carries by id into round 5. (1090 R2)
+- [ ] T3 (1094) the four marks with their glyphs, the capital-moved slide (on I1's fold — if I1 has
+  not landed, slide old → new from the event's `other` region directly), the Post Road pulse; no
+  other kind marks; STARTUP.md § Identity across the rounds matches. (1094 R1, R2)
+- [ ] T4 captures per kind on a library seed; Release build; cold review; Ben's live click. (R3s)
+
+### Wave 1, lane I3 (voice) — BL-1106 (names and voice). Group `names-and-voice`.
+
+- [ ] T1 the Culture board 'peoples / Homeland', no battle cells; the civilisation/creed name table on
+  the report (record-only, the envelope bump); schism prose naming both parties and the creed;
+  'Something happens' gone. (R1)
+- [ ] T2 in-world footers (startup_screens.cpp:~1510-1518); ticker priority by kind
+  (history_lapse.cpp:~2028-2035); the lagged-slice clamp (startup_screens.cpp:~1151-1153); the
+  quiet-age sentence. (R2)
+- [ ] T3 captures; Release build; cold review; Ben's live click. (R3)
+
 - [ ] T1 join every in-flight worker at the top of `~app` (and on the quit path) with a
   "finishing the build before quitting" line on the wait surface. Verification: start a cold Begin
   build in a Release run and close the window mid-build — exit 0, no exception line; the same during
