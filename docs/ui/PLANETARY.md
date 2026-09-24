@@ -214,8 +214,8 @@ draws **no ring at all**: its centre glyph already describes it fully, and a rin
 built tile in the world would be chrome rather than information.
 
 **The rim is the borders' territory, and a ring placed there must not read as one.** Three
-passes claim it: the player's own footprint outline (the loudest), the nation-border
-segments under the Country lens, and the province edge stroke. Every one of them is
+passes claim it: the player's own footprint outline (the loudest), the national border
+band's inset boundary stroke (§ The national border band), and the province edge stroke. Every one of them is
 **hexagonal, continuous and thin**, and four properties separate the ring from all three:
 
 | Property | The ring | The border passes |

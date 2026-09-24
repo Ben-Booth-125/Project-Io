@@ -1049,7 +1049,7 @@ void app::draw_generation_screen()
                   "the lapse rounds are a prefix of the pass rounds");
 
     // Which kind of round is on screen. The planetology rounds preview a pure chain
-    // per keystroke; the pass rounds cannot (STARTUP.md § The wait is the round).
+    // per keystroke; the pass rounds cannot (STARTUP.md § The wait, then the lapse).
     const bool planetology_round = (m_wiz_round < wizard_planetology_round_count);
     const int  pass_index        = m_wiz_round - wizard_planetology_round_count;
 

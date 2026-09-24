@@ -299,6 +299,16 @@ ask. The full render spec, the falloff table, and the
 never-average-two-nations constraint that decides both halves of the pass are in
 [PLANETARY.md](PLANETARY.md) § The national border band.
 
+**The identity colour is the realm's, pinned per world (Ben, 2026-09-24).** A
+nation's colour is the colour slot its founding realm held on the wizard's map —
+the slot the Empires, Exploration and Industrialisation rounds carry by id
+(`STARTUP.md`) — pinned as a per-world nation → slot table into
+`palette::nation_colour` at Begin and at load, read from the saved report. The
+border band, the seat map and the Ages view share that one table, so the realm
+the player watched grow through the rounds is met in the same colour at Begin:
+one mapping, never a hash of the nation id and never a second greedy assignment
+of its own.
+
 **Why a lens was the wrong home for it, in this system's own terms.** A lens is a
 *mode*: one is active at a time, and it re-skins the map to answer one question at
 the cost of every other. Territory is not that kind of question — it is context

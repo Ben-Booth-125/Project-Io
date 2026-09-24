@@ -5,8 +5,9 @@
 > and which peoples raise them · what a civilisation is, as distinct from a creed · how two
 > cultures come to be similar or opposed, and why that is the engine of conquest · what the
 > Culture phase must hand forward for any of it to work · what the phase hands the exploration
-> age at its CLOSURE, and the readings that contract is judged on · how a fall is told, and why
-> the sim reads that story back · what makes a long run affordable.
+> age at its CLOSURE, and the readings that contract is judged on · what a realm is called, and
+> why the name never follows its seat · how a fall is told, and why the sim reads that story
+> back · what makes a long run affordable.
 > **Not here:** how people came to live where they live (COLONISATION) · how force resolves
 > once two polities contest ground (MILITARY_HISTORY) · what a pantheon is or how a tongue is
 > coined (../lore/CREEDS) · the stage ladder this phase sits inside (../lore/HISTORY) · what a
@@ -47,9 +48,10 @@ from this one:
 | **Empires** — this phase | 400 BCE | 1200 CE | 1,600 |
 | **Pass 1**, total | 2400 BCE | 1200 CE | **3,600** |
 
-**1200 CE is unmoved**, so everything downstream of it — the coast to 1560, pass 2, the 1960 epoch
-— is untouched (`GENERATION_STRATEGY.md` § Pass 2 is the economy pass, 1560 → 1960). What moved is
-where pass 1 *starts* and where it *divides*.
+**1200 CE is unmoved**, so everything downstream of it — the Exploration age to 1660, then
+Industrialisation to 1960, the 1960 epoch — is untouched (§ The closure of the Empire era carries
+the phase table; `GENERATION_STRATEGY.md` § Pass 2 is the economy pass carries the pass map). What
+moved is where pass 1 *starts* and where it *divides*.
 
 **400 BCE is NOT a year the engine already knows.** The sim's ancient arc ends at 0 CE, so the
 boundary is not free the way the first cut of this section claimed — the split is real work, and
@@ -59,8 +61,9 @@ boundary is not free the way the first cut of this section claimed — the split
 2026-09-09, confirming NR-818).** That document ends the migration round when every habitable
 landmass carries some culture, which is a derived year and not 400 BCE. Both hold. The Culture
 round ends when the filling ends, and the world then **coasts** to 400 BCE holding what migration
-left it — the same device the design already uses for 1200 → 1560, where a span whose defining
-property is that little changes is not worth simulating.
+left it. A coast is the right device for a span whose defining property is that little changes,
+and this is the one the design keeps: the far side of 1200 CE is simulated, not coasted (§ The
+closure of the Empire era).
 
 **A migration unfinished at 400 BCE is a defect in the migration, not in this boundary.**
 Unsettled ground is the exception marking hostile country (`../ui/STARTUP.md`
@@ -385,6 +388,15 @@ empire that raised it has fragmented. A record persists, and the fragments inher
 **Its name is coined from the tongues that mixed, never from a bank of its own.** The naming
 substrate exists (`../lore/CREEDS.md`, `world/tongue.hpp`) and the standing rule holds without
 exception: generated names are sci-fi, never drawn from an Earth list.
+
+**The coining is a named moment on the record, and it is one of two (Ben, 2026-09-24).** The
+instant a civilisation is coined is the `civilisation_formed` event — seated at the coining
+region, on the realm whose ground did the mixing. The record names exactly two moments as a
+realm's step up: this one, and the realm's rise past the sweep's own ROSE rule (a peak at least
+double its start and at least three regions more — `history_sweep`'s definition, so no reader
+can drift from it). Any reading that ratchets on a realm's growth ratchets at these two moments
+and nowhere else; both are facts of the record keyed by polity id, stable except at the moment,
+so they cross a span boundary by id. What is drawn at either is `../ui/STARTUP.md`'s.
 
 **The ETHIC is the field that makes it not-a-creed.** A creed answers *which gods there are*; the
 ethic answers *how one ought to live*. It is second-order by construction — derived from what the
@@ -998,10 +1010,10 @@ where resources are seen as CAPITAL — so it matters specifically how larger em
 expand their reach, and then collapse into smaller nations ready for an industrial boom.**
 
 **That names the arc's ENDING as a deliverable, and the ending is FRAGMENTATION.** Pass 2 is an
-economy pass over nations (`GENERATION_STRATEGY.md` § Pass 2 is the economy pass, 1560 → 1960),
-and nations are
-what an empire leaves behind when it stops being able to hold itself. So *a stable dark age* is
-not merely where the arc runs out — it is the state in which the industrial era finds its actors.
+economy pass over nations, in two phases — Exploration then Industrialisation, 1200 → 1660 → 1960
+(`GENERATION_STRATEGY.md` § Pass 2 is the economy pass) — and nations are what an empire leaves
+behind when it stops being able to hold itself. So *a stable dark age* is not merely where the
+arc runs out — it is the state in which the industrial era finds its actors.
 
 **A world that ends pass 1 as one hegemon has failed this handoff**, however plausible its
 numbers, and so has a world that never assembled anything larger than a city state. Both ends of
@@ -1035,6 +1047,46 @@ those two, not of a network outrunning itself.
 conquest consumes; the reading of ground as capital belongs to the economy pass and must not leak
 backwards into a phase that has no price
 (`../economy/MARKETS.md`, and § Materials are spent when something happens).
+
+---
+
+## A realm's name
+
+**A realm is named once, in its founding culture's tongue, and the name is carried by id (Ben,
+2026-09-24).** `polity::name` is coined at `founded` by `coin_lexicon` over the founding region's
+culture, its `speech` — the same pure function of the tongue that coins that people's cities and
+region words, so a realm and everything else in its sound system read as kin
+(`NATION_GENERATION.md` § Pass 5 — Naming holds the register of naming sites). Nothing renames it
+afterwards: not a re-seating, not the loss of its seat, not a span boundary. The seat a polity rose
+from is where the name is coined, never what the name IS.
+
+**The record carries the name beside the region table.** The time-lapse record holds a
+`polity_name` table parallel to its polities, as `region_name` is parallel to its regions
+(`era_timelapse.hpp`), and every reader — the board, the ticker, and the seat briefing after them —
+prints a realm by that table and never by its seat. Because the key is the polity id, a span
+resumed from the last handoff carries every living realm's name forward unchanged: a resumed span
+inherits, it does not coin.
+
+**Where the seat stands is a fact about a year; the name is not.** A realm's capital at a given
+year is a read-side fold of `founded` and `capital_moved`, and every mark that sits on a seat takes
+its place from that fold (`../ui/STARTUP.md` owns what is drawn). **The name never follows the
+capital.** A realm that re-seats is the realm it was — "X re-seats itself at Y" — and the name on
+the board does not move.
+
+**A resumed span states each living realm's seat without re-founding it.** A span resumed from the
+last handoff opens by restating where every living realm sits, so the record replays from that
+span alone. That restatement is an `inherited` kind — region = the capital, dated at the span's
+start year — and it is ticker-silent, because nothing rose. A `founded` at a resume would tell the
+player that a realm they watched hold ground for centuries was born at the span's opening year.
+
+**An ownerless founding is a people settling, not a realm rising.** Ground that organises with no
+polity to own it is told as "A people settle at X" — the people, on the region's own name — never
+as "A realm rises", because none has.
+
+**The nation inherits the realm's name verbatim.** At the 1960 fold a realm becomes a nation under
+the name it was founded with; Pass 5 consumes the name rather than coining another, and which
+realm names the nation where the size floor folds two together is that pass's rule
+(`NATION_GENERATION.md` § Pass 5 — Naming).
 
 ---
 

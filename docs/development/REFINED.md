@@ -1,5 +1,98 @@
 # REFINED — active worklist
 
+## Sprint 47 — one history, told through the rounds (opened 2026-09-24)
+
+**Goal.** The wizard reads as one history: the world is built once at the Life gate and moves
+forward through every round with nothing recomputed; rerolls are per stage; round 6 absorbs
+Begin's work and closes on the map the campaign opens on; a realm keeps its colour, shade and name
+from the Empires round to the seat card; each round carries its flair (arrows, hard borders,
+fleets, works chartered). The rulings record is `drafts/sprint-47-rulings.md`; the sprint row in
+`sprints.json` carries the waves, the risk and the done-when. Items are promoted here as each lane
+opens; a lane's tasks are written by the main session before its agent is briefed.
+
+**Lanes, by file (keep them disjoint):**
+- **Generation seams** — `hard_coded_world.*`, `era_minus_one.cpp`, `world_gen_config.hpp`,
+  `startup_screens.cpp` (the worker/slots only): BL-1083 (one seed per span) then BL-1084 (the
+  world built once and moved). Serial; the cursor proof gates every UI lane below.
+- **Core / Begin** — `app.cpp`, `app.hpp`, new `world/finish_campaign_world.*`,
+  `world/campaign_settle.*`, `harness_params.hpp`: BL-1085 (Begin retired into round six),
+  BL-1108 (quit-during-build crash, Light). Then BL-1086 (search inside generation, stretch).
+- **World-movers** — `history_sim.*` (the subjection block; the end-of-run block), `era_band.hpp`,
+  `law.cpp`: BL-1096 (purchase verb) + BL-1097 (sea legs recorded) in one lane; BL-1101 (band from
+  history); BL-1102 (tariff posture derived). Then BL-1098 (lane stamp, stretch).
+- **Identity (UI)** — `history_lapse.*`, `presentation.cpp`, `nation_generation.*`,
+  `seat_screen.cpp`, `tile_inspector.cpp`: BL-1087 (colour) → BL-1088 (name) → BL-1089 (nation);
+  BL-1090 (hard borders), BL-1094 (marks), BL-1106 (names and voice) beside them.
+- **Rounds' flair (UI + record kinds)** — `history_lapse.*`, `era_timelapse.hpp`,
+  `save_game.cpp`, `generation_charts.cpp`, `settlement.*`: BL-1091 (from Life to people) →
+  BL-1092 (routes and splits); BL-1095 (fleets and ties); BL-1099 (works chartered events);
+  BL-1100 (rung crossing); BL-1104 (Culture record saved); BL-1107 (ground profile, stretch).
+
+**Gates.** Every merge: Release build, `world_determinism` twice (bit-identical), `save_roundtrip`,
+`save_envelope_roundtrip`, the item's harnesses, a cold `code-reviewer` pass, then Ben's live
+click for any UI item. World-movers land behind the sprint's ONE re-bless, taken once after the
+last of them. Save versions: one envelope bump and one world bump for the whole sprint, each
+claimed by the first lane that needs it (`next_save_version.js --kind envelope|world --claim`).
+
+**Owed live clicks carried in:** BL-1068, BL-1072, BL-1073, BL-1076, BL-1080 (round 6, the wait,
+Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
+
+### Wave 0, lane G (generation seams) — BL-1083 (one seed per span). Group `span-seeds-per-round`.
+
+- [ ] T1 `world_params::span_seed[4]` after `era_seed` (hard_coded_world.hpp:40-63), zero by default,
+  the fold rule in its comment; the stale `era_seed` comment rewritten. provides: the field.
+  consumes: nothing. (R1)
+- [ ] T2 each span folds ONLY its own counter, additively with an odd multiplier so zero is neutral:
+  `era_minus_one_sim_seed` / `exploration_sim_seed` / `industrialisation_sim_seed`
+  (era_minus_one.cpp:315, :382, :446) take span_seed[1..3]; the `run_settlement` seed
+  (hard_coded_world.cpp:919) folds span_seed[0]. provides: the folds. consumes: T1. (R1, R2, R3)
+- [ ] T3 `same_world_params` compares the four (app.cpp:514-534); the reroll handler bumps
+  `span_seed[lapse_index]` instead of `era_seed` (startup_screens.cpp:1647); invalidation unchanged.
+  consumes: T1. (R4)
+- [ ] T4 the save envelope writes and reads the four under a claimed envelope version
+  (`next_save_version.js --kind envelope --claim "BL-1083 span seeds"`; save_game.cpp:88-111);
+  `save_roundtrip` and `save_envelope_roundtrip` green. consumes: T1. (R4)
+- [ ] T5 the turbulence lean's own dirty path: invalidate Empires onward and relaunch round 4 at
+  once, no `m_wiz_dirty` (startup_screens.cpp:1573-1585; app.hpp:287-321). (R5)
+- [ ] T6 a headless check that span_seed[2]=1 leaves the migration and Empires records identical and
+  changes Exploration, and span_seed[0]=1 changes the migration (a `tools/verify` harness or a
+  `--verify` script; name it in the group). (R2, R3)
+- [ ] T7 seed library entries and harness fixtures that set `era_seed` still build; STARTUP.md's two
+  sections re-read against the built behaviour; Release build; `world_determinism` twice; Ben's
+  live click (R6, R7).
+
+### Wave 0, lane C (core / Begin) — BL-1085 (Begin retired into round six). Group `begin-retired-into-round-six`.
+
+- [ ] T1 promote the settle tick body from `tools/verify/harness_params.hpp:569-639` into
+  `src/world/campaign_settle.{hpp,cpp}` (`run_settle_tick`, `run_settle`); `app::step_economy`'s
+  world half and the harness mirror call it; `begin_adopts_check.js` PASS and the 16-seed
+  `--digest-check` unchanged before anything else moves. provides: the one settle function. (R1)
+- [ ] T2 `src/world/finish_campaign_world.{hpp,cpp}`: the world-only setup halves, the band (from the
+  epoch until BL-1101 lands), `assign_default_recipes`, the stockpile budget, the search, the winner
+  apply, the recipe pass, the twelve-tick settle; returns the winner score and the charter report.
+  consumes: T1. (R2)
+- [ ] T3 the registry loaded from Lua on the main thread before the round-6 launch (the `m_works`
+  pattern) and a copy handed to the worker; `wizard_world_cache` carries the banded copy, the score
+  and the report; Begin moves them out. consumes: T2. (R3)
+- [ ] T4 the round-6 lambda calls `finish_campaign_world` after `make_hard_coded_world`; the label
+  table widened past 16 with "Searching the landscape" / "Proving the field" and measured weights
+  (re-measure the search in Release first and write the number into the item). consumes: T2. (R6)
+- [ ] T5 Begin: waits on round 6's future (never a second build); adopt path moves everything;
+  the cold worker calls the same function; the twelve ticks' presentation half dropped;
+  `m_econ_steps = 12`; STARTUP.md § Handoff re-read against it. consumes: T3. (R4, R5)
+- [ ] T6 `run_serve` adopts; `run_verify` unchanged; `--autostart-windowed` waits on the future;
+  `harness_params.hpp` mirrors call the promoted functions; `begin_adopts_check.js`'s log proof
+  re-pointed; `seat_pick_check.js` PASS. consumes: T5. (R7)
+- [ ] T7 Release build; `world_determinism` twice; both check scripts; Ben's live click — Begin after
+  the playback opens the seat with no freeze. (R8) BL-1078 closes here.
+
+### Wave 0, Light — BL-1108 (quit during a build crashes).
+
+- [ ] T1 join every in-flight worker at the top of `~app` (and on the quit path) with a
+  "finishing the build before quitting" line on the wait surface. Verification: start a cold Begin
+  build in a Release run and close the window mid-build — exit 0, no exception line; the same during
+  a wizard round's wait.
+
 ## Drained 2026-09-16
 
 Three finished blocks were cleared at the session close; each one's record lives in the

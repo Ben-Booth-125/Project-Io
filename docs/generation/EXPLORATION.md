@@ -7,8 +7,8 @@
 > treasury allocates its spend · what a treaty is as data and what it binds · what a colony
 > is and why it wants things of its own · the two ways ground is claimed across water and what
 > each costs · what a colonial tie is on the map and what reads it · how ports, navies and
-> standing armies are paid for and
-> how they decay · how an arms race buys quiet at home and opportunity abroad · the two ways to
+> standing armies are paid for and how they decay · what the record keeps of a fleet, a harbour
+> and a crossing · how an arms race buys quiet at home and opportunity abroad · the two ways to
 > be strong and how a creed decides which · how a good acquires a cultural preference · what the
 > phase hands Industrialisation.
 > **Not here:** what crosses into it from the Empire phase (CIVILISATION § The closure of the
@@ -24,6 +24,13 @@
 > (§ Force persists now, § The engine is shared); unmet-want signal; no flat market income; trade
 > value in a binding; an eleventh reading (Trade); trade flows, grudges and the surviving network
 > added to the handoff list, with world setup reading them.
+
+> ⟳ **What changed (2026-09-24, the sprint 47 rulings — remove once reviewed):** the purchase is
+> decided inside the subjection, with a price, no grudge and the kind as the verb (§ Two ways to
+> claim ground across water; § Where subjects come from); what writes a sea leg, the use count that
+> earns a lane, and the lane level on water (§ The colonial tie is a sea lane); the fleet, the
+> harbour and the wet campaign on the record (§ Force persists now); sea legs on the handoff list;
+> lane decay, the purchase constants and the fuller contest under § Open questions.
 
 **Exploration is the third simulated span and the first with a price on anything.** It runs
 **1200 → 1660 CE, 460 years**, opening the instant the Empire phase closes — the 1200 → 1560
@@ -152,7 +159,10 @@ want to visualise fleets and caravans moving, this can be heavily abstracted sin
 time-lapse is too fast, so we will just render examples when a threshold supply is reached."* A
 corridor whose throughput crosses a threshold draws an exemplar — one caravan, one sail — and the
 exemplar stands for the flow rather than depicting it. Because the flow is already a corridor
-number, this costs a comparison.
+number, this costs a comparison. On water the exemplar marks the flow and nothing else: the fleet
+the map draws is the standing navy the record samples (§ Force persists now), and the line it draws
+is the lane the record earned (§ The colonial tie is a sea lane) — each read from what the span
+recorded, none a second simulation.
 
 ---
 
@@ -276,10 +286,20 @@ So a subject arises one of two ways, and Ben, 2026-09-11 names both: *"the most 
 dominant nations are able to lay claim to polities they have no direct control over — beginning to
 sprout trade provinces, and steal land from natives."*
 
-- **A trade province** — a foothold on a native polity's coast, taken by a power that arrived with
-  capital and a want. It is a *seat with a market and an overlord*, not a conquest: the native
-  polity survives beside it, which is what makes the relation extractive rather than terminal.
-- **A subjected polity** — the native polity itself, brought under an overlord link, whole.
+- **A trade province** — a native polity bought, not taken, by a power that arrived with capital
+  and a want. The relation is a **label on the bound native polity** — the native, under the
+  buyer's overlord link, with *bought* as its kind — and the province is paid for, never resented
+  and never digested (§ Two ways to claim ground across water; Ben, 2026-09-24). The label extends
+  to a foothold on the native's coast: a *seat with a market and an overlord*, minted beside the
+  native's capital, not a conquest — the native polity survives beside it, which is what makes the
+  relation extractive rather than terminal.
+- **A subjected polity** — the native polity itself, brought under an overlord link, whole, with
+  *taken* as its kind.
+
+**A subject's kind is the VERB that bound it, recorded at the binding — never a proxy read off
+whether its seat has a port (Ben, 2026-09-24).** A coastal people taken by force is a subjected
+polity, and nothing about its coast makes it a trade province; which verb binds is decided on the
+ground's terms in § Two ways to claim ground across water.
 
 **The asymmetry that permits either is technological, and it is a node, not a rank.** Nothing
 reads size. What decides who can arrive at all is what the arriving polity holds — the sea legs
@@ -302,24 +322,42 @@ deterministic, scored-utility, never a planner (`../ai/AI_OPPONENT.md` § 11). T
 **Purchase — the diplomatic claim.** *"Something like purchasing a province for the purpose of
 trade, and respecting local customs."* A polity pays for a province rather than taking it, out of
 the capital its seat already holds (§ Capital arrives, and it sits in the capital — the same
-currency, no second one). What it buys is *access*: the province's endowment becomes reachable to
+currency, no second one). **The price is the greater of a floor and the native seat's treasury at
+a rate**, debited from the buyer's seat and credited to the native's (Ben, 2026-09-24): a seller
+whose stores are empty is cheaper to buy from, down to the floor, and the money changes hands
+rather than vanishing. What it buys is *access*: the province's endowment becomes reachable to
 the buyer's network, and the buyer comes to want what it grows (§ A good acquires a cultural
 preference). What it does **not** buy is the people. **A purchased province keeps its culture
-shares**; nothing is digested, because nothing was conquered. That is what "respecting local
-customs" means as data.
+shares, and no ground-taken grudge is written**; nothing is digested and nothing is resented,
+because nothing was conquered. That is what "respecting local customs" means as data. The record
+notes the purchase as a moment of its own, so the time-lapse can draw it and the handoff can read
+it.
 
 **Conquest — the military claim.** *"Military claims, and war for items such as gold."* The
-campaign verb `MILITARY_HISTORY.md` already resolves, played across a sea leg. The province changes
-hands, its people are digested over centuries, and the grudge ledger records who did it. A
-conquered province's endowment is the conqueror's outright, which is why a polity would fight for
-it: gold is worth a war in a way a cash crop's *access* is not.
+campaign verb `MILITARY_HISTORY.md` already resolves, played across a sea leg — a wet campaign,
+which the record notes at its launch (§ Force persists now). The province changes hands, its
+people are digested over centuries, and the grudge ledger records who did it. A conquered
+province's endowment is the conqueror's outright, which is why a polity would fight for it: gold
+is worth a war in a way a cash crop's *access* is not.
 
-**The scorer chooses between them on the ground's terms**, never on a posture flag. A rich metal
-endowment behind a weak defence scores the campaign; a cash-crop province under a polity with a
-full treasury scores the purchase; a seller whose stores are empty is cheaper to buy from. The two
-verbs are one contest with two costs, which is what makes the map readable afterwards — a player
-can point at a colony and say *bought* or *taken*, and the culture shares and the grudge ledger
-will agree.
+**The contest is decided inside the subjection itself, on the ground's terms (Ben, 2026-09-24,
+superseding the 2026-09-16 fold)**, never on a posture flag. The moment an arriving power binds a
+native polity (§ Where subjects come from), two facts about the ground say which verb it was. If
+the native seat is coastal — its region carries a port window, `port_q`, so a purchase party can
+land — and the arriver's seat treasury covers the price, the province is **bought**: the price
+moves, no grudge is written, the culture shares stand, and the subject's kind is *bought*.
+Otherwise it is **taken**: the overlord link is imposed, the grudge ledger records the ground as
+taken, and the kind is *taken*. Either way the tribute clause and its term bind as § A colony is a
+subject, and it wants things of its own says; what differs is what the natives keep and what they
+remember. The two verbs are one contest with two costs, which is what makes the map readable
+afterwards — a player can point at a colony and say *bought* or *taken*, and the culture shares
+and the grudge ledger will agree.
+
+**The floor and the rate are measured before they are fixed**: across the seed library,
+never on one seed, with the treasury spread reported beside the bought/taken split. The
+requirement is a split that is not degenerate on a spread — a world where every province is
+bought has priced the purchase at nothing, and one where none is has priced it out of every purse
+(§ Open questions).
 
 **Both culminate as every major does.** The non-hegemony invariant is not relaxed for the sea; a
 metropole that overreaches fragments, and its colonies arrive at the epoch as nations with a
@@ -337,11 +375,19 @@ because the buy side that would have read them is dormant in play, and a relatio
 is not a force. What the design needed was the same thing the ancient roads gave the land.
 
 **Sea lanes are stamped FROM the record, exactly as roads are stamped from the empires'.** The span
-records every sea leg it walked — a purchase party's crossing, a campaign's sea supply, the
-standing traffic between a metropole and what it holds — and a pass immediately after stamps those
-legs onto the water as a **sea lane** tier that discounts sea-leg traversal cost, the water
-analogue of `../economy/LOGISTICS.md` § 4a. Traffic earns the tier; a crossing made once is no
-lane. Purely additive; land tiles are untouched.
+keeps a table of sea legs — one row per pair of shores, with a count of uses — and **three things
+write a use** (Ben, 2026-09-24): a wet campaign's crossing, at its launch, from the staging hub to
+the target; a purchase party's crossing, from the buyer's seat to the seat it buys (§ Two ways to
+claim ground across water); and the standing traffic between a metropole and each subject it
+holds, one use per decision round for as long as the link stands. **A leg earns the lane at the
+same use count that earns a land corridor its Track** (§ Goods move as throughput, never as cargo;
+`../economy/LOGISTICS.md` § 4a): traffic earns the tier, and a crossing made once is no lane. The
+year a leg crosses that count is recorded, so the time-lapse draws the lane as a line of its own
+from the moment it opened — distinct from the tie, which is drawn only while the link stands, from
+the binding to the freeing or the overlord's end. A pass immediately after the span stamps every
+earned leg onto the water as a **sea lane**: a lane level on each water tile the leg crosses,
+which traversal cost reads as one more multiplier, the water analogue of the ancient road. Purely
+additive; land tiles are untouched.
 
 **What reads it is everything that reads traversal cost**, because traversal cost is one weight
 function (`../economy/LOGISTICS.md` § 1). A convoy between a colony's market and its metropole's
@@ -354,7 +400,8 @@ prices would be invisible to the search, and a search that cannot see roads cann
 **A lane is what a colony leaves behind when the metropole falls.** Ties outlive the polity that
 made them, as roads outlive the empire that paved them; the map carries lanes between nations that
 have not been one polity for a century, and that network is what `INDUSTRIALISATION.md` hands to the
-landscape search.
+landscape search. Whether a lane *decays* once its traffic stops is this doc's open question
+(§ Open questions); a road does not, but the sea is not a roadbed.
 
 ---
 
@@ -401,6 +448,15 @@ conflated — otherwise every coastal polity begins with the thing the phase is 
 treaties bind and no port discount applies. A frontier skirmish is staged from a port the polity
 paid for, against ground whose defender has no fleet. That price gap *is* the displacement of
 conflict, expressed in the only currency the phase has.
+
+**The record keeps the fleet and the harbour, year by year (Ben, 2026-09-24).** Each polity's
+sample on the round's record carries its standing navy and its capital's port stock at every
+sampled year, so the time-lapse draws a fleet that is *there* — a hull at the capital that scales
+with the stock and shrinks as it decays — and a harbour that silts when its upkeep lapses. **A wet
+campaign is a moment of its own on the record**: noted at its launch with its target, its attacker
+and the staging hub it was victualled from, so the map draws the crossing, and a seat captured
+across water is drawn as a landing rather than a march. The record reads the sim; the sim never
+reads the record.
 
 ---
 
@@ -643,6 +699,8 @@ and what preference different cultures develop for these goods."*
   polity enters at 1660 (`trees/TREES.md` § Milestones, and how a tree unlocks the next).
 - **The grudge table and the surviving network**, grown across the span and filtered over this
   span's dead, exactly as the Empire handoff filters its own.
+- **The sea legs it walked**, each with its count of uses — what the lane stamp reads
+  (§ The colonial tie is a sea lane), as the surviving network is what the road stamp reads.
 
 **The list is a struct, and it has readers before Industrialisation exists.** Every item above is one
 field of the handoff value, checked by a validator, on the same footing as the Empire handoff
@@ -710,3 +768,16 @@ that ran off it.
   Industrialisation and never forces it; `INDUSTRIALISATION.md` § A world war is permitted, never forced
   reads its spread through the mutual-defence clause this phase creates. How densely great powers
   are bound at 1660 is therefore one of that war's causes, and it is measured, not tuned for.
+- **Lane decay — whether a sea lane decays once its traffic stops.** `../economy/LOGISTICS.md`
+  defers the question here: a road does not decay (its § 4a), but the sea is not a roadbed, and a
+  lane whose metropole fell may carry nothing for a century before the campaign opens on it. The
+  leg's use count is recorded (§ The colonial tie is a sea lane), so a decay rule would have its
+  input; whether there should be one is unsettled.
+- **Where the purchase price sits — the floor and the rate** (§ Two ways to claim ground across
+  water). Measured across the seed library before either is fixed, the treasury spread reported
+  beside the bought/taken split; the requirement is a split that is not degenerate on a spread,
+  never a number picked to make one seed buy.
+- **Whether the purchase becomes a verb of its own**, weighed beside the campaign on the scorer's
+  one shape rather than decided inside the subjection — a metal endowment behind a weak defence
+  pulling toward the campaign, a cash crop under a full treasury toward the purchase. The rule
+  reads the coast and the purse; whether it should read the endowment class is open.

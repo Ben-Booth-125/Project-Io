@@ -1,9 +1,10 @@
 # Project Io — Nation Generation
 
 > **Settles:** how a nation comes to exist — where a seed is placed, how territory expands,
-> what the size floor merges away · how a resource profile and a political character are
-> derived from the ground a nation holds · how a nation is named · what treasury and substrate density it opens with · how settlements are
-> placed alongside.
+> how the history's realms fold into nations, what the size floor merges away · how a resource
+> profile and a political character are derived from the ground a nation holds · how a nation
+> inherits its realm's name and colour · what treasury and substrate density it opens with · how
+> settlements are placed alongside.
 > **Not here:** what a nation *does* once the campaign runs (../politics/NATIONS) · how
 > corporations attach to one (CORPORATION_GENERATION) · which ladder produced the history it
 > inherits (../lore/HISTORY).
@@ -168,6 +169,58 @@ absorbing neighbour by tile count then lowest index; an island with no land neig
 into the globally largest nation). This pass is *not* itself a source of fragmentation — it only
 ever merges a nation into a neighbour it already touches, so it cannot cut one in two.
 
+**The floor runs after the fold, so it judges realms, not seeds** (§ Pass 2d — The polity fold).
+Every seed anchored in ground one polity held at the close has already collapsed into that
+polity's one candidate nation before the floor looks, so what it absorbs is a small realm, never
+one region of a large one. A **city state** — a polity that reached the close holding one region
+with a population centre on it — is exempt: the loop steps past it, it is never absorbed, and it
+never absorbs, since a city state that annexed its neighbours would stop being one. This
+absorption is the **only merge** in the pipeline, and § Pass 2d owns what an absorption does to
+a nation's identity.
+
+### Pass 2d — The polity fold
+
+**One realm becomes one nation** (Ben, 2026-09-24). The carve answers a geometric question — where
+the line between two anchors falls — and the fold answers the political one the history already
+settled: whose flag flies over both. Every seed anchored in a region the same polity held at the
+last span's close collapses into ONE nation, so an empire that held nine regions arrives as one
+realm holding nine regions' ground, not nine neighbours that happen to touch. The fold runs before
+the size floor (Pass 2c), which is why the floor judges realms.
+`GENERATION_STRATEGY.md` § Pass 2 is the economy pass, and it is TWO phases owns the handoff
+this pass finalises — the polity map crosses, and the carve is unchanged.
+
+**A nation is its realm, and it keeps what the realm had.** The fold's **representative** for a
+polity is its founding core — the lowest-indexed region it held, because region ids ascend in
+founding order — and the nation the fold makes carries the realm's identity through that
+representative: its **name**, coined once at the realm's founding and never re-coined (§ Pass 5);
+its **colour slot**, the one the wizard's rounds painted it in (§ Pass 5); its **treasury** at
+the close (§ Pass 7); and its capital tile. Nothing about a realm is recalculated at the handoff:
+the nation the player meets at Begin is the realm they watched rise, under the same name and the
+same colour. A realm's territory can be **non-contiguous**, and that is a fact of the history
+rather than a defect — a polity that conquered across a neighbour holds ground on both sides of
+it.
+
+**A city state crosses as itself.** A polity that reached the close holding one region with a
+population centre on it is a nation on its own account — exempt from the size floor, and never an
+absorber. A world with no city state is a legitimate outcome; the exemption is a permission, never
+a quota.
+
+**The size floor's absorption is the only merge, and the absorber keeps its identity** (merge
+rule A, Ben, 2026-09-24). When Pass 2c folds a small realm into a neighbour, the nation that
+results is the **absorber**: it keeps its own name and its own colour slot, its chest grows by the
+absorbed realm's (§ Pass 7), and the seat card (`../ui/STARTUP.md` § The seat) lists under the
+nation's name the realms it absorbed. The absorbed realm contributes ground, people and a chest —
+never a name, whatever index its seed carried. No other pass merges nations, and nothing splits
+one.
+
+**Ownerless ground crosses as a nation with no realm.** A Voronoi cell around an anchor no polity
+held at the close folds to itself, so it becomes a nation of its own, subject to the size floor
+like any other. It has no founding realm to inherit from, so it is the one case Pass 5 **coins** a
+name for — in the tongue of the culture that settled the region its seed grew from — and the one
+case the colour table assigns a fresh slot to; the seat card says the ground had no realm at the
+close. A body with no settlement pass is all ownerless ground, and there the fold is the identity:
+every seed is its own nation, exactly as the random-placement path carves.
+
 ### Territorial fragmentation, measured
 
 The settlement-sim path rests largely on the claim that **fragmentation falls out of it for
@@ -249,7 +302,8 @@ tongue is **not true of every site** — the exceptions are the reason a registe
 | Site | Source | Draws on a tongue |
 |---|---|---|
 | Star and body names | `body_names.cpp` | Yes — its own `roll_tongue` sky tongue, distinct from any culture's |
-| Nation names | `make_nation_name`, `nation_generation.cpp` | Yes — `tongue_word` over the culture's `speech` |
+| Realm names | the founding, `history_sim.cpp` (`polity::name`) | Yes — `coin_lexicon` over the founding region's culture `speech`, at the year the realm is founded; carried by id through every later span and onto the record beside the region names |
+| Nation names | § Pass 5, `nation_generation.cpp` | **Inherited**, not coined — a nation takes its founding realm's name verbatim. `make_nation_name` coins over the culture's `speech` only for ownerless ground |
 | Region names | `settlement.cpp` | Yes, **both halves** — the culture half and the quarter word |
 | City names | `city_names.cpp` | Yes — `coin_lexicon` over the founding culture's tongue |
 | Culture and god names | `creeds.cpp` | Yes — the tongue's own word builder |
@@ -265,20 +319,41 @@ table for that case alone — a region with no name at all would be worse than o
 register. That is a degenerate-input guard, not a second naming system.
 
 
-**There is no name bank** (BL-290, native nation names). A nation is named in the **tongue of the
-culture that settled the region its seed grew from** — the same phoneme inventory the creeds pass
-(BL-235) coined that culture's own name and its gods from. Naming *consumes* the phonology the
-generation chain already produces; it does not roll a second one.
+**A nation inherits its founding realm's name, verbatim** (Ben, 2026-09-24, superseding the
+lowest-indexed-seed rule). A realm is named **once, at its founding**, in the tongue of the culture
+of the region it was founded on — `polity::name`, coined by `coin_lexicon` over that culture's
+`speech` at the founding year, carried by id through every later span, and written onto the
+record beside the region names so the board and the ticker print it
+([CIVILISATION.md](CIVILISATION.md) owns the founding). The name never follows the capital: a
+realm that moves its seat keeps the name it was founded under. The nation the fold makes of that
+realm (§ Pass 2d) *is* the realm, so Pass 5 does not name it — it copies the name across. The
+player meets at Begin the realm they watched rise in the wizard, under the same name.
+
+**The name follows the fold representative through a merge.** A nation the size floor grew by
+absorption (Pass 2c) carries its **absorber's** realm name — the representative of the polity
+that absorbed — and the absorbed realm's seed contributes nothing to it, whatever its index. A
+rule that named a merged nation after whichever surviving seed carried the lowest index could
+name a realm after the small neighbour it had just absorbed; the fold representative is the one
+rule Pass 2d, Pass 5 and Pass 7 all read, and it cannot.
+
+**There is no name bank, and coining is for ownerless ground only** (BL-290, native nation
+names). A nation with no founding realm — a Voronoi cell no polity held at the close (§ Pass 2d)
+— is named here, in the **tongue of the culture that settled the region its seed grew from** —
+the same phoneme inventory the creeds pass (BL-235) coined that culture's own name and its gods
+from. Naming *consumes* the phonology the generation chain already produces; it does not roll a
+second one.
 
 The plumbing:
 
 - `world/tongue.{hpp,cpp}` owns the `tongue` (onset / vowel / coda inventory), the word builder,
-  and `coin_lexicon`. `creeds.cpp` rolls the tongue and **retains** it on `culture::speech`.
+  and `coin_lexicon`. `creeds.cpp` rolls the tongue and **retains** it on `culture::speech`; the
+  founding in the history sim coins a realm's name from that same retained tongue.
 - `hard_coded_world.cpp` carries each region's tongue across into `nation_params::seed_tongues`,
-  parallel to the `seed_tiles` anchors the settlement pass supplies.
-- Pass 5 gives each surviving nation the speech of the **lowest-indexed seed still inside it** (a
-  seed absorbed by the Pass 2c merge contributes nothing — the surviving core names the realm), then
-  builds the name with one of three structural forms: bare name, epithet + name, name + realm word.
+  parallel to the `seed_tiles` anchors the settlement pass supplies, and each seed's polity into
+  `nation_params::seed_polities` — the fold's input and the name's.
+- Pass 5 gives each nation the name of its fold representative's polity. Only a nation whose
+  representative carries no polity is coined: it takes that seed's speech and builds the name with
+  one of three structural forms: bare name, epithet + name, name + realm word.
 
 **The structural words are native too.** There is no "Republic", "Commonwealth", "Free" or
 "United": `coin_lexicon` coins each tongue its *own* morphemes for *realm*, *town* and *standing epithet*,
@@ -314,6 +389,27 @@ population centres are placed *before* the creeds exist, they are first named fr
 for the body, then re-named per-region by `name_population_centres` (`world/city_names.cpp`) once
 the settlement record exists, using the **nearest region's** culture — the same "whose gods" rule
 the settlement pass uses.
+
+**Colour is inherited the same way: a nation's colour is its realm's slot** (Ben, 2026-09-24).
+The wizard's rounds paint every realm in one slot of the lapse polity palette — a slot the round
+assigns from the realm's founding culture's hue family, offset against its neighbours so kin
+realms read as kin and no two neighbours share a hue — and **pin it on the record**, so a realm
+keeps its colour from the round it rises in to the close
+(`../ui/STARTUP.md` § Rounds — System, Life, Culture, Empires, Exploration, Industrialisation
+owns the assignment and the pin). Pass 5 writes a per-world **nation → colour-slot table**: each
+nation takes the slot its founding realm holds on the record — through a merge, the absorber's —
+and a nation of ownerless ground takes a slot the same rule hands it against its neighbours. The
+table is derived from the saved record, at Begin and again on load, so a loaded game colours every
+nation as the wizard did; `ui::palette::nation_colour` reads it and never hashes an entity id.
+Every surface that colours a nation reads that one table — the national border band on the plain
+canvas (`../ui/LENSES.md` § The Country lens has retired — national borders are chrome; rendered
+in `../ui/PLANETARY.md` § The national border band), the carve on the loading screen (§ The carve
+is watched), the History ledger's Ages tab and its seat map (`../ui/ledgers/tile_ledger.md`), and
+any Ages view that replays the wizard's rounds in play — so the colour a realm was watched in is
+the colour its nation is met in. The palette the slots index **must hold under a colour
+deficiency**, on the same reasoning that chose the twelve-slot nation table — safe hues widened by
+lightness within a hue family rather than by new hues — because the band is the plain canvas's
+only political read; that requirement is checked before the slots are pinned.
 
 ### Pass 6 — Substrate density
 
@@ -474,12 +570,13 @@ headlessly - the standing determinism invariant is the binding constraint and th
 is subordinate to it. Every existing headless caller (harnesses, `--serve`, `--verify`) passes
 null and is unaffected.
 
-The carve is drawn in `ui::palette::nation_colour` - the same palette the in-game **Country
-lens** uses - so the map a player watches being carved is the map they meet again under the
-lens. The nation entities do not exist while the BFS runs, so the map is keyed by index until
-`nation_id_base` is published (ids come out of one tight `create_entity` loop, so index *i* is
-`base + i`); the borders have already settled by then, and the recolour reads as them becoming
-real nations.
+The carve is drawn in `ui::palette::nation_colour` - the same per-world slot table the
+**national border band** draws in (§ Pass 5 — Naming;
+`../ui/LENSES.md` § The Country lens has retired — national borders are chrome) - so the map a
+player watches being carved is the map they meet again on the plain canvas. The nation entities
+do not exist while the BFS runs, so the map is keyed by index until `nation_id_base` is published
+(ids come out of one tight `create_entity` loop, so index *i* is `base + i`); the borders have
+already settled by then, and the recolour reads as them becoming real nations.
 
 ---
 

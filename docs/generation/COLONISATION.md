@@ -1,16 +1,19 @@
 # Project Io — Colonisation
 
 > **Settles:** what the colonisation span is and where it ends · what a domestication
-> package is, how it spreads, and what it gates · what makes people move and what that
-> movement costs · what caps the pressure on a people that cannot spread, and what a
-> cradle stopping actually means · where fragmentation comes from once no creed marches ·
-> which culture a founded region inherits, and on what terms · what the span hands the
-> settlement, sim and province layers · why no actor and no infrastructure appear anywhere
-> in it.
+> package is, how it spreads, and what it gates · how a cradle is announced, and the ground
+> profile it coins beside its package · what makes people move and what that movement
+> costs · what caps the pressure on a people that cannot spread, and what a cradle stopping
+> actually means · where fragmentation comes from once no creed marches · which culture a
+> founded region inherits, and on what terms · what the span records of its routes, and at
+> which grain the round draws them · what the span hands the settlement, sim, round and
+> province layers · why no actor and no infrastructure appear anywhere in it.
 > **Not here:** what a pantheon is or how a tongue is coined (../lore/CREEDS) · the stage
 > ladder this span sits inside (../lore/HISTORY) · how force resolves once polities contest
 > ground (MILITARY_HISTORY) · how the partition is drawn from what this span leaves
-> (PROVINCES) · what a centre consumes once the campaign starts (../economy/POPULATION).
+> (PROVINCES) · what a centre consumes once the campaign starts (../economy/POPULATION) ·
+> how the Culture round lays the record out on screen — its board, ticker, palette and
+> playhead (../ui/STARTUP).
 > **Confused with:** ../lore/HISTORY.md, MILITARY_HISTORY.md, PROVINCES.md.
 
 **How a people comes to live where it lives, before anybody fights over it.**
@@ -39,8 +42,13 @@ covers three thousand six hundred (Ben, 2026-09-09).
 
 **A COAST JOINS THE TWO (Ben, 2026-09-09, confirming NR-818).** This round's end is derived and
 the next round's start is stated, so they are not the same year and are not meant to be. When the
-filling finishes, the world holds what migration left it until 400 BCE — the same device the
-design uses across 1200 → 1560. Nothing is simulated in between, and nothing is reset.
+filling finishes, the world holds what migration left it until 400 BCE. A coast is the right
+device for a span whose defining property is that little changes, and this is the one the design
+keeps: the far side of 1200 CE is simulated, not coasted (`EXPLORATION.md`). Nothing is simulated
+in between, and nothing is reset. Where the
+filling outruns 400 BCE the record keeps its true end: the round may clamp what it *shows* at
+400 BCE and say so in a caption, but that clamp is presentation, `../ui/STARTUP.md`'s, and never
+a cut to the record (Ben, 2026-09-24).
 
 **THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09).** This is the framing correction, and it is
 the load-bearing one: the migration round is not the opening slice of the ancient pass with the
@@ -129,10 +137,24 @@ belongs to this span alone (Ben, 2026-09-11): the migration ends with the famili
 Empires phase makes peoples only by mixing them (`CIVILISATION.md` § A civilisation is what mixing
 makes).
 
+**A range comes apart on the map when the ticker says it does (Ben, 2026-09-24).** A region the
+isolation split moves to a daughter is recorded twice, each change dated: founded under its
+parent at its founding year, re-cultured to the daughter at the split year. So it wears the
+parent's hue until the split and the daughter's after it, and the moment the record announces
+the split is the moment the map shows it. Painting such a region in the daughter's hue from its
+founding would show the range already apart centuries before it divided — the record
+contradicting itself.
+
 **Over-tuning is paid for at the boundary, not at the split (Ben, 2026-09-16, NR-879).** A daughter
 that ends the round holding no ground folds back into its nearest living ancestor, keeping the
 lineage link; the splits themselves are never gated. `CIVILISATION.md` § Empty cultures fold into
 their parent owns the rule.
+
+**Folded daughters are counted, not narrated (Ben, 2026-09-24).** The great majority of the
+peoples the walk coins hold no ground by the round's end, and a ticker that named each one "on
+the march" would drown the founding it sits beside. A daughter that folds is a figure on the
+round's board — peoples coined, peoples folded, read from the settlement's own census — never a
+ticker line of its own. The ticker names the peoples that come to hold ground.
 
 ---
 
@@ -153,7 +175,8 @@ people:
   corners of a world get peopled. What is wanted is the **crude** version — a bounded hop across a
   small number of water tiles, not seafaring, not a naval capability, and emphatically not the
   staged harbour-works model of `MILITARY_HISTORY.md` § Sea legs, which belongs to a later era with
-  institutions in it. A hop costs years like everything else here.
+  institutions in it. A hop costs years like everything else here, and it is a fact of the route
+  (§ The route record) — which is what lets the map draw it as a crossing.
 
 Both are the same claim the span already makes about mountains, applied to water: **the routes
 people actually followed should be the cheap ones**, and the map should show it.
@@ -220,6 +243,19 @@ currently has no instrument for.
 **Ground no package suits is not settled**, and stays empty for as long as that holds. Emptiness
 is a real outcome here, not a failure to fill.
 
+**The cradle is announced (Ben, 2026-09-24).** Every cradle people opens the round with a
+`cradle` moment — one per people, pinned to the cradle's seat and dated the span's start,
+2400 BCE — that names the people and the package it raised. For the round to say them, the
+cradle names and the packages are retained on the settlement record as **pure outputs** of the
+pass: written once at the coining, read by the round, read by nothing inside the walk.
+
+**Otherwise a package is a fact of the STREAM, never of the ground.** It rides on the source a
+settled region sends from, is unioned there when a crossing happens (§ Packages broaden by
+crossing), and is not a field on a founded region. A founding records its culture and its year,
+and the route record says where its people came from (§ The route record); the package its
+stream carried is the cradle's, or the union two cradles' made — a property of the people in
+motion, not of the ground they settled.
+
 ### Packages broaden by crossing
 
 Where a stream carrying package A settles ground marginal for A and adjacent to a people carrying
@@ -236,6 +272,30 @@ otherwise only ever the thing that ends it.
 > which is simpler and defensible. It survives because a frontier that can never unstick makes the
 > long run static, and the 4000-year ladder is the target (`CIVILISATION.md` § The long run is paid
 > for by the table, not the fighting).
+
+### The ground profile
+
+**Materials shape culture (Ben, 2026-09-24; the profile's composition below is a delegated
+reading, NEEDS_REVIEW).** A cradle coins a **ground profile** beside its
+package, from the same window: the deposits the window holds, summed in the four classes the
+founding survey reads — farm, ore, energy, water — plus one **amenity class** read off the
+window's cover, the ground `../economy/TILES.md` § Amenity tiles names (forest, coastal grass,
+marsh in a valley). Package, pantheon and profile are one act of self-description read on three
+axes: what the cradle's people learned to farm, what they came to believe, and what their
+country was *made of* and *felt like*.
+
+The profile is stored on the culture beside the farm class it was coined on, and a daughter
+inherits it whole with the rest of its descent. It is a fact about where a people **began**,
+never about where it now stands — exactly as its origin farm class is — so a people that walked
+a continent still carries the profile of the valley that coined it.
+
+**Its reader is the cultural preference for goods**
+(`EXPLORATION.md` § A good acquires a cultural preference), which derives what a people wants
+from what its ground never held and what its route exposed it to: the profile is the first of
+those two inputs, at culture grain. That is what lets a people that never raises a polity carry
+a preference all the same — even a primitive culture leans toward the amenities of the country
+it was coined on. Like the package, the profile is seeded and never rolled: the same window, and
+no die.
 
 ---
 
@@ -414,13 +474,44 @@ remains exactly the doctrine input the sim reads. What changed is that the distr
 `culture_shares` distribution, so a region reached from two directions inside the span carries
 both, and the assimilation machinery that resolves it already exists.
 
+### The route record
+
+**A route exists at two grains, and the record says which is which (Ben, 2026-09-24).** "A
+record of who walked where" is a claim this document makes of the map; this is what the span
+keeps so the claim can be drawn.
+
+**Region grain — what the round draws.** The migration record holds one dated change per
+founding, owned by the people who founded it, and the round draws its **kin arrows** from that
+record alone: each founding a line from its people's *previous* region — the region the same
+people most recently founded before it in the record — to the new one, fading over the years
+after the founding, dashed where the line between the two anchors crosses water: the crude hop,
+at region grain. The arrow is honest about its grain. It says a people was there and is now
+here; it does not say which stream carried them, which shore they walked or which strait they
+crossed. The exact answer — the source region whose stream reached the founded anchor — is the
+walk's, and the hop record below is what keeps it.
+
+**Hop grain — what a true route needs.** The walk moves tile by tile, and an overseas hop is a
+bounded crossing from a shore tile to a landfall tile; a route *is* that sequence. The **hop
+record** keeps it: one entry per hop a stream takes — the region it flows from, the tile it
+left, the tile it landed on, the year, the culture it carried and whether the hop was water —
+written by the walk as it claims ground, rather than dying with the walk's field when the pass
+returns. Only that record draws a coastal route as a coast and a crossing as the strait it
+actually crossed; the kin arrow is its projection onto the region table. The walk knows every
+hop it takes, so the record is the walk keeping what it knows — a cost of retention, never of
+recomputation.
+
+Both grains are **records, not mechanisms**: neither changes where anybody arrives, and a world
+generated with or without them is the same world. That is the test either must keep passing.
+
 ---
 
 ## What the span hands downstream
 
 | Consumer | What it receives | What changes for it |
 |---|---|---|
-| `run_settlement` | The founding set, with culture, package and `founded_year` | Founding *rules* unchanged; the set is earned rather than scattered |
+| The founding rules (`run_settlement`) | The founding set: each region with its culture and its `founded_year`. **No package rides on a founding** — a package is coined per cradle, carried by the stream and unioned where two meet (§ The domestication package); it is retained only as the cradle's own record | Founding *rules* unchanged; the set is earned rather than scattered |
+| The **Culture round** (`../ui/STARTUP.md`) | The migration record: one dated change per founding and a second per re-culturing, the `cradle` and split moments (from which the kin arrows are drawn — § The route record), the cradle names and packages, and the census the board counts folded daughters from | Draws the record; the record is the round's whole input |
+| The **cultural preference for goods** (`EXPLORATION.md` § A good acquires a cultural preference) | Each culture's ground profile (§ The ground profile), inherited down the tree | Reads what a people's first ground held, at culture grain |
 | The **history round** (`run_history_sim`) | A filled, culturally uneven map — every habitable landmass carrying some culture | Starts from a world with a migration behind it rather than an even fill. A SEPARATE round with its own span (`../ui/STARTUP.md`), not a continuation of this one |
 | The province partition | **The settled cells and their anchors, as a hard input** | A new binding input; ordering and nation lock unchanged |
 | `../economy/POPULATION.md` | Regions whose `centres` record begins at a founding the span dates | Nothing — the urban record already works this way |

@@ -605,6 +605,13 @@ bounded by the coverage-min across every input, the total drawn from a market in
 never exceed what was actually on hand — no double-spend, no negative inventory, no ordering
 dependence beyond the tick's own fixed pass order.
 
+**The shelf's third drain is the market's own export (Ben, 2026-09-24).** Shelf stock that
+another market prices above its landed cost by more than the margin leaves by convoy, in the
+dispatch step, after the corporations' own dispatch has claimed what room it wanted
+(`docs/economy/SUPPLY.md` § Dispatch trigger). **A market export moves no money:** the shelf
+belongs to no corporation, so there is nobody to charge for the haul and nobody to pay for the
+goods — the haul is the margin given up, taken off what the cargo realises where it lands.
+
 **The sell side has no volume cap.** `market_component.supply` is a derived per-tick flow for
 pricing, and the market absorbs any quantity a seller is willing to release at the resolved price.
 What is conditional is the *price*: an order whose floor exceeds the resolved price holds rather
@@ -813,6 +820,15 @@ of charge — the matched-trade charge is retired with it, so no good pays twice
   and the treasury it is paid into, so a tariff with a null author is inert by construction rather
   than by a special case. Rates from several enacted laws stack additively, clamped to `[0, 1]` —
   a stack of laws cannot charge a buyer more than the goods are worth.
+- **The posture a nation holds at world setup is derived by its history, not set by a dial
+  (Ben, 2026-09-24).** The Industrialisation span derives each nation's protection
+  (`polity::protection_q`) at its close from three readings the span already carries — its
+  scarcity signals, its trade flows and its cultural preference — and the handoff enacts that
+  posture as the nation's one blanket `import_tariff` law, authored by the nation itself
+  (`derive_national_protection` → `seed_national_tariffs`; `docs/generation/INDUSTRIALISATION.md`
+  § The boundary owns the derivation, `docs/politics/NATIONS.md` § The import tariff the
+  enactment). A nation whose derived protection sits below the floor enacts none, and no other
+  path writes a tariff at setup.
 - **`nation_component` carries a `treasury`**, zero at generation — a treasury that started full
   would be a balance change smuggled in as a field. Its spend side is the national budget
   (`docs/politics/NATIONS.md`, BL-537).

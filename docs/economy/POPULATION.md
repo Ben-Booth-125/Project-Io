@@ -139,9 +139,10 @@ lens-gated — so the surface reads as inhabited rather than "resources with ind
 - **Anchor and tier** — each conurbation is anchored at its highest-scale member and takes
   that member's scale as its tier.
 - **Marker** — the tiered `icons::settlement` skyline glyph (tower count and height grow with
-  tier), in the civic-neutral `palette::settlement` colour; the host nation's tint applies
-  only under the Country lens. Tier is carried by glyph size, keeping colour out of the
-  ownership vocabulary (see `docs/ui/ICONS.md`).
+  tier), in the civic-neutral `palette::settlement` colour under every lens; ownership is read
+  off the national border band (`docs/ui/PLANETARY.md` § The national border band), so the host
+  nation's tint has no live gate now that the Country lens is retired. Tier is carried by glyph
+  size, keeping colour out of the ownership vocabulary (see `docs/ui/ICONS.md`).
 - **Labels** — only City-and-above conurbations (tier ≥ 4) are labelled, named
   deterministically from the anchor tile id against a fixed settlement name bank, so labels
   are stable per campaign. Names are sci-fi / fantasy, never Earth-drawn (standing rule).

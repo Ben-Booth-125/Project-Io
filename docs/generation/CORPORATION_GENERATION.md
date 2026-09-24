@@ -442,13 +442,27 @@ of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:
 
 1. **Generate** — Passes 1–6, exactly as above. No corporation is the player's yet.
 2. **Search and settle in spectate** — phase 6 scores and applies the landscape, then its single
-   validation run ticks with **no seated corp**, under `corp_ai_params::spectating`.
+   validation run ticks with **no seated corp**, under `corp_ai_params::spectating`. **This is
+   generation's last act, and it runs inside the Industrialisation round's worker** (Ben,
+   2026-09-24): the search that charters the firms follows the world build in the same worker,
+   so the seat canvas opens over the world the round closed on, and a Begin with no wizard
+   behind it (a cold build, an autostarted run) makes the same call in the same order — an
+   adopted world and a cold build open on one state.
 3. **Shortlist** — every specialist whose ground clears the viability floor on the static landscape
    score, ranked by that score.
 4. **Seat** — the player picks one on the selection canvas (the `take_seat` command; a path with
    no player to ask draws one from the shortlist against the world seed), and `is_player` /
    `world::player_entity` are re-pointed onto it. The same world and the same pick seat the same
    firm in the same state.
+
+**A firm carries its founding year and its origin region** (`corporation_component::founded_year`,
+`corporation_component::origin_region`; Ben, 2026-09-24). The search charters each firm from a
+population centre's budget (§ Pass 6), so its origin is the region of that centre, and its year
+is read off the Industrialisation span: the span notes a crossing each time a region's industry
+points reach the next multiple of a fixed fraction of the running price, and a region's k-th
+chartered firm takes the year of its k-th crossing (`INDUSTRIALISATION.md` owns the crossing).
+The seat briefing's origin sentence reads both fields off the firm, never off the report;
+`docs/ui/STARTUP.md` § The seat owns the sentence.
 
 **Spectate is the machine this needs, and it already exists.** BL-409 settled that under
 `spectating` the no-auto-act prohibition has *no subject*: every corp evaluates on the same

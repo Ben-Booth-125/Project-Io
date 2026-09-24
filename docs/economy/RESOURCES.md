@@ -295,8 +295,9 @@ A polity **discovers** a good when its network first reaches a region carrying t
 by purchase, by conquest, or by supply reach — and the nation that inherits it carries the taste.
 **The colony grows it; the metropole wants it.** A nation whose history reached no cash crop wants
 none, which is a fact the player can read rather than a penalty.
-The derivation is the colonial era's (`docs/research/COLONIAL_ERA.md` § Who discovered what —
-taste is a fact of history); this section owns what the good is worth once it is wanted.
+The derivation is the exploration age's (`docs/generation/EXPLORATION.md` § A good acquires a
+cultural preference — taste is a fact of history); this section owns what the good is worth once
+it is wanted.
 
 ---
 
@@ -360,8 +361,10 @@ needs, so the one value serves both.
 Re-derive if either input's price or the recipe quantities move.
 
 **It has a producer in every era band.** The Fabricator recipe carries `era = "industrial"`, and
-unit upkeep draws ordnance every tick regardless of band, so an ancient campaign (the default,
-`epoch_year = 0`) needs an ancient producer too: the Smithy — the same building that turns
+unit upkeep draws ordnance every tick regardless of band, so an ancient-band campaign
+(`docs/economy/PRODUCTION.md` § The era band — which roster a campaign sees; the band is the
+history's, `docs/economy/ERAS.md` § Where the ladder starts) needs an ancient producer too: the
+Smithy — the same building that turns
 `iron_blooms + charcoal` into steel — carries an alternate recipe to `ordnance` at the identical
 basket (`docs/economy/PRODUCTION.md` § The ancient chain). `chain_depth`'s R1b row (producer and
 consumer reachable in the *same* concrete era band) is the check that a good admitted on its

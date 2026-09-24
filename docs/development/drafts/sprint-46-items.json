@@ -147,27 +147,6 @@
   },
   {
    "group": "carry",
-   "short_name": "TARIFF_POSTURE_CARRIED",
-   "title": "The Industrialisation span derives each nation's tariff posture, and a tariff is charged where goods actually cross a border",
-   "priority": "A",
-   "difficulty": 3,
-   "world_mover": true,
-   "requires": [
-    "PLAY_HANDOFF_CONTRACT"
-   ],
-   "authority_doc": "docs/economy/MARKETS.md",
-   "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 2).\n\nWHY (three gaps). DERIVATION: protection_q is written only when boundary_year != INT64_MIN (history_sim.cpp:7858, :7876); industrialisation_sim_params builds on exploration_sim_params (era_minus_one.cpp:432), which leaves it INT64_MIN (comment :321-322), so the 1960 close writes 0 and seed_national_tariffs (law.cpp:158, called hard_coded_world.cpp:1820) skips every nation (law.cpp:174). The Industry tree's tariff_pressure is pinned 0 (history_sim.cpp:8809). INDUSTRIALISATION.md:137-143 says the derivation from scarcity_q, trade_flows and culture_preference is owed to this phase. CHARGING: the only charge is on matched trades with a buyer domiciled abroad (market_clearing.cpp:1257-1291), dormant in play. CONVOY DUTY: MARKETS.md:784-794 rules a duty on convoy arrival and retires the matched-trade charge; not built (credit_arrived_convoys, supply_system.cpp:151); BL-1005 was cancelled.\n\nTHE WORK. A span-side derivation of protection_q from the three inputs at the end-of-run block (history_sim.cpp:7857ff) or the handoff; the broadcast (:7913-7919) then feeds derive_national_protection (settlement.cpp:1405) unchanged. SCOPE CALL AT THE CUT: the convoy-arrival duty (quantity x destination last price x nation_tariff_rate, a treasury transfer) and retiring the matched-trade block are what make a posture bite in play — carry them here, or state play-side charging deferred.\n\nDONE WHEN. On a 1960 world at least one LAW-IMPORT-TARIFF-* law exists; if the duty is in scope, a cross-border convoy raises the destination treasury by exactly the owner's debit (money_conservation extended) and the matched-trade block is gone.",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/settlement.cpp",
-    "src/world/law.cpp",
-    "src/world/supply_system.cpp",
-    "src/world/market_clearing.cpp",
-    "tools/verify/money_conservation.cpp"
-   ]
-  },
-  {
-   "group": "carry",
    "short_name": "CULTURE_LENS",
    "title": "A culture lens shows each province's people, checkered where two are nearly even, and survives a save",
    "priority": "A",
@@ -231,29 +210,6 @@
   },
   {
    "group": "carry",
-   "short_name": "SEA_LANES_CARRIED",
-   "title": "The sim records its sea legs, and the campaign opens with lanes on the water they crossed",
-   "priority": "A",
-   "difficulty": 4,
-   "world_mover": true,
-   "requires": [
-    "PLAY_HANDOFF_CONTRACT"
-   ],
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 6). Design: EXPLORATION.md:330-358. The largest carry row: the sim records nothing yet. BL-876 was cancelled.\n\nWHY. No sea-leg record in the sim (grep sea_lane in src is empty; only the sea_legs_* ration params, history_sim.hpp:1173-1223); history_corridor has no water flag (era_timelapse.hpp:469-484). Traversal uses a flat sea_leg_cost = 2.5f (logistics.cpp:18); tile_traversal_cost (logistics.cpp:94-100) already multiplies the water base by road_traversal_multiplier(tc.road_level), so a tier on water tiles discounts with no pathfinding change.\n\nTHE WORK. Record sea legs in the sim (amphibious supply, purchase-party crossings, metropole-holding traffic) as a counted table; fold it into the play handoff with validator rules; at setup stamp water tiles along each leg with a lane tier once traffic passes a threshold, by analogy with stamp_history_roads (road_generation.hpp:103); serialise it as its own field rather than overloading road_level.\n\nDONE WHEN. Lane tiles on a 1960 world > 0 and counted in the report; A* cost between two lane-joined ports falls below the unlaned cost; reach crosses the lane; digests move only behind the switch.",
-   "files": [
-    "src/world/history_sim.hpp",
-    "src/world/history_sim.cpp",
-    "src/world/era_timelapse.hpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/road_generation.cpp",
-    "src/world/logistics.cpp",
-    "src/world/components.hpp",
-    "src/world/world_save.cpp"
-   ]
-  },
-  {
-   "group": "carry",
    "short_name": "DEPLETION_RETROFIT",
    "title": "Reserves open depleted where history worked the ground",
    "priority": "B",
@@ -274,28 +230,6 @@
   },
   {
    "group": "carry",
-   "short_name": "CAMPAIGN_TECH_STATE",
-   "status": "design-owed",
-   "title": "Each corporation opens holding the campaign techs its nation's Industry mask earned",
-   "priority": "A",
-   "difficulty": 3,
-   "world_mover": true,
-   "requires": [
-    "PLAY_HANDOFF_CONTRACT"
-   ],
-   "authority_doc": "docs/generation/trees/INDUSTRY_TREE.md",
-   "design": "RULED (Ben, 2026-09-18, NR-898 (7), carry row 8): per CORPORATION through the existing earned_techs gates, not per nation. NOVELTY/SCOPE FLAG owed at the cut (NEXT_SESSION): there is no per-nation consumer and no IN-* -> E*-* mapping; the mapping needs a design session with Ben.\n\nWHY. polity::industry_mask is 45 nodes (history_sim.hpp:2719-2728; node_count industry_tree_data.hpp:12), crossing in industrialisation_output::polities, read by no setup code. world::earned_techs is per-corporation and empty at setup (world.hpp:458-464), written only by advance_tech_gates (tech_gate.cpp:175-205), which also appends each tech's modify_scalar effects to corp_modifiers. The campaign gate table has 4 gates: E0-ML-01, E0-EC-01, E1-EC-01, E0-EC-03 (tech_gate.cpp:33, :79, :113, :137). The Lua campaign tree (tech_tree.hpp, load_from_lua) feeds the F9 viewer. Industry nodes unlock works rows and roster bands (industry_tree_data.hpp:57-93); IN-SP-3m 'The Renewed Line' opens the campaign tree (:43). earned_techs is erased when a corporation is regenerated (corporation_generation.cpp:2084), and the landscape search regenerates rosters (landscape_search.cpp:211).\n\nTHE WORK. Design session: the IN-node -> campaign-tech mapping. Polity -> nation by the representative-polity tally used for grudges (hard_coded_world.cpp:1761-1790). Seed each corporation from its home_nation's mask AFTER the search winner is applied (after app.cpp:1076), not in world-gen, or the regeneration wipes it; seed through a helper that also appends the tech's modifiers; 'The Renewed Line held' opens the root. Check whether state_hash folds earned_techs (unverified).\n\nDONE WHEN. On a 1960 world, corporations of a nation holding the mapped IN node have the mapped tech (has_tech) and its modifiers, corporations of one without it do not, and both survive save and load.",
-   "files": [
-    "src/world/tech_gate.hpp",
-    "src/world/tech_gate.cpp",
-    "src/core/app.cpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/corporation_generation.cpp",
-    "docs/generation/trees/INDUSTRY_TREE.md"
-   ]
-  },
-  {
-   "group": "carry",
    "short_name": "DENSITY_FOLLOWS_CITIES",
    "title": "Density follows cities: the charter web at the ruled prices is too sparse to track cities across the markets — a design pass on the density knobs",
    "priority": "A",
@@ -312,5 +246,10 @@
     "tools/verify/player_seed_sweep.cpp"
    ]
   }
- ]
+ ],
+ "_promoted": {
+  "TARIFF_POSTURE_CARRIED": "BL-1102 + BL-1103 (2026-09-24)",
+  "SEA_LANES_CARRIED": "BL-1097 + BL-1098 (2026-09-24)",
+  "CAMPAIGN_TECH_STATE": "BL-1109 (2026-09-24)"
+ }
 }

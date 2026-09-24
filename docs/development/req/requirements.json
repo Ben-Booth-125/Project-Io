@@ -7298,6 +7298,197 @@
      "result_metric": "cold review: 10 findings; 7 fixed in the fix round (2cfb373a), 3 low noted (solvency before income, held convoys count, space-leg pricing)."
     }
    ]
+  },
+  {
+   "brief": "span-seeds-per-round",
+   "title": "BL-1083 - One seed per span: a reroll re-seeds only its own round, and the Culture round can reroll at all",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1083 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: hard_coded_world.hpp span_seed",
+      "headless: world_determinism x2 (seedA/on 5BA2EE1EE993C201, seedB/on 5ECE9A097D14DACE, seedA/off 4834366D19271E5F unchanged)"
+     ],
+     "requirement": "world_params carries span_seed[4] (migration, Empires, Exploration, Industrialisation); each span folds ONLY its own counter, additively, and the migration folds span_seed[0]; with all four at zero every world_determinism digest is unchanged (item-spanning gate).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: a harness or verify script diffing prehistory_timelapse / exploration_timelapse across the two builds (name it)"
+     ],
+     "requirement": "A non-zero span_seed[k] changes span k and every later span while every earlier span's record is byte-identical: span_seed[2]=1 leaves the migration and Empires records identical to the zero build and changes the Exploration record.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: the same check on the migration record"
+     ],
+     "requirement": "span_seed[0]=1 changes the migration (the Culture round's record differs from the zero build).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: startup_screens.cpp reroll handler; app.cpp same_world_params; save_game.cpp",
+      "headless: save_roundtrip, save_envelope_roundtrip"
+     ],
+     "requirement": "The reroll handler bumps span_seed[lapse_index] and nothing else; same_world_params compares all four; the save envelope writes and reads them under a claimed envelope version; save_roundtrip and save_envelope_roundtrip are green.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "code: startup_screens.cpp lean handler",
+      "visual: live click - change the lean on round 4, watch the round relaunch with Culture still behind Back"
+     ],
+     "requirement": "A turbulence-lean change on round 4 invalidates Empires onward only, keeps the Culture record, and relaunches round 4 at once (no m_wiz_dirty, no planetology re-preview).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "visual: Ben's live click on the Release build"
+     ],
+     "requirement": "LIVE: reroll round 5, Back to round 4, Next - round 4's 1200 board and frame are unchanged and round 5 opens on them; reroll round 3 and the migration map visibly changes.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "doc: docs/ui/STARTUP.md",
+      "code: docs/generation/seed_library.json; tools/verify/harness_params.hpp",
+      "build"
+     ],
+     "requirement": "STARTUP.md § Each pass round is rerollable and § Rounds stay causal state the per-span rule; the seed library entries carry the four seeds (zero) where the schema records era_seed; harness fixtures that set era_seed still build.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "begin-retired-into-round-six",
+   "title": "BL-1085 - Round 6 does all of Begin's work: the landscape search and the settle run inside its worker, and Begin only seats the player",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1085 - sprint 47 (cut 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: src/world/campaign_settle.*; tools/verify/harness_params.hpp calls it",
+      "headless: begin_adopts_check.js PASS",
+      "headless: player_seed_sweep --digest-check 16/16 (D_settle/D_seat unchanged before the band change lands)"
+     ],
+     "requirement": "ONE settle function in src/world (run_settle_tick / run_settle) is called by app::step_economy's world half, by the worker and by every harness that mirrored it; harness_params.hpp no longer restates the tick body; D_settle and D_seat pins are unchanged by the promotion alone (item-spanning gate: begin_adopts_check.js PASS, adopt hash == cold hash).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: src/world/finish_campaign_world.*; startup_screens.cpp round-6 lambda; app.cpp cold worker"
+     ],
+     "requirement": "finish_campaign_world(world&, recipe_registry&, const world_params&, const world_gen_config&, generation_progress*) exists in src/world and does, in order: the world-only setup halves, the band, assign_default_recipes, the stockpile budget, the landscape search, the winner apply, the recipe pass, the twelve-tick settle; it is called by the round-6 worker after make_hard_coded_world and by Begin's cold worker, same order.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: app.cpp / startup_screens.cpp registry hand-off",
+      "headless: seat_pick_check.js PASS ((seed, pick) reproduces the seat)"
+     ],
+     "requirement": "The recipe registry is loaded from Lua on the main thread before the round-6 launch and a COPY is handed to the worker; Begin moves the worker's banded copy into m_registry; play runs on the registry the settle ran on.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: begin_new_game",
+      "headless: begin_adopts_check.js (adopt and cold runs)",
+      "visual: live click - press Begin during round 6's wait"
+     ],
+     "requirement": "Begin pressed while round 6's worker runs WAITS on it behind the wait surface; there is never a second concurrent build; with no cache (menu -> Begin, --autostart) the cold worker builds and calls the same function.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "code: app.cpp poll_worldgen / finish_seat",
+      "doc: docs/ui/STARTUP.md § Handoff"
+     ],
+     "requirement": "What stays at Begin is exactly: the presentation half of setup, m_econ_steps = 12, the tech tree and persona bench, the balance series from filed returns, the seat, the clock rebase; the presentation half of the twelve pre-game ticks is dropped and STARTUP.md says so.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "code: hard_coded_world.hpp generation_stage_labels / step costs",
+      "visual: live click - the caption names each step and the bar moves"
+     ],
+     "requirement": "The wait's caption and bar carry \"Searching the landscape\" and \"Proving the field\" with measured weights (the label table widened past 16); the search is re-measured in Release before the weights are set and the number is written into the item.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "headless: --serve vs --autostart state hash",
+      "code: main.cpp; verify_api.cpp; tools/verify/begin_adopts_check.js"
+     ],
+     "requirement": "run_serve adopts the searched+settled world (its state hash equals --autostart's on the same params); run_verify keeps the unsearched seed-candidate world; --autostart-windowed waits on round 6's future; begin_adopts_check.js's log proof is re-pointed to the new phase lines.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R8",
+     "status": "pending",
+     "verification": [
+      "visual: Ben's live click on the Release build"
+     ],
+     "requirement": "LIVE: after round 6's playback, Begin opens the seat canvas with no freeze; the seat list is the firms of the world round 6 closed on; BL-1078's symptom is gone.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

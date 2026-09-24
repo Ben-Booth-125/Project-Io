@@ -109,10 +109,10 @@ The **seed** is an 8-digit hex value. You can roll it, type one in, or copy the 
 same seed and the same preferences always produce the same world; this is guaranteed, not
 incidental.
 
-Generation then runs the world's history from **2400 BCE to the campaign epoch of 1960** — four
-thousand simulated years across two passes, with a deliberate gap at 1200–1560 that is coasted
-rather than stepped. It hands you a world with settled peoples, borders drawn by centuries of war,
-and cities where the ground actually rewarded building one. The homeworld is a **312 × 145 hex grid — 45,240
+Generation then runs the world's history from **2400 BCE to the campaign epoch of 1960**: a
+first pass of 3,600 years — the migration, then the empires — and after it the exploration and
+industrial ages, simulated on the same engine. It hands you a world with settled peoples, borders
+drawn by centuries of war, and cities where the ground actually rewarded building one. The homeworld is a **312 × 145 hex grid — 45,240
 tiles**, of which roughly 18,000 are land.
 
 ### 2.2 The screen
@@ -395,8 +395,9 @@ engine ships no HTTP client, no API key and no cloud dependency, and it never wi
 
 ### 4.13 The pre-history
 
-Before you arrive, the world runs — **2400 BCE to the 1960 campaign epoch, four thousand of those
-years simulated.** It runs in two passes with a coast between them.
+Before you arrive, the world runs — **2400 BCE to the 1960 campaign epoch.** A first pass of
+3,600 years builds the peoples and their empires; the exploration and industrial ages follow on
+the same engine, and nothing on the far side of 1200 is skipped.
 
 **The migration, 2400 BCE → 400 BCE.** An empty world fills: where people started, the routes they
 took over land and along coasts, and the cultures those routes produced. It ends when every
@@ -407,13 +408,13 @@ being who arrives. Polities settle, campaign, invest and consolidate; cohesion f
 lost, so defeat compounds; supply decays with distance and with the breadth of what you hold, so
 empires stall on arithmetic rather than on a designer's cap.
 
-**1200 to 1560 is a coast.** A stable dark age is a span whose defining property is that little
-changes, and that is the one span not worth simulating. The world arrives at 1560 holding what 1200
-left it.
+**The exploration age, 1200 → 1660.** The same engine asking who can reach across water: capitals
+build ports and navies, treaties are struck for a term, and provinces across the sea are bought or
+taken — leaving the colonies, the sea lanes and the tastes your map inherits.
 
-**The economy, 1560 → 1960.** The same engine asking a different question: not who holds the
-ground, but what it produces and trades — who industrialised and when, what was carried where, and
-how protective each nation had become by the time you arrive.
+**The industrial age, 1660 → 1960.** The question turns to what the ground produces and trades —
+who industrialised and when, what was carried where, and how protective each nation had become by
+the time you arrive.
 
 **The clock steps.** Decisions come every 100 years in deep prehistory, then 50, 20, 10, 5, and
 finally every year approaching the epoch — so the recent centuries that shaped your starting world

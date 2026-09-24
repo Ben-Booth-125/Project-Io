@@ -31,9 +31,11 @@ The subject docs:
   driven by the pre-national history ladder.
 - **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
   market-based and non-hegemonic. **The campaign epoch is 1960 (Ben, 2026-09-08), and `epoch_year`
-  names a calendar and a recipe band, never a history (Ben, 2026-09-18; `INDUSTRIALISATION.md`):
-  generation reads no epoch, and 0 CE is the same world dated 0 CE on the ancient band (Ben,
-  2026-09-24)** — § Pass 2 is the economy
+  names a calendar and nothing else — never a history (Ben, 2026-09-18; `INDUSTRIALISATION.md`),
+  and not the recipe band either (Ben, 2026-09-24, superseding the 2026-09-18 reading in which the
+  epoch named the band): generation reads no epoch, the band is derived from the history's own
+  industry state at the 1960 fold (§ The world descriptor, `epoch_year`), and 0 CE is the same
+  world dated 0 CE** — § Pass 2 is the economy
   pass owns the calendar, and the clock rebases at the handoff (`../economy/ERAS.md`) — and
   generation runs a stepped pre-campaign history whose span § Pass 2 is the economy pass states
   (3,600 years, 2400 BCE → 1200 CE, divided at 400 BCE — Ben, 2026-09-09), followed by the
@@ -64,10 +66,34 @@ tiles                                                    (Selene, then the aster
 laws → provinces (every other body) → province holders → garrisons
 ```
 
-After the worker returns, the app runs **phase 6 — the landscape search** (`search_landscape`;
-the winning candidate's background firms *are* the background economy) and then the **settle**:
-phase 6's single validation run of the winner (`../economy/ERAS.md`; BL-978, warm start retired,
-owns the work).
+The order is one cursor's, and the wizard's rounds cut it at its joints — the Life gate, then
+each span's close — so a round's worker resumes the previous round's close rather than rebuilding
+from the seed (§ What crosses each handoff).
+
+**The search and the settle are the ladder's last act, not the app's (Ben, 2026-09-24, superseding
+the 2026-09-15 reading in which the app ran them after the worker returned).** When
+`make_hard_coded_world` returns inside the Industrialisation round's worker, the same worker runs
+**phase 6 — the landscape search** (`search_landscape`; the winning candidate's background firms
+*are* the background economy) and then the **settle**, phase 6's single validation run of the
+winner (`../economy/ERAS.md`; BL-978, warm start retired, owns the settle). Both live in one
+`world/*` function, `finish_campaign_world`, which holds everything that finishes a world for play:
+the world halves of setup (the genesis history, the survey states), the recipe band read from the
+history (§ The world descriptor, `epoch_year`), the default recipes, the stockpile budget, the
+search, the winner applied, the recipe pass and the twelve-tick settle — whose tick body is the
+one function every harness runs too. The recipe registry it bands is a copy loaded from Lua on the
+main thread before the round launches; Begin adopts the banded copy with the world. Begin's cold
+path — the menu's Begin with no wizard, or `--autostart` — makes the same call in the same order
+after the same build, so an adopted world and a cold build open on one state hash, and Begin
+pressed while the round's worker is still running **waits on it** rather than building a second
+world. What stays at Begin is presentation and the seat: the epoch formatter, the chat line, the
+zoom and frame, the tech tree and persona bench, the balance series from filed returns,
+`take_seat` and the clock rebase (`../ui/STARTUP.md` § Handoff). The round's record lands at the
+1960 close and plays back while the worker builds this tail behind it, captioned by the step under
+way — "Searching the landscape", "Proving the field" — never a blank wait (`../ui/STARTUP.md`
+§ The wait, then the lapse). The settle keeps its meaning from
+`../economy/ERAS.md`: twelve quarterly ticks with no calendar meaning, and the clock rebased at
+Begin. The serve path adopts the searched and settled world; the verify path opens on the
+unsearched seed-candidate world, so a golden reads generation alone.
 
 The three simulated passes — two polity spans and one economic settle — are § Three passes of
 simulated history; `../lore/HISTORY.md` owns the polity spans.
@@ -246,10 +272,11 @@ the world's serialisation seam; the save file records it so a load rebuilds the 
 |---|---|---|
 | `seed` (`uint32_t`) | XOR-folded into each **per-body seed literal** (`params.seed ^ 0xC1D0001u`, …). Seed `0` yields the bare literals, so the **default descriptor is the reference world**. | cheap |
 | `abundance` (`sparse`/`lean`/`standard`) | A **deposit-density scalar** applied as a pure post-multiply in `generate_body_tiles` Pass 6 (`0.40` / `0.65` / `1.00`). Consumes no RNG, so `standard` (1.0) is bit-identical to the unscaled surface. | cheap, isolated |
-| `epoch_year` (`int64_t`) | The campaign epoch, 1960 by default: its calendar and its recipe band, both applied after generation. Generation reads none of it, so every epoch builds the same world — the arc that once keyed on it is retired (Ben, 2026-09-18). | cheap |
+| `epoch_year` (`int64_t`) | The campaign epoch, 1960 by default: the calendar the clock rebases to at the handoff, applied after generation, and nothing else. Generation reads none of it, so every epoch builds the same world — the arc that once keyed on it is retired (Ben, 2026-09-18). It does **not** name the recipe band (Ben, 2026-09-24, superseding the 2026-09-18 reading): the band is a fact about the history, derived per world at the 1960 fold — `industrial` iff any living polity's materials capacity reaches the industrial rung (`roster_band_for_capacity`, the derivation `industrial_year` uses), else `ancient` — persisted on the world as `campaign_band` and applied wherever a world is loaded, so a loaded save opens on the band its history earned (the per-world grain and the persistence: delegated reading, 2026-09-24, NEEDS_REVIEW). A world whose history never crosses plays on the ancient roster and is a legitimate outcome, never reshaped to force `industrial`; per-nation grain rides the campaign tech state (the Industry mask into each corporation's earned techs, `INDUSTRIALISATION.md` § What crosses into play), not a second band. Whether a 0 CE epoch may also override the band for an ancient sandbox is Ben's open call (NEEDS_REVIEW, 2026-09-24). | cheap |
 | `prehistory_years` (`int`) | The era's **scope knob, not a tuning dial**: any positive value runs the year-tick history sim, `0` skips it, which is how harnesses that do not test the era avoid paying for it. Not a span length — the spans are the fixed years below. Part of the params, so determinism is untouched. | the most expensive pass |
 | `empires_start_year`, `empires_stop_year`, `exploration_stop_year`, `industrialisation_stop_year` (`int64_t`) | The spans' own calendar: 400 BCE → 1200 CE → 1660 → 1960 (`CIVILISATION.md`, `EXPLORATION.md`, `INDUSTRIALISATION.md`). Fixed years, never derived from the epoch; a harness binds a shorter span by moving one. | — |
-| `exploration_sim_enabled`, `industrialisation_span_enabled`, `resume_seeds_corridor_tier` (`bool`) | Which spans run and how a resumed span reopens its corridors — on by default; off builds the legacy arcs instruments pin. With `era_seed`, these choose the history, so the save records them. | — |
+| `exploration_sim_enabled`, `industrialisation_span_enabled`, `resume_seeds_corridor_tier` (`bool`) | Which spans run and how a resumed span reopens its corridors — on by default; off builds the legacy arcs instruments pin. With the history seeds, these choose the history, so the save records them. | — |
+| `era_seed`, `span_seed[4]` (`uint32_t`) | The history's own seeds, beneath `seed`, so the same ground can be played through twice and come out differently without redrawing the star or the surface (Ben, 2026-09-09). One seed per span — the migration, Empires, Exploration, Industrialisation — each folded additively into its own span's seed, so all-zero is the reference history and `era_seed` stays as the legacy term beneath them (Ben, 2026-09-24). A reroll of a wizard round moves that round's seed and nothing else, which is what lets the round resume from its predecessor's close (§ What crosses each handoff). Part of the params, so the save and the seed library record them. | cheap |
 | `body_count` (`int`) | **Reserved.** The body set is hand-authored prototype *profiles* (hot inner planet / homeworld / moon / metallic asteroid — their **names** are generated per seed, BL-257, body naming); a true count knob needs the generator to synthesise variable body profiles. The field exists so the descriptor is forward-shaped. | heaviest |
 | `preferences` (`world_preferences`) | The New World wizard's input: eight **leans** (`any`/`low`/`mid`/`high`), resolved against the seed by `resolve_preferences` with reject-and-reroll until the homeworld clears the strict Earth-like floor. Preferences, not parameters — see `PLANETOLOGY.md` § Preferences, not parameters. | cheap |
 
@@ -313,7 +340,7 @@ through what it produced.
 | 7 | History ladder, Stages 0–2 | Dated lines in the body biography | Watched (as text) |
 | 8 | Creeds / pantheons | Biography lines; culture on regions | Watched (as text) |
 | 9 | Settlement & industrialisation | `generation_report.settlement`; History ledger | **Owed** — regions are the anchors the carve grows from and have no map surface of their own |
-| 10 | **Nation carve (Voronoi BFS)** | **Loading screen, live**; Country lens in play | Watched |
+| 10 | **Nation carve (Voronoi BFS)** | **Loading screen, live**; the national border band in play (`../ui/LENSES.md` § The Country lens has retired — national borders are chrome) | Watched |
 | 11 | National character derivation | Nation detail in the Selection band | Watched |
 | 12 | Exploration | Biography lines | Watched (as text) |
 | 13 | Roads | Road tiers on the planetary canvas | Watched |
@@ -321,13 +348,12 @@ through what it produced.
 | 15 | **Corporations (placement + finance)** | **Loading screen, live** — map markers + charter ledger | Watched |
 | 17 | Market carving | Market lens; market ledger | Watched (outcome) / **Owed** (*why* a nation fractured into N markets is nowhere) |
 | 18 | Prototype laws | Law panel | Watched |
-| 19 | Background firms | Corporations panel, in play | **Owed** — runs on the main thread *after* the worker, so the loading screen cannot show it; the one generation pass with no live surface at all |
-| 20 | Pre-game warm start (80 econ ticks) | The inner bar and a caption only | Partly watched — the bar is honest, but the balances it produces are not shown |
+| 19 | Background firms | The Industrialisation round's close — the search that places them runs inside that round's worker (§ The eight phases), and the round closes on the winner's firms; Corporations panel, in play | Watched (outcome) — the ranking itself is not a spectacle, § The two watched passes |
+| 20 | The settle — twelve ticks on the winner | The Industrialisation round's caption ("Proving the field"), and the cold Begin path's bar | Partly watched — the caption is honest, but what the ticks prove is not shown |
 
-Four owed items, none of them blocking: the tile-derivation ledger (designed in
-`GENERATION_LEDGER.md`), a region surface, a market-carving explanation, and background firms —
-which the worker split puts out of the loading screen's reach. Recorded here rather than filed as
-items so the map stays in one place; promote from this table when one is picked up.
+Three owed items, none of them blocking: the tile-derivation ledger (designed in
+`GENERATION_LEDGER.md`), a region surface and a market-carving explanation. Recorded here rather
+than filed as items so the map stays in one place; promote from this table when one is picked up.
 
 ### The two watched passes (Ben, 2026-09-08)
 
@@ -336,29 +362,31 @@ wizard is the one generation surface that works — the player sets a lean, watc
 and understands what they chose — and it stops at phase 1. Phases 4 and 6 produce the two things a
 player would most want to have watched, and neither has a surface.
 
-They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds 4 and 5):
+They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds):
 
 | Round | Phase | The moving object |
 |---|---|---|
-| **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of 400 BCE → 1200 CE** (Ben, 2026-09-09) — the empire half of pass 1's 3,600 years; the migration half (2400 BCE → 400 BCE) is round 3's. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
-| **5** | **6 — The economic substrate** | A time-lapse of 1660 → 1960 showing **cities industrialising**, **mass migration** and **decolonisation**, closing on **firm markers and their charters** and the **market carve with its price field** (Ben, 2026-09-15; `INDUSTRIALISATION.md` § Part II). |
+| **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of 400 BCE → 1200 CE** (Ben, 2026-09-09) — the empire half of pass 1's 3,600 years; the migration half (2400 BCE → 400 BCE) is round 3's. Polity colour spreads, stalls, fractures. A **leaderboard** on the left ranks people share, land share, population and might (NR-876, 2026-09-15); the industry column joins on round 6 only (`../ui/STARTUP.md` § Rounds). |
+| **6** | **6 — The economic substrate** | A time-lapse of 1660 → 1960 showing **cities industrialising**, **mass migration** and **decolonisation**, closing on **firm markers and their charters** and the **market carve with its price field** (Ben, 2026-09-15; `INDUSTRIALISATION.md` § Part II). |
 
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
 any `world_preference`, and targets no outcome — the tune-the-forces-never-the-outcome rule of
 § Asymmetry is the deliverable is not relaxed for being player-facing. The wizard's standing
 premise carries over unchanged: **you set conditions, you do not steer.**
 
-**Round 5 shows the selected landscape, not the search.** Phase 6 scores candidates statically in
+**Round 6 shows the selected landscape, not the search.** Phase 6 scores candidates statically in
 milliseconds and the ranking is not a spectacle; what the player watches is the winner being drawn.
 
 **The search is Industrialisation's last act, spending its budgets (Ben, 2026-09-15).** Industrialisation
 decides how much corporate capital each city holds and where; phase 6 decides which roster and
 placement spends each city's charter budget viably, on the five terms below. Neither decides the
-other's question (`INDUSTRIALISATION.md` § This phase sets budgets; the search spends them).
+other's question (`INDUSTRIALISATION.md` § This phase sets budgets; the search spends them). And it
+runs where the budgets were set: inside the Industrialisation round's worker, after the span closes
+(Ben, 2026-09-24; § The eight phases).
 
 **And the wait becomes the round.** The planetology rounds preview by re-running a cheap pure
-chain per control move; the history sim cannot be previewed that way at any budget. So rounds 4
-and 5 run the real pass *inside the round*, drawing as they compute. Ben, 2026-09-08: *a watched
+chain per control move; the history sim cannot be previewed that way at any budget. So the history
+rounds run the real pass *inside the round*, drawing as they compute. Ben, 2026-09-08: *a watched
 wait needs no budget.* The obligation that replaces the budget is sharper, not looser — a watched
 wait must be **worth watching**, and a round that shows a still globe for ninety seconds is worse
 than the bar it replaced.
@@ -505,15 +533,17 @@ history in, invented names out, which is not softened here.
 Research points accumulate in proportion to a culture's population. Nothing else: no tree, no
 rates, no unlocks in this pass.
 
-That has one consequence the leaderboard must not hide. Under the placeholder, *research speed* and
-*population* are the same number in two columns, so the board shows a correlation it did not
-measure. Either the column is **labelled as population-derived** while the placeholder stands, or
-it is not shown until research is real. An unlabelled duplicate column is a chart that lies.
+That has one consequence for the leaderboard. Under the placeholder, *research speed* and
+*population* are the same number, so a research column would show a correlation the board did not
+measure; the board therefore ranks no research — its columns are people share, land share,
+population and might (§ The two watched passes), with industry joining on round 6 only
+(`../ui/STARTUP.md` § Rounds) — and a research column appears only once research is real. An
+unlabelled duplicate column is a chart that lies.
 
-**Three of the four owed items above are paid by this.** The region surface is round 4's globe;
-the market-carving explanation is round 5's carve; background firms are round 5's markers, which
-also settles the "runs after the worker" objection — a wizard round is not the worker's loading
-screen and does not inherit its threading constraint.
+**Two of the three owed items above are paid by this.** The region surface is round 4's globe;
+the market-carving explanation is round 6's carve. Background firms stopped being owed the same
+way: the search that places them runs inside the Industrialisation round's worker and the round
+closes on them, so the "runs after the worker" objection went with the worker split it named.
 
 ---
 
@@ -650,6 +680,13 @@ coverage-and-margin problem in milliseconds, pick the winner by a deterministic 
 order with an explicit tie-break, then run **one** short tick simulation on the winner alone to
 confirm it holds up live. That dissolves the span question — there is no span, because there is no
 clock — and it turns the candidate count from a budget question into a design one.
+
+**Where it runs (Ben, 2026-09-24).** Phase 6 and its validation run are the last act of the
+Industrialisation round's worker, called on the world that worker has just closed — not a pass the
+app runs after the worker returns, and the same call Begin's cold path makes when no wizard ran
+(the pass map above; `INDUSTRIALISATION.md` § This phase sets budgets; the search spends them). It
+is static all the same: the world it scores is the one the span closed, and nothing in it moves
+while the candidates are ranked.
 
 **The one thing a static check cannot see is price feedback**, and it is the failure that actually
 killed the industrial field: processors buying inputs at the ceiling and being idled as
@@ -798,7 +835,7 @@ target.
 | Pass | Engine | Span | Produces |
 |---|---|---|---|
 | **1 — Ancient** | The polity sim (`history_sim`), the Empires round | **400 BCE → 1200 CE** | Ancient borders, cultural doctrines — who walked where |
-| **2 — Exploration and Industrialisation** | The same polity sim, two further calls each resumed from the last handoff, sea legs open | **1200 → 1660 → 1960** | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
+| **2 — Exploration and Industrialisation** | The same polity sim, two further calls each resumed from the last handoff, sea legs open | **1200 → 1660 → 1960** | The extent of colonisation by major powers, which polities industrialised and when (and with them the campaign's recipe band, § The world descriptor), each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
 | **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which firms exist, what each market can close, the price field |
 
 **Pass 1 and pass 2 are one engine, not two.** The works roster is cumulative across its four
@@ -830,16 +867,19 @@ is read against that table.
 | **Exploration** | 1200 CE | 1660 CE | 460 |
 | **Industrialisation** | 1660 CE | 1960 CE | 300 |
 
-**1960 and 1200 are both unmoved**, so pass 1, the epoch and the industrial-band campaign are
-untouched. What changed is that the span between them is now SIMULATED rather than coasted, and
-that the exploration age is a phase in its own right with the Empire closure as its input.
+**1960 and 1200 are both unmoved**, so pass 1 and the epoch are untouched. What changed is that
+the span between them is now SIMULATED rather than coasted, and that the exploration age is a
+phase in its own right with the Empire closure as its input.
 
 **The calendar is now stated rather than derived.** Pass 1 runs **3,600 years, 2400 BCE → 1200 CE**,
 divided at **400 BCE** into the migration and empire rounds (Ben, 2026-09-09;
 `CIVILISATION.md` § The span is 400 BCE to 1200 CE owns the arithmetic). The earlier figure here was
 4000 years, before the boundary and the total were revised. Pass 1 ends at **1200 CE**;
-pass 2 runs **1560 → 1960**; the epoch is **1960**. That makes the campaign an **industrial-band**
-world (`era_band_for_epoch` flips at 1700), not the ancient one the 0 CE default produced.
+pass 2 runs **1200 → 1660 → 1960** (Exploration, then Industrialisation); the epoch is **1960**.
+The campaign's recipe band is not the epoch's to name: it is derived from the history's industry
+state at the 1960 fold (§ The world descriptor, `epoch_year`; Ben, 2026-09-24), so an
+industrial-band campaign is what a history that crossed the rung earns, never what the calendar
+grants.
 
 **SUPERSEDED — THE GAP IS GONE (Ben, 2026-09-11).** Exploration opens at 1200 CE, so there is no
 coast to advance accumulators across; `EXPLORATION.md` owns the span. The paragraph below
@@ -857,7 +897,7 @@ industrialised and when, what colonisation carried where, and what each nation's
 by 1960. This is what makes pass 2 the bridge to phase 6: the substrate search selects a corporate
 landscape over a world whose trade relationships already have a cause.
 
-**Its output is round 5's**, exactly as pass 1's is round 4's: metros grown from the centres pass 1
+**Its output is round 6's**, exactly as pass 1's is round 4's: metros grown from the centres pass 1
 sacked, reach across water, firms and their charters, the market carve and its price field.
 
 **Pass 3 SELECTS a landscape; it does not settle one.** The earlier design made pass 3 the warm
@@ -881,15 +921,50 @@ failure. The recipe-margin anchor (`../economy/PRODUCTION.md`) is therefore a **
 pass 3 — which is precisely why margin is not one of the scoring terms. It is the gate the roster
 passes before the search runs, not an axis the search trades against.
 
+### What crosses each handoff
+
+**Every handoff rides ONE cursor, and the world is built once (Ben, 2026-09-24).** The ladder
+`make_hard_coded_world` runs is a composition of resumable stage functions over a single
+`generation_cursor` — the world itself, with the report, the naming state, the RNG and the deposit
+scalar, every homeworld intermediate the stages exchange (planetology, the ladder, creeds,
+settlement, corridors, grudges, region ownership, polity treasuries, market shells) and the last
+span's resume struct — and each stage takes the cursor its predecessor closed and moves it
+forward. The world is built once, at the Life gate: Helios, Cinder and Kepler stand with their
+tiles, deposits and rivers before the first person walks — the deposits sit downstream of the
+biosphere's Legacy and Spend, so the ground a culture is coined over is the ground play is fought
+over — and the Culture, Empires, Exploration and Industrialisation stages run over that world in
+turn. Nothing downstream rebuilds it from the seed. The wizard's rounds cut the same ladder at the
+same joints: the Life round builds the gate world and the globe is rastered from it; each later
+round's worker takes the previous round's close and runs only its own span; Begin adopts the
+Industrialisation round's close (`../ui/STARTUP.md` § The world cache — Begin adopts the wizard's
+world). The composition is byte-identical to one uninterrupted call — a single invocation is what
+every harness, fixture and seed-library pin reads — and the identity is checked at every round
+boundary, not only at Begin. Selene and the asteroids stay in the finishing pass after the last
+span: no round shows them, and moving them forward would shift every entity id (delegated
+reading, 2026-09-24, NEEDS_REVIEW).
+
+**A reroll re-seeds one span and touches nothing above it (Ben, 2026-09-24).** Each span — the
+migration, Empires, Exploration, Industrialisation — draws from its own seed (`span_seed`, § The
+world descriptor), so rerolling a round changes that round's history and leaves every earlier
+round's world exactly as it was; a lean changed on a round invalidates that round and those after
+it, never those before. The round resumes from its predecessor's held close where one is held, and
+otherwise replays from the Life gate under the fixed per-span seeds — the same calculation by
+determinism, so nothing a round displays is ever a different world from the one it stands on
+(hold-or-replay: delegated reading, 2026-09-24, NEEDS_REVIEW). A serialised snapshot is not a
+resume point: a save round trip reorders the unordered stores. Going back keeps every record and
+every world, and recomputes nothing.
+
 **What crosses each handoff, and nothing else.**
 
 - Pass 1 → pass 2: the region table, cultures, works, the strain accumulators, the **grudges**,
   and the **provinces each polity holds**. Nothing is reset.
 
-  **The list is a struct, not a promise.** `pass_one_output` is the whole of what crosses, and
-  every consumer takes it rather than reaching into the sim's live state — so this clause and
-  the struct's fields are the same list, and a validator checks them rather than a reader
-  trusting the sentence. What that buys is the take-back: **cultures cross as SHARES**, a
+  **The list is a struct, not a promise, and the struct rides the cursor.** `pass_one_output` is
+  the whole of what crosses between the sim's spans, and every consumer takes it rather than
+  reaching into the sim's live state — so this clause and the struct's fields are the same list,
+  and a validator checks them rather than a reader trusting the sentence. It is the cursor's
+  sim-handoff half: the world rides the same cursor beside it, and the next span resumes from the
+  pair. What that buys is the take-back: **cultures cross as SHARES**, a
   per-mille distribution over a small number of peoples rather than one index, so a conquest
   arrives half-digested and says how far; and **grudges cross as directed, decaying, named
   causes**, so a nation can be asked *why* it resents its neighbour rather than only *how much*.
@@ -902,9 +977,10 @@ passes before the search runs, not an axis the search trades against.
   discount on a conquest fades over centuries instead of at the instant the border moves — a
   realm that expands fast carries a long tail of ground still charging it, and a realm that
   expands slowly does not. Nothing is clamped; the cost is in the world.
-- Pass 2 → the political map: the same outputs `generate_nations` reads today, plus the
-  **polity map itself** — which polity held each region at the epoch, so a realm arrives as one
-  nation rather than as a Voronoi cell per region — plus a nation's **tariff posture**, enacted
+- Pass 2 → the political map: the same outputs `generate_nations` reads, plus the **polity map
+  itself**, carried on the cursor from the Industrialisation span's close — which polity held
+  each region at the epoch, so a realm arrives as one nation rather than as a Voronoi cell per
+  region — plus a nation's **tariff posture**, enacted
   as an ordinary `import_tariff` law at world setup where pass 2's polity ended up protective.
   (Colonial ties no longer seed preferred-seller relationships: that half was superseded on
   2026-09-09, because nothing on the buy side emits orders — `EXPLORATION.md` § The colonial tie
@@ -921,7 +997,9 @@ passes before the search runs, not an axis the search trades against.
   consider city states as population centres" (Ben, point 5) — and never absorbs anybody, since a
   city state that annexed its neighbours would stop being one. A world with no city state is a
   legitimate outcome; the exemption is a permission, never a quota.
-- Pass 3 → play: the world state, as the warm start hands it over today. Pass 3 seeds no
+- Pass 3 → play: the world state, searched and settled inside the Industrialisation round's
+  worker and adopted whole at Begin — the cursor's last position (§ The eight phases;
+  `../ui/STARTUP.md` § The world cache — Begin adopts the wizard's world). Pass 3 seeds no
   behaviour (§ Generation seeds no behaviour in `CORPORATION_GENERATION.md` still holds).
 
 **Separate market conditions are produced by in-world forces with visible causes** — never by a

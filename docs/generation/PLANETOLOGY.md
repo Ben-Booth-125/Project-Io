@@ -407,6 +407,11 @@ Not a timer. Five concrete requirements, each traceable to something above:
 in Δv: 1000 kg to escape costs ~44 t of vehicle at 1 M⊕ and ~2,936 t at 6 M⊕, becoming impractical
 above ~10–11.5 M⊕. A fully industrial world can be **planetbound**.
 
+**On screen this is the Life round's last fold (Ben, 2026-09-24).** The endowment, the endemics and
+the gate are walked as the round's closing panel, the `drawdown` lean is taken under it (§ S9,
+§ Preferences, not parameters), and with the gate cleared the globe dissolves into the Culture map
+stamped 2400 BCE — the joint this section names is shown, not skipped.
+
 ---
 
 ## S9 — Spend: why the game's premise exists
@@ -416,6 +421,11 @@ industrialises *earlier* and is therefore *more* drawn down at campaign start.**
 the **accessible** fraction, never the formed fraction — the ore is still there, the *cheap* ore is
 not. Terrestrial peak conventional oil and the exhaustion of near-surface high-grade copper are the
 real analogue.
+
+**It acts before the tile pass.** The drawdown is folded into each resource's `endowment` ahead of
+`generate_body_tiles`, so the Pass 6 post-multiply — and every deposit a world is built with —
+already carries it. That is why its lean belongs to the Life round, under the Legacy fold
+(§ Preferences, not parameters), and not to any round that runs on the built world.
 
 This is the cheapest possible generated, in-fiction answer to *"why would a corporation go to
 space"* — and it makes Era 1 → Era 2 a **pressure** rather than a menu choice, which is exactly what
@@ -731,9 +741,11 @@ state reproduces the unendowed surface bit-for-bit:
   `deposit_scalar` and in the same pure post-multiply shape (no RNG draw).
 
 **The ten player decisions.** `planetology_params` carries one knob per decision-bearing stage;
-the New World flow walks them in chain order. **Air** and **Legacy** carry *no* decision — the first
-is a consequence of earlier choices, the second is the payoff — and the UI says so rather than
-inventing a knob.
+the New World flow walks them in chain order, in the two rounds § Preferences, not parameters lays
+out. **Air** and **Legacy** carry *no* decision of their own — the first is a consequence of earlier
+choices, the second is the payoff — and the UI says so rather than inventing a knob. The one lean
+taken under the Legacy fold is Spend's `drawdown`, named as Spend's: S9 acts on the endowment S8
+leaves, before the tiles, so its lean is set where the world is built.
 
 The bands below are the **measured always-viable spans**, not authored preferences —
 `earthlike_corridor` swept each axis and these are the spans where every seed clears the homeworld
@@ -892,17 +904,28 @@ displayed**; the moment a player can type `star_mass = 1.0342` the screen is a f
 `resolve_preferences(prefs, seed)` turns those into concrete parameters, rejecting and rerolling with
 the attempt index folded into the draw — so the whole search stays a pure function of the seed.
 
-**Three rounds, on the chain's own A → B → C shape**, replacing ten:
+**Two rounds, on the chain's own A → B shape**, replacing ten — with the B → C joint walked as the
+second round's closing panel rather than as a round of its own (Ben, 2026-09-24, superseding the
+2026-07-22 three-round table and the 2026-09-09 reading that retired the third round and left its
+lean editable nowhere):
 
 | Round | Chain stages | Preferences |
 |---|---|---|
 | **A — The System** | System, Accretion, Air, Engine | star, world size, interior, metal |
-| **B — Life** | Water, Spark, Breath, Green | ocean, oxygen story, coal basins |
-| **C — Inheritance** | Legacy, Spend | drawdown |
+| **B — Life** | Water, Spark, Breath, Green, Legacy | ocean, oxygen story, coal basins, drawdown |
 
-Air and Legacy carried no decision, so as standalone screens they were pure interstitials; grouped,
-they become their round's consequence and payoff panels. Each round has its own **reroll** —
-set leans, roll, read the charts, roll again, commit.
+Air carries no decision, so as a standalone screen it was a pure interstitial; grouped, it is round
+A's consequence panel. **Legacy is the Life round's last fold**: the endowment, the endemics and
+the civilisation gate are walked as the round's closing panel — its payoff — and the `drawdown`
+lean is taken there, under the Legacy fold, because it is a planetology input (S9 Spend multiplies
+the endowments before any tile is generated, § S9) and so belongs in the round where the world is
+built, not in one that runs on the built world. Spend has no fold and no round of its own —
+Inheritance is not revived — but the chart chain keeps a third group holding Spend alone, read
+only by the in-game History ledger's Chain view; the wizard never walks it. **The joint is shown,
+not skipped**: with the gate cleared, the globe holds through the Culture round's wait and
+dissolves into its map, stamped 2400 BCE. `../ui/STARTUP.md` owns the screen — the folds, the
+globe, the dissolve; this doc owns which stage carries which lean. Each round has its own
+**reroll** — set leans, roll, read the charts, roll again, commit.
 
 **`interior` deliberately folds age and radiogenic endowment together.** "Old and cold" against
 "young and vigorous" is one idea to a player; splitting it into two sliders would be two settings
@@ -1086,6 +1109,8 @@ Recorded so nobody later mistakes design choices for derived physics.
   endowment post-multiply in Pass 6.
 - **`CONTINENTS.md`** — the plate-drift sibling pass between S3 Engine and the tiles; consumes
   `mobile_lid`/`theta`, appends `chain_stage::engine` biography lines (see § Implementation).
+- **`../ui/STARTUP.md`** — owns the wizard screen: the two rounds as walked, the folds, the globe
+  and its dissolve into the Culture map. This doc owns which stage carries which lean.
 - **`GENERATION_STRATEGY.md`** — records Planetology as the first stage in generation ordering and the
   sibling-pass architecture convention (BL-051).
 - **`RESOURCES.md` / `PRODUCTION.md`** — the endowment mapping above is the seam; § Open calls 1 is a

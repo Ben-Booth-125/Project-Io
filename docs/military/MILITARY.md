@@ -419,8 +419,10 @@ graduated dial; quantity-scaled readiness is a follow-on.
 **`campaign_roster_band_for(era_band)` derives the band from the campaign's own era.** It is
 fixed at no single value, and it is **not** derived from a military-capacity score — that is the
 Era −1 settlement model — but from `recipe_registry::era()`, the same coarse ancient/industrial
-split `era_band_for_epoch` gives every other era gate: an ancient campaign opens at the roster's
-lowest band (`classical`), an industrial one at its highest (`industrial`). Because bands are
+split every other era gate reads — the campaign band derived from the history's industry state at
+the 1960 fold (`../economy/ERAS.md` § Where the ladder starts): a world whose history never crossed
+the industrial rung opens at the roster's lowest band (`classical`), one that did at its highest
+(`industrial`). Because bands are
 cumulative, every earlier row the corp's ground supports is exposed either way.
 
 `roster_stack(manpower, region, band, readiness)` composes an army stack from region manpower.
@@ -680,9 +682,10 @@ first terminal military good (BL-457, ordnance), added so this draw has somethin
 Naming a good here is a one-line `economy.lua` change, never a code change.
 
 > **The ordnance recipe is industrial.** The Fabricator recipe that makes ordnance is tagged
-> `era = "industrial"` (`scripts/recipes.lua` id 27), and an ancient campaign
-> (`era_band_for_epoch`, `src/world/recipe_registry.hpp`) masks it out of the allowed recipes. So
-> an ancient-epoch campaign cannot produce the good its upkeep draws; the draw goes unmet and the
+> `era = "industrial"` (`scripts/recipes.lua` id 27), and a campaign whose derived band is
+> ancient (`recipe_registry::era()`, `src/world/recipe_registry.hpp`; `../economy/ERAS.md` § Where
+> the ladder starts) masks it out of the allowed recipes. So
+> an ancient-band campaign cannot produce the good its upkeep draws; the draw goes unmet and the
 > decay rule fires. That is the rule working as written, and a fact to price against when the
 > rates are set.
 

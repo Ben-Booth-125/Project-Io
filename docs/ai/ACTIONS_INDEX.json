@@ -599,7 +599,7 @@
   ],
   [
    "chrome.epoch_cli",
-   "Command line. The only route to a start other than the default 0 CE one — the 1960s branch was live in world_params but reachable solely by editing a source default (BL-705)."
+   "Command line. The only route to a start other than the default 1960 one (BL-705 opened the flag; the 0 CE start remains supported)."
   ],
   [
    "canvas.border_band_select",

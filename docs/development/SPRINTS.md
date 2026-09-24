@@ -60,14 +60,27 @@ and/or a version goal (v0.1.1 etc.).
 ## Open now
 
 ### Sprint 47 — one history, told through the rounds
-*Proposed · Ben (2026-09-24); Claude (handoff from a six-round narrative survey with adversarial verification)*
+*Open · opened 2026-09-24 · Ben (2026-09-24); Claude (handoff from a six-round narrative survey with adversarial verification)*
 
 **Goal.** The wizard reads as one history unfolding, not six screens: what a player meets in one round — a people, a polity, a creed, a place, a road, an industry — carries visibly into the next, and the corporation they choose at the end stands in the history that made it.
 
 **Planned.**
-- Cut at the next session from NEXT_SESSION.md.
+- WAVE 0 — the seams (generation, world-movers land behind the re-bless): BL-1083 (one seed per span), BL-1084 (the world built once and moved), BL-1085 (Begin retired into round six), BL-1101 (the band from history), BL-1096 (the purchase verb), BL-1097 (sea legs recorded), BL-1102 (tariff posture derived), BL-1108 (quit-during-build crash, Light, any time)
+- WAVE 1 — identity (UI, on the seeds): BL-1087 (realm keeps its colour), BL-1088 (realm keeps its name), BL-1089 (realm becomes nation), BL-1090 (hard borders by people share), BL-1094 (marks that earn their place), BL-1106 (names and voice)
+- WAVE 2 — each round's flair: BL-1091 (from Life to people), BL-1092 (routes and splits on the map), BL-1095 (fleets and ties), BL-1099 (works chartered events and the origin sentence), BL-1100 (the rung crossing narrated), BL-1104 (the Culture record saved)
+- WAVE 3 — stretch, in the re-bless only if their predecessors land with time: BL-1086 (the search inside generation), BL-1098 (the sea-lane tier stamped), BL-1107 (the culture ground profile)
+- CARRIED: BL-1068, BL-1072, BL-1073, BL-1076, BL-1080 owe Ben's live click; BL-1078 is delivered by BL-1085; BL-1082 and BL-1049 ride the re-bless; BL-1071 owes a further reading (Ben: measure more first)
+- FILED, NOT IN SPRINT: BL-1093 (true migration routes), BL-1103 (convoy arrival duty), BL-1105 (Ages view, four spans), BL-1109 (campaign tech from the Industry mask)
 
-**Done when.** Set at the cut.
+**Done when.** A player can follow one people, one realm and one place from the Culture round to the seat card without a name, a colour or a thread breaking; every seam opens on the ground the last round left with nothing recomputed; round 6 plays from the 1960 close while the tail builds and closes on the map the campaign opens on; Begin only seats the player; the four flair asks are on their rounds; one re-bless, taken once.
+
+**Risk.** THE CURSOR. BL-1084 splits a 2,800-line function whose locals thread through every stage; the composition must be byte-identical to the monolith at every round boundary or every pin moves for the wrong reason. Prove it on the 16 seeds before any UI lane builds on the moved world. SECOND: three world-movers (purchase verb, band, tariffs) and one re-bless — every one of them is read on the 16 seeds first (Rule 0b) and none is tuned to make a seed behave. THIRD: the sprint is wide; the identity wave is worth shipping alone if the seams overrun.
+
+THE CUT (2026-09-24). Twenty-seven ids minted (BL-1083..BL-1109); the rulings record is docs/development/drafts/sprint-47-rulings.md, with the two reader workflows beside it (sprint-47-scoping-readers.json, sprint-47-design-prep.json). Delegated readings are NR-918..NR-930.
+
+BEN'S PICKS THAT WENT DEEPER THAN THE RECOMMENDATION: the whole world moves (not the sim close); hard borders by a share threshold with hysteresis (not top-3); the purchase verb and sea-lane tier built now (a sim beat); the recipe band from the history; mid-span works events; the search inside the round's wait. No per-round close; no prebuild of the next round; no heat blooms.
+
+THE ONE SAVE BUMP PER SEAM: envelope (per-span seeds, migration_timelapse, the new record kinds, series fields, the name tables) and world (campaign_band, corporation founded_year/origin_region, lane_level) — each claimed once through next_save_version.js by the first lane that needs it.
 
 ## Where things stand
 
@@ -138,9 +151,9 @@ and/or a version goal (v0.1.1 etc.).
 | 44 | the corporate web's plumbing | CLOSED 2026-09-18. Four items: harness parity, a world-bytes pin, the charter-budget seam (off by default, 16/16 pins held), and the cost sweep. No shipped world moved. NR-889 (the density cap) carries the cost readings for Ben. |
 | 45 | industrialisation makes the web real | OPEN 2026-09-18. Ten items in three waves: world copies, the span boundary, the Industry tree and the charter rules first, all behind switches; then the span, Beat 1 and the stockpile budget; then the real-stockpile sweep and one re-bless that turns it all on at epoch 0. |
 | 46 | the generation reaches the game | CLOSED EARLY 2026-09-24 (Ben: cut v0.1.25, move to sprint 47). The core landed — the wizard plays the whole arc, Begin keeps the world it built, the player chooses the corporation — and the economy thread it exposed was rebuilt; the carry rows and the draft's unfiled rows go to the sprint 47 cut. |
-| 47 | one history, told through the rounds | PROPOSED 2026-09-24 (Ben, closing sprint 46 early): focus on a connected narrative through each generation round. The handoff is docs/development/NEXT_SESSION.md; the cut is the next session's. |
+| 47 | one history, told through the rounds | OPEN 2026-09-24. Cut from Ben's design form (docs/development/drafts/sprint-47-rulings.md): the world is built once at the Life gate and moves forward, rerolls are per stage, round 6 absorbs Begin, and a realm keeps its colour, shade and name to the seat card. Twenty-three items in four waves plus the five owed live clicks and one re-bless. |
 
-**Next up.** SPRINT 43 OPEN (2026-09-17): the 1960 baseline — BL-1026 (seed library re-read), then BL-1027 (span cost to 1960), BL-1028 (weakness counters to 1960), BL-1029 (Digitisation readings at 1960), serially in one lane. Sprints 44 (the corporate web's plumbing) and 45 (industrialisation makes the web real) are proposed goal rows; their items are cut at the gates.
+**Next up.** SPRINT 47 OPEN (2026-09-24): wave 0 first — BL-1083 then BL-1084 in one generation lane, BL-1085 in a core lane, BL-1101/BL-1096/BL-1097/BL-1102 as world-mover lanes; the identity wave opens as soon as BL-1083 lands. Re-bless once after wave 0's world-movers.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 

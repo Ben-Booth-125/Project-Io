@@ -504,7 +504,7 @@ That is the honest reading — protection is a response to an industrial competi
 without one has nothing to protect against.
 
 **The colony term is owed, not forgotten.** It has no input while a polity cannot claim ground across
-water; the colonial era's two claim verbs (`../research/COLONIAL_ERA.md` § Two ways to claim
+water; the exploration age's two claim verbs (`../generation/EXPLORATION.md` § Two ways to claim
 ground across water; BL-832, colonial ties) are what give it one, and it lands as an addend on the
 same scalar. A purchased province counts as a colony exactly as a conquered one does — a metropole
 protects what it bought no less than what it took. A far-flung holding is a large empire, not an

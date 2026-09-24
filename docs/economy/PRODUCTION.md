@@ -884,8 +884,8 @@ noun register as `ceramics`/`dressed_stone`/`tools`.
 **The Smithy's second recipe is the ancient arc's route to `ordnance`** (BL-460, ancient
 ordnance) — the same building, same `iron_blooms + charcoal` basket as its steel recipe,
 switchable between the two (§ Alternate production methods). Unit upkeep draws ordnance every
-tick in either arc, so an ancient campaign (the default, `epoch_year = 0`) must be able to make
-it. See § Fabricator above and `RESOURCES.md` § The two terminal goods.
+tick in either arc, so an ancient-band campaign (§ The era band) must be able to make it. See
+§ Fabricator above and `RESOURCES.md` § The two terminal goods.
 
 **The load-bearing authoring is the tag on the coal-fired `steel` recipe, not the additions.**
 That recipe is `industrial`, so the ancient arc reaches steel only through timber → charcoal →
@@ -1057,10 +1057,18 @@ shared by both arcs), `ancient`, or `industrial` (BL-433, era band). Authored as
 `scripts/economy.lua` and `scripts/recipes.lua`; an unknown string is a **load-time error**, not a
 silent fallback, because a typo would quietly re-admit a space-era entry to the ancient roster.
 
-The campaign's band is derived from `world_params::epoch_year` against the same 1700 threshold the
-antiquity branch uses — below 1700 is ancient — and applied in `app::load_economy` right after the
-registry loads. This is why a 0 CE campaign is never offered a Launchpad, the petroleum and
-propellant chains, or the spacecraft chain.
+The campaign's band is derived from the history the world was generated with, never from the
+epoch (Ben, 2026-09-24, superseding the reading under which `world_params::epoch_year` picked it):
+the world is `industrial` iff any living polity's materials capacity reaches the industrial rung at
+the 1960 fold — `roster_band_for_capacity`, the same derivation that dates a polity's
+`industrial_year` (`../lore/HISTORY.md` § Stage 4) — and `ancient` otherwise. The verdict is
+persisted on the world as `world::campaign_band` and applied to the registry on a new game
+(`app::load_economy`) and on a loaded save (`load_game_from`) alike, so a save never opens on a
+band its world did not earn. A seed on which no polity crosses is an ancient-band campaign — it is
+never offered a Launchpad, the petroleum and propellant chains, or the spacecraft chain — and the
+sim is never reshaped to force the industrial answer (delegated reading, 2026-09-24, NEEDS_REVIEW).
+The epoch names the calendar only; what the 0 CE start means for the band is `ERAS.md` § Where the
+ladder starts' open call.
 
 **The band masks; it never removes.** A recipe's id is its index in the authored list and that id
 is *stored* in `building_component.recipe`, so a filter that compacted the list would silently

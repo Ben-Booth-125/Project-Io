@@ -6,7 +6,7 @@
 > colonies are lost · why war kills people in this phase and what a world war costs the campaign ·
 > what a proxy war is at the epoch · how a region-grain sim becomes a tile-grain opening map ·
 > where this phase stops and the landscape search starts · what the phase is judged on · what
-> crosses into play · where its boundary with Exploration falls.
+> crosses into play · where the recipe band comes from · where its boundary with Exploration falls.
 > **Not here:** the phase before it and everything it hands forward (EXPLORATION) · the nodes of
 > its technology tree (trees/INDUSTRY_TREE) · how a market clears and how a price resolves
 > (../economy/MARKETS) · how a haul is costed (../economy/SUPPLY) · how a corporation is placed,
@@ -42,45 +42,54 @@
 > living polity at 1660, with its root ungated (`trees/TREES.md`, `trees/INDUSTRY_TREE.md`). The
 > proposals the form listed and Ben did not overturn are marked PROPOSED where they land.
 
+> ⟳ **What changed (2026-09-24, the sprint 47 design pass — remove once reviewed):** Ben ruled that
+> the recipe band is derived from the history's industry state, never from the epoch; that the
+> Industrialisation round's worker runs the landscape search and the twelve-tick settle as the
+> phase's last act, so Begin does no world work beyond seating the player and setting up the
+> presentation; that company creation shows in-span as
+> *works chartered* notes against the running charter price, with the real charters flashing at
+> the close; that the polity's crossing of the Industrial rung is the span's narrated industrial
+> moment; and that the span derives each nation's tariff posture at its end. Delegated readings
+> are marked where they land.
+
 **Industrialisation is the fourth and last simulated span: 1660 → 1960 CE, 300 years.** It opens the
 instant Exploration closes and ends at the epoch, so the world it produces is the world the
 campaign opens on (`GENERATION_STRATEGY.md` § Pass 2).
 
-**The default epoch is 1960 (Ben, 2026-09-08; the flip, NR-869).** The campaign opens in the year
-this span closes, because a 1960 calendar over a world the sim stopped at 1660 would open on a
-300-year gap nobody simulated.
+**The epoch and the band.** The default epoch is 1960, the year this span closes, so the campaign
+opens on the world the sim finished rather than on a 300-year gap nobody simulated. The epoch
+names the tick calendar's day 0, applied after generation, and nothing else. Generation reads no
+epoch: every span runs on its own fixed years — the migration runs 2400 BCE → 400 BCE, Empires
+400 BCE → 1200 CE, Exploration to 1660, this span to 1960 — so this span runs wherever Exploration
+runs, whatever the epoch, and the same seed builds the same world, byte for byte. There is no
+other history: no single 1560 → 1960 pass that skips Exploration, none of the narrative passes
+that belonged to one (the ruptures, the Charter Act, the 1951 common tongue), and no reading of
+`epoch_year` that chooses between histories (the default epoch, the flip and the span running
+whatever the epoch: Ben, 2026-09-08 and 2026-09-18, NR-869; `GENERATION_STRATEGY.md` § Pass 2).
 
-**SETTLED (Ben, 2026-09-18, sprint 46 form, re-timing NR-869): the flip does not wait for Beats 2
-and 3.** It lands once this span runs by default and the superseded arc is retired, so that no
-reading of `epoch_year` chooses a history. The superseded 1560 → 1960 arc and the three narrative
-passes that ran only on it (the ruptures, the Charter Act, the 1951 common tongue) are retired
-outright.
+The recipe band is derived from the history's industry state, never from the epoch (Ben,
+2026-09-24). At the 1960 fold the world is read once: it is `industrial` iff a living polity's
+materials capacity reaches the Industrial rung of the capacity ladder — the same derivation that
+dates a polity's crossing (§ Beat 1; `../lore/HISTORY.md` § Stage 4) — and `ancient` otherwise.
+The band is per world, persisted on the world and read on a new game and a loaded save alike, so
+a world opens on the band its history earned, never on one a calendar implies (the per-world grain
+and the persistence: delegated reading, 2026-09-24, NEEDS_REVIEW). The per-nation grain of
+technology crosses through the Industry mask into each corporation's earned techs (§ What crosses
+into play), not through a second band. A world on which no polity crosses by 1960 derives
+`ancient` and opens with the industrial roster masked — a legitimate world, counted by the seed
+spread and never reshaped until it crosses. Which of the three axes that say "era" in code this
+is: `../economy/ERAS.md` § Three things that say "era" in code.
 
-**A 1960 epoch names a calendar, not a history.** The world at 1960 is Exploration's handoff
-continued through this span — never the single 1560 → 1960 industrial pass, which is superseded
-and runs no Exploration, and so hands this phase none of its inputs (`GENERATION_STRATEGY.md`
-§ Pass 2).
-
-**Generation reads no epoch.** Every span runs on its own fixed years — the settlement pass stops
-at 0 CE, Empires runs 400 BCE → 1200 CE, Exploration to 1660, this span to 1960 — so the same seed
-builds the same world, byte for byte, whatever epoch is asked for. The epoch decides two things,
-both after generation: the tick calendar's day 0, and the campaign's recipe band
-(`../economy/ERAS.md` § Three things that say "era" in code).
-
-**Epoch 0 stays a supported start (Ben, 2026-09-24).** It is the same generated world, dated so
-play opens at 0 CE, on the ancient recipe band: the Launchpad and the petroleum, propellant and
-spacecraft chains are masked from the roster. It is not the pre-flip ancient product — that world
-stopped its history at 1200 or 1660 and is no longer built by any epoch. What epoch 0 buys is the
-ancient roster over the 1960 map, which is a sandbox, not a second arc.
+Epoch 0 is the same generated world, dated so play opens at 0 CE (Ben, 2026-09-24). Since the
+band is the history's and not the calendar's, what epoch 0 buys beyond the date — the 1960 map on
+the band its history earned, or a separate band override that masks the Launchpad and the
+petroleum, propellant and spacecraft chains for an ancient sandbox — is an open call
+(§ Open questions; NEEDS_REVIEW, 2026-09-24).
 
 **SETTLED (Ben, 2026-09-17, NR-888): the span runs on Exploration's 4-year band.** One decision
 round every four years, 75 rounds from 1660 to 1960. Measured on Exploration's forces alone, that
 costs less than the 460 years before it; a 1-year band costs about four times as much and is not
 taken unless a mechanism this phase adds is shown to need the grain.
-
-**SETTLED (Ben, 2026-09-18, elicitation): the span runs wherever Exploration runs, whatever the
-epoch.** The epoch names a calendar and a recipe band; it never decides whether this span runs. So
-a world grown through Exploration is grown on to 1960, and the flip changes the calendar alone.
 
 **The span is its own call, resumed from `exploration_output`, and the resume loses nothing the
 struct carries.** Treaty clauses and tribute cross as dated objects, and trade flows rebuild from
@@ -145,14 +154,16 @@ and a market it can price against. Exploration produces all three and charters n
 **This phase inherits `EXPLORATION.md` § What this phase hands Industrialisation and nothing else.**
 That list is the contract: a struct, not a promise.
 
-**The tariff posture is derived here, from inputs that already cross.** Scarcity
-(`region::scarcity_q`), trade flows (`trade_flows`) and cultural preference (`culture_preference`)
-arrive in `exploration_output`; the derivation of `polity::protection_q` from them is owed to this
-phase (BL-976, tariff derivation hands to Industrialisation), and `derive_national_protection` →
-`seed_national_tariffs` is the enactment seam that reads whatever this phase writes. The Era −1
-sim derives no tariff scalar of its own — its one derivation, from industrialisation timing, ran
-on the retired two-span arc — so until this phase writes one a world carries no tariff, which is a
-legitimate outcome rather than a gap.
+**The tariff posture is derived here, at the span's end, from inputs that already cross (Ben,
+2026-09-24).** Scarcity (`region::scarcity_q`), trade flows (`trade_flows`) and cultural preference
+(`culture_preference`) arrive in `exploration_output` and run on through the span; in the span's
+end-of-run block each nation's `polity::protection_q` is derived from the three as they stand at
+1960 — what its people are short of, what it ships and receives, and what they prefer — so a
+polity that imports what it wants arrives protective and one that sells arrives open.
+`derive_national_protection` → `seed_national_tariffs` is the enactment seam: it reads the posture
+the span broadcasts and writes it as `import_tariff` law, and the Era −1 sim carries no other
+tariff derivation. Whether a posture bites in play is the convoy-arrival duty, which is
+`../economy/MARKETS.md` § Tariffs — the first flow that pays a nation, not this phase's.
 
 ---
 
@@ -182,7 +193,7 @@ has no business here.
 | 3 | Some conflicts are ongoing, mostly proxy wars in polities left behind or decolonised | A standing war condition on provinces | Beat 3, and the price gap it builds between great powers |
 | 4 | A culture lens: primary culture per province, a secondary as a checkered fill when close | Culture shares read onto provinces | Beat 2 moves culture into cities |
 | 5 | Wealth inequality, a tangible market cap per market, GDP per nation | Derived readings over the seeded economy | Beats 1 and 2 concentrating output |
-| 6 | Some technological progress, political systems and armies — simple stubs | Campaign tech state, a regime field, garrison strength | Tree masks, the works fork, carried force |
+| 6 | Some technological progress, political systems and armies — simple stubs | Earned techs per corporation, a regime field, garrison strength | Tree masks, the works fork, carried force |
 | 7 | Working international markets: shipping far, over sea or land, often beats the nearest market | Price gaps with visible causes, and inherited trade relationships | Specialisation, preference, depletion, tariffs, colonial ties |
 
 ### 1. A dense corporate web, and markets that stock what their people want
@@ -371,8 +382,9 @@ at 1660; this phase carries the same refusal to 1960.
 **PROPOSED: proxy war is where great-power conflict goes when war at home costs too much.** Great
 powers that read each other's visible capability do not fight each other cheaply, so the cheap
 option is backing one side of a war somewhere weak. A proxy war is a **patron link** — a great
-power paying treasury or force into a client's army — on ground whose polity was left behind (no
-furnace lit) or recently decolonised (§ Beat 3). Nothing picks the client; the price gap does.
+power paying treasury or force into a client's army — on ground whose polity was left behind
+(never crossed the Industrial rung, § Beat 1) or recently decolonised (§ Beat 3). Nothing picks
+the client; the price gap does.
 
 **SETTLED (Ben, 2026-09-17, NR-888): Beat 3 carries its own displacement force; none is
 inherited.** The arms race Exploration hands forward seals near-home war rather than displacing it.
@@ -451,7 +463,7 @@ already produces, so the campaign has a place to grow them later.
 
 | Stub | PROPOSED source | Lands in |
 |---|---|---|
-| **Technology** | The Industry tree mask; *The Renewed Line* opens the campaign tree | The campaign tree's starting unlocks, per nation |
+| **Technology** | The Industry tree mask; *The Renewed Line* opens the campaign tree | Earned techs on each corporation the nation charters, seeded from its mask (Ben, 2026-09-18) — a nation holds no tech field of its own |
 | **Political system** | The Works fork (State Arsenal / Private Works), charter reach, whether the polity was ever a subject, and whether it fought a world war | One regime field per nation, beside the three character enums in `NATION_GENERATION.md` |
 | **Armies** | Carried `army_stock` and navy, and beat 1's mechanised force | Nation garrison strength, which otherwise sizes from a treasury seeded at zero |
 
@@ -480,7 +492,8 @@ sources, each a consequence of upstream scalars:
 - **Preference** — cultural weight makes the same good dearer where it is wanted (property 1).
 - **Depletion** — ground worked for centuries hands the campaign a thinner reserve (§ Spend is
   estimated at the end).
-- **Tariffs** — a late industrialiser protects what it has (`../politics/NATIONS.md`).
+- **Tariffs** — a nation short of what it wants protects what it has; the posture is derived at the
+  span's end (§ The boundary) and enacted as law (`../politics/NATIONS.md`).
 - **Colonial ties** — a former colony's chains still close through its old metropole
   (`GENERATION_STRATEGY.md` § What crosses each handoff).
 
@@ -570,6 +583,37 @@ campaign with different corporate webs.
 **An industry point is a second currency beside the treasury, and that cost is accepted.** It
 earns its place because it is located and the treasury is not spread to cities; the alternative —
 a treasury share earmarked per city — is the same object without the name.
+
+**The span's industrial moment is the polity's crossing, and it is narrated (Ben, 2026-09-24).**
+The capacity ladder the sim runs carries each polity's materials capacity, and the year a living
+polity's materials capacity reaches the Industrial rung is its `industrial_year` — the crossing the
+span itself computes, and the one the recipe band reads at the fold (the band, at the head of this
+doc). It is noted as a dated, record-only moment at the polity's capital, and the ticker narrates
+it as the span's industrial moment; on a seed where no polity crosses, the layer is honestly empty
+rather than filled. The region furnace — a region lighting at its polity's crossing plus its own
+ground's lag — is Stage 4's design (`../lore/HISTORY.md` § Stage 4) and the record property 3's
+*left behind* reads; the polity rung is what the span computes, and the polity rung is what the
+round shows.
+
+**Works chartered: the moment a city's stock crosses a charter's price (Ben, 2026-09-24).** A firm
+is chartered at the epoch, from a centre's stockpile (§ 1); the span shows *when* the capital that
+charters it was built. After each year's accrual, when a region's accumulated industry points cross
+the next multiple of a fraction *f* of the RUNNING charter price — the world's stock so far over
+the charter divisor (§ 1), so a crossing is read against the price the close's own price grows
+into, never against a constant and never against the 1960 price applied backwards (NR-907) — a
+*works chartered* note fires for that region, capped per region per round. It fires on the same
+switches that let the span record industry points at all — the industry-point switch, from the
+span's open year, and a record being written — with no other gate than the price multiple. It
+records nothing but the moment: region, polity, focus and year. **Points are not
+debited** — the Works sink above is Beat 1's own force, and a note is not a sink. The fraction *f*
+is read on the seed spread, notes against 1960 firm count per seed, before it is pinned, starting
+at 1. At the close the firms that flash are the REAL charters — the ones each budget bought,
+richest centre first, at their anchor tiles — and each is dated by pairing a region's k-th firm
+with its k-th in-span crossing; a roster no budget chartered is never shown, because the player
+never meets it. **A firm carries its founding year and its origin region into play**, so a seat's
+origin is read from the firm, not from the record. The note's shape — a record-only crossing of a
+running price rather than a debit or a heat reading — is a delegated reading (2026-09-24,
+NEEDS_REVIEW).
 
 ### Beat 2 — Mass migration, and innovation where people gather
 
@@ -711,7 +755,7 @@ prices. Every property in Part I needs a stated rule for crossing that gap.
 | Corridor throughput and rail rung | Road tiers on tiles | The existing stamp, one rung higher |
 | Held-and-worked duration, class, throughput | `tile_component::resource_remaining` | The depletion formula (§ Spend is estimated at the end) |
 | Standing wars and patron links | A war condition on provinces | Property 3 |
-| Industry tree mask, works fork, army stock | Tech state, regime, garrisons | Property 6's stubs |
+| Industry tree mask, works fork, army stock | Earned techs per corporation, regime, garrisons | Property 6's stubs |
 | War grudges, standing force, severed flows | Per-nation Alarm at the epoch | § A world war leaves the campaign closer to its catastrophe |
 
 ### This phase sets budgets; the search spends them
@@ -723,9 +767,24 @@ to this phase. Both hold. Industrialisation produces a charter budget per centre
 market and a price field; the search picks the roster and placement that spends each budget
 viably, on its existing terms.
 
-**So the search is Industrialisation's last act, not a phase after it.** Neither is written twice, and
-the viability check the search exists for survives: a budget spent on firms that cannot pay is
-exactly what its terms score down.
+**So the search is Industrialisation's last act, not a phase after it — and it runs inside the
+round (Ben, 2026-09-24).** The Industrialisation round's own worker, once the span has closed,
+carries on into everything the campaign world still needs — the borders, the roads, the companies,
+the landscape search that spends each budget, the winner's apply and its recipe pass, and the
+twelve-tick settle that proves the field — as the phase's last act. One world function does all of
+it, in one order, whether the wizard ran the round or a cold start built the world without one, so
+an adopted world and a cold build open on one state hash. The round therefore closes on the map the
+campaign opens on, and **Begin does no world work: it seats the player and sets up the
+presentation** (`../ui/STARTUP.md` § Handoff). The seat, the clock rebase and
+the framing are the shell's, and nothing that shapes the world waits for Begin
+(`../ui/STARTUP.md` § The world cache — Begin adopts the wizard's world). A Begin pressed while the worker still runs waits on it;
+there is never a second build. The round's record is published at the 1960 close, so its playback
+starts while the same worker builds the tail behind it; landing swaps the world alone, and the
+caption names only the step under way. The settle keeps its meaning from `../economy/ERAS.md`
+§ Where the ladder starts — twelve quarterly ticks with no calendar meaning, the clock rebased at
+Begin — and the wait's caption is the only thing that names it. Neither the search nor the settle is
+written twice, and the viability check the search exists for survives: a budget spent on firms
+that cannot pay is exactly what its terms score down.
 
 ---
 
@@ -766,6 +825,8 @@ Readings taken at **1960 CE** over a **seed spread**, never per world — the di
 | **Inequality** | GDP per head spread wide across nations; output spread wide across a nation's cities |
 | **Far trade** | A material share of seeded trade relationships skip the seller's nearest market |
 | **Industry points** | Industry points unevenly distributed, with the fuel gate visible in who holds them |
+| **Industrial crossing** | At least one living polity crosses the Industrial rung by 1960 in most worlds, so the band derives `industrial`; a world that derives `ancient` is reported, never reshaped |
+| **Works notes** | Works-chartered notes per region track the 1960 firm count per seed, which is what pins *f* |
 | **Migration** | Urban share rising across the span; at least one cross-border stream in most worlds |
 | **Decolonisation** | Fewer subjects at 1960 than at 1660, not zero, and at least one lost without a war |
 | **World war** | Present in some worlds and absent in others — never all, never none |
@@ -783,13 +844,21 @@ The epoch's handoff, and nothing else:
 
 - **Nations** from the 1960 polity map, with seeded **GDP**, a **regime** stub and **garrisons**
   from carried force.
-- **The corporate web**: firms and installations the search spent from each city's charter budget.
+- **The corporate web**: firms and installations the search spent from each city's charter budget,
+  each firm carrying its founding year and origin region (§ Beat 1).
 - **The price field** and **household demand weights** per market.
-- **Tariff posture** as `import_tariff` laws.
+- **The recipe band** — derived at the 1960 fold from the history's industry state: `industrial`
+  iff a living polity's materials capacity reaches the Industrial rung, `ancient` otherwise;
+  persisted on the world and read on every load; the epoch names the calendar only.
+- **Tariff posture** — each nation's protection, derived at the span's end from its scarcity
+  signals, trade flows and cultural preference (§ The boundary) and enacted as `import_tariff` law;
+  the convoy-arrival duty that makes it bite is `../economy/MARKETS.md` § Tariffs — the first flow
+  that pays a nation.
 - **Road tiers** with the rail rung, stamped from corridors.
 - **Culture shares** per region and per centre, for the lens and for demand.
 - **Standing war conditions** on provinces, with their patrons.
-- **Campaign tech state** per nation from the Industry tree mask.
+- **Campaign tech state** per corporation — the earned techs each firm opens holding, seeded from
+  its nation's Industry mask (Ben, 2026-09-18); a nation holds no tech field of its own.
 - **Per-nation Alarm** seeded from the span's wars, grudges and severed flows.
 - **Sea lanes**, a traffic count per sea leg stamped to a tier, discounting sea-leg
   traversal cost for every consumer of it
@@ -838,9 +907,18 @@ Measured rather than argued:
   stockpiles, with the trailing net over a window long enough to judge it.
 - **What a world gets when no centre can afford a specialist** — decided when Beat 1's real
   stockpiles exist, not on a synthetic budget.
+- **The works-note fraction *f*** — the share of the running charter price a region's stock must
+  cross to note a works chartered, read on the seed spread as notes against 1960 firm count,
+  starting at 1 (§ Beat 1).
+- **How many worlds cross the Industrial rung by 1960** — measured across the library before the
+  rung's threshold is fixed; a world that derives `ancient` loses its industrial roster, and the sim
+  is never reshaped to force the band.
 
 Owed from Ben when they bite, not before:
 
+- **What `--epoch 0` means beyond the calendar** — the band is the history's, so an epoch of 0 CE
+  dates the 1960 map and nothing else unless a separate band override exists for the ancient
+  sandbox; whether one does is Ben's call (raised 2026-09-24, NEEDS_REVIEW).
 - **Whether a standing war condition ever becomes a live nation war** — that is a new widening of
   `../ai/AI_OPPONENT.md` § 11, raised when the campaign wants it.
 - **The PROPOSED readings above that the form did not ask about** — computing as electronics,

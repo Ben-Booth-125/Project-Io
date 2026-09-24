@@ -23,7 +23,7 @@ on nothing):
 | View | Answers (one question) | Content |
 |---|---|---|
 | **Story** | What happened here, in order? | Body summary line (`name | AU | WxH tiles`), then the dated biography — planetology, plate, and history-ladder events in sequence (`format_history_date`, whose unit comes from the date's own magnitude so deep-time and historical lines share one loop), each with an optional wrapped consequence line underneath; "No recorded history for this body" when the report has none. Takes the full-canvas disclosure control alone (the in-place one has nothing to expand) |
-| **Chain** | How did the generation chain arrive at this body? | The wizard's stage charts (`generation_charts.cpp`), re-rendered from the persisted `generation_report`, grouped into three rounds (**System / Life / Legacy**) via a second `nav_button` strip; one collapsing accordion per stage, only the round's first stage open by default. Every body side by side — the comparison *is* the view. No view-level disclosure control: each stage carries its own |
+| **Chain** | How did the generation chain arrive at this body? | The wizard's stage charts (`generation_charts.cpp`), re-rendered from the persisted `generation_report`, grouped into three groups (**System / Life / Spend**) via a second `nav_button` strip — the wizard walks only the first two, Legacy being the Life round's closing fold, and the Spend group is this view's alone (`../../generation/PLANETOLOGY.md` § Preferences, not parameters); one collapsing accordion per stage, only the group's first stage open by default. Every body side by side — the comparison *is* the view. No view-level disclosure control: each stage carries its own |
 | **Ages** | How did its polities rise and fall? | Transport (Play / Pause, Restart, a signed-year slider reading `400 BCE` … `0 CE`, the run playing through in a fixed ~16 s whatever the span), the replayed map over the body's actual terrain, and the multipolarity line `year | N regions | N powers`. It **replays a recorded timeline** — `body_entry::prehistory_timelapse`, written by generation at its own sim call site — rather than re-running the era. There is no sim on this surface and no cache to invalidate. A body with an empty record says "never settled", which is every body but the cradle. No disclosure control: the map sizes itself to its column |
 | **Tectonics** | Which plates made this ground, and where do they meet? | The plate field over the body, reached from the canvas as well as the tab — a plate press under the Continent lens routes here (`CONTINENTS.md` § the Continent lens). |
 
@@ -137,3 +137,12 @@ parameterised. Replaying deletes the second caller, which closes all six at once
 Measured after: **4 battles, 1 conquest, 1184 foundings** over 1334 changes — the era the world
 actually has. And the multi-minute cost is gone with the sim: a capture pass that opens Ages six
 times now runs within ~8 s of one that never opens it at all.
+
+**The migration record is saved with the report (Ben, 2026-09-24).**
+`generation_report::body_entry::migration_timelapse` is built on every full run from the same
+`build_migration_timelapse` fold the wizard's Culture round plays, and saved in the app envelope
+beside the report — so a replay of that span reads it from the save exactly as this view reads
+`prehistory_timelapse`: no sim on the surface, no cache to invalidate. The Ages view's extension
+from the empire span to all four — migration, Empires, Exploration, Industrialisation — is design,
+stated as such: one transport over a span selector, replaying the records the wizard's rounds were
+watched in, never re-running an age.

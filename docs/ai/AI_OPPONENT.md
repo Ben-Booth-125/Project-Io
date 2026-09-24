@@ -1638,7 +1638,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   by PURCHASE (Ben, 2026-09-09) is recorded here as a new sim verb rather than read into the
   existing ones** — same actor, same grain, same constraints, raised because a verb that creates a
   relationship (a province bought, its customs kept) is the shape the prohibition says to raise;
-  `docs/research/COLONIAL_ERA.md` § Two ways to claim ground across water owns it. What it does **not** admit:
+  `docs/generation/EXPLORATION.md` § Two ways to claim ground across water owns it. What it does **not** admit:
 
 
   anything whose timing, latency or ordering can vary the generated world (`docs/lore/HISTORY.md`

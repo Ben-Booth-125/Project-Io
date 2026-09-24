@@ -37,14 +37,24 @@ that say "era" in code, which already establishes those as separate axes. Nothin
 
 ### Where the ladder starts
 
-**The working start is the 1960s** (Ben, 2026-08-31). `world_params::epoch_year` defaults to 1960 and
-`era_band_for_epoch` puts the recipe registry on the industrial band. The epoch is a calendar and a
-band, never a history: generation reads no epoch, and the world it builds is the one the
-Industrialisation span closes on at 1960 whatever start is asked for
-(`../generation/INDUSTRIALISATION.md`). The 0 CE start (Ben, 2026-09-24) remains supported: the
-same world, dated 0 CE, on the ancient band. `docs/development/ROADMAP.md` § The two arcs owns
-which is the commercial product, and this document owns only the Era structure, which is the same
-on both.
+**The working start is the 1960s** (Ben, 2026-08-31). `world_params::epoch_year` defaults to 1960.
+The epoch names the calendar only — never a history, and never the band (Ben, 2026-09-24,
+superseding the reading under which the epoch picked the band): generation reads no epoch, and the
+world it builds is the one the Industrialisation span closes on at 1960 whatever start is asked for
+(`../generation/INDUSTRIALISATION.md`).
+
+**The recipe band comes from the history's industry state.** The world is `industrial` iff any
+living polity's materials capacity reaches the industrial rung at the 1960 fold —
+`roster_band_for_capacity`, the same derivation that dates a polity's `industrial_year`
+(`docs/lore/HISTORY.md` § Stage 4) — and `ancient` otherwise. The verdict is persisted on the world
+(`world::campaign_band`) and applied to the registry on a new game and on a loaded save alike, so a
+save never opens on a band its world did not earn. A seed on which no polity crosses derives
+`ancient` and loses the industrial roster; that is the world the history made, and the sim is never
+reshaped to force the other answer (delegated reading, 2026-09-24, NEEDS_REVIEW). The 0 CE start
+(Ben, 2026-09-24) remains supported: the same world, dated 0 CE. Whether that start also names a
+band — the calendar only, or an override that buys the ancient roster as a sandbox — is Ben's call
+(NEEDS_REVIEW). `docs/development/ROADMAP.md` § The two arcs owns which is the commercial product,
+and this document owns only the Era structure, which is the same on both.
 
 **The prehistory is a generator, not a play layer.** Generation runs a pre-epoch history sim that
 produces the world the campaign opens on, at either epoch. It runs three spans on one engine, each
@@ -67,8 +77,10 @@ load-bearing half of this paragraph and it does not depend on which pass does th
 opening position owes the calendar nothing.
 
 **The validation run is twelve quarterly econ ticks** (`app::validation_ticks`), run on the winner
-in time-boxed batches across loading-screen frames, under spectate with nobody seated, with the
-persona counsel and battle dispatches suppressed. The balances, pools, filed returns and prices those ticks leave
+inside the Industrialisation round's worker as generation's last act — the round hands Begin a
+world already proved, and a cold Begin with no wizard makes the same call in the same order (Ben,
+2026-09-24) — under spectate with nobody seated, with the persona counsel and battle dispatches
+suppressed. The balances, pools, filed returns and prices those ticks leave
 *are* the opening position; the seat card shows the returns they file. Twelve is **measured,
 not round**, and the instrument is `haulage_measure --per-tick` (the only harness that sees
 trade): pooled over five seeds, the per-tick convoy dispatch count climbs from zero — tick 1
@@ -109,9 +121,14 @@ history; the search itself is BL-770 (Era 0 candidate search).
 
 - **`era_band`** (`src/world/recipe_registry.hpp`) tags each authored building type and recipe
   `any` / `ancient` / `industrial`, and the registry masks its browsable roster on the band the
-  campaign's `epoch_year` derives (below 1700 → ancient). The band is applied after generation and
-  never read by it, so choosing it moves no generated world. It answers *which product is this* — a
-  world-wide fact fixed at generation (BL-433, era band). It is **not** the Era of this document.
+  world carries (`world::campaign_band`): `industrial` iff any living polity's materials capacity
+  reaches the industrial rung at the 1960 fold, `ancient` otherwise (§ Where the ladder starts;
+  Ben, 2026-09-24). The band is read off the finished history and never by it, so the band moves
+  no generated world and no epoch moves the band. It answers *which product is this* — a
+  world-wide fact fixed at generation (BL-433, era band) and saved with the world, so a loaded
+  save opens on the band its history earned. Per-nation grain is not a second band: it reaches
+  play as campaign tech state, the Industry tree mask seeding each corporation's `earned_techs`
+  (`../generation/INDUSTRIALISATION.md`). It is **not** the Era of this document.
 - **`condition_subject::era`** (`src/world/condition_set.cpp`) is the predicate subject the laws
   and techs layers evaluate. It measures **1 for a corp that owns a launchpad and 0 otherwise** —
   a per-corp proxy for "has industrialised into space", chosen so that authored conditions keep

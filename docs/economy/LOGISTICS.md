@@ -264,8 +264,11 @@ nothing — the network's failure state remains insolvency, not decay.
 (`../generation/EXPLORATION.md` § The colonial tie is a sea lane, and the map reads it) records every sea leg it walked — a purchase party's crossing, a
 campaign's sea supply, the standing traffic between a metropole and what it holds — and a pass
 after it stamps those legs onto the water as a **sea lane** tier that discounts the sea-leg
-traversal cost in § 1. Traffic earns the tier, as it earns a Road on land; a crossing made once is
-no lane. **Purely additive and purely water**: land tiles are untouched, and the § 4a rule that a
+traversal cost in § 1. Traffic earns the tier: a leg earns the lane at `sea_lane_tier1_uses`, four
+uses by default, mirroring `road_tier1_uses` — the count at which the history's own ladder promotes
+a land corridor to its first rung, Track (`src/world/history_sim.hpp`), and the count the stamp onto
+the campaign map reads as a Road (`kAncientRoadUses`, § 4a) — so a crossing made once is no lane.
+**Purely additive and purely water**: land tiles are untouched, and the § 4a rule that a
 corridor crossing open ocean is not stamped as road is unchanged — the crossing becomes a lane
 instead.
 
@@ -278,8 +281,8 @@ That second effect is wider than a market preference and it is intended: a tie o
 see would be invisible to the corporate search, which reads reach cost (BL-812, phase 6 sees roads).
 
 **A lane outlives the polity that made it**, as a road outlives the empire that paved it. Whether
-a lane *decays* when its traffic stops is open in `COLONIAL_ERA.md` § Open questions; roads do not
-(§ 4a), but the sea is not a roadbed.
+a lane *decays* when its traffic stops is open in `../generation/EXPLORATION.md` § Open questions;
+roads do not (§ 4a), but the sea is not a roadbed.
 
 ### 5. Physical scale and travel time (Ben, 2026-08-12)
 
