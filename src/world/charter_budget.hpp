@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 // charter_budget — BL-1032. A per-centre charter budget, and what spending it did.
 //
-// THE DESIGN IS DIGITISATION.md § 1 (the budget charters the whole web; one
+// THE DESIGN IS INDUSTRIALISATION.md § 1 (the budget charters the whole web; one
 // specialist per centre that affords one, richest first; nation balance
 // dropped; a charter stays near its centre; no budget and an empty budget are
 // today's world) and CORPORATION_GENERATION.md Pass 1 / Pass 6. This file is
@@ -83,7 +83,7 @@ private:
 /// The two LEGACY rules are BL-1033's measurement switch, kept selectable so
 /// every reading taken on them reproduces: `fixed` is the old `resource_cap =
 /// true` (cap kept), `lifted` the old `resource_cap = false` (cap lifted).
-/// `sqrt_capital` is the ruled rule (DIGITISATION.md § 1, Ben 2026-09-18: "the
+/// `sqrt_capital` is the ruled rule (INDUSTRIALISATION.md § 1, Ben 2026-09-18: "the
 /// cap scales by a SQUARE ROOT of the body's charter capital, under a named
 /// DENSITY CEILING"); see `charter_sqrt_per_good_cap` for the formula and what
 /// B, B_ref and G are.
@@ -143,7 +143,7 @@ inline const char* charter_cap_rule_name(charter_cap_rule r)
 /// centres hold less than one firm's price, so almost every point is remainder
 /// (BL-1044 Step 2: a median 79% of every stock).
 ///
-/// `none` (THE DEFAULT, and the shipped rule: DIGITISATION.md § 1, "what cannot
+/// `none` (THE DEFAULT, and the shipped rule: INDUSTRIALISATION.md § 1, "what cannot
 /// be spent stays unspent") books it `remainder` at its own centre. The others
 /// are a MEASUREMENT for Ben's call on NR-913 (2026-09-22: "measure pooling
 /// first"): every nation-resolved centre's remainder moves to the RICHEST centre
@@ -182,7 +182,7 @@ struct charter_pool_transfer
     std::int64_t points = 0;
 };
 
-/// How a budget is spent. THE PRICES HAVE NO SHIPPED DEFAULT (DIGITISATION.md
+/// How a budget is spent. THE PRICES HAVE NO SHIPPED DEFAULT (INDUSTRIALISATION.md
 /// § 1: "the price of a specialist and of a firm are measured against live-play
 /// cost before either is fixed"). They default to 0, and a NON-EMPTY budget with
 /// a price <= 0 is REFUSED (`charter_spend_refusal`). A REFUSAL MUTATES NOTHING
@@ -208,7 +208,7 @@ struct charter_pool_transfer
 /// with the processing/trade premium, CORPORATION_GENERATION.md Pass 4 as
 /// written. There is no capital parameter here.
 ///
-/// A SPECIALIST'S PRICE IS A WHOLE NUMBER OF FIRM CHARTERS (DIGITISATION.md § 1:
+/// A SPECIALIST'S PRICE IS A WHOLE NUMBER OF FIRM CHARTERS (INDUSTRIALISATION.md § 1:
 /// "a specialist's price — a fixed number of firm charters"), so it is not a free
 /// number: it is `firm_price_points x specialist_firm_charters`.
 struct charter_spend_params
@@ -247,7 +247,7 @@ struct charter_spend_params
     /// The ANTI-RUNAWAY guard: background firms a body may carry, counted as
     /// `body_cap`. Must be > 0 on a non-empty budget.
     std::int32_t max_firms_per_body = 0;
-    /// THE DENSITY CEILING (DIGITISATION.md § 1): background firms a body may
+    /// THE DENSITY CEILING (INDUSTRIALISATION.md § 1): background firms a body may
     /// carry under `sqrt_capital`, counted as `density_ceiling` — BELOW the
     /// guard, so the guard goes back to catching runaways only. Under
     /// `sqrt_capital` it must satisfy 0 < ceiling < `max_firms_per_body`; under
@@ -283,7 +283,7 @@ inline std::int64_t charter_isqrt(std::int64_t x)
     return lo;
 }
 
-/// THE SQUARE-ROOT RULE (BL-1039; DIGITISATION.md § 1, Ben 2026-09-18):
+/// THE SQUARE-ROOT RULE (BL-1039; INDUSTRIALISATION.md § 1, Ben 2026-09-18):
 ///
 ///     per-good cap = max(c, floor(c x sqrt(B / B_ref)))
 ///     B_ref        = c x |G| x firm_price_points

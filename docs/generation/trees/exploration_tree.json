@@ -61,7 +61,7 @@
       "requires": [ "EX-GD-3a", "EX-HL-3a" ],
       "requires_fork": [ "EX-WY-3a", "EX-WY-3b" ],
       "effects": [ { "kind": "open", "target": "industry tree" } ],
-      "pursued_when": { "term": "spire", "situation": "A realm that knows what a good is worth to whom, can reach it, and can carry it. The rim: the Industry tree opens when digitisation does." },
+      "pursued_when": { "term": "spire", "situation": "A realm that knows what a good is worth to whom, can reach it, and can carry it. The rim: the Industry tree opens when Industrialisation does." },
       "earth_ref": "capital, accounted and mobile — the threshold of an industrial economy" },
 
     { "id": "EX-HL-1a", "name": "Decked Coaster", "kind": "major", "ring": 1, "branch": "HL",

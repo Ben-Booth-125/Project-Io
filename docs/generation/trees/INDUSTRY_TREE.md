@@ -15,12 +15,17 @@
 > ../../economy/RESEARCH.md, ../CORPORATION_GENERATION.md.
 
 The Industry tree is the last of the four trees `TREES.md` defines, and it runs inside
-**digitisation, 1660 → 1960** (`../DIGITISATION.md`) — not the whole economy pass. The pass split
+**Industrialisation, 1660 → 1960** (`../INDUSTRIALISATION.md`) — not the whole economy pass. The pass split
 in two on 2026-09-11 and the exploration half took its own tree (`EXPLORATION_TREE.md`), so
 this tree follows Exploration's, never Empire's, and opens at its root to **every living polity at
 1660** (`TREES.md` § Milestones, and how a tree unlocks the next). It is
 **invested**: the Era −1 sim's polities are the actors, and the Invest verb takes one node a
 round, chosen by the scorer.
+
+**Three things share the root word, and this doc means only the first.** The *Industry tree* is
+this tree. *Industrialisation* is the phase it runs in, a span of time. A region *industrialising*
+is its furnace crossing, a dated event per region (`../../lore/HISTORY.md` § Stage 4) that a node
+here can bring forward but never is.
 
 **This tree is three rings, not four (Ben, 2026-09-11, BL-938).** What was ring 1 — the pit, the
 toolroom, the fuel trade, the ocean hull, the joint-stock venture, the press — was the exploration
@@ -359,7 +364,7 @@ assignment.
 
 **A charter-budget world does not read these terms.** PROPOSED (listed to Ben 2026-09-18, not
 overturned): where a centre's budget charters the web, a specialist stands wherever its centre can
-afford one (`../DIGITISATION.md` § 1). Read as written, the bottom row would deny a specialist to
+afford one (`../INDUSTRIALISATION.md` § 1). Read as written, the bottom row would deny a specialist to
 every nation that never took a Works side, and how many those are is unmeasured.
 
 **Demography.** Labour Doctrine × Farm Mechanisation × Soil Chemistry set a nation's growth rate,

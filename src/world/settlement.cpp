@@ -1307,6 +1307,8 @@ settlement_state run_settlement(const planetology_state& pl,
     }
 
     // --- Stage 4: WHO CAN light the furnaces, and how long their ground takes --
+    // (A region's furnace crossing, dated per region. It is not the
+    // Industrialisation phase, the 1660 -> 1960 span that generation runs.)
     // "Coal-near-cities made Britain — endowment, not virtue" (HISTORY.md Stage
     // 4). The gate is the ground; the creed only moves the date, and only where
     // the creed itself came from the same ground (a forge god is raised over

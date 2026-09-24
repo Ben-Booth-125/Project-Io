@@ -67,20 +67,20 @@ Corporation count per campaign is a tunable parameter: `corporation_params::corp
 **8** specialists on the homeworld (including the player's). Background firms (Pass 6) are not
 counted by it.
 
-**AMENDED FORWARD (Ben, 2026-09-17): on a Digitisation world the specialists are chartered too.**
+**AMENDED FORWARD (Ben, 2026-09-17): on a Industrialisation world the specialists are chartered too.**
 Where the span has run, each population centre's charter budget pays for specialists as well as
 background firms, so the specialist roster is spent from the budgets rather than set by a count
-(`DIGITISATION.md` § 1). The shortlist the seat is chosen from follows where capital accumulated.
+(`INDUSTRIALISATION.md` § 1). The shortlist the seat is chosen from follows where capital accumulated.
 On that path a specialist's home nation is its centre's nation, one specialist per centre rich enough
 to afford one, and **the balancing factor above does not apply** (Ben, 2026-09-17): a nation whose
 cities built capital holds the seats it bought. A specialist's price is anchored to the seat menu
 (Ben, 2026-09-18): the median library world offers about as many seats as a world with no budget.
 It costs two firm charters, each priced as a share of the world's stockpile (NR-907, NR-910;
-`DIGITISATION.md` § 1), and a world rich in near-equal cities offers more seats than the median —
+`INDUSTRIALISATION.md` § 1), and a world rich in near-equal cities offers more seats than the median —
 the spread is the world's, not capped. **A world whose budget opens no specialist is built as the
 world with no budget** (Ben, 2026-09-21, NR-910), so the player is seated from a specialist. The one
 exception — a world whose affording centres all find no ground for their specialist — is reported
-and counted, not patched (Ben, 2026-09-22, NR-911; `DIGITISATION.md` § 1).
+and counted, not patched (Ben, 2026-09-22, NR-911; `INDUSTRIALISATION.md` § 1).
 
 ### Pass 2 — Industrial focus assignment
 
@@ -307,7 +307,7 @@ access.
 
 **A charter-budget world keeps this draw (Ben, 2026-09-18).** A specialist chartered from a
 centre's budget opens on the same seeded capital as any other; capital drawn from its centre's
-unspent points was measured and reversed the same day (`DIGITISATION.md` § 1).
+unspent points was measured and reversed the same day (`INDUSTRIALISATION.md` § 1).
 
 **Pre-game operating history.** Corporations do not open cold. At campaign start the economy
 is run forward a fixed number of **pre-game ticks** — phase 6's single validation run of the
@@ -377,20 +377,20 @@ a world that consumes twice as much of the same goods gets the same firms. That 
 and it is now the intended one — but it means the demand basket's breadth is a **density knob**,
 and anything editing that basket is editing the size of the background economy.
 
-**AMENDED FORWARD (Ben, 2026-09-18, NR-889): on a Digitisation world the cap scales with capital.**
+**AMENDED FORWARD (Ben, 2026-09-18, NR-889): on a Industrialisation world the cap scales with capital.**
 Where a charter budget places the web, the per-resource cap above is no longer fixed at 8: it
 scales with the body's charter capital, so a richer body stands more firms per good
-(`DIGITISATION.md` § 1). It scales by a square root, under a named density ceiling below the
+(`INDUSTRIALISATION.md` § 1). It scales by a square root, under a named density ceiling below the
 200-per-body guard, which fills goods in turn so it trims every good evenly (Ben, 2026-09-18).
 The budget path's caps are its own, not restatements of this pass's constants. Worlds without a
 budget keep the cap exactly as ruled on 2026-09-06.
 
-**AMENDED FORWARD (Ben, 2026-09-15): density follows the city on a Digitisation world.** The opening
+**AMENDED FORWARD (Ben, 2026-09-15): density follows the city on a Industrialisation world.** The opening
 map wants *many companies around population centres*, which breadth cannot place. Where the
-Digitisation span has run, each population centre arrives with a **charter budget** — its unspent
+Industrialisation span has run, each population centre arrives with a **charter budget** — its unspent
 industry points — and the landscape search spends it on firms around that centre, specialists and
 background firms alike (Ben, 2026-09-17)
-(`DIGITISATION.md` § This phase sets budgets; the search spends them). Breadth still decides which
+(`INDUSTRIALISATION.md` § This phase sets budgets; the search spends them). Breadth still decides which
 goods a firm can serve; the budget decides how many firms stand where. How a budget converts to a
 firm count is owed and is measured against tick cost before it is tuned.
 

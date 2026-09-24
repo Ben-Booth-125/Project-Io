@@ -2628,7 +2628,7 @@ constexpr uint32_t k_charter_salt_player       = 0x2E97A3F1u;
 //
 // The per-province cap is the one number still held here. It is the budget
 // path's own constant, NOT a copy that tracks Pass 6's. RULED at 2 on a budget
-// world (Ben, 2026-09-21, NR-910; DIGITISATION.md § 1), read on real budgets:
+// world (Ben, 2026-09-21, NR-910; INDUSTRIALISATION.md § 1), read on real budgets:
 // BL-1043 stage 2 found it binding on 7 of 16 library worlds at 650:4, up to
 // 24.6% of one world's budget, and the ruling keeps it there.
 constexpr int k_charter_per_province_firm_cap = 2;
@@ -2678,7 +2678,7 @@ struct charter_centre
     int          character_region_idx = -1;
     /// ANCHORING (rung 2's window): `nearest_region` ONLY when that region is
     /// the centre nation's own, else -1 and rung 2 is empty. Never the
-    /// reconciled region: a charter stays near its centre (DIGITISATION.md § 1),
+    /// reconciled region: a charter stays near its centre (INDUSTRIALISATION.md § 1),
     /// and the nation's nearest region can be anywhere in the nation.
     int          anchor_region_idx    = -1;
 
@@ -3381,7 +3381,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             cc.gw = (b != w.bodies.end()) ? b->second.grid_width : 0;
 
             // HOME NATION = the owner of the centre's own tile. Nothing else:
-            // no weighting, no balancing across nations (DIGITISATION.md § 1).
+            // no weighting, no balancing across nations (INDUSTRIALISATION.md § 1).
             const auto own = w.tile_to_nation.find(cc.tile);
             if (own != w.tile_to_nation.end() && w.nations.count(own->second) != 0)
             {
@@ -3544,7 +3544,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         chartered.push_back(corp_id);
     };
 
-    // --- ONE WALK (DIGITISATION.md § 1) ---------------------------------------
+    // --- ONE WALK (INDUSTRIALISATION.md § 1) ---------------------------------------
     // Each centre in spend order "charters exactly one specialist; what remains
     // buys background firms around it" — its specialist, then its firms, then
     // the next centre. So a richer centre's firms stand before a poorer centre's
@@ -3792,7 +3792,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // with none the firm is an extraction firm, exactly the legacy test.
             //
             // A GOOD THAT CANNOT BE PLACED IS SKIPPED, NOT FATAL (Ben, 2026-09-19,
-            // NR-903; DIGITISATION.md § 1): when this centre's windows hold no
+            // NR-903; INDUSTRIALISATION.md § 1): when this centre's windows hold no
             // ground for its firm, the good is passed over for THE REST OF THIS
             // CENTRE and the turn moves on to the next, in this same firm. The
             // ground a firm needs is set by its FOCUS, not its good: an extraction

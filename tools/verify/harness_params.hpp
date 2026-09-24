@@ -30,7 +30,7 @@ inline world_params no_prehistory(world_params p = {})
 // ---------------------------------------------------------------------------
 // The two arcs (BL-1044)
 // ---------------------------------------------------------------------------
-// BL-1044 turned the Digitisation span and BL-1037's corridor tier ON by
+// BL-1044 turned the Industrialisation span and BL-1037's corridor tier ON by
 // default, so `world_params{}` is the SHIPPED world: the 1960 close, and the
 // charter web the world's own stockpile buys. The world before it — span off,
 // tier off — is the LEGACY arc: the world BL-1031's digest pins were taken on,
@@ -55,7 +55,7 @@ inline world_params arc_params(world_arc a, world_params p = {})
 {
     if (a == world_arc::legacy)
     {
-        p.digitisation_span_enabled  = false;
+        p.industrialisation_span_enabled  = false;
         p.resume_seeds_corridor_tier = false;
     }
     return p;
@@ -135,7 +135,7 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 /// builds the world's own stockpile budget (`build_stockpile_budget`, charged at
 /// `stockpile_charter_spend`) and passes it to BOTH the search and the winner's
 /// apply, and `apply_shipped_landscape` does exactly that when this is null.
-/// The Digitisation span runs by default (BL-1044), so that budget is the
+/// The Industrialisation span runs by default (BL-1044), so that budget is the
 /// world's own; on a world the span did not run on (the legacy arc) it is EMPTY,
 /// and an empty budget is the pre-budget world byte for byte. A non-null budget
 /// (even an empty one) is an instrument's own, and REPLACES the stockpile.
@@ -749,7 +749,7 @@ inline void run_app_live_window(world& w, const recipe_registry& reg, int first_
 // SYNTHETIC TEST INPUT — a charter budget for the BL-1032 seam (tools/verify only)
 // ---------------------------------------------------------------------------
 // NOT A BUDGET SOURCE, AND NOTHING SHIPPED MAY READ IT. The budget has one source
-// by design — a centre's unspent industry-point stockpile at 1960 (DIGITISATION.md
+// by design — a centre's unspent industry-point stockpile at 1960 (INDUSTRIALISATION.md
 // § 1), built by `build_stockpile_budget` (BL-1042) — and "no stand-in derived
 // from urban population fills it" (Ben, 2026-09-17). This builder exists only so the seam can be shown to DO something
 // (BL-1032 R4): its weights are SEEDED DRAWS, never population, so a reading taken

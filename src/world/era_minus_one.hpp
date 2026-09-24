@@ -143,25 +143,25 @@ history_sim_params exploration_sim_params(const world_params& params);
 uint32_t exploration_sim_seed(const world_params& params);
 
 // ---------------------------------------------------------------------------
-// BL-1040 — the Digitisation span's own derivations, on the same footing as
+// BL-1040 — the Industrialisation span's own derivations, on the same footing as
 // Exploration's: this file derives the SPAN and the SEED; the resume pointers
 // (every table of the closing `exploration_output`) are per-call state the
 // caller sets immediately before `run_history_sim`.
 //
-// THERE IS NO `digitisation_span_enabled(params)` PREDICATE HERE, AND THAT IS
+// THERE IS NO `industrialisation_span_enabled(params)` PREDICATE HERE, AND THAT IS
 // THE POINT. The span runs if and only if Exploration ran (Ben, 2026-09-18),
 // so the call site nests it inside the block that ran Exploration and gates it
-// on `world_params::digitisation_span_enabled` alone. A params-only predicate
+// on `world_params::industrialisation_span_enabled` alone. A params-only predicate
 // would be a second reading of Exploration's own gate -- one more place for
 // the two to drift, and one more place an epoch test could creep back in.
 // ---------------------------------------------------------------------------
 
-/// The `history_sim_params` the Digitisation span runs on. STARTS FROM
+/// The `history_sim_params` the Industrialisation span runs on. STARTS FROM
 /// `exploration_sim_params` (struct defaults plus Exploration's overrides),
 /// NEVER the Empires derivation -- copying the wrong base silently changes the
 /// verb set (supply upgrades, universal creeds, army upkeep). Then only:
 ///   - the span: `start_year = params.exploration_stop_year` (1660, wherever
-///     Exploration closed), `stop_year = params.digitisation_stop_year`
+///     Exploration closed), `stop_year = params.industrialisation_stop_year`
 ///     (1960), one band at Exploration's 4-year cadence (NR-888): 75 rounds;
 ///   - the Industry tree ON from the span's own open (BL-1038, TREES.md sec
 ///     Milestones), and on in this span only.
@@ -170,12 +170,12 @@ uint32_t exploration_sim_seed(const world_params& params);
 /// 1200 stays far however late a span opens (Ben, 2026-09-18). BL-1037's
 /// `resume_seeds_corridor_tier` is Exploration's, from `world_params` (on by
 /// default since BL-1044).
-history_sim_params digitisation_sim_params(const world_params& params);
+history_sim_params industrialisation_sim_params(const world_params& params);
 
-/// The seed generation hands the Digitisation span: its own constant, own
+/// The seed generation hands the Industrialisation span: its own constant, own
 /// additive fold, so polity temperaments re-roll at 1660 as they did at 1200
-/// (DIGITISATION.md, PROPOSED 2026-09-18, not overturned).
-uint32_t digitisation_sim_seed(const world_params& params);
+/// (INDUSTRIALISATION.md, PROPOSED 2026-09-18, not overturned).
+uint32_t industrialisation_sim_seed(const world_params& params);
 
 /// EXACTLY what generation handed `run_history_sim`, captured at its own call
 /// site — the arguments, and the three counts the run produced.
@@ -338,7 +338,7 @@ struct era_minus_one_fixture
 
     // --- BL-956: the Exploration handoff, and what world setup consumed ----
 
-    /// The Exploration -> Digitisation handoff value exactly as generation
+    /// The Exploration -> Industrialisation handoff value exactly as generation
     /// folded it (`make_exploration_output`), default-constructed when
     /// `exploration_ran` is false.
     exploration_output exploration_handoff;
@@ -347,8 +347,8 @@ struct era_minus_one_fixture
     /// and the corridor set it actually handed `stamp_history_roads`,
     /// captured at those two consumption sites (populated whenever a fixture
     /// was asked for, whichever span supplied them). A harness binds these
-    /// against the LAST close that ran -- `digitisation_handoff` when the
-    /// Digitisation span ran (BL-1053), else `exploration_handoff` -- to prove
+    /// against the LAST close that ran -- `industrialisation_handoff` when the
+    /// Industrialisation span ran (BL-1053), else `exploration_handoff` -- to prove
     /// that close's values were the ones read, rather than an earlier span's.
     std::vector<grudge>           setup_grudges;
     std::vector<history_corridor> setup_corridors;
@@ -363,19 +363,19 @@ struct era_minus_one_fixture
     std::vector<int64_t>          setup_polity_treasuries;
     std::vector<history_corridor> setup_junction_corridors;
 
-    // --- BL-1040: the Digitisation span's own capture ---------------------
+    // --- BL-1040: the Industrialisation span's own capture ---------------------
     //
     // Same discipline as the Exploration capture above. Populated only when
     // generation actually ran the span -- `world_params::
-    // digitisation_span_enabled` set, Exploration run, and no stop knob that
-    // ends generation before it; `digitisation_ran` says which, and every
+    // industrialisation_span_enabled` set, Exploration run, and no stop knob that
+    // ends generation before it; `industrialisation_ran` says which, and every
     // field below is the struct default otherwise. The span's INPUT is
     // `exploration_handoff` above, the value the span resumed from, PLUS the
     // span-open survey (BL-1051), which is why the region table it opened on
     // is captured below rather than re-derived.
 
-    /// True when generation actually ran the Digitisation span this call.
-    bool digitisation_ran = false;
+    /// True when generation actually ran the Industrialisation span this call.
+    bool industrialisation_ran = false;
 
     /// BL-1051 — the region table the span actually OPENED ON: the 1660
     /// handoff's regions with `survey_regions_at_span_open` applied, captured
@@ -384,36 +384,36 @@ struct era_minus_one_fixture
     /// and the shares they are taken from (`survey_fuel_raw`,
     /// `survey_forest_raw`: BL-1059) and in nothing else, and a harness resuming the span must open on it
     /// (the survey reads tiles, which a fixture does not carry).
-    std::vector<region> digitisation_open_regions;
+    std::vector<region> industrialisation_open_regions;
 
     /// The span/clock the span ran on. Resume pointers NULL, as above: a
     /// re-run points them at `exploration_handoff`'s tables, and its regions
-    /// at `digitisation_open_regions` (BL-1051, BL-1053).
-    history_sim_params digitisation_params;
-    uint32_t           digitisation_seed = 0;
+    /// at `industrialisation_open_regions` (BL-1051, BL-1053).
+    history_sim_params industrialisation_params;
+    uint32_t           industrialisation_seed = 0;
 
     /// The 1960 close exactly as generation folded it
-    /// (`make_digitisation_output`), default-constructed when the span did
+    /// (`make_industrialisation_output`), default-constructed when the span did
     /// not run.
-    digitisation_output digitisation_handoff;
+    industrialisation_output industrialisation_handoff;
 
     /// The span's own full sim output, as generation's untraced call produced
     /// it -- its counters (battles, subjections formed and freed) count THIS
     /// span only, because a resumed run starts them at zero.
-    history_sim_state digitisation_state;
+    history_sim_state industrialisation_state;
 
     /// Decision rounds the span ran (`history_sim_profile::decision_rounds`,
     /// read straight after the call): 75 at the defaults, 1660 -> 1956.
-    int64_t digitisation_rounds = 0;
+    int64_t industrialisation_rounds = 0;
 
     /// Wall clock of the span's `run_history_sim` call alone, in
     /// milliseconds. REPORTED, NEVER ASSERTED, and never folded into a digest
     /// or a branch -- the same rule the BL-754 timings above obey, for the
     /// same reason. Say which build type produced a figure when quoting it.
-    int64_t ms_digitisation = 0;
+    int64_t ms_industrialisation = 0;
 
     /// BL-1041: the span's industry-point scale accrual alone
     /// (`history_sim_profile::ns_industry_points`), in nanoseconds, summed
-    /// over its rounds. Same footing as `ms_digitisation`: reported only.
-    int64_t ns_digitisation_industry_points = 0;
+    /// over its rounds. Same footing as `ms_industrialisation`: reported only.
+    int64_t ns_industrialisation_industry_points = 0;
 };

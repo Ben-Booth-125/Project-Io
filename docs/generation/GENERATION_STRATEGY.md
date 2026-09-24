@@ -31,9 +31,9 @@ The subject docs:
   driven by the pre-national history ladder.
 - **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
   market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the
-  ancient arc's epoch (Ben, 2026-08-12, NR-177). The default flips to 1960 once the Digitisation
+  ancient arc's epoch (Ben, 2026-08-12, NR-177). The default flips to 1960 once the Industrialisation
   span runs by default, and the superseded 1560 → 1960 arc is retired, so `epoch_year` names a
-  calendar and never chooses a history (Ben, 2026-09-18; `DIGITISATION.md`)** — § Pass 2 is the economy
+  calendar and never chooses a history (Ben, 2026-09-18; `INDUSTRIALISATION.md`)** — § Pass 2 is the economy
   pass owns the calendar, and the clock rebases at the handoff (`../economy/ERAS.md`) — and
   generation runs a stepped pre-campaign history whose span § Pass 2 is the economy pass states
   (3,600 years, 2400 BCE → 1200 CE, divided at 400 BCE — Ben, 2026-09-09), followed by the
@@ -342,7 +342,7 @@ They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds 4 and 5):
 | Round | Phase | The moving object |
 |---|---|---|
 | **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of 400 BCE → 1200 CE** (Ben, 2026-09-09) — the empire half of pass 1's 3,600 years; the migration half (2400 BCE → 400 BCE) is round 3's. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
-| **5** | **6 — The economic substrate** | A time-lapse of 1660 → 1960 showing **industrialisation**, **mass migration** and **decolonisation**, closing on **firm markers and their charters** and the **market carve with its price field** (Ben, 2026-09-15; `DIGITISATION.md` § Part II). |
+| **5** | **6 — The economic substrate** | A time-lapse of 1660 → 1960 showing **cities industrialising**, **mass migration** and **decolonisation**, closing on **firm markers and their charters** and the **market carve with its price field** (Ben, 2026-09-15; `INDUSTRIALISATION.md` § Part II). |
 
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
 any `world_preference`, and targets no outcome — the tune-the-forces-never-the-outcome rule of
@@ -352,10 +352,10 @@ premise carries over unchanged: **you set conditions, you do not steer.**
 **Round 5 shows the selected landscape, not the search.** Phase 6 scores candidates statically in
 milliseconds and the ranking is not a spectacle; what the player watches is the winner being drawn.
 
-**The search is Digitisation's last act, spending its budgets (Ben, 2026-09-15).** Digitisation
+**The search is Industrialisation's last act, spending its budgets (Ben, 2026-09-15).** Industrialisation
 decides how much corporate capital each city holds and where; phase 6 decides which roster and
 placement spends each city's charter budget viably, on the five terms below. Neither decides the
-other's question (`DIGITISATION.md` § This phase sets budgets; the search spends them).
+other's question (`INDUSTRIALISATION.md` § This phase sets budgets; the search spends them).
 
 **And the wait becomes the round.** The planetology rounds preview by re-running a cheap pure
 chain per control move; the history sim cannot be previewed that way at any budget. So rounds 4
@@ -619,7 +619,7 @@ decision and you set the quiet precedent this project files items to avoid):
 3. **The candidate search varies rosters, placements and road tiers — not worlds.** So generation
    runs once and only the economic sim repeats, which is the whole reason the budget closes.
    PROPOSED (listed to Ben 2026-09-17, not overturned): where a charter budget sets the roster
-   (`DIGITISATION.md` § 1), the roster axis has nothing to choose and is skipped rather than scored;
+   (`INDUSTRIALISATION.md` § 1), the roster axis has nothing to choose and is skipped rather than scored;
    the axis count and the order of every other draw are unchanged.
 4. **The search optimises for viable-but-uneven, not maximum profit.** Maximising profit would
    flatten exactly the spread this document asks generation to produce.
@@ -818,11 +818,11 @@ the epoch and the sim stops where it stops today.
 
 ### Pass 2 is the economy pass, and it is TWO phases (Ben, 2026-09-11)
 
-**SUPERSEDED AND REPLACED (Ben, 2026-09-11): pass 2 SPLITS into Exploration and Digitisation,
-and the 1200 → 1560 coast is gone.** Exploration and digitisation are different subjects with
+**SUPERSEDED AND REPLACED (Ben, 2026-09-11): pass 2 SPLITS into Exploration and Industrialisation,
+and the 1200 → 1560 coast is gone.** Exploration and Industrialisation are different subjects with
 different terminating conditions, so they are two phases rather than one 400-year economy span.
 `CIVILISATION.md` § The closure of the Empire era owns the arithmetic; **`EXPLORATION.md` and
-`DIGITISATION.md` own the two phases themselves**; the rest of this section predates the split and
+`INDUSTRIALISATION.md` own the two phases themselves**; the rest of this section predates the split and
 is read against that table.
 
 | Phase | from | to | years |
@@ -830,7 +830,7 @@ is read against that table.
 | **Culture** — the migration | 2400 BCE | 400 BCE | 2,000 |
 | **Empires** | 400 BCE | 1200 CE | 1,600 |
 | **Exploration** | 1200 CE | 1660 CE | 460 |
-| **Digitisation** | 1660 CE | 1960 CE | 300 |
+| **Industrialisation** | 1660 CE | 1960 CE | 300 |
 
 **1960 and 1200 are both unmoved**, so pass 1, the epoch and the industrial-band campaign are
 untouched. What changed is that the span between them is now SIMULATED rather than coasted, and
@@ -942,7 +942,7 @@ the passes; the roster half of that reasoning moved to `../research/COLLAPSE_ROS
 `COLLAPSE.md` was retired on 2026-09-16.
 
 Merged late (2026-09-16): this paragraph was measured on 2026-09-09 against a design with ONE pass
-after the dark age. Two ran in its place — Exploration and Digitisation — so read "pass 2" as "a
+after the dark age. Two ran in its place — Exploration and Industrialisation — so read "pass 2" as "a
 span on the polity engine", and take the 0.9 s / 66 s figures as the engine's rate at that region
 count, not as a budget for either round.
 

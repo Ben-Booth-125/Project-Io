@@ -100,7 +100,7 @@ int scale_for_share(int64_t share_heads)
 /// BL-1042 (stockpile to budget) adds the SLOT: the key it sorted on and its
 /// rank inside its region. The carve already knew both and threw them away; the
 /// charter budget needs them, because a region's industry points reach its
-/// campaign centres by those slots (DIGITISATION.md Part III) and nothing after
+/// campaign centres by those slots (INDUSTRIALISATION.md Part III) and nothing after
 /// the carve can recover which centre was which region's k-th.
 struct carved_centre
 {

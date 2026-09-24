@@ -4,7 +4,7 @@
 // stockpile_budget — BL-1042 (stockpile to budget). A region's industry points
 // become its campaign centres' charter budgets.
 //
-// THE DESIGN IS DIGITISATION.md Part III (the downscale): "a region's points
+// THE DESIGN IS INDUSTRIALISATION.md Part III (the downscale): "a region's points
 // reach its campaign centres by the carve's slots, and a carved centre dropped
 // when its body is built out takes its share unspent", with § Beat 1 (the stock
 // sits on each region that holds centres; the treasury's share was already
@@ -34,7 +34,7 @@
 // whole stockpile over `k_stockpile_price_divisor`, derived here once and carried
 // on the budget, so the spend charges every world the same SHARE of itself.
 //
-// WITH THE DIGITISATION SPAN OFF (the legacy arc; it runs by default since
+// WITH THE INDUSTRIALISATION SPAN OFF (the legacy arc; it runs by default since
 // BL-1044) no region holds a point, the budget is EMPTY, and an empty budget is
 // the pre-budget world byte for byte (`apply_landscape_candidate`'s legacy
 // branch runs first).
@@ -124,7 +124,7 @@ struct stockpile_budget
     std::int64_t points_to_centres = 0; ///< == budget.total()
 
     /// BL-1064 — THE FIRM PRICE, DERIVED (Ben, 2026-09-21, NR-907;
-    /// DIGITISATION.md § 1): the world's WHOLE stockpile (`points_total`, every
+    /// INDUSTRIALISATION.md § 1): the world's WHOLE stockpile (`points_total`, every
     /// region's points, the ones no centre took included) divided by
     /// `price_divisor`, in whole points, and never below 1 — fixed here, once,
     /// when the budget is built. So the seat menu is about the same size on every
@@ -169,9 +169,9 @@ inline constexpr std::int64_t stockpile_region_keys_max = 1LL << 32;
 
 /// The divisor a world's whole stockpile is split by into the price of ONE firm
 /// charter (Ben, 2026-09-21, NR-907: "a charter's price is the world's whole
-/// industry stockpile divided by a constant"; DIGITISATION.md § 1).
+/// industry stockpile divided by a constant"; INDUSTRIALISATION.md § 1).
 ///
-/// TWO KNOBS, TWO JOBS (Ben, 2026-09-21, NR-908; DIGITISATION.md § 1).
+/// TWO KNOBS, TWO JOBS (Ben, 2026-09-21, NR-908; INDUSTRIALISATION.md § 1).
 /// A centre affords a specialist when its points cover
 /// `k_stockpile_specialist_firm_charters` / this of the world's stock, so the
 /// SEAT MENU turns on the ratio of the two alone, and the specialist's price in
@@ -225,11 +225,11 @@ stockpile_budget build_stockpile_budget(const std::vector<region>*            re
 //
 // THE SHIPPED SPEND'S NAMED CONSTANTS, SET HERE AND NOT IN charter_budget.hpp
 // (whose prices have no shipped default by design). Every one is RULED
-// (DIGITISATION.md § 1): the specialist's price anchored to the seat menu and the
+// (INDUSTRIALISATION.md § 1): the specialist's price anchored to the seat menu and the
 // square root's base (Ben, 2026-09-21, NR-910), the density ceiling (NR-902).
 // The FIRM price is not a constant at all: it is derived from the world's own
 // stockpile by `k_stockpile_price_divisor` (above, NR-907). They are read only
-// when the budget is non-empty — a world the Digitisation span ran on; with the
+// when the budget is non-empty — a world the Industrialisation span ran on; with the
 // span off no price is read.
 
 /// Firm charters one specialist costs: TWO (Ben, 2026-09-21, NR-910). A
@@ -248,7 +248,7 @@ inline constexpr std::int32_t k_stockpile_per_resource_firm_cap = 8;
 /// The anti-runaway guard per body (Pass 6's 200).
 inline constexpr std::int32_t k_stockpile_max_firms_per_body = 200;
 /// The density ceiling under the ruled square-root rule: 120 background firms
-/// per body. RULED (Ben, 2026-09-19, NR-902; DIGITISATION.md § 1): on the cost
+/// per body. RULED (Ben, 2026-09-19, NR-902; INDUSTRIALISATION.md § 1): on the cost
 /// table's square-root rows the ceiling is what binds — at four times the
 /// reference budget it trims every good evenly to 12 firms — while 160 never
 /// bound (each good's own cap of 15 filled first) and cost a 12-31% dearer
@@ -275,7 +275,7 @@ struct seed_candidate_spend
 };
 
 /// NR-909 (Ben, 2026-09-21): --verify, --serve and the headless run never
-/// search, and once the Digitisation span runs by default their worlds carry a
+/// search, and once the Industrialisation span runs by default their worlds carry a
 /// stockpile budget. Where the budget is NON-EMPTY this spends it as the
 /// harness's unsearched apply does (`apply_shipped_landscape` with search =
 /// false): the search's SEED CANDIDATE — placement seed `world_seed ^

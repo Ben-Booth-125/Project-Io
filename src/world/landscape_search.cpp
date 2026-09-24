@@ -288,7 +288,7 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
 
     assign_default_recipes(w, reg);
 
-    // THE BUDGET CHARTERS THE WHOLE WEB (DIGITISATION.md § 1, Ben 2026-09-17):
+    // THE BUDGET CHARTERS THE WHOLE WEB (INDUSTRIALISATION.md § 1, Ben 2026-09-17):
     // world-gen's specialist roster goes, and every specialist and background
     // firm the candidate carries is bought from a centre's budget. So there is
     // no `regenerate_specialists = false` reading here — the roster is not the

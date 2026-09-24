@@ -39,7 +39,7 @@ that one requirement, and any of a name, a culture or an economy would be a new 
 field.
 
 **A province READS a culture; it still does not own one (Ben, 2026-09-15).** The culture lens
-shows a primary culture per province (`DIGITISATION.md` § 4. A culture lens at province grain). The
+shows a primary culture per province (`INDUSTRIALISATION.md` § 4. A culture lens at province grain). The
 restraint above survives by the idiom the owner already uses: a province's culture is **derived**
 from the shares beneath it — its region's rural share blended with the shares of any population
 centre inside it, weighted by population — and held nowhere on the province itself.

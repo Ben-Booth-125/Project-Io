@@ -1,7 +1,7 @@
 {
  "_schema": "generation/seed-library-v1",
  "_note": [
-  "Sixteen curated generation seeds, chosen off a 48-seed parity sweep on 2026-09-16 for the Digitisation phase; four replaced off a re-sweep on main 2026-09-17 (NR-887).",
+  "Sixteen curated generation seeds, chosen off a 48-seed parity sweep on 2026-09-16 for the Industrialisation phase; four replaced off a re-sweep on main 2026-09-17 (NR-887).",
   "",
   "A SEED IS THE SAVE. Generation is a pure function of the world descriptor, so a seed reproduces its world exactly on a given binary; there is no separate snapshot format and none is needed. What a seed cannot carry is why it was chosen, which is what this store holds.",
   "",
@@ -62,7 +62,7 @@
     "sparse",
     "stress"
    ],
-   "why": "The floor case: 22 polities, eleven trade flows and 320 volume — the fewest flows and the lowest volume in the pool — no post roads and a modest 66k median chest. Digitisation has to produce something legible from almost nothing here.",
+   "why": "The floor case: 22 polities, eleven trade flows and 320 volume — the fewest flows and the lowest volume in the pool — no post roads and a modest 66k median chest. Industrialisation has to produce something legible from almost nothing here.",
    "readings": {
     "empire_battles": 3418,
     "expl_battles": 181,
@@ -161,7 +161,7 @@
     "treasury",
     "roads"
    ],
-   "why": "Wealthy and uninterested: displacement 0.88 (135 neighbour wars against 119 frontier battles), a 1.64M median chest, 26 post roads — the second most in the pool — and 36 flows. Money and infrastructure without an outward turn — the case where Digitisation must not assume exploration set the table.",
+   "why": "Wealthy and uninterested: displacement 0.88 (135 neighbour wars against 119 frontier battles), a 1.64M median chest, 26 post roads — the second most in the pool — and 36 flows. Money and infrastructure without an outward turn — the case where Industrialisation must not assume exploration set the table.",
    "readings": {
     "empire_battles": 5820,
     "expl_battles": 254,
@@ -421,7 +421,7 @@
     "trade",
     "violent"
    ],
-   "why": "18,776 Empire battles, 75 polities, 75 flows and 9,030 volume: large, violent and commercial at once. The stress case for whatever Digitisation runs per polity per round.",
+   "why": "18,776 Empire battles, 75 polities, 75 flows and 9,030 volume: large, violent and commercial at once. The stress case for whatever Industrialisation runs per polity per round.",
    "readings": {
     "empire_battles": 18776,
     "expl_battles": 629,

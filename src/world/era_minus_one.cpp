@@ -386,8 +386,8 @@ history_sim_params exploration_sim_params(const world_params& params)
     // BL-1036 — THE 1200 ANCHORS, EXPLICIT. Consolidation and the near-home
     // cutoff were read off `start_year`; this span opens at
     // `empires_stop_year`, so setting both to it is byte-identical to the
-    // reads they replace. A later span (Digitisation, from 1660) copies these
-    // params and keeps both at 1200 (DIGITISATION.md, the span paragraphs).
+    // reads they replace. A later span (Industrialisation, from 1660) copies these
+    // params and keeps both at 1200 (INDUSTRIALISATION.md, the span paragraphs).
     hp.consolidation_year    = params.empires_stop_year;
     hp.near_home_cutoff_year = params.empires_stop_year;
 
@@ -410,7 +410,7 @@ history_sim_params exploration_sim_params(const world_params& params)
     hp.settle_requires_razed_ground         = true;
 
     // BL-1037 — a resumed corridor reopens at the rung it was bought to. This
-    // span resumes the Empires round's record at 1200, and the Digitisation
+    // span resumes the Empires round's record at 1200, and the Industrialisation
     // span, built on these params, resumes this one's at 1660; both take it
     // from `world_params` (on by default, BL-1044) so the legacy arc can
     // switch it off.
@@ -427,10 +427,10 @@ uint32_t exploration_sim_seed(const world_params& params)
 }
 
 // ---------------------------------------------------------------------------
-// BL-1040 — the Digitisation span
+// BL-1040 — the Industrialisation span
 // ---------------------------------------------------------------------------
 
-history_sim_params digitisation_sim_params(const world_params& params)
+history_sim_params industrialisation_sim_params(const world_params& params)
 {
     // THE BASE IS EXPLORATION'S, and the one line below is the whole of that
     // decision: struct defaults plus Exploration's overrides (the upkeep step,
@@ -442,14 +442,14 @@ history_sim_params digitisation_sim_params(const world_params& params)
     // Exploration's own 4-year band (Ben, 2026-09-17, NR-888): at the defaults
     // 1660 -> 1960, 75 decision rounds (1660, 1664, ... 1956).
     hp.start_year      = params.exploration_stop_year;
-    hp.stop_year       = params.digitisation_stop_year;
+    hp.stop_year       = params.industrialisation_stop_year;
     hp.tick_bands[0]   = {hp.stop_year, 4};
     hp.tick_band_count = 1;
 
     // THE 1200 ANCHORS ARE NOT TOUCHED. `exploration_sim_params` set both to
     // `empires_stop_year`, and they stay there: the sweep of seat stores into
     // the capital happens once, and a pair met after 1200 stays far however
-    // late a span opens (DIGITISATION.md, PROPOSED 2026-09-18, not
+    // late a span opens (INDUSTRIALISATION.md, PROPOSED 2026-09-18, not
     // overturned). Re-anchoring them at 1660 would consolidate a second time
     // and call every pair met during Exploration near home.
 
@@ -461,7 +461,7 @@ history_sim_params digitisation_sim_params(const world_params& params)
     hp.industry_tree_enabled = true;
     hp.industry_open_year    = hp.start_year;
 
-    // BL-1041 — INDUSTRY POINTS, IN THIS SPAN ONLY (DIGITISATION.md sec Beat
+    // BL-1041 — INDUSTRY POINTS, IN THIS SPAN ONLY (INDUSTRIALISATION.md sec Beat
     // 1). They open with the Industry tree, at the span's own open year, and
     // accrue on every region with centres plus a share of each capital's
     // surplus; the constants are the struct's (history_sim.hpp says why each).
@@ -479,7 +479,7 @@ history_sim_params digitisation_sim_params(const world_params& params)
     return hp;
 }
 
-uint32_t digitisation_sim_seed(const world_params& params)
+uint32_t industrialisation_sim_seed(const world_params& params)
 {
     // Own constant, own additive fold, on the shape of the two seeds above --
     // neither the Empires round's (`0x415C1E17u`) nor Exploration's

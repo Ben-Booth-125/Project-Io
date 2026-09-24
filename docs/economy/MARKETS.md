@@ -339,7 +339,7 @@ What changes is the volume: household demand for a good is weighted by the popul
 preference of the cultures in the market's catchment. Trade therefore arises from **both**
 asymmetries — supply, because deposits are regional, and demand, because peoples are. The
 preference is derived in the history (`docs/generation/EXPLORATION.md` § A good acquires a cultural
-preference) and seeded at the epoch (`docs/generation/DIGITISATION.md` § 1. A dense corporate web,
+preference) and seeded at the epoch (`docs/generation/INDUSTRIALISATION.md` § 1. A dense corporate web,
 and markets that stock what their people want).
 
 **6. Two channels are settled by the power and construction design** (Ben, 2026-08-31), and both
@@ -771,7 +771,7 @@ market cap stands; nothing here gives a corporation equity, a share count or a s
 toward the market whose catchment holds its headquarters, once.
 
 **It is derived, never stored**, and it is seeded at the epoch only in the sense that the firms it
-sums are (`docs/generation/DIGITISATION.md` § 5. Wealth inequality, market cap and GDP).
+sums are (`docs/generation/INDUSTRIALISATION.md` § 5. Wealth inequality, market cap and GDP).
 
 ## Procurement is not the order book
 

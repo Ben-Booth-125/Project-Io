@@ -726,10 +726,10 @@ in `tools/verify/README.md`.
   would meet. C3a found its own map to be a wrapped-Chebyshev TIE, so the proximity half of the
   route claim was asserting nothing while reading green.
 
-- **`digitisation_sim_harness`** — the thirteen readings `DIGITISATION.md` § What the phase is
+- **`industrialisation_sim_harness`** — the thirteen readings `INDUSTRIALISATION.md` § What the phase is
   judged on names (BL-982), over the curated seeds read from `docs/generation/seed_library.json`,
   as a SPREAD and never a per-world verdict. **Lua builder** (`bash tools/verify/build_lua_harness.sh
-  digitisation_sim_harness`); run from the repo root; `--limit N` or `--seeds a,b,c` for a short
+  industrialisation_sim_harness`); run from the repo root; `--limit N` or `--seeds a,b,c` for a short
   run. Each world is generated at shipped parity (world_gen/works/recipes/economy, era band from the
   epoch, `apply_shipped_landscape`); the 12-tick validation run is not mirrored and the face says so.
   **Report only.** Every reading prints MEASURED, PARTIAL or n/a — an n/a names the missing
@@ -981,7 +981,7 @@ in `tools/verify/README.md`.
   `g++ -std=c++20 -O0 -g -fsanitize=address,undefined -Isrc tools/verify/nation_scorer_harness.cpp ...`.
 
 - **`stockpile_budget_check`** — Does a region's industry stock reach its campaign centres the way
-  DIGITISATION.md Part III says? (BL-1042, stockpile to budget; named here with Ben's permission,
+  INDUSTRIALISATION.md Part III says? (BL-1042, stockpile to budget; named here with Ben's permission,
   2026-09-19.) `build_stockpile_budget` splits each region's points over its carved centres by slot
   key, largest remainder, ties to the lower rank, and books every point it cannot place under a
   reason (`carve_dropped`, `razed`, the residual `no_carved_centre`, `rejected`).

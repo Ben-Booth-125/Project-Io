@@ -7,7 +7,7 @@
 > **Not here:** the grammar every tree obeys — kinds, rings, the five rules, diffusion, the
 > scorer's shape, the JSON schema (TREES) · the phase this tree runs in, its treasury, its
 > treaties and its subjects (../EXPLORATION) · the phase before it (../CIVILISATION,
-> EMPIRE_TREE) · the phase after it (../DIGITISATION, INDUSTRY_TREE).
+> EMPIRE_TREE) · the phase after it (../INDUSTRIALISATION, INDUSTRY_TREE).
 > **Confused with:** EMPIRE_TREE.md, INDUSTRY_TREE.md, ../../economy/RESEARCH.md.
 
 The Exploration tree is the third of the four trees `TREES.md` defines, and it runs inside the
@@ -149,7 +149,7 @@ sails.
 
 Naming a good, counting it, and wanting it. This branch produces the **scarcity signal**
 (`../EXPLORATION.md` § There is no price here) and the durable **cultural preference** — the two
-things Digitisation is waiting for.
+things Industrialisation is waiting for.
 
 | id | node | kind | ring | links | gate | diffusion | effect | pursued when |
 |---|---|---|---|---|---|---|---|---|
@@ -209,13 +209,13 @@ to say to a continental power, and the tree's two-strategy claim would be decora
 ## What the tree hands the Industry tree
 
 - **Entry timing.** A polity holding *The Long Reckoning* at 1660 starts the Industry tree at its
-  root when digitisation opens; one that does not starts once it holds the rim. This is the second
+  root when Industrialisation opens; one that does not starts once it holds the rim. This is the second
   of the two inputs to the 1960 spread, the first being Empire's rim.
 - **The charter.** *The Chartered Company* held is the institutional precondition for a firm — the
   Industry tree's Works Doctrine and General Incorporation decide what may be chartered, and this
   decides whether anything can be.
 - **The network.** Which fork of Ways a realm took, and whether *Post Roads* ever fired, is the
-  road ladder digitisation inherits.
+  road ladder Industrialisation inherits.
 - **The signal.** *Quayside Market* and *Standing Preference* held are what make a realm's scarcity
   signals and its peoples' preferences legible at 1660 — the inputs a price field resolves against.
 - **The water.** The Hulls fork decides whether the realm arrives at 1660 with ocean reach or with

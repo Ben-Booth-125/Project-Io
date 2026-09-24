@@ -326,10 +326,10 @@ void app::launch_wizard_history_run(int lapse_index)
     // `begin_new_game` builds a whole world from its own config, and a world
     // stopped at any of these points has no nations, roads or corporations in it.
     //
-    // BL-1040: `stop_after_exploration` also keeps the Digitisation span out
+    // BL-1040: `stop_after_exploration` also keeps the Industrialisation span out
     // of round 5's run (generation gates the span on it), so this round plays
-    // Exploration's record alone whatever `digitisation_span_enabled` says.
-    // The Digitisation round's own stop, `stop_after_digitisation`, exists for
+    // Exploration's record alone whatever `industrialisation_span_enabled` says.
+    // The Industrialisation round's own stop, `stop_after_industrialisation`, exists for
     // the day that round plays a record; it is a placeholder today
     // (`draw_pass_round_placeholder`) and launches no generation.
     world_gen_config hist_cfg = cfg;
@@ -734,7 +734,7 @@ namespace {
 /// helpers are free functions. draw_generation_screen static_asserts the pair against
 /// the real constants, so a drift here is a compile error, not a wrong layout.
 constexpr int planetology_rounds = 2;  // System, Life (BL-863)
-constexpr int pass_rounds        = 4;  // Culture, Empires, Exploration, Digitisation (BL-946)
+constexpr int pass_rounds        = 4;  // Culture, Empires, Exploration, Industrialisation (BL-946)
 constexpr int lapse_rounds       = 3;  // Culture, Empires, Exploration all replay a real record
 
 /// Empires' historical-turbulence caption, shared between the layout-height
@@ -816,10 +816,9 @@ wizard_round_head wizard_round_head_at(int r)
           // CE, where conflict moves off the home coast and a treasury, a
           // fleet and a treaty become real.
           "Who reaches beyond this ground, and what do they bring back?" },
-        { "Digitisation",
-          // Renamed from "Industrialisation" (BL-946); still the honest empty
-          // placeholder BL-914 built -- Digitisation's own content is out of
-          // this item's scope.
+        { "Industrialisation",
+          // Still the honest empty placeholder BL-914 built -- the phase's own
+          // content is out of this item's scope (BL-1068 plays the span).
           "What does that ground produce, and who trades it?" },
     };
     int i = r - planetology_rounds;
@@ -832,7 +831,7 @@ wizard_round_head wizard_round_head_at(int r)
 /// a placeholder in as many words: an unlabelled empty pane reads as a finished
 /// surface, and the next session believes it.
 ///
-/// Only the Digitisation round reaches this now — Culture, Empires and
+/// Only the Industrialisation round reaches this now — Culture, Empires and
 /// Exploration all play a real record (BL-946) — so it no longer branches on
 /// which pass round asked.
 void draw_pass_round_placeholder()
@@ -847,7 +846,7 @@ void draw_pass_round_placeholder()
 
     ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
     ImGui::TextWrapped(
-        "Digitisation will run the economy pass: 1660 to 1960, then the substrate carve - "
+        "Industrialisation will run the economy pass: 1660 to 1960, then the substrate carve - "
         "metros, colonial reach, firms and their charters, and the market carve. "
         "Nothing runs yet; the globe beside this is still the planetology globe.");
     ImGui::Spacing();

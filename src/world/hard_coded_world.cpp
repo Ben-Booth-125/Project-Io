@@ -346,10 +346,10 @@ int generation_stage_count(const world_gen_config& cfg)
     // Seven stages every run reports: bump 0, 1, 2 and 4-7.
     if (cfg.stop_after_migration) return 7;       // returns after bump 7
     // The history (bump 8) is ONE stage whichever of its spans run: the
-    // ancient era, then the exploration age and the Digitisation span, each
+    // ancient era, then the exploration age and the Industrialisation span, each
     // re-captioned (labels 13, 14) with its own years on the inner bar. So
     // whether Exploration or the span runs never moves this count.
-    if (cfg.stop_after_ancient_era || cfg.stop_after_exploration || cfg.stop_after_digitisation)
+    if (cfg.stop_after_ancient_era || cfg.stop_after_exploration || cfg.stop_after_industrialisation)
         return 8;
     return 12;                                     // + bump 9-12: borders to finishing
 }
@@ -774,7 +774,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     /// BL-975: indexed by POLITY id, the treasury each polity held at the LAST
     /// span's close — `region::treasury` summed over the regions flying its
     /// flag (`polity_treasuries_at_close`): Exploration's 1660 close, or the
-    /// Digitisation span's 1960 one when that span ran (BL-1053). Empty when
+    /// Industrialisation span's 1960 one when that span ran (BL-1053). Empty when
     /// neither ran, so a world without them credits nothing and every nation
     /// starts on the floor. The corridor and grudge records above follow the
     /// same rule: each is the last close's, replaced span by span.
@@ -1201,7 +1201,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
             // closes, and `kepler_corridors` / `kepler_grudges` above are
             // REPLACED by that value's 1660 grudges and surviving network
             // (filtered over THIS span's dead) — EXPLORATION.md § What this
-            // phase hands digitisation: "A campaign that opens on the 1660
+            // phase hands Industrialisation: "A campaign that opens on the 1660
             // political map must not open on 1200's resentments and 1200's
             // roads." When the span does not run, the Empires values stand.
             if (exploration_sim_enabled(params) && !kepler_pass_one.polities.empty()
@@ -1344,8 +1344,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 }
 
                 // --------------------------------------------------------
-                // BL-1040 — THE DIGITISATION SPAN, exploration_stop_year ->
-                // digitisation_stop_year (1660 -> 1960), as its OWN call to
+                // BL-1040 — THE INDUSTRIALISATION SPAN, exploration_stop_year ->
+                // industrialisation_stop_year (1660 -> 1960), as its OWN call to
                 // the same engine, resumed from `kepler_exploration` above.
                 //
                 // THE RUN PREDICATE IS THIS BLOCK'S NESTING. It sits inside
@@ -1372,14 +1372,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // had been handed to the sim. Refused here instead, loudly, and
                 // world setup reads the 1660 close as if the switch were off.
                 const bool span_years_ordered =
-                    params.digitisation_stop_year > params.exploration_stop_year;
-                if (params.digitisation_span_enabled && !span_years_ordered)
+                    params.industrialisation_stop_year > params.exploration_stop_year;
+                if (params.industrialisation_span_enabled && !span_years_ordered)
                     std::fprintf(stderr,
-                                 "make_hard_coded_world: Digitisation span refused -- digitisation_stop_year "
+                                 "make_hard_coded_world: Industrialisation span refused -- industrialisation_stop_year "
                                  "%lld is not after exploration_stop_year %lld\n",
-                                 static_cast<long long>(params.digitisation_stop_year),
+                                 static_cast<long long>(params.industrialisation_stop_year),
                                  static_cast<long long>(params.exploration_stop_year));
-                if (params.digitisation_span_enabled && span_years_ordered
+                if (params.industrialisation_span_enabled && span_years_ordered
                     && !gen_cfg.stop_after_exploration)
                 {
                     // PARAMS FROM EXPLORATION'S DERIVATION, never the Empires
@@ -1390,7 +1390,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     // civilisation and creed records so the numbering
                     // continues. Trade flows rebuild from the treaties in the
                     // span's first round (the resume pointer's comment).
-                    history_sim_params dp = digitisation_sim_params(params);
+                    history_sim_params dp = industrialisation_sim_params(params);
                     dp.resume_polities         = &kepler_exploration.polities;
                     dp.resume_grudges          = &kepler_exploration.grudges;
                     dp.resume_contacts         = &kepler_exploration.contacts;
@@ -1398,7 +1398,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     dp.resume_dated_objects    = &kepler_exploration.dated_objects;
                     dp.resume_civilisations    = &kepler_exploration.civilisations;
                     dp.resume_universal_creeds = &kepler_exploration.universal_creeds;
-                    const uint32_t dseed = digitisation_sim_seed(params);
+                    const uint32_t dseed = industrialisation_sim_seed(params);
 
                     // THE SPAN OPENS ON THE STRUCT. The region table the
                     // resume reads is the handoff's own (equal to the live one
@@ -1430,11 +1430,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     survey_regions_at_span_open(w, kepler_tiles, home_grid_width, home_grid_height,
                                                 kepler_settlement.regions);
                     if (fixture != nullptr)
-                        fixture->digitisation_open_regions = kepler_settlement.regions;
+                        fixture->industrialisation_open_regions = kepler_settlement.regions;
 
                     if (progress != nullptr)
                     {
-                        progress->label.store(14, std::memory_order_relaxed); // the digitisation span
+                        progress->label.store(14, std::memory_order_relaxed); // the Industrialisation span
                         progress->sub_progress.store(0, std::memory_order_relaxed);
                         progress->sub_total.store(
                             static_cast<int>(dp.stop_year - dp.start_year),
@@ -1442,7 +1442,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     }
 
                     const gen_clock::time_point t_span_begin = gen_clock::now(); // reported only
-                    const history_sim_state kepler_digitisation_hs = run_history_sim(
+                    const history_sim_state kepler_industrialisation_hs = run_history_sim(
                         kepler_settlement, &kepler_creeds, terr.view(),
                         home_grid_width, home_grid_height, dp, dseed,
                         progress != nullptr ? &progress->sub_progress : nullptr,
@@ -1455,22 +1455,22 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
                     // The span's wars join the world log, as Exploration's do.
                     kepler_settlement.history.insert(kepler_settlement.history.end(),
-                                                     kepler_digitisation_hs.history.begin(),
-                                                     kepler_digitisation_hs.history.end());
+                                                     kepler_industrialisation_hs.history.begin(),
+                                                     kepler_industrialisation_hs.history.end());
 
                     // THE 1960 CLOSE, folded while the run and the now-final
                     // settlement are both live, and validated on the shipped
                     // path against the live creeds AND against the 1660 value
                     // it resumed from (BL-969's discipline, one span later) --
                     // and against the stop year it was asked to reach (BL-1053).
-                    const digitisation_output kepler_digitisation = make_digitisation_output(
-                        kepler_settlement, kepler_digitisation_hs, &kepler_creeds);
+                    const industrialisation_output kepler_industrialisation = make_industrialisation_output(
+                        kepler_settlement, kepler_industrialisation_hs, &kepler_creeds);
                     {
                         std::string why;
-                        if (!digitisation_output_valid(kepler_digitisation, &why, &kepler_creeds,
+                        if (!industrialisation_output_valid(kepler_industrialisation, &why, &kepler_creeds,
                                                        &kepler_exploration,
-                                                       params.digitisation_stop_year))
-                            record_handoff_violation("digitisation_output", why);
+                                                       params.industrialisation_stop_year))
+                            record_handoff_violation("industrialisation_output", why);
                     }
 
                     // BL-1053 -- WORLD SETUP READS THE 1960 CLOSE, NOT THE 1660
@@ -1494,31 +1494,31 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     //   - TREASURIES: summed under the flag over the ground at
                     //     1960, so a polity founded after 1660 is credited its
                     //     chest and one conquered after 1660 is credited none.
-                    kepler_corridors         = kepler_digitisation.surviving_corridors;
-                    kepler_grudges           = kepler_digitisation.grudges;
+                    kepler_corridors         = kepler_industrialisation.surviving_corridors;
+                    kepler_grudges           = kepler_industrialisation.grudges;
                     kepler_grudge_cap        = static_cast<int32_t>(dp.grudge_cap);
-                    kepler_polity_treasuries = polity_treasuries_at_close(kepler_digitisation.regions);
+                    kepler_polity_treasuries = polity_treasuries_at_close(kepler_industrialisation.regions);
 
                     // No report fields: `generation_report` is on the save seam
                     // (a field there is a `save_game_version` bump), and the
-                    // wizard's Digitisation round, the one reader a span
+                    // wizard's Industrialisation round, the one reader a span
                     // time-lapse would have, does not play a record yet.
                     if (fixture != nullptr)
                     {
-                        fixture->digitisation_ran     = true;
+                        fixture->industrialisation_ran     = true;
                         // BL-1053: no pointer into `kepler_exploration`, which
                         // dies with the Exploration block.
-                        fixture->digitisation_params  = without_resume_pointers(dp);
-                        fixture->digitisation_seed    = dseed;
-                        fixture->digitisation_handoff = kepler_digitisation;
-                        fixture->digitisation_state   = kepler_digitisation_hs;
+                        fixture->industrialisation_params  = without_resume_pointers(dp);
+                        fixture->industrialisation_seed    = dseed;
+                        fixture->industrialisation_handoff = kepler_industrialisation;
+                        fixture->industrialisation_state   = kepler_industrialisation_hs;
                         // The profile is a process-wide accumulator the NEXT
                         // run resets; nothing between the call and this line
                         // runs the sim, and it is read only for a harness.
-                        fixture->digitisation_rounds  = history_sim_last_profile().decision_rounds;
-                        fixture->ms_digitisation      = span_ms;
+                        fixture->industrialisation_rounds  = history_sim_last_profile().decision_rounds;
+                        fixture->ms_industrialisation      = span_ms;
                         // BL-1041: the points' own accrual cost, same footing.
-                        fixture->ns_digitisation_industry_points =
+                        fixture->ns_industrialisation_industry_points =
                             history_sim_last_profile().ns_industry_points;
                     }
                 }
@@ -1629,7 +1629,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // BL-975 — THE HISTORY'S CHESTS CROSS WITH ITS MAP. Indexed by the
         // same polity ids `seed_polities` just read, so Pass 2d can land each
         // polity's treasury on the seed it folds to -- the chest at the same
-        // close as the map (1660, or 1960 when the Digitisation span ran:
+        // close as the map (1660, or 1960 when the Industrialisation span ran:
         // BL-1053), so a polity's ids and its chest are never two dates.
         // Empty when the Exploration span did not run (opted out, or the
         // wizard's Empires-round launch), which credits nothing. The fixture
@@ -1701,7 +1701,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // BL-946: the wizard's new Exploration round's own stop point, one round
     // later than the Empires round's above -- same contract, same reason.
-    // (It stopped the Digitisation span too, at the span's own gate: the span
+    // (It stopped the Industrialisation span too, at the span's own gate: the span
     // runs ahead of this line, so this return alone could not.)
     if (gen_cfg.stop_after_exploration)
     {
@@ -1711,10 +1711,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
         return w;
     }
 
-    // BL-1040: one span later -- the Digitisation span has run (when it was
+    // BL-1040: one span later -- the Industrialisation span has run (when it was
     // enabled and Exploration ran), and nothing of world setup has. Same
     // contract as the two stops above.
-    if (gen_cfg.stop_after_digitisation)
+    if (gen_cfg.stop_after_industrialisation)
     {
         if (report)
             for (generation_report::body_entry& be : report->bodies)
@@ -1757,7 +1757,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // depend on a container's layout.
     //
     // BL-956/BL-1053: the table read here is the LAST span's close -- the
-    // Digitisation span's 1960 one when it ran, else Exploration's 1660 one
+    // Industrialisation span's 1960 one when it ran, else Exploration's 1660 one
     // when that ran (see the spans' blocks above); the fixture records exactly
     // what this site was handed.
     if (fixture != nullptr) fixture->setup_grudges = kepler_grudges;
@@ -1820,8 +1820,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // A world whose polities never industrialised enacts NOTHING here, and that
     // is a legitimate outcome rather than a gap — see `polity::protection_q`.
     // THIS IS THE ENACTMENT SEAM, NOT THE DERIVATION (BL-976): the Era -1 sim
-    // writes `protection_q` only on the two-span arc, and Digitisation owns the
-    // derivation on the shipped arc (DIGITISATION.md § The boundary). The call
+    // writes `protection_q` only on the two-span arc, and Industrialisation owns the
+    // derivation on the shipped arc (INDUSTRIALISATION.md § The boundary). The call
     // stays so that whatever writes the field is read by one path.
     seed_national_tariffs(w, kepler_nations,
                           derive_national_protection(
@@ -1966,7 +1966,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // No-op when the era did not run — `kepler_corridors` is empty, and every
     // harness declaring `no_prehistory()` takes exactly that path. BL-956/
     // BL-1053: the set is the last span's surviving network -- the
-    // Digitisation span's 1960 one when it ran, else Exploration's 1660 one.
+    // Industrialisation span's 1960 one when it ran, else Exploration's 1660 one.
     if (fixture != nullptr) fixture->setup_corridors = kepler_corridors;
     if (!kepler_corridors.empty())
     {
@@ -2153,7 +2153,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
         //
         // BL-1053: the record counted here is the one the road stamp above
         // read -- the last span's surviving network, 1960's when the
-        // Digitisation span ran -- so the markets the campaign opens on stand
+        // Industrialisation span ran -- so the markets the campaign opens on stand
         // on the junctions of the map it opens on. Captured at this site too,
         // because this is a second consumer of the record.
         if (fixture != nullptr) fixture->setup_junction_corridors = kepler_corridors;

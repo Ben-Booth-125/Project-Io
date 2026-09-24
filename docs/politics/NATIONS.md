@@ -82,7 +82,7 @@ sentiment model, not two.
 here 2026-09-15 as the player-facing figure Ben's opening map asks for). It is **derived, never
 stored**: a reading over what the nation's ground produces and what its markets pay, read over a
 trailing window in play and over output capacity at the seeded price field at the epoch
-(`../generation/DIGITISATION.md` § 5. Wealth inequality, market cap and GDP).
+(`../generation/INDUSTRIALISATION.md` § 5. Wealth inequality, market cap and GDP).
 
 **GDP per head is the axis of inequality between nations**, and output per centre is the axis
 within one. Neither is a household measure, and neither feeds the treasury — a levy does
@@ -90,7 +90,7 @@ within one. Neither is a household measure, and neither feeds the treasury — a
 
 **A regime field sits beside the three character fields** as a stub, derived at the epoch from the
 Works fork, charter reach, subject history and whether the polity fought a world war
-(`../generation/DIGITISATION.md` § 6. Stubs). Its names are invented, never Earth labels.
+(`../generation/INDUSTRIALISATION.md` § 6. Stubs). Its names are invented, never Earth labels.
 
 ### 2. The treasury — *a balance with both halves*
 

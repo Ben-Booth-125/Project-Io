@@ -270,7 +270,7 @@ struct region
     // above is surveyed only for ground the pre-sim settlement pass drew; a
     // region the sim founds inherits its parent's reading x0.7, which is about
     // two regions in three on a long arc. These two fields are the SAME window
-    // survey, taken over every region's own tiles, once, at the Digitisation
+    // survey, taken over every region's own tiles, once, at the Industrialisation
     // span's open (`survey_regions_at_span_open`). They are NEW fields rather
     // than a rewrite of `energy_q` so Exploration, the empire tree, the
     // treasury endowment and every gate mean are untouched.
@@ -313,6 +313,9 @@ struct region
     int survey_forest_raw = -1;
 
     int64_t founded_year = 0;     ///< Calendar year settled (negative = before epoch year 0).
+    // `industrial_year` / `industrialised` are THIS REGION'S furnace crossing
+    // (Stage 4), an event with a date -- not the Industrialisation phase, the
+    // 1660 -> 1960 span of generation, which a region may cross inside or not.
     int64_t industrial_year = 0;  ///< Calendar year the furnaces lit; 0 when never.
     bool    industrialised = false;
 
@@ -440,7 +443,7 @@ struct region
     int64_t treasury = 0;
 
     // --- BL-1041: industry points --------------------------------------------
-    // DIGITISATION.md sec Beat 1 (SET, Ben 2026-09-15: "large city centres
+    // INDUSTRIALISATION.md sec Beat 1 (SET, Ben 2026-09-15: "large city centres
     // build industry points which can be consumed for appropriate tasks, or
     // stockpiled until the end of the phase"). A LOCATED stock, exactly like
     // `treasury` and `material_stock` above and for the same reason: a
@@ -452,7 +455,7 @@ struct region
     // handoff.
 
     /// Industry points standing on this region. Credited ONLY inside the
-    /// Digitisation span (`history_sim_params::industry_points_enabled`, from
+    /// Industrialisation span (`history_sim_params::industry_points_enabled`, from
     /// `industry_open_year`), by two consequences and no choice: every round,
     /// on every region with `centres > 0`, its urban scale x its fuel factor x
     /// its holder's Industry-tree industrial capacity
@@ -460,7 +463,7 @@ struct region
     /// treasury, a fixed share of its surplus after the round's army and navy
     /// bills, spread over the polity's centres by urban scale
     /// (`run_exploration_upkeep`; BL-1056). Never spent: this cut carries no sink,
-    /// and nothing in the sim reads it (DIGITISATION.md: three sinks, later).
+    /// and nothing in the sim reads it (INDUSTRIALISATION.md: three sinks, later).
     /// Zero on every path the span does not run. GENERATION SCRATCH, NOT SAVED:
     /// `w_region` does not write it, the same footing as `treasury` -- its one
     /// reader is the 1960 handoff (the charter budget, Part III), which must
@@ -1026,7 +1029,7 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
 /// `energy_q`, the treasury endowment and every gate mean stay as the history
 /// left them.
 ///
-/// Called once, by generation, at the Digitisation span's open (the one place
+/// Called once, by generation, at the Industrialisation span's open (the one place
 /// both the tiles and the 1660 region table are live), and only when that span
 /// runs. Pure and integer: the same tiles and the same region table give the
 /// same fields on every machine. `ids` is the body's raster-order tile list.

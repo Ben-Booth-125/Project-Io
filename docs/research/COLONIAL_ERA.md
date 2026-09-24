@@ -6,23 +6,23 @@
 > colonial tie is on the map and what reads it · what such a span would hand the corporate search.
 > **Not here:** the authority for any of it — the two claim verbs and the sea lane are
 > `../generation/EXPLORATION.md` § Two ways to claim ground across water and § The colonial tie is
-> a sea lane; the search seed and the 1960 handoff are `../generation/DIGITISATION.md` § What
+> a sea lane; the search seed and the 1960 handoff are `../generation/INDUSTRIALISATION.md` § What
 > crosses into play; a good's cultural preference is `../generation/EXPLORATION.md` § A good
 > acquires a cultural preference; the opening treasury is § Capital arrives, and it sits in the
 > capital.
-> **Confused with:** generation/EXPLORATION.md, generation/DIGITISATION.md,
+> **Confused with:** generation/EXPLORATION.md, generation/INDUSTRIALISATION.md,
 > generation/CIVILISATION.md.
 
 > **RETIRED TO RESEARCH — a mechanism reference, not authority (Ben, 2026-09-16, NR-884).** This
 > document was written on 2026-09-09 for a single **1560 → 1960** colonial span, on a branch that
 > stayed unmerged for a week while sprints 40, 41 and 42 ran. In that time the span was divided
 > between two documents that are now the authority for it: `../generation/EXPLORATION.md` owns
-> **1200 → 1660** and is BUILT, and `../generation/DIGITISATION.md` owns **1660 → 1960**. The
-> wizard rounds here are wrong too — round 5 is Exploration and round 6 is Digitisation, both
+> **1200 → 1660** and is BUILT, and `../generation/INDUSTRIALISATION.md` owns **1660 → 1960**. The
+> wizard rounds here are wrong too — round 5 is Exploration and round 6 is Industrialisation, both
 > time-lapses, where this document specifies one round 5 shown as a STILL.
 >
 > **Its live content has been folded out (2026-09-16).** The two claim verbs and the sea lane went
-> to `EXPLORATION.md`; the search seed went to `DIGITISATION.md`'s handoff. What remains here is
+> to `EXPLORATION.md`; the search seed went to `INDUSTRIALISATION.md`'s handoff. What remains here is
 > the reasoning behind them and the parts neither sibling took. **Never cite this document as the
 > authority for a date, a round number, a span, or a mechanism** — read the sibling section
 > instead, and treat a disagreement as this file being the stale one.

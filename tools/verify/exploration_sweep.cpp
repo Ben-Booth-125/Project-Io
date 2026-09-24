@@ -852,7 +852,7 @@ int main(int argc, char** argv)
         // BL-958: STOP AT THE EXPLORATION CLOSE. Every reading reads the era
         // fixture, which is complete before this stop; nations, roads, firms and
         // markets (~90% of a whole world) are never read here. BL-1040: the stop
-        // also keeps the Digitisation span out, whatever `wp.digitisation_span_
+        // also keeps the Industrialisation span out, whatever `wp.industrialisation_span_
         // enabled` says -- the seed-library fingerprints this sweep feeds are
         // Exploration's, and stay cheap and unmoved by the span.
         world_gen_config gen_cfg = shipped.cfg; // BL-1007: the shipped data layer

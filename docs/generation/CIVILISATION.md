@@ -25,7 +25,7 @@ whom*.
 into empires, expanding ancient logistics networks, and abstracting the use of natural resources
 for conquest."*
 
-**THE PHASES ARE NOT CONTINUOUS** (`../ui/STARTUP.md` § Rounds — System, Life, Culture, Empires, Exploration, Digitisation). Migration and empire have
+**THE PHASES ARE NOT CONTINUOUS** (`../ui/STARTUP.md` § Rounds — System, Life, Culture, Empires, Exploration, Industrialisation). Migration and empire have
 different subjects, different rules and different terminating conditions. What crosses between
 them is a **stated handoff** — see § What the Culture phase must hand forward — and not an
 assumption that whatever happens to be in memory will do.
@@ -64,7 +64,7 @@ property is that little changes is not worth simulating.
 
 **A migration unfinished at 400 BCE is a defect in the migration, not in this boundary.**
 Unsettled ground is the exception marking hostile country (`../ui/STARTUP.md`
-§ Rounds — System, Life, Culture, Empires, Exploration, Digitisation), so a world still filling after two
+§ Rounds — System, Life, Culture, Empires, Exploration, Industrialisation), so a world still filling after two
 thousand years has a colonisation problem to fix rather than a boundary to move.
 
 **Sixteen hundred years, not four thousand, is the constraint on everything below.** The arc —
@@ -828,16 +828,16 @@ contract, and the contract is what makes a mechanism inside this phase judgeable
 that moves no reading below is a force nobody asked for.
 
 **THE PHASE THAT FOLLOWS IS EXPLORATION, AND THE COAST IS GONE (Ben, 2026-09-11).** That phase
-is `EXPLORATION.md`'s, and the phase after it `DIGITISATION.md`'s. Pass 2 was
+is `EXPLORATION.md`'s, and the phase after it `INDUSTRIALISATION.md`'s. Pass 2 was
 one economy span, 1560 → 1960, with 1200 → 1560 left unsimulated. Splitting exploration from
-digitisation replaces both:
+Industrialisation replaces both:
 
 | Phase | from | to | years |
 |---|---|---|---|
 | **Culture** — the migration | 2400 BCE | 400 BCE | 2,000 |
 | **Empires** — this phase | 400 BCE | 1200 CE | 1,600 |
 | **Exploration** | 1200 CE | 1660 CE | 460 |
-| **Digitisation** | 1660 CE | 1960 CE | 300 |
+| **Industrialisation** | 1660 CE | 1960 CE | 300 |
 
 **1960 is unmoved and 1200 is unmoved**, so this phase's own span (§ The span is 400 BCE to
 1200 CE) is untouched. What moved is what sits on the far side of 1200: a simulated exploration

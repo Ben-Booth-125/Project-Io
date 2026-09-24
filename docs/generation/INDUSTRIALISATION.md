@@ -1,4 +1,4 @@
-# Project Io — Digitisation
+# Project Io — Industrialisation
 
 > **Settles:** what the fourth simulated span is for · the seven properties of the world the
 > campaign opens on · the three beats the wizard shows producing them · what an industry point is,
@@ -17,7 +17,7 @@
 > **Confused with:** EXPLORATION.md, CORPORATION_GENERATION.md, NATION_GENERATION.md,
 > MILITARY_HISTORY.md, ../economy/MARKETS.md.
 
-> ⟳ **What changed (2026-09-15, the Digitisation design session — remove once reviewed):** the
+> ⟳ **What changed (2026-09-15, the Industrialisation design session — remove once reviewed):** the
 > placeholder is replaced. Ben set the three beats and the seven properties of the opening world,
 > then ruled nine calls on an elicitation form: cultural demand weight, the industry-point sinks
 > and charter budget, the proxy-war stub, a world war permitted and never forced, war that kills,
@@ -42,13 +42,13 @@
 > living polity at 1660, with its root ungated (`trees/TREES.md`, `trees/INDUSTRY_TREE.md`). The
 > proposals the form listed and Ben did not overturn are marked PROPOSED where they land.
 
-**Digitisation is the fourth and last simulated span: 1660 → 1960 CE, 300 years.** It opens the
+**Industrialisation is the fourth and last simulated span: 1660 → 1960 CE, 300 years.** It opens the
 instant Exploration closes and ends at the epoch, so the world it produces is the world the
 campaign opens on (`GENERATION_STRATEGY.md` § Pass 2).
 
 **The default epoch flips to 1960 as this phase's done-when (Ben, 2026-09-15, NR-869).** The
 campaign epoch is 1960 (Ben, 2026-09-08), and the default world descriptor selects that arc when
-this phase lands — never before, because a 1960 world with no Digitisation opens on a 300-year gap
+this phase lands — never before, because a 1960 world with no Industrialisation opens on a 300-year gap
 the sim did not simulate.
 
 **SETTLED (Ben, 2026-09-18, sprint 46 form, re-timing NR-869): the flip does not wait for Beats 2
@@ -102,7 +102,7 @@ phases before it hand forward abstractions — shares, signals, flows — and th
 must turn every one of them into something a player can click.
 
 **It is designed to what the world allows, not to what the player does** (Ben, 2026-09-17, ruling
-NR-885): *"for the digitisation round, it's less important what the player should be doing, and
+NR-885): *"for the [Industrialisation] round, it's less important what the player should be doing, and
 more important what the world allows."* The player's verbs are the campaign's business; this phase
 owns the ground they are used on.
 
@@ -110,17 +110,17 @@ owns the ground they are used on.
 
 ## The boundary
 
-**Ben, 2026-09-11, drawing it in one line:** *"Digitisation is exactly the round which generates
+**Ben, 2026-09-11, drawing it in one line:** *"[Industrialisation] is exactly the round which generates
 companies as we know them in live play. Exploration gives us cultural preference to goods,
 markets that trade named goods in a simplified form."*
 
-| Belongs to Exploration | Belongs to Digitisation |
+| Belongs to Exploration | Belongs to Industrialisation |
 |---|---|
 | Capital as a per-polity treasury | Capital as firm balance sheets, and as industry points at cities |
 | Named goods, traded in simplified form | The price field, the order book, the market carve |
 | Trade flows between polities, unpriced, opened by treaty | Trade relationships a firm inherits and prices |
 | Cultural preference for a good | Demand resolved from population and preference |
-| Ports, navies, standing armies and their upkeep | Industrialisation, railways, mechanised force |
+| Ports, navies, standing armies and their upkeep | Industry points, railways, mechanised force |
 | Treaties, subjects, trade provinces | Decolonisation, world war, and **corporations as live-play actors** |
 | War that destroys armies and spares civilians | War that kills people |
 | The Exploration tree | The **Industry** tree, open to every living polity at 1660 |
@@ -131,13 +131,13 @@ markets that trade named goods in a simplified form."*
 with (`../CONCEPT.md`), and generating one needs a chartering institution, a treasury behind it,
 and a market it can price against. Exploration produces all three and charters none of them.
 
-**This phase inherits `EXPLORATION.md` § What this phase hands digitisation and nothing else.**
+**This phase inherits `EXPLORATION.md` § What this phase hands Industrialisation and nothing else.**
 That list is the contract: a struct, not a promise.
 
 **The tariff posture is derived here, from inputs that already cross.** Scarcity
 (`region::scarcity_q`), trade flows (`trade_flows`) and cultural preference (`culture_preference`)
 arrive in `exploration_output`; the derivation of `polity::protection_q` from them is owed to this
-phase (BL-976, tariff derivation hands to Digitisation), and `derive_national_protection` →
+phase (BL-976, tariff derivation hands to Industrialisation), and `derive_national_protection` →
 `seed_national_tariffs` is the enactment seam that reads whatever this phase writes. The Era −1
 sim derives the scalar only on the two-span arc, from industrialisation timing; a single-span world
 carries no tariff, which is a legitimate outcome rather than a gap.
@@ -480,8 +480,8 @@ the epoch alone: a gap that play erases in a year was never a working internatio
 
 ## Part II — The three beats the wizard shows
 
-**SET (Ben, 2026-09-15):** the wizard's Digitisation round visibly shows three things happening —
-industrialisation, mass migration into larger centres, and decolonisation.
+**SET (Ben, 2026-09-15):** the wizard's Industrialisation round visibly shows three things happening —
+cities industrialising, mass migration into larger centres, and decolonisation.
 
 **The beats are the watched half; Part I is the delivered half.** Each beat names which properties
 it feeds, so a beat that drifts from its consumer is visible.
@@ -491,7 +491,7 @@ The three beats play over 1660 → 1960 on the same 2D map as rounds 3–5, and 
 epoch's opening map — firms, markets and the price field drawn in place. `../ui/STARTUP.md`
 § Rounds owns the surface.
 
-### Beat 1 — Industrialisation: cities make industry points
+### Beat 1 — Industry: cities make industry points
 
 **SET (Ben, 2026-09-15):** *"large city centres build industry points which can be consumed for
 appropriate tasks, or stockpiled until the end of the phase."*
@@ -574,7 +574,7 @@ one rule:
 
 #### Far pairs meet and bind, and this phase makes them
 
-**SETTLED (Ben, 2026-09-17, NR-888): the force that binds far pairs is Digitisation's.** Polities
+**SETTLED (Ben, 2026-09-17, NR-888): the force that binds far pairs is Industrialisation's.** Polities
 arrive having met — 1,250 new contact pairs across the seed library by 1660 — but not one pair
 first met after 1200 holds a non-aggression clause, and continued past 1660 on Exploration's own
 forces contact nearly stops: 43 new pairs in 300 years (BL-1028, weakness counters to 1960).
@@ -704,14 +704,14 @@ prices. Every property in Part I needs a stated rule for crossing that gap.
 
 ### This phase sets budgets; the search spends them
 
-**SETTLED (Ben, 2026-09-15, elicitation): Digitisation decides HOW MUCH and WHERE; the landscape
+**SETTLED (Ben, 2026-09-15, elicitation): Industrialisation decides HOW MUCH and WHERE; the landscape
 search decides WHICH.** `GENERATION_STRATEGY.md` § The eight phases gives phase 6 — a static search
 over rosters, placements and road tiers — the corporate landscape; Ben's 2026-09-11 line gives it
-to this phase. Both hold. Digitisation produces a charter budget per centre, a demand weight per
+to this phase. Both hold. Industrialisation produces a charter budget per centre, a demand weight per
 market and a price field; the search picks the roster and placement that spends each budget
 viably, on its existing terms.
 
-**So the search is Digitisation's last act, not a phase after it.** Neither is written twice, and
+**So the search is Industrialisation's last act, not a phase after it.** Neither is written twice, and
 the viability check the search exists for survives: a budget spent on firms that cannot pay is
 exactly what its terms score down.
 
@@ -753,7 +753,7 @@ Readings taken at **1960 CE** over a **seed spread**, never per world — the di
 | **Mixed cities** | Checkered provinces present, and concentrated in large centres |
 | **Inequality** | GDP per head spread wide across nations; output spread wide across a nation's cities |
 | **Far trade** | A material share of seeded trade relationships skip the seller's nearest market |
-| **Industrialisation** | Industry points unevenly distributed, with the fuel gate visible in who holds them |
+| **Industry points** | Industry points unevenly distributed, with the fuel gate visible in who holds them |
 | **Migration** | Urban share rising across the span; at least one cross-border stream in most worlds |
 | **Decolonisation** | Fewer subjects at 1960 than at 1660, not zero, and at least one lost without a war |
 | **World war** | Present in some worlds and absent in others — never all, never none |
@@ -794,7 +794,7 @@ The epoch's handoff, and nothing else:
 ### Spend is estimated at the end, not accumulated throughout
 
 **SETTLED (Ben, 2026-09-11): depletion is RETROFITTED.** *"I would prefer if we retrofit this, and
-come to a sensible estimate at the very end of digitisation."* The campaign's
+come to a sensible estimate at the very end of [Industrialisation]."* The campaign's
 `tile_component::resource_remaining` is seeded from a **stated formula** — named inputs, named
 arithmetic — computed once at 1960 from how long ground was held and worked, its dominant class,
 whether and when it industrialised, and the throughput that ran off it. An unwritten estimate is

@@ -10,13 +10,13 @@
 > standing armies are paid for and
 > how they decay · how an arms race buys quiet at home and opportunity abroad · the two ways to
 > be strong and how a creed decides which · how a good acquires a cultural preference · what the
-> phase hands digitisation.
+> phase hands Industrialisation.
 > **Not here:** what crosses into it from the Empire phase (CIVILISATION § The closure of the
 > Empire era) · the nodes of its technology tree and the grammar every tree obeys
-> (trees/EXPLORATION_TREE, trees/TREES) · the phase after it (DIGITISATION) · how a market
+> (trees/EXPLORATION_TREE, trees/TREES) · the phase after it (INDUSTRIALISATION) · how a market
 > clears once there is a price (../economy/MARKETS) · the campaign-era money loop
 > (../economy/FINANCE) · the pass map and the calendar (GENERATION_STRATEGY § Pass 2).
-> **Confused with:** CIVILISATION.md, COLONISATION.md, DIGITISATION.md,
+> **Confused with:** CIVILISATION.md, COLONISATION.md, INDUSTRIALISATION.md,
 > ../economy/MARKETS.md.
 
 > ⟳ **What changed (2026-09-14, the Exploration trade batch — remove once reviewed):** new § Trade
@@ -104,7 +104,7 @@ it earns nothing, and a market on a busy line earns in proportion to the line
 
 **SETTLED (Ben, 2026-09-11): this phase carries a SCARCITY SIGNAL, not a price.** One integer per
 good per market — how badly this market wants this good — with no clearing, no order book and no
-firm. Digitisation resolves signals into prices; this phase only says what is wanted and how much.
+firm. Industrialisation resolves signals into prices; this phase only says what is wanted and how much.
 
 **This is what keeps `CIVILISATION.md`'s boundary from drifting.** That doc's markets at the close
 are *a place and a visible condition, not an order book*, and a price in this phase would quietly
@@ -291,7 +291,7 @@ a ranking (`CIVILISATION.md` § Some peoples gain the capacity to explore).
 ## Two ways to claim ground across water
 
 *(Folded from `../research/COLONIAL_ERA.md` on 2026-09-16, NR-884. The subject is this phase's; the doc it
-came from claimed a span this one and `DIGITISATION.md` now own between them.)*
+came from claimed a span this one and `INDUSTRIALISATION.md` now own between them.)*
 
 A colonial claim is a polity verb on a target across a **sea leg**, staged from harbour works, and
 there are **two of them**. Both are the same actor at the same grain choosing among its sim verbs,
@@ -353,7 +353,7 @@ prices would be invisible to the search, and a search that cannot see roads cann
 
 **A lane is what a colony leaves behind when the metropole falls.** Ties outlive the polity that
 made them, as roads outlive the empire that paved them; the map carries lanes between nations that
-have not been one polity for a century, and that network is what `DIGITISATION.md` hands to the
+have not been one polity for a century, and that network is what `INDUSTRIALISATION.md` hands to the
 landscape search.
 
 ---
@@ -423,7 +423,7 @@ people that walked past a good and never held it is the people that pays most fo
 **What the preference does in this phase is weight a want, not set a price.** The want table
 (`CIVILISATION.md` § The directed want) is directed and unpriced; preference makes some directed
 wants *stronger* than others, which is enough to rank where a fleet goes first. Turning a weight
-into a price is Digitisation's job.
+into a price is Industrialisation's job.
 
 **Preference is read LIVE, round by round.** Ground changes hands and routes open across the span,
 so a preference derived once at 1200 would describe a world that no longer exists. It is derived
@@ -470,7 +470,7 @@ opportunity abroad, which is exactly the displacement the phase claims.
 
 **AND IT MUST NOT PRODUCE CALM (Ben, 2026-09-11, agreeing the reading is a RATIO).** The Empire
 phase runs continuous conflict to 1200, and the obvious failure of this phase is to damp it
-everywhere and hand Digitisation a frozen map. `CIVILISATION.md`'s handoff requires
+everywhere and hand Industrialisation a frozen map. `CIVILISATION.md`'s handoff requires
 **fragmentation**, not peace. So the reading is neighbour-war rate *against* frontier-skirmish
 rate, and a fall in both is a failure, not a success (§ What the phase is judged on).
 
@@ -621,17 +621,17 @@ reason the ratio replaced the original one-way reading.
 
 ---
 
-## What this phase hands digitisation
+## What this phase hands Industrialisation
 
-`DIGITISATION.md` owns what happens next; this is the list, and nothing else crosses.
+`INDUSTRIALISATION.md` owns what happens next; this is the list, and nothing else crosses.
 
-**Ben, 2026-09-11, on what that phase needs it for:** *"the aim of digitisation is to spawn our
+**Ben, 2026-09-11, on what that phase needs it for:** *"the aim of [Industrialisation] is to spawn our
 saturated web of companies and corporations... the main levers we pass are going to be about how
 much of easily accessible resource has been actually spent, and what prices different goods have,
 and what preference different cultures develop for these goods."*
 
 - **Treasuries**, one per polity at its capital — the capital a firm will be chartered against.
-- **Scarcity signals**, per good per market — what Digitisation resolves into prices. Not prices.
+- **Scarcity signals**, per good per market — what Industrialisation resolves into prices. Not prices.
 - **Trade flows**, per seller, buyer and good — the trade relationships a firm inherits.
 - **Corridor throughput** — which lines carry volume, and at which rung of the road ladder.
 - **Cultural good preference** — the demand shape a price field resolves against.
@@ -644,7 +644,7 @@ and what preference different cultures develop for these goods."*
 - **The grudge table and the surviving network**, grown across the span and filtered over this
   span's dead, exactly as the Empire handoff filters its own.
 
-**The list is a struct, and it has readers before Digitisation exists.** Every item above is one
+**The list is a struct, and it has readers before Industrialisation exists.** Every item above is one
 field of the handoff value, checked by a validator, on the same footing as the Empire handoff
 (`GENERATION_STRATEGY.md` § What crosses each handoff). Wherever the span ran, world setup seeds
 sentiment from ITS grudges and stamps roads from ITS surviving corridors. A campaign that opens on
@@ -653,7 +653,7 @@ the 1660 political map must not open on 1200's resentments and 1200's roads.
 ### Spend is estimated at the end, not accumulated throughout
 
 **SETTLED (Ben, 2026-09-11): depletion is RETROFITTED.** *"I would prefer if we retrofit this, and
-come to a sensible estimate at the very end of digitisation. For generation you are right in that
+come to a sensible estimate at the very end of [Industrialisation]. For generation you are right in that
 keeping items abstract is best policy."*
 
 **Where it lands is already built.** The campaign's `tile_component::resource_remaining` is a
@@ -676,7 +676,7 @@ that ran off it.
 - **What displaces conflict, if not the deterrence weight — RULED NOT THIS PHASE'S (Ben,
   2026-09-17, NR-888).** Exploration is not revisited for the saturated alarm or for new contacts
   that never bind (§ The arms race). The displacement this phase measures is carried forward as
-  found; `DIGITISATION.md` owns both the force that sends a patron abroad (§ 3) and the force that
+  found; `INDUSTRIALISATION.md` owns both the force that sends a patron abroad (§ 3) and the force that
   binds far pairs (§ Far pairs meet and bind, and this phase makes them).
 - **What earns the treasury, in terms.** § Capital arrives names the four sources; the arithmetic
   is a measurement, and it must be set from a sweep that produces both rich and poor survivors,
@@ -707,6 +707,6 @@ that ran off it.
   `sea_legs_q` is earned too easily for "no sea legs" ever to be true. If the creed axes stop
   separating a world's polities at all, the fix is upstream in the Empire phase, never a flag here.
 - **What this phase's treaty graph hands the world war.** Ben, 2026-09-15, permits a world war in
-  Digitisation and never forces it; `DIGITISATION.md` § A world war is permitted, never forced
+  Industrialisation and never forces it; `INDUSTRIALISATION.md` § A world war is permitted, never forced
   reads its spread through the mutual-defence clause this phase creates. How densely great powers
   are bound at 1660 is therefore one of that war's causes, and it is measured, not tuned for.

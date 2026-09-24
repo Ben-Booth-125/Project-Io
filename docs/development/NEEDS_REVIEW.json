@@ -461,7 +461,7 @@
    "recommendation": "D then C. The phase split is already in the run, and the cost tracks specialists rather than firms, so a seat-side bound is the knob that does not disturb the anchor or the density ruling. A is defensible if 30 s a tick is acceptable on the richest worlds; B moves the seat menu the re-bless just pinned.",
    "files": [
     "src/world/stockpile_budget.hpp",
-    "docs/generation/DIGITISATION.md",
+    "docs/generation/INDUSTRIALISATION.md",
     "tools/verify/player_seed_sweep.cpp"
    ],
    "resolution": null

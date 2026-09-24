@@ -478,7 +478,7 @@ struct history_sim_params
     /// The switch. Read only by the Invest verb's Industry block.
     bool industry_tree_enabled = false;
 
-    /// The calendar year the Industry tree opens (the Digitisation span's
+    /// The calendar year the Industry tree opens (the Industrialisation span's
     /// own start, 1660). A round at or after it invests; one before it does
     /// not, so a run with the switch on that stops at or before this year is
     /// the switch-off run bit for bit (exploration_sim_harness pins that).
@@ -530,7 +530,7 @@ struct history_sim_params
     int64_t industry_urban_mass_cap        = 600000;
 
     // -----------------------------------------------------------------------
-    // BL-1041 — INDUSTRY POINTS, A LOCATED STOCK (DIGITISATION.md sec Beat 1).
+    // BL-1041 — INDUSTRY POINTS, A LOCATED STOCK (INDUSTRIALISATION.md sec Beat 1).
     // -----------------------------------------------------------------------
     //
     // Every decision round inside the span, from `industry_open_year`:
@@ -566,7 +566,7 @@ struct history_sim_params
     //   converts NOTHING (NR-901, Ben 2026-09-19): no debit, no credit, the
     //   treasury keeps the round's share.
     //
-    // OFF BY DEFAULT, and only `digitisation_sim_params` turns it on: with the
+    // OFF BY DEFAULT, and only `industrialisation_sim_params` turns it on: with the
     // switch off no region's `industry_points` is written and no treasury is
     // debited, so every other span is bit for bit what it was.
     //
@@ -596,7 +596,7 @@ struct history_sim_params
     /// treasury units per world over the span (median ~47k) while cities built
     /// about 11M-50M points at the rate above (median ~21M) -- three orders
     /// apart at 1:1, where the treasury could not move a single region's rank
-    /// and points would be headcount by another name (DIGITISATION.md sec 1).
+    /// and points would be headcount by another name (INDUSTRIALISATION.md sec 1).
     /// At 1000 the treasury-paid share runs 0.16-0.82 (median 0.69): a
     /// property of each world (how its capitals' surplus ran against its
     /// cities), scaled as a whole by this constant.
@@ -605,7 +605,7 @@ struct history_sim_params
     /// The fuel factor's FLOOR, per mille (domain 0-1000). A city standing on
     /// no fuel at all still builds at this share of a coalfield city's rate,
     /// so "a large unfuelled city still builds and the fuel reading is a
-    /// finding rather than a tautology" (DIGITISATION.md sec Beat 1). 250: fuel
+    /// finding rather than a tautology" (INDUSTRIALISATION.md sec Beat 1). 250: fuel
     /// is at most a x4 lever -- large enough that a seam shows in the spread,
     /// small enough that a city's size is never cancelled by its ground.
     int     industry_points_fuel_floor_q = 250;
@@ -1902,14 +1902,14 @@ struct history_sim_params
 
     // -----------------------------------------------------------------------
     // BL-1036 — A SPAN RESUMED FROM A HANDOFF STRUCT LOSES NOTHING THE STRUCT
-    // CARRIES (DIGITISATION.md, "The span is its own call, resumed from
+    // CARRIES (INDUSTRIALISATION.md, "The span is its own call, resumed from
     // `exploration_output`").
     // -----------------------------------------------------------------------
     //
     // Three more tables cross beside BL-931's four. Each is null by default,
     // and the Exploration caller leaves all three null, so every existing run
     // -- the shipped Exploration span included -- opens exactly as before.
-    // The Digitisation span (BL-1040, hard_coded_world.cpp) is the caller that
+    // The Industrialisation span (BL-1040, hard_coded_world.cpp) is the caller that
     // sets all seven, from its `exploration_output`.
 
     /// Treaty clauses and tribute standing at the prior span's close
@@ -1963,7 +1963,7 @@ struct history_sim_params
     /// this default is what a caller building its own params gets.
     bool resume_seeds_corridor_tier = true;
 
-    /// THE TWO 1200 ANCHORS, EXPLICIT (DIGITISATION.md: "Consolidation and the
+    /// THE TWO 1200 ANCHORS, EXPLICIT (INDUSTRIALISATION.md: "Consolidation and the
     /// near-home cutoff stay anchored at 1200"). Before this item both were
     /// read off `start_year`, which is right only for the span that opens at
     /// 1200: a span opening at 1660 would sweep every seat's stores into the
@@ -1992,7 +1992,7 @@ struct history_sim_params
     // --- BL-1036: the resume-fidelity instrumentation -----------------------
     //
     // Both default off and neither is set by any generation caller. They exist
-    // so `digitisation_sim_harness --fidelity` can PROVE a resume loses
+    // so `industrialisation_sim_harness --fidelity` can PROVE a resume loses
     // nothing, rather than assert it: one reads the run, the other lets the
     // harness hand a resume the continued run's own live network.
 
@@ -2567,7 +2567,8 @@ struct polity
     /// gives: a Blast Works turns over with metallurgy, not with the column
     /// whose rows turn over at a roster boundary.
     ///
-    /// This is the polity half of Stage 4. The REGION half is
+    /// This is the polity half of Stage 4 -- a crossing dated per polity, not
+    /// the Industrialisation phase (the 1660 -> 1960 span). The REGION half is
     /// `region::industrial_lag_years` — how long that particular ground takes
     /// once its owner can pay for a furnace at all — and a region lights at
     /// `industrial_year + lag`, if that year falls before the epoch.
@@ -2622,7 +2623,7 @@ struct polity
     ///
     /// WRITTEN ON THE TWO-SPAN ARC ONLY (BL-976). The single-span arc runs no
     /// industrial span, so the sim leaves this at zero there and the
-    /// derivation is Digitisation's (DIGITISATION.md § The boundary);
+    /// derivation is Industrialisation's (INDUSTRIALISATION.md § The boundary);
     /// `seed_national_tariffs` reads it on both arcs as the enactment seam.
     int protection_q = 0;
 
@@ -3072,7 +3073,7 @@ struct industry_scorer_reading
     /// share clears the world's fuel bar, its top third (`industry_ground_fuel_q`;
     /// BL-1059, NR-899, NR-900), so the Fuel Doctrine's coal pull does not grow with
     /// the realm. -1 = NO SHARE TAKEN (the
-    /// span-open survey never ran: every path but the Digitisation span, or a
+    /// span-open survey never ran: every path but the Industrialisation span, or a
     /// harness reading built by hand): the term then reads `fuel_seam_q`, the
     /// old seam. Inside the span it is never -1.
     int ground_fuel_q    = -1;
@@ -3141,7 +3142,7 @@ int industry_ground_fuel_q(const std::vector<region>& regions, const std::vector
 bool industry_coke_smelting_held(uint64_t mask);
 
 // ---------------------------------------------------------------------------
-// BL-1041 — industry points (DIGITISATION.md sec Beat 1)
+// BL-1041 — industry points (INDUSTRIALISATION.md sec Beat 1)
 // ---------------------------------------------------------------------------
 
 /// No region's `industry_points` may pass this: a credit that would carry it
@@ -3205,7 +3206,7 @@ int64_t industry_points_scale_credit(const region& r, int industrial_q,
 /// under 2^63. A polity past it has its conversion REFUSED, never clamped.
 inline constexpr int64_t industry_points_apportion_heads_max = 1LL << 32;
 
-/// BL-1056 (Ben, 2026-09-19, NR-897; DIGITISATION.md sec Beat 1): split the
+/// BL-1056 (Ben, 2026-09-19, NR-897; INDUSTRIALISATION.md sec Beat 1): split the
 /// @p credit of treasury-paid points over the regions @p holder holds that
 /// stand centres, IN PROPORTION TO THEIR URBAN SCALE (`urban_population`), by
 /// largest-remainder apportionment: each region takes the floor of its exact
@@ -4675,7 +4676,7 @@ struct culture_good_preference
 
     /// 0-1000 — how strongly this culture prefers this good, derived from how
     /// widely its route has exposed it to holders of a good its own ground
-    /// never reaches. NOT a price (Digitisation's job); enough to RANK which
+    /// never reaches. NOT a price (Industrialisation's job); enough to RANK which
     /// directed want a fleet answers first.
     int16_t weight_q = 0;
 };
@@ -4999,20 +5000,20 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
                            const creed_state* live = nullptr);
 
 // ---------------------------------------------------------------------------
-// The Exploration -> Digitisation handoff (BL-956)
+// The Exploration -> Industrialisation handoff (BL-956)
 // ---------------------------------------------------------------------------
 
 /// THE WHOLE OF WHAT THE EXPLORATION SPAN HANDS FORWARD, AND NOTHING ELSE
-/// (BL-956). EXPLORATION.md § What this phase hands digitisation names the
+/// (BL-956). EXPLORATION.md § What this phase hands Industrialisation names the
 /// list and says "The list is a struct, and it has readers before
-/// Digitisation exists" — this is that struct, on exactly the footing of
+/// Industrialisation exists" — this is that struct, on exactly the footing of
 /// `pass_one_output` above: a VALUE (copies, never views of live sim state),
 /// folded by `make_exploration_output` and held to its list by
 /// `exploration_output_valid`.
 ///
-/// ITS READER IS THE NEXT THING TO RUN. Where the Digitisation span runs, it
+/// ITS READER IS THE NEXT THING TO RUN. Where the Industrialisation span runs, it
 /// resumes from this value and world setup reads the span's own close
-/// (`digitisation_output` below: the same tables, one span later) -- never
+/// (`industrialisation_output` below: the same tables, one span later) -- never
 /// this one (BL-1053). Where the span does not run, world setup reads this
 /// value: sentiment is seeded from `grudges`, roads are stamped and junction
 /// markets counted from `surviving_corridors`, and nations are credited the
@@ -5156,13 +5157,13 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
                               const creed_state* live = nullptr);
 
 // ---------------------------------------------------------------------------
-// The Digitisation span's close (BL-1040)
+// The Industrialisation span's close (BL-1040)
 // ---------------------------------------------------------------------------
 
-/// WHAT THE DIGITISATION SPAN ENDS WITH, AT 1960 -- the fourth span's handoff,
+/// WHAT THE INDUSTRIALISATION SPAN ENDS WITH, AT 1960 -- the fourth span's handoff,
 /// on the footing of `exploration_output` and `pass_one_output`: a VALUE
-/// (copies, never views of live sim state), folded by `make_digitisation_output`
-/// and held to its rules by `digitisation_output_valid`.
+/// (copies, never views of live sim state), folded by `make_industrialisation_output`
+/// and held to its rules by `industrialisation_output_valid`.
 ///
 /// THE SAME TABLES AS `exploration_output`, FOLDED BY THE SAME RULE, AND ON
 /// PURPOSE. The span is the same engine resumed from that struct, so its close
@@ -5176,10 +5177,10 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
 /// field list is what keeps the two from drifting: a table added to the
 /// Exploration close is on this one too.
 ///
-/// WHAT IT DOES NOT YET CARRY. Nothing Digitisation-only exists to carry --
+/// WHAT IT DOES NOT YET CARRY. Nothing Industrialisation-only exists to carry --
 /// industry points (BL-1041) land on `region` and so cross inside `regions`
 /// without a field here; a charter budget, when one is built, is a table
-/// added beside the inherited ones. DIGITISATION.md § What crosses into play
+/// added beside the inherited ones. INDUSTRIALISATION.md § What crosses into play
 /// is the list this grows toward, and is not this struct's claim today.
 ///
 /// ITS READER IS WORLD SETUP (BL-1053). When the span runs, every record world
@@ -5190,23 +5191,23 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
 /// under the flag flying over the ground at 1960). The live settlement the
 /// span left -- ownership, population, culture -- is the same close, read in
 /// place. The fixture and the harnesses read the struct too.
-struct digitisation_output : exploration_output
+struct industrialisation_output : exploration_output
 {
 };
 
-/// Fold the Digitisation span's closing sim state and settlement state into
+/// Fold the Industrialisation span's closing sim state and settlement state into
 /// the handoff value -- `make_exploration_output`'s rule, applied at the
 /// span's close. @param cs The culture table at the close.
-digitisation_output make_digitisation_output(const settlement_state&  ss,
+industrialisation_output make_industrialisation_output(const settlement_state&  ss,
                                              const history_sim_state& hs,
                                              const creed_state*       cs);
 
-/// The enforcement half of `digitisation_output`. Every rule
+/// The enforcement half of `industrialisation_output`. Every rule
 /// `exploration_output_valid` holds (the tables, the overlord graph, the
 /// holdings, the standing objects and flows, the culture table), PLUS what
 /// makes it a span's close: the span ran (`start_year < stop_year`), and --
 /// when @p stop_year is given (anything but INT64_MIN) -- it ran all the way
-/// to that year, the `world_params::digitisation_stop_year` it was asked for.
+/// to that year, the `world_params::industrialisation_stop_year` it was asked for.
 ///
 /// When @p from (the value it resumed from) is given, that it opened where
 /// @p from closed and CONTINUED it rather than restarting it (BL-1053: checks
@@ -5225,10 +5226,10 @@ digitisation_output make_digitisation_output(const settlement_state&  ss,
 ///     overlord. A rule with material only on a close inside one treaty term
 ///     (`treaty_term_years`, 80) of the open: at the shipped 1960 close every
 ///     1660 object has expired, so there it checks nothing, and
-///     `digitisation_sim_harness --fidelity` exercises it on the one-round
+///     `industrialisation_sim_harness --fidelity` exercises it on the one-round
 ///     close instead.
 /// Writes the first failure into @p why.
-bool digitisation_output_valid(const digitisation_output& o, std::string* why,
+bool industrialisation_output_valid(const industrialisation_output& o, std::string* why,
                                const creed_state*        live = nullptr,
                                const exploration_output* from = nullptr,
                                int64_t                   stop_year = INT64_MIN);

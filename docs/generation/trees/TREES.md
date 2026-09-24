@@ -16,7 +16,7 @@
 
 **Four trees, one grammar.** Generation runs four simulated spans, and each has a technology
 tree of its own: **Colonisation** for the migration, **Empire** for the city states,
-**Exploration** for the exploration age, **Industry** for digitisation. They are four trees and
+**Exploration** for the exploration age, **Industry** for Industrialisation. They are four trees and
 not four regions of one web (Ben, 2026-09-10,
 overturning the one-web reading of `../../research/ANCIENT_TECH_LADDER.md` § Geometry — the
 constellation, for the pre-game layer). What they share is everything in this document; what differs is in each tree's
@@ -32,7 +32,7 @@ unit roster's band boundary, the furnace crossing. Nothing new keys off a band.
 | **Colonisation** | The migration, 2400 → 400 BCE (`../COLONISATION.md`) | None, by construction | **Carried** — a people acquires a node by time on ground that satisfies its gate, and a daughter inherits its parent's set at coining | `COLONISATION_TREE.md` · `colonisation_tree.json` |
 | **Empire** | The city states, 400 BCE → 1200 CE (`../CIVILISATION.md`) | Yes — the five scored verbs | **Invested** — the Invest verb takes one node a round, chosen by the tree's scorer | `EMPIRE_TREE.md` · `empire_tree.json` |
 | **Exploration** | The exploration age, 1200 → 1660 CE (`../EXPLORATION.md`) | Yes | **Invested**, the same verb; the first tree with a treasury to pay for a node | `EXPLORATION_TREE.md` · `exploration_tree.json` |
-| **Industry** | Digitisation, 1660 → 1960 (`../DIGITISATION.md`) | Yes | **Invested**, the same verb; capacity gates bind here as nowhere else | `INDUSTRY_TREE.md` · `industry_tree.json` |
+| **Industry** | Industrialisation, 1660 → 1960 (`../INDUSTRIALISATION.md`) | Yes | **Invested**, the same verb; capacity gates bind here as nowhere else | `INDUSTRY_TREE.md` · `industry_tree.json` |
 
 The Colonisation tree has no scorer because the migration has no actor and must never grow one.
 Its nodes are things a people *carries*, and the tree exists so that what a people carries at
@@ -181,7 +181,7 @@ polity with nothing binding it researches fastest; and a starved one is behind, 
 the same shortfall shape every goods draw in the campaign takes.
 
 **The Industry tree's rate reads urban mass instead of the industry slice.** PROPOSED (listed to Ben
-2026-09-18, not overturned; `../DIGITISATION.md` § Beat 2): the population of the polity's largest
+2026-09-18, not overturned; `../INDUSTRIALISATION.md` § Beat 2): the population of the polity's largest
 held centres, superlinearly, so innovation gathers where people do. It lives in the rate and never
 in the scorer, which may not carry a term that grows with the polity's size (§ The scorer). The
 spire-ring scaling applies to it as to every rate. SETTLED (Ben, 2026-09-18, NR-891, accepting the

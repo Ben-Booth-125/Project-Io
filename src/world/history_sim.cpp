@@ -891,7 +891,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // capital, once"). Fires exactly on the round at
         // `params.consolidation_year` -- the Exploration span's own start
         // year, which it sets explicitly (BL-1036). A span that opens later
-        // (Digitisation, at 1660) keeps the 1200 anchor and so never reaches
+        // (Industrialisation, at 1660) keeps the 1200 anchor and so never reaches
         // it: the sweep happened once, and a second one would be a second
         // windfall. Unreachable on the Empire span too, because
         // `exploration_upkeep_enabled` is false throughout it.
@@ -1031,7 +1031,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         }
 
         // ---- BL-1041 -- CAPITAL PAID IN, AS A CONSEQUENCE. -----------------
-        // DIGITISATION.md sec Beat 1 (RULED, Ben 2026-09-18): "each round a
+        // INDUSTRIALISATION.md sec Beat 1 (RULED, Ben 2026-09-18): "each round a
         // fixed share of the capital treasury's surplus after the round's bills
         // converts to industry points." No polity scores it, so it is no verb.
         // THE SURPLUS is the purse's net rise across this round's earn and its
@@ -3504,7 +3504,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
         // ---- BL-1041: INDUSTRY POINTS, THE SCALE ACCRUAL ------------------
         //
-        // DIGITISATION.md sec Beat 1. Every region with centres is credited on
+        // INDUSTRIALISATION.md sec Beat 1. Every region with centres is credited on
         // itself, once a round, off the round's OPENING state (ahead of the
         // upkeep and every polity's turn, so no polity's act this round moves
         // another region's credit). Behind its switch and from the span's own
@@ -6647,7 +6647,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // the Industry exception): no rim gate, so a landlocked
                     // realm Exploration's coast-bound rim would exclude for good
                     // is only ever BEHIND here. With the switch off (every
-                    // span but the Digitisation span's own) this block is
+                    // span but the Industrialisation span's own) this block is
                     // skipped whole and no Industry field is read or written.
                     //
                     // The readings below are the Industry scorer's ONLY: the
@@ -6762,7 +6762,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             // span-open survey) -- like with like, and neither grows with the realm,
                             // where the best-of-held they replace could only
                             // rise as it did. No gate reads either, so only a
-                            // pick needs them. Off the Digitisation span nothing
+                            // pick needs them. Off the Industrialisation span nothing
                             // was surveyed (`span_surveyed` false): forest reads
                             // 0 (the old pin) and fuel -1, which leaves the term
                             // on the seam. Inside it a realm holding no surveyed
@@ -7869,8 +7869,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // `era_minus_one_sim_params`) runs one. The single-span arc closes at
     // 1200 CE with no furnace lit on any seed, so this derivation had nothing
     // to read there and computed a number nothing could use; on that arc the
-    // scalar is Digitisation's to write from scarcity, flows and preference
-    // (DIGITISATION.md § The boundary). The broadcast below runs on both arcs:
+    // scalar is Industrialisation's to write from scarcity, flows and preference
+    // (INDUSTRIALISATION.md § The boundary). The broadcast below runs on both arcs:
     // it is the seam `derive_national_protection` reads, and a zero field is
     // the single-span world's honest tariff posture.
     {
@@ -8608,7 +8608,7 @@ int industry_ground_fuel_q(const std::vector<region>& regions, const std::vector
     // share reads, each against its own resource's bar, so the Fuel Doctrine
     // compares like with like. -1 only when
     // the span-open survey never happened (@p survey_ran false: every path but
-    // the Digitisation span), and the term then keeps the seam, the old
+    // the Industrialisation span), and the term then keeps the seam, the old
     // reading. Inside the span a realm with no read region reads 0, never the
     // seam: a best-of-held fallback there would grow with the realm again.
     // The GATE is not this -- it still reads any held seam.
@@ -8649,7 +8649,7 @@ int industry_points_fuel_factor_q(int fuel_reading_q, const history_sim_params& 
 int industry_tree_industrial_q(uint64_t industry_mask)
 {
     using namespace io::industry_tree;
-    // KNOWN DRIFT, OPEN (BL-1041 cold review): DIGITISATION.md sec Beat 1 reads
+    // KNOWN DRIFT, OPEN (BL-1041 cold review): INDUSTRIALISATION.md sec Beat 1 reads
     // "Industry tree CAPACITY nodes held", and the store tags every node's
     // diffusion kind (capacity / practice / artifact; TREES.md sec Diffusion
     // follows kind). The GENERATED table (`industry_tree_data.hpp`) does not
@@ -9928,7 +9928,7 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
 }
 
 // ---------------------------------------------------------------------------
-// The Exploration -> Digitisation handoff (BL-956)
+// The Exploration -> Industrialisation handoff (BL-956)
 // ---------------------------------------------------------------------------
 
 exploration_output make_exploration_output(const settlement_state&  ss,
@@ -10238,10 +10238,10 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
 }
 
 // ---------------------------------------------------------------------------
-// The Digitisation span's close (BL-1040)
+// The Industrialisation span's close (BL-1040)
 // ---------------------------------------------------------------------------
 
-digitisation_output make_digitisation_output(const settlement_state&  ss,
+industrialisation_output make_industrialisation_output(const settlement_state&  ss,
                                              const history_sim_state& hs,
                                              const creed_state*       cs)
 {
@@ -10249,12 +10249,12 @@ digitisation_output make_digitisation_output(const settlement_state&  ss,
     // prune, the dead-filter on corridors and the derived tables are what
     // "standing at the close" means for any span of this engine; restating
     // them here would be a second construction of the same value.
-    digitisation_output o;
+    industrialisation_output o;
     static_cast<exploration_output&>(o) = make_exploration_output(ss, hs, cs);
     return o;
 }
 
-bool digitisation_output_valid(const digitisation_output& o, std::string* why,
+bool industrialisation_output_valid(const industrialisation_output& o, std::string* why,
                                const creed_state*        live,
                                const exploration_output* from,
                                int64_t                   stop_year)
