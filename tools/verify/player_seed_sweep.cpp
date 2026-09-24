@@ -61,7 +61,7 @@
 //                                    | [--price-pairs 325:2,1300:8]  (divisor:m, own m)
 //                                    | [--firm-prices 5000,10000,20000]           (stage 1)
 //                                    [--specialist-prices 2,4,8] [--no-span-control]
-//                                    — the REAL budget: the Digitisation span at epoch 0 and
+//                                    — the REAL budget: the Industrialisation span at epoch 0 and
 //                                      the budget build_stockpile_budget makes from the
 //                                      world's own stockpile. No budget scales apply. The
 //                                      price is DERIVED from each world's stock by the
@@ -593,11 +593,11 @@ spawn_seat_result build_and_seat(lua_state& lua, uint32_t seed, bool fast,
     // legacy one the BL-1031 pins were taken on (span off, tier off).
     world_params p = fast ? no_prehistory(arc_params(arc)) : arc_params(arc);
     p.seed = seed;
-    // BL-1042: `--charter-budget stockpile` runs the Digitisation span on
+    // BL-1042: `--charter-budget stockpile` runs the Industrialisation span on
     // whatever arc, so the shipped path's own stockpile budget has points in it
     // (on the legacy arc: span on, tier off — the world BL-1042/BL-1064 measured).
     if (force_span)
-        p.digitisation_span_enabled = true;
+        p.industrialisation_span_enabled = true;
     // app::begin_new_game + app::start_new_game_prelude: config and works, the
     // world, setup_world's writes, load_economy with its era band, the
     // landscape-search WINNER (not the seed candidate — BL-979) and the second
@@ -675,7 +675,7 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 };
 
 // THE SHIPPED ARC'S PINS (BL-1044) — the same sixteen library worlds on the
-// world the player is handed since BL-1044: the Digitisation span and BL-1037's
+// world the player is handed since BL-1044: the Industrialisation span and BL-1037's
 // tier on, the charter web bought from the world's own stockpile at the ruled
 // prices (divisor 650, two firm charters a specialist; NR-910, NR-914).
 //
@@ -728,7 +728,7 @@ const std::vector<world_digest_pin>& digest_pins(world_arc arc)
 //              corporation count, measured on a legacy build of the same seed in
 //              this process, over the non-razed centres by seeded weights (R4 —
 //              the non-vacuity reading; its digests must NOT match the pins).
-//   stockpile  BL-1042: the Digitisation span ON, and NO budget handed in, so
+//   stockpile  BL-1042: the Industrialisation span ON, and NO budget handed in, so
 //              the SHIPPED PATH's own stockpile budget (`build_stockpile_budget`
 //              at `stockpile_charter_spend`, harness_params.hpp's mirror of
 //              app.cpp) reaches the search and the apply. Its digests are
@@ -1233,7 +1233,7 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
     }
     // `none` reaches here only on the shipped arc, where it IS the stockpile world.
     if (mode == charter_mode::stockpile || mode == charter_mode::none)
-        std::printf("      charter budget stockpile — the Digitisation stockpile (BL-1042): %lld "
+        std::printf("      charter budget stockpile — the Industrialisation stockpile (BL-1042): %lld "
                     "points over %zu carved centres; firm price %d, specialist %d firm charters "
                     "(= %lld points), window radius %d, province cap %s, cap rule %s (per-good cap "
                     "%d, density ceiling %d, guard %d) — the prices ruled (NR-910)\n",
@@ -1584,7 +1584,7 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                     ? " — the synthetic budget with a ZERO firm price: REFUSED, so the digests "
                       "must equal the pins"
                 : mode == charter_mode::stockpile
-                    ? " — the Digitisation span ON and the shipped path's own stockpile budget "
+                    ? " — the Industrialisation span ON and the shipped path's own stockpile budget "
                       "(BL-1042); its digests are EXPECTED to differ from the pins"
                     : " (an empty budget reaches the seam; the digests must equal the pins)");
     std::printf("BL-1044. --arc %s: %s\n", world_arc_name(arc),
@@ -1835,13 +1835,13 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
 //       [--live-ticks N]
 //       [--out file.json] [--note TEXT]`
 //
-// WHY (DIGITISATION.md hard part 7, § Open questions; Ben, NR-889). The charter
+// WHY (INDUSTRIALISATION.md hard part 7, § Open questions; Ben, NR-889). The charter
 // prices are measured against live-play cost before either is fixed, and the
 // per-resource firm cap is measured KEPT and LIFTED before the ruling on which
 // gives way. This mode REPORTS; nothing in it is a verdict on a price or a cap.
 //
 // THE PRICE. A firm is 1 point (synthetic_charter_spend). A specialist costs a
-// whole number of firm charters (DIGITISATION.md § 1), read from
+// whole number of firm charters (INDUSTRIALISATION.md § 1), read from
 // --specialist-prices (each > 0; default 4,8). The FIRST entry is the BASE price;
 // every later entry is a LADDER rung. Every row carries its price in its label,
 // and the table and the JSON write firm_price_points, specialist_firm_charters
@@ -1881,7 +1881,7 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
 // exactly that ground.
 //
 // BL-1039 — THE RULED RULES, as more matrix axes. `--resource-cap` also takes
-// `sqrt` (the square-root per-good cap, DIGITISATION.md § 1), which runs once per
+// `sqrt` (the square-root per-good cap, INDUSTRIALISATION.md § 1), which runs once per
 // `--density-ceilings` entry and has no default ceiling; `on` and `off` are the
 // legacy fixed and lifted rules, unchanged (biggest gap first); `sqrt` fills the
 // goods IN TURN (Ben, 2026-09-18). A specialist's capital is today's draw on
@@ -1919,8 +1919,8 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
 // unchanged in every particular (its rows are checked in and must reproduce);
 // `--budget stockpile` runs a DIFFERENT matrix on the shipped builder's own
 // budget:
-//   * The world runs the Digitisation span at EPOCH 0
-//     (`world_params::digitisation_span_enabled`) — never epoch_year 1960, which
+//   * The world runs the Industrialisation span at EPOCH 0
+//     (`world_params::industrialisation_span_enabled`) — never epoch_year 1960, which
 //     is the superseded arc with Exploration off.
 //   * NO budget is handed to the seam, so `apply_shipped_landscape` builds the
 //     world's own (`build_stockpile_budget`, BL-1042) and hands it to BOTH the
@@ -1979,7 +1979,7 @@ struct cost_config
     /// from the world's own stockpile, charged at this row's prices.
     enum class kind { none, synthetic, forced, stockpile };
     kind   k             = kind::none;
-    /// BL-1043: the Digitisation span on at epoch 0 for this row's world (NEVER
+    /// BL-1043: the Industrialisation span on at epoch 0 for this row's world (NEVER
     /// epoch_year 1960, the superseded arc). Always on for a `stockpile` row —
     /// the stockpile is empty without it — and on for the span CONTROL, a `none`
     /// row that hands the seam an empty budget so the span world is measured
@@ -2412,7 +2412,7 @@ void measure_stockpile_row(const world& w, const stockpile_budget& sb,
 
     // DENSITY FOLLOWS CITIES. Meaningful ONLY because the budget is the world's
     // own stockpile: a budget made of headcount would pass this by construction
-    // (DIGITISATION.md § 1). Firms chartered TO a centre against that centre's
+    // (INDUSTRIALISATION.md § 1). Firms chartered TO a centre against that centre's
     // population, over every non-razed centre (a centre with no firm is a zero,
     // not a missing row) and over the budgeted centres alone.
     {
@@ -2508,7 +2508,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         // THE SPAN CONTROL (BL-1043): the span world with NO budget. An EMPTY
         // budget is handed in so the shipped path does not build the stockpile's
         // — an empty budget takes the legacy branch, which IS "no budget"
-        // (DIGITISATION.md § 1: "no budget and an empty budget are the same
+        // (INDUSTRIALISATION.md § 1: "no budget and an empty budget are the same
         // world as today's"). This row is the seat-menu anchor: as many seats as
         // a world with no budget, on the same world the budget rows are measured on.
         static const charter_budget k_no_budget{};
@@ -2557,7 +2557,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         // row run after BL-1044 runs it on.
         world_params p = arc_params(cfg.span ? world_arc::shipped : world_arc::legacy);
         p.seed = seed;
-        // BL-1043: the Digitisation span at EPOCH 0 — never epoch_year 1960, the
+        // BL-1043: the Industrialisation span at EPOCH 0 — never epoch_year 1960, the
         // superseded arc with Exploration off.
         const auto g0 = clk::now();
         build_app_base_world(lua, p, *run);
@@ -2619,7 +2619,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         // read back — a divisor row's price exists only once its stock does.
         const charter_spend_params spend = stock_row ? run->land.stockpile_spend : charter.spend;
         if (stock_row && bud.empty())
-            throw std::runtime_error("stockpile row '" + row.label + "': the Digitisation span is "
+            throw std::runtime_error("stockpile row '" + row.label + "': the Industrialisation span is "
                                      "on but the stockpile budget is EMPTY — the row would measure "
                                      "today's world under a budget label");
         if (stock_row)
@@ -2813,7 +2813,7 @@ struct cost_options
 
     // --- BL-1043: `--budget stockpile`, the REAL budget ---
     /// The row's budget is the world's own stockpile, built by the shipped
-    /// builder on a Digitisation-span world. Off is BL-1033's synthetic mode,
+    /// builder on a Industrialisation-span world. Off is BL-1033's synthetic mode,
     /// unchanged in every particular.
     bool stockpile = false;
     /// --firm-prices: POINTS per firm charter, a FIXED P_f axis (BL-1043 stage 1).
@@ -2921,7 +2921,7 @@ void write_cost_json(const std::string& path, const cost_options& opt,
     std::fprintf(f, "  \"synthetic_test_input\": %s,\n", b(!opt.stockpile));
     std::fprintf(f, "  \"synthetic_note\": \"%s\",\n",
                  json_escape(opt.stockpile
-                     ? "BL-1043: NOT synthetic. Every budget row runs the Digitisation span at epoch "
+                     ? "BL-1043: NOT synthetic. Every budget row runs the Industrialisation span at epoch "
                        "0 (never epoch_year 1960) and spends the budget build_stockpile_budget makes "
                        "from the world's own stockpile, handed to the search and the winner's apply "
                        "as app::start_new_game_prelude hands it. Budget scales are not an axis. The "
@@ -3053,7 +3053,7 @@ void write_cost_json(const std::string& path, const cost_options& opt,
             const char* rcap = r.cfg.resource_cap_rule == charter_cap_rule::fixed    ? "true"
                              : r.cfg.resource_cap_rule == charter_cap_rule::lifted   ? "false"
                                                                                      : "null";
-            // BL-1043: `span` is the Digitisation span at epoch 0 for this row's
+            // BL-1043: `span` is the Industrialisation span at epoch 0 for this row's
             // world; a `none` row with span true is the no-budget control.
             std::fprintf(f, "          \"span\": %s,\n", b(r.cfg.span));
             std::fprintf(f, "          \"label\": \"%s\", \"kind\": \"%s\", \"scale\": %g, "
@@ -3339,7 +3339,7 @@ void print_cost_table_header(const cost_options& opt)
             for (std::size_t i = 0; i < opt.specialist_prices.size(); ++i)
                 text_appendf(ms, "%s%d", i ? ", " : "", static_cast<int>(opt.specialist_prices[i]));
         std::printf("  THE REAL BUDGET on every stockpile row: the world's own industry-point "
-                    "stockpile (build_stockpile_budget, BL-1042) on a Digitisation-span world at "
+                    "stockpile (build_stockpile_budget, BL-1042) on a Industrialisation-span world at "
                     "EPOCH 0 — never epoch_year 1960. Budget SCALES are not an axis here and are "
                     "refused: there is no scale to apply to a world's own stockpile. MATRIX: firm "
                     "price P_f %s x specialist price m in firm charters {%s}. fP firm "
@@ -3585,7 +3585,7 @@ void print_stockpile_row_extras(const cost_row& r, const cost_baseline& legacy,
         return;
     const char* pad = "  %-52s   ";
     std::printf(pad, "");
-    std::printf("REAL BUDGET: the world's own stockpile (build_stockpile_budget), Digitisation "
+    std::printf("REAL BUDGET: the world's own stockpile (build_stockpile_budget), Industrialisation "
                 "span ON at epoch 0; only the prices and the rules are this row's\n");
     std::fputs(r.stockpile_text.c_str(), stdout);
 
@@ -3918,8 +3918,8 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
     {
         std::printf("player_seed_sweep --charter-cost --budget stockpile — BL-1043: the charter "
                     "prices and the no-specialist world, measured on REAL stockpiles\n");
-        std::printf("THE REAL BUDGET: every budget row runs the Digitisation span at EPOCH 0 "
-                    "(world_params::digitisation_span_enabled — NEVER epoch_year 1960, the "
+        std::printf("THE REAL BUDGET: every budget row runs the Industrialisation span at EPOCH 0 "
+                    "(world_params::industrialisation_span_enabled — NEVER epoch_year 1960, the "
                     "superseded arc with Exploration off) and spends the budget the SHIPPED BUILDER "
                     "makes from the world's own stockpile (build_stockpile_budget, BL-1042), handed "
                     "to the search and the winner's apply exactly as app::start_new_game_prelude "
@@ -4768,7 +4768,7 @@ int main(int argc, char** argv)
                     "       %s --charter-cost --budget stockpile [--price-divisors 325,650,1300\n"
                     "                         | --price-pairs 650:4,1300:8 | --firm-prices 5000,10000,20000]\n"
                     "                         [--specialist-prices 2,4,8] [--no-span-control]      (BL-1043:\n"
-                    "                         the REAL budget — the Digitisation span at epoch 0 and the world's\n"
+                    "                         the REAL budget — the Industrialisation span at epoch 0 and the world's\n"
                     "                         own stockpile; budget scales do not apply and are refused.\n"
                     "                         BL-1064: the firm price is the stock over a divisor unless\n"
                     "                         --firm-prices fixes it; a pair D:M carries its own m)\n",
@@ -5006,7 +5006,7 @@ int main(int argc, char** argv)
             {
                 // BL-1043: which budget the rows spend. `synthetic` is BL-1033's,
                 // unchanged; `stockpile` is the world's own, built by the shipped
-                // builder on a Digitisation-span world.
+                // builder on a Industrialisation-span world.
                 if (val == "stockpile")      opt.stockpile = true;
                 else if (val == "synthetic") opt.stockpile = false;
                 else

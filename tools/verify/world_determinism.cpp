@@ -442,7 +442,7 @@ void print_coverage(const char* what, const world& w, const era_minus_one_fixtur
                 w.gen_carve_centres.size(), w.gen_carve_dropped.size());
 }
 
-/// BL-1042: the Digitisation span is OFF in every world this harness builds, so
+/// BL-1042: the Industrialisation span is OFF in every world this harness builds, so
 /// the stockpile must be empty — no point on any region, an empty budget, a
 /// closed account — and the stockpile fold must not have run.
 bool stockpile_empty(const world& w)
@@ -684,7 +684,7 @@ int main()
                     static_cast<long long>(rep_a2.prehistory_conquests),
                     static_cast<long long>(rep_a2.prehistory_foundings));
 
-    // 3.7 — BL-1042, RE-POINTED BY BL-1044: the Digitisation span runs by
+    // 3.7 — BL-1042, RE-POINTED BY BL-1044: the Industrialisation span runs by
     //       default, so the two shipped worlds here carry a stockpile — points,
     //       a non-empty budget, a derived price, every point accounted — and
     //       it is the same stockpile on two same-seed builds. The prehistory-

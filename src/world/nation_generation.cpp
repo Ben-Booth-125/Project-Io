@@ -1047,7 +1047,7 @@ std::vector<entity_id> generate_nations(
     std::vector<int> fold(static_cast<std::size_t>(seed_count));
     for (int si = 0; si < seed_count; ++si) fold[static_cast<std::size_t>(si)] = si;
     // BL-975 — THE CHEST CROSSES WITH THE FLAG. Parallel to `seeds`: the
-    // last close's (1660, or 1960 when the Digitisation span ran: BL-1053)
+    // last close's (1660, or 1960 when the Industrialisation span ran: BL-1053)
     // treasury (sim material currency, unconverted) each seed carries into
     // nationhood. Only a polity's REPRESENTATIVE seed carries anything, and it
     // carries the polity's whole sum once — the other seeds of the same polity

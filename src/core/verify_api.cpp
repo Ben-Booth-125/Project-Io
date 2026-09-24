@@ -517,7 +517,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // path so the verified world is the world the player would get. NOT warmed up —
     // run_verify stays deterministically cold, as its own comment below says.
     // BL-1044 — THE CHARTER BUDGET, SPENT ON THE SEED CANDIDATE (Ben,
-    // 2026-09-21, NR-909). This path does not search. The Digitisation span
+    // 2026-09-21, NR-909). This path does not search. The Industrialisation span
     // runs by default, so its world carries a stockpile budget, and a non-empty
     // one is spent as the harness's unsearched apply spends it — the search's
     // seed candidate, the budget world minus the search. An EMPTY budget (a
@@ -1075,7 +1075,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
 
     // Park the wizard on a specific ROUND (0-5, BL-946: System, Life, Culture,
-    // Empires, Exploration, Digitisation) so a visual check can capture each
+    // Empires, Exploration, Industrialisation) so a visual check can capture each
     // one. Clamped by draw_generation_screen, so an out-of-range index is harmless —
     // the name is kept for the scripts that already call it. Every round is a stable
     // capture: the wizard is driven by the preferences and the seed, not by

@@ -441,7 +441,7 @@ private:
     /// are the chart chain's own rounds (ui::chain_round_count) and take
     /// `world_preferences`. The remainder are the PASS rounds — round 3 the
     /// migration (Culture), round 4 the history to 1200 CE (Empires), round 5 the
-    /// Exploration span to 1660 CE (BL-946), and round 6 the Digitisation
+    /// Exploration span to 1660 CE (BL-946), and round 6 the Industrialisation
     /// placeholder — which run an expensive pass inside the round rather than
     /// previewing it per keystroke (STARTUP.md § Rounds 4, 5 and 6). The two counts
     /// are deliberately separate: the wizard grew, the chart chain did not.
@@ -454,10 +454,9 @@ private:
     /// terminating conditions; see STARTUP.md § Rounds 4, 5 and 6.
     // SIX ROUNDS, TWO OF THEM PLANETOLOGY (BL-946, revising BL-863's five;
     // Ben, 2026-09-13). System, Life, Culture, Empires, Exploration,
-    // Digitisation. The third planetology round -- 'Inheritance', which
-    // carried the drawdown lean -- retires into Digitisation, which is what
-    // draws a world down in the first place. Digitisation is the renamed
-    // Industrialisation placeholder (BL-946); it is still the honest empty
+    // Industrialisation. The third planetology round -- 'Inheritance', which
+    // carried the drawdown lean -- retires into Industrialisation, which is what
+    // draws a world down in the first place. It is still the honest empty
     // placeholder BL-914 built, not new content.
     static constexpr int wizard_planetology_round_count = 2;
     static constexpr int wizard_round_count            = 6;
@@ -466,7 +465,7 @@ private:
         wizard_round_count - wizard_planetology_round_count;
     /// The pass rounds that play a TIME-LAPSE, and so own a record of their own:
     /// round 3 (Culture, the migration), round 4 (Empires, the history) and now
-    /// round 5 (Exploration, BL-946). The Digitisation placeholder round does
+    /// round 5 (Exploration, BL-946). The Industrialisation placeholder round does
     /// not, so it is deliberately NOT `wizard_pass_round_count`.
     ///
     /// THE THREE LAPSE ROUNDS RUN THREE DIFFERENT SPANS on the one shared

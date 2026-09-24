@@ -7,7 +7,7 @@ Sprint 45 is closed and archived: seventeen items delivered, one re-bless spent,
 ## The goal, unchanged from Ben's sprint 46 form (NR-898)
 
 The wizard shows the whole arc and **the game begins on the world it built**: round 6 plays the
-Digitisation span, Begin adopts the wizard's world, every row of `DIGITISATION.md` § What crosses
+Industrialisation span, Begin adopts the wizard's world, every row of `INDUSTRIALISATION.md` § What crosses
 into play carries into the campaign or is stated deferred, the superseded 1560 → 1960 arc and its
 narrative passes are retired, the default epoch flips to 1960, and the select-corporation screen
 closes the sprint. Sprint 45 built the world; sprint 46 wires it in.

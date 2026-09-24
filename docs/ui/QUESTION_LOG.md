@@ -390,11 +390,11 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 *Demanded by BL-816, BL-829, BL-860, BL-916, BL-915, BL-943 · `src/ui/startup_screens.cpp`, `src/ui/history_lapse.cpp`, `src/core/app.hpp` · id `wizard_round_history`*
 
-### New World wizard - round 7, Digitisation
+### New World wizard - round 7, Industrialisation
 
 **Answers:** What does that ground produce, and who trades it?
 
-**Because:** Rounds 4, 5 and 6 settle who reached this ground, who then held it, and who reached beyond it; what that ground PRODUCES is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Renamed from Industrialisation to Digitisation (BL-946, Ben 2026-09-13) as the honest label for everything after 1660 CE; still the same labelled placeholder BL-914 built, and Digitisation's own content is out of BL-946's scope.
+**Because:** Rounds 4, 5 and 6 settle who reached this ground, who then held it, and who reached beyond it; what that ground PRODUCES is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Renamed from Industrialisation to Industrialisation (BL-946, Ben 2026-09-13) as the honest label for everything after 1660 CE; still the same labelled placeholder BL-914 built, and Industrialisation's own content is out of BL-946's scope.
 
 *Demanded by BL-816, BL-819, BL-824, BL-860, BL-946 · `src/ui/startup_screens.cpp` · id `wizard_round_substrate`*
 

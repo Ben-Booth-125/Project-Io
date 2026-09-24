@@ -327,7 +327,7 @@ struct world
     /// and a loaded world never regenerates its roster. Null after a load.
     std::shared_ptr<const settlement_state> gen_settlement;
 
-    /// BL-1042 (stockpile to budget; DIGITISATION.md Part III) — THE CARVE
+    /// BL-1042 (stockpile to budget; INDUSTRIALISATION.md Part III) — THE CARVE
     /// INDEX: every population centre the demography carve founded, keyed by
     /// centre id, bound to the (region, rank, key) SLOT it materialises. A
     /// region's industry points reach its campaign centres through this index

@@ -372,7 +372,7 @@ never settled generation, and two consumers hit the gap at once (garrison sizing
 funding both scale off treasury, so both flattened to their floor in a freshly generated world).
 Ruled 2026-08-24 that generation credits a treasury of its own; ruled 2026-09-15 that the credit is
 the **treasury folded across the last simulated span's handoff** — Exploration's at 1660, or the
-Digitisation span's at 1960 where that span runs — not a levy re-run at world creation. The history
+Industrialisation span's at 1960 where that span runs — not a levy re-run at world creation. The history
 already wrote the number, and a nation that inherited an empire's chest should open richer than one
 that inherited a city state's.
 
@@ -419,7 +419,7 @@ authored here.
 **What this pass is not.** It is not a mint inside the campaign: it runs once, at world creation,
 as the fold of a stock the history already held, on the same footing as a corporation's opening
 capital (`CORPORATION_GENERATION.md`). It says nothing about what the treasury is *spent on* —
-NATIONS.md § 1 owns the budget, and Digitisation owns whatever the 1660 → 1960 span adds to it.
+NATIONS.md § 1 owns the budget, and Industrialisation owns whatever the 1660 → 1960 span adds to it.
 
 ---
 

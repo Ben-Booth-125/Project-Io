@@ -19,8 +19,8 @@
 -- been the wrong repair.
 --
 -- BL-946 ADDS A THIRD LAPSE ROUND, Exploration, between Empires and the
--- renamed Digitisation placeholder: the wizard now walks SIX rounds --
--- System, Life, Culture, Empires, Exploration, Digitisation -- and
+-- Industrialisation placeholder: the wizard now walks SIX rounds --
+-- System, Life, Culture, Empires, Exploration, Industrialisation -- and
 -- Culture/Empires/Exploration all replay a real, recorded span on the same
 -- shared engine (EXPLORATION.md sec The engine is shared).
 --
@@ -64,7 +64,7 @@ verify.frames(4)
 local round, rounds = verify.wizard_round()
 verify.expect(rounds == 6,
               "the wizard walks SIX rounds -- System, Life, Culture, Empires, "
-              .. "Exploration, Digitisation (got " .. rounds .. ")")
+              .. "Exploration, Industrialisation (got " .. rounds .. ")")
 verify.expect(round == 1, "parked on round 2, Life (0-based " .. round .. ")")
 verify.expect(verify.history_powers() == 0,
               "round 2 carries no history record (the case is not pre-loaded)")
@@ -215,17 +215,17 @@ verify.expect(verify.history_powers() > 0,
               .. "on the round")
 verify.capture("press_07_round6_after_reroll")
 
--- A12 -- NEXT FROM 5 (EXPLORATION) LANDS ON 6, DIGITISATION -- the last round,
--- still the honest empty placeholder BL-914 built (renamed from
--- Industrialisation; BL-946 does not build its content). Its own press is
+-- A12 -- NEXT FROM 5 (EXPLORATION) LANDS ON 6, INDUSTRIALISATION -- the last round,
+-- still the honest empty placeholder BL-914 built (BL-946 does not
+-- build its content). Its own press is
 -- "Begin" and this script does not touch it -- pressing it would generate a
 -- world and leave the wizard entirely.
 verify.click(NEXTP_X, NEXTP_Y)
 verify.frames(4)
 round = select(1, verify.wizard_round())
-verify.expect(round == 5, "NEXT on round 5 lands on round 6, DIGITISATION (0-based "
+verify.expect(round == 5, "NEXT on round 5 lands on round 6, INDUSTRIALISATION (0-based "
                           .. round .. ")")
-verify.capture("press_08_round7_digitisation")
+verify.capture("press_08_round7_industrialisation")
 
 -- A8 -- BACK WALKS THE LADDER DOWN ONE RUNG AT A TIME, and a finished record is
 -- NOT discarded and re-run on the way past. That guard is the reason the

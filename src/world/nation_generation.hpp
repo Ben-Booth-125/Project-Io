@@ -115,7 +115,7 @@ struct nation_params
     ///
     /// Indexed by POLITY ID (the same ids `seed_polities` carries): the
     /// treasury each polity held at the last simulated span's close — the
-    /// Exploration span's 1660 one, or the Digitisation span's 1960 one when
+    /// Exploration span's 1660 one, or the Industrialisation span's 1960 one when
     /// that span ran (BL-1053) — in the sim's material currency, summed over
     /// every region flying its flag (`region::treasury` sits on the ground,
     /// and the flag over the ground at that close owns the chest —

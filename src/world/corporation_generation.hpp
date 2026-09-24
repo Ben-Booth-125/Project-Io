@@ -146,7 +146,7 @@ std::vector<entity_id> generate_corporations(
 /// @return The number of corporations removed.
 int remove_specialist_roster(world& w);
 
-/// BL-1032 — CHARTER THE WEB FROM A PER-CENTRE BUDGET (DIGITISATION.md § 1;
+/// BL-1032 — CHARTER THE WEB FROM A PER-CENTRE BUDGET (INDUSTRIALISATION.md § 1;
 /// CORPORATION_GENERATION.md Pass 1 and Pass 6, both AMENDED FORWARD). Lays
 /// specialists AND background firms around the population centres @p budget
 /// names, in place of `generate_corporations` + `generate_background_firms`.
@@ -163,7 +163,7 @@ int remove_specialist_roster(world& w);
 ///    nothing; the report is `charter_refused_report`. (The landscape overload
 ///    decides a refusal before any mutation and never calls this with one.)
 ///  * Centres spend by budget DESCENDING, ties to the lower centre id, in ONE
-///    walk (DIGITISATION.md § 1: a centre "charters exactly one specialist; what
+///    walk (INDUSTRIALISATION.md § 1: a centre "charters exactly one specialist; what
 ///    remains buys background firms around it"): each centre's specialist, then
 ///    that centre's firms, then the next centre.
 ///  * Home nation = `tile_to_nation` of the centre tile; none -> the whole

@@ -148,15 +148,15 @@ int main()
     //        sim mutates it.
     //   R1b  THE RUN FOUNDS NOTHING PAST ITS OWN CLOSE. No region in the
     //        finished world is dated after the last span generation ran.
-    // BL-1044: the Digitisation span runs by default, so the last close is its
+    // BL-1044: the Industrialisation span runs by default, so the last close is its
     // 1960 one where it ran — and it is the span that lights furnaces (the
     // Industry tree opens at its own open year, BL-1038), so "no furnace" is
     // held up to that open year rather than for the whole run.
     bool all_founded = !ps.empty(), none_industrial = true;
     int64_t last_close = fx_a.params.stop_year;
     if (fx_a.exploration_ran) last_close = fx_a.exploration_params.stop_year;
-    if (fx_a.digitisation_ran) last_close = fx_a.digitisation_params.stop_year;
-    const int64_t furnaces_open = fx_a.digitisation_ran ? fx_a.digitisation_params.industry_open_year
+    if (fx_a.industrialisation_ran) last_close = fx_a.industrialisation_params.stop_year;
+    const int64_t furnaces_open = fx_a.industrialisation_ran ? fx_a.industrialisation_params.industry_open_year
                                                         : INT64_MAX;
     for (const region& p : ps)
     {
@@ -178,10 +178,10 @@ int main()
     check(handed_by_epoch, "R1a the settlement pass hands the era nothing founded after 0 CE");
     check(all_founded, "R1b no 0 CE-arc region is founded after the last span generation ran");
     check(none_industrial, "R1 no 0 CE region lit a furnace before the Industry tree opened "
-                           "(the Digitisation span's own open, BL-1038)");
+                           "(the Industrialisation span's own open, BL-1038)");
     check(ka->settlement.median_industrial_year == 0
               || ka->settlement.median_industrial_year >= furnaces_open,
-          "R1 median industrial year is 0 (nobody) or inside the Digitisation span");
+          "R1 median industrial year is 0 (nobody) or inside the Industrialisation span");
 
     // --- R2: demography seeded ----------------------------------------------
     bool pop_ok = !ps.empty(), mp_ok = true;
@@ -387,9 +387,9 @@ int main()
         const double floor_v   = static_cast<double>(nation_params{}.treasury_floor);
 
         // BL-1044: the chest is read off the LAST close that ran — the
-        // Digitisation span's 1960 fold where it ran (setup credits it since
+        // Industrialisation span's 1960 fold where it ran (setup credits it since
         // BL-1053), else Exploration's 1660 one.
-        const std::vector<region>& hx = fx_a.digitisation_ran ? fx_a.digitisation_handoff.regions
+        const std::vector<region>& hx = fx_a.industrialisation_ran ? fx_a.industrialisation_handoff.regions
                                                               : fx_a.exploration_handoff.regions;
         check(fx_a.exploration_ran && hx.size() == ps.size(),
               "R7 the last span ran and its handoff table is the report's region table");

@@ -265,19 +265,22 @@ A corporation's store of resource quantities **per market** — the `(corp, mark
 
 
 **Culture share**
-A per-mille distribution over peoples, carried on a **region** and on a **population centre** — never on a province or a tile. It crosses each generation handoff whole, so a conquest arrives half-digested and a city full of migrants reads mixed. A **province** *reads* culture by blending the shares beneath it; it holds none of its own. See `docs/generation/DIGITISATION.md` § 4 and `docs/ui/LENSES.md` § Culture lens.
+A per-mille distribution over peoples, carried on a **region** and on a **population centre** — never on a province or a tile. It crosses each generation handoff whole, so a conquest arrives half-digested and a city full of migrants reads mixed. A **province** *reads* culture by blending the shares beneath it; it holds none of its own. See `docs/generation/INDUSTRIALISATION.md` § 4 and `docs/ui/LENSES.md` § Culture lens.
+
+**Industrialisation (generation phase)**
+The fourth and last simulated span of generation, **1660 → 1960 CE**: it opens the instant Exploration closes and ends at the campaign epoch, so the world it produces is the world the campaign opens on. Its boundary is the epoch — everything after 1960 is the campaign era, played rather than generated. Computing and networks, what ordinary speech calls *digitisation*, belong to the campaign, never to this phase. Capitalised, it names the phase; do not confuse it with a **region** industrialising (its furnace crossing, a dated event: `region::industrial_year`, `docs/lore/HISTORY.md` § Stage 4) or with the **Industry tree** the phase's polities invest in (`docs/generation/trees/INDUSTRY_TREE.md`). See `docs/generation/INDUSTRIALISATION.md`.
 
 **Industry point**
-The Digitisation span's located industrial stock: one number per population centre, built by large cities from their scale, fuel within reach, capital paid in and tree capacity. Spent on **rail**, **mechanised force** or **works**; what is left at the epoch is the centre's **charter budget**. Located, so a conqueror who takes the city takes it. Not a campaign quantity. See `docs/generation/DIGITISATION.md` § Beat 1.
+The Industrialisation span's located industrial stock: one number per population centre, built by large cities from their scale, fuel within reach, capital paid in and tree capacity. Spent on **rail**, **mechanised force** or **works**; what is left at the epoch is the centre's **charter budget**. Located, so a conqueror who takes the city takes it. Not a campaign quantity. See `docs/generation/INDUSTRIALISATION.md` § Beat 1.
 
 **Charter budget**
-A population centre's unspent industry points at the epoch — the corporate capital the landscape search spends on firms around that centre, specialists and background firms alike. It is what makes firm density follow cities. See `docs/generation/DIGITISATION.md` § This phase sets budgets; the search spends them.
+A population centre's unspent industry points at the epoch — the corporate capital the landscape search spends on firms around that centre, specialists and background firms alike. It is what makes firm density follow cities. See `docs/generation/INDUSTRIALISATION.md` § This phase sets budgets; the search spends them.
 
 **Decolonisation**
-A subject polity leaving its overlord in the Digitisation span — by refusing renewal of its tribute clause once it can pay for itself, or by a war over empire. Holding a subject grows dearer as the subject's cities and industry grow, whether or not anyone fights. See `docs/generation/DIGITISATION.md` § Beat 3.
+A subject polity leaving its overlord in the Industrialisation span — by refusing renewal of its tribute clause once it can pay for itself, or by a war over empire. Holding a subject grows dearer as the subject's cities and industry grow, whether or not anyone fights. See `docs/generation/INDUSTRIALISATION.md` § Beat 3.
 
 **Proxy war**
-A war in a weak or decolonised polity with a great power as **patron**, paying into one side. At the epoch it crosses into play as a **standing war condition** on the provinces it covers — contested ground, interdicted supply, raised ordnance demand, a named patron — not as a war any actor plays. See `docs/generation/DIGITISATION.md` § 3.
+A war in a weak or decolonised polity with a great power as **patron**, paying into one side. At the epoch it crosses into play as a **standing war condition** on the provinces it covers — contested ground, interdicted supply, raised ordnance demand, a named patron — not as a war any actor plays. See `docs/generation/INDUSTRIALISATION.md` § 3.
 
 **Listed value**
 A **market's** cap: the summed buyout valuation of the firms headquartered in its catchment. Derived, never stored, and a sum over firms — it gives no corporation equity or a share price. See `docs/economy/MARKETS.md` § A market's listed value.

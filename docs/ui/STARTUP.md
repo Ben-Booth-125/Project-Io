@@ -114,7 +114,7 @@ subdivided in latitude, every cell a quad — not a per-pixel inverse projection
 into a texture. Both avoid projecting ~7,500 hexes as polygons against ImGui's
 16-bit draw indices; the slice path gets there with less machinery.
 
-## Rounds — System, Life, Culture, Empires, Exploration, Digitisation (Ben, 2026-09-08; reframed and renamed 2026-09-09; a fourth pass round added 2026-09-13, BL-946)
+## Rounds — System, Life, Culture, Empires, Exploration, Industrialisation (Ben, 2026-09-08; reframed and renamed 2026-09-09; a fourth pass round added 2026-09-13, BL-946)
 
 **FIVE ROUNDS, AND THE SPENDING ROUND RETIRED (Ben, 2026-09-09).** The third planetology round —
 *Inheritance*, which asked what the era before you already took and carried the **drawdown** lean —
@@ -128,7 +128,7 @@ rather than dropped: the drawdown lean is editable nowhere until the substrate p
 `world_params::exploration_sim_enabled` (default false) with no round to show it — a real
 generation pass, invisible to the player. The default flips to **true** and a new round —
 **Exploration** — is inserted between Empires and the placeholder, which is renamed
-**Digitisation** (still the same honest empty placeholder BL-914 built; its own content is a
+**Industrialisation** (still the same honest empty placeholder BL-914 built; its own content is a
 separate item). `wizard_round_count` 5 → 6, `wizard_pass_round_count` 3 → 4,
 `wizard_lapse_round_count` 2 → 3.
 
@@ -204,8 +204,8 @@ same terrain base, same seat dots, same frontier — with its own battle/conques
 counters rather than round 4's. `world_params::exploration_sim_enabled` defaults **true**
 (BL-946; it was opt-in and invisible to the player before).
 
-**Round 6 — Digitisation.** The span **1660 → 1960 CE**, three hundred years, and its
-authority is [`DIGITISATION.md`](../generation/DIGITISATION.md). **A time-lapse that ends
+**Round 6 — Industrialisation.** The span **1660 → 1960 CE**, three hundred years, and its
+authority is [`INDUSTRIALISATION.md`](../generation/INDUSTRIALISATION.md). **A time-lapse that ends
 on the seeded map (Ben, 2026-09-15)** — not the still globe this round was first specified
 as, because its three beats are things that happen across a span, and a globe shows a
 state. It draws on the same 2D map as rounds 3–5, over the same terrain base, and shows
@@ -304,7 +304,7 @@ next and painted under ground nobody holds yet, fading out over the opening tent
 span while the new round's own holders fade in over the same stretch. It is a cross-fade, not a
 cut — the Empires round opens on the migration's peoples and watches city states organise them
 (BL-920 made that literally what happens), and the same carry runs Empires into Exploration and
-will run Exploration into Digitisation. A round whose predecessor was never run carries nothing
+will run Exploration into Industrialisation. A round whose predecessor was never run carries nothing
 and draws at full strength from its first frame.
 
 **The pass rounds draw the ground, not only the fill (Ben, 2026-09-11).** Rivers and the

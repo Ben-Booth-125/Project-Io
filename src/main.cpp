@@ -135,7 +135,7 @@ int run_serve(int ticks, long long as_corp, bool as_any)
             b.recipe = default_recipe;
 
     // BL-1044 — THE CHARTER BUDGET, SPENT ON THE SEED CANDIDATE (Ben,
-    // 2026-09-21, NR-909). This path does not search. The Digitisation span
+    // 2026-09-21, NR-909). This path does not search. The Industrialisation span
     // runs by default (make_hard_coded_world()'s default params, seed 0), so
     // its world carries a stockpile budget, and a non-empty one is spent as the
     // harness's unsearched apply spends it — the search's seed candidate. An
@@ -259,7 +259,7 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
             b.recipe = default_recipe;
 
     // BL-1044 — THE CHARTER BUDGET, SPENT ON THE SEED CANDIDATE (Ben,
-    // 2026-09-21, NR-909). This path does not search. The Digitisation span
+    // 2026-09-21, NR-909). This path does not search. The Industrialisation span
     // runs by default (make_hard_coded_world()'s default params, seed 0), so
     // its world carries a stockpile budget, and a non-empty one is spent as the
     // harness's unsearched apply spends it — the search's seed candidate. An

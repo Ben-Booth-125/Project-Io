@@ -576,7 +576,7 @@ player can read why a good is dear in one city and cheap in the next.
 **Data definition.** A province's culture shares are **derived**, never stored on the province: its
 region's rural shares blended with the shares of each population centre inside it, weighted by
 population (`../generation/PROVINCES.md` § What a province is). Migration fills the centres, so
-cities read mixed and countryside reads plain (`../generation/DIGITISATION.md` § Beat 2).
+cities read mixed and countryside reads plain (`../generation/INDUSTRIALISATION.md` § Beat 2).
 
 **Surface.** Two layers on the province:
 

@@ -30,7 +30,7 @@
 // one seat of each other, where one fixed price opens twice the menu on the
 // richer. Every expected number is worked by hand beside its check.
 //
-// PART 2 — R8, A NON-EMPTY BUDGET BUILT TWICE (one seed, the Digitisation span
+// PART 2 — R8, A NON-EMPTY BUDGET BUILT TWICE (one seed, the Industrialisation span
 // ON). world_determinism's stockpile fold only runs when a region holds a
 // point, and none of its worlds runs the span, so it never sees a non-empty
 // budget. This builds the seed's campaign world twice in app order as far as
@@ -233,7 +233,7 @@ void part_one()
 
 /// Seats a budget opens at @p specialist_price: its centres whose points cover
 /// one specialist. The count `charter_web_from_budget` charters — one specialist
-/// per centre that can afford one (DIGITISATION.md § 1) — before any ground is
+/// per centre that can afford one (INDUSTRIALISATION.md § 1) — before any ground is
 /// read; a centre whose window holds no free site can only lower it.
 int seats_at(const stockpile_budget& sb, std::int64_t specialist_price)
 {
@@ -427,7 +427,7 @@ void part_two(std::uint32_t seed)
 
     world_params p{};
     p.seed = seed;
-    p.digitisation_span_enabled = true;
+    p.industrialisation_span_enabled = true;
 
     stockpile_budget first;
     std::map<entity_id, carve_slot> carve_first;
@@ -537,7 +537,7 @@ void part_three_seat_curve(const std::vector<std::uint32_t>& seeds,
     {
         world_params p{};
         p.seed = seed;
-        p.digitisation_span_enabled = true;
+        p.industrialisation_span_enabled = true;
         lua_state lua;
         auto out = std::make_unique<app_start_world>();
         build_app_base_world(lua, p, *out);

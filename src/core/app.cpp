@@ -1152,7 +1152,7 @@ void app::start_new_game_prelude()
         sp.start.placement_seed    = sp.seed;
         sp.start.corporation_count = m_worldgen_cfg.corporation_count;
         // BL-1042 — THE CHARTER BUDGET: the world's own industry-point
-        // stockpile (Beat 1, DIGITISATION.md Part III), split over the carved
+        // stockpile (Beat 1, INDUSTRIALISATION.md Part III), split over the carved
         // centres by `build_stockpile_budget` and charged at
         // `stockpile_charter_spend` — its firm price DERIVED from the world's
         // whole stockpile (BL-1064, NR-907), its other constants named and

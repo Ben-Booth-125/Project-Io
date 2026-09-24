@@ -44,7 +44,7 @@ NR-908 gave the divisor to live-play cost, and the pin was set on the median: at
 
 > **Recommendation:** D then C. The phase split is already in the run, and the cost tracks specialists rather than firms, so a seat-side bound is the knob that does not disturb the anchor or the density ruling. A is defensible if 30 s a tick is acceptable on the richest worlds; B moves the seat menu the re-bless just pinned.
 
-*Files: `src/world/stockpile_budget.hpp`, `docs/generation/DIGITISATION.md`, `tools/verify/player_seed_sweep.cpp`*
+*Files: `src/world/stockpile_budget.hpp`, `docs/generation/INDUSTRIALISATION.md`, `tools/verify/player_seed_sweep.cpp`*
 
 ### NR-916 — CALL: the size of the capital market premium — 1.25x the carve's price is a placeholder, not a derivation
 *question · raised 2026-09-23 · from BL-1066 (the player cannot build), main session 2026-09-23, on Ben's ruling that capital markets are priced at a premium.*

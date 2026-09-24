@@ -159,7 +159,7 @@ world that fought a world war late in the pre-game span opens *"more likely to f
 catastrophe"*: its survivors carry standing force their neighbours can see, grudges written by the
 dead and trade flows the war severed — all three already Alarm's inputs — and none of it adds
 Ceiling, which remembers only a rupture *averted*. The war moves a world toward the failure branch
-without deciding it (`../generation/DIGITISATION.md` § A world war leaves the campaign closer to its
+without deciding it (`../generation/INDUSTRIALISATION.md` § A world war leaves the campaign closer to its
 catastrophe).
 
 ### The test

@@ -151,7 +151,7 @@ struct landscape_search_params
     /// BL-1032 — the per-centre CHARTER BUDGET, or none. NONE BY DEFAULT here;
     /// the shipped new-game path (app::start_new_game_prelude, BL-1042) passes
     /// the world's own stockpile budget (`build_stockpile_budget`), which the
-    /// Digitisation span fills (on by default since BL-1044) and which is EMPTY
+    /// Industrialisation span fills (on by default since BL-1044) and which is EMPTY
     /// on a world the span did not run on — the pre-budget search.
     ///
     /// Null or EMPTY (an all-zero budget is the same state — charter_budget

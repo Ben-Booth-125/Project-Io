@@ -271,7 +271,7 @@ already seeded from how early it industrialised — multiplies the volume of run
 normalised to the world mean at generation. A qualified nation's cities buy more fuel and
 electronics than an equally large city in a nation that industrialised late. Staples and welfare
 goods do not scale with it: a head eats whatever the nation's history. This is the campaign's half
-of *wealthier nations leverage their wealth into production* (`../generation/DIGITISATION.md` § 2),
+of *wealthier nations leverage their wealth into production* (`../generation/INDUSTRIALISATION.md` § 2),
 read from a slow, seeded quantity rather than from balances that swing every tick.
 
 **4. An unmet top rung BLOCKS PROMOTION.** A centre promotes only while its own highest rung is met

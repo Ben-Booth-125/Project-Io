@@ -156,9 +156,9 @@ struct world_params
     /// harness that wants to bind a shorter span.
     int64_t         exploration_stop_year = 1660;
 
-    /// BL-1040 — RUN THE DIGITISATION SPAN, `exploration_stop_year` ->
-    /// `digitisation_stop_year`, as its OWN call to the same engine, resumed
-    /// from the Exploration span's `exploration_output` (DIGITISATION.md, the
+    /// BL-1040 — RUN THE INDUSTRIALISATION SPAN, `exploration_stop_year` ->
+    /// `industrialisation_stop_year`, as its OWN call to the same engine, resumed
+    /// from the Exploration span's `exploration_output` (INDUSTRIALISATION.md, the
     /// span paragraphs).
     ///
     /// THE RUN PREDICATE IS "EXPLORATION RAN", NEVER THE EPOCH (Ben,
@@ -184,23 +184,23 @@ struct world_params
     /// not a property a loaded campaign re-reads. A loaded span world needs
     /// nothing from it: generation has run, and what it left (the nations, the
     /// centres, the chartered web) is world state the save already carries.
-    bool digitisation_span_enabled = true;
+    bool industrialisation_span_enabled = true;
 
-    /// The calendar year the Digitisation span closes: the campaign epoch the
-    /// span grows the world to (DIGITISATION.md: "1660 -> 1960 CE, 300
+    /// The calendar year the Industrialisation span closes: the campaign epoch the
+    /// span grows the world to (INDUSTRIALISATION.md: "1660 -> 1960 CE, 300
     /// years"). A field on the same footing as `exploration_stop_year`, for a
     /// harness that wants to bind a shorter span.
-    int64_t         digitisation_stop_year = 1960;
+    int64_t         industrialisation_stop_year = 1960;
 
     /// BL-1037 — a resumed span's corridors reopen at the RUNG they were
     /// bought to, not the rung their walks earn (`history_sim_params::
     /// resume_seeds_corridor_tier` says why). ON BY DEFAULT with BL-1044's
     /// re-bless. Copied into BOTH resumed spans' params — Exploration's
-    /// (`exploration_sim_params`) and so the Digitisation span's, which is
+    /// (`exploration_sim_params`) and so the Industrialisation span's, which is
     /// built on it; the Empires round resumes no corridors. A field here, not
     /// only the struct default, so an instrument can build the LEGACY arc
     /// (span off, this off): the world the BL-1031 pins were taken on.
-    /// NOT ON THE SAVE SEAM, on the footing of `digitisation_span_enabled`.
+    /// NOT ON THE SAVE SEAM, on the footing of `industrialisation_span_enabled`.
     bool resume_seeds_corridor_tier = true;
 
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
@@ -447,7 +447,7 @@ inline const char* const generation_stage_labels[] = {
     "Placing companies",    // 11
     "Finishing",            // 12
     "Running the exploration age", // 13 — 1200 -> 1660, after the ancient era
-    "Running the digitisation span", // 14 — 1660 -> 1960, after the exploration age (BL-1040)
+    "Running the Industrialisation span", // 14 — 1660 -> 1960, after the exploration age (BL-1040)
 };
 inline constexpr int generation_stage_label_count =
     static_cast<int>(sizeof(generation_stage_labels) / sizeof(generation_stage_labels[0]));
@@ -456,7 +456,7 @@ inline constexpr int generation_stage_label_count =
 /// REPORT -- the number of times it advances `generation_progress::stage`,
 /// which is what `stage_count` must hold for the bar to reach its end. Never
 /// the label count above: some labels caption a stage rather than being one
-/// (the exploration age and the Digitisation span re-caption the history's
+/// (the exploration age and the Industrialisation span re-caption the history's
 /// single stage), and one is never published. Set by generation itself at its
 /// first line; a caller that publishes `stage_count` before the worker starts
 /// uses this so the two agree.
