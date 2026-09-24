@@ -588,13 +588,12 @@ int main(int argc, char* argv[])
             if (std::string(argv[i]) == "--spectate")
                 spectate = true;
 
-        // --epoch <year>  (BL-705): the calendar year every world this process
-        // generates BEGINS at — world_params::epoch_year. Below 1700 takes the
-        // antiquity branch (0 is the default 0 CE start); 1960 selects the
-        // industrial one, which puts the recipe registry on the industrial band
-        // and skips the Era -1 antiquity prehistory. Both starts are supported
-        // (docs/economy/ERAS.md § Where the ladder starts); before this flag the
-        // 1960s branch was live but reachable only by editing a source default.
+        // --epoch <year>  (BL-705): the calendar year play opens on in every
+        // world this process generates — world_params::epoch_year. It moves the
+        // calendar and the recipe band only (BL-1047, the epoch flip): 1960 is
+        // the default and the industrial band; below 1700 (0 CE) opens the same
+        // generated world on the ancient band. Both starts are supported
+        // (docs/economy/ERAS.md § Where the ladder starts).
         //
         // Applies to a NEW world. --load carries the save's own epoch. It is
         // parsed here, below the --verify / --verify-all / --serve dispatch, so
@@ -602,7 +601,7 @@ int main(int argc, char* argv[])
         // against the default world, and giving them a second epoch would mean
         // a second golden set. Deliberate, not an oversight.
         bool         epoch_set  = false;
-        std::int64_t epoch_year = 0;
+        std::int64_t epoch_year = world_params{}.epoch_year;
         for (int i = 1; i < argc; ++i)
         {
             if (std::string(argv[i]) != "--epoch")

@@ -35,13 +35,11 @@ void app::open_new_world_wizard()
     m_screen    = app_screen::generating;
 
     // THE EMPIRES ROUND STARTS AT 400 BCE (BL-871, revising BL-846's 4000;
-    // Ben, 2026-09-09). `era_minus_one_sim_params`'s single-span branch
-    // (`era_minus_one.cpp`) derives the sim's own start year as
-    // `epoch_year - prehistory_years`; at this wizard's epoch (0 CE — the
-    // "ancient refocus" default, NR-177) that means `prehistory_years` IS the
-    // number of years before 0 CE the sim starts at. 400 lands it at exactly
-    // 400 BCE, the year `CIVILISATION.md` § The span is 400 BCE to 1200 CE
-    // hands the Empires round.
+    // Ben, 2026-09-09). The start is `world_params::empires_start_year`, the
+    // round's own fixed year (BL-1047); it used to be derived as
+    // `epoch_year - prehistory_years`, which only landed on 400 BCE while the
+    // epoch was 0 CE. `prehistory_years` is now the scope knob alone: any
+    // positive value runs the era.
     //
     // NOT SIXTEEN HUNDRED YEARS, AND THAT IS A KNOWN GAP, NOT AN OVERSIGHT.
     // The design's full arithmetic is 400 BCE -> 1200 CE, 1,600 years — but
@@ -64,7 +62,7 @@ void app::open_new_world_wizard()
     //
     // THIS IS ALSO WHAT "BEGIN" BUILDS (unchanged from before BL-846): the
     // struct default already IS 400, so this line is written for clarity
-    // against the new arithmetic rather than for a numeric change.
+    // rather than for a numeric change.
     m_pending_world_params.prehistory_years = 400;
 }
 

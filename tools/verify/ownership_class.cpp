@@ -16,12 +16,13 @@
 //       and behaviourally (the class moves with the charter, and does not move
 //       with a region's furnace year at all).
 //   R2  MEASURED, NOT ASSERTED. The mapping holds directionally across a seed
-//       sweep; the distribution is REPORTED at BOTH epochs. There is no magic
+//       sweep; the distribution is REPORTED on the default world (once at
+//       BOTH epochs; one since the epoch flip, BL-1047). There is no magic
 //       share here on purpose -- a pinned share would be a target to tune the
 //       derivation toward, which is exactly what BL-219 retired.
 //
 //       BL-638's R2 is THE GATE, and it is a non-degeneracy property rather than
-//       a target: at the DEFAULT 0 CE epoch at least one specialist must class
+//       a target: on the DEFAULT world at least one specialist must class
 //       public on a MAJORITY of the swept seeds. Under the retired Stage 4 read
 //       that number was zero of eight -- all 64 corporations and all 1298
 //       regions classed `closed`, so nothing filed and nothing was buyable in
@@ -461,22 +462,23 @@ int main(int argc, char* argv[])
     }
 
     // -----------------------------------------------------------------------
-    // The sweep -- R1 (part 2), R2, R4. Run at BOTH epochs, and the reason is
-    // the single most important thing this harness has to say.
+    // The sweep -- R1 (part 2), R2, R4. ONE sweep since the epoch flip
+    // (BL-1047): it ran at BOTH epochs while 1960 selected the superseded arc,
+    // and generation now reads no epoch, so a second sweep would build the same
+    // worlds again. What it said then is still the most important thing here.
     //
-    // The DEFAULT campaign is an antiquity world (world_params::epoch_year = 0
-    // since NR-177), and BL-631's own measured row here is what exposed BL-638:
+    // The DEFAULT campaign was an antiquity world (world_params::epoch_year = 0
+    // under NR-177), and BL-631's own measured row here is what exposed BL-638:
     // settlement.cpp's Stage 4 breaks out before lighting a furnace on one, so
     // median_industrial_year was 0, every region read as never-industrialised,
     // and all 64 corporations across 8 seeds classed `closed`. The default world
     // had NOTHING that filed a return and NOTHING that could be bought.
     //
-    // Re-pointed to Stage 1, the default epoch is the ONE that has to be
-    // non-degenerate, because it is the one people play. The 1960 arc stays in
-    // the sweep as the contrast: if the two epochs ever agree exactly, the
-    // derivation has stopped reading anything the era changes. So: both, side by
-    // side, and the `median` column is printed at each purely to show that the
-    // retired signal no longer moves the answer.
+    // Re-pointed to Stage 1, the default world is the ONE that has to be
+    // non-degenerate, because it is the one people play. The 1960 arc was the
+    // contrast sweep; it is retired, and the default world at 1960 is the same
+    // world the 0 CE start builds. The `median` column is still printed purely
+    // to show that the retired signal does not move the answer.
     // -----------------------------------------------------------------------
     struct sweep_result
     {
@@ -530,8 +532,7 @@ int main(int argc, char* argv[])
         return sr;
     };
 
-    const sweep_result antiquity = run_sweep(0,    "the DEFAULT campaign");
-    const sweep_result modern    = run_sweep(1960, "the 1960 arc");
+    const sweep_result dflt = run_sweep(world_params{}.epoch_year, "the DEFAULT campaign");
 
     auto report_sweep = [&](const sweep_result& sr, const char* label) {
         std::printf("\n[%s]\n", label);
@@ -558,13 +559,12 @@ int main(int argc, char* argv[])
     };
 
     std::printf("\n--- R2 (MEASURED, not asserted) ---\n");
-    report_sweep(antiquity, "epoch 0 CE -- the DEFAULT campaign");
-    report_sweep(modern,    "epoch 1960 -- the industrial arc");
+    report_sweep(dflt, "the DEFAULT campaign (the same world at any epoch, BL-1047)");
 
     // The direction is a PROPERTY of the bucketing, so it is assertable without
-    // any magic number: the buckets and the classes must agree exactly, at both
-    // epochs. This is R2's claim stated as a check rather than as a share.
-    for (const sweep_result* sr : { &antiquity, &modern })
+    // any magic number: the buckets and the classes must agree exactly. This
+    // is R2's claim stated as a check rather than as a share.
+    for (const sweep_result* sr : { &dflt })
     {
         check(sr->t_out == sr->region_totals[2],
               "R2 every out-of-reach region, and only those, class closed");
@@ -577,25 +577,25 @@ int main(int argc, char* argv[])
     // THE GATE (BL-638 R2). Stated as a non-degeneracy property, never as a
     // share: the number that must move is the count of DEFAULT worlds in which
     // anything at all can file a return or be bought. It was 0 of 8.
-    check(antiquity.floors_met * 2 > static_cast<int>(seeds),
-          "R2 GATE: at the DEFAULT 0 CE epoch a majority of worlds seat at least one "
+    check(dflt.floors_met * 2 > static_cast<int>(seeds),
+          "R2 GATE: on the DEFAULT world a majority of worlds seat at least one "
           "PUBLIC specialist");
-    for (const sweep_result* sr : { &antiquity, &modern })
+    for (const sweep_result* sr : { &dflt })
     {
         check(sr->region_totals[0] > 0 && sr->region_totals[1] > 0
            && sr->region_totals[2] > 0,
               "R2 all three rungs are exercised at this epoch (the mapping is not "
               "degenerate)");
     }
-    check(antiquity.corp_totals[2] < antiquity.total_corps,
-          "R2 the antiquity default no longer classes EVERY corporation closed");
+    check(dflt.corp_totals[2] < dflt.total_corps,
+          "R2 the default world no longer classes EVERY corporation closed");
 
-    const std::vector<sweep_row>& rows = modern.rows;
-    const int total_corps   = antiquity.total_corps + modern.total_corps;
-    const int undeliverable = antiquity.undeliverable + modern.undeliverable;
-    const int via_region    = antiquity.via_region + modern.via_region;
-    const int via_character = antiquity.via_character + modern.via_character;
-    const int floors_met    = modern.floors_met;
+    const std::vector<sweep_row>& rows = dflt.rows;
+    const int total_corps   = dflt.total_corps;
+    const int undeliverable = dflt.undeliverable;
+    const int via_region    = dflt.via_region;
+    const int via_character = dflt.via_character;
+    const int floors_met    = dflt.floors_met;
 
 
     std::printf("\n--- R1/R4: derivability (a patched corp is a non-derivable one) ---\n");
@@ -608,10 +608,10 @@ int main(int argc, char* argv[])
           "R4 no corporation was individually patched to satisfy the floor");
 
     std::printf("\n--- R4: the public floor rides the existing reroll ---\n");
-    std::printf("(1960 arc) public floor met in %d of %u worlds; "
+    std::printf("(default world) public floor met in %d of %u worlds; "
                 "unmet floors STAND (never hand-fixed)\n",
                 floors_met, seeds);
-    std::printf("(antiquity default) floor UNMEETABLE in %d of %u worlds and WAIVED there.\n"
+    std::printf("(default world) floor UNMEETABLE in %d of %u worlds and WAIVED there.\n"
                 "     BL-638 made this RARE, not dead: under the retired Stage 4 read it fired "
                 "on every\n     default world, because no furnace ever lit on one. What "
                 "survives is the genuine\n     case -- a world that wrote no charter, or a "
@@ -620,7 +620,7 @@ int main(int argc, char* argv[])
                 "against it would silently relocate every corporation in the world.\n"
                 "     Same 'unmeetable by construction' waiver the focus floor carries for "
                 "corp_count < 3.\n",
-                seeds - antiquity.reachable_worlds, seeds);
+                seeds - dflt.reachable_worlds, seeds);
     for (const sweep_row& r : rows)
         if (!r.public_floor_met)
             std::printf("     seed %u: floor UNMET and standing -- 0 public specialists, "

@@ -148,14 +148,23 @@ save_envelope make_envelope()
     e.params.seed        = 0xC0FFEEu;
     e.params.abundance   = abundance_level::sparse;
     e.params.epoch_year  = -350;
-    // BL-760 (2): the two year fields must differ from EACH OTHER and from the
-    // authored default. Both default to 400, so a run that left them there would
-    // round-trip clean even if the writer swapped their order — an assertion that
-    // cannot fail is not an assertion. 137 and 291 are distinct, non-default, and
-    // not each other's transposition.
+    // BL-760 (2): a year field must differ from the authored default, or a run
+    // that left it there would round-trip clean even if the writer swapped its
+    // order — an assertion that cannot fail is not an assertion. 137 is
+    // non-default. (Its old twin, `industrial_years`, left the record at v20.)
     e.params.prehistory_years = 137;
-    e.params.industrial_years = 291;
     e.params.body_count       = 7;
+    // BL-1047 (save_game_version 20): the fields that choose the history. Each
+    // is non-default and distinct from its same-typed neighbours, so a
+    // transposition among the four int64 years or the three bools shows.
+    e.params.era_seed                       = 0x5EEDu;
+    e.params.empires_start_year             = -777;
+    e.params.empires_stop_year              = 1111;
+    e.params.exploration_sim_enabled        = false;
+    e.params.exploration_stop_year          = 1555;
+    e.params.industrialisation_span_enabled = true;
+    e.params.industrialisation_stop_year    = 1888;
+    e.params.resume_seeds_corridor_tier     = false;
     // preferences is the SEVENTH field and the one most exposed to the defect
     // this row exists for: save_game writes EIGHT consecutive same-typed `lean`
     // enums plus roll[3], all read back under one bound, so any two of them
@@ -388,16 +397,15 @@ int main()
                   && le.speed == env.speed,
               "S2 the clock survives (five distinct fields)");
 
-        // EVERY field, not three of six. prehistory_years and industrial_years
-        // were both unasserted on a record whose version was just bumped to 4,
+        // EVERY field, not three of six. prehistory_years and (until v20)
+        // industrial_years were both unasserted on a record whose version was just bumped to 4,
         // and both default to 400 — so an order swap in the writer round-tripped
         // clean and the comment guarding it was the only check (BL-760 (2)).
         check(le.params.seed == env.params.seed && le.params.abundance == env.params.abundance
                   && le.params.epoch_year == env.params.epoch_year
                   && le.params.prehistory_years == env.params.prehistory_years
-                  && le.params.industrial_years == env.params.industrial_years
                   && le.params.body_count == env.params.body_count,
-              "S3 world_params survives (the six scalar fields)");
+              "S3 world_params survives (the five original scalar fields)");
         const world_preferences& lp = le.params.preferences;
         const world_preferences& ep = env.params.preferences;
         check(lp.star == ep.star && lp.world_size == ep.world_size
@@ -418,8 +426,19 @@ int main()
         // fields must come back DISTINCT and in the right slots. Comparing
         // round-tripped-to-original cannot catch a swap if the writer and reader
         // swap symmetrically, so this pins them to their literal values.
-        check(le.params.prehistory_years == 137 && le.params.industrial_years == 291,
-              "S3 the two year fields land in the RIGHT slots (137/291, not swapped)");
+        check(le.params.prehistory_years == 137 && le.params.epoch_year == -350,
+              "S3 the epoch and prehistory fields land in the RIGHT slots (-350/137)");
+        // BL-1047, pinned to literals for the same reason.
+        check(le.params.era_seed == 0x5EEDu
+                  && le.params.empires_start_year == -777
+                  && le.params.empires_stop_year == 1111
+                  && le.params.exploration_stop_year == 1555
+                  && le.params.industrialisation_stop_year == 1888,
+              "S3 era_seed and the four span years survive in their slots (BL-1047, v20)");
+        check(!le.params.exploration_sim_enabled
+                  && le.params.industrialisation_span_enabled
+                  && !le.params.resume_seeds_corridor_tier,
+              "S3 the three span switches survive in their slots (false/true/false, BL-1047)");
         // Pinned to literals, not compared to the original: three consecutive
         // int64s of the same type are exactly the shape a symmetric writer/reader
         // transposition survives.

@@ -82,9 +82,11 @@ struct calendar_date
 /// January 1st of.
 ///
 /// THIS IS A VALUE, NOT A CONSTANT (BL-705). It was `constexpr int = 1960` up
-/// to 2026-08-31, which was simply wrong: `world_params::epoch_year` has
-/// defaulted to 0 since the ancient refocus (NR-177), and no UI site read it —
-/// so a 0 CE campaign rendered 1960-based dates on every clock in the shell.
+/// to 2026-08-31, which was simply wrong: `world_params::epoch_year` then
+/// defaulted to 0 (the ancient refocus, NR-177), and no UI site read it — so a
+/// 0 CE campaign rendered 1960-based dates on every clock in the shell. The
+/// default is 1960 again since the epoch flip (BL-1047); the value still has to
+/// be read, because `--epoch 0` remains a supported start.
 /// Both starts are supported (`docs/economy/ERAS.md` § Where the ladder starts),
 /// so a constant is wrong for one of them whichever value it holds.
 ///

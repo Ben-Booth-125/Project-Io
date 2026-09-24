@@ -827,7 +827,7 @@ void case_founding_schedule(int span_years)
 
     world_params wp;
     wp.seed             = 0;
-    wp.prehistory_years = span_years;
+    wp.empires_start_year = -span_years; // BL-1047: the span is the start year now
 
     generation_report rep;
     const world w = make_hard_coded_world(wp, &rep, world_gen_config{}, nullptr, nullptr,
@@ -995,7 +995,7 @@ void case_sea_legs_crossing(int seed_count)
     {
         world_params wp;
         wp.seed = static_cast<uint32_t>(s);
-        wp.prehistory_years = 2000;
+        wp.empires_start_year = -2000; // BL-1047: the span is the start year now
 
         generation_report     rep;
         era_minus_one_fixture fx;
@@ -1078,7 +1078,7 @@ void case_family_tree(int seed_count, int span_years)
         // fixed 4000-year prehistory window no longer lines up with where the walk
         // actually starts -- take it from the harness's own span argument instead,
         // matching case_founding_schedule (C12) and case_spawned_cultures (C13).
-        wp.prehistory_years = span_years;
+        wp.empires_start_year = -span_years; // BL-1047: the span is the start year now
 
         generation_report     rep;
         era_minus_one_fixture fx;
@@ -1189,7 +1189,7 @@ void case_settlement_seats(int seed_count)
     {
         world_params wp;
         wp.seed             = static_cast<uint32_t>(s);
-        wp.prehistory_years = 2000; // BL-871: the Empires span; long enough for real wars.
+        wp.empires_start_year = -2000; // BL-871: the Empires span; long enough for real wars (BL-1047: a start year).
 
         generation_report rep;
         const world w = make_hard_coded_world(wp, &rep, world_gen_config{});
@@ -1457,7 +1457,7 @@ void case_split_census(int seed_count, int span_years)
     {
         world_params wp;
         wp.seed = static_cast<uint32_t>(s);
-        wp.prehistory_years = span_years;
+        wp.empires_start_year = -span_years; // BL-1047: the span is the start year now
 
         generation_report     rep;
         era_minus_one_fixture fx;
@@ -1586,7 +1586,7 @@ void case_boundary_fold(int seed_count, int span_years)
     {
         world_params wp;
         wp.seed = static_cast<uint32_t>(s);
-        wp.prehistory_years = span_years;
+        wp.empires_start_year = -span_years; // BL-1047: the span is the start year now
 
         generation_report     rep;
         era_minus_one_fixture fx;

@@ -37,18 +37,20 @@ that say "era" in code, which already establishes those as separate axes. Nothin
 
 ### Where the ladder starts
 
-**The working start is the 1960s** (Ben, 2026-08-31). `world_params::epoch_year = 1960` selects it
-and the branch is live: `era_band_for_epoch` puts the recipe registry on the industrial band, and the
-prehistory sim runs to it in two spans, ancient then industrial (`docs/lore/HISTORY.md` § The
-epoch and the run). The 0 CE ancient
-start (Ben, 2026-08-12; NR-177 — the antiquity prehistory) remains a supported
-configuration on the same ladder; `docs/development/ROADMAP.md` § The two arcs owns which is the
-commercial product, and this document owns only the Era structure, which is the same on both.
+**The working start is the 1960s** (Ben, 2026-08-31). `world_params::epoch_year` defaults to 1960 and
+`era_band_for_epoch` puts the recipe registry on the industrial band. The epoch is a calendar and a
+band, never a history: generation reads no epoch, and the world it builds is the one the
+Industrialisation span closes on at 1960 whatever start is asked for
+(`../generation/INDUSTRIALISATION.md`). The 0 CE start (Ben, 2026-09-24) remains supported: the
+same world, dated 0 CE, on the ancient band. `docs/development/ROADMAP.md` § The two arcs owns
+which is the commercial product, and this document owns only the Era structure, which is the same
+on both.
 
 **The prehistory is a generator, not a play layer.** Generation runs a pre-epoch history sim that
-produces the world the campaign opens on, at either epoch. On the ancient arc it is one span: **400 years in one band, at 4 years a tick — 100
-decision rounds** (`world_params::prehistory_years = 400`, `src/world/hard_coded_world.hpp`; the
-single band is `hp.tick_bands[0] = {epoch_year, 4}` in `hard_coded_world.cpp`). A six-band ladder
+produces the world the campaign opens on, at either epoch. It runs three spans on one engine, each
+on one band at 4 years a tick: Empires, 400 BCE → 1200 CE; Exploration, to 1660; Industrialisation,
+to 1960 (`src/world/era_minus_one.cpp` derives each; `world_params::prehistory_years` is the scope
+knob that runs them at all). A six-band ladder
 (100 → 50 → 20 → 10 → 5 → 1 years) is authored as the `history_sim_params` struct default
 (`src/world/history_sim.hpp`) and read by the tile inspector and the harnesses; generation
 overrides it on every world. A settle-dominated run is the intended shape, not a defect (NR-205,
@@ -107,7 +109,8 @@ history; the search itself is BL-770 (Era 0 candidate search).
 
 - **`era_band`** (`src/world/recipe_registry.hpp`) tags each authored building type and recipe
   `any` / `ancient` / `industrial`, and the registry masks its browsable roster on the band the
-  campaign's `epoch_year` derives (below 1700 → ancient). It answers *which product is this* — a
+  campaign's `epoch_year` derives (below 1700 → ancient). The band is applied after generation and
+  never read by it, so choosing it moves no generated world. It answers *which product is this* — a
   world-wide fact fixed at generation (BL-433, era band). It is **not** the Era of this document.
 - **`condition_subject::era`** (`src/world/condition_set.cpp`) is the predicate subject the laws
   and techs layers evaluate. It measures **1 for a corp that owns a launchpad and 0 otherwise** —

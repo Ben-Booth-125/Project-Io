@@ -828,7 +828,7 @@ int main(int argc, char** argv)
     std::printf("=== exploration sweep (BL-937) - %d seeds, 1200 -> %lld CE ===\n\n", seed_count,
                 static_cast<long long>(through_year));
     if (through_year != 1660)
-        std::printf("NOTE: --through %lld runs the SHIPPED world (epoch 0) with Exploration's own call continued\n"
+        std::printf("NOTE: --through %lld runs the SHIPPED world (any epoch) with Exploration's own call continued\n"
                     "      past 1660. It runs Exploration's forces only, with the Empires-round overrides off\n"
                     "      (era_minus_one.cpp exploration_sim_params). Every reading below describes the close\n"
                     "      at %lld, including those whose names say 1660.\n\n",

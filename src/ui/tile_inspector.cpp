@@ -26,7 +26,7 @@ namespace ui {
 // needed to: `::campaign_epoch_year` (now `::history_datum_year`) is the FIXED,
 // SERIALISED datum `history_event::years_before_epoch` is measured against,
 // while `fmt::campaign_epoch_year()` is the year the LIVE CAMPAIGN opens on —
-// `world_params::epoch_year`, which is 0 by default and 1960 on the industrial
+// `world_params::epoch_year`, which is 1960 by default and 0 on the ancient
 // start, and both of which are supported (ERAS.md § Where the ladder starts).
 //
 // Asserting them equal is what pinned the tick calendar at 1960 while every

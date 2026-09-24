@@ -115,9 +115,10 @@ int main()
     // --- Generate the real world twice --------------------------------------
     world_params wp;
     wp.seed = 0xB235u;
-    // The 1960 epoch is the longest generation run, and the one C4's absence
-    // guard means something on. The DEFAULT epoch became 0 CE with the ancient
-    // refocus (NR-177), so ask for it rather than inheriting the campaign's.
+    // The 1960 epoch was the longest generation run, and the one C4's absence
+    // guard meant something on. Since the epoch flip (BL-1047) it is the
+    // default and builds the same world as any other epoch; restated so the
+    // case cannot drift with the default.
     wp.epoch_year = 1960;
     generation_report r1, r2;
     const world w1 = make_hard_coded_world(no_prehistory(wp), &r1);

@@ -329,9 +329,9 @@ int main()
         {
             world_params p;
             p.seed = 0xB2180000u + static_cast<uint32_t>(s) * 0x9E37u;
-            // The 1960 epoch runs the settlement pass through the industrial
-            // centuries, its longest run; the default 0 CE epoch (NR-177)
-            // stops it at the start year.
+            // The default 1960 epoch (BL-1047). The settlement pass no longer
+            // reads it: it stops at `world_params::settlement_stop_year` at any
+            // epoch, so this is the shipped world across a seed spread.
             p.epoch_year = 1960;
             generation_report rr;
             make_hard_coded_world(no_prehistory(p), &rr);

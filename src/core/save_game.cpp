@@ -83,21 +83,39 @@ bool r_prefs(std::istream& i, world_preferences& p)
     return true;
 }
 
+// save_game_version 20 (BL-1047): `industrial_years` is gone from the record
+// (the superseded arc it scoped is retired), and the descriptor gains the
+// fields that decide WHICH history generation plays -- `era_seed`, the span
+// switches and the span years -- so the envelope's params rebuild the world
+// they describe. Keep r_world_params in step, field for field.
 void w_world_params(std::ostream& o, const world_params& p)
 {
     w_u32(o, p.seed);
+    w_u32(o, p.era_seed);
     w_enum(o, p.abundance);
     w_i64(o, p.epoch_year);
     w_int(o, p.prehistory_years);
-    w_int(o, p.industrial_years); // save_game_version 4 (BL-747) -- keep r_world_params in step.
+    w_i64(o, p.empires_start_year);
+    w_i64(o, p.empires_stop_year);
+    w_bool(o, p.exploration_sim_enabled);
+    w_i64(o, p.exploration_stop_year);
+    w_bool(o, p.industrialisation_span_enabled);
+    w_i64(o, p.industrialisation_stop_year);
+    w_bool(o, p.resume_seeds_corridor_tier);
     w_int(o, p.body_count);
     w_prefs(o, p.preferences);
 }
 
 bool r_world_params(std::istream& i, world_params& p)
 {
-    return r_u32(i, p.seed) && r_enum(i, p.abundance, max_abundance) && r_i64(i, p.epoch_year)
-        && r_int(i, p.prehistory_years) && r_int(i, p.industrial_years) // save_game_version 4
+    return r_u32(i, p.seed) && r_u32(i, p.era_seed)
+        && r_enum(i, p.abundance, max_abundance) && r_i64(i, p.epoch_year)
+        && r_int(i, p.prehistory_years)
+        && r_i64(i, p.empires_start_year) && r_i64(i, p.empires_stop_year)
+        && r_bool(i, p.exploration_sim_enabled) && r_i64(i, p.exploration_stop_year)
+        && r_bool(i, p.industrialisation_span_enabled)
+        && r_i64(i, p.industrialisation_stop_year)
+        && r_bool(i, p.resume_seeds_corridor_tier)
         && r_int(i, p.body_count) && r_prefs(i, p.preferences);
 }
 

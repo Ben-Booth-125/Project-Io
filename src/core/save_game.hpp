@@ -176,7 +176,19 @@ inline constexpr uint32_t save_game_magic =
 /// and border-accord rungs having gone with their pass. A v18 stream carries
 /// bytes this reader no longer consumes, so it is refused whole on the same
 /// strict-equality contract as every prior bump.
-inline constexpr uint32_t save_game_version = 19; // BL-1074, the narrative passes retired
+///
+/// LAYOUT 20 = LAYOUT 19 WITH A RE-CUT `world_params` RECORD (BL-1047, the
+/// epoch flip): `w_world_params` drops `industrial_years` (the superseded
+/// two-span arc's scope, retired) and gains `era_seed` after `seed`, then
+/// `empires_start_year`, `empires_stop_year`, `exploration_sim_enabled`,
+/// `exploration_stop_year`, `industrialisation_span_enabled`,
+/// `industrialisation_stop_year` and `resume_seeds_corridor_tier` after
+/// `prehistory_years`. Once the epoch stopped choosing the history, these are
+/// what choose it, and a descriptor without them rebuilds a different world.
+/// A MID-RECORD re-cut, so a v19 stream misreads everything from `abundance`
+/// on -- refused whole on the same strict-equality contract. 20 is this
+/// lane's claim; 21 is held by another lane and 17 by BL-841's branch.
+inline constexpr uint32_t save_game_version = 20; // BL-1047, the epoch flip
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

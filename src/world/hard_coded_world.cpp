@@ -918,7 +918,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
         kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
                                            kepler_tiles, home_grid_width, home_grid_height, budget,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
-                                           /*stop_year=*/params.epoch_year,
+                                           // BL-1047: generation's own year, never
+                                           // the campaign epoch.
+                                           /*stop_year=*/world_params::settlement_stop_year,
                                            /*sim_start_year=*/sim_start);
         t_settlement_end = gen_clock::now(); // BL-754
 
@@ -1456,8 +1458,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // THE RUN PREDICATE IS THIS BLOCK'S NESTING. It sits inside
                 // the block that ran Exploration, so it runs if and only if
                 // Exploration ran (Ben, 2026-09-18) -- never on an epoch test
-                // of its own; on the superseded arc (epoch >= 1700) Exploration
-                // is off and this never opens. Its own gates are the switch
+                // of its own; on the superseded two-span arc Exploration is
+                // off and this never opens. Its own gates are the switch
                 // (on by default since BL-1044) and `stop_after_exploration`,
                 // which must stop BEFORE this span: that knob's own return
                 // sits below population centres, past this call, so it is

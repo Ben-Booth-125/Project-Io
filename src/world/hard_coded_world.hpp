@@ -63,26 +63,40 @@ struct world_params
     uint32_t        era_seed   = 0;
     abundance_level abundance  = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
 
-    /// Calendar year the generated world BEGINS at (BL-271, the Era -1 sandbox).
-    /// 1960 (default) is the campaign epoch: the settlement pass's own
-    /// industrialisation dating runs to the end. Any year below 1700 stops
-    /// the settlement pass at that year instead: regions founded later do not
-    /// exist yet, no furnace ever lights — that history is the year-tick
-    /// sim's to produce — and region demography is
-    /// seeded at founding and grown to the start year. Sandbox-only: the
-    /// 1960-era economy scaffolding (corps, markets, roads) still generates
-    /// underneath and is out of frame; gating it is BL-271's build.
-    /// **0 CE since 2026-08-12 (Ben, NR-177).** The ancient refocus makes the
-    /// antiquity branch above the DEFAULT rather than a sandbox opt-in: the
-    /// campaign now opens at 0 CE, so the settlement pass stops there and the
-    /// year-tick sim produces the run-up. The 1960 arc is not deleted — pass
-    /// `epoch_year = 1960` and it still runs, which is what keeps the parked
-    /// space work (era/space) buildable.
-    int64_t         epoch_year = 0;
+    /// THE CAMPAIGN'S CALENDAR: the year play opens on (BL-1047, the epoch
+    /// flip; INDUSTRIALISATION.md, "the flip changes the calendar alone").
+    ///
+    /// GENERATION DOES NOT READ IT. Every history span runs on its own fixed
+    /// years (`empires_start_year`, `empires_stop_year`, `exploration_stop_year`,
+    /// `industrialisation_stop_year`, and `settlement_stop_year` below), so the
+    /// same params at any epoch build the same world, byte for byte. What the
+    /// epoch decides is the tick calendar's day 0 (`ui::fmt::
+    /// set_campaign_epoch_year`) and the campaign's recipe band
+    /// (`era_band_for_epoch`, read by the app after generation, never by it).
+    ///
+    /// 1960 BY DEFAULT (Ben, 2026-09-08 and 2026-09-18): the year the
+    /// Industrialisation span closes, so the calendar opens where the history
+    /// stops. It used to be 0 CE (NR-177), and at 0 CE the settlement pass, the
+    /// Empires start and the recipe band all derived from it; they no longer
+    /// do, which is what lets the default move without moving a mechanism.
+    ///
+    /// EPOCH 0 IS STILL A SUPPORTED START (Ben, 2026-09-24): the same world,
+    /// dated so play opens at 0 CE, on the ancient recipe band.
+    int64_t         epoch_year = 1960;
 
-    /// Years of year-tick pre-history the antiquity branch simulates before the
-    /// epoch (Ben's figure: 400 at 4 years a tick). SCOPE KNOB, not a tuning
-    /// dial — set it to 0 and the pass is skipped entirely.
+    /// The year the settlement pass generates the map AT: regions the
+    /// colonisation walk dates after it are dropped, and demography is grown to
+    /// it (`run_settlement`'s `stop_year`). A fixed year of generation's own,
+    /// NOT the campaign epoch (BL-1047) -- it was the epoch while the epoch was
+    /// 0 CE, and it keeps that value so the world is unmoved by the flip.
+    static constexpr int64_t settlement_stop_year = 0;
+
+    /// THE ERA'S SCOPE KNOB: any positive value runs the history sim, `0`
+    /// skips it entirely. NOT a span length any more (BL-1047): the Empires
+    /// round runs `empires_start_year` -> `empires_stop_year` whatever this
+    /// holds. It used to set the start as `epoch_year - prehistory_years`,
+    /// which tied the round's opening to the campaign calendar -- a 1960 epoch
+    /// would have opened Empires in 1560 CE.
     ///
     /// It exists because wiring the sim into generation added ~23 s to EVERY
     /// world any caller builds, and the headless harnesses build several each.
@@ -94,11 +108,18 @@ struct world_params
     /// params still give the same world.
     int             prehistory_years = 400;
 
-    /// Years of INDUSTRIAL span the sim plays after the boundary year, on an
-    /// epoch that has one. `prehistory_years` is the ANCIENT span before it,
-    /// so a 1960 arc at the defaults runs 1160 -> 1560 -> 1960. Zero means no
-    /// industrial span and the run is single-span, as an ancient epoch is.
-    int             industrial_years = 400;
+    /// THE EMPIRES ROUND'S OWN START YEAR (BL-1047), mirroring
+    /// `empires_stop_year` below: 400 BCE, where `CIVILISATION.md` § The span
+    /// opens the round (Ben, 2026-09-09). A fixed calendar year, independent of
+    /// `epoch_year`. A harness that wants a longer or shorter round moves this.
+    int64_t         empires_start_year = -400;
+
+    /// The SUPERSEDED two-span arc's industrial half, in years, closing at
+    /// `industrialisation_stop_year`. ZERO BY DEFAULT and no longer chosen by
+    /// the epoch (BL-1047): the arc was retired outright (Ben, 2026-09-18), and
+    /// this field survives only until BL-1075 deletes the arc's machinery.
+    /// Nothing but a harness pinning that arc sets it.
+    int             industrial_years = 0;
 
     /// THE EMPIRES ROUND'S OWN STOP YEAR (BL-906), for a SINGLE-span run only
     /// (`era_minus_one_has_industrial_span(params) == false`) — independent of
@@ -114,12 +135,12 @@ struct world_params
     ///
     /// 1200 is Ben's ruling (2026-09-11) and the doc's own "1200 is unmoved" —
     /// it is a fixed year the Empires round closes ON, not a span length, so it
-    /// does not move if `prehistory_years` (the START side of the span) is
+    /// does not move if `empires_start_year` (the START side of the span) is
     /// ever retuned.
     ///
-    /// TWO-SPAN EPOCHS (>= 1700) DO NOT READ THIS FIELD. There the industrial
-    /// arc's own stop is `epoch_year` (the 1960 arc, untouched) and the ancient
-    /// half beneath it stops at `boundary_year`, both unaffected by BL-906.
+    /// THE TWO-SPAN ARC (`industrial_years > 0`) DOES NOT READ THIS FIELD.
+    /// There the industrial half stops at `industrialisation_stop_year` and the
+    /// ancient half beneath it at `boundary_year`, both unaffected by BL-906.
     ///
     /// Default 1200 matches the doc for every existing single-span caller —
     /// nothing opts in, the shipped world simply runs its documented span.
@@ -141,7 +162,7 @@ struct world_params
     /// nothing new gets. A caller that wants the span opts in here.
     ///
     /// Only read on a SINGLE-span Empires run (`!era_minus_one_has_industrial
-    /// _span(params)`) — a two-span (>= 1700) epoch's own industrial arc
+    /// _span(params)`) — the superseded two-span arc's own industrial half
     /// already plays past 1660 on a different calendar mapping, and stacking
     /// this on top of it is a question this item does not answer.
     /// DEFAULT FLIPPED TO TRUE (Ben, 2026-09-13, BL-946, resolving NR-847):
@@ -164,8 +185,8 @@ struct world_params
     ///
     /// THE RUN PREDICATE IS "EXPLORATION RAN", NEVER THE EPOCH (Ben,
     /// 2026-09-18): the span runs wherever Exploration runs, whatever
-    /// `epoch_year` says, and nowhere else. On the superseded arc (epoch >=
-    /// 1700) Exploration is off, so this span is too. The call site nests it
+    /// `epoch_year` says, and nowhere else. On the superseded two-span arc
+    /// Exploration is off, so this span is too. The call site nests it
     /// inside the block that ran Exploration, so the predicate is structural
     /// rather than a second reading of the same conditions.
     ///
@@ -179,18 +200,20 @@ struct world_params
     /// (with `resume_seeds_corridor_tier` below off too) to keep the BL-1031
     /// pins a live check.
     ///
-    /// NOT ON THE SAVE SEAM, on exactly the footing of `exploration_sim_enabled`
-    /// and `exploration_stop_year` above: `w_world_params` writes neither of
-    /// those, and a scope knob that decides which history generation plays is
-    /// not a property a loaded campaign re-reads. A loaded span world needs
-    /// nothing from it: generation has run, and what it left (the nations, the
-    /// centres, the chartered web) is world state the save already carries.
+    /// ON THE SAVE SEAM since envelope version 20 (BL-1047), with every other
+    /// span switch and span year: the envelope's `world_params` is the
+    /// descriptor a world is rebuilt from, and one missing the switches that
+    /// decide which history ran would rebuild a different world. A loaded
+    /// campaign does not re-generate from it; the fields are carried so the
+    /// descriptor is whole.
     bool industrialisation_span_enabled = true;
 
-    /// The calendar year the Industrialisation span closes: the campaign epoch the
-    /// span grows the world to (INDUSTRIALISATION.md: "1660 -> 1960 CE, 300
-    /// years"). A field on the same footing as `exploration_stop_year`, for a
-    /// harness that wants to bind a shorter span.
+    /// The calendar year the Industrialisation span closes: the year the span
+    /// grows the world to (INDUSTRIALISATION.md: "1660 -> 1960 CE, 300 years"),
+    /// and the default campaign epoch, but NOT read from `epoch_year` — the
+    /// history's close and the calendar's opening are two fields that agree by
+    /// default (BL-1047). A field on the same footing as
+    /// `exploration_stop_year`, for a harness that wants to bind a shorter span.
     int64_t         industrialisation_stop_year = 1960;
 
     /// BL-1037 — a resumed span's corridors reopen at the RUNG they were
@@ -201,7 +224,7 @@ struct world_params
     /// built on it; the Empires round resumes no corridors. A field here, not
     /// only the struct default, so an instrument can build the LEGACY arc
     /// (span off, this off): the world the BL-1031 pins were taken on.
-    /// NOT ON THE SAVE SEAM, on the footing of `industrialisation_span_enabled`.
+    /// On the save seam with `industrialisation_span_enabled` (envelope 20).
     bool resume_seeds_corridor_tier = true;
 
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).

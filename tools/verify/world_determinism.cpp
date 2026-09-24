@@ -17,15 +17,17 @@
 //       whole-world determinism guarantee EXCLUDED the year-tick history sim —
 //       the pass that runs 400 years of settlement, war and conquest before the
 //       campaign opens, and the pass an eight-sprint arc is about to change.
-//       R3 builds the DEFAULT world (epoch_year 0, prehistory_years 400) and
-//       asserts:
+//       R3 builds the DEFAULT world (epoch_year 1960 since the epoch flip,
+//       BL-1047; prehistory_years 400) and asserts:
 //         3.1 same seed + prehistory on, built twice -> identical world;
 //         3.2 a different seed + prehistory on -> a different world;
 //         3.3 prehistory on vs off at the SAME seed -> a different world, so the
 //             pass is demonstrably not a silent no-op;
 //         3.4 the pass reports having run, and having done something;
 //         3.5 the sim's own reported outcome (battles/conquests/foundings) is
-//             identical across the two same-seed runs.
+//             identical across the two same-seed runs;
+//         3.8 THE EPOCH IS A CALENDAR ALONE (BL-1047): the same seed at epoch
+//             0 builds the byte-identical world the default 1960 epoch does.
 //
 //       R3 deliberately uses the REAL default of 400 years, not a shortened
 //       run: a determinism guarantee measured over a span nobody ships is not
@@ -563,18 +565,18 @@ int main()
     // R3 — the same guarantee with the Era -1 pre-history pass ON
     // -----------------------------------------------------------------------
     // The values below are the SHIPPING DEFAULTS, restated explicitly so the
-    // case cannot drift with them: epoch_year 0 (the ancient refocus, NR-177)
-    // and prehistory_years 400 (Ben's figure, 4 years a tick = 100 rounds).
+    // case cannot drift with them: epoch_year 1960 (the epoch flip, BL-1047;
+    // it was 0 CE under NR-177) and prehistory_years 400 (the scope knob: on).
     // Nothing here is shortened to fit a timeout.
     std::printf("\n--- R3: determinism with the Era -1 pre-history pass ON ---\n");
     std::fflush(stdout);
 
     const world_params pre_a{ .seed = seed_a, .abundance = abundance_level::standard,
-                              .epoch_year = 0, .prehistory_years = 400 };
+                              .epoch_year = 1960, .prehistory_years = 400 };
     const world_params pre_b{ .seed = seed_b, .abundance = abundance_level::standard,
-                              .epoch_year = 0, .prehistory_years = 400 };
+                              .epoch_year = 1960, .prehistory_years = 400 };
     const world_params off_a{ .seed = seed_a, .abundance = abundance_level::standard,
-                              .epoch_year = 0, .prehistory_years = 0 };
+                              .epoch_year = 1960, .prehistory_years = 0 };
 
     generation_report rep_a1{}, rep_a2{}, rep_b{};
 
@@ -712,6 +714,26 @@ int main()
     }
     check(!w_a1.gen_carve_centres.empty() && w_a1.gen_carve_centres == w_a2.gen_carve_centres,
           "R3.7 the carve index is populated and identical across two same-seed builds (BL-1042)");
+
+    // 3.8 — BL-1047, THE EPOCH FLIP: the epoch is the campaign's calendar and
+    //       nothing else generation reads. Epoch 0 stays a supported start
+    //       (Ben, 2026-09-24), and it must be the SAME world dated differently
+    //       — every span runs on its own fixed years. A mechanism that still
+    //       keyed on the epoch (the settlement stop, the Empires start, an arc
+    //       predicate) would show here as a digest that differs.
+    {
+        world_params pre_a0 = pre_a;
+        pre_a0.epoch_year   = 0;
+        generation_report     rep_a0{};
+        era_minus_one_fixture fx_a0;
+        const world    w_a0 = timed_world(pre_a0, &rep_a0, "seed A, prehistory ON, epoch 0", fx_a0);
+        const uint64_t d_a0 = deep_digest(w_a0, fx_a0);
+        std::printf("     digest seedA/on/epoch0 = %016llX\n", static_cast<unsigned long long>(d_a0));
+        check(d_a0 == d_a1 && measure(w_a0) == m_a1
+                  && rep_a0.prehistory_years == rep_a1.prehistory_years
+                  && rep_a0.prehistory_battles == rep_a1.prehistory_battles,
+              "R3.8 epoch 0 and epoch 1960 build the byte-identical world (the flip moves the calendar alone)");
+    }
 
     // -----------------------------------------------------------------------
     // R4 — the TWO-SPAN arc (BL-747), and the generation budget (BL-754)

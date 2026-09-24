@@ -2,7 +2,8 @@
 // Headless Era -1 world harness (BL-271 first slice; no SDL / Lua / ImGui)
 // ---------------------------------------------------------------------------
 // Generates the canonical world with world_params::epoch_year = 0 — the 0 CE
-// antiquity start — and both VERIFIES the stop and PRINTS the world, because
+// start, which since the epoch flip (BL-1047) is the default world dated 0 CE
+// on the ancient band — and both VERIFIES the stop and PRINTS the world, because
 // "you cannot look at a screenshot and see whether relations are interesting"
 // (DEVLOG 2026-08-04 handoff: build the instrument before the feature).
 //
@@ -11,28 +12,19 @@
 //       last span generation ran (1200 Empires / 1660 Exploration); none is
 //       industrialised, and the median industrial year is 0 (nobody).
 //   R2  DEMOGRAPHY IS SEEDED. Every region holds population in
-//       (0, carrying_capacity]; manpower sits within its ceiling. The 1960
-//       settlement pass hands the era an unseeded table and the era seeds it
-//       (graduation is the era's job on both arcs, not the pass's).
+//       (0, carrying_capacity]; manpower sits within its ceiling, at both
+//       epochs.
 //   R3  MULTIPOLAR BY CONSTRUCTION. More than one nation exists at 0 CE —
 //       the precondition for BL-309's two-great-powers seed to mean anything.
 //   R4  DETERMINISM. Two epoch-0 generations produce byte-identical region
 //       tables (the settlement pass's whole deterministic surface).
-//   R5  THE 1960 ARC IS UNTOUCHED. An explicit epoch_year = 1960 world still
-//       runs Stage 4's endowment gate, lights a furnace somewhere across a
-//       four-world sweep, and holds at least as many regions as the 0 CE
-//       world.
-//
-// KNOWN BASELINE (BL-1010, 2026-09-16) — ONE RED IS EXPECTED ON MAIN:
-//   R5 "the 1960 arc still industrialises (reachable across the seed sweep)".
-//   Cause: no living polity's capacity passes 4 in any domain by 1960, and the
-//   Industrial rung needs 5, so no furnace lights on any swept seed. A world
-//   defect or a tuning wall, not a harness one; fixing it moves the 1960 world
-//   and is Ben's call (NR-807 made the industrial arc the live product). Also
-//   listed in DEVELOPMENT_PRACTICES.md § Known harness baselines. Any OTHER
-//   red is a regression.
-//   (R1 and R2 went red for a different reason — the checks were stale, not
-//   the code — and were restated in place; see their comments.)
+//   R5  THE 1960 WORLD IS THE 0 CE WORLD, DATED (BL-1047, the epoch flip).
+//       The default epoch is 1960 and it builds the same span-on world the
+//       0 CE start builds: the settlement pass hands the era the same table,
+//       and the finished region table is identical. Re-pointed from "the 1960
+//       arc is untouched" (Stage 4's endowment gate and a furnace sweep), which
+//       asserted the superseded arc the flip retired; that arc's known red
+//       baseline (no furnace lights by 1960) went with it.
 //   R7  THE 1660 TREASURIES CROSS THE FOLD (BL-975). Every nation's starting
 //       treasury is its folded polities' Exploration-span chest through the
 //       one per-mille NATION_GENERATION.md § Pass 7 names; a nation folded
@@ -106,12 +98,11 @@ int main()
     world wa = make_hard_coded_world(antiq, &rep_a, {}, nullptr, nullptr, &fx_a);
     world wb = make_hard_coded_world(antiq, &rep_b);
 
-    // R5's control world. NOT `{}` any more: the default epoch became 0 with the
-    // ancient refocus (NR-177), so default params now generate the SAME world as
-    // `antiq` and every R5 check would fail by construction rather than by
-    // regression. The 1960 arc is still reachable — it just has to be asked for.
+    // R5's world: the DEFAULT params, epoch 1960 since the flip (BL-1047). It
+    // used to reach the superseded two-span arc; it now builds the same span-on
+    // world as `antiq`, and R5 asserts exactly that.
     world_params modern{};
-    modern.epoch_year = 1960;
+    modern.epoch_year = 1960; // restated, so the case cannot drift with the default
     // The fixture is asked for so R2 can read the table the settlement pass
     // HANDED the era, before the sim seeded it (BL-1010).
     era_minus_one_fixture fx_60{};
@@ -170,7 +161,8 @@ int main()
         handed_latest = std::max(handed_latest, p.founded_year);
     for (const region& p : fx_a.settlement.pending_foundings)
         handed_latest = std::max(handed_latest, p.founded_year);
-    if (handed_latest > antiq.epoch_year) handed_by_epoch = false;
+    // BL-1047: the pass stops at its own year, not the epoch's.
+    if (handed_latest > world_params::settlement_stop_year) handed_by_epoch = false;
     std::printf("  R1: settlement handed the era %zu regions + %zu scheduled, latest founded %" PRId64
                 "; migration ended %" PRId64 "; the run closed at %" PRId64 "\n",
                 fx_a.settlement.regions.size(), fx_a.settlement.pending_foundings.size(),
@@ -196,20 +188,17 @@ int main()
     }
     check(pop_ok, "R2 every 0 CE region holds population within (0, capacity]");
     check(mp_ok, "R2 manpower sits within its population ceiling");
-    // RESTATED 2026-09-16 (BL-1010): the check was stale, not the code. It
-    // asserted every region of the FINISHED 1960 world holds zero people. That
-    // was true while the era ran only below 1700; since the two-span arc
-    // (BL-747, Ben 2026-09-03) a 1960 world runs the SAME sim, and the sim's
-    // opening seeds a headcount into every region the pass left at zero
-    // (history_sim.cpp, "the graduation path settlement.hpp's demography note
-    // leaves to this item"). So graduation is not the SETTLEMENT PASS's job on
-    // the 1960 arc — it is the era's, on both arcs. Measured on seed 0: the
-    // pass hands the era 206 regions, all at zero; the finished world holds 667,
-    // none at zero. The two halves are asserted where each now lives.
-    bool unseeded_1960 = fx_60.ran && !fx_60.settlement.regions.empty();
-    for (const region& p : fx_60.settlement.regions)
-        if (p.population != 0) unseeded_1960 = false;
-    check(unseeded_1960, "R2 the 1960 settlement pass hands the era an unseeded table (graduation not its path)");
+    // RE-POINTED BY THE EPOCH FLIP (BL-1047). This asserted the 1960
+    // settlement pass handed the era an UNSEEDED table — true of the superseded
+    // arc, whose settlement pass ran the full dating path and left graduation to
+    // the era. The pass no longer reads the epoch, so at 1960 it hands the era
+    // the very table it hands the 0 CE world: seeded at founding and grown to
+    // `settlement_stop_year`. The claim worth holding is that identity.
+    const bool same_handoff_1960 = fx_60.ran && fx_a.ran
+        && regions_identical(fx_60.settlement.regions, fx_a.settlement.regions)
+        && regions_identical(fx_60.settlement.pending_foundings, fx_a.settlement.pending_foundings);
+    check(same_handoff_1960,
+          "R2 the 1960 settlement pass hands the era the same table the 0 CE pass does (BL-1047)");
     bool seeded_1960 = !ps60.empty();
     for (const region& p : ps60)
         if (p.population <= 0 || p.population > region_carrying_capacity(p.farm_q)) seeded_1960 = false;
@@ -222,68 +211,26 @@ int main()
     check(regions_identical(ps, kb->settlement.regions),
           "R4 two 0 CE generations produce identical region tables");
 
-    // --- R5: the 1960 arc untouched ------------------------------------------
-    // RESTATED 2026-09-16 (BL-1010) — AND STILL RED, AS A NAMED BASELINE.
-    //
-    // WHAT WENT STALE. The check asserted that THIS ONE world lights a furnace.
-    // When it was written Stage 4 DATED every endowed region's furnace inside
-    // `run_settlement`, so a 1960 world industrialised by construction. BL-748
-    // moved the date into the run: a region lights only once its polity's
-    // MATERIALS capacity crosses the Industrial rung, and docs/lore/HISTORY.md
-    // § Stage 4 says "a polity that never climbs never lights, and that is a
-    // legitimate world". So at one seed the outcome is a reading, not an
-    // invariant — and the claim worth failing on is R6d's shape: a SWEEP in
-    // which no furnace ever lights means the mechanism is dead.
-    //
-    // WHY IT IS STILL RED (baseline, recorded in DEVELOPMENT_PRACTICES.md §
-    // Known harness baselines). Measured 2026-09-16 at epoch 1960. This sweep
-    // (default inputs): 22 / 10 / 36 / 13 regions carry a furnace lag, 0 of 4
-    // worlds light one. A one-off probe re-running the era off the fixture read
-    // WHY — on seed 0 under default inputs, and on seeds 0-3 under the app's
-    // shipped world_gen.lua + works.lua: no living polity's capacity passes 4 in
-    // ANY of the seven domains, and the Industrial rung needs 5
-    // (`roster_band_for_capacity`). Nobody crosses, so nothing lights. Not fixed here: any fix moves the 1960 world, and whether the
-    // industrial arc must industrialise by its epoch is Ben's call now that it
-    // is the live product (NR-807).
-    int lag_regions_1960 = 0, industrial_regions_1960 = 0;
-    for (const region& p : ps60)
-    {
-        if (p.industrial_lag_years >= 0) ++lag_regions_1960;
-        if (p.industrialised) ++industrial_regions_1960;
-    }
-    std::printf("  R5: 1960 seed 0 — %d regions carry a furnace lag, %d industrialised, median furnace year %" PRId64 "\n",
-                lag_regions_1960, industrial_regions_1960, k60->settlement.median_industrial_year);
-    check(lag_regions_1960 > 0, "R5 the 1960 arc still runs Stage 4's endowment gate (ground carries a furnace lag)");
-    {
-        int worlds_lit = industrial_regions_1960 > 0 ? 1 : 0;
-        for (std::uint32_t s = 1; s < 4; ++s)
-        {
-            world_params sp = modern;
-            sp.seed = s * 0x9E3779B1u; // R6d's seeds, so the two sweeps read the same worlds
-            generation_report rs{};
-            make_hard_coded_world(sp, &rs);
-            const auto* ks = kepler_entry(rs);
-            int lag = 0, lit = 0;
-            if (ks != nullptr)
-                for (const region& p : ks->settlement.regions)
-                {
-                    if (p.industrial_lag_years >= 0) ++lag;
-                    if (p.industrialised) ++lit;
-                }
-            std::printf("  R5: 1960 seed %u — %d regions carry a furnace lag, %d industrialised\n", s, lag, lit);
-            if (lit > 0) ++worlds_lit;
-        }
-        std::printf("  R5: a furnace lit in %d of 4 worlds at epoch 1960\n", worlds_lit);
-        check(worlds_lit > 0,
-              "R5 the 1960 arc still industrialises (reachable across the seed sweep) [BASELINE: no polity passes capacity 4]");
-    }
+    // --- R5: the 1960 world is the 0 CE world, dated -----------------------
+    // RE-POINTED BY THE EPOCH FLIP (BL-1047; Ben, 2026-09-18: the flip changes
+    // the calendar alone). This section asserted the SUPERSEDED arc an explicit
+    // 1960 epoch used to build: Stage 4's endowment gate put a furnace lag on
+    // the ground, and a four-world sweep asked whether a furnace lit (a named
+    // red baseline, BL-1010: no polity passed capacity 4). The flip retires that
+    // arc, and 1960 now builds the span-on world, so the claim that replaces it
+    // is the flip's own: the finished 1960 world IS the 0 CE world. Not
+    // weakened — a stronger claim, an identity rather than a reachability.
+    check(regions_identical(ps60, ps),
+          "R5 the finished 1960 region table is identical to the 0 CE one (the flip moves the calendar alone)");
+    check(w60.nations.size() == wa.nations.size(),
+          "R5 the 1960 world holds the same nations as the 0 CE world");
     // R5's region-count comparison is against the SETTLEMENT PASS's 0 CE
     // output, not against `ps`. Since the year-tick sim was wired into
     // generation (2026-08-12) the 0 CE world keeps founding regions for 400
     // years after the settlement pass stops — 1107 of them on a measured run —
     // so `ps` is no longer "what had been settled by year 0" and comparing 1960
     // against it asks the wrong question. The claim worth checking is unchanged:
-    // the 1960 arc settles at least as much ground as the ancient stop did.
+    // the 1960 world settles at least as much ground as the ancient stop did.
     world_params antiq_settled = antiq;
     antiq_settled.prehistory_years = 0;
     generation_report rep_settled{};
@@ -524,10 +471,9 @@ int main()
 
     // --- The dossier ---------------------------------------------------------
     std::printf("\n=== KEPLER AT 0 CE ===\n");
-    // Signed difference deliberately: the 0 CE world now out-founds the 1960 one
-    // (the year-tick sim keeps settling for 400 years), so an unsigned subtraction
-    // here wrapped to a nonsense number.
-    std::printf("regions: %zu at 0 CE (the 1960 arc reaches %zu — a difference of %" PRId64 ")\n",
+    // Signed difference deliberately (it is 0 since the epoch flip, BL-1047; an
+    // unsigned subtraction once wrapped to a nonsense number here).
+    std::printf("regions: %zu at 0 CE (the 1960 world reaches %zu — a difference of %" PRId64 ")\n",
                 ps.size(), ps60.size(),
                 static_cast<int64_t>(ps60.size()) - static_cast<int64_t>(ps.size()));
     std::printf("nations:   %zu\n", wa.nations.size());

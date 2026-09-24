@@ -18,13 +18,14 @@ generation stack hangs dated history lines off. Companion to `../generation/PLAN
 
 ## The epoch and the run
 
-**The ladder runs to whichever epoch the arc sets** — 0 CE for the ancient arc (Ben, 2026-08-12;
-NR-177) and 1960 for the industrial one (Ben, 2026-08-31). Stages 0–3 — agrarian surplus, the
-enforceable promise, fragmentation-with-connectivity, capital disciplines the sovereign — are
-pre-industrial in mechanism and sit inside the pre-epoch run on both arcs. Stage 4, the energy
-transition, sits inside the run only on an industrial epoch. The old Stages 5 and 6 (the rupture
-and saturation) lie past both epochs and are DLC-era material alongside the parked space arc; what
-replaces them is § Stage 5 below.
+**The ladder runs to 1960, whatever the epoch** (Ben, 2026-08-31; the epoch flip, 2026-09-18).
+The epoch is the campaign's calendar, not the run's stop: the spans close on their own fixed years,
+so a 0 CE start (Ben, 2026-09-24) opens the same world dated 0 CE
+(`../generation/INDUSTRIALISATION.md`). Stages 0–3 — agrarian surplus, the enforceable promise,
+fragmentation-with-connectivity, capital disciplines the sovereign — are pre-industrial in
+mechanism and sit inside the run. The old Stages 5 and 6 (the rupture and saturation) lie past the
+run and are DLC-era material alongside the parked space arc; what replaces them is § Stage 5
+below.
 
 **The run is two spans on one engine (Ben, 2026-09-03).** The sim plays the polities forward in
 an **ancient pass** — Classical and Medieval bands, ending at a **boundary year** — and, where the
@@ -53,8 +54,9 @@ epoch — no pre-resolved rupture, no Charter Act written after the political ma
 event; the sim produces that history live.
 
 **The span is a parameter, and the derivation lives in one place.** `era_minus_one.cpp` derives
-`history_sim_params` from `world_params`: `start_year = epoch_year − prehistory_years`,
-`stop_year = epoch_year`, the boundary year between the two spans, and the tick bands. `prehistory_years` is a **scope knob, not a tuning
+`history_sim_params` from `world_params`: each span's start and stop from its own fixed field
+(`empires_start_year`, `empires_stop_year`, `exploration_stop_year`,
+`industrialisation_stop_year`) — never from `epoch_year` — and the tick bands. `prehistory_years` is a **scope knob, not a tuning
 dial** — set to 0 it skips the pass entirely, which is how harnesses that do not test the era
 avoid paying for it. Every harness derives its parameters through the same helpers, so no check
 measures a different run from the one that generates a world (BL-462).
@@ -202,9 +204,9 @@ reached by playing — a people that spends its rounds fighting does not reach t
 "nobody industrialised" is an outcome the ladder can produce, not a gap for a later pass to fill
 in. `history_sweep` reports the distribution.
 
-Under an ancient epoch none of this fires: the gate never runs below 1700, so no region carries a
-lag and no furnace lights. The industrial clock the sim *does* run there is the capacity ladder
-itself (§ The works roster).
+On the generated world none of this fires: the settlement pass stops at 0 CE whatever the epoch,
+the gate never runs below 1700, so no region carries a lag and no furnace lights. The industrial
+clock the sim *does* run is the capacity ladder itself (§ The works roster).
 
 **A polity's investment follows its ground.** The ladder's seven domains are a *profile*, not a
 level: the Invest verb weighs how far a domain has fallen behind against what the polity's own

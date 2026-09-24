@@ -1232,6 +1232,11 @@ settlement_state run_settlement(const planetology_state& pl,
     // and the population that HAS arrived is seeded at founding and grown
     // logistically to the start year. RNG-safe: the founding loop above already
     // consumed its draws for every candidate, so the streams match the 1960 arc.
+    //
+    // THIS READS THE PASS'S OWN STOP YEAR, NEVER THE CAMPAIGN EPOCH (BL-1047).
+    // Generation passes `world_params::settlement_stop_year` (0 CE) whatever
+    // the calendar, so every generated world takes this branch; the full-dating
+    // path below it (Stage 4's furnace lag) is reached by no generation caller.
     const bool antiquity = stop_year < 1700;
     if (antiquity)
     {
