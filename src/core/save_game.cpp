@@ -564,6 +564,7 @@ void w_body_entry(std::ostream& o, const generation_report::body_entry& b)
     w_bool(o, b.tiles.used_convergent);
     w_timelapse(o, b.prehistory_timelapse); // save_game_version 3 (NR-733)
     w_timelapse(o, b.exploration_timelapse); // save_game_version 14 (BL-946)
+    w_timelapse(o, b.industrialisation_timelapse); // save_game_version 18 (BL-1068)
 }
 
 bool r_body_entry(std::istream& i, generation_report::body_entry& b)
@@ -575,7 +576,8 @@ bool r_body_entry(std::istream& i, generation_report::body_entry& b)
         && r_f32(i, b.tiles.deposit_scalar) && r_int(i, b.tiles.gw) && r_int(i, b.tiles.gh)
         && r_bool(i, b.tiles.used_convergent)
         && r_timelapse(i, b.prehistory_timelapse) // save_game_version 3 (NR-733)
-        && r_timelapse(i, b.exploration_timelapse); // save_game_version 14 (BL-946)
+        && r_timelapse(i, b.exploration_timelapse) // save_game_version 14 (BL-946)
+        && r_timelapse(i, b.industrialisation_timelapse); // save_game_version 18 (BL-1068)
 }
 
 void w_report(std::ostream& o, const generation_report& g)
@@ -602,6 +604,11 @@ void w_report(std::ostream& o, const generation_report& g)
     // save_game_version 15 (BL-969, the handoff validators' verdict) -- keep r_report in step.
     w_bool(o, g.handoff_invalid);
     w_str(o, g.handoff_violation);
+    // save_game_version 18 (BL-1068, the Industrialisation span's own counters) -- keep r_report in step.
+    w_i64(o, g.industrialisation_years);
+    w_i64(o, g.industrialisation_battles);
+    w_i64(o, g.industrialisation_conquests);
+    w_i64(o, g.industrialisation_foundings);
 }
 
 bool r_report(std::istream& i, generation_report& g)
@@ -619,7 +626,10 @@ bool r_report(std::istream& i, generation_report& g)
         && r_i64(i, g.exploration_years) && r_i64(i, g.exploration_battles)
         && r_i64(i, g.exploration_conquests) && r_i64(i, g.exploration_foundings)
         // save_game_version 15 (BL-969) -- keep w_report in step.
-        && r_bool(i, g.handoff_invalid) && r_str(i, g.handoff_violation);
+        && r_bool(i, g.handoff_invalid) && r_str(i, g.handoff_violation)
+        // save_game_version 18 (BL-1068) -- keep w_report in step.
+        && r_i64(i, g.industrialisation_years) && r_i64(i, g.industrialisation_battles)
+        && r_i64(i, g.industrialisation_conquests) && r_i64(i, g.industrialisation_foundings);
 }
 
 // ---------------------------------------------------------------------------

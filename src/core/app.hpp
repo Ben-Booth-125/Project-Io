@@ -442,7 +442,7 @@ private:
     /// `world_preferences`. The remainder are the PASS rounds — round 3 the
     /// migration (Culture), round 4 the history to 1200 CE (Empires), round 5 the
     /// Exploration span to 1660 CE (BL-946), and round 6 the Industrialisation
-    /// placeholder — which run an expensive pass inside the round rather than
+    /// span to 1960 CE (BL-1068) — which run an expensive pass inside the round rather than
     /// previewing it per keystroke (STARTUP.md § Rounds 4, 5 and 6). The two counts
     /// are deliberately separate: the wizard grew, the chart chain did not.
     ///
@@ -456,24 +456,27 @@ private:
     // Ben, 2026-09-13). System, Life, Culture, Empires, Exploration,
     // Industrialisation. The third planetology round -- 'Inheritance', which
     // carried the drawdown lean -- retires into Industrialisation, which is what
-    // draws a world down in the first place. It is still the honest empty
-    // placeholder BL-914 built, not new content.
+    // draws a world down in the first place. It plays the 1660 -> 1960 span
+    // (BL-1068).
     static constexpr int wizard_planetology_round_count = 2;
     static constexpr int wizard_round_count            = 6;
     /// The pass rounds, which own a reroll counter each rather than a preference block.
     static constexpr int wizard_pass_round_count =
         wizard_round_count - wizard_planetology_round_count;
     /// The pass rounds that play a TIME-LAPSE, and so own a record of their own:
-    /// round 3 (Culture, the migration), round 4 (Empires, the history) and now
-    /// round 5 (Exploration, BL-946). The Industrialisation placeholder round does
-    /// not, so it is deliberately NOT `wizard_pass_round_count`.
+    /// round 3 (Culture, the migration), round 4 (Empires, the history), round 5
+    /// (Exploration, BL-946) and round 6 (Industrialisation, BL-1068). Every
+    /// pass round is a lapse round now; the count stays its own constant
+    /// because the two say different things.
     ///
-    /// THE THREE LAPSE ROUNDS RUN THREE DIFFERENT SPANS on the one shared
+    /// THE FOUR LAPSE ROUNDS RUN FOUR DIFFERENT SPANS on the one shared
     /// engine (EXPLORATION.md sec The engine is shared): the migration's own
-    /// walk, the Empires history to 1200 CE, and the Exploration span to 1660
-    /// CE — each stopped at its own close by `world_gen_config::
-    /// stop_after_migration` / `stop_after_ancient_era` / `stop_after_exploration`.
-    static constexpr int wizard_lapse_round_count = 3;
+    /// walk, the Empires history to 1200 CE, the Exploration span to 1660 CE
+    /// and the Industrialisation span to 1960 CE. The first three are stopped
+    /// at their own close by `world_gen_config::stop_after_migration` /
+    /// `stop_after_ancient_era` / `stop_after_exploration`; round 6 runs the
+    /// FULL build with no stop, the world "Begin" would build.
+    static constexpr int wizard_lapse_round_count = 4;
 
     /// BL-948 — the three autoplay durations offered on every lapse round, in
     /// seconds for the whole span, and the one selected by default.
@@ -547,8 +550,8 @@ private:
     /// the ones below it.
     std::uint32_t m_wiz_pass_roll[wizard_pass_round_count] = {};
     /// Whether each pass round's output is current. A pass round is invalidated by
-    /// any reroll at or above it. The lapse rounds carry the record itself in
-    /// `m_wiz_history`; round 6's flag is still ahead of its pass (BL-819).
+    /// any reroll at or above it. The lapse rounds (all four pass rounds) carry
+    /// the record itself in `m_wiz_history`.
     bool          m_wiz_pass_current[wizard_pass_round_count] = {};
     /// --autostart-windowed wizard driver: frames spent in the wizard so far, or
     /// -1 when inactive (every interactive run). While >= 0 the wizard advances a
@@ -600,7 +603,7 @@ private:
     void launch_wizard_surface_build();       ///< Start the worker for the CURRENT pending params.
     void poll_wizard_surface();               ///< Per-frame: adopt a finished build, relaunch if stale.
 
-    // --- Rounds 4 and 5: the two time-lapse rounds (BL-829 / BL-830 / BL-860) --
+    // --- Rounds 3-6: the four time-lapse rounds (BL-829 / BL-860 / BL-946 / BL-1068) --
     //
     // THESE ROUNDS INVERT THE WIZARD'S MODEL and STARTUP.md § The wait is the
     // round says why: rounds 0-2 re-run a cheap chain preview on every control
@@ -685,7 +688,8 @@ private:
     /// Per session and per round, deliberately: a viewer who slows the Empires
     /// round down has said nothing about the migration.
     float m_wiz_history_secs[wizard_lapse_round_count]{
-        wizard_lapse_secs_default, wizard_lapse_secs_default, wizard_lapse_secs_default};
+        wizard_lapse_secs_default, wizard_lapse_secs_default, wizard_lapse_secs_default,
+        wizard_lapse_secs_default};
     /// Start lapse round @p lapse_index's pass for the CURRENT pending params.
     /// Synchronous under `--verify` (a capture must never race a worker), exactly
     /// as the wizard's surface build already is.

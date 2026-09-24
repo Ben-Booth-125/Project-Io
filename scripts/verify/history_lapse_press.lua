@@ -18,11 +18,12 @@
 -- wrong, not the code. Restoring the button to keep a check green would have
 -- been the wrong repair.
 --
--- BL-946 ADDS A THIRD LAPSE ROUND, Exploration, between Empires and the
--- Industrialisation placeholder: the wizard now walks SIX rounds --
--- System, Life, Culture, Empires, Exploration, Industrialisation -- and
--- Culture/Empires/Exploration all replay a real, recorded span on the same
--- shared engine (EXPLORATION.md sec The engine is shared).
+-- BL-946 ADDS A THIRD LAPSE ROUND, Exploration, between Empires and
+-- Industrialisation: the wizard walks SIX rounds -- System, Life, Culture,
+-- Empires, Exploration, Industrialisation. BL-1068 (round six plays the span)
+-- makes the last one a lapse round too, so all four pass rounds replay a real,
+-- recorded span on the same shared engine (EXPLORATION.md sec The engine is
+-- shared).
 --
 -- A1 IS NOW THE INTERESTING ONE, and it is why this script walks rather than
 -- parks. The auto-start hangs off the round-3 NEXT press, so a script that jumps
@@ -215,17 +216,43 @@ verify.expect(verify.history_powers() > 0,
               .. "on the round")
 verify.capture("press_07_round6_after_reroll")
 
--- A12 -- NEXT FROM 5 (EXPLORATION) LANDS ON 6, INDUSTRIALISATION -- the last round,
--- still the honest empty placeholder BL-914 built (BL-946 does not
--- build its content). Its own press is
--- "Begin" and this script does not touch it -- pressing it would generate a
--- world and leave the wizard entirely.
+-- A12 -- NEXT FROM 5 (EXPLORATION) LANDS ON 6, INDUSTRIALISATION (BL-1068) --
+-- the last round, and a lapse round like the three before it: it runs its
+-- own span (1660 -> 1960 CE) on arrival and its record is its OWN
+-- (`industrialisation_timelapse`), not Exploration's showing through. Its
+-- own press is "Begin" and this script does not touch it -- pressing it
+-- would generate a world and leave the wizard entirely.
 verify.click(NEXTP_X, NEXTP_Y)
-verify.frames(4)
+verify.frames(6)
 round = select(1, verify.wizard_round())
 verify.expect(round == 5, "NEXT on round 5 lands on round 6, INDUSTRIALISATION (0-based "
                           .. round .. ")")
-verify.capture("press_08_round7_industrialisation")
+local r7 = verify.history_powers()
+verify.expect(r7 > 0,
+              "round 6 (Industrialisation) runs its OWN pass on arrival (" .. r7 .. " powers)")
+local ind_first, ind_last = verify.history_span()
+verify.expect(ind_first == exp_last,
+              "Industrialisation opens where Exploration closed (" .. ind_first
+              .. " vs " .. exp_last .. ")")
+verify.expect(ind_last > ind_first,
+              "Industrialisation's own record spans years (" .. ind_first .. " -> "
+              .. ind_last .. ")")
+
+-- A13 -- THE LAPSE PLAYS: mid-span and at the close are DIFFERENT instants of
+-- one record, both holding ground. Captured at both so the round is seen
+-- mid-play and where it ends, not only as the frame it lands on.
+local ind_mid = ind_first + (ind_last - ind_first) // 2
+verify.history_year(ind_mid)
+verify.frames(2)
+local at_mid = verify.history_powers()
+verify.capture("press_08_round7_industrialisation_mid")
+verify.history_year(ind_last)
+verify.frames(2)
+local at_end = verify.history_powers()
+verify.expect(at_mid > 0 and at_end > 0,
+              "the Industrialisation span holds ground mid-span and at its close ("
+              .. at_mid .. " -> " .. at_end .. " powers)")
+verify.capture("press_08b_round7_industrialisation_end")
 
 -- A8 -- BACK WALKS THE LADDER DOWN ONE RUNG AT A TIME, and a finished record is
 -- NOT discarded and re-run on the way past. That guard is the reason the
@@ -237,6 +264,10 @@ verify.expect(round == 4, "Back from round 6 lands on round 5, EXPLORATION (0-ba
                           .. round .. ")")
 verify.expect(verify.history_powers() > 0,
               "round 5's (Exploration) record survived the trip to round 6 and back")
+local back_first = select(1, verify.history_span())
+verify.expect(back_first == exp_first,
+              "round 5 shows its OWN record again, not round 6's (" .. back_first
+              .. " vs " .. exp_first .. ")")
 
 verify.click(BACKP_X, BACKP_Y)
 verify.frames(4)

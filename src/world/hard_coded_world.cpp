@@ -1499,10 +1499,23 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     kepler_grudge_cap        = static_cast<int32_t>(dp.grudge_cap);
                     kepler_polity_treasuries = polity_treasuries_at_close(kepler_industrialisation.regions);
 
-                    // No report fields: `generation_report` is on the save seam
-                    // (a field there is a `save_game_version` bump), and the
-                    // wizard's Industrialisation round, the one reader a span
-                    // time-lapse would have, does not play a record yet.
+                    // BL-1068: THE RECORDED RECORD, on Exploration's footing
+                    // above -- the four counters and the time-lapse are the
+                    // record of the run for the wizard's Industrialisation
+                    // round, recorded here, at the one call site that ran the
+                    // span. Write-only: nothing at world setup reads them, so
+                    // recording cannot steer the world (save_game_version 18).
+                    if (report != nullptr)
+                    {
+                        report->industrialisation_years     = kepler_industrialisation_hs.years;
+                        report->industrialisation_battles   = kepler_industrialisation_hs.battles;
+                        report->industrialisation_conquests = kepler_industrialisation_hs.conquests;
+                        report->industrialisation_foundings = kepler_industrialisation_hs.foundings;
+                        for (generation_report::body_entry& be : report->bodies)
+                            if (be.id == kepler)
+                                be.industrialisation_timelapse = as_timelapse(kepler_industrialisation_hs);
+                    }
+
                     if (fixture != nullptr)
                     {
                         fixture->industrialisation_ran     = true;

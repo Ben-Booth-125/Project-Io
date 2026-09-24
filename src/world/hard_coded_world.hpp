@@ -562,6 +562,17 @@ struct generation_report
         /// what the wizard's new Exploration round replays.
         era_timelapse exploration_timelapse;
 
+        /// THE INDUSTRIALISATION SPAN'S OWN RECORD (BL-1068), 1660 -> 1960,
+        /// same shape and discipline as the two above -- recorded at the one
+        /// call site that ran the span, never re-simulated. Empty wherever the
+        /// span did not run (`industrialisation_span_enabled` off, Exploration
+        /// did not run, a `stop_after_exploration` run, or any body but the
+        /// cradle). This is what the wizard's Industrialisation round replays.
+        /// A RECORD ONLY: nothing at world setup reads it, so it cannot steer
+        /// the world it describes (a watched and an unwatched build are the
+        /// same build).
+        era_timelapse industrialisation_timelapse;
+
         /// Exactly what `generate_body_tiles` was called with for this body — the
         /// arguments that are NOT recoverable from anything else the report or the
         /// world holds (the seed above all: Kepler's is chosen by the BL-276
@@ -624,6 +635,14 @@ struct generation_report
     int64_t exploration_battles   = 0; ///< Battles fought in that span.
     int64_t exploration_conquests = 0; ///< Regions that changed hands.
     int64_t exploration_foundings = 0; ///< Regions founded (trade provinces) in that span.
+
+    // --- The Industrialisation span's own counters (BL-1068), same
+    // discipline again -- zero wherever that span did not run (see
+    // `body_entry::industrialisation_timelapse`).
+    int64_t industrialisation_years     = 0; ///< Years simulated in the Industrialisation span.
+    int64_t industrialisation_battles   = 0; ///< Battles fought in that span.
+    int64_t industrialisation_conquests = 0; ///< Regions that changed hands.
+    int64_t industrialisation_foundings = 0; ///< Regions founded in that span.
 
     // --- What the grudge record seeded (BL-898) -----------------------------
     //

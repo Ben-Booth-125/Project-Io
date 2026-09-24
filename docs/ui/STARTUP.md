@@ -127,10 +127,10 @@ rather than dropped: the drawdown lean is editable nowhere until the substrate p
 (1200 → 1660 CE, [`EXPLORATION.md`](../generation/EXPLORATION.md)) used to run opt-in behind
 `world_params::exploration_sim_enabled` (default false) with no round to show it — a real
 generation pass, invisible to the player. The default flips to **true** and a new round —
-**Exploration** — is inserted between Empires and the placeholder, which is renamed
-**Industrialisation** (still the same honest empty placeholder BL-914 built; its own content is a
-separate item). `wizard_round_count` 5 → 6, `wizard_pass_round_count` 3 → 4,
-`wizard_lapse_round_count` 2 → 3.
+**Exploration** — is inserted between Empires and the last round, which is renamed
+**Industrialisation**. `wizard_round_count` 5 → 6 and `wizard_pass_round_count` 3 → 4.
+**Every pass round is a lapse round** (BL-1068, round six plays the span): Industrialisation
+plays its own span like the three before it, so `wizard_lapse_round_count` is 4.
 
 The wizard does not stop at planetology. Four further rounds carry the generation
 phases — [`GENERATION_STRATEGY.md`](../generation/GENERATION_STRATEGY.md) § The eight
@@ -218,6 +218,15 @@ the phase's three beats as they occur:
 - **Decolonisation** — subjects refuse renewal and stand as their own polities; wars over
   empire flare, and on some worlds one becomes general.
 
+**Its run is the whole build (BL-1068, round six plays the span).** Rounds 3–5 each stop
+generation at their own close. Round 6 sets no stop: it runs the Industrialisation span and
+then everything after it — borders, roads, companies — which is the world Begin builds. Its
+record (`generation_report::body_entry::industrialisation_timelapse`, with its own
+battle/conquest/founding counters) is recorded once, at the call site that runs the span, and
+plays on the same map as rounds 3–5. The span runs only when Exploration ran and
+`world_params::industrialisation_span_enabled` is on (the default). The record is write-only:
+nothing at world setup reads it, so a watched and an unwatched build are the same build.
+
 **The round closes on the epoch's opening map.** When the playhead reaches 1960 the firms
 the search chartered from each city's budget draw in place, with the market carve and its
 price field — the landscape that was selected, never the candidates that were scored. The
@@ -257,7 +266,8 @@ the player can see that they have to wait, and what they are watching is a time-
 very fast calculation."*
 
 So a pass round is two moments, and they do not overlap. **The wait** is one centred line —
-*Loading the Culture round*, *Loading the Empires round*, *Loading the Exploration round* — and
+*Loading the Culture round*, *Loading the Empires round*, *Loading the Exploration round*,
+*Loading the Industrialisation round* — and
 under it a progress bar (Ben, 2026-09-18: *"wire in a progress bar for 'Loading x round'"*), and
 nothing else on the surface: no map, no board, no stage list, no year counter. The bar is the
 building screen's pair, read from the round's own run: an outer bar over the passes the run
@@ -304,12 +314,12 @@ next and painted under ground nobody holds yet, fading out over the opening tent
 span while the new round's own holders fade in over the same stretch. It is a cross-fade, not a
 cut — the Empires round opens on the migration's peoples and watches city states organise them
 (BL-920 made that literally what happens), and the same carry runs Empires into Exploration and
-will run Exploration into Industrialisation. A round whose predecessor was never run carries nothing
+Exploration into Industrialisation. A round whose predecessor was never run carries nothing
 and draws at full strength from its first frame.
 
 **The pass rounds draw the ground, not only the fill (Ben, 2026-09-11).** Rivers and the
 landform relief — mountains, highlands, the barriers the walk and the campaign both price — are
-drawn beneath the culture or polity fill on rounds 3, 4 and 5 (Exploration added by BL-946), and
+drawn beneath the culture or polity fill on every pass round, 3 to 6, and
 the fill is a tint over that ground rather than a flat colour that hides it. A frontier, a road
 and a bridge are legible only against the terrain they cross.
 

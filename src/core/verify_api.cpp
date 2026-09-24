@@ -1106,7 +1106,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     //
     // @param which  0 = round 3 (Culture, the migration), 1 = round 4
     //               (Empires, the history to 1200 CE), 2 = round 5
-    //               (Exploration, the span to 1660 CE, BL-946). Omitted means
+    //               (Exploration, the span to 1660 CE, BL-946), 3 = round 6
+    //               (Industrialisation, the span to 1960 CE, BL-1068). Omitted means
     //               0, which is what every existing script asked for when
     //               there was only one lapse round.
     v.set_function("history_run", [this](sol::optional<int> which) {

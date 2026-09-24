@@ -44,11 +44,10 @@ void app::open_new_world_wizard()
     //
     // NOT SIXTEEN HUNDRED YEARS, AND THAT IS A KNOWN GAP, NOT AN OVERSIGHT.
     // The design's full arithmetic is 400 BCE -> 1200 CE, 1,600 years — but
-    // reaching 1200 CE needs an epoch past it, and this wizard's epoch is
-    // still 0 CE: round 5 (Industrialisation) and pass 2's 1560 -> 1960 span
-    // (`GENERATION_STRATEGY.md` § Pass 2 is the economy pass) are not built
-    // yet (`draw_pass_round_placeholder`), so nothing today can watch the sim
-    // run past 0 CE. CIVILISATION.md's own words: "sixteen hundred years is
+    // reaching 1200 CE needed an epoch past it when this was written, and this
+    // wizard's epoch was 0 CE. (BL-906 later decoupled the Empires span from
+    // the epoch, and the Exploration and Industrialisation rounds, BL-946 and
+    // BL-1068, now play the spans past it.) CIVILISATION.md's own words: "sixteen hundred years is
     // the constraint on the phase going forward, not something to solve in
     // this item." What BL-871 owes is the SPLIT and the STARTING YEAR the
     // Culture round hands off at; the full depth is follow-on work once the
@@ -147,12 +146,14 @@ namespace {
 /// `app::launch_wizard_history_run` for why that matters more than it looks.
 ///
 /// @param lapse_index Which lapse round this is: 0 = Culture (the migration),
-///                   1 = Empires, 2 = Exploration (BL-946). Culture's owners
-///                   are CULTURES and it therefore carries the lineage
-///                   palette (BL-919); Empires and Exploration's owners are
-///                   polities and carry none. Exploration reads its own
-///                   recorded span (`exploration_timelapse`) rather than the
-///                   Empires round's `prehistory_timelapse`.
+///                   1 = Empires, 2 = Exploration (BL-946), 3 =
+///                   Industrialisation (BL-1068). Culture's owners are
+///                   CULTURES and it therefore carries the lineage palette
+///                   (BL-919); the later rounds' owners are polities and carry
+///                   none. Exploration and Industrialisation each read their
+///                   own recorded span (`exploration_timelapse` /
+///                   `industrialisation_timelapse`) rather than the Empires
+///                   round's `prehistory_timelapse`.
 /// @param adopted    True when the report is the harness's own finished world
 ///                   rather than a run stopped at this round's end. A finished
 ///                   report's record is the Empires sim's, so the Culture round
@@ -161,8 +162,9 @@ namespace {
 ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_index,
                                     bool adopted)
 {
-    const bool migration   = lapse_index == 0;
-    const bool exploration = lapse_index == 2;
+    const bool migration         = lapse_index == 0;
+    const bool exploration       = lapse_index == 2;
+    const bool industrialisation = lapse_index == 3;
 
     ui::history_lapse h;
 
@@ -173,7 +175,9 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
         if (b.is_homeworld) { home = &b; break; }
     if (home == nullptr) return h;
 
-    h.lapse  = exploration ? home->exploration_timelapse : home->prehistory_timelapse;
+    h.lapse  = industrialisation ? home->industrialisation_timelapse
+             : exploration       ? home->exploration_timelapse
+                                 : home->prehistory_timelapse;
     h.grid_w = home_grid_width;
     h.grid_h = home_grid_height;
 
@@ -236,9 +240,13 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
         // BL-946: Exploration reads its OWN counters -- the Empires round's
         // battles/conquests/foundings describe a different span entirely, and
         // showing them on this round would misreport what it actually ran.
-        h.battles   = exploration ? rep.exploration_battles   : rep.prehistory_battles;
-        h.conquests = exploration ? rep.exploration_conquests : rep.prehistory_conquests;
-        h.foundings = exploration ? rep.exploration_foundings : rep.prehistory_foundings;
+        // BL-1068: Industrialisation likewise, one span later.
+        h.battles   = industrialisation ? rep.industrialisation_battles
+                    : exploration       ? rep.exploration_battles   : rep.prehistory_battles;
+        h.conquests = industrialisation ? rep.industrialisation_conquests
+                    : exploration       ? rep.exploration_conquests : rep.prehistory_conquests;
+        h.foundings = industrialisation ? rep.industrialisation_foundings
+                    : exploration       ? rep.exploration_foundings : rep.prehistory_foundings;
     }
     return h;
 }
@@ -329,16 +337,25 @@ void app::launch_wizard_history_run(int lapse_index)
     // BL-1040: `stop_after_exploration` also keeps the Industrialisation span out
     // of round 5's run (generation gates the span on it), so this round plays
     // Exploration's record alone whatever `industrialisation_span_enabled` says.
-    // The Industrialisation round's own stop, `stop_after_industrialisation`, exists for
-    // the day that round plays a record; it is a placeholder today
-    // (`draw_pass_round_placeholder`) and launches no generation.
+    //
+    // ROUND 6 (Industrialisation, lapse_index 3, BL-1068) SETS NO STOP AT ALL.
+    // It runs the FULL build -- the Industrialisation span, then borders,
+    // roads, companies and the rest -- because that is the world "Begin"
+    // builds, and a round that has already built it is the one a later item
+    // can hand to Begin rather than building it twice. The span runs because
+    // nothing here sets `stop_after_exploration` and the pending params carry
+    // `industrialisation_span_enabled` unchanged (on by default). And
+    // `stop_after_industrialisation` stays unset: stopping at the 1960 close
+    // would throw away exactly the world a full run exists to keep. The world
+    // is still discarded below; only the record is read.
     world_gen_config hist_cfg = cfg;
     if (lapse_index == 0)      hist_cfg.stop_after_migration   = true;
     else if (lapse_index == 1) hist_cfg.stop_after_ancient_era = true;
-    else                       hist_cfg.stop_after_exploration = true;
+    else if (lapse_index == 2) hist_cfg.stop_after_exploration = true;
 
-    // BL-1053: the stages this stopped run will report (7 for the Culture
-    // round, 8 for the other two), published before the worker starts so the
+    // BL-1053: the stages this run will report (7 for the Culture round, 8
+    // for Empires and Exploration, the full count for Industrialisation's
+    // unstopped build), published before the worker starts so the
     // total never reads as the label table's size. Generation restates it.
     prog.stage_count.store(generation_stage_count(hist_cfg), std::memory_order_relaxed);
 
@@ -735,7 +752,7 @@ namespace {
 /// the real constants, so a drift here is a compile error, not a wrong layout.
 constexpr int planetology_rounds = 2;  // System, Life (BL-863)
 constexpr int pass_rounds        = 4;  // Culture, Empires, Exploration, Industrialisation (BL-946)
-constexpr int lapse_rounds       = 3;  // Culture, Empires, Exploration all replay a real record
+constexpr int lapse_rounds       = 4;  // every pass round replays a real record (BL-1068)
 
 /// Empires' historical-turbulence caption, shared between the layout-height
 /// estimate below and the actual draw call in the round switch, so the two
@@ -817,41 +834,15 @@ wizard_round_head wizard_round_head_at(int r)
           // fleet and a treaty become real.
           "Who reaches beyond this ground, and what do they bring back?" },
         { "Industrialisation",
-          // Still the honest empty placeholder BL-914 built -- the phase's own
-          // content is out of this item's scope (BL-1068 plays the span).
+          // BL-1068: the last pre-game span, 1660 to 1960 CE, on the same
+          // shared engine -- and the round whose run builds the whole world
+          // (docs/generation/INDUSTRIALISATION.md).
           "What does that ground produce, and who trades it?" },
     };
     int i = r - planetology_rounds;
     if (i < 0)             i = 0;
     if (i >= pass_rounds)  i = pass_rounds - 1;
     return passes[i];
-}
-
-/// The honest placeholder a pass round rests as until its pass is built. Labelled as
-/// a placeholder in as many words: an unlabelled empty pane reads as a finished
-/// surface, and the next session believes it.
-///
-/// Only the Industrialisation round reaches this now — Culture, Empires and
-/// Exploration all play a real record (BL-946) — so it no longer branches on
-/// which pass round asked.
-void draw_pass_round_placeholder()
-{
-    constexpr ImU32 col_dim   = IM_COL32(120, 128, 145, 255);
-    constexpr ImU32 col_label = IM_COL32(205, 170, 90, 255);
-
-    ImGui::PushStyleColor(ImGuiCol_Text, col_label);
-    ImGui::TextUnformatted("PLACEHOLDER - this round is not built yet");
-    ImGui::PopStyleColor();
-    ImGui::Spacing();
-
-    ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
-    ImGui::TextWrapped(
-        "Industrialisation will run the economy pass: 1660 to 1960, then the substrate carve - "
-        "metros, colonial reach, firms and their charters, and the market carve. "
-        "Nothing runs yet; the globe beside this is still the planetology globe.");
-    ImGui::Spacing();
-    ImGui::TextWrapped("Reroll and Back work. Nothing on this round changes the world yet.");
-    ImGui::PopStyleColor();
 }
 
 /// One preference row: a name, then four segmented options with `Any` first.
@@ -1013,9 +1004,9 @@ void app::draw_generation_screen()
 
     // ── A LAPSE ROUND'S playback, advanced once per frame and read TWICE — the
     //    board on the left and the map on the right must show the same instant, so
-    //    the slice is materialised here rather than in each of them. Rounds 3, 4
-    //    and 5 (Culture, Empires, Exploration) are all lapse rounds and each owns
-    //    its own record slot (BL-946). ──
+    //    the slice is materialised here rather than in each of them. Rounds 3-6
+    //    (Culture, Empires, Exploration, Industrialisation) are all lapse rounds
+    //    and each owns its own record slot (BL-946, BL-1068). ──
     const bool lapse_round =
         (!planetology_round && pass_index < wizard_lapse_round_count);
     const int  lapse_index = lapse_round ? pass_index : 0;
@@ -1270,8 +1261,8 @@ void app::draw_generation_screen()
         }
         else if (lapse_round)
         {
-            // ── Rounds 3, 4 and 5: the wait, then the board (BL-829 / BL-830 /
-            //    BL-860 / BL-946) ──
+            // ── Rounds 3-6: the wait, then the board (BL-829 / BL-830 /
+            //    BL-860 / BL-946 / BL-1068) ──
             //
             // THE TRANSPORT IS DELIBERATELY PLAIN. The wizard's standing premise —
             // *you set conditions here, you do not steer* — and the globe's own
@@ -1301,6 +1292,7 @@ void app::draw_generation_screen()
                         "Loading the Culture round",
                         "Loading the Empires round",
                         "Loading the Exploration round",
+                        "Loading the Industrialisation round",
                     };
                     const char* const label = k_loading[lapse_index];
                     const float w  = ImGui::GetContentRegionAvail().x;
@@ -1365,9 +1357,14 @@ void app::draw_generation_screen()
                       "previewed: the history is the most expensive pass in the "
                       "project, and it cannot be re-rolled on every keystroke the way "
                       "the planetology rounds are."
-                    : "Treasuries, treaties and fleets from 1200 CE, run here rather "
+                    : lapse_index == 2
+                    ? "Treasuries, treaties and fleets from 1200 CE, run here rather "
                       "than previewed: conflict moves off the home coast in this span, "
                       "and it cannot be re-rolled on every keystroke the way the "
+                      "planetology rounds are."
+                    : "Industry from 1660 to 1960, run here rather than previewed: "
+                      "this round builds the whole world the campaign opens on, and "
+                      "it cannot be re-rolled on every keystroke the way the "
                       "planetology rounds are.");
             }
             else
@@ -1486,14 +1483,10 @@ void app::draw_generation_screen()
                 else if (lapse_index == 2)
                     dim_text("This round's own span, 1200 to 1660 CE — where conflict "
                              "moves off the home coast (docs/generation/EXPLORATION.md).");
+                else if (lapse_index == 3)
+                    dim_text("This round's own span, 1660 to 1960 CE — the last before "
+                             "the campaign opens (docs/generation/INDUSTRIALISATION.md).");
             }
-        }
-        else
-        {
-            // Round 6's real chart surface — the substrate readout — arrives with its
-            // pass. Until then the round says so in as many words rather than showing
-            // an empty column.
-            draw_pass_round_placeholder();
         }
 
         ImGui::EndChild();
@@ -1713,10 +1706,14 @@ void app::draw_generation_screen()
                     ImGui::TextWrapped(running
                         ? "  The history is starting."
                         : "  The history has not been run for this world yet.");
-                else
+                else if (lapse_index == 2)
                     ImGui::TextWrapped(running
                         ? "  The exploration is starting."
                         : "  The exploration has not been run for this world yet.");
+                else
+                    ImGui::TextWrapped(running
+                        ? "  The industrialisation is starting."
+                        : "  The industrialisation has not been run for this world yet.");
                 ImGui::PopStyleColor();
             }
             else
