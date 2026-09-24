@@ -598,7 +598,7 @@
    "design": "RULED (Ben, 2026-09-24). Found watching BL-1068's round 6: it animates borders and seats, but the phase's story is industry, and none of it shows — on the verify seed the map barely changes 1810-1960. INDUSTRIALISATION.md § Beat 1 owns what industrialises (industry points; a region's furnace crossing, region::industrial_year; the Industry tree).\n\nTHE WORK (a reading to confirm at the live click, not a closed design). (1) The span's timelapse records, per sampled year, the industry the round is about: which regions have crossed the furnace (by year), each polity's industry points, and the railway/road corridors the span lays if it lays any — whatever the span actually computes; do not invent a quantity it lacks. (2) The map: a region that has crossed the furnace is marked (tinted or glyphed) from its crossing year on, so the lapse visibly industrialises. (3) The board gains an industry column (industry points) beside People/Land/Pop. (4) The ticker carries crossings ('X's heartland lights its furnaces, 1782') beside treaties. (5) The record is save-format state (envelope version; claim it through the ledger BL-1081 adds, or by the scan if that has not landed). Watched and unwatched runs byte-identical; world_determinism digests unchanged.\n\nDONE WHEN. A live Release click-through of round 6 where industry visibly spreads across the span, the board ranks industry, and the ticker names crossings."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "sprint": "46",
    "written": "2026-09-24",
@@ -617,7 +617,8 @@
     "tools/session/next_save_version.js",
     "save_version_reservations.jsonl"
    ],
-   "design": "RULED (Ben, 2026-09-24). Two agents bumped save_game_version (the envelope, save_game.cpp) in one day (BL-1068 to 18, BL-1074 to 19) with no ledger: next_save_version.js reads only world_save_version, and an envelope line in the ledger made it report a false collision. THE WORK: the tool reads both constants and every ref, the ledger records which version a claim is for (world or envelope), and it reports the next safe number of each. DONE WHEN: `node tools/session/next_save_version.js` prints both and the ledger's existing rows parse unchanged."
+   "design": "RULED (Ben, 2026-09-24). Two agents bumped save_game_version (the envelope, save_game.cpp) in one day (BL-1068 to 18, BL-1074 to 19) with no ledger: next_save_version.js reads only world_save_version, and an envelope line in the ledger made it report a false collision. THE WORK: the tool reads both constants and every ref, the ledger records which version a claim is for (world or envelope), and it reports the next safe number of each. DONE WHEN: `node tools/session/next_save_version.js` prints both and the ledger's existing rows parse unchanged.",
+   "resolved": "2026-09-24"
   }
  ]
 }
