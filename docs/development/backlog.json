@@ -363,7 +363,7 @@
     "src/world/market_clearing.cpp",
     "src/world/corp_ai.cpp"
    ],
-   "design": "RULED IN DIRECTION (Ben, 2026-09-24: 'goods should move'); the MECHANISM is open. FOUND on BL-1066: auto-surplus sells every unit above processor reservation to the local market (the market is buyer of last resort), and market inventory has no owner, so nothing hauls it — on the epoch-0 verify world ~3,300 steel sat on 13 of 255 shelves while construction sites elsewhere paused for it. BL-995 (trade reaches for price) makes a SELLER haul before it sells; stock already on a shelf still cannot move.\n\nMECHANISM OPTIONS (Ben's call, then written into SUPPLY.md and MARKETS.md): (a) any corporation may BUY shelf stock at the shelf's price and haul it under the same net-price rule — a merchant is just a corp acting on a gap, one rule for every corp; (b) the market itself exports its surplus shelf stock by the net-price rule, the haul paid from the sale; (c) a construction site or processor may buy from the nearest stocked shelf across markets, paying the haul (narrow: fixes consumers, not trade).\n\nDONE WHEN. A shelf holding a good that another market prices above landed cost is drawn down by hauls, measured by haulage_measure --far-trade and steel_chain_probe's shelf geography."
+   "design": "MECHANISM RULED (Ben, 2026-09-24): option (b) — the market exports its own surplus shelf stock by the net-price rule, the haul paid from the export. SUPPLY.md § Dispatch trigger ('A market exports its own shelf') owns it.\n\nTHE WORK. In the dispatch step, AFTER corporations' dispatch: for each market and good, shelf inventory (above what its own local consumers drew last clear — measure, do not guess) is a source under net(d) = price_d - haul - [handling, duty when built]; send to argmax net(d) above the margin, quantity = the same absorbable room corporations use (all pending subtracted). The convoy has no corporation: model its owner as the source market (a convoy field or a sentinel owner) and settle: on arrival the cargo lands on the DESTINATION market's shelf and sells there; the haul is charged against the export's proceeds — decide with FINANCE.md where the net proceeds go (the source market holds no treasury today: the options are that they vanish as the market's margin, or credit the source market's nation as a tariff-like line) and state it. Interdiction, LP and the arrived-this-tick rule apply as to any convoy. Harness rows: a shelf with a far better-priced market exports; one under the margin does not; no churn; goods conserved (shelf debit = cargo = destination shelf credit).\n\nDONE WHEN. On the epoch-0 verify world the stranded shelf steel moves toward the markets pricing it (steel_chain_probe's shelf geography), and haulage_measure --far-trade shows market exports as their own line.\n\n--- EARLIER ---\nRULED IN DIRECTION (Ben, 2026-09-24: 'goods should move'); the MECHANISM is open. FOUND on BL-1066: auto-surplus sells every unit above processor reservation to the local market (the market is buyer of last resort), and market inventory has no owner, so nothing hauls it — on the epoch-0 verify world ~3,300 steel sat on 13 of 255 shelves while construction sites elsewhere paused for it. BL-995 (trade reaches for price) makes a SELLER haul before it sells; stock already on a shelf still cannot move.\n\nMECHANISM OPTIONS (Ben's call, then written into SUPPLY.md and MARKETS.md): (a) any corporation may BUY shelf stock at the shelf's price and haul it under the same net-price rule — a merchant is just a corp acting on a gap, one rule for every corp; (b) the market itself exports its surplus shelf stock by the net-price rule, the haul paid from the sale; (c) a construction site or processor may buy from the nearest stocked shelf across markets, paying the haul (narrow: fixes consumers, not trade).\n\nDONE WHEN. A shelf holding a good that another market prices above landed cost is drawn down by hauls, measured by haulage_measure --far-trade and steel_chain_probe's shelf geography."
   },
   {
    "status": "designed",
@@ -500,7 +500,7 @@
     "docs/ui/question_log.json",
     "docs/ai/ACTIONS.json"
    ],
-   "design": "DESIGNED WITH BEN, 2026-09-24 (the design session NR-898 (12) required before any code read). STARTUP.md § The seat owns it — read the whole section; CORPORATION_GENERATION.md § The spawn shortlist, and the seat was amended the same day. BL-880 (cancelled) was the first design and is superseded by the section.\n\nTHE RULINGS. (1) A ranked list beside the map; the map is the home body at the wizard's world and highlights the hovered row's firm (HQ, works, home market catchment). (2) EVERY specialist is offered, in static-score order; the viability floor MARKS the ones below it and they stay pickable. (3) The card shows four things: industry and goods; HQ and home market with its prices for the firm's goods and inputs; cash, debt and assets; its nation and that nation's stance. (4) Picking opens a briefing (the opening position in prose; for a marked firm, why the floor marked it), then Confirm seats the player and opens play, Back returns with nothing changed. (5) The seat is reproducible from (seed, pick).\n\nTHE WORK. The canvas at Begin over the adopted world (BL-1073 keeps it); the seat step re-pointed from the weighted draw to the pick (the draw stays for --verify/--serve/headless paths that have no player to ask, and says so); the pick as a command so an agent can make it (ACTIONS.json entry — the wizard is out of the dictionary's scope, but seating a corporation is a game act, not a wizard control: confirm with Ben if in doubt); question_log.json entry with the surface's question ('which corporation am I?').\n\nDONE WHEN. A live click-through: Begin -> list + map -> hover highlights -> pick -> briefing -> Confirm -> play opens seated on the chosen firm; Back returns unchanged; a marked firm is pickable; (seed, pick) reproduces the seat (state hash); question_log and ACTIONS entries written."
+   "design": "DESIGNED WITH BEN, 2026-09-24 (the design session NR-898 (12) required before any code read). STARTUP.md § The seat owns it — read the whole section; CORPORATION_GENERATION.md § The spawn shortlist, and the seat was amended the same day. BL-880 (cancelled) was the first design and is superseded by the section.\n\nTHE RULINGS. (1) A ranked list beside the map; the map is the home body at the wizard's world and highlights the hovered row's firm (HQ, works, home market catchment). (2) EVERY specialist is offered, in static-score order; the viability floor MARKS the ones below it and they stay pickable. (3) The card shows four things: industry and goods; HQ and home market with its prices for the firm's goods and inputs; cash, debt and assets; its nation and that nation's stance. (4) Picking opens a briefing (the opening position in prose; for a marked firm, why the floor marked it), then Confirm seats the player and opens play, Back returns with nothing changed. (5) The seat is reproducible from (seed, pick).\n\nTHE WORK. The canvas at Begin over the adopted world (BL-1073 keeps it); the seat step re-pointed from the weighted draw to the pick (the draw stays for --verify/--serve/headless paths that have no player to ask, and says so); the pick as a command so an agent can make it (ACTIONS.json entry: RULED Ben 2026-09-24 — the pick is a game act, so it has a dictionary entry although the wizard does not); question_log.json entry with the surface's question ('which corporation am I?').\n\nDONE WHEN. A live click-through: Begin -> list + map -> hover highlights -> pick -> briefing -> Confirm -> play opens seated on the chosen firm; Back returns unchanged; a marked firm is pickable; (seed, pick) reproduces the seat (state hash); question_log and ACTIONS entries written."
   },
   {
    "status": "designed",
@@ -544,6 +544,80 @@
     "src/core/app.cpp"
    ],
    "design": "FOUND 2026-09-24 building BL-1073 (Begin adopts the wizard's world): even with the world adopted, background_firms blocks ~18 s on the UI thread in Release (Windows marks a window hung after ~5 s), and the validation run then took 112 s for 12 ticks (~9.4 s a tick; measured under memory pressure, so possibly inflated — STARTUP.md's figure is ~0.9 s). Related: NR-915 (the live-tick tail), under investigation.\n\nTHE WORK. Move every post-Begin step that can exceed ~1 s onto the worker the wizard already uses, behind the same wait surface BL-1072 built (caption, bar, elapsed count), so the window never stops pumping events; re-measure the validation run's per-tick cost quietly and reconcile STARTUP.md's figure.\n\nDONE WHEN. From Begin to the select-company canvas (BL-1076) the window never stops responding, and the wait shows what it is doing."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1079",
+   "short_name": "LIVE_TICK_SPEEDUPS",
+   "author": "Ben (2026-09-24, NR-915 option A); Claude",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "The live tick's two hot loops are cut with identical results: the province ceiling cached within a tick, and each pool's origin tile resolved once per dispatch pass",
+   "authority_doc": "docs/generation/PROVINCES.md",
+   "files": [
+    "src/world/province.cpp",
+    "src/world/placement_rules.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/supply_system.cpp",
+    "src/world/market_clearing.cpp",
+    "tools/verify/live_tick_cost_probe.cpp"
+   ],
+   "design": "RULED (Ben, 2026-09-24): NR-915 option A — pure speed-ups, identical results, no re-bless. The measurement is NR-915's investigation entry (tools/verify/live_tick_cost_probe).\n\nTHE WORK. (1) measure_province_sustain rebuilds a map over every population centre per call and the military_base candidate calls it ~820-3,100 times per base-less corp per evaluation: build the population-by-tile map once per tick (or per scan) and invalidate it wherever centres or their scale change (growth, razing, urban transform, road changes if the sustain reads them) — find every writer. (2) dispatch: resolve each source pool's origin tile ONCE per pass, not per destination; make markets_by_body stop scanning every market per call (build once per pass). (3) NO RESULT MAY MOVE: world_determinism digests identical, AND a live-tick state hash after N ticks identical before/after on seeds 0, 28, 41 (add the before/after hash to live_tick_cost_probe or a sibling). (4) Re-measure the tail with live_tick_cost_probe on seeds 41, 31, 28, 0, 13 on a quiet machine.\n\nDONE WHEN. Identical hashes; the econ step and dispatch shares fall as estimated (~90% / ~70%); NR-915 resolved with the new tail."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "requires": [
+    "BL-1068"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1080",
+   "short_name": "ROUND_SIX_SHOWS_INDUSTRY",
+   "author": "Ben (2026-09-24: yes, add an industry layer this sprint); Claude",
+   "category": "UI",
+   "priority": "S",
+   "difficulty": 3,
+   "title": "The Industrialisation round shows industry, not only borders: furnace crossings, industry points and the railways as the span plays",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/history_sim.cpp",
+    "src/core/save_game.cpp"
+   ],
+   "design": "RULED (Ben, 2026-09-24). Found watching BL-1068's round 6: it animates borders and seats, but the phase's story is industry, and none of it shows — on the verify seed the map barely changes 1810-1960. INDUSTRIALISATION.md § Beat 1 owns what industrialises (industry points; a region's furnace crossing, region::industrial_year; the Industry tree).\n\nTHE WORK (a reading to confirm at the live click, not a closed design). (1) The span's timelapse records, per sampled year, the industry the round is about: which regions have crossed the furnace (by year), each polity's industry points, and the railway/road corridors the span lays if it lays any — whatever the span actually computes; do not invent a quantity it lacks. (2) The map: a region that has crossed the furnace is marked (tinted or glyphed) from its crossing year on, so the lapse visibly industrialises. (3) The board gains an industry column (industry points) beside People/Land/Pop. (4) The ticker carries crossings ('X's heartland lights its furnaces, 1782') beside treaties. (5) The record is save-format state (envelope version; claim it through the ledger BL-1081 adds, or by the scan if that has not landed). Watched and unwatched runs byte-identical; world_determinism digests unchanged.\n\nDONE WHEN. A live Release click-through of round 6 where industry visibly spreads across the span, the board ranks industry, and the ticker names crossings."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "46",
+   "written": "2026-09-24",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1081",
+   "short_name": "ENVELOPE_VERSION_LEDGER",
+   "author": "Ben (2026-09-24, yes); Claude",
+   "category": "Tools",
+   "priority": "C",
+   "difficulty": 1,
+   "title": "next_save_version.js and the reservation ledger cover the save envelope's version too",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/session/next_save_version.js",
+    "save_version_reservations.jsonl"
+   ],
+   "design": "RULED (Ben, 2026-09-24). Two agents bumped save_game_version (the envelope, save_game.cpp) in one day (BL-1068 to 18, BL-1074 to 19) with no ledger: next_save_version.js reads only world_save_version, and an envelope line in the ledger made it report a false collision. THE WORK: the tool reads both constants and every ref, the ledger records which version a claim is for (world or envelope), and it reports the next safe number of each. DONE WHEN: `node tools/session/next_save_version.js` prints both and the ledger's existing rows parse unchanged."
   }
  ]
 }

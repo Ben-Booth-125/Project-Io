@@ -121,6 +121,10 @@ send to argmax_d net(d)   if   net(d) − price_src  >  margin_threshold × pric
 
 **It is one rule for every corporation, the player's included** (Ben, 2026-09-15). Auto-dispatch is logistics automation of the same kind as auto-surplus, not a strategic act on the player's behalf, so the player's goods move by the same rule a rival's do. The player keeps `hold_convoy` on any convoy and the directed verb below for any haul the rule would not choose. The rival scorer's own directed-dispatch valuation reads the same net price, home price subtracted — a scorer that valued a haul by the destination price alone would send goods away from a better home market.
 
+**Held cargo is still committed (Ben, 2026-09-24).** A convoy the player has held counts as in transit to its destination, so auto-dispatch does not send a second load to fill the same gap; releasing the hold is what delivers it.
+
+**A market exports its own shelf (Ben, 2026-09-24).** Stock on a market's shelf — what auto-surplus sold it, what a convoy delivered and nobody bought — belongs to no corporation, and without this rule it could never leave. So each market runs the same net-price rule on its own inventory: a good whose shelf stock another market prices above the landed cost, by more than the margin, is exported there, in the quantity that gap can absorb. The haul is paid out of the export itself — the landed cargo sells at the destination and the haul comes off what it realises — so an export that would not cover its own haul is never sent. It is the same rule a seller follows, on stock no seller holds any more, and it runs in the same dispatch step, after the corporations' own dispatch has claimed what room it wanted. Owner: BL-1071 (shelf stock moves).
+
 **Player-direction is the exception** (BL-452, convoy verbs). A player (or an agent) directs a
 specific convoy through the `dispatch_convoy` corp_verb: subject = source market, `counterparty` =
 destination market, `target` = cargo, `quantity` = units. It is the auto-dispatch body above

@@ -24,26 +24,13 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*21 entries — 1 open, 20 resolved.*
+*21 entries — 0 open, 21 resolved.*
 
 ---
 
 ## Open
 
-### NR-915 — CALL: the live tick at the pinned 650:2 is fine at the median and heavy in the tail — three of sixteen worlds run 2.5-6x their legacy selves
-*question · raised 2026-09-22 · from BL-1044 re-bless (player_seed_sweep --charter-cost --budget stockpile --price-pairs 650:2, 16 library seeds, Release, serial, quiet machine, 7669 s), main session, 2026-09-22.*
-
-NR-908 gave the divisor to live-play cost, and the pin was set on the median: at 650:2 the shipped world's live tick is a median x0.78 of the same seed's legacy world (4.5 s against 5.4 s), inside the band stage 2 read (x0.43 / x0.91 / x1.70 at 325 / 650 / 1300 with the tier off). The TAIL is not: seed 41 ticks 30.9 s against its legacy 5.3 s (x5.79), seed 31 25.5 s against 6.2 s (x4.12), seed 28 12.8 s against 4.1 s (x3.13); the other thirteen run x0.36 to x1.51. It is not a small-denominator artefact — those are absolute seconds per live tick, and 31 s a tick is heavy for play. The heavy worlds are the ones the seat menu opens widest (seed 41 seats 65 specialists, seed 31 seats 31, against a library median of 8.5), so the cost follows the specialists the budget charters rather than the background firms (seed 41 holds 56 firms, fewer than the median world's 65). Generation cost moved too: the budget row's generation is a median 53.3 s against the legacy row's 42.5 s (max 93 s), about 26% dearer.
-
-**Why it matters.** The divisor is pinned and the world is re-blessed on it. If a 31-second tick is not playable, the knob that fixes it is the same divisor (or a seat cap), and moving it costs another re-bless.
-
-- A: pure speed-ups with identical results, no re-bless — cache the province ceiling within a tick (PROVINCES.md owns the rule; the cache must invalidate when centres/roads change), and resolve each pool's origin tile once per dispatch pass plus make markets_by_body stop rescanning (SUPPLY.md owns dispatch). Estimated: ~90% of the econ step, ~70% of dispatch.
-- B: A, then change the base scan's behaviour — stop at the first placeable tile, cache a corp's best base tile, or back off after the candidate loses; this also ends the offered-forever pattern but changes which bases are built (re-bless; AI_OPPONENT.md § 11 read first).
-- C: NR-915's original seat cap — misses seed 28 and moves the pinned seat menu; not recommended.
-
-> **Recommendation:** A now (identical results, verified by world_determinism and a before/after digest on the live tick), then re-measure; B only if the base-scan pattern still matters after A.
-
-*Files: `src/world/stockpile_budget.hpp`, `docs/generation/INDUSTRIALISATION.md`, `tools/verify/player_seed_sweep.cpp`*
+*Nothing open.*
 
 ---
 
@@ -352,6 +339,23 @@ NR-910 ruled the RULE — the divisor at which the median library world opens th
 > **RESOLVED.** RULED (Ben, 2026-09-22, the Gate 2 form): A — apply the ruled rule to the shipped world: re-pin the divisor to the value the fine seat curve (affording, m = 2, 16 library seeds) gives for a median of nine. The number is pinned by BL-1044 and written into DIGITISATION.md § 1. PINNED 650 (2026-09-22): the fine shipped seat curve at m = 2 reads median 7.5 / 7.5 / 8 / 8.5 / 8.5 / 9 / 13.5 at d = 600-660 by 10; 650 is the first divisor at nine, none opens zero, spread 4 to 98; its tick near x0.91 legacy (stage 2).
 
 *Files: `src/world/stockpile_budget.hpp`, `docs/generation/DIGITISATION.md`, `tools/verify/stockpile_budget_check.cpp`*
+
+### NR-915 — CALL: the live tick at the pinned 650:2 is fine at the median and heavy in the tail — three of sixteen worlds run 2.5-6x their legacy selves
+*question · raised 2026-09-22 · from BL-1044 re-bless (player_seed_sweep --charter-cost --budget stockpile --price-pairs 650:2, 16 library seeds, Release, serial, quiet machine, 7669 s), main session, 2026-09-22.*
+
+NR-908 gave the divisor to live-play cost, and the pin was set on the median: at 650:2 the shipped world's live tick is a median x0.78 of the same seed's legacy world (4.5 s against 5.4 s), inside the band stage 2 read (x0.43 / x0.91 / x1.70 at 325 / 650 / 1300 with the tier off). The TAIL is not: seed 41 ticks 30.9 s against its legacy 5.3 s (x5.79), seed 31 25.5 s against 6.2 s (x4.12), seed 28 12.8 s against 4.1 s (x3.13); the other thirteen run x0.36 to x1.51. It is not a small-denominator artefact — those are absolute seconds per live tick, and 31 s a tick is heavy for play. The heavy worlds are the ones the seat menu opens widest (seed 41 seats 65 specialists, seed 31 seats 31, against a library median of 8.5), so the cost follows the specialists the budget charters rather than the background firms (seed 41 holds 56 firms, fewer than the median world's 65). Generation cost moved too: the budget row's generation is a median 53.3 s against the legacy row's 42.5 s (max 93 s), about 26% dearer.
+
+**Why it matters.** The divisor is pinned and the world is re-blessed on it. If a 31-second tick is not playable, the knob that fixes it is the same divisor (or a seat cap), and moving it costs another re-bless.
+
+- A: pure speed-ups with identical results, no re-bless — cache the province ceiling within a tick (PROVINCES.md owns the rule; the cache must invalidate when centres/roads change), and resolve each pool's origin tile once per dispatch pass plus make markets_by_body stop rescanning (SUPPLY.md owns dispatch). Estimated: ~90% of the econ step, ~70% of dispatch.
+- B: A, then change the base scan's behaviour — stop at the first placeable tile, cache a corp's best base tile, or back off after the candidate loses; this also ends the offered-forever pattern but changes which bases are built (re-bless; AI_OPPONENT.md § 11 read first).
+- C: NR-915's original seat cap — misses seed 28 and moves the pinned seat menu; not recommended.
+
+> **Recommendation:** A now (identical results, verified by world_determinism and a before/after digest on the live tick), then re-measure; B only if the base-scan pattern still matters after A.
+
+> **RESOLVED.** RULED (Ben, 2026-09-24): option A — pure speed-ups with identical results (province ceiling cached within a tick; each pool's origin tile resolved once per dispatch pass). The work is BL-1079 (live tick speedups); re-measure the tail after it.
+
+*Files: `src/world/stockpile_budget.hpp`, `docs/generation/INDUSTRIALISATION.md`, `tools/verify/player_seed_sweep.cpp`*
 
 ### NR-916 — CALL: the size of the capital market premium — 1.25x the carve's price is a placeholder, not a derivation
 *question · raised 2026-09-23 · from BL-1066 (the player cannot build), main session 2026-09-23, on Ben's ruling that capital markets are priced at a premium.*
