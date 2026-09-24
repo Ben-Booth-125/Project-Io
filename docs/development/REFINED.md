@@ -170,6 +170,13 @@ BL-1066 (the player cannot build) opens it, and Ben's rulings on it (2026-09-23)
   - [ ] T5 every other reader: a body-aggregate helper or a stated market (R4).
   - [ ] T6 save format, state hash, the new pools_per_market harness (R1-R3, R5).
   - [ ] T7 main session: merge, build, world_determinism, the straddle count, the BL-1066 probe re-read, cold review (R5-R8).
+**The sprint's core characteristic (Ben, 2026-09-24): the wizard plays the whole arc.** BL-1068
+(round 6 plays the span) is the centre of sprint 46, not one row of the cut: the generation reaching
+the game is first something the player WATCHES. Order: BL-1067 (the rename) -> BL-1068 -> Begin
+adopts the wizard's world. The economy thread (BL-1066 and the steel collapse) runs alongside.
+
+- [ ] **BL-1067 (rename to Industrialisation)** — agent in a worktree; digests must not move.
+- [ ] **BL-1068 (round 6 plays the span)** — after BL-1067; a live click-through is its done-when.
 - [ ] **BL-995 (trade reaches for price)** — restored 2026-09-23 on Ben's BL-1066 ruling; economy-dev in a worktree; requirement group `trade-reaches-for-price`. Dispatch moves before the clear.
   - [ ] T1 the net-price rule and its quantity, the shortfall scan retired (R2, R3).
   - [ ] T2 the tick order at every replicating site; the margin threshold authored (R1, R4).
