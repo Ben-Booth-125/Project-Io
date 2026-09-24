@@ -132,8 +132,8 @@ enum class abiogenesis_depth : uint8_t
 // Checkpoints — where a branch decision lives, and how a lean narrows it
 // (BL-217, GENERATION_CHECKPOINT_BRANCH_MODEL). This is the class-agnostic
 // mechanism; PLANETOLOGY.md's S5-S8 mass-extinction points are the first
-// checkpoint class to use it, and a second (BL-218's historical rupture, at
-// the settlement stage) is meant to reuse this file's types unchanged.
+// checkpoint class to use it, and the settlement pass's plague event reuses
+// this file's types unchanged.
 //
 // See PLANETOLOGY.md's "Checkpoints" section for the full design rationale —
 // this header only carries the settled shape.
@@ -165,7 +165,7 @@ struct checkpoint_record
 
 /// A deterministic splitmix64 sub-stream, public (unlike planetology.cpp's
 /// internal `rng`) so a checkpoint resolver OUTSIDE planetology.cpp — a
-/// future checkpoint class such as BL-218's historical rupture — draws from
+/// checkpoint class such as the settlement pass's plague event — draws from
 /// the SAME RNG mechanism rather than inventing a second one
 /// (PLANETOLOGY.md § Determinism & cost).
 struct checkpoint_rng
@@ -314,16 +314,15 @@ constexpr int64_t years_from_calendar_year(int64_t year)
 /// A rung of the institutional history ladder (HISTORY.md), tagged onto the
 /// lines `history_ladder.cpp` emits so consumers can select them structurally.
 ///
-/// Ordered by causal position, and the ordering is load-bearing: a charter
-/// cannot precede the farms that fed it, and a border accord counts an outcome
-/// of both. `none` covers every line written by some other pass — planetology,
-/// continents, creeds, settlement — which is most of the biography.
+/// Ordered by causal position; a later rung appends after `surplus`. `none`
+/// covers every line written by some other pass — planetology, continents,
+/// creeds, settlement — which is most of the biography. The value is saved
+/// (save_game.cpp's `max_rung` bounds the loader), so a new rung is a save
+/// format change.
 enum class ladder_rung : uint8_t
 {
     none = 0,  ///< Not a ladder line.
     surplus,   ///< Stage 0 — first granary cities on a floodplain.
-    charter,   ///< Stage 1 — the Charter Act; the enforceable perpetual promise.
-    borders,   ///< Stage 2 — the border accord, or the hegemon that replaced it.
 };
 
 /// The right column is the entire feature — "640 Myr of ferruginous ocean ->
@@ -372,8 +371,8 @@ struct history_event
     ///
     /// Distinct from `stage` above, and deliberately a second axis rather than
     /// more values on the first: `stage` names the planetology gate, and every
-    /// ladder line sits at `chain_stage::legacy`, so it cannot tell the three
-    /// rungs apart. `history_ladder.cpp` is the only writer.
+    /// ladder line sits at `chain_stage::legacy`, so it cannot tell the rungs
+    /// apart. `history_ladder.cpp` is the only writer.
     ///
     /// It exists so a check can FILTER on the rung instead of pattern-matching
     /// the prose. `history_ladder_harness`'s H4 used to find its window by

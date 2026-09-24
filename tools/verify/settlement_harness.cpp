@@ -7,7 +7,7 @@
 //
 //   S1  DETERMINISM. The pass is a pure function of (seed, tiles, creeds): the
 //       same world generated twice yields identical regions, cultures,
-//       industrialisation dates, checkpoints and lacunae. The standing
+//       industrialisation dates and nation attribution. The standing
 //       invariant everything else answers to.
 //
 //   S2  BELIEF IS MAPPED ONTO GROUND. Every region carries a culture index
@@ -28,16 +28,12 @@
 //       political map is different from the random-placement one. "Seeding
 //       changes, expansion does not."
 //
-//   S5  THE RECORD CAN BE DESTROYED, AND THE HOLE IS VISIBLE. Where a war
-//       fires, lines are erased and a dated lacuna replaces them; the count is
-//       reported rather than hidden. A conquered region keeps its FOUNDERS
-//       in founding_culture and its conquerors in culture, so the erasure is
-//       of the record, never of the fact.
+//   S5  A CONQUERED REGION KEEPS ITS FOUNDERS. A region the Era -1 sim took
+//       keeps its FOUNDERS in founding_culture and its conquerors in culture,
+//       so a conquest rewrites who lives there, never who settled it.
 //
-//   S6  RUPTURES ARE TRANSFORMS, NOT NARRATION (BL-218 § 2a). Every resolved
-//       checkpoint is recorded (failed attempts included, per BL-217), the
-//       branch labels are drawn only from the three designed ones, and no
-//       rupture leaves a nation with zero tiles.
+//   S6  NO NATION IS EMPTY. Every nation the political pass produced holds at
+//       least one tile.
 //
 //   S7  BL-219's READ. focus_from_region is a pure function of the region's
 //       ancient endowment and its industrialisation timing, and the movement
@@ -80,9 +76,7 @@ const generation_report::body_entry* kepler_of(const generation_report& r)
 bool same_regions(const settlement_state& a, const settlement_state& b)
 {
     if (a.regions.size() != b.regions.size()) return false;
-    if (a.lacunae != b.lacunae) return false;
     if (a.median_industrial_year != b.median_industrial_year) return false;
-    if (a.checkpoints.size() != b.checkpoints.size()) return false;
     for (std::size_t i = 0; i < a.regions.size(); ++i)
     {
         const region& p = a.regions[i];
@@ -97,10 +91,6 @@ bool same_regions(const settlement_state& a, const settlement_state& b)
          || p.creed_conquered != q.creed_conquered)
             return false;
     }
-    for (std::size_t i = 0; i < a.checkpoints.size(); ++i)
-        if (a.checkpoints[i].branch_taken != b.checkpoints[i].branch_taken
-         || a.checkpoints[i].viability_result != b.checkpoints[i].viability_result)
-            return false;
     return true;
 }
 
@@ -247,12 +237,10 @@ int main()
               "S4b  the political map still produced a multipolar world");
     }
 
-    // --- S5 the record can be destroyed ---------------------------------------
+    // --- S5 a conquered region keeps its founders --------------------------------
     {
-        // Lacunae are only produced by a war branch. If no war fired this seed
-        // the count is legitimately zero — assert the INVARIANT instead of the
-        // outcome: a conquered region keeps its founders, and the lacuna count
-        // is never negative or unexplained.
+        // Assert the INVARIANT rather than the outcome: a seed with no conquest
+        // is legitimate, but a conquered region must keep its founders.
         bool founders_kept = true;
         int conquered = 0;
         for (const region& p : s1.regions)
@@ -265,34 +253,15 @@ int main()
         }
         check(founders_kept,
               "S5a  a conquered region keeps its founders and records its conquerors");
-        check(s1.lacunae >= 0, "S5b  the lacuna count is reported, not hidden");
-
-        bool war_fired = false;
-        for (const checkpoint_record& c : s1.checkpoints)
-            if (c.branch_taken == "war") war_fired = true;
-        check(!war_fired || conquered >= 0,
-              "S5c  a war that fired is consistent with the conquest bookkeeping");
-        std::printf("      (seed 0: %d checkpoints, %d conquered regions, %d lines erased)\n",
-                    static_cast<int>(s1.checkpoints.size()), conquered, s1.lacunae);
+        std::printf("      (seed 0: %d conquered regions)\n", conquered);
     }
 
-    // --- S6 ruptures are transforms -------------------------------------------
+    // --- S6 no nation is empty --------------------------------------------------
     {
-        bool labels_ok = true;
-        for (const checkpoint_record& c : s1.checkpoints)
-        {
-            if (c.branch_taken == "war" || c.branch_taken == "collapse"
-             || c.branch_taken == "revolution"
-             || c.branch_taken == "(no eligible branch — rerolled)")
-                continue;
-            labels_ok = false;
-        }
-        check(labels_ok, "S6a  every checkpoint records one of the three designed branches");
-
         bool no_deletion = true;
         for (const auto& kv : w1.nations)
             if (kv.second.tiles.empty()) no_deletion = false;
-        check(no_deletion, "S6b  no rupture left a nation with zero tiles");
+        check(no_deletion, "S6   every nation holds at least one tile");
     }
 
     // --- S7 BL-219's read ------------------------------------------------------
@@ -355,16 +324,14 @@ int main()
 
     // --- Seed spread: the pass must not depend on one lucky world -------------
     {
-        int worlds = 0, with_regions = 0, with_ruptures = 0, with_lacunae = 0;
+        int worlds = 0, with_regions = 0;
         for (int s = 0; s < 6; ++s)
         {
             world_params p;
             p.seed = 0xB2180000u + static_cast<uint32_t>(s) * 0x9E37u;
-            // Ruptures (S8b) are a 1960-era ladder event: the settlement pass has
-            // to reach the industrial centuries to resolve one. The DEFAULT epoch
-            // became 0 CE with the ancient refocus (NR-177), which stops the pass
-            // ~1900 years before any rupture — so ask for the era under test, as
-            // creeds_harness and history_ladder_harness now do.
+            // The 1960 epoch runs the settlement pass through the industrial
+            // centuries, its longest run; the default 0 CE epoch (NR-177)
+            // stops it at the start year.
             p.epoch_year = 1960;
             generation_report rr;
             make_hard_coded_world(no_prehistory(p), &rr);
@@ -372,14 +339,9 @@ int main()
             if (!k) continue;
             ++worlds;
             if (!k->settlement.regions.empty()) ++with_regions;
-            if (!k->settlement.checkpoints.empty()) ++with_ruptures;
-            if (k->settlement.lacunae > 0) ++with_lacunae;
         }
         check(worlds > 0 && with_regions == worlds,
               "S8a  every seed in the spread settles regions");
-        check(with_ruptures > 0, "S8b  the rupture checkpoints fire across the spread");
-        std::printf("      (%d/%d worlds lost part of their record to a war)\n",
-                    with_lacunae, worlds);
     }
 
     std::printf("=== %d passed, %d failed ===\n", g_pass, g_fail);

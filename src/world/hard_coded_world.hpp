@@ -64,11 +64,11 @@ struct world_params
     abundance_level abundance  = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
 
     /// Calendar year the generated world BEGINS at (BL-271, the Era -1 sandbox).
-    /// 1960 (default) is the campaign epoch: the full pre-computed history runs
-    /// (industrialisation, ruptures, globalisation). Any year below 1700 stops
+    /// 1960 (default) is the campaign epoch: the settlement pass's own
+    /// industrialisation dating runs to the end. Any year below 1700 stops
     /// the settlement pass at that year instead: regions founded later do not
-    /// exist yet, no furnace ever lights, no rupture is pre-resolved — that
-    /// history is the year-tick sim's to produce — and region demography is
+    /// exist yet, no furnace ever lights — that history is the year-tick
+    /// sim's to produce — and region demography is
     /// seeded at founding and grown to the start year. Sandbox-only: the
     /// 1960-era economy scaffolding (corps, markets, roads) still generates
     /// underneath and is out of frame; gating it is BL-271's build.
@@ -613,9 +613,7 @@ struct generation_report
         /// `continents.history` is — those lines were merged into
         /// `state.history` at generation. What is kept is the region set (who
         /// settled where, whose gods they keep, which ancient deposits they sit
-        /// on, when their furnaces lit), the rupture `checkpoints`, and the
-        /// `lacunae` count — the holes the wars left in the record. Nothing
-        /// else records any of it. Presentation data, like the rest of this
+        /// on, when their furnaces lit). Nothing else records any of it. Presentation data, like the rest of this
         /// struct: it never enters `world`, but it reaches the save with the
         /// rest of the report (`w_settlement`, `core/save_game.cpp`).
         settlement_state settlement;

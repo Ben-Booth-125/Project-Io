@@ -11,7 +11,7 @@
 // each one's founding CULTURE forward, industrialises the ones the ground can
 // pay for, and then hands the political pass its seeds.
 //
-// THREE THINGS THIS PASS IS FOR:
+// TWO THINGS THIS PASS IS FOR:
 //
 //  1. BELIEF MAPPED ONTO GROUND. A region is not a blob with a name; it is
 //     a place a named people settled, and it carries their gods. The culture
@@ -28,13 +28,6 @@
 //     industrialisation, ideology <- industrialisation timing against
 //     neighbours.
 //
-//  3. THE RECORD IS NOT SAFE. Wars redraw borders, spread the victor's gods
-//     over the loser's regions, and ERASE part of the loser's history —
-//     replaced by a dated lacuna, not silently dropped (Ben, 2026-08-02:
-//     "don't be afraid to have parts of the record erased when two nations go
-//     to war"). A history that cannot be damaged is a history nobody fought
-//     over.
-//
 // THE PASS DRIVES, IT DOES NOT NARRATE — the BL-221/BL-235 rule, inherited.
 // Regions are placed BEFORE the political map and become the nation seeds;
 // the BFS/growth machinery BL-053 tuned is kept and only its INPUTS change
@@ -42,9 +35,8 @@
 //
 // DETERMINISM. Integer scoring with explicit index tie-breaks, fresh stage
 // tags, every container walk in raster or sorted-id order, no transcendentals.
-// The rupture checkpoints reuse planetology.hpp's class-agnostic
-// `resolve_checkpoint` rather than inventing a second branch mechanism —
-// BL-217 named this pass as its intended second client.
+// The plague checkpoint reuses planetology.hpp's class-agnostic
+// `resolve_checkpoint` rather than inventing a second branch mechanism.
 // ---------------------------------------------------------------------------
 
 #include "colonisation.hpp" // BL-918: split_trigger, region_reculture
@@ -814,11 +806,6 @@ struct settlement_state
 {
     std::vector<region> regions;      ///< In placement order (best ground first).
     std::vector<history_event> history;   ///< Dated settlement / furnace / war lines.
-    std::vector<checkpoint_record> checkpoints; ///< Rupture branch decisions (BL-217 shape).
-
-    /// How many history lines the wars destroyed. Every one is replaced by a
-    /// dated lacuna line, so this is a count of holes the player can SEE.
-    int lacunae = 0;
 
     /// The world-median industrialisation year over industrialised regions,
     /// or 0 when none industrialised. BL-219's "early vs late" pivot reads it.
@@ -1125,32 +1112,6 @@ void derive_national_character(settlement_state& ss,
                                const std::vector<entity_id>& nation_ids,
                                const std::vector<entity_id>& tile_ids,
                                int gw, int gh);
-
-/// The historical-rupture checkpoint class (BL-218 § 2a) — collapse, war and
-/// revolution as TRANSFORMS on nation state, never as narration alone.
-///
-///  * **Collapse** — the nation's peripheral regions are lost to their
-///    nearest neighbour and their industrial clock resets; abundance falls.
-///  * **War** — the contested border redraws toward the stronger; the loser's
-///    expansionism rises (grievance); the victor's gods are planted on the
-///    regions taken; and PART OF THE LOSER'S RECORD IS DESTROYED, replaced
-///    by a dated lacuna.
-///  * **Revolution** — territory untouched; the ideology axis flips; abundance
-///    takes a one-off hit.
-///
-/// Branch eligibility is a FILTER, never a weight (BL-217's rule): a nation
-/// with no land neighbour cannot go to war, a single-region nation cannot
-/// collapse. Every attempt appends a `checkpoint_record`, failures included.
-///
-/// Mutates @p ss (records, redaction, region culture) and @p w (tile
-/// ownership, nation character, resource abundance).
-void resolve_historical_ruptures(settlement_state& ss,
-                                 const creed_state& cs,
-                                 world& w,
-                                 const std::vector<entity_id>& nation_ids,
-                                 const std::vector<entity_id>& tile_ids,
-                                 int gw, int gh,
-                                 uint32_t seed);
 
 /// Index of the region whose anchor is nearest (col,row), or -1 when there
 /// are none. Column-wrapped; ties break on the lowest region index.

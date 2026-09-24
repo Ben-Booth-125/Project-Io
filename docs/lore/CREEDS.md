@@ -2,7 +2,7 @@
 
 > **Settles:** how a cradle culture rolls its own phonology and coins its lexicon · why one
 > pantheon per culture · what a creed's drives do at the tribal-conflict stage · where a
-> pantheon sits on the ground · how globalisation renders the record into a common tongue.
+> pantheon sits on the ground · which language the record is rendered in.
 > **Not here:** which names each generation pass draws from a tongue, and on what terms
 > (../generation/NATION_GENERATION § Pass 5 — Naming, the register of naming sites) · the
 > stage ladder this pass interleaves with (HISTORY) · how a polity narrates its doom
@@ -14,8 +14,8 @@
 > sanctioned place an English structural word survives — is registered in
 > [NATION_GENERATION.md](../generation/NATION_GENERATION.md) § Pass 5 — Naming.
 
-One pantheon per cradle-culture, each in its own generated tongue, and the
-globalisation that renders the record in the player's language. The pass is
+One pantheon per cradle-culture, each in its own generated tongue, with the
+record rendered in the player's language. The pass is
 `src/world/creeds.{hpp,cpp}` (BL-235, creeds), verified by
 `tools/verify/creeds_harness.cpp` (C1–C4). Companion to `HISTORY.md` (the
 ladder this pass interleaves with) and `../generation/NATION_GENERATION.md`
@@ -282,17 +282,12 @@ its own `schisms`/`regions_sundered` counters) precisely so the two readings nev
 
 ---
 
-## Globalisation and the common tongue
+## The record's language
 
-For a modern-era epoch, generation closes with one fixed event (1951): the
-common trade tongue spreads (`record_globalisation`). From that hinge the
-record is rendered in **the player's language** — English for now, as the
-development language (Ben, 2026-07-31: the common tongue is whatever the
-player picks to play in). Proper names stay native: the old tongues survive
-in the names of gods.
-
-Under the ancient epoch (0 CE — HISTORY.md § The epoch and the run) there is
-no globalisation hinge: the record is rendered in the player's language
-throughout, and proper names stay native exactly as above. How a common
-tongue squares with the bloc structure of the averted rupture belongs to
-BL-223 (averted rupture) with the rest of the post-epoch world.
+The record is rendered in **the player's language** throughout — English for
+now, as the development language (Ben, 2026-07-31: the common tongue is
+whatever the player picks to play in). Proper names stay native: the old
+tongues survive in the names of gods. Generation writes no dated
+common-tongue event on any epoch; the harness's C4 asserts its absence. How a
+common tongue squares with the bloc structure of the averted rupture belongs
+to BL-223 (averted rupture) with the rest of the post-epoch world.

@@ -18,8 +18,10 @@
 //       below half the STRUCTURAL value it started from, so creeds alone
 //       still cannot manufacture a hegemon by themselves (BL-224).
 //
-//   C4  GLOBALISATION CLOSES THE STORY. Exactly one common-tongue line, dated
-//       1951 (nine years before the epoch), after every shrine and war line.
+//   C4  NO COMMON TONGUE IS PRE-WRITTEN. Even a world generated to the 1960
+//       epoch carries no common-tongue line: the pass that dated one is gone,
+//       and a line that reappears means something pre-computes that history
+//       again instead of the live sims producing it.
 //
 // HONEST SCOPE NOTE: culture regions (BL-218) are not built; the culture unit
 // here is the CRADLE, which BL-218's clustering will refine rather than
@@ -113,10 +115,9 @@ int main()
     // --- Generate the real world twice --------------------------------------
     world_params wp;
     wp.seed = 0xB235u;
-    // The ladder this harness reads runs to 1960 (industrialisation, ruptures,
-    // the common tongue). The DEFAULT epoch became 0 CE with the ancient refocus
-    // (NR-177), which stops the settlement pass before any of it happens - so ask
-    // for the era under test rather than inheriting whatever the campaign wants.
+    // The 1960 epoch is the longest generation run, and the one C4's absence
+    // guard means something on. The DEFAULT epoch became 0 CE with the ancient
+    // refocus (NR-177), so ask for it rather than inheriting the campaign's.
     wp.epoch_year = 1960;
     generation_report r1, r2;
     const world w1 = make_hard_coded_world(no_prehistory(wp), &r1);
@@ -167,31 +168,20 @@ int main()
 
         bool consequences = true;
         for (const history_event& e : k1->state.history)
-            if (contains(e.event, "shrine") || contains(e.event, "war-bands") ||
-                contains(e.event, "common tongue"))
+            if (contains(e.event, "shrine") || contains(e.event, "war-bands"))
                 consequences = consequences && !e.consequence.empty()
                             && e.consequence.rfind("->", 0) == 0;
         check(consequences, "C2 every creed line carries its consequence");
 
-        // --- C4 globalisation ------------------------------------------------
-        check(tongue.size() == 1, "C4 exactly one common-tongue line");
-        if (tongue.size() == 1)
-        {
-            check(tongue[0]->years_before_epoch == 9,
-                  "C4 the common tongue is dated 1951 - nine years before the epoch");
-            bool latest = true;
-            for (const history_event* e : shrines)
-                latest = latest && e->years_before_epoch > tongue[0]->years_before_epoch;
-            check(latest, "C4 globalisation postdates every shrine");
-        }
+        // --- C4 no common tongue is pre-written -------------------------------
+        check(tongue.empty(), "C4 a 1960-epoch biography carries no common-tongue line");
     }
 
     // The seed's actual creed record, for the human reading the run — the
     // sweep readout is these lines' only window (BL-219's argument).
     std::printf("\n--- seed 0xB235's creed record ---\n");
     for (const history_event& e : k1->state.history)
-        if (contains(e.event, "shrine") || contains(e.event, "war-bands") ||
-            contains(e.event, "common tongue"))
+        if (contains(e.event, "shrine") || contains(e.event, "war-bands"))
             std::printf("  %s  %s\n      %s\n",
                         format_history_date(e.years_before_epoch).c_str(),
                         e.event.c_str(), e.consequence.c_str());

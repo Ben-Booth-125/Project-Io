@@ -20,8 +20,8 @@
 //       tables (the settlement pass's whole deterministic surface).
 //   R5  THE 1960 ARC IS UNTOUCHED. An explicit epoch_year = 1960 world still
 //       runs Stage 4's endowment gate, lights a furnace somewhere across a
-//       four-world sweep, still resolves ruptures (lacunae or checkpoints
-//       present), and holds at least as many regions as the 0 CE world.
+//       four-world sweep, and holds at least as many regions as the 0 CE
+//       world.
 //
 // KNOWN BASELINE (BL-1010, 2026-09-16) — ONE RED IS EXPECTED ON MAIN:
 //   R5 "the 1960 arc still industrialises (reachable across the seed sweep)".
@@ -277,8 +277,6 @@ int main()
         check(worlds_lit > 0,
               "R5 the 1960 arc still industrialises (reachable across the seed sweep) [BASELINE: no polity passes capacity 4]");
     }
-    check(k60->settlement.lacunae > 0 || !k60->settlement.checkpoints.empty(),
-          "R5 the 1960 world still resolves ruptures");
     // R5's region-count comparison is against the SETTLEMENT PASS's 0 CE
     // output, not against `ps`. Since the year-tick sim was wired into
     // generation (2026-08-12) the 0 CE world keeps founding regions for 400

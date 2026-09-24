@@ -1970,42 +1970,15 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // already says where the cities are.
     stamp_urban_land_use(w, kepler);
 
-    // Everything from here to globalisation is the 0-1960 story. An antiquity
-    // start (BL-271: epoch_year < 1700) generates the world BEFORE it happens —
-    // no rupture is pre-resolved, no charter is enacted, no common tongue forms.
-    // The year-tick sim produces that history live instead of this pass
-    // pre-computing it.
-    const bool antiquity_start = params.epoch_year < 1700;
-
-    // The historical ruptures: collapse, war and revolution as transforms on
-    // territory, character and abundance — and, where a war is won, the
-    // victor's gods travel with the border and part of the loser's record is
-    // destroyed rather than merely contradicted.
-    if (!antiquity_start)
-        resolve_historical_ruptures(kepler_settlement, kepler_creeds, w,
-                                    kepler_nations, kepler_tiles, home_grid_width, home_grid_height,
-                                    /*seed=*/params.seed ^ 0x80174E5u);
-
-    // Stages 1-2 can only be written now: the Charter Act names a nation and
-    // the border accord counts them, and neither existed a moment ago. The
-    // lines then merge into Kepler's biography, which the History ledger reads.
-    if (!antiquity_start)
-        record_institutional_history(kepler_hist, w, kepler, kepler_tiles, home_grid_width);
-
-    // Globalisation closes the generated story: the common tongue line is the
-    // hinge from the creeds' native record to the campaign epoch — rendered in
-    // the player's language (English for now; Ben, 2026-07-31). The creed
-    // lines then merge into the same ladder history the report reads.
-    if (!antiquity_start)
-        record_globalisation(kepler_creeds, w, kepler);
+    // The creed lines merge into Kepler's biography — the same ladder history
+    // the History ledger reads. No pass here pre-computes the story between
+    // the start year and the epoch: the year-tick sims produce it live.
     kepler_hist.history.insert(kepler_hist.history.end(),
                                std::make_move_iterator(kepler_creeds.history.begin()),
                                std::make_move_iterator(kepler_creeds.history.end()));
     kepler_creeds.history.clear(); // moved-from; the ladder owns the lines now.
 
-    // The settlement/industrialisation record joins the same biography — after
-    // the ruptures have had their chance to destroy part of it, so what merges
-    // is the record as it SURVIVED, lacunae included.
+    // The settlement/industrialisation record joins the same biography.
     kepler_hist.history.insert(kepler_hist.history.end(),
                                std::make_move_iterator(kepler_settlement.history.begin()),
                                std::make_move_iterator(kepler_settlement.history.end()));
@@ -2018,7 +1991,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
             if (be.id != kepler) continue;
             be.state.history.insert(be.state.history.end(),
                                     kepler_hist.history.begin(), kepler_hist.history.end());
-            // The region set / checkpoints / lacunae travel with the report
+            // The region set travels with the report
             // (its `history` is already merged above and stays empty here,
             // matching the continents convention).
             be.settlement = kepler_settlement;

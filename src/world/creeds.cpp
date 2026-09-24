@@ -275,40 +275,6 @@ void record_cultural_contact(history_ladder_state& hl,
 }
 
 // ---------------------------------------------------------------------------
-// Globalisation — the common tongue closes generation.
-// ---------------------------------------------------------------------------
-
-void record_globalisation(creed_state& cs, const world& w, entity_id body_id)
-{
-    if (cs.cultures.empty())
-        return;
-
-    // The same sorted-key realm count record_institutional_history performs —
-    // sorted, so the count cannot depend on unordered_map iteration order.
-    std::vector<entity_id> nation_ids;
-    nation_ids.reserve(w.nations.size());
-    for (const auto& kv : w.nations) nation_ids.push_back(kv.first);
-    std::sort(nation_ids.begin(), nation_ids.end());
-
-    int realms = 0;
-    for (const entity_id nid : nation_ids)
-    {
-        const auto nit = w.nations.find(nid);
-        if (nit == w.nations.end() || nit->second.tiles.empty()) continue;
-        const auto tit = w.tiles.find(nit->second.tiles.front());
-        if (tit != w.tiles.end() && tit->second.body == body_id) ++realms;
-    }
-
-    // Fixed late date, deliberately: globalisation is the END of the
-    // generated story, the hinge to the campaign epoch, not a rolled outcome.
-    cs.history.push_back(history_event{
-        years_from_calendar_year(1951), chain_stage::legacy,
-        "The common tongue spreads through every port and press.",
-        "-> " + std::to_string(std::max(realms, 1)) +
-            " realms, one trade language; the old tongues survive in the names of gods" });
-}
-
-// ---------------------------------------------------------------------------
 // Culture relations (BL-870; CIVILISATION.md § Culture relations)
 // ---------------------------------------------------------------------------
 

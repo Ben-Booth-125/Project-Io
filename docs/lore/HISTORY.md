@@ -48,9 +48,9 @@ The pre-epoch history is **produced by a running simulation, not narrated over a
 The one-shot passes (`history_ladder`, `creeds`, `settlement`) found the cradles, the cultures and
 the regions; the Era −1 sim (`src/world/history_sim.{hpp,cpp}`, BL-271) then plays the polities
 forward from `start_year` to the epoch on a stepped year-tick clock, and the wars, borders and
-collapses the campaign inherits are its output. Under an antiquity epoch the pre-computed
-modern-era hinges — pre-resolved ruptures, a Charter Act written after the political map, the
-globalisation event — do not run; the sim produces that history live.
+collapses the campaign inherits are its output. No pass pre-computes a modern-era hinge on any
+epoch — no pre-resolved rupture, no Charter Act written after the political map, no common-tongue
+event; the sim produces that history live.
 
 **The span is a parameter, and the derivation lives in one place.** `era_minus_one.cpp` derives
 `history_sim_params` from `world_params`: `start_year = epoch_year − prehistory_years`,
@@ -122,8 +122,8 @@ operationally-free compromise in `../generation/CORPORATION_GENERATION.md` is ex
 bargain sovereigns strike with chartered companies: taxability and seizability in exchange for
 freedom of operation. The charter cradle raises a **sealed-oath god** (`CREEDS.md`), and that
 creed buys its regions an industrialisation-date bonus — contract law reaching capital one stage
-early.
-History line: `"YYYY: The {nation} Charter Act — first perpetual company registered."`
+early. Generation writes no dated line for the Charter Act: the charter is an institution the
+live sims carry, not a sentence pre-written over a finished map.
 
 ### Stage 2 — Fragmentation with connectivity (the non-hegemony ingredient)
 
@@ -141,8 +141,8 @@ more multipolar than Earth ever was.
 
 **Generator hook.** Nation count is an outcome of landmass and of the ladder. The history pass
 reads the final nation count back into the narrative: more nations → earlier and harder
-Stages 3–4.
-History line: `"YYYY: The {range} Peace — {n} realms confirm mutual borders."`
+Stages 3–4. Generation writes no border-accord line; how many realms confirm their borders, or
+whether one absorbs the rest, is the sim's outcome to show.
 
 ### Stage 3 — Capital disciplines the sovereign
 
@@ -159,9 +159,8 @@ credit access). Progressive loss instead of a lose screen mirrors the historical
 sovereigns squeezed companies far more often than they destroyed them.
 
 **What the generator carries of it.** The stage's *mechanism* — credit disciplining the sovereign
-— is not simulated as such. Its two legible consequences are: the charter culture's sealed-oath
-god buys its regions an industrialisation-date bonus (Stage 1), and the **war** rupture branch
-costs both belligerents abundance rather than paying the winner. The seizure-cost half belongs to
+— is not simulated as such. Its legible consequence is that the charter culture's sealed-oath
+god buys its regions an industrialisation-date bonus (Stage 1). The seizure-cost half belongs to
 BL-223 (averted rupture), alongside the diplomacy origin it defines.
 
 ### Stage 4 — Energy transition
@@ -240,19 +239,18 @@ second system. The compact thesis's closing corollary
 
 `src/world/history_ladder.{hpp,cpp}` (BL-221), a sibling pass that runs after the tile pipeline
 and **interleaves with** nation generation; verified by `tools/verify/history_ladder_harness.cpp`
-(H1–H5):
+(H1–H6):
 
 ```
 generate_body_tiles                 terrain exists
 run_history_ladder            ->    cradles, fragmentation, Stage 0's line
 nation_params_from_ladder     ->    fragmentation DRIVES the seed budget
 generate_nations                    polities grow
-record_institutional_history  ->    Stages 1-2, which need the outcome
 ```
 
-Two entry points rather than one, because the Charter Act names a nation and the border accord
-counts them — neither exists until the political pass has run. `record_institutional_history`
-runs for a modern epoch; under an antiquity epoch those lines are the sim's to write.
+Stage 0 is the only rung the ladder writes a line for. Stages 1 and 2 are the sim's to produce
+on every epoch; the harness's H6 asserts that no generated biography carries a pre-written
+charter or border-accord line.
 
 **It drives, it does not narrate** (Ben, 2026-07-30). Stage 0's cradle count and Stage 2's
 fragmentation are computed *before* the political map and shape it: a fragmented world seeds
@@ -348,19 +346,13 @@ industrialisation-timing axis, and a nation above the floor opens with an enacte
 read at the handoff and never chosen in a round — a polity does not spend a decision on
 protectionism.
 
-**The record is destructible, and the hole is visible.** A won war plants the victor's pantheon
-on the regions taken and erases the lines naming them, leaving a dated lacuna with a count of
-what was lost (Ben, 2026-08-02). A conquered region keeps its founders in `founding_culture` and
-its conquerors in `culture` — the erasure is of the record, never of the fact, which is the pair a
-religion or diplomacy layer needs to describe a grievance.
+**A conquest keeps its founders.** A conquered region keeps its founders in `founding_culture`
+and its conquerors in `culture` — the pair a religion or diplomacy layer needs to describe a
+grievance.
 
-**Ruptures draw through the checkpoint model.** The modern-epoch ruptures (collapse, war,
-revolution — `resolve_historical_ruptures`) are a second checkpoint class, drawing through
-`resolve_checkpoint` with eligibility as a filter and never a weight (BL-217's mechanism, reused
-unchanged). They are bounded to the six most-contested nations, so their count is a property of
-the design rather than of the map size. Under an ancient epoch the sim's own breaks — secession
-(`../generation/CIVILISATION.md` § How an empire actually falls) and schism (`CREEDS.md` § The
-schism verb) — are the ruptures.
+**The ruptures are the sim's own breaks.** Secession (`../generation/CIVILISATION.md` § How an
+empire actually falls) and schism (`CREEDS.md` § The schism verb) are what break a polity; no
+pass pre-resolves a collapse, war or revolution over a finished map.
 
 **Calibration is the sweep's, not the harness's.** A green harness means the pass is
 self-consistent, deterministic and wired into the political map — *not* that its dates or
