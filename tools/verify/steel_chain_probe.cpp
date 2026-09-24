@@ -27,6 +27,9 @@
 //   --fast   no pre-epoch history (NOT the shipped world; quick iteration only)
 //   --good   follow another processed good's makers instead of steel
 //   --quiet  suppress the per-maker rows; print the per-tick aggregates only
+//   --lp-scale X  COUNTERFACTUAL (not the shipped world): scale the passive-LP cap
+//            per anchor by X from the first probed tick — BL-1071's reading of how
+//            much shelf stock the cap, rather than the price rule, holds home
 //
 // FIRST READING (2026-09-24, seeds 0-2, shipped epoch 0 = ANCIENT band): there
 // is no steel production to collapse. The home body starts with ZERO steel
@@ -39,6 +42,15 @@
 // Pre-BL-1003 (a185c0ff) shows the same absence. Read the `construction:` and
 // `geography` lines first.
 //
+// BL-1071 READING (2026-09-24, seed 0, 20 ticks): with markets exporting their
+// own shelves, steel moves but little — ~46 u over 20 ticks, while the same
+// pass exports 30-49 cargoes a tick across every good and the passive-LP gate
+// refuses 11-42 a tick. `--lp-scale 100` (a counterfactual) moves ~680 u and
+// spreads steel from 13 to 16-17 shelves: the cap, taken first by corporations
+// and by goods earlier in the walk, is the main brake on the shelf; the rest is
+// the price rule (most shelf -> wanting pairs fail price_d > price_src x 1.05,
+// the `shelf test` line). Read `market exports` and `shelf test` first.
+//
 // Ticks are econ steps 0..N-1 with the validation run's tick state (spectated,
 // day tick 0) — the first 12 ARE the app's validation run; beyond that the probe
 // keeps stepping the same way (a spectated continuation, not the seated game).
@@ -49,6 +61,7 @@
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
 #include "world/resource_names.hpp"
+#include "world/supply_system.hpp" // BL-1071: the shelf test (market_shelf_surplus, legs, room)
 #include "world/world.hpp"
 #include "harness_params.hpp"
 
@@ -75,6 +88,7 @@ struct options
     bool quiet = false;
     long long epoch = -1;   ///< -1: world_params' own default (the shipped epoch)
     resource_type good = resource_type::steel;
+    float lp_scale = 1.0f;  ///< --lp-scale: a counterfactual passive-LP cap (BL-1071 reading)
 };
 
 /// Owner of every building, by a sorted corp walk (assets lists).
@@ -144,6 +158,16 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
         p = no_prehistory(p);
     auto start = std::make_unique<app_start_world>();
     build_app_start_world(lua, p, *start);
+    if (o.lp_scale != 1.0f)
+    {
+        // A COUNTERFACTUAL, not the shipped world: the passive-LP cap scaled
+        // from the first live tick on (the world was built at the shipped cap).
+        military_capability_params mp = start->reg.military();
+        mp.active_lp_per_anchor_tick *= o.lp_scale;
+        start->reg.set_military(mp);
+        std::printf("COUNTERFACTUAL: passive LP per anchor x%.2f (NOT the shipped world)\n",
+                    o.lp_scale);
+    }
     world& w                   = start->w;
     const recipe_registry& reg = start->reg;
     print_shipped_landscape(start->land);
@@ -202,7 +226,7 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
         advance_convoys(w);
         credit_arrived_convoys(w, 0);
         economy_report report = run_economy_step(w, reg, /*spectating=*/true, &tick_lp_pools);
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+        const convoy_dispatch_tick dt = dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
                          reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
         const auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
@@ -484,6 +508,85 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
                         "in wanting markets %.1f, elsewhere %.1f; largest shelf m%u %.1f\n",
                         rn(G).c_str(), with_shelf, with_demand, both, shelf_where_wanted,
                         shelf_where_not, static_cast<unsigned>(top_m), top_shelf);
+
+            // BL-1071: the followed good leaving shelves by the MARKET's own
+            // export (owner null) — sent this tick (progress 0: dispatch runs
+            // after the tick's advance) and in flight in all.
+            int   mx_new = 0;
+            float mx_new_q = 0.0f, mx_flight_q = 0.0f, mx_to_wanting = 0.0f;
+            for (const convoy_component& cv : w.convoys)
+            {
+                if (cv.corp != null_entity || static_cast<std::size_t>(cv.cargo_resource) != G)
+                    continue;
+                mx_flight_q += cv.cargo_qty;
+                if (cv.progress == 0.0f)
+                {
+                    ++mx_new;
+                    mx_new_q += cv.cargo_qty;
+                    const auto dit = w.markets.find(cv.dest_market);
+                    if (dit != w.markets.end() && dit->second.demand[G] > 0.0f)
+                        mx_to_wanting += cv.cargo_qty;
+                }
+            }
+            std::printf("  %s market exports: %d sent this tick (%.1f u, %.1f u of it to wanting "
+                        "markets); %.1f u in flight | every good: market exports %d, corp "
+                        "dispatches %d, refused for passive LP %d\n",
+                        rn(G).c_str(), mx_new, mx_new_q, mx_to_wanting, mx_flight_q,
+                        dt.market_exports, dt.dispatched, dt.refused_no_lp);
+
+            // WHY a shelf does or does not leave, read after this tick's clear
+            // (the prices and demand the NEXT dispatch will act on): every
+            // (shelf market, same-body destination) pair, by the first rule of
+            // the net-price test it fails. Read-only (price_market_export_leg
+            // only warms the A* cache).
+            {
+                const logistics_nodes nodes = collect_logistics_nodes(w);
+                std::vector<entity_id> corp_sorted;
+                for (const auto& [cid, cc] : w.corporations)
+                    corp_sorted.push_back(cid);
+                std::sort(corp_sorted.begin(), corp_sorted.end());
+                reservation_memo memo;
+                const float margin = reg.dispatch_margin();
+                int   srcs = 0;
+                long  gate_fail = 0, unroutable = 0, under_margin = 0, no_room = 0, go = 0;
+                float shelf_all = 0.0f, surplus_all = 0.0f, demand_at_shelves = 0.0f;
+                for (const entity_id s_id : home_markets)
+                {
+                    const market_component& sm = w.markets.at(s_id);
+                    shelf_all += sm.inventory[G];
+                    if (sm.inventory[G] > 0.5f)
+                        demand_at_shelves += sm.demand[G];
+                    const float surplus = market_shelf_surplus(w, s_id, G);
+                    if (!(surplus > 0.0f))
+                        continue;
+                    ++srcs;
+                    surplus_all += surplus;
+                    const float p_src = dispatch_market_price(sm, G);
+                    const float gate  = p_src + margin * p_src;
+                    for (const entity_id d_id : home_markets)
+                    {
+                        if (d_id == s_id)
+                            continue;
+                        const market_component& dm = w.markets.at(d_id);
+                        const float p_d = dispatch_market_price(dm, G);
+                        if (!(p_d > gate)) { ++gate_fail; continue; }
+                        const convoy_leg leg = price_market_export_leg(w, reg, nodes, s_id, d_id, 1.0f);
+                        if (!leg.viable) { ++unroutable; continue; }
+                        const float net = p_d - leg.cost;
+                        if (!(net - p_src > margin * p_src)) { ++under_margin; continue; }
+                        const float room = dispatch_absorbable(w, reg, d_id, G, p_src + leg.cost)
+                                         - dispatch_pending(w, reg, d_id, G, corp_sorted, memo)
+                                         - std::max(0.0f, dm.inventory[G]);
+                        if (!(room > 0.0f)) { ++no_room; continue; }
+                        ++go;
+                    }
+                }
+                std::printf("  %s shelf test (next dispatch): shelf %.1f, local demand at shelf "
+                            "markets %.1f, surplus %.1f on %d markets | pairs: price<=gate %ld, "
+                            "unroutable %ld, net under margin %ld, no room %ld, would send %ld\n",
+                            rn(G).c_str(), shelf_all, demand_at_shelves, surplus_all, srcs,
+                            gate_fail, unroutable, under_margin, no_room, go);
+            }
         }
 
         // Events touching the body.
@@ -548,6 +651,7 @@ int main(int argc, char** argv)
         else if (a == "--fast")                  o.fast = true;
         else if (a == "--quiet")                 o.quiet = true;
         else if (a == "--epoch" && i + 1 < argc) o.epoch = std::atoll(argv[++i]);
+        else if (a == "--lp-scale" && i + 1 < argc) o.lp_scale = static_cast<float>(std::atof(argv[++i]));
         else if (a == "--good" && i + 1 < argc)
         {
             bool ok = false;

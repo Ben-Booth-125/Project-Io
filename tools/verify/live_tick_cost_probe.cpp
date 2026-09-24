@@ -49,7 +49,11 @@
 // Build:  cmd.exe //c "tools\verify\build_lua_harness.bat live_tick_cost_probe"
 // Run (repo root):
 //   build_gen/verify/live_tick_cost_probe.exe [--seeds 41,31,28] [--live-ticks 4]
-//        [--arc shipped|legacy] [--sample [--top N]]
+//        [--arc shipped|legacy] [--sample [--top N]] [--quick]
+//   --quick   skip the dispatch shadow and the base-scan replay (timing + hash only)
+//   Every run ends each seed with a STATE line (BL-1079): world::state_hash and an
+//   FNV-1a of the save snapshot after the live window - the before/after proof
+//   that a pure speed-up moved no result.
 //   --sample  (Windows) an in-process stack sampler over the econ_step and
 //             dispatch laps (~1 ms period). Build with a PDB for names:
 //             CL="-Zi -FS" _LINK_=-DEBUG (dashes: Git Bash rewrites a leading /),
@@ -65,6 +69,7 @@
 #include "world/spawn_seat.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
+#include "world/world_save.hpp"
 #include "harness_params.hpp"
 
 #include <algorithm>
@@ -75,6 +80,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -276,6 +282,7 @@ struct options
     int                        live_ticks = 4;
     world_arc                  arc        = world_arc::shipped;
     bool                       sample     = false;
+    bool                       quick      = false;   // skip the shadow and the base-scan replay
     int                        top        = 40;
 };
 
@@ -426,6 +433,8 @@ void base_scan_replay(const world& w, const recipe_registry& reg,
         if (corp_strategic_eval_due(w, cid, w.current_econ_tick))
             ++due_scanning[oc];
         const auto t0 = clk::now();
+        // BL-1079: the scan runs under the same memo corp_ai.cpp opens for it.
+        const province_ceiling_scope ceiling_memo(w);
         for (const entity_id tid : nit->second.tiles)
         {
             ++calls[oc];
@@ -530,7 +539,7 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
         const std::size_t ff_e1 = w.logistics_flood_fields.size();
         const std::size_t ac_e1 = w.astar_cost_cache.size();
 
-        const shadow sh = take_shadow(w, reg, specs, firms);   // untimed in the laps
+        const shadow sh = o.quick ? shadow{} : take_shadow(w, reg, specs, firms);   // untimed in the laps
         const std::size_t conv0 = w.convoys.size();
 
         t0 = clk::now();
@@ -592,7 +601,7 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
                     dt.dispatched, conv0, w.convoys.size());
         std::printf("   caches: flood fields econ %zu->%zu, dispatch ->%zu; astar pairs econ %zu->%zu, "
                     "dispatch ->%zu\n", ff_e0, ff_e1, ff_d1, ac_e0, ac_e1, ac_d1);
-        if (k == 1)
+        if (k == 1 && !o.quick)
             base_scan_replay(w, reg, specs, firms);
     }
     std::printf("MEAN over %d live ticks: %.0f ms |", o.live_ticks, tick_sum / o.live_ticks);
@@ -600,6 +609,28 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
         std::printf(" %s %.0f (%.0f%%)", k_lap_names[i], lap_sum[i] / o.live_ticks,
                     tick_sum > 0 ? 100.0 * lap_sum[i] / tick_sum : 0.0);
     std::printf("\n");
+
+    // BL-1079: the live-tick STATE after the window, so a pure speed-up can be
+    // proved result-identical by running this probe on the tree before and after
+    // it. Two readings: world::state_hash (the tick-mutating fields) and an
+    // FNV-1a over the whole flat-binary save snapshot (convoys, shelves, pools,
+    // population, the order book - everything the save carries).
+    {
+        std::ostringstream snap(std::ios::binary);
+        write_world_snapshot(w, snap);
+        const std::string bytes = snap.str();
+        std::uint64_t fh = 1469598103934665603ull;
+        for (const unsigned char c : bytes)
+        {
+            fh ^= c;
+            fh *= 1099511628211ull;
+        }
+        std::printf("STATE seed %u after %d live ticks: state_hash %016llX snapshot %016llX "
+                    "(%zu bytes; convoys %zu)\n",
+                    seed, o.live_ticks,
+                    static_cast<unsigned long long>(w.state_hash(w.current_econ_tick)),
+                    static_cast<unsigned long long>(fh), bytes.size(), w.convoys.size());
+    }
     std::fflush(stdout);
 }
 
@@ -628,12 +659,13 @@ int main(int argc, char** argv)
         }
         else if (a == "--live-ticks" && i + 1 < argc) o.live_ticks = std::atoi(argv[++i]);
         else if (a == "--sample")                 o.sample = true;
+        else if (a == "--quick")                  o.quick = true;
         else if (a == "--top" && i + 1 < argc)    o.top = std::atoi(argv[++i]);
         else if (a == "--arc" && i + 1 < argc)
             o.arc = std::string(argv[++i]) == "legacy" ? world_arc::legacy : world_arc::shipped;
         else
         {
-            std::printf("usage: %s [--seeds 41,31,28] [--live-ticks N] [--arc shipped|legacy]\n", argv[0]);
+            std::printf("usage: %s [--seeds 41,31,28] [--live-ticks N] [--arc shipped|legacy] [--quick]\n", argv[0]);
             return 2;
         }
     }

@@ -525,7 +525,7 @@ int main()
         check(loaded.body_tile_index.empty() && loaded.astar_cost_cache.empty()
                   && loaded.body_reach_cost.empty() && loaded.body_market_index.empty()
                   && loaded.body_market_index_count == 0
-                  && loaded.body_market_index_max_id == null_entity,
+                  && loaded.body_market_index_cursor == 0,
               "P4 the loaded world starts with every derived cache cleared");
 
         check(loaded.ai_decisions.entries.empty() && loaded.ai_decisions.total == 0,

@@ -9,6 +9,7 @@
 #include "market_clearing.hpp" // market_for_tile
 #include "nation_budget.hpp"   // budget_claim (Sprint N3 T5: the cash-gated survey asks its nation)
 #include "placement_rules.hpp"
+#include "province.hpp"        // province_ceiling_scope (BL-1079: the muster scan's memo)
 #include "recipe_registry.hpp"
 #include "supply_system.hpp"   // price_convoy_leg / commit_convoy (BL-600, the shared dispatch seam)
 #include "survey_system.hpp"
@@ -1716,6 +1717,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // pure, cached per-body Dijkstra, so warming it at
                     // enumeration time instead of apply time changes no value.
                     const float reach_budget = reg.construction().max_logistics_reach;
+                    // BL-1079 (live tick speedups): nearly every tile of the home
+                    // nation reaches the province ceiling, and each reach used to
+                    // rebuild a map over every population centre in the world and
+                    // walk every building. The scan below mutates none of what the
+                    // ceiling reads (body_reach_field writes only its own reach
+                    // cache), so the reads are memoised for the scan's length —
+                    // the same answers, once per province instead of once per tile.
+                    const province_ceiling_scope ceiling_memo(w);
                     for (const entity_id tid : nation_it->second.tiles)
                     {
                         body_reach_field(w, tile_body(w, tid));

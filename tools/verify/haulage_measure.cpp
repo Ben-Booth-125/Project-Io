@@ -210,6 +210,10 @@ struct cargo_track
     double        p_dest_arrival = 0.0;
     entity_id     sell_market   = null_entity;
     double        sold          = 0.0;
+    /// BL-1071: a MARKET's own shelf export (owner null_entity). It lands on the
+    /// destination SHELF, not in a pool, and no seller lists it — so it is read
+    /// on its own line and kept out of every corporation figure below.
+    bool          market_export = false;
 };
 
 /// Where an ARRIVED cargo sells: the market of the pool it was credited to.
@@ -279,6 +283,12 @@ struct far_tally
     double v_del_skipped = 0.0; ///< context: delivered-away volume whose destination != nearest
     double v_del_away = 0.0;    ///< delivered volume bound for a market other than home
     double v_del_total = 0.0;
+    // BL-1071: market exports (a market's own shelf), their own line.
+    long   n_mx = 0;            double v_mx = 0.0;            ///< dispatched
+    long   n_mx_del = 0;        double v_mx_del = 0.0;        ///< landed on a destination shelf
+    double v_mx_open = 0.0;     ///< in flight / cut / lost at read end
+    double mx_haul_w = 0.0;     ///< qty x haul/unit, over the dispatched
+    double mx_gap_w  = 0.0;     ///< qty x (dest price - source price) at dispatch
 
     struct good_row
     {
@@ -304,6 +314,8 @@ struct far_tally
         n_sb_del += o.n_sb_del; n_sb_del_home += o.n_sb_del_home;
         v_a_skipped += o.v_a_skipped; v_del_skipped += o.v_del_skipped;
         v_del_away += o.v_del_away; v_del_total += o.v_del_total;
+        n_mx += o.n_mx; v_mx += o.v_mx; n_mx_del += o.n_mx_del; v_mx_del += o.v_mx_del;
+        v_mx_open += o.v_mx_open; mx_haul_w += o.mx_haul_w; mx_gap_w += o.mx_gap_w;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             good_row& g = goods[r];
@@ -322,6 +334,16 @@ far_tally tally_window(const std::vector<cargo_track>& tracks, int window)
     {
         if (c.window != window)
             continue;
+        if (c.market_export)
+        {
+            ++t.n_mx;
+            t.v_mx      += c.qty;
+            t.mx_haul_w += c.qty * c.haul_per_unit;
+            t.mx_gap_w  += c.qty * (c.p_dest_dispatch - c.p_home_dispatch);
+            if (c.fate == cargo_fate::settled) { ++t.n_mx_del; t.v_mx_del += c.qty; }
+            else                               t.v_mx_open += c.qty;
+            continue;
+        }
         const bool same_body = c.mode != convoy_mode::space;
         ++t.n_disp;
         t.v_disp += c.qty;
@@ -425,6 +447,14 @@ void print_window(const far_tally& t, const char* title, bool per_good)
                 t.v_del_skipped, t.v_del_away);
     std::printf("  same-body deliveries whose arrival pool clears at home: %ld of %ld\n",
                 t.n_sb_del_home, t.n_sb_del);
+    // BL-1071: a market's own shelf, exported — its own line, in none of the above.
+    std::printf("  MARKET EXPORTS (a market's own shelf, owner none; BL-1071):\n");
+    std::printf("    dispatched                          %6ld convoys  %12.1f units\n", t.n_mx, t.v_mx);
+    std::printf("    landed on the destination shelf     %6ld          %12.1f\n", t.n_mx_del, t.v_mx_del);
+    std::printf("    in flight / cut / lost at end                     %12.1f\n", t.v_mx_open);
+    if (t.v_mx > 0.0)
+        std::printf("    volume-weighted: price gap dest - source %.3f, haul/unit %.3f\n",
+                    t.mx_gap_w / t.v_mx, t.mx_haul_w / t.v_mx);
     if (!per_good)
         return;
     std::printf("  (c) price gap per delivered good, destination - home, volume-weighted:\n");
@@ -518,7 +548,8 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
             t.home            = cv.source_market;
             t.p_home_dispatch = price_at(w, t.home, t.r);
             t.p_dest_dispatch = price_at(w, t.dest_market, t.r);
-            if (window >= 0 && t.src_body != null_entity)
+            t.market_export   = (cv.corp == null_entity); // BL-1071
+            if (window >= 0 && t.src_body != null_entity && !t.market_export)
             {
                 if (!nodes_built)
                 {
@@ -561,6 +592,16 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
         using pool_key = std::tuple<entity_id, entity_id, std::size_t>;
         std::map<pool_key, std::pair<double, double>> pool_watch; // before, expected gain
         auto pool_qty = [&](const pool_key& k) {
+            // BL-1071: a market export (owner null) credits the destination
+            // SHELF, and nothing else writes a shelf during the credit, so the
+            // same before/after check reads the shelf for it.
+            if (std::get<0>(k) == null_entity)
+            {
+                const auto mit = w.markets.find(std::get<1>(k));
+                return mit != w.markets.end()
+                           ? static_cast<double>(mit->second.inventory[std::get<2>(k)])
+                           : 0.0;
+            }
             const auto pit = w.corp_market_pools.find({std::get<0>(k), std::get<1>(k)});
             return pit != w.corp_market_pools.end()
                        ? static_cast<double>(pit->second.quantities[std::get<2>(k)])
@@ -595,7 +636,9 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, const rec
                 t.fate = cargo_fate::lost;
                 continue;
             }
-            t.fate           = cargo_fate::awaiting_sale;
+            // A market export lands on a shelf; no seller lists it, so it has
+            // no first clear to read: it is settled on landing (BL-1071).
+            t.fate           = t.market_export ? cargo_fate::settled : cargo_fate::awaiting_sale;
             t.p_home_arrival = price_at(w, t.home, t.r);
             t.p_dest_arrival = price_at(w, t.dest_market, t.r);
             pool_watch[{t.corp, t.dest_market, t.r}].second += t.qty;
@@ -788,9 +831,11 @@ int run_far_trade(int argc, char** argv)
                         t.v_a_sb, t.v_a_ib);
             const double a = t.v_a_sb + t.v_a_ib;
             if (a > 0.0)
-                std::printf(" | (b) %.1f%%\n", 100.0 * t.v_a_skipped / a);
+                std::printf(" | (b) %.1f%%", 100.0 * t.v_a_skipped / a);
             else
-                std::printf(" | (b) n/a\n");
+                std::printf(" | (b) n/a");
+            std::printf(" | market exports %ld (%.1f u, %.1f u landed on a shelf)\n", t.n_mx,
+                        t.v_mx, t.v_mx_del);
             pooled[static_cast<std::size_t>(k)].add(t);
         }
         std::fflush(stdout);
@@ -834,7 +879,8 @@ int run_far_trade(int argc, char** argv)
     std::printf("  pool model: %ld credited arrivals checked; %ld pool(s) did not gain their cargo\n",
                 arrivals_checked, pool_mismatches);
     check(arrivals_checked > 0 && pool_mismatches == 0,
-          "every credited arrival raised the (corp, destination market) pool by exactly its cargo "
+          "every credited arrival raised the (corp, destination market) pool — or, for a market's "
+          "own export (BL-1071), the destination shelf — by exactly its cargo "
           "(the pool model this reading assumes is the tree's)");
 
     std::printf("\n=== haulage_measure --far-trade: %d failure(s) ===\n", g_failures);

@@ -662,6 +662,46 @@ int province_building_ceiling(const world& w, uint32_t province_id);
 /// counted here too, and are bounded independently by their deposit's richness.
 int province_buildings_standing(const world& w, uint32_t province_id);
 
+/// BL-1079 (live tick speedups) — a SCOPED memo over the three province-ceiling
+/// reads above, for a caller that asks them hundreds to thousands of times while
+/// the world holds still: the corp AI's muster-base scan walks every tile of a
+/// home nation through `can_place_in_world`, and each tile that reaches the
+/// province rule used to rebuild a map over every population centre in the world
+/// (`measure_province_sustain`) and walk every building (`..._standing`).
+///
+/// WHILE ONE IS ALIVE ON THIS THREAD, for the world it was opened on:
+///   * the population-by-tile map is built ONCE, on first need;
+///   * `province_building_ceiling` answers each province id once;
+///   * `province_buildings_standing` counts every province in one building walk.
+/// Every answer is the SAME value the unscoped call returns (same arithmetic, same
+/// summation order) — the memo moves time, never a result.
+///
+/// WHY A SCOPE AND NOT A PER-TICK CACHE WITH INVALIDATION. What these read —
+/// centre scale and tile (growth, decline, razing, the urban transform, BL-1050's
+/// settlement writers), tile habitability and road level (road builds, climate),
+/// and the building set (construction, decommission, capture) — is written from a
+/// dozen places across the tick, and a cache that misses one writer returns a
+/// stale ceiling SILENTLY. A scope has no writers to find: the caller promises the
+/// world is not mutated in those fields while it is open, and the memo dies with
+/// it. Open one only around a read-only stretch (the muster-base scan calls only
+/// const placement reads plus the reach-field warm, which writes none of them).
+///
+/// Nests (the inner scope shadows the outer, then restores it). Thread-local, so
+/// a UI-thread read never sees a sim-thread scope. Queries against any OTHER
+/// world than the one the scope was opened on bypass it.
+class province_ceiling_scope
+{
+public:
+    explicit province_ceiling_scope(const world& w);
+    ~province_ceiling_scope();
+    province_ceiling_scope(const province_ceiling_scope&)            = delete;
+    province_ceiling_scope& operator=(const province_ceiling_scope&) = delete;
+
+private:
+    void* m_prev; ///< The enclosing scope's state, restored on exit.
+    void* m_self; ///< This scope's state (province.cpp owns the type).
+};
+
 // ---------------------------------------------------------------------------
 // The province holder (BL-569, province holder) — a military fact, not a
 // political one

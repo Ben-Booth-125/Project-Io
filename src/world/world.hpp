@@ -621,11 +621,13 @@ struct world
     /// A derived cache like body_tile_index, serving market_for_tile / clear_markets
     /// (market_clearing.cpp) so the hot read path stops rebuilding the grouping per
     /// call. Rebuilt when the stamp below stops matching the market set — markets
-    /// are created at runtime but never destroyed, so count + max id catches every
-    /// mutation. Mutable so the const read path (market_for_tile) can refresh it.
+    /// are created at runtime but never destroyed, and every market is an entity,
+    /// so count + the allocator cursor catches every mutation in O(1) (BL-1079:
+    /// the stamp was count + max id, and the max id cost a walk of every market
+    /// per call). Mutable so the const read path (market_for_tile) can refresh it.
     mutable faithful_unordered_map<entity_id, std::vector<entity_id>> body_market_index;
-    mutable std::size_t body_market_index_count  = 0;           ///< markets.size() at build.
-    mutable entity_id   body_market_index_max_id = null_entity; ///< Max market id at build.
+    mutable std::size_t   body_market_index_count  = 0; ///< markets.size() at build.
+    mutable std::uint32_t body_market_index_cursor = 0; ///< next_entity_id() at build.
 
     /// Per-body population-centre index (BL-1050): body -> its centres in
     /// ASCENDING ID ORDER. The same derived cache as `body_market_index` above

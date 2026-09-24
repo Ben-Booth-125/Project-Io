@@ -303,7 +303,7 @@ bool read_world_snapshot(world& w, std::istream& in);
 /// needs to clear a freshly-generated world the same way a load does.
 ///
 /// Clears: `body_tile_index`, `astar_cost_cache`, `logistics_flood_fields`, `body_reach_cost`,
-/// `body_market_index` (and its count/max-id stamps), `ai_decisions`, and
+/// `body_market_index` (and its count/cursor stamps), `ai_decisions`, and
 /// `current_day_tick`. Does NOT touch `corp_modifiers` -- see above.
 ///
 /// @param w World whose caches are dropped.

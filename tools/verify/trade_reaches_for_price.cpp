@@ -415,7 +415,7 @@ int main()
         set_book(s, s.market_f, 100.0f, consistent_demand(100.0f, 30.0f));
 
         std::set<std::uint32_t> seen;
-        int  dispatched = 0, bad = 0, from_non_a = 0;
+        int  dispatched = 0, bad = 0, from_non_a = 0, market_exports = 0;
         for (int t = 0; t < 40; ++t)
         {
             s.w.current_econ_tick = t;
@@ -432,7 +432,21 @@ int main()
                 if (!seen.insert(c.id).second)
                     continue;
                 ++dispatched;
-                if (c.source_market != s.market_a)
+                // BL-1071: a MARKET's own export (owner null) is shelf stock —
+                // cargo that already met its clear and was not bought — and the
+                // ruling is that it moves. Counted apart; (d).1 still holds it to
+                // the net-price rule like any convoy.
+                if (c.corp == null_entity)
+                {
+                    ++market_exports;
+                    std::printf("      tick %d market export %u: %s -> %s, %.3f units\n", t, c.id,
+                                c.source_market == s.market_a   ? "A"
+                                : c.source_market == s.market_n ? "N" : "F",
+                                c.dest_market == s.market_a   ? "A"
+                                : c.dest_market == s.market_n ? "N" : "F",
+                                c.cargo_qty);
+                }
+                else if (c.source_market != s.market_a)
                     ++from_non_a;
                 const float p_src  = price_of(s.w.markets.at(c.source_market), r_iron);
                 const float p_dest = price_of(s.w.markets.at(c.dest_market), r_iron);
@@ -451,16 +465,17 @@ int main()
             s.w.markets.at(s.market_n).demand[r_iron] = 225.0f;
             s.w.markets.at(s.market_f).demand[r_iron] = 900.0f;
         }
-        std::printf("      %d convoys over 40 ticks (%d from a pool other than A); "
-                    "prices A %.3f N %.3f F %.3f\n",
-                    dispatched, from_non_a, price_of(s.w.markets.at(s.market_a), r_iron),
+        std::printf("      %d convoys over 40 ticks (%d market exports; %d corporation convoys "
+                    "from a pool other than A); prices A %.3f N %.3f F %.3f\n",
+                    dispatched, market_exports, from_non_a, price_of(s.w.markets.at(s.market_a), r_iron),
                     price_of(s.w.markets.at(s.market_n), r_iron),
                     price_of(s.w.markets.at(s.market_f), r_iron));
         check(dispatched > 0, "(d).0 fixture: the loop dispatches at all");
         check(bad == 0,
               "(d).1 every convoy's destination net price beats its source price at dispatch");
         check(from_non_a == 0,
-              "(d).2 every convoy leaves A — no delivered cargo is re-exported");
+              "(d).2 every CORPORATION's convoy leaves A — no delivered cargo is re-exported from a "
+              "pool (BL-1071: a market's shelf export is counted apart)");
     }
 
     // -----------------------------------------------------------------------

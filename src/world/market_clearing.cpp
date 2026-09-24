@@ -94,16 +94,22 @@ struct matched_trade
 };
 
 /// Markets present on each body, in ascending market-id order (deterministic).
-/// Served from world::body_market_index (BL-356), rebuilt when the count + max-id
-/// stamp stops matching the market set (markets are created, never destroyed).
+/// Served from world::body_market_index (BL-356), rebuilt when the stamp stops
+/// matching the market set (markets are created, never destroyed).
+///
+/// BL-1079 (live tick speedups): THE STAMP IS O(1) — the market count plus the
+/// entity-allocator cursor, `centres_by_body`'s stamp (budget_system.cpp). It was
+/// count + max id, and deriving the max id walked every market on EVERY call:
+/// dispatch reaches this through pool_key_for_tile once per asset per priced
+/// leg, ~509M market visits a live tick on seed 31 (NR-915). A market is an
+/// entity, so no market can be created without the cursor moving; the cursor
+/// also moves on unrelated creations, which costs a rebuild, never a stale read.
 const std::unordered_map<entity_id, std::vector<entity_id>>& markets_by_body(const world& w)
 {
-    entity_id max_id = null_entity;
-    for (const auto& [mid, mc] : w.markets)
-        max_id = std::max(max_id, mid);
+    const std::uint32_t cursor = w.next_entity_id();
 
     if (w.body_market_index_count != w.markets.size() ||
-        w.body_market_index_max_id != max_id)
+        w.body_market_index_cursor != cursor)
     {
         auto& map = w.body_market_index;
         map.clear();
@@ -113,7 +119,7 @@ const std::unordered_map<entity_id, std::vector<entity_id>>& markets_by_body(con
         for (auto& [body, ids] : map)
             std::sort(ids.begin(), ids.end());
         w.body_market_index_count  = w.markets.size();
-        w.body_market_index_max_id = max_id;
+        w.body_market_index_cursor = cursor;
     }
     return w.body_market_index;
 }

@@ -87,6 +87,12 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
             // DIRECTED, and only this direction: the tile's holder must have
             // DECLARED hostility toward the cargo's owner. A corp that has been
             // declared against but has not answered is a victim, not a raider.
+            //
+            // BL-1071 CALL: a market's own export (owner null_entity) walks this
+            // same check, and no declaration can name it — hostility is declared
+            // corporation to corporation — so today it is never cut. When a
+            // declaration can name a market or its nation, it applies here with
+            // no other change.
             if (!is_hostile(w, uc.owner, cv.corp))
                 continue;
             interceptor_unit = uid;
@@ -179,6 +185,21 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
         if (mit == w.markets.end())
             continue;
         const entity_id dest_body = mit->second.body;
+
+        // BL-1071: a MARKET'S OWN EXPORT (owner sentinel null_entity) lands on
+        // the destination market's SHELF — real inventory, where that market's
+        // consumers draw it — not in any pool, since no corporation owns it.
+        // Remembered for this tick's dispatch under (null, market): a shelf
+        // delivery meets its destination's economy step before it may move again
+        // (market_shelf_surplus). It runs no trade route: a market export is
+        // intra-body by construction, and routes are a corporation's record.
+        if (convoy.corp == null_entity)
+        {
+            const std::size_t r = static_cast<std::size_t>(convoy.cargo_resource);
+            mit->second.inventory[r] += convoy.cargo_qty;
+            w.arrived_this_tick[{null_entity, convoy.dest_market}].quantities[r] += convoy.cargo_qty;
+            continue;
+        }
 
         // Credit the DESTINATION MARKET's pool (BL-1003) — so a same-body haul
         // sells at the destination, not back at home. The credit is the whole delivery —
@@ -436,6 +457,72 @@ float node_discount_fraction(const logistics_path& path, const logistics_nodes& 
     return std::clamp(std::min(disc, np.discount_cap), 0.0f, 0.95f);
 }
 
+/// The intra-body half of a leg (BL-077 path, BL-608 sea gate, BL-148/149 node
+/// discount): route `origin` -> `dest_centre` on `src_body` and fill the leg's
+/// mode, distance, rate, travel time and discount. False when it cannot route.
+/// Split out of price_convoy_leg for BL-1071 (a market exports its own shelf),
+/// whose convoy has no corporation but routes by exactly the same road.
+bool route_intra_body_leg(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
+                          entity_id src_body, entity_id origin, entity_id dest_centre,
+                          convoy_mode& mode, float& dist, float& unit_cost, int& travel_ticks,
+                          float& node_discount)
+{
+    const logistics_node_params& node_params = reg.logistics_nodes();
+    if (origin == null_entity || dest_centre == null_entity)
+        return false; // no production anchor / unanchored market: cannot route
+    const logistics_path& path = intra_body_path(w, src_body, origin, dest_centre);
+    if (!path.reachable)
+        return false;
+    if (path.crosses_ocean)
+    {
+        // BL-608: sea mode is gated on an active Port at BOTH endpoints
+        // (SUPPLY.md § Infrastructure gates). The cheapest A* path already
+        // crosses water — there is no cheaper land-only route BL-522's
+        // per-leg pricing would recover — so an ungated pair is refused
+        // outright rather than silently re-priced at the land rate: a
+        // cart cannot be billed for a lane it cannot physically cross.
+        // The caller's leg is still default-constructed (viable == false)
+        // here, so this mutates nothing; the caller's existing `!leg.viable`
+        // path (corp_command.cpp: dispatch_convoy -> rejected_placement)
+        // surfaces it.
+        if (!tile_has_active_port(w, origin) || !tile_has_active_port(w, dest_centre))
+            return false;
+        mode = convoy_mode::sea;
+    }
+    else
+    {
+        mode = convoy_mode::land;
+    }
+    dist      = path.cost;
+    unit_cost = reg.logistics_cost(mode);
+    // Distance now costs TIME as well as money (Ben, 2026-08-12). Computed
+    // here because `path` is a reference into the A* cache and must be read
+    // before anything can invalidate it.
+    travel_ticks = convoy_travel_ticks(w, src_body, path);
+    // BL-148/149: discount the haul for the cities + hubs its path crosses.
+    node_discount = node_discount_fraction(path, nodes, node_params);
+    return true;
+}
+
+/// The priced tail every leg shares: cost = rate x distance x qty x (1 - discount).
+convoy_leg finish_leg(convoy_mode mode, float unit_cost, float dist, float qty,
+                      float node_discount, int travel_ticks)
+{
+    convoy_leg leg;
+    const float cost = unit_cost * dist * qty * (1.0f - node_discount);
+    // A cost that is not a finite, non-negative number is not a price. Reached
+    // by an absurd (but finite) quantity overflowing the product; refused here
+    // rather than debited, since `balance -= inf` is unrecoverable.
+    if (!std::isfinite(cost) || cost < 0.0f)
+        return leg;
+
+    leg.viable       = true;
+    leg.mode         = mode;
+    leg.cost         = cost;
+    leg.travel_ticks = travel_ticks < 1 ? 1 : travel_ticks;
+    return leg;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -483,7 +570,8 @@ logistics_nodes collect_logistics_nodes(const world& w)
 convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id corp_id,
                             entity_id src_key, entity_id dest_market_id,
-                            std::size_t ri, float qty, float logistics_cost_space)
+                            std::size_t ri, float qty, float logistics_cost_space,
+                            const entity_id* known_origin)
 {
     convoy_leg leg;
 
@@ -523,7 +611,6 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
     const corporation_component& corp        = cit->second;
     const market_component&      dest_market = mit->second;
     const entity_id              dest_body   = dest_market.body;
-    const logistics_node_params& node_params = reg.logistics_nodes();
 
     convoy_mode mode;
     float       dist;
@@ -537,40 +624,13 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         // the source catchment, else the source market's centre) to the short
         // market's centre, terrain-weighted over the tile grid (land, or sea
         // when the path must cross water).
-        const entity_id origin      = convoy_origin_tile(w, corp, src_key);
+        const entity_id origin      = known_origin != nullptr
+                                          ? *known_origin // BL-1079: resolved once per pool
+                                          : convoy_origin_tile(w, corp, src_key);
         const entity_id dest_centre = dest_market.centre_tile;
-        if (origin == null_entity || dest_centre == null_entity)
-            return leg; // no production anchor / unanchored market: cannot route
-        const logistics_path& path = intra_body_path(w, src_body, origin, dest_centre);
-        if (!path.reachable)
+        if (!route_intra_body_leg(w, reg, nodes, src_body, origin, dest_centre, mode, dist,
+                                  unit_cost, travel_ticks, node_discount))
             return leg;
-        if (path.crosses_ocean)
-        {
-            // BL-608: sea mode is gated on an active Port at BOTH endpoints
-            // (SUPPLY.md § Infrastructure gates). The cheapest A* path already
-            // crosses water — there is no cheaper land-only route BL-522's
-            // per-leg pricing would recover — so an ungated pair is refused
-            // outright rather than silently re-priced at the land rate: a
-            // cart cannot be billed for a lane it cannot physically cross.
-            // `leg` is still default-constructed (viable == false) here, so
-            // this mutates nothing; the caller's existing `!leg.viable` path
-            // (corp_command.cpp: dispatch_convoy -> rejected_placement) surfaces it.
-            if (!tile_has_active_port(w, origin) || !tile_has_active_port(w, dest_centre))
-                return leg;
-            mode = convoy_mode::sea;
-        }
-        else
-        {
-            mode = convoy_mode::land;
-        }
-        dist      = path.cost;
-        unit_cost = reg.logistics_cost(mode);
-        // Distance now costs TIME as well as money (Ben, 2026-08-12). Computed
-        // here because `path` is a reference into the A* cache and must be read
-        // before anything can invalidate it.
-        travel_ticks = convoy_travel_ticks(w, src_body, path);
-        // BL-148/149: discount the haul for the cities + hubs its path crosses.
-        node_discount = node_discount_fraction(path, nodes, node_params);
     }
     else
     {
@@ -600,19 +660,84 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         travel_ticks = (dist > 1.0f) ? static_cast<int>(dist + 0.999f) : 1;
     }
 
-    const float cost = unit_cost * dist * qty * (1.0f - node_discount);
-    // A cost that is not a finite, non-negative number is not a price. Reached
-    // by an absurd (but finite) quantity overflowing the product; refused here
-    // rather than debited, since `balance -= inf` is unrecoverable.
-    if (!std::isfinite(cost) || cost < 0.0f)
-        return leg;
-
-    leg.viable       = true;
-    leg.mode         = mode;
-    leg.cost         = cost;
-    leg.travel_ticks = travel_ticks < 1 ? 1 : travel_ticks;
-    return leg;
+    return finish_leg(mode, unit_cost, dist, qty, node_discount, travel_ticks);
 }
+
+convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
+                                   const logistics_nodes& nodes, entity_id src_market,
+                                   entity_id dest_market, float qty)
+{
+    if (src_market == dest_market || !std::isfinite(qty) || !(qty > 0.0f))
+        return convoy_leg{};
+    const auto sit = w.markets.find(src_market);
+    const auto dit = w.markets.find(dest_market);
+    if (sit == w.markets.end() || dit == w.markets.end())
+        return convoy_leg{};
+    const entity_id body = sit->second.body;
+    if (body == null_entity || dit->second.body != body)
+        return convoy_leg{}; // BL-1071 CALL: a market has no pad and no propellant
+    // BL-1071 CALL: the haul leaves from the market's own centre — where
+    // convoyed and unsold stock sits (convoy_origin_tile's fallback for a pool
+    // with no building in the catchment). Unanchored: no road to leave by.
+    convoy_mode mode      = convoy_mode::land;
+    float       dist      = 0.0f;
+    float       unit_cost = 0.0f;
+    float       discount  = 0.0f;
+    int         ticks     = 1;
+    if (!route_intra_body_leg(w, reg, nodes, body, sit->second.centre_tile,
+                              dit->second.centre_tile, mode, dist, unit_cost, ticks, discount))
+        return convoy_leg{};
+    return finish_leg(mode, unit_cost, dist, qty, discount, ticks);
+}
+
+namespace {
+
+/// BL-597's passive-LP admissibility gate, shared by a corporation's convoy
+/// (commit_convoy) and a market's own export (BL-1071): the nearest anchor to
+/// `origin` on `src_body` must hold `qty` of passive LP this tick, and on success
+/// draws it. On refusal mutates nothing and sets *out_refused_no_lp.
+bool passive_lp_admit(world& w, const recipe_registry& reg, entity_id src_body, entity_id origin,
+                      float qty, lp_pool_map* shared_lp_pools, bool* out_refused_no_lp)
+{
+    lp_pool_map local_pools;
+    lp_pool_map& pools_by_body = shared_lp_pools ? *shared_lp_pools : local_pools;
+    const military_capability_params& mil = reg.military();
+    std::unordered_map<entity_id, float>& pools =
+        lp_pool_for_body(pools_by_body, w, src_body, mil.active_lp_per_anchor_tick);
+
+    const entity_id nearest_anchor =
+        (origin != null_entity) ? nearest_lp_anchor(w, src_body, origin, pools) : null_entity;
+
+    if (nearest_anchor == null_entity)
+    {
+        // No reachable anchor on this body at all — no passive LP exists
+        // to draw against.
+        if (out_refused_no_lp)
+            *out_refused_no_lp = true;
+        return false;
+    }
+
+    float& pool = pools.at(nearest_anchor);
+    if (pool + 1e-6f < qty)
+    {
+        // The nearest anchor's pool is already exhausted (by a
+        // higher-priority draw earlier this tick — possibly THIS SAME
+        // TICK'S active march pass, if `shared_lp_pools` ties the two
+        // together — or simply too small).
+        if (out_refused_no_lp)
+            *out_refused_no_lp = true;
+        return false;
+    }
+
+    // Granted: consume the anchor's pool. LP is the CAP, not a second
+    // PRICE (LOGISTICS.md rule 1) — `leg.cost` (already debited below)
+    // is the only credit charge a passive draw pays; unlike BL-596's
+    // active draw, there is no separate LP-specific credit line here.
+    pool -= qty;
+    return true;
+}
+
+} // namespace
 
 bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, entity_id src_body,
                    entity_id src_market, entity_id dest_market_id,
@@ -653,44 +778,11 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     // remain the sole price of distance.
     if (leg.mode != convoy_mode::space)
     {
-        lp_pool_map local_pools;
-        lp_pool_map& pools_by_body = shared_lp_pools ? *shared_lp_pools : local_pools;
-        const military_capability_params& mil = reg.military();
-        std::unordered_map<entity_id, float>& pools =
-            lp_pool_for_body(pools_by_body, w, src_body, mil.active_lp_per_anchor_tick);
-
         // Same locus as price_convoy_leg's own origin — `convoy_origin_tile`
         // of the source pool, the convoy's actual dispatch point.
         const entity_id origin = convoy_origin_tile(w, corp, src_key);
-        const entity_id nearest_anchor =
-            (origin != null_entity) ? nearest_lp_anchor(w, src_body, origin, pools) : null_entity;
-
-        if (nearest_anchor == null_entity)
-        {
-            // No reachable anchor on this body at all — no passive LP exists
-            // to draw against.
-            if (out_refused_no_lp)
-                *out_refused_no_lp = true;
+        if (!passive_lp_admit(w, reg, src_body, origin, qty, shared_lp_pools, out_refused_no_lp))
             return false;
-        }
-
-        float& pool = pools.at(nearest_anchor);
-        if (pool + 1e-6f < qty)
-        {
-            // The nearest anchor's pool is already exhausted (by a
-            // higher-priority draw earlier this tick — possibly THIS SAME
-            // TICK'S active march pass, if `shared_lp_pools` ties the two
-            // together — or simply too small).
-            if (out_refused_no_lp)
-                *out_refused_no_lp = true;
-            return false;
-        }
-
-        // Granted: consume the anchor's pool. LP is the CAP, not a second
-        // PRICE (LOGISTICS.md rule 1) — `leg.cost` (already debited below)
-        // is the only credit charge a passive draw pays; unlike BL-596's
-        // active draw, there is no separate LP-specific credit line here.
-        pool -= qty;
     }
 
     // Debit cost and source pool; create the convoy.
@@ -854,6 +946,186 @@ float dispatch_arrived(const world& w, entity_id corp, entity_id key, std::size_
                                                                    : 0.0f;
 }
 
+float market_shelf_surplus(const world& w, entity_id market, std::size_t r)
+{
+    if (r >= resource_count)
+        return 0.0f;
+    const auto it = w.markets.find(market);
+    if (it == w.markets.end())
+        return 0.0f;
+    const market_component& m = it->second;
+    // BL-1071 CALL: WHAT THE MARKET'S OWN CONSUMERS NEED is last clear's DEMAND
+    // for the good at this market (`demand` still holds it at dispatch — clearing
+    // zeroes it only at its own top). Demand is the per-tick want of everything
+    // local that draws on the shelf (processors' wants, construction sites'
+    // wants, the population), so one tick of it stays on the shelf for the next
+    // tick's economy step, which draws before the next clear refills anything.
+    // It is a WANT, not a measured draw, so it errs on the side of keeping stock
+    // home: a processor that covers its want from its own pool still counts.
+    // The alternative — this tick's measured shelf draw — needs a persistent
+    // per-market record the save would carry, and reads zero at exactly the
+    // stranded shelves this exists for (construction paused elsewhere, nothing
+    // drawing here).
+    //
+    // Minus THIS TICK'S shelf deliveries: a market export delivered this tick
+    // reaches its destination's economy step before it may move again — the
+    // same arrived-this-tick rule a corporation's delivery obeys (the transient
+    // record is keyed (null corporation, market) for shelf deliveries).
+    const float surplus = m.inventory[r] - std::max(0.0f, m.demand[r])
+                        - dispatch_arrived(w, null_entity, market, r);
+    return surplus > 0.0f ? surplus : 0.0f;
+}
+
+namespace {
+
+/// BL-1071 — a market exports its own shelf. SUPPLY.md § Dispatch trigger ("A
+/// market exports its own shelf"); the net-price rule of dispatch_convoys,
+/// applied to stock no corporation holds any more. Runs after every
+/// corporation's dispatch in the same pass, so it takes only the room left.
+void export_market_shelves(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
+                           const std::vector<entity_id>& corp_ids,
+                           const std::vector<entity_id>& market_ids, reservation_memo& memo,
+                           lp_pool_map* shared_lp_pools, convoy_dispatch_tick& out)
+{
+    const float              margin     = reg.dispatch_margin();
+    const grid_goods_params& grid_rules = reg.grid_goods();
+
+    struct candidate
+    {
+        float     net;
+        entity_id dest;
+        float     haul;
+    };
+    std::vector<candidate> cands;
+
+    for (const entity_id src : market_ids) // ascending: a fixed commit order
+    {
+        const auto sit = w.markets.find(src);
+        if (sit == w.markets.end())
+            continue;
+        const entity_id src_body = sit->second.body;
+        // The haul leaves from the market's centre (price_market_export_leg);
+        // an unanchored market has no road to leave by, so its shelf stays.
+        const entity_id origin = sit->second.centre_tile;
+        if (src_body == null_entity || origin == null_entity)
+            continue;
+
+        for (std::size_t ri = 0; ri < resource_count; ++ri)
+        {
+            if (grid_rules.grid(ri)) // BL-708: a grid good is never cargo
+                continue;
+            const float surplus = market_shelf_surplus(w, src, ri);
+            if (!(surplus > 0.0f))
+                continue;
+
+            const float price_src = dispatch_market_price(w.markets.at(src), ri);
+            const float gate      = price_src + margin * price_src;
+            const float probe_qty = std::min(surplus, 1.0f);
+
+            cands.clear();
+            for (const entity_id dest_id : market_ids)
+            {
+                if (dest_id == src)
+                    continue;
+                const market_component& dm = w.markets.at(dest_id);
+                // BL-1071 CALL: SAME BODY ONLY. A space lane needs a launchpad on
+                // the source body and burns propellant from the SHIPPER's pool;
+                // a market owns neither, so it has no lane off its body.
+                if (dm.body != src_body)
+                    continue;
+                const float price_d = dispatch_market_price(dm, ri);
+                if (!(price_d > gate))
+                    continue;
+                const convoy_leg leg =
+                    price_market_export_leg(w, reg, nodes, src, dest_id, probe_qty);
+                if (!leg.viable)
+                    continue;
+                const float haul = leg.cost / probe_qty;
+                const float net  = price_d - haul;
+                if (!(net - price_src > margin * price_src))
+                    continue;
+                cands.push_back({net, dest_id, haul});
+            }
+            if (cands.empty())
+                continue;
+            std::sort(cands.begin(), cands.end(), [](const candidate& a, const candidate& b) {
+                return (a.net != b.net) ? (a.net > b.net) : (a.dest < b.dest);
+            });
+
+            for (const candidate& c : cands)
+            {
+                // The room corporations' dispatch uses (absorbable less every
+                // corporation's cargo in flight to d and stock sitting in d above
+                // its reservation) — AND, BL-1071 CALL, less the stock already on
+                // d's SHELF. Shelf stock is not listed at a clear, so it never
+                // lowers d's price the way a seller's delivery does; without this
+                // term a destination whose price cannot respond would be sent the
+                // same room every tick for ever. What is on d's shelf reaches d's
+                // consumers first, so it is pending in every sense that matters.
+                const float landed = price_src + c.haul;
+                const float absorb = dispatch_absorbable(w, reg, c.dest, ri, landed);
+                if (!(absorb > 0.0f))
+                    continue;
+                const float pending = dispatch_pending(w, reg, c.dest, ri, corp_ids, memo)
+                                    + std::max(0.0f, w.markets.at(c.dest).inventory[ri]);
+                const float room = absorb - pending;
+                const float qty  = std::min(surplus, room);
+                if (!(qty > 0.0f) || !std::isfinite(qty))
+                    continue;
+
+                const convoy_leg leg = price_market_export_leg(w, reg, nodes, src, c.dest, qty);
+                if (!leg.viable)
+                    continue;
+
+                // The passive-LP cap binds a market's export exactly as it binds
+                // a corporation's (BL-597): the anchor nearest the market centre.
+                bool refused_no_lp = false;
+                if (!passive_lp_admit(w, reg, src_body, origin, qty, shared_lp_pools,
+                                      &refused_no_lp))
+                {
+                    ++out.refused_no_lp;
+                    break;
+                }
+
+                // BL-1071 CALL (FINANCE.md): NO BALANCE MOVES. The market has no
+                // treasury — it is already the counterparty that pays auto-surplus
+                // sellers and takes buyers' money with no ledger of its own — so
+                // the haul is "paid out of the export" only in the rule's sense:
+                // an export whose destination net does not beat home by the
+                // margin is never sent, and the haul's cost is the margin that
+                // vanishes. Nobody is debited and nobody is credited; the cost is
+                // recorded on the convoy (cost_paid) so a reader can see it.
+                // Goods are conserved exactly: shelf debit = cargo = the
+                // destination shelf's credit on arrival.
+                w.markets.at(src).inventory[ri] -= qty;
+
+                convoy_component cv;
+                cv.id             = w.allocate_convoy_id();
+                cv.source_market  = src;
+                cv.dest_market    = c.dest;
+                cv.mode           = leg.mode;
+                cv.cargo_resource = static_cast<resource_type>(ri);
+                cv.cargo_qty      = qty;
+                cv.progress       = 0.0f;
+                cv.speed          = 1.0f / static_cast<float>(leg.travel_ticks);
+                // BL-1071 CALL: owned by NO corporation — the sentinel
+                // `corp == null_entity` IS "the source market's export", read
+                // with `source_market`. On arrival it lands on the destination
+                // SHELF (credit_arrived_convoys), not in any pool.
+                cv.corp           = null_entity;
+                cv.arrived        = false;
+                cv.held           = false;
+                cv.cost_paid      = leg.cost;
+                w.convoys.push_back(cv);
+                ++out.market_exports;
+                break; // one destination per (market, good) per pass
+            }
+        }
+    }
+}
+
+} // namespace
+
 convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                       float logistics_cost_land, float logistics_cost_space,
                       lp_pool_map* shared_lp_pools)
@@ -956,6 +1228,23 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 continue;
             const bool src_is_market = (w.markets.find(src_key) != w.markets.end());
 
+            // BL-1079 (live tick speedups): this pool's intra-body origin tile,
+            // resolved on the first intra-body leg and reused for every other
+            // destination and good of the pool. It reads only the corp's
+            // buildings and the market set, and nothing in this pass moves either
+            // (commit_convoy writes balances, pools and the convoy list), so the
+            // value is the one each leg used to recompute for itself.
+            bool      origin_known = false;
+            entity_id origin_tile  = null_entity;
+            const auto pool_origin = [&]() -> const entity_id* {
+                if (!origin_known)
+                {
+                    origin_tile  = convoy_origin_tile(w, w.corporations.at(corp_id), src_key);
+                    origin_known = true;
+                }
+                return &origin_tile;
+            };
+
             // The same reservation auto-surplus holds back: what a seller may
             // haul is exactly what it would otherwise list at home.
             auto rit = memo.find({corp_id, src_key});
@@ -1011,7 +1300,8 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                         continue;
                     const convoy_leg leg = price_convoy_leg(
                         w, reg, nodes, corp_id, src_key, dest_id, ri, probe_qty,
-                        logistics_cost_space);
+                        logistics_cost_space,
+                        dm.body == src_body ? pool_origin() : nullptr);
                     if (!leg.viable)
                         continue; // unroutable / unpadded / unfuelled / same market
                     const float haul = leg.cost / probe_qty;
@@ -1051,7 +1341,7 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                     // Re-price the committed leg at its real quantity.
                     const convoy_leg leg = price_convoy_leg(
                         w, reg, nodes, corp_id, src_key, c.dest, ri, qty,
-                        logistics_cost_space);
+                        logistics_cost_space, c.space ? nullptr : pool_origin());
                     if (!leg.viable)
                         continue;
 
@@ -1072,6 +1362,11 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
             }
         }
     }
+
+    // BL-1071 — A MARKET EXPORTS ITS OWN SHELF, after every corporation has
+    // claimed the room it wanted (SUPPLY.md § Dispatch trigger).
+    export_market_shelves(w, reg, nodes, corp_ids, market_ids, memo, &pools_by_body, out);
+
     (void)logistics_cost_land; // intra-body reads reg.logistics_cost(land/sea) directly; this
                                // param is retained for caller/signature stability.
     return out;

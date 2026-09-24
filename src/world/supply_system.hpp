@@ -164,6 +164,9 @@ struct convoy_dispatch_tick
 {
     int dispatched    = 0; ///< Convoys committed this pass.
     int refused_no_lp = 0; ///< BL-597: shortfalls refused for want of passive LP.
+    /// BL-1071: convoys a MARKET sent from its own shelf this pass (owner
+    /// null_entity), counted apart — `dispatched` stays corporations' convoys.
+    int market_exports = 0;
 };
 
 convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
@@ -209,6 +212,18 @@ float dispatch_room(const world& w, const recipe_registry& reg, entity_id dest, 
 /// This tick's delivery of good `r` into the (corp, key) pool
 /// (`world::arrived_this_tick`) — not shippable until it has met a clear.
 float dispatch_arrived(const world& w, entity_id corp, entity_id key, std::size_t r);
+
+/// BL-1071 (shelf stock moves): the stock of good `r` on `market`'s SHELF
+/// (`market_component::inventory`) the market may export this pass — the shelf
+/// less what its own consumers need (last clear's demand for the good there),
+/// less this tick's shelf deliveries; never negative. The reading and why it was
+/// chosen are written out at the definition. `dispatch_convoys` exports it, after
+/// every corporation's dispatch, by the same net-price rule: same body only, from
+/// the market's centre, into the room left once every pending cargo AND the
+/// destination's own shelf are subtracted. The convoy's owner is `null_entity`;
+/// it lands on the destination shelf, and no balance moves (the market holds no
+/// treasury — the haul is the margin the export gives up).
+float market_shelf_surplus(const world& w, entity_id market, std::size_t r);
 
 // ---------------------------------------------------------------------------
 // The shared dispatch (BL-452)
@@ -275,7 +290,23 @@ struct convoy_leg
 convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id corp_id,
                             entity_id src_key, entity_id dest_market_id,
-                            std::size_t ri, float qty, float logistics_cost_space);
+                            std::size_t ri, float qty, float logistics_cost_space,
+                            const entity_id* known_origin = nullptr);
+// BL-1079 (live tick speedups): `known_origin`, when given, is the caller's
+// already-resolved `convoy_origin_tile(corp, src_key)` — the SAME value this
+// function would compute (null_entity included), handed in so a caller pricing
+// one pool against every destination resolves it once per pool, not once per
+// leg. It must be computed against the world as it stands; nothing between the
+// two may move the corp's buildings or the market set.
+
+/// BL-1071: price a MARKET's own export leg of `qty` units from `src_market`'s
+/// centre to `dest_market`'s centre — the same intra-body routing, sea gate, node
+/// discount and cost a corporation's leg uses (price_convoy_leg), with no
+/// corporation, launchpad or propellant. Not viable across bodies, from or to an
+/// unanchored market, or to itself.
+convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
+                                   const logistics_nodes& nodes, entity_id src_market,
+                                   entity_id dest_market, float qty);
 
 /// Tile of the corp's lowest-id building on `body` (BL-077's production anchor).
 /// `null_entity` if the corp holds nothing on the body.
