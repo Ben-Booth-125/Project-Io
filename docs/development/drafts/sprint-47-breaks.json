@@ -1,0 +1,482 @@
+[
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "high",
+  "claim": "No planetology imagery carries into Culture, and nothing cross-fades between them. The round-to-round carry skips round 3 (i > 0), and lapse rounds drop the globe. The player sees a blank \"Loading the Culture round\" screen with a progress bar, then a flat 2D map. That map never shows the world's generated name and uses landform colours, not the globe's biome colours. It is still the same body's ground, with the same coastlines and relief, and the wizard header and progress pips stay on screen. So what is lost is the visual and named identity, not the geography.",
+  "evidence": "startup_screens.cpp:459-473 (carry only when i > 0); startup_screens.cpp:1713-1759 vs :1761-1797 (globe branch dropped for lapse rounds); STARTUP.md:149-151"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "high",
+  "claim": "Largely accurate, with three refinements. (1) The globe-to-map switch is a deliberate ruling (Ben, 2026-09-08, startup_screens.cpp:1715), not an accident. A map shows a frontier, and the frontier is these rounds' subject. So the fix is a bridge, not undoing the switch. (2) Between the rounds, the preview pane goes empty while the Culture pass computes (startup_screens.cpp:1727). The break is globe, then blank, then flat map. (3) The lapse ground is not wholly unrelated to the globe. It keeps the same coastline raster (water via preview_substrate), mountain relief rims and blue rivers (col_river). What vanishes is ice caps, cover/biome colour, the sphere and the brighter ocean. The only cross-fade (lapse_carry_fade) works between lapse rounds and deliberately gives the migration a fade of 0.",
+  "evidence": "generation_preview.cpp:357-369 (terrain_colour, ice) vs history_lapse.cpp:29, :34-45 (col_base 'Dull on purpose'), :837-842 (map_nudge_x)"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "medium",
+  "claim": "Rounds 1 and 2 label the homeworld: under each body on the system orrery (generation_preview.cpp:178), under the globe (:424), and in the generation charts. From the Culture round on, the four lapse rounds never name the world. The round heads, lapse map and ticker prose carry no body name. The star's coined name is never shown in the wizard; it only names the campaign's star entity (hard_coded_world.cpp:687). PLANETOLOGY.md § Body naming does not claim sky names tie to culture or city names. It says the sky tongue is seed-rolled and shares only the word-building machinery with culture names, so the names feel non-arbitrary. The real narrative break is that the world, and its star, are named in the planetology rounds and then lose their names for the whole history.",
+  "evidence": "generation_preview.cpp:424-425 (home name label); history_lapse.cpp draw_lapse_map :802-900 (no body name); body_names.hpp:54 (star coined), with no reader in src/ui; PLANETOLOGY.md:797-805, :813-815"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "high",
+  "claim": "Deep time jumps to 2400 BCE with no bridge. The planetology rounds show no year, only a Gyr-scaled anoxic-window chart. The Life round stops at the green stage. The legacy stage, where PLANETOLOGY.md puts the civilisation gate (fire, ore, dense fuel, arable land, cheap transport), is never shown in the wizard. After that comes a blank \"Loading the Culture round\" screen, then Culture's first year at 2400 BCE. The only hint that people arose is the spark stage's peak-biology ladder, which can label the homeworld \"Civilised\". It is undated, sits before green, does not name the gate, and says nothing about where the cradles are.",
+  "evidence": "generation_charts.cpp:35-36 (Life = water..green only); PLANETOLOGY.md:391-409 (civilisation gate), :322-326 ('The link from life to civilisation'); colonisation.hpp colonisation_start_year -2400 (startup_screens.cpp:59)"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "high",
+  "claim": "The Life round (stages water..green) asks 'what did that leave in the rocks?', but the wizard never shows the stage that answers it. S8 Legacy, including the endemic trade goods, sits in the retired Inheritance chart group, which the wizard does not walk (wizard_planetology_round_count = 2). The legacy charts are reachable only after Begin, in the in-game History ledger in tile_inspector.cpp. The Culture round never names the endemics or the domestication packages coined from them (COLONISATION.md § The domestication package). So the biosphere input behind each cradle's package is invisible in the wizard, both before and during the round that spreads people.",
+  "evidence": "generation_charts.cpp:35-38 (Life = water..green; legacy/spend under 'Inheritance'); generation_charts.cpp:621-690 (legacy stage charts endemics); COLONISATION.md:194-200"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "medium",
+  "claim": "The wizard never shows the planetology biography, the dated two-column story PLANETOLOGY.md § Presentation calls the body's primary presentation. Rounds 1-2 show only stage charts and explanations from generation_charts. Those charts are also shared with the in-game History ledger. The biography is drawn only in the History ledger's Story tab (tile_inspector.cpp ~350-374), after Begin. It is merged there with creed and settlement lines in hard_coded_world.cpp, so no joined version exists during the wizard. Only the planetology chain's own history lines could be surfaced in rounds 1-2.",
+  "evidence": "PLANETOLOGY.md:557-596; no 'biography'/history_event reader in startup_screens.cpp or generation_charts.cpp; format_history_date used in tile_inspector.cpp"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "high",
+  "claim": "The Drawdown lean is drawn on the Culture round (m_wiz_round 2, the first lapse round), but nothing on that round shows its effect. Moving it re-runs planetology and wipes every lapse record, Culture's included, and a run in flight is blanked and marked stale. The pane stays empty or says \"not been run\" until the player presses Reroll, which also bumps era_seed and so plays a different history, or steps Back and Next. STARTUP.md still says the lean is editable nowhere, so the doc and the code disagree.",
+  "evidence": "startup_screens.cpp:1556-1559; startup_screens.cpp:1006-1013; app.hpp:287-314; startup_screens.cpp:1728-1740; STARTUP.md:122-124"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "medium",
+  "claim": "The claim holds, with three refinements. First, the retrofit INDUSTRIALISATION.md settles is not built anywhere in src/. So the S9 scalar is the only depletion the campaign receives: the docs give two accounts, the code only one. That scalar multiplies homeworld coal, oil, iron and copper endowment into tile deposits and resource_remaining (tile_generation.cpp:2563, 2598-2605). Second, drawdown is ROLLED from a lean (the default lean::any spans 0-0.95), not strictly \"picked\". The lean row sits on round 3, the Culture lapse round (startup_screens.cpp:1556-1558). STARTUP.md:120-124 wrongly says that lean is editable nowhere. Third, the result is as claimed: a world whose round-6 Industrialisation lapse shows little industry can still open drawn down by up to ~71% of its accessible coal and oil. That depletion was decided before any history ran.",
+  "evidence": "planetology.cpp:1544-1554; PLANETOLOGY.md:412-422; INDUSTRIALISATION.md:806-813"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "low",
+  "claim": "The claim is accurate, and a related mismatch makes it slightly worse. The drawdown-scarred homeworld painting (generation_preview.cpp:473-477) can never run: its only call site (startup_screens.cpp:1784) is reached only on planetology rounds 0-1. The lapse map (history_lapse.cpp) never reads drawdown, so the player never sees the worked world they inherit. The comment at startup_screens.cpp:1707-1709 wrongly describes round 2 as \"its industrial history\". Also, the Drawdown lean still sits under m_wiz_round case 2 (around line 1557). That is now the Culture lapse round, so the control is on a screen where its effect is never shown.",
+  "evidence": "generation_preview.cpp:473-477; startup_screens.cpp:1707-1713"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "medium",
+  "claim": "The docs and code comments disagree on how many rounds there are and how they are numbered, but the player never sees this. The screen shows \"Round N of 6\" on every round, matching app.hpp (2 planetology rounds + 4 lapse rounds). What is stale: STARTUP.md:72 (\"first three rounds\"), :75 (\"Three further rounds … Rounds 4, 5 and 6\"), :95-97 (0-based \"rounds 1–2 draw the homeworld\", where index 2 is actually Culture's 2D map), PLANETOLOGY.md:895-901 (the three-round table still listing \"C — Inheritance\" as a round) and the startup_screens.cpp:764-766 header comment (\"THREE rounds\"). The only accurate account is STARTUP.md :117-149 (six rounds, Culture as Round 3). The code comment at :818 counts Culture as \"round 2\" from zero, the same as m_wiz_round. It is correct against the code but inconsistent with the 1-based numbering the docs use.",
+  "evidence": "STARTUP.md:72, :75, :95-97, :117-133; PLANETOLOGY.md:895-905; startup_screens.cpp:818, :1237, :764-766 ('THREE rounds')"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "low",
+  "claim": "The round-1 name does differ, but only cosmetically: the wizard header shows \"The System\" (the chain_round_at name), while STARTUP.md and a code comment say \"System\". The part a player actually sees is elsewhere. The in-game History ledger hard-codes its tabs as \"System\" / \"Life\" / \"Legacy\" (tile_inspector.cpp:573-577), but it reads the questions from the shared table, whose names are \"The System\" / \"Life\" / \"Inheritance\". So the same round carries a different name in the wizard and in the History ledger, and the third round is \"Inheritance\" in the table but \"Legacy\" on its tab. A fix is to have the ledger tabs use chain_round_at(r).name.",
+  "evidence": "generation_charts.cpp:33; STARTUP.md:117; startup_screens.cpp:804"
+ },
+ {
+  "round": "Rounds 1-2: Planetology (The System, Life)",
+  "severity": "medium",
+  "claim": "Changing the Empires turbulence lean (round 4) sets m_wiz_dirty. On the next frame, startup_screens.cpp:1006-1013 re-runs the planetology preview and the surface build. It then calls invalidate_wizard_rounds_below(1), which clears the Culture round's record (m_wiz_history[0]) and its pass flag, even though the migration never reads turbulence. The lean only reaches history_sim_params (era_minus_one.cpp:272), and the migration stops before that sim runs (hard_coded_world.cpp:1051). The Empires round does not inherit Culture's cached record: each round re-generates deterministically from the same seed. So the history is not contradicted. The breaks are these: Culture's time-lapse is silently emptied and must replay from scratch if the player goes Back, and the planetology preview and surface are rebuilt for nothing. The fix is for case 3 not to set m_wiz_dirty, and to rely only on its own invalidate_wizard_rounds_below(m_wiz_round - 1).",
+  "evidence": "startup_screens.cpp:1572-1585 with :1006-1013; app.hpp:287-314"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "high",
+  "claim": "Culture identity dies about 160 years into Empires. STARTUP.md promises that round 4 tints its culture base with the same hue family beneath the polity fill. The only hand-over is a 10%-of-span fade; the Empires record has an empty culture_family, and polity colours are chosen with no link to the cultures they rose from.",
+  "evidence": "docs/ui/STARTUP.md:166-170; src/ui/history_lapse.cpp:656, 787-800; src/ui/startup_screens.cpp:500-509"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "high",
+  "claim": "The Culture round asks \"by which routes?\", but no route is ever drawn. There are no stream lines or arrows, no mark for a coastal path and no mark for an overseas hop. The migration sim computes the hops (colonisation.cpp, BL-857), but the lapse record carries only `culture_split`, so road_segs and trade_segs stay empty. Direction can only be inferred indirectly, from two things. The lineage palette (BL-919) groups daughter peoples in hues shifted off their parent's. The ticker names the region where each new people parted from its kin. That falls short of COLONISATION.md's \"the map should show it\" and of the coastal and overseas emphasis in STARTUP.md.",
+  "evidence": "src/ui/startup_screens.cpp:865-866; src/ui/history_lapse.cpp:559-570; docs/generation/COLONISATION.md:139-159; docs/ui/STARTUP.md:158-161"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "high",
+  "claim": "The map misrepresents isolation splits. build_migration_timelapse emits one owner_change per region, at founded_year, using the post-rewrite plurality. A recultured region therefore shows the daughter's colour and name from its founding, before her coined_year. No change fires at the reculture year, so the hue change of a range coming apart never plays on the map. settlement_state::culture_recultured (region, parent, daughter, year) has no reader anywhere in src/. The ticker is not silent: a culture_split event is emitted at the daughter's coined_year. That event is pinned to a region that already wore the daughter's colour, so the ticker and the map contradict each other. Fix: emit the region's pre-split parent at founded_year, then a second owner_change at rc.year from culture_recultured. The region name would also have to change with the date, since it is currently rewritten to the daughter's name.",
+  "evidence": "src/world/settlement.cpp:1146-1160; src/world/colonisation.hpp:738-744; src/world/hard_coded_world.cpp:122-131; docs/generation/COLONISATION.md:122-126"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "medium",
+  "claim": "On the Culture round, the board and counter still use war and polity words from the later rounds. The board says \"N powers hold ground\" under a Seat column. People, Pop and Mt stay \"-\" for the whole round, because the migration record carries no polity samples. A comment at startup_screens.cpp:468 says this board has no People column, but it does. The counter line reads \"0 battles, 0 conquests, N foundings\". The turn from peoples to realms is not wholly invisible: the map carries the last Culture frame into Empires and fades it out, and the pre-run and quiet-age text uses migration and peoples wording. But the board and counter never change their words, so the text itself does not mark the turn.",
+  "evidence": "src/ui/history_lapse.cpp:1542-1545, 1577-1585, 1654-1690; src/ui/startup_screens.cpp:1482-1488; docs/generation/COLONISATION.md:163-172"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "medium",
+  "claim": "The claim holds, with one refinement. On the report path, cradle cultures' names never reach the UI, because creed_state does not cross the report. Daughter cultures' names do arrive (ss.spawned_cultures), but the lapse keeps only their parent and fold fields. So naming cradle cultures needs a data-path change as well as a UI change.",
+  "evidence": "src/ui/history_lapse.cpp:1622-1631, 1959-1965; src/world/hard_coded_world.cpp:176-181; src/world/creeds.hpp (struct culture, name field)"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "medium",
+  "claim": "Round 3 has no 'What happened here' summary. draw_lapse_arc (history_lapse.cpp:1874) returns early because the migration record deliberately has no steps or samples, so it counts no polities. The census counts (cradles, total peoples, splits by trigger, recultured regions) are never summarised at the close. Two pieces do appear elsewhere. The header line gives a count of peopled land ('N foundings', = settlement.regions.size()). The ticker lists each culture split as an event. The round still ends without a closing account of the migration's shape.",
+  "evidence": "src/ui/history_lapse.cpp:1776-1797, 1874; src/world/hard_coded_world.cpp:80-85; src/world/settlement.cpp:1162-1171"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "medium",
+  "claim": "The claim is correct as stated. It needs one refinement: in the worker path (hard_coded_world.cpp:1079-1082), round 3 closes at max(migration_end_year, 400 BCE). On overrunning seeds (6 of 60 in the BL-947 sweep, up to 343 years over), that is later than 400 BCE, where round 4 opens, so the calendar steps back. The carry cross-fade in history_lapse.cpp fades colours only and does not cover the year jump. Separately, the adopted-report rebuild (startup_screens.cpp:193-194) uses raw migration_end_year with no max. On normal seeds round 3 then ends before 400 BCE, leaving a gap in years instead of the documented coast. On overrunning seeds it still steps back in time.",
+  "evidence": "src/world/hard_coded_world.cpp:1052-1082"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "medium",
+  "claim": "Moving from the Life (planetology) round to the Culture round is a hard cut. The continuity carry runs only between lapse rounds (`i > 0`), so the rotating globe hands nothing over. The map pane stays empty while the pass computes, apart from a \"Loading the ... round\" line in the left column. The flat map then appears on a muted backdrop with no cross-fade. Cradles show up only as colour families on the map. No text names a cradle or its domestication package, and the ticker never ties either back to the Life round's endemics. The Life round shows endemics only as trade goods, so the biosphere-to-people link COLONISATION.md describes is invisible.",
+  "evidence": "src/ui/startup_screens.cpp:473, 1733, 1762-1787; docs/generation/COLONISATION.md:199-203"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "medium",
+  "claim": "Nothing announces the cradles. They emit no lapse event (hard_coded_world.cpp:163-176 emits only culture_split), so the ticker is silent until the first split, and no text or label names where people started. Seat dots have the same shape, size and ring for cradles and daughters. Only the lineage palette tells them apart: a cradle is the brightest rung of its hue family and each daughter generation is a step darker (history_lapse.cpp:240-245, 331-332; presentation.hpp lineage_colour). That cue is implicit and unexplained, and it is too weak to deliver STARTUP.md's promise that the round shows 'where people started'.",
+  "evidence": "src/world/hard_coded_world.cpp:164-169; src/ui/history_lapse.cpp:1243-1261; docs/ui/STARTUP.md:149-151"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "medium",
+  "claim": "The claim holds, with one refinement. The Drawdown lean renders on Culture (round index 2). Its subject is the retired Inheritance round's: how far the era before you stripped the world. STARTUP.md gives that subject to the last pass round (Industrialisation) and says the lean is editable nowhere. A code comment says round 5 should take it. Moving it sets m_wiz_dirty, which calls invalidate_wizard_rounds_below(1) and marks all four pass rounds stale, Culture included. The migration history re-runs over a value it does not read. The narrative break is real: an industrial-depletion dial sits on the migration screen. The doc/code mismatch is a truth defect in its own right.",
+  "evidence": "src/ui/startup_screens.cpp:1556-1559, 1006-1013, 818-829; docs/ui/STARTUP.md:120-124"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "low",
+  "claim": "The Round 3 ticker narrates every split the migration coined, including the ~85% of daughters that the BL-1017 boundary fold later absorbs. These print as the unnamed, unplaced line \"A new people parts from its kin on the march.\" Nothing on the map answers them: no region, no colour, and no name that outlives the round. A few living daughters get the same line: those that never hold a region's plurality within the span, or whose region is only founded after the round. The ticker filters only road events, so these lines crowd out the splits that do take ground.",
+  "evidence": "src/world/hard_coded_world.cpp:156-182; src/ui/history_lapse.cpp:1960-1962"
+ },
+ {
+  "round": "Round 3 — Culture / Colonisation (lapse index 0, 2400 BCE to about 400 BCE)",
+  "severity": "low",
+  "claim": "Under --verify, the Culture round is rebuilt from the finished report (startup_screens.cpp:185-199, 297-307). It ends at the seed's migration_end_year. The live path ends at max(migration_end_year, sim_start), about 400 BCE (hard_coded_world.cpp:1079-1087). So a capture drops the coast to the Empires opening year whenever the migration ends before that boundary, which is most seeds. Its per-region owner cultures come from the settlement after the Empires sim, where plurality has drifted slightly toward the conquerors. Region positions, founding years, split events and the counters (0 battles, 0 conquests, foundings = region count) match the live round. The mismatch is the missing coast and small colour differences in ownership, not a wholly different round.",
+  "evidence": "src/ui/startup_screens.cpp:185-199, 294-307"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "high",
+  "claim": "Accurate as stated, with two additions. First, the carried Culture frame is drawn under all ground, not just unowned ground. It fades linearly over the first 10% of the span (400 to 240 BCE, 6 s at the default 60 s pace, 3 s at 30 s, 9 s at 90 s). After that, peopled unorganised ground and empty land both draw as bare terrain, with no culture tint. The 'dull culture tint' in the BL-920 comment (history_sim.cpp:3129-3133) and the hue-family culture base under the polity fill in CIVILISATION.md:338-341 and STARTUP.md are not implemented. Second, Empires polity colours do not take their culture's hue family: culture_family is empty on this round, so assign_polity_colours gets nullptr. Once the fade ends, nothing on the map links a city state to the culture it rose from.",
+  "evidence": "history_lapse.cpp:787-800 (fade = 10% of span), 950-975 (unowned = no tint); history_lapse.hpp:31-32, 275-280 (culture palette empty on Empires); startup_screens.cpp:164,181 (palette built only for lapse_index 0); app.hpp:505 (60 s default); history_sim.cpp:3129-3133 comment vs render; CIVILISATION.md:338-341; STARTUP.md:171-172"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "high",
+  "claim": "Round 4 polity colours are unrelated to round 3's culture hues. On the Empires record `culture_family` is empty, so `assign_polity_colours` gets nullptr (history_lapse.cpp:656). The polity slots then come from an adjacency-only greedy colouring, so a blue-family people can found an orange city state. The one link is the carry cross-fade (startup_screens.cpp ~476-486; history_lapse.cpp 787-800, 922-972). It shows round 3's final lineage colours only during the first tenth of the span (about 400 to 240 BCE) and fades out as polity colours fade in. After that, kinship has no visual trace. The persistent culture base under the polity fill that STARTUP.md:171-172 promises does not exist.",
+  "evidence": "history_lapse.cpp:656 (assign_polity_colours gets nullptr when culture_family empty), 659-778; history_lapse.hpp:284-286 ('A sibling surface tinting the Empires round's base by family reads this' — none does); STARTUP.md:171-172"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "medium",
+  "claim": "The break is real, with three limits on how far it reaches:\n\n(a) It hits only tiles whose nearest anchor, by walking distance, is a region founded after 400 BCE. That can be a small share of the map.\n\n(b) The carried frame fades out over the opening tenth of the span anyway. Each hole fills when its region is founded, but those regions arrive as unheld ground (owner_none, so no own fill), so a hole only gains a tint once the region is organised or conquered. What the player sees is a set of untinted patches at 400 BCE, not a wholesale mismatch. The patches are also outlined by frontier lines, because -2 ground draws borders. So the unfounded regions' outlines show at the opening even though round 3 never showed them.\n\n(c) On the adopted path (the harness's finished world), round 3 rebuilds its record from the final settlement, which already includes the later foundings. There both rounds share one raster and the break is different or absent.",
+  "evidence": "hard_coded_world.cpp:113-129 (migration record over ss.regions only), 1076-1087; history_sim.cpp:3013-3113 (pending foundings appended in-span); history_lapse.cpp:356-395 (BFS over all region_col), 926-935 (index >= carry size -> 0, no rect); startup_screens.cpp:475-486"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "medium",
+  "claim": "Confirmed as stated, with one addition. A scheduled founding under BL-920 is recorded as `founded` with polity -1 (history_sim.cpp:3144-3146), and prose.cpp prints \"A realm rises at X\" without checking polity (history_lapse.cpp:1928-1930). So the ticker names unorganised, ownerless ground a realm, and neither the board nor the map shows one. If that ground later reaches the city-state threshold, it gets a second `founded` event with a real polity (history_sim.cpp:3493). The same region then \"rises\" twice in the ticker. A fix could branch on e.polity < 0, e.g. \"A people settle at X.\", in line with the history line \"X is settled\".",
+  "evidence": "history_sim.cpp:3144-3146 (note_event founded, polity -1); history_lapse.cpp:1928-1930 (prose ignores e.polity)"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "medium",
+  "claim": "No round of the lapse puts the name of a people, creed or civilisation on screen. Round 3 names each culture by its seat region (polity_name_of, history_lapse.cpp:1490), not by a culture name. In Round 4 the civilisation_formed and creed_preached ticker lines (history_lapse.cpp:1954-1958) name only the region and throw away the civilisation or creed index in e.other. The coined civilisation name (history_sim.cpp:4160-4166) goes only into the history log. The Round 4 board (history_lapse.cpp:1575-1583) has no culture or civilisation column. No tooltip shows which people a city state belongs to. The only visual link from round 3 is the lineage colour palette, and it is applied only on the Culture round. So a player cannot follow any people, creed or civilisation by name from round 3 into round 4.",
+  "evidence": "history_lapse.cpp:1954-1959; history_sim.cpp:4160-4166 (civilisation name into history log only); CIVILISATION.md:376-384; history_lapse.cpp:1575-1583 (board columns)"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "medium",
+  "claim": "The file path is src/ui/history_lapse.cpp, not src/world. Otherwise the claim is correct as stated. lapse_event_prose has no case for lapse_event_kind::schism. A schism from the live sim, enabled by schism_min_regions = 3, therefore prints \"Something happens at <seat region>.\" in the Empires ticker. The parent polity and the creed are not named.",
+  "evidence": "history_sim.cpp:7607; era_timelapse.hpp:200 (schism = 16); history_lapse.cpp:1922-2004 (no schism case, default at 2002); CIVILISATION.md:1060-1066, 1116-1118"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "medium",
+  "claim": "The problem is slightly wider than claimed. On the Culture round the board also calls cultures \"powers\" holding a \"Seat\", and names them from the same region-name pool the Empires board uses for polities. So a culture already looks like a realm on round 3's own screen, not only when compared with round 4. One region name can name a people in round 3 and a polity in round 4, and no header, label or cross-fade marks the change. The fix belongs on the board's labels (\"Seat\"/\"powers\" vs \"Homeland\"/\"peoples\"), not in polity_seat itself.",
+  "evidence": "history_lapse.cpp:406-413 (polity_seat from changes regardless of owner kind), 1616-1625; hard_coded_world.cpp:74-81, 125-129 (migration owner = culture)"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "medium",
+  "claim": "A lapse's seat dot and a realm's name (board, ticker and polity_name_of) are frozen at the lowest-index region the polity holds at that round's span open, taken from the baseline owner_change list. They are never updated on capital_moved. capital_moved fires only when the capital is lost. So after 'X re-seats itself at Y', the dot sits on the conqueror's ground and the realm keeps the lost region's name. Each round rebuilds seats from its own baseline, so at the Empires-to-Exploration hand-over a realm's dot and name can jump. This happens whenever its lowest-index region held at 1200 differs from the region the Empires lapse used. That covers every realm that lost its capital, or later gained a lower-index region.",
+  "evidence": "history_lapse.cpp:1243-1261, 406-413; history_sim.cpp:4045 (capital_moved), 2705-2712 (baseline changes in region-index order at span open)"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "high",
+  "claim": "Confirmed, with two refinements. First, the dead inheritance hits every boundary between polity rounds, not only Empires into Exploration: Exploration into Industrialisation uses the same code at startup_screens.cpp:503-509. Second, the break is softened but not removed. The `carry_colour` cross-fade does paint the predecessor's last-frame colours on ground nobody holds yet, fading over the first tenth of the span. But any region a realm holds takes the new record's freshly greedy-coloured slot from the first frame. The fix is to apply the inheritance after `assign_polity_colours` runs, or inside it (for example, pass the predecessor's slots in as a seed). Copying into the empty vector at landing does nothing.",
+  "evidence": "startup_screens.cpp:500-509 (inheritance, n = min(slot.size(), ...)), 1077-1081 (finish at draw); history_lapse.cpp:347, 656, 661 (polity_slot.clear())"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "medium",
+  "claim": "Every resumed span re-founds the living realms it inherits: Exploration at 1200, and Industrialisation at 1660 too. history_sim.cpp:2753-2757 skips only the dead polities (the BL-1036 change) and notes `founded` for each living polity at its current capital, dated to the span's start year. The ticker filters only road events (history_lapse.cpp:2028-2030). So round 5 opens with a run of \"A realm rises at X\" lines for realms round 4 showed standing for centuries, and round 6 does the same with round 5's survivors. X is the realm's current seat, which may not be where it first rose.",
+  "evidence": "history_sim.cpp:2753-2757; history_lapse.cpp:1928-1930"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "low",
+  "claim": "On seeds where the migration runs past 400 BCE (the BL-947 comment quotes 6 of 60 seeds, up to 343 years), round 3's displayed span closes at the true migration end, for example 57 BCE. Round 4 then opens at 400 BCE, so the year label runs backwards at the hand-over. The foundings between those years are not shown twice. run_settlement moves every region founded after sim_start into pending_foundings, and round 3's lapse reads only settlement.regions. So round 3's final stretch, 400 BCE to 57 BCE, shows no new foundings (only culture-split events can land there), and those foundings first appear inside round 4. The fault is a backwards clock plus an empty tail in round 3, not a replay.",
+  "evidence": "hard_coded_world.cpp:1070-1082 (std::max(migration_end_year, sim_start)); history_sim.cpp:2996-3013; CIVILISATION.md:55-67"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "low",
+  "claim": "Rerolling the Culture round replays the identical migration and silently rerolls this round instead. Every pass-round reroll bumps era_seed, but the migration is seeded from params.seed alone; only the Empires and later sims read era_seed. The player sees the same round 3 and a different round 4 inheriting it.",
+  "evidence": "startup_screens.cpp:1641-1650; hard_coded_world.cpp:917-919 (settlement seed params.seed^0x5E77ED); era_minus_one.cpp:315"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "low",
+  "claim": "STARTUP.md § Round 4 (lines 183-186) is stale: it still lists \"research speed\" as one of four leaderboard metrics. GENERATION_STRATEGY.md:343 repeats it. The board deliberately has no research column (history_lapse.cpp:1553-1556, hpp:33-36, QUESTION_LOG.md:473). GENERATION_STRATEGY.md:504-511 sanctions leaving it out while research is a population placeholder. The fix is to reconcile the docs (drop or qualify research speed in STARTUP.md and GENERATION_STRATEGY.md:343), not the code. The code calls the refusal \"standing\", but the strategy doc says \"until research is real\", which is a small conflict. Ranking polities rather than cultures matches STARTUP.md's own share definition. \"How cultures grew and fell\" is loose prose, not a broken promise.",
+  "evidence": "STARTUP.md:183-192; history_lapse.cpp:1553-1560, 1575-1583; history_lapse.hpp:33-36"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "medium",
+  "claim": "Round 4's close shows the map and a prose arc. The map draws the surviving road network and each polity's seat. The closure readings that set up Exploration are not shown or narrated anywhere in round 4: who has met whom, which pairs are still unmet, the directed wants, and markets standing on capitals. The roads appear only as drawn lines, never named as an inherited estate, and the ticker deliberately leaves them out. The one bridge is the capital-consolidation beat and the \"from 1200 CE\" text at the start of round 5. So round 5's motive (strangers to find, goods wanted) is invisible at the hand-over, though the setting (roads, seats) is on the map.",
+  "evidence": "CIVILISATION.md:823-993 (esp. 881, 931-953, 969-990); startup_screens.cpp:1489-1512 (the round's whole left column)"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "low",
+  "claim": "Two parts of the break are real. First, the Empires readout's quiet-age sentence (history_lapse.cpp:1893) calls polities \"peoples\", the word round 3 uses for cultures (history_lapse.cpp:1955). The branch right below it (:1897) says \"polities\". Second, CIVILISATION.md:50-51 still says \"the coast to 1560, pass 2\" and cites the retired \"Pass 2 is the economy pass, 1560 → 1960\", while § The closure (:829-840) has replaced that with Exploration 1200-1660 and Industrialisation 1660-1960. The round-4 question \"in the age before the epoch\" (startup_screens.cpp:880) is still true, since 400 BCE-1200 CE is before 1960. It is vague rather than stale: it reads as the last age before the epoch, but Exploration and Industrialisation follow. It does not place Empires within the connected arc.",
+  "evidence": "startup_screens.cpp:880; history_lapse.cpp:1893-1894; CIVILISATION.md:50-51 vs 827-846"
+ },
+ {
+  "round": "Round 4 of 6: Empires (lapse_index 1), 400 BCE to 1200 CE",
+  "severity": "low",
+  "claim": "The code comments describe map markers that were removed. history_lapse.cpp:2026 says roads \"still pulse\", history_lapse.hpp:38-47 describes a pulsing event marker, and the exemplar comments at cpp:1168 and hpp:55-56 mention an \"event ring\" that no longer exists. The generic ring at every event was retired (Ben, 2026-09-16). Road promotions and trade-link openings still get a fading fleet or caravan exemplar at their corridor, but no other event kind is located on the map. Conflict has no map mark at all, and the record has no battle event kind. seat_captured and realm_ended appear only in the ticker, and on the map force shows only as borders changing and seats disappearing. So in Round 4 the MILITARY_HISTORY force model is visible only through border change, the board's Might column and ticker lines.",
+  "evidence": "history_lapse.cpp:2020-2027, 1331-1345; history_lapse.hpp:38-47"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "high",
+  "claim": "The claim is correct as stated, with one addition. A round-5 reroll bumps the one shared era_seed. That re-seeds the Empires sim that round 5's worker re-runs internally. Round 4's record (m_wiz_history[1]) and its accepted flag are never cleared. So round 5, round 6 and the Begin world all descend from a different Empires history than the one round 4 shows. The carry_colour and palette hand-over are built from the stale round-4 record. The Culture round is unaffected, because the migration does not read era_seed.",
+  "evidence": "startup_screens.cpp:1631-1649 (++era_seed, invalidate_wizard_rounds_below(m_wiz_round)); app.hpp:287-322 (clears only lapse i with 2+i > 4, i.e. index 3); era_minus_one.cpp:315 (era_minus_one_sim_seed uses era_seed); hard_coded_world.cpp:1178, 1211-1219 (round 5's worker re-runs Empires with hseed); startup_screens.cpp:473-486 (carry taken from m_wiz_history[1], which is not invalidated)"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "high",
+  "claim": "The code that keeps realm colours across the hand-over (startup_screens.cpp:503-509) never does anything. The newly landed record's polity_slot is empty when that code runs, so n=0 and no slot is copied. Later, finish_history_lapse -> assign_polity_colours (history_lapse.cpp:656) clears polity_slot and colours the realms from scratch using only this record's adjacency. So any realm whose new slot differs from its Empires-round slot changes colour at the Empires->Exploration boundary; the same happens at Exploration->Industrialisation. The change is an immediate jump for any realm that holds ground in the new record. It is not a 46-year cross-fade: the carried old colour fades only under ground nobody holds yet. Realms whose slots happen to match keep their colour by coincidence.",
+  "evidence": "startup_screens.cpp:488-509 (slot = m_wiz_history[i].polity_slot; n = min(slot.size(), ...)); startup_screens.cpp:379, 161-251 (lapse_from_report never derives); startup_screens.cpp:1077 (finish_history_lapse runs on the draw thread afterwards); history_lapse.cpp:656, 661 (h.polity_slot.clear() then reassign)"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "high",
+  "claim": "Confirmed with one sharpening. Any realm whose lowest-indexed region at 1200 differs from the region round 4 named it by is renamed in Round 5. Wide conquest makes this more likely but is not needed. The swatch colour and polity id stay the same, so the break is in the name only. The seat dot and the one-time 1200 capital-consolidation burst are drawn at that same lowest-index region, not at polity.capital. So the burst that is meant to show stores flowing into the capital lands on an arbitrary held region.",
+  "evidence": "history_lapse.cpp:407-416 (polity_seat = first region in changes); history_sim.cpp:2706-2712 (resume seeds owner_changes by ascending region index at start_year); history_lapse.cpp:1489-1496, 1625-1631 (board and ticker names read polity_seat)"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "high",
+  "claim": "The claim holds, with one qualification. At 1200 the Exploration record notes a 'founded' event at q.capital for every living inherited polity. The ticker narrates each as \"A realm rises at <capital>\", so the round opens on up to max_rows rising lines for realms that already existed. The ticker caps what the player sees, so this is not literally every realm. The line names q.capital, but the seat dot, the board row and the polity's name use polity_seat. On a resumed span, polity_seat is the realm's lowest-index region at the start year, not its capital. So the ticker and the board name different regions for the same realm, unless the two happen to match.",
+  "evidence": "history_sim.cpp:2753-2757 (resume notes founded for every alive q at q.capital); history_lapse.cpp:1928-1930 ('A realm rises at %s.'); history_lapse.cpp:1243-1261 (dot at polity_seat)"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "high",
+  "claim": "Roads break at the boundary, for the whole round. Round 5 bakes road segments only from its own road_promoted events. The resume seeds the inherited corridor rungs into road_uses_live without any event, and the hand-over carries only owner colours. So Round 4's Track and Road corridors are missing from Round 5's map. A corridor shows again only if this span promotes it again, dated to that year. One that is never promoted again stays hidden until 1660. Trade lines break only briefly. trade_link_open_live starts empty and the seeded corridors satisfy its road_uses_live test. So every inherited trade link that still qualifies fires trade_link_opened again in the span's first simulated year. The lines disappear at the cut and redraw in a burst at the start of 1200, which the ticker reports as new openings instead of carried-over links.",
+  "evidence": "history_lapse.cpp:524-577 (road_segs built from h.lapse.events road_promoted only); history_sim.cpp:1920-1949 (resume_corridors seeded into road_uses_live, no note_event); history_lapse.cpp:579-628 (trade_segs likewise); history_lapse.cpp:1092-1131"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "medium",
+  "claim": "The claim is correct, with two additions. At 1200 the ticker does place a line at each capital: the resumed span's 'founded' note, which reads 'A realm rises at <capital>.' It still does not name the consolidation, and it wrongly tells the player that realms which already exist are being founded. The same mismatch between polity_seat and the capital also affects the realm names built by polity_name_of.",
+  "evidence": "EXPLORATION.md § Capital arrives, and it sits in the capital ('every seat's stores flow to the capital, once... a thing the time-lapse can show'); history_lapse.cpp:1286-1293 (burst at h.polity_seat[o]); era_timelapse.hpp:182-203 (no consolidation event kind)"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "medium",
+  "claim": "Round 5 never states its thesis, displacement of conflict off the home coast, as a reading. Only the static dim_text note says it (startup_screens.cpp:1513-1515). The \"What happened here\" arc is the same function every round uses (draw_lapse_arc). It reads in Empires' terms only: largest empire, destroyed, rose and fell. It has no summary of the readings in EXPLORATION.md § What the phase is judged on, such as the neighbour-war to frontier-skirmish ratio, treaty depth, colonial asymmetry, fleets or treasury spread. The event model has no war kind to build the ratio from. Some of the age does show elsewhere, but only as events and marks, never as a summary. The ticker narrates treaty, subject and trade-link events. The map draws the 1200 CE consolidation burst and the fleet and caravan exemplars.",
+  "evidence": "history_lapse.cpp:1871-1911 (draw_lapse_arc text); EXPLORATION.md § The shape of the age and § What the phase is judged on; startup_screens.cpp:1513-1515"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "medium",
+  "claim": "Round 5 shows only two parts of what STARTUP.md and EXPLORATION.md promise for Exploration. First, a one-time gold burst at each seat at 1200 CE marks the treasury consolidating. Second, fading sail and caravan marks appear on water corridors when a road is promoted or a trade link opens. Everything else is missing from the screen. No treasury level is tracked after the burst. There are no ports, navies, standing armies, scarcity or want signals, or goods brought back. Colonies are not marked as bought or taken, and no lasting sea lane or overlord link is drawn between a colony and its overlord. The board has no treasury or navy column, and no event kind exists for a purchase, port, navy or sea lane. Treaties and subjection appear only as ticker lines. So the header question \"what do they bring back?\" still has no answer on screen, and the promise of \"Treasuries, treaties and fleets\" is only partly kept.",
+  "evidence": "STARTUP.md § Round 5 ('treasuries consolidate... colonies and trade provinces appear across water, and ports/navies/standing armies persist and decay'); EXPLORATION.md § Two ways to claim ground ('say bought or taken'), § The colonial tie is a sea lane; era_timelapse.hpp:182-203; history_lapse.cpp:1577-1584 (board columns); startup_screens.cpp:886, 1391-1394"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "medium",
+  "claim": "The schism lapse event (BL-944 schism, kind 16), emitted at history_sim.cpp:7607, has no case in lapse_event_prose (history_lapse.cpp:1922-2006). It falls to the default and the ticker prints \"Something happens at <region>.\" The code does not limit it to the Exploration span. It can appear in any lapse round whose sim span runs the creed-schism pass, so Empires may show it as well as Exploration.",
+  "evidence": "history_sim.cpp:7607 (note_event(lapse_event_kind::schism,...)); history_lapse.cpp:1922-2003 (switch lacks schism, falls to default)"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "medium",
+  "claim": "Between Empires and Exploration there is a hard cut to a blank \"Loading the Exploration round\" wait: the map is empty (startup_screens.cpp:1727) while the worker re-runs migration, Empires and Exploration from zero with stop_after_exploration (348-351, 375-378). The hand-over is not a bare cut once the record lands. poll_wizard_history keeps the Empires round's last owner frame (carry_colour) and each realm's palette slot, and the new map plays from its first year. It opens with a cross-fade from that frame over the first tenth of the span (history_lapse.cpp lapse_carry_fade, 905-975). The break is the blank wait in the middle: the cross-fade can only bridge it visually after the wait. Whether the recomputed 1200 CE start actually matches the frame carried over still depends on determinism.",
+  "evidence": "startup_screens.cpp:1341-1366, 1727 (wait draws nothing on the map); startup_screens.cpp:348-351, 375-378 (fresh make_hard_coded_world with stop_after_exploration); hard_coded_world.cpp:1211-1219, 1357-1363"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "low",
+  "claim": "For the first 38 years of Round 5 (1200-1237), every realm on the board gets the bright ' *' entered mark. That happens because the lagged slice is read before start_year and comes back empty. The fix points are startup_screens.cpp:1151-1153 (no clamp on the lagged year) and history_lapse.cpp:1597-1600, 1639. So inherited realms read as newcomers at the open. The People, Pop and Mt columns are NOT dashed at the open. The first decision round runs at 1200 and records a sampled step there (history_sim.cpp:2900, 7724-7726), so those columns fill from the first frame.",
+  "evidence": "startup_screens.cpp:1148-1153 (lag = span/12, lagged slice before first); history_lapse.cpp:1597-1600, 1639 (entered when absent from then); history_lapse.cpp:1650-1668 (dash with no sample)"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "low",
+  "claim": "The claim is accurate but understates the scope. All three per-round captions in the lapse block (startup_screens.cpp:1510-1518) talk as the developer to the player. Round 5 cites docs/generation/EXPLORATION.md and Round 6 cites docs/generation/INDUSTRIALISATION.md. Round 4 talks about \"round 3's migration\" and \"the span the design asks for\". Each caption is written as an explanation of the wizard's structure, not as part of the history.",
+  "evidence": "startup_screens.cpp:1514-1515"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "low",
+  "claim": "The code comments are stale, but the player sees nothing wrong. history_lapse.hpp:12-16 and 60-66 predate BL-946 (Exploration round wiring). They still describe a single \"round 4\" lapse and an unwired Exploration tap, which makes the 1200 CE consolidation burst sound inert. The tap is actually wired (hard_coded_world.cpp:1363), and the burst fires on arrival at the Exploration round (history_lapse.cpp:1263-1276). The fit_text ids `wizard.round4.seat` and `wizard.round4.ticker` (cpp:1645, 2055) are hard-coded for all four lapse rounds, so they are wrong for every round except Empires. These are internal comment and record-id defects: a light cleanup, not a break in the player-facing narrative.",
+  "evidence": "history_lapse.hpp:12, 60-66; hard_coded_world.cpp:1363 ('BL-946: wired.'); history_lapse.cpp:1273-1275, 1645, 2053"
+ },
+ {
+  "round": "Round 5, Exploration (1200 -> 1660 CE), lapse index 2",
+  "severity": "low",
+  "claim": "STARTUP.md § Leans per pass says every pass round takes a lean. In code, only Culture (Drawdown) and Empires (historical turbulence) have one. Both Exploration (round index 4) and Industrialisation (index 5) fall through round_pref_count to 0 and hit the `default: break` in the lean switch. So the last two lapse rounds let the player set no condition, only reroll. The doc does not name what axes those rounds would take, so either the doc overpromises or two leans are undesigned. This is an agency and doc-vs-code gap common to both late rounds, not an Exploration-specific narrative break.",
+  "evidence": "startup_screens.cpp:825-830 (round_pref_count(4) returns 0), 1589-1590 (default: break); STARTUP.md § Leans per pass"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "high",
+  "claim": "The per-realm colour inheritance at startup_screens.cpp:503-509 never takes effect at any polity-round hand-over: Empires -> Exploration (round 4 -> 5) and Exploration -> Industrialisation (round 5 -> 6). At landing, the new record's polity_slot is empty because lapse_from_report never fills it and the worker does not run finish_history_lapse, so n = 0. Even a successful copy would be wiped, because finish_history_lapse later runs on the underived landed record and calls assign_polity_colours, which clears polity_slot and re-colours greedily over this record's own adjacency. The carried frame (carry_colour) is right, so over the opening tenth of the span a realm's old hue cross-fades into a possibly different new one. That is the \"read as a different world\" failure the comment describes.",
+  "evidence": "src/ui/startup_screens.cpp:450, 488-509 (slot empty at landing); src/ui/history_lapse.cpp:656, 661-662, 750-774 (clear + reassign); lapse_from_report never sets polity_slot, startup_screens.cpp:161-251"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "high",
+  "claim": "Each round's board and ticker name a realm after the lowest-index region it holds at that round's start_year. The cause is the resumed span's opening owner_changes, in ascending region-index order, which the per-round polity_seat reads as the first change. The name ignores the polity's actual seat_region or capital from the sim, and no name carries over between rounds; carry_colour cross-fades only colour. So a realm is renamed between round 5 and round 6 whenever its lowest-index held region at 1660 differs from the one at 1200. That happens if it gained a lower-index region, or if it lost the region it was named after. The same break applies at every resumed-span boundary, not only 5 to 6.",
+  "evidence": "src/world/history_sim.cpp:2705-2711 (opening changes in region-index order); src/ui/history_lapse.cpp:407-416 (polity_seat = first change), 1489-1496, 1626-1631"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "high",
+  "claim": "At the opening year of Round 6, and of Round 5 too, the ticker re-notes every surviving polity as founded, printing \"A realm rises at <q.capital>\". The board and the other ticker lines name each polity after its lowest-index held region at that opening. That region matches the capital only by coincidence. So the round opens by announcing old realms as newly rising, often under a region name that differs from their board row. The player sees only the last few ticker rows at once, not dozens. How often the names actually differ has not been measured.",
+  "evidence": "src/world/history_sim.cpp:2753-2757; src/ui/history_lapse.cpp:1928-1929 vs 407-416, 1626-1631"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "high",
+  "claim": "The claim is correct, with two refinements. First, Culture (round 3) is never affected: the migration does not read era_seed. Only the Empires record is stranded by a round-5 reroll, and both Empires and Exploration by a round-6 reroll. Second, the stale carry mismatches the old frame's ownership, and it also passes stale `polity_slot` colours by id onto polities that no longer match, which makes the break worse. It still holds that Begin adopts round 6's rebuilt world, whose 400 BCE–1660 history differs from what rounds 4 and 5 displayed.",
+  "evidence": "src/ui/startup_screens.cpp:1631-1649; src/world/era_minus_one.cpp:315, 382, 446 (all three span seeds add era_seed); src/core/app.hpp:287-322 (only rounds after `round` invalidated)"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "high",
+  "claim": "The doc promises the round closes on the seeded opening map: firms drawn in place with the market carve and price field, so 'the player's last sight before Begin is the map they will play on'. The map ends on a 1960 polity fill with seats. No firm, installation, market, city or price layer exists in draw_lapse_map, even though round 6's run has already placed companies.",
+  "evidence": "docs/ui/STARTUP.md:246-249; docs/generation/INDUSTRIALISATION.md:501-504; src/ui/history_lapse.cpp:802-1349 (no firm/market layer); hard_coded_world.hpp:533 'Placing companies' runs inside the round's wait"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "high",
+  "claim": "At Begin the world keeps its shape but changes its colours and names. The seat canvas colours land with palette::nation_colour, keyed to the nation entity id and mixed at only 35%. Nations are named with Pass-5 make_nation_name. Round 6's board and map use greedy polity_slot colours and seat-region names. Nothing carries those slots or names over to the seat screen: the round-to-round colour carry in startup_screens.cpp stops at round 6. Territory does carry: the Pass 2c polity fold makes each final polity one nation, so the borders mostly match round 6's last frame. The count differs only where undersized realms merge or a seed cell had no polity. The break is in naming and palette, not in geography. Without a name or colour link, the player cannot tell which round-6 power became the nation they will trade under.",
+  "evidence": "src/ui/seat_screen.cpp:309-346, 472-508, 544; docs/generation/NATION_GENERATION.md:277-283; src/world/hard_coded_world.cpp:1745 (seed_polities fold), 1843-1854"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "medium",
+  "claim": "No generated world ever lights a furnace at region level. Generation always stops the settlement pass at 0 CE, so Stage 4's industrial_lag_years is never set and stays -1. The crossing loop at history_sim.cpp:7040 skips every region, so no furnace_lit event, ember square or \"lights its furnaces\" ticker line is ever produced. STARTUP.md and history_lapse.cpp already admit the empty ember layer on antiquity-epoch worlds and add the per-polity stipple heat and the board's Ind column to cover it. So the break is known and papered over, not hidden. The doc still describes the ticker furnace line and the ember layer as if they were live. The polity-level rung crossings that do happen (polities_industrialised) are never narrated. So the round's \"cities industrialising\" beat rests only on the stipple and the Ind column, with no event in the ticker.",
+  "evidence": "src/world/settlement.cpp:1240, 1335, 1357; src/world/settlement.hpp:329; src/world/history_sim.cpp:7016-7020, 7037; src/ui/history_lapse.cpp:1020-1023; docs/ui/STARTUP.md:221-235"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "medium",
+  "claim": "Beat 2 (mass migration) is not on screen in round 6, and there is nothing yet to put there. The Industrialisation span has no migration mechanism: no urbanisation or emigration streams and no city growth. INDUSTRIALISATION.md Beat 2 is still PROPOSED, and BL-985 (migration into cities) was cancelled unbuilt. The record's culture_changes is only the generic recorder's culture-mix drift, and the lapse surface does not draw culture mixes anyway (BL-826, history_lapse.hpp:31-32). The culture thread from round 3 fades out during round 4 through the carry_colour cross-fade. Rounds 5 and 6 inherit only polity colours, so lineage-coloured peoples never come back. Yet STARTUP.md:216-217 describes streams and a mixed tint as part of round 6. Closing this gap needs sim work (the migration streams) as well as a UI layer for the culture tint.",
+  "evidence": "docs/ui/STARTUP.md:216-217; docs/generation/INDUSTRIALISATION.md:574-618; src/ui/history_lapse.hpp:31-32 (culture mixes not drawn); backlog BL-985 (migration into cities) status cancelled"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "medium",
+  "claim": "Beat 3 (decolonisation, wars over empire, a possible world war, war that kills) has no visual. Subjects and overlord links are never drawn on the map. subject_freed appears only as a ticker line from Exploration's renewal mechanic. The item that makes colonies cost more as they grow was cancelled, and no event kind marks a general war. The arc readout still speaks only of empires formed and fallen.",
+  "evidence": "docs/ui/STARTUP.md:218-219; docs/generation/INDUSTRIALISATION.md:620-695; src/world/era_timelapse.hpp:182-203 (no war/world-war kind); src/ui/history_lapse.cpp:1985-1999, 1871-1910; backlog BL-986 (decolonisation by rising cost) cancelled"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "medium",
+  "claim": "Rail is promised but not drawn. The span lays no rail, so the corridor overlay is the same Track/Road ladder as rounds 4-5. No rung beyond Road is visibly distinct in the line layer; Post Road shows only in exemplar rings.",
+  "evidence": "docs/ui/STARTUP.md:214-215; src/ui/history_lapse.hpp:351-353; src/ui/history_lapse.cpp:1109-1131"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "medium",
+  "claim": "Round 6 (Industrialisation) rebuilds the world from scratch instead of resuming round 5's state (startup_screens.cpp:338-378). Its wait draws generation's own stage captions: caption is nullptr at 1364, so generation_wait.cpp:64-67 shows the labels from hard_coded_world.hpp:521-536. The player therefore sees 'Forming the system', 'Seeding peoples', 'Running the ancient era' and 'Running the exploration age' before 'Running the Industrialisation span'. That reads as starting over. Generation is deterministic from the same params and seed, so the rebuilt history matches what rounds 3-5 showed. The break is in what the wait says and in repeated work, not a different history.",
+  "evidence": "src/ui/startup_screens.cpp:338-351, 375-378, 1364-1365; src/world/hard_coded_world.hpp:521-536"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "low",
+  "claim": "No on-screen element ties Exploration's capital to Industrialisation's industry points. Round 5 shows capital only as a one-time gold burst at each seat around 1200 CE. It has no treasury column or ongoing treasury display. Round 6 introduces the Ind column, the industry heat layer and the furnace-lit ticker lines, but none of them names the treasury surplus as their source. INDUSTRIALISATION.md says that surplus is paid in each round. The burst stays in 1200 CE by design, so nothing re-states the capital-to-industry conversion when the playhead reaches 1660-1960.",
+  "evidence": "docs/generation/INDUSTRIALISATION.md:525-541; src/ui/history_lapse.cpp:1276-1307, 1568, 1696-1713"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "low",
+  "claim": "In Round 6, the six-row \"As it happened\" ticker filters out only road_promoted and has no priority by kind. Trade_link_opened/closed transitions, and also treaty and subject_bound events, can fill all six rows. That pushes out rare arc events (furnace_lit, subject_freed, seat_captured) from the ticker's named narration. Only the ticker names these events. The map still shows furnace crossings as ember squares, conquest shows as border changes, and the \"What happened here\" arc gives an aggregate summary. How often this crowding happens in the 1660-1960 span has not been measured. The \"several a year\" figure is a general code comment, not a Round 6 count.",
+  "evidence": "src/ui/history_lapse.cpp:1335-1338, 2028-2035"
+ },
+ {
+  "round": "Round 6 — Industrialisation (lapse index 3, 1660 -> 1960 CE)",
+  "severity": "low",
+  "claim": "Round 6's framing only half matches what it shows. The counter line (startup_screens.cpp:1482-1488) is shared by all lapse rounds and counts battles, conquests and foundings, with no industry figure. The footer (1516-1518) shows the player a repository path, docs/generation/INDUSTRIALISATION.md. The industry question is partly answered: BL-1080 (industry heat) draws the heat stipple, the furnace embers and the board's Ind column, and trade corridors draw who is linked. But no layer shows which goods the ground produces or what is traded, so \"What does that ground produce\" goes unanswered at the level of goods.",
+  "evidence": "src/ui/startup_screens.cpp:891, 1482-1488, 1516-1518"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "high",
+  "claim": "STARTUP.md:246-249 says round 6 closes on the epoch's opening map, and the code does not do this. The landscape the player will actually play does not exist when round 6 ends. The winning specialist roster, the background firms, the charter-budget firms and the validated prices are all made after Begin. The landscape search and its apply run in start_new_game_prelude (app.cpp:1330-1333), called from poll_worldgen (app.cpp:781) on the building screen. The validation run that produces the prices comes after that. The wizard's world does hold provisional world-gen specialists from make_hard_coded_world, but the search replaces them. The lapse surface (history_lapse.cpp) draws no firms, markets or prices at all. On the adopted path, Begin also clears the carve view, so no charter map appears in the hand-over either.",
+  "evidence": "STARTUP.md:246-249 vs app.cpp:1330-1333 (search_landscape/apply_landscape_candidate inside start_new_game_prelude, called from poll_worldgen after Begin, app.cpp:781); grep of src/ui/history_lapse.cpp finds no corporat/firm/charter/market/price drawing"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "high",
+  "claim": "The corporations have no recorded history. After Begin, the landscape search's winner replaces round 6's world-gen specialists, and app.cpp's comment admits the roster the player meets differs from the one the loading ledger listed. No lapse event kind covers a firm, so no ticker line ever introduces one. corporation_component also has no founding year or origin. The seat card does name each firm's HQ city and home nation, with that nation's politics and stance. So firms have a place but no past: nothing links them to a moment or polity from the lapse rounds, and the seat list is where they first appear.",
+  "evidence": "app.cpp:1283-1295 (regenerate_specialists replaces world-gen specialists; 'What the loading screen's ledger listed during generation was the world-gen roster; the one the player meets is the winner's'); seat_screen.cpp:480-512 card has no origin line"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "high",
+  "claim": "In rounds 4-6 a polity is called by its seat region's name (src/ui/history_lapse.cpp:1490-1495 and 1627-1632). At the seat and in play, the nation it folds into (one polity to one nation via BL-769, capital at the founding-core seed) carries a freshly coined make_nation_name from a separate name_rng stream. That name is in the same culture tongue but is not derived from the seat region's name. The seat card (seat_screen.cpp:504) and entity summaries show only the new name, with no link back to the realm the player watched. So the territory and language carry over, but the name the player learned does not.",
+  "evidence": "history_lapse.cpp:1490-1495 (polity_name_of = seat region name), 1627-1632 (board uses region_name[seat]); nation_generation.cpp:1196-1226 (name = make_nation_name(name_rng, ...))"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "high",
+  "claim": "Place names break at the hand-over. Rounds 3-6 (ticker and board) name places only by region: the people's name plus a quarter word, from settlement.cpp. The seat card's \"HQ and home market\" and the briefing name the home market by its population-centre city name. That name comes from a separate generate_city_name coinage with its own RNG stream. Nothing on the seat screen names the region, the people or any history record. The city is coined in the same tongue as its region's plurality culture, so the names sound alike but are never linked. A city named on the seat screen never appeared in the lapse.",
+  "evidence": "settlement.cpp:1074,1158 (region name = people + quarter_word); city_names.cpp:18-41,79-82 (generate_city_name per centre); seat_screen.cpp:467 (ui::market_city_name -> population_centre_name, market_ledger.cpp:49-66)"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "high",
+  "claim": "Lapse polity colours (a 20-slot palette, with slots from greedy adjacency colouring, carried from round to round in startup_screens.cpp:503-508) never map into play. After Begin, every surface uses palette::nation_colour: a 12-slot hash of the nation entity id with a different hue order. Those surfaces are the live-carve screen (app.cpp draw_building_carve), the seat map (at a 35% mix, so paler) and the Country lens. So a realm's colour changes where the lapse rounds end and generation/seating begins, possibly at the carve screen before the seat map. Nothing ties a lapse polity to the nation it becomes. The post-Begin surfaces do agree with each other.",
+  "evidence": "history_lapse.cpp:78-88 (polity_colour via assign_polity_colours slot -> palette::lapse_polity_colour), presentation.cpp:416-428; seat_screen.cpp:344-346 (palette::nation_colour(nation id)), presentation.cpp:369 and presentation.hpp:205-218"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "medium",
+  "claim": "The claim is accurate, with a small correction and an addition. The seat map (seat_screen.cpp:309-451) draws none of the lapse map's layers. It shows water and grey-green land with a 35% nation tint, plus the catchment wash, HQ dots, the market icon and the chosen firm's works. The territory tint does not carry over either. The lapse map colours owners with its culture or polity lineage palette (owner_colour, history_lapse.cpp:240). The seat map uses ui::palette::nation_colour, so the same land likely changes colour at the hand-over. The existing cross-fades work only between lapse rounds, and nothing fades the last lapse frame into the seat canvas. One correction: STARTUP.md's \"sits over the landscape the final wizard round selected\" is about handing over the world object (NR-811), not the visuals. The break is a design gap the doc never promised to cover, not code contradicting the doc.",
+  "evidence": "seat_screen.cpp:309-357 (base = water/land + nation mix only), 399-451 (only catchment, HQ dots, market icon, works); STARTUP.md:428-431"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "medium",
+  "claim": "The seat card and the briefing carry no epoch context. They never mention 1960, the span that just ended, standing wars and their patrons, per-nation Alarm, tariff laws, culture shares or GDP. A nation appears only as ideology, posture and the Access/Trust read. Grudges affect that read, but the briefing never names them. The seat map shows only nation territory. This matches STARTUP.md § The seat, which caps the card at four things and does not ask the briefing for history. The fix is therefore a design change to that spec, not a code bug. The last screen that shows the history is the Industrialisation round's close on the 1960 opening map. Nothing links that close to the briefing's \"whose law you trade under\" line.",
+  "evidence": "INDUSTRIALISATION.md:780-804 vs seat_screen.cpp:517-565 (briefing lines: identity, market prices, debt, nation character + Access/Trust, floor reason only)"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "high",
+  "claim": "In play, the recorded history covers only planetology and the Empires span. world.history_log is seeded only from planetology genesis and checkpoints (history_log.cpp:142-189, via app.cpp:1716). history_topic has no human-history topic. The Ages view replays only prehistory_timelapse, which on the adopted world is the Empires pass-one record (hard_coded_world.cpp:1673). exploration_timelapse and industrialisation_timelapse are saved in the report but read only by the wizard (startup_screens.cpp:177-179), never in play. The Culture migration record is not saved with the adopted world at all. It is written to prehistory_timelapse only on the Culture-stop path (hard_coded_world.cpp:1134, early return), and the full build overwrites that slot. So after Begin, the player cannot revisit Culture, Exploration or Industrialisation. Culture is lost entirely; the other two are saved but unused.",
+  "evidence": "app.cpp:1716; history_log.cpp:142-189; world.hpp:100-107; tile_inspector.cpp:401-440 (entry->prehistory_timelapse only); save_game.cpp:432-464 (timelapses written)"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "medium",
+  "claim": "Between round 6 and the seat, the hand-over has no map or story. On the adopted path, Begin sets grid_w and grid_h to 0 and clears the carve (app.cpp:562-573), so draw_building_carve draws nothing. The screen is titled \"BUILDING THE WORLD\" (app.cpp:807) even though the world is already built, and its subtitle is the validation line \"Three years of commerce prove the chosen landscape.\" Before that screen can draw its first frame, the landscape search runs synchronously on the main thread (app.cpp:1330, inside start_new_game_prelude via poll_worldgen). The window stays frozen on the last wizard frame for that time, measured at ~20 s on 2026-09-07 (placement and tier only). The wrong-span subtitle \"Four hundred years of history are being lived through.\" (app.cpp:830) appears only on the cold path, where there is no valid wizard cache and Begin rebuilds the world. There it misstates a history of about 4,400 years (2400 BCE to 1960).",
+  "evidence": "app.cpp:562-572 (label 12, grid_w/h 0, carve cleared), 807, 827-830; app.cpp:1310-1313 (MEASURED ~20 s comment), 1330"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "low",
+  "claim": "Pressing Begin while round 6's build is still running falls through to a cold make_hard_coded_world. The Begin button is not disabled while round 6 is in flight, and begin_new_game only adopts a landed cache (m_wiz_world->ready), never the pending slot (m_wiz_world_pending). There is no wait-and-adopt path. The cold build gives the same world deterministically, but it throws away the in-flight progress. Worse, the round-6 worker is not cancelled or released. It keeps running at the same time as the cold build, so two full builds compete for CPU. Its result is never polled after leaving the wizard: poll_wizard_history runs only from the wizard draw. So the pending slot and its finished world stay held until something else clears them. STARTUP.md § The world cache does not cover the in-flight case.",
+  "evidence": "app.cpp:553-583 (ready check), 584-637 (cold build); STARTUP.md:386-390"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "low",
+  "claim": "Mostly accurate, with three refinements. First, the holdout merge is only one reason the counts drift. Merge_undersized_nations absorbs any realm under the size floor, not just city-less single-region polities. The polity fold also collapses a polity's several seeds into one nation. Second, Voronoi cells that no polity governed can still come through as nations, so the count can go up as well as down. Third, m_world.nations.size() counts nations on every body, while round 6's board ranks one history's polities. So the two numbers are computed differently and can disagree, and no on-screen text explains the gap. The chat line is in src/core/app.cpp:1721-1725.",
+  "evidence": "nation_generation.cpp:691-722 (city-state exemption / holdout merge), 1031-1037; history_lapse.cpp:1541 ('%d powers hold ground'); app.cpp:1721-1725"
+ },
+ {
+  "round": "Begin, the adopted world, and the select-company canvas (the hand-over from round 6 Industrialisation into play)",
+  "severity": "medium",
+  "claim": "Round 6's industry points (the board's 'Ind' column) become the charter budget the firms are bought from (app.cpp:1321-1328). The hand-over never says so. The seat screen's 'Industry' label is only the Extraction/Processing/Trade focus. The card and briefing do name each firm's HQ and home-market city, which is an implicit place link, but nothing says that city's round-6 industry chartered the firm. The screen shows no charter budget or points.",
+  "evidence": "app.cpp:1321-1328 (build_stockpile_budget from round-6 industry points); history_lapse.cpp:1560-1583 (Ind column); seat_screen.cpp:46-55, 285, 484"
+ }
+]
