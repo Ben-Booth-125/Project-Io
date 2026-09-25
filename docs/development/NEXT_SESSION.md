@@ -42,6 +42,19 @@ Expect the pinned determinism digits to MOVE on that tree (world content moved):
 re-bless, taken once, after the last world-mover. Wave 1 is in flight: lane I2 (BL-1090 → BL-1094)
 and lanes I1 (BL-1087 → 1088 → 1089) / I3 (BL-1106) in worktrees branched from `cc5e51d1`.
 
+**Gate run on the full wave-0 tree (02:06):** world_determinism twice ALL PASS with the pinned
+digits UNCHANGED (the harness world runs the ancient arc to 1200, so purchases and laws never
+reach it); save_roundtrip and save_envelope_roundtrip green; Begin-adopts (adopt == cold) and
+seat-pick all pass; `span_seed_isolation` 25/26 (S0, NR-931); exploration_sim_harness fails
+exactly R3b (its regression pin, +400 tribute — the re-bless); industrialisation fidelity 16/16 on
+all three gates with the sea-leg producer wired; BL-1056 self-check pass. Wave-0 requirement rows
+are closed accordingly (`fa7e3a7f`). Lane I2 (BL-1090 hard borders, BL-1094 marks) merged
+`27154072` with a main-session fix round `70b2759e` (the rest seat read off the record; the
+civilisation diamond carried across the seam); its two capture scripts and the 16-seed
+`player_seed_sweep --digest-check` were running when this was written (logs in the session
+scratchpad: `digest_check_wave0.log`). NR-937 asks Ben whether a hard realm's coast draws heavy
+and whether 10% of people (off at 6%) is the pin.
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936
