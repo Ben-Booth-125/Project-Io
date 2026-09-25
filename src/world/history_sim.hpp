@@ -613,10 +613,25 @@ struct history_sim_params
     /// thousand times the price, so a fraction can be read far past 1 before
     /// it is pinned); 0 disables; outside the domain the whole run notes
     /// nothing and says so (`history_sim_state::works_event_params_rejected`)
-    /// -- rejected, never clamped. 1000 is f = 1: the reading's starting
-    /// point, measured against the 1960 firm count on the library
-    /// (industrialisation_sim_harness) before it is pinned.
-    int     works_event_fraction_q = 1000;
+    /// -- rejected, never clamped.
+    ///
+    /// PINNED AT 2000 (f = 2), READ OFF THE LIBRARY (industrialisation_sim_harness
+    /// --through 1960 --works-fractions 0,2000,4000,8000,16000,32000,64000, 16
+    /// curated seeds, 2026-09-25). The notes exist to DATE the real charters
+    /// (`date_chartered_firms`: a region's k-th charter takes its k-th note),
+    /// so the reading is notes against charters dated in-span, not notes
+    /// against charters alone: f = 1 noted 8798 works against 1297 charters
+    /// and dated 938 of them (72%; the cap of four per region binds where one
+    /// region charters many firms); f = 2 kept 894 of those (95%) at 3233
+    /// notes; f = 4 brought the notes level with the charters (1087) but dated
+    /// only 554 (43%); f = 8, 332 notes, 220 dated. Two is the largest
+    /// fraction that still dates nearly every charter f = 1 dates, at a third
+    /// of the flashes. The f = 0 control re-run closed EQUAL region for region
+    /// on every seed; the count was monotone in f and bounded on every seed.
+    /// The notes cluster in the span's first century (the running price is
+    /// tiny at the open, so a region crosses its four multiples early) -- a
+    /// consequence of the running-price rule, raised as NR-939.
+    int     works_event_fraction_q = 2000;
 
     /// DEFAULT A (RULED, Ben 2026-09-18, wave 1 form). A region the span FOUNDS
     /// after its open has no survey of its own (the sim has no tiles); with

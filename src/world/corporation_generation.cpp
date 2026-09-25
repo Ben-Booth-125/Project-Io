@@ -4208,6 +4208,13 @@ void date_chartered_firms(world& w, charter_spend_report& report,
     // k-th charter takes its k-th note; past the notes, its furnace year;
     // never lit, the epoch. A firm with no origin (none the search chartered)
     // opens at the epoch and is not counted against any region.
+    //
+    // "The report's own order" is ASCENDING CORP ID (`charter_spend_report::
+    // charters`), which is the walk's order only because `world::create_entity`
+    // hands out ids monotonically and the walk charters richest centre first,
+    // each centre's specialist before its firms. A walk that ever allocated
+    // out of that order would pair a region's notes with the wrong firms;
+    // the dependency is named here so that change knows what it moves.
     std::map<int, std::size_t> taken;
     for (charter_record& r : report.charters)
     {

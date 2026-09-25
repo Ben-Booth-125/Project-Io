@@ -257,20 +257,45 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
 
 ### Wave 2, lane F3 (Industrialisation) — BL-1099 (works chartered) with BL-1100 (rung crossing) and BL-1104 (Culture record saved). Groups `works-chartered-events`, `rung-crossed-narrated`, `culture-record-saved`.
 
-- [ ] T1 (1099) `works_chartered` in the span loop after the accrual (history_sim.cpp:~3532-3546
+- [x] T1 (1099) `works_chartered` in the span loop after the accrual (history_sim.cpp:~3532-3546
   region), the running price from the world stock so far over the charter divisor, a loop-local
   per-region counter, the per-round cap, `works_event_fraction_q` validated and zero-disabled;
   the harness rows (control equality, bounded/monotone count, events vs firms per seed). (1099 R1, R2)
-- [ ] T2 (1099) `founded_year` / `origin_region` on `corporation_component` (world save bump), set in
+  DONE 2026-09-25: kind 21; `charter_price.hpp` holds the divisor for both readers; cap 4/region;
+  `industrialisation_sim_harness --through 1960 --works-fractions ...` prints notes, regions at the
+  cap, first/last year, charters dated in-span per fraction, control EQUAL / monotone / bounded
+  (all 16 seeds EQUAL, monotone, bounded). PINNED f = 2 (`works_event_fraction_q` 2000) off the
+  16-seed reading: f=1 8798 notes / 938 of 1297 charters dated; f=2 3233 / 894; f=4 1087 / 554;
+  the notes' dawn cluster is NR-939.
+- [x] T2 (1099) `founded_year` / `origin_region` on `corporation_component` (world save bump), set in
   `charter_web_from_budget`; the briefing's origin sentence (seat_screen.cpp:~478-512). (1099 R3)
-- [ ] T3 (1099) the in-span flash marker and, on BL-1085's charter report, the closing-frame flash of
+  DONE 2026-09-25: world save 27 (claimed); `date_chartered_firms` pairs the k-th charter with the
+  k-th note after the winner's apply; `save_roundtrip` P1 origin row green; `seat_pick.lua`'s
+  `seat_02_briefing` capture reads "Chartered from Guagua's industry, in Gesher Nehua, under
+  Tuarthuage Thuathe, the realm of Gesher Nehua since 1660 CE" (the 'since' floor is NR-938).
+- [x] T3 (1099) the in-span flash marker and, on BL-1085's charter report, the closing-frame flash of
   the real charters dated by pairing. (1099 R4)
-- [ ] T4 (1100) the polity crossing noted at history_sim.cpp:~7029 and narrated; the ember layer marks
+  DONE 2026-09-25: the works glyph (bright block, furnace stack) in 3f per note and in 3g at the
+  close from `works_close`, filled by `fill_works_close` on the wizard landing and on the
+  `--verify` adopt path from the dated seed-candidate spend; `history_lapse_works.lua`: 40 of 40
+  charters on the home body, 40 close marks, 587 notes on the record, no clipping.
+- [x] T4 (1100) the polity crossing noted at history_sim.cpp:~7029 and narrated; the ember layer marks
   the capital; crossings per seed reported. (1100 R1)
-- [ ] T5 (1104) `body_entry::migration_timelapse` on every full run (hard_coded_world.cpp:~1134 vs
+  DONE 2026-09-25: `rung_crossed` = 22 (its own kind, documented on the enum); the bake marks the
+  capital from its year; the ticker's "The realm of Y lights its furnaces at X" at priority 0;
+  the harness's RUNG CROSSED column (46: 21 realms first 1672; 28: 2 first 1896; 11: 11 first
+  1692); the capture's lit = 9 and the line named; digests unchanged on both runs.
+- [x] T5 (1104) `body_entry::migration_timelapse` on every full run (hard_coded_world.cpp:~1134 vs
   ~1670-1673), serialised in the envelope bump. (1104 R1, R2)
+  DONE 2026-09-25: the fold lifted above the stop branch (built where a report or the stop will
+  hold it), written onto the cradle's entry on both paths, `w_/r_body_entry` tail under v22;
+  `save_envelope_roundtrip` S3 row green; `world_determinism` ALL PASS twice, seedA/on
+  5BA2EE1EE993C201, seedB/on 4F7BBD76AEEF3431 both runs.
 - [ ] T6 harness rows; captures; Release build; `world_determinism` twice; the round trips; cold review;
   Ben's live click. (R5, R2)
+  2026-09-25: harness rows, captures, Release build, determinism x2, both round trips DONE; a
+  self-review (7 findings: 4 fixed, NR-938 filed, 2 noted) stands in for the cold review until the
+  main session's; Ben's live click (R5, 1100 R2) OWED.
 
 ### Wave 1, lane I3 (voice) — BL-1106 (names and voice). Group `names-and-voice`.
 

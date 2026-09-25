@@ -202,6 +202,13 @@ int main()
             r.book_value  = 250.0f * k;
             hist.push_back(r);
         }
+        // BL-1099 (format v27): the firm's origin pair, two int32 at the
+        // record's tail after `returns`. Generation stamps them only through
+        // the charter walk, which this harness's fixture world never runs, so
+        // hand-stamp distinct non-default values on the same corp: the
+        // defaults (0 / -1) would let a dropped pair pass P1 unnoticed.
+        w.corporations.at(filing_corp).founded_year  = 1874;
+        w.corporations.at(filing_corp).origin_region = 3;
     }
 
     // -----------------------------------------------------------------------
@@ -274,6 +281,17 @@ int main()
                   && got[i].book_value == want[i].book_value;
         }
         check(ok, "P1 filed quarterly returns (BL-626) round-trip by value, in order");
+        // BL-1099 (v27): the origin pair survives by value at the tail, and a
+        // corp the fixture left unstamped reads back as "no origin" (-1), not
+        // as a neighbour's value -- the transposition a misplaced tail read
+        // would produce.
+        bool origin_ok = read_ok && cit != loaded.corporations.end()
+                      && cit->second.founded_year == 1874 && cit->second.origin_region == 3;
+        for (const auto& [cid, cc] : loaded.corporations)
+            if (cid != filing_corp)
+                origin_ok = origin_ok && cc.founded_year == 0 && cc.origin_region == -1;
+        check(origin_ok, "P1 the firm's origin pair (BL-1099) round-trips by value; unstamped "
+                         "firms read back with no origin");
     }
 
     // BL-624: the razed centre reloads as the ruin it is — flag, zeroed

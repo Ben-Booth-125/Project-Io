@@ -158,9 +158,13 @@ std::string seat_origin_sentence(const world& w, const generation_report& rep,
 
     std::string s = "Chartered from " + city + "'s industry, in " + region;
     if (nat != nullptr) s += ", under " + nat->name;
-    if (!realm.empty())
+    // An UNDATED firm (`founded_year` 0: an origin the walk stamped, a year no
+    // finish dated -- a fixture, or a save from before the pairing) keeps the
+    // sentence short of any year: year 0 falls inside the Empires record's
+    // span, and reading a realm off it would name a realm the firm never knew.
+    if (cc.founded_year != 0 && !realm.empty())
         s += ", the realm of " + realm + " since " + ui::lapse_year_label(since);
-    else
+    else if (cc.founded_year != 0)
         s += ", in " + ui::lapse_year_label(cc.founded_year);
     s += ".";
     return s;

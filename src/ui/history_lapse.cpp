@@ -672,10 +672,17 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // A region's first `furnace_lit` is its crossing; the list is ascending, so
     // the first seen is the earliest. Industry points are read off the samples
     // at draw time (they are a series, not a bake); here only whether any exist.
+    //
+    // BL-1100: a REALM's crossing (`rung_crossed`, at its capital) marks the
+    // capital the same way from the same year (STARTUP.md § Round 6, "The rung
+    // crossing is narrated") -- a generated world lights no region furnace,
+    // so on the shipped world this is the only mark the layer carries. On a
+    // seed where no realm crosses the layer stays honestly empty.
     h.region_lit_year.assign(h.region_col.size(), INT32_MAX);
     for (const lapse_event& e : h.lapse.events)
     {
-        if (e.kind != static_cast<uint8_t>(lapse_event_kind::furnace_lit)) continue;
+        if (e.kind != static_cast<uint8_t>(lapse_event_kind::furnace_lit)
+         && e.kind != static_cast<uint8_t>(lapse_event_kind::rung_crossed)) continue;
         if (e.region == lapse_event_none || e.region >= h.region_lit_year.size()) continue;
         int32_t& y = h.region_lit_year[e.region];
         if (e.year < y) y = e.year;
@@ -1448,23 +1455,27 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     struct seat_slide { uint16_t polity; float c0, r0, c1, r1, t; };
     std::vector<seat_slide> slides;
     // THE WORKS (BL-1099): the one glyph here that is a building -- a low
-    // block with a stack rising from its right shoulder, in the furnace tone
-    // over a dark underline, so it reads beside the ember squares as the same
-    // family of fact (industry) and as a different one (a charter, not a
-    // crossing). A specialist's stands a little taller. Shared by the in-span
-    // note in 3f and the close's real charters in 3g, so the two read as one
-    // kind of thing.
+    // BRIGHT block with a furnace-toned stack rising from its right shoulder,
+    // over a dark underline. The stack ties it to the ember squares as the
+    // same family of fact (industry); the bright block is what tells it from
+    // them and from the heat sparks, which are plain furnace-hued squares (the
+    // first capture drew it all in the furnace tone and it vanished into the
+    // stipple: a flash must read apart from the ground it lands on). A
+    // specialist's stands a little taller. Shared by the in-span note in 3f
+    // and the close's real charters in 3g, so the two read as one kind of
+    // thing.
     const auto draw_works = [&](ImVec2 at, int alpha, bool specialist) {
-        const float s   = std::clamp(scale * (specialist ? 0.75f : 0.6f), 2.0f, 4.5f);
+        const float s   = std::clamp(scale * (specialist ? 0.9f : 0.75f), 2.5f, 5.5f);
         const float bw  = s * 1.4f, bh = s * 0.8f;          // the block
-        const float sw  = s * 0.45f, sh = s * (specialist ? 2.2f : 1.8f); // the stack
+        const float sw  = s * 0.45f, sh = s * (specialist ? 2.4f : 2.0f); // the stack
         const ImU32 under = with_alpha(col_seat_ring, alpha);
-        const ImU32 over  = with_alpha(col_furnace, alpha);
+        const ImU32 block = with_alpha(col_bright, alpha);
+        const ImU32 stack = with_alpha(col_furnace, alpha);
         // the underline first, one pixel proud all round
         dl->AddRectFilled({at.x - bw - 1.0f, at.y - bh - 1.0f}, {at.x + bw + 1.0f, at.y + bh + 1.0f}, under);
         dl->AddRectFilled({at.x + bw - sw - 1.0f, at.y - sh - 1.0f}, {at.x + bw + 1.0f, at.y + 1.0f}, under);
-        dl->AddRectFilled({at.x - bw, at.y - bh}, {at.x + bw, at.y + bh}, over);
-        dl->AddRectFilled({at.x + bw - sw, at.y - sh}, {at.x + bw, at.y}, over);
+        dl->AddRectFilled({at.x - bw, at.y - bh}, {at.x + bw, at.y + bh}, block);
+        dl->AddRectFilled({at.x + bw - sw, at.y - sh}, {at.x + bw, at.y}, stack);
         prims += 4;
     };
     // THE REST SEAT (BL-1094, the review's fix round): where a polity's dot
@@ -1639,6 +1650,8 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    against the clock rather than the year, because the year has
     //    stopped. Each carries the year the pairing dated it to; nothing is
     //    read off the world-gen roster. Frozen under --verify. ──
+    if (!h.works_close.empty() && year < h.lapse.start_year + h.lapse.years)
+        h.works_close_t0 = -1.0; // off the close: the next arrival flashes again (cold review)
     if (!h.works_close.empty() && year >= h.lapse.start_year + h.lapse.years)
     {
         constexpr double stagger_s = 0.04; // per charter, in report order
@@ -2658,6 +2671,16 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
             std::snprintf(buf, sizeof buf, "%s, in the realm of %s, lights its furnaces.",
                           R, polity_name_of(h, e.polity));
         break;
+    case lapse_event_kind::rung_crossed:
+        // BL-1100: the realm's crossing, named by the realm and by the capital
+        // it crossed at (STARTUP.md § Round 6: "the realm of Y lights its
+        // furnaces at X").
+        if (e.polity == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "A realm lights its furnaces at %s.", R);
+        else
+            std::snprintf(buf, sizeof buf, "The realm of %s lights its furnaces at %s.",
+                          polity_name_of(h, e.polity), R);
+        break;
     case lapse_event_kind::subject_freed:
         std::snprintf(buf, sizeof buf, "%s refuses renewal and breaks from %s.",
                       polity_name_of(h, e.polity), polity_name_of(h, e.other));
@@ -2724,7 +2747,12 @@ int ticker_priority(const lapse_event& e)
     case lapse_event_kind::civilisation_formed:
     case lapse_event_kind::creed_preached:
     case lapse_event_kind::schism:
-    case lapse_event_kind::furnace_lit:          return 0;
+    case lapse_event_kind::furnace_lit:
+    case lapse_event_kind::rung_crossed:         return 0; // BL-1100: a realm's crossing, a handful per world
+    // BL-1099: a works note is CHURN on a busy world (up to four per region),
+    // so it takes the ticker only when the arc is quiet; its glyph on the map
+    // is the primary telling.
+    case lapse_event_kind::works_chartered:      return 2;
     case lapse_event_kind::supply_site_upgraded:
     case lapse_event_kind::trade_link_opened:
     case lapse_event_kind::trade_link_closed:

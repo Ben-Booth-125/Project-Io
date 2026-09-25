@@ -102,6 +102,11 @@
 //                so it costs about (75 / N) / 2 span-lengths per seed; 0 skips
 //                it and prints the integral lines as not taken.
 //   --out path   BL-1029: also write the per-seed table as JSON
+//   --works-fractions a,b,c  BL-1099, span mode: re-run the span from the fixture
+//                at each per-mille fraction of the running price (0 = the
+//                control, whose close must equal the shipped one); the WORKS
+//                CHARTERED line reads notes and charters dated in-span per
+//                fraction. Default "0,2000,4000"; "none" skips the re-runs.
 //   --fidelity   BL-1036: instead of the readings, the RESUME-FIDELITY check --
 //                the Industrialisation span's resume from the 1660
 //                exploration_output, gated on its opening, on one neutralised
@@ -620,10 +625,22 @@ struct seed_row
     int64_t works_last_year  = 0;      ///< year of the last note (0: none)
     /// Per --works-fractions entry: (fraction, notes), and the control's verdicts.
     std::vector<std::pair<int, int>> works_at;
+    /// THE PAIRING'S OUTCOME, the reason the notes exist: how many of the
+    /// seed's real charters `date_chartered_firms` dates IN-SPAN (a region's
+    /// k-th charter to its k-th note, or its furnace year) rather than at the
+    /// epoch -- at the shipped fraction, and per --works-fractions entry
+    /// (fraction, dated). Read beside `works_notes`: the fraction to pin is the
+    /// largest that still dates (nearly) every charter, since past it the
+    /// flashes thin but the seat briefing's origin year falls to 1960.
+    int     works_dated = 0;
+    std::vector<std::pair<int, int>> works_dated_at;
     bool    works_control_ok   = false; ///< f=0 re-run: close equal, other events equal
     int     works_control_diff = -1;    ///< regions that differ in the control (-1: not run)
     bool    works_monotone     = true;  ///< notes never rise with the fraction
     bool    works_bounded      = true;  ///< notes <= cap x regions with centres, every row
+    // --- BL-1100: the realms' crossings, reported per seed --------------------
+    int     rung_crossings     = 0;      ///< `rung_crossed` notes on the record (one per polity that crossed)
+    int64_t rung_first_year    = 0;      ///< year of the first crossing (0: none crossed)
 
     // --- Reading 1: density follows cities (campaign world) -----------------
     int    markets        = 0;
@@ -2849,10 +2866,36 @@ int main(int argc, char** argv)
                 };
                 tally(dst.events, close_t.size(), row.works_notes, row.works_regions, row.works_capped,
                       row.works_first_year, row.works_last_year);
+                // BL-1100: the realms' crossings, off the record itself (the
+                // sim's own counter agrees or the note is wrong).
+                for (const lapse_event& e : dst.events)
+                {
+                    if (e.kind != static_cast<uint8_t>(lapse_event_kind::rung_crossed)) continue;
+                    if (row.rung_crossings == 0) row.rung_first_year = e.year;
+                    ++row.rung_crossings;
+                }
+                if (row.rung_crossings != dst.rung_crossings_noted)
+                    std::printf("seed %u RUNG CROSSED (BL-1100): record carries %d notes but the sim "
+                                "counted %lld -- MISMATCH\n",
+                                seed, row.rung_crossings, static_cast<long long>(dst.rung_crossings_noted));
                 for (const region& rg : close_t)
                     if (rg.centres > 0) ++row.works_centres;
                 const int bound = works_event_region_cap * static_cast<int>(close_t.size());
                 row.works_bounded = row.works_notes <= bound;
+                // THE PAIRING, run as the finish runs it (`date_chartered_firms`
+                // on the winner's report against a record), on a COPY of the
+                // report per record: the count of charters dated in-span is
+                // what a fraction buys. The harness world's firms take the
+                // last dating written; nothing here reads them back.
+                const auto dated_in_span = [&](const std::vector<lapse_event>& ev) {
+                    charter_spend_report rep = charter_rep;
+                    date_chartered_firms(w, rep, ev, static_cast<int32_t>(through_year));
+                    int dated = 0;
+                    for (const charter_record& c : rep.charters)
+                        if (c.founded_year != static_cast<int32_t>(through_year)) ++dated;
+                    return dated;
+                };
+                row.works_dated = dated_in_span(dst.events);
 
                 if (!works_fractions.empty() && !open_t.empty())
                 {
@@ -2871,6 +2914,7 @@ int main(int argc, char** argv)
                         int64_t a = 0, b = 0;
                         tally(x.hs.events, close_t.size(), n, r, c, a, b);
                         row.works_at.emplace_back(f, n);
+                        row.works_dated_at.emplace_back(f, dated_in_span(x.hs.events));
                         if (n > bound) row.works_bounded = false;
                         if (f == 0)
                         {
@@ -2909,6 +2953,9 @@ int main(int argc, char** argv)
                             row.works_control_ok   = diff == 0 && ev_ok;
                         }
                     }
+                    // The world's firms carry the LAST dating written; put the
+                    // shipped one back so nothing below reads a re-run's.
+                    dated_in_span(dst.events);
                     std::vector<std::pair<int, int>> pts = row.works_at;
                     pts.emplace_back(row.works_f_q, row.works_notes);
                     std::sort(pts.begin(), pts.end());
@@ -2924,13 +2971,18 @@ int main(int argc, char** argv)
                             row.works_notes, row.works_regions, row.works_capped, close_t.size(), row.works_centres,
                             static_cast<long long>(row.works_first_year), static_cast<long long>(row.works_last_year),
                             row.ch_specialists, row.ch_firms, row.ch_specialists + row.ch_firms);
+                std::printf(" (%d dated in-span at f_q %d)", row.works_dated, row.works_f_q);
                 if (row.works_at.empty()) std::printf(" (none)");
-                for (const auto& [f, n] : row.works_at) std::printf(" f_q %d -> %d", f, n);
-                std::printf(" | control %s (%d regions differ), monotone %s, bounded %s\n",
+                for (std::size_t k = 0; k < row.works_at.size(); ++k)
+                    std::printf(" f_q %d -> %d notes, %d dated", row.works_at[k].first, row.works_at[k].second,
+                                k < row.works_dated_at.size() ? row.works_dated_at[k].second : -1);
+                std::printf(" | control %s (%d regions differ), monotone %s, bounded %s"
+                            " | RUNG CROSSED (BL-1100): %d realms, first %lld\n",
                             row.works_control_diff < 0 && row.works_at.empty() ? "not run"
                                                            : row.works_control_ok ? "EQUAL" : "DIFFERS",
                             row.works_control_diff, row.works_monotone ? "yes" : "NO",
-                            row.works_bounded ? "yes" : "NO");
+                            row.works_bounded ? "yes" : "NO",
+                            row.rung_crossings, static_cast<long long>(row.rung_first_year));
             }
             const std::size_t open_n = open_t.size();
             int64_t inherited_pts = 0, unheld_pts = 0;
@@ -4314,6 +4366,14 @@ int main(int argc, char** argv)
                                 "\"works_bounded\": %s,\n",
                              r.works_control_ok ? "true" : "false", r.works_control_diff,
                              r.works_monotone ? "true" : "false", r.works_bounded ? "true" : "false");
+                // BL-1099: the pairing's outcome -- charters dated in-span, shipped and per fraction.
+                std::fprintf(f, "   \"works_dated\": %d, \"works_dated_at\": [", r.works_dated);
+                for (std::size_t k = 0; k < r.works_dated_at.size(); ++k)
+                    std::fprintf(f, "%s[%d, %d]", k ? ", " : "", r.works_dated_at[k].first, r.works_dated_at[k].second);
+                std::fprintf(f, "],\n");
+                // BL-1100: the realms' crossings, per seed.
+                std::fprintf(f, "   \"rung_crossings\": %d, \"rung_first_year\": %lld,\n",
+                             r.rung_crossings, (long long)r.rung_first_year);
                 std::fprintf(f, "   \"markets\": %d, \"markets_urban\": %d, \"corps_on_body\": %d, ",
                              r.markets, r.markets_urban, r.corps_on_body);
                 put_rho("rho_firms_urban", r.rho_firms_urban, ", ");

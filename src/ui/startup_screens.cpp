@@ -253,6 +253,11 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
 
 } // namespace
 
+// BL-1099: defined above poll_wizard_history below; the adopt branch here fills
+// the same marks from the verify spend's report.
+static void fill_works_close(ui::history_lapse& h, const world& w, const generation_report& rep,
+                             const charter_spend_report& charter, bool frozen);
+
 void app::launch_wizard_history_run(int lapse_index)
 {
     // Out-of-range is a caller bug, not a display state: the array index below is
@@ -320,6 +325,15 @@ void app::launch_wizard_history_run(int lapse_index)
             m_wiz_history[lapse_index]      = std::move(adopted);
             m_wiz_history_year[lapse_index] = m_wiz_history[lapse_index].lapse.start_year;
             inherit_hard(); // BL-1090: the adopted record carries the flag too
+            // BL-1099: the adopted round 6 flashes the verify spend's own
+            // charters at its close (`m_verify_charter`, dated in run_verify),
+            // so a capture of the last frame proves the close marks the way a
+            // wizard run's would. Empty on rounds whose record is not the
+            // Industrialisation span's -- the map draws the marks only on the
+            // record's last year, and only round 6's last year is 1960.
+            if (lapse_index == wizard_lapse_round_count - 1)
+                fill_works_close(m_wiz_history[lapse_index], m_world, m_generation_report,
+                                 m_verify_charter, /*frozen=*/true);
             return;
         }
     }
@@ -450,6 +464,37 @@ void app::drop_wizard_world(const char* why)
     }
 }
 
+/// BL-1099: THE REAL CHARTERS, for round 6's close flash (STARTUP.md § Round 6,
+/// "Company creation flashes"). Read off a finish's own charter report -- the
+/// firms the search chartered from each centre's budget, in the report's order
+/// (ascending corp id, which is the walk's own order: richest centre first, its
+/// specialist then its firms), each at its anchor tile's raster position and at
+/// the year the pairing dated it to -- and never off the world-gen roster.
+/// Homeworld tiles only: the lapse raster is the cradle's. Called once per
+/// landing, because the record and the finish land together and neither
+/// changes again; under --verify (`frozen`) every mark draws at once.
+static void fill_works_close(ui::history_lapse& h, const world& w, const generation_report& rep,
+                             const charter_spend_report& charter, bool frozen)
+{
+    entity_id home = null_entity;
+    for (const generation_report::body_entry& be : rep.bodies)
+        if (be.is_homeworld) { home = be.id; break; }
+    h.works_close.clear();
+    h.works_close.reserve(charter.charters.size());
+    for (const charter_record& r : charter.charters)
+    {
+        const auto t = w.tiles.find(r.anchor_tile);
+        if (t == w.tiles.end() || t->second.body != home) continue;
+        h.works_close.push_back(ui::history_lapse::works_mark{
+            static_cast<float>(t->second.grid_x), static_cast<float>(t->second.grid_y),
+            r.founded_year, r.specialist});
+    }
+    h.works_close_t0     = -1.0;
+    h.works_close_frozen = frozen;
+    std::printf("[works close] %zu of %zu charters stand on the home body (%s)\n",
+                h.works_close.size(), charter.charters.size(), frozen ? "frozen" : "staggered");
+}
+
 void app::poll_wizard_history()
 {
     // Every lapse round, not just the one on screen: a player who presses Next
@@ -502,34 +547,10 @@ void app::poll_wizard_history()
         if (world_slot && world_slot->ready)
         {
             m_wiz_world = std::move(world_slot);
-            // BL-1099: THE REAL CHARTERS, for the close flash (STARTUP.md
-            // § Round 6). Read off the finish's own report -- the firms the
-            // search chartered from each centre's budget, in the report's
-            // order (richest centre first), each at its anchor tile's raster
-            // position and at the year the pairing dated it to -- and never
-            // off the world-gen roster. Homeworld tiles only: the lapse raster
-            // is the cradle's. Filled here, once, because the record and the
-            // finish land together and neither changes again.
-            {
-                const world&                w   = m_wiz_world->w;
-                const charter_spend_report& rep = m_wiz_world->finish.charter;
-                entity_id home = null_entity;
-                for (const generation_report::body_entry& be : m_wiz_world->report.bodies)
-                    if (be.is_homeworld) { home = be.id; break; }
-                ui::history_lapse& h = m_wiz_history[i];
-                h.works_close.clear();
-                h.works_close.reserve(rep.charters.size());
-                for (const charter_record& r : rep.charters)
-                {
-                    const auto t = w.tiles.find(r.anchor_tile);
-                    if (t == w.tiles.end() || t->second.body != home) continue;
-                    h.works_close.push_back(ui::history_lapse::works_mark{
-                        static_cast<float>(t->second.grid_x), static_cast<float>(t->second.grid_y),
-                        r.founded_year, r.specialist});
-                }
-                h.works_close_t0     = -1.0;
-                h.works_close_frozen = !m_golden_dir.empty();
-            }
+            // BL-1099: the real charters, for the close flash (`fill_works_close`
+            // above) -- off the finish's own report, never the world-gen roster.
+            fill_works_close(m_wiz_history[i], m_wiz_world->w, m_wiz_world->report,
+                             m_wiz_world->finish.charter, !m_golden_dir.empty());
             std::printf("[wizard world] cached for Begin (seed %u, era seed %u, "
                         "span seeds %u/%u/%u/%u): searched and settled, %zu corporations\n",
                         m_wiz_world->params.seed, m_wiz_world->params.era_seed,

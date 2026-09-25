@@ -415,10 +415,16 @@ every event still crosses, the ticker still names it with its year and place, th
 still counts it. A mark is earned by kind, each with its own glyph: a **seat captured** draws a
 ring in the winner's colour at the fallen seat; a **break-away or schism** draws a crack from
 the parent seat to the successor's; a **civilisation formed** draws a two-tone diamond that
-stays at the coining region; a **capital moved** slides the seat dot from old to new. A layer's
-transition is a mark on the thing, not a ping over it: a corridor promoted to Post Road pulses
-once along its length, a tie that changes layer is tinted. A realm ending and a creed preached
-do not mark; nothing else does.
+stays at the coining region; a **capital moved** slides the seat dot from old to new; a **works
+chartered** (round 6, § Round 6) draws a works — a bright block with a furnace-toned stack —
+at the region's anchor, fading over the window, and the close's real charters wear the same
+glyph so the two read as one kind of thing (bright rather than furnace-toned, because the
+heat stipple and the ember squares are furnace-toned and a flash must read apart from the
+ground it lands on). A layer's transition is a mark on the thing, not a ping over it: a
+corridor promoted to Post Road pulses once along its length, a tie that changes layer is
+tinted, and a **realm's rung crossing** is the ember square at its capital from its crossing
+year (the same state mark a region furnace earns). A realm ending and a creed preached do not
+mark; nothing else does.
 
 ### Leans per pass
 

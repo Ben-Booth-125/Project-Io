@@ -751,6 +751,13 @@ private:
     };
     std::shared_ptr<wizard_world_cache> m_wiz_world_pending;
     std::shared_ptr<wizard_world_cache> m_wiz_world;
+    /// BL-1099, VERIFY ONLY: the charter report of the search-less `--verify`
+    /// spend (run_verify's seed-candidate spend), dated against the record
+    /// exactly as `finish_campaign_world` dates the worker's, so the adopted
+    /// round-6 record can flash the same close marks a wizard run would
+    /// (`fill_works_close`) and the seat briefing's origin sentence has a year
+    /// to read. Empty on every interactive path.
+    charter_spend_report m_verify_charter;
     /// The slot Begin adopted from the wizard, consumed by poll_worldgen on
     /// its next call: the world, report, registry and finish move into play
     /// and the tail (the presentation half, the seat) runs.
