@@ -1962,9 +1962,13 @@ int region_urban_share_q(int farm_q)
 
 namespace {
 
-/// Promote `centres` to whatever `urban_population` now stands up, never
-/// demote on growth. POPULATION.md's asymmetry: passive failure shrinks a
-/// centre and never destroys one, so only `sack_region_urban` razes one.
+/// Let `centres` follow what `urban_population` now stands up.
+///
+/// BL-1137 — CENTRES FOLLOW THE HEADS BOTH WAYS (Ben, 2026-09-25, superseding
+/// "growth only promotes"): growing heads promote; @p shrinking heads (this
+/// year's step took the headcount down) hold the count to what they still
+/// stand, so a centre whose heads fell below a village's worth is ABANDONED —
+/// people leaving, not a sack, so `centres_razed` is untouched.
 ///
 /// BL-1141 — A REGION DEEPENS INTO ONE PLACE: what the heads stand up is one
 /// centre once they reach a village's worth (`region_centres_wanted`), held to
@@ -1973,14 +1977,18 @@ namespace {
 /// off the heads at the carve — never more numerous.
 ///
 /// BL-872 — `network_ok` false FREEZES growth: the ground the network can no
-/// longer feed or govern stands up no NEW centre. The ground hold still
-/// applies — a cell that lost its ground holds none whether or not the seat
-/// reaches it — and `sack_region_urban` stays the only place a centre is razed.
-void promote_centres(region& p, bool network_ok)
+/// longer feed or govern stands up no NEW centre. The ground hold and the
+/// abandonment still apply — a cell that lost its ground holds none, and heads
+/// that left are gone, whether or not the seat reaches it — and
+/// `sack_region_urban` stays the only place a centre is DESTROYED (razed).
+void promote_centres(region& p, bool network_ok, bool shrinking)
 {
     int c = p.centres;
+    const int wanted = region_centres_wanted(p.urban_population);
     if (network_ok)
-        c = std::max(c, region_centres_wanted(p.urban_population));
+        c = std::max(c, wanted);
+    if (shrinking)
+        c = std::min(c, wanted);
     p.centres = region_centres_fit(c, p.urban_ground);
 }
 
@@ -2115,7 +2123,7 @@ void draw_region_urban(region& p)
     // (`advance_region_urban`), never on the one-centre opening seed every
     // farmable region gets regardless of network, above.
     p.centres = 1;
-    promote_centres(p, /*network_ok=*/true);
+    promote_centres(p, /*network_ok=*/true, /*shrinking=*/false);
 }
 
 void draw_urban_map(settlement_state& s)
@@ -2133,18 +2141,27 @@ void advance_region_urban(region& p, bool network_ok)
         // touched here: nobody sacked these walls, the people simply went.
         p.urban_population = 0;
         p.centres          = 0;
+        p.industrial_heads = 0;
         return;
     }
 
-    const int64_t target =
-        clampi64((p.population * region_urban_share_q(p.farm_q)) / 1000, 0, 1LL << 40);
+    // BL-1137: the industrial heads are people this region holds (a plague
+    // that took them leaves fewer), and they all live in its centres, so the
+    // target is the farm-fed people's urban share PLUS every industrial head.
+    // With none — every span before the Industrialisation span's stream — the
+    // target is exactly `population * share`, as it always was.
+    p.industrial_heads = clampi64(p.industrial_heads, 0, p.population);
+    const int64_t farm_fed = p.population - p.industrial_heads;
+    const int64_t target = clampi64(
+        (farm_fed * region_urban_share_q(p.farm_q)) / 1000 + p.industrial_heads, 0, 1LL << 40);
+    const int64_t before = p.urban_population;
     const int64_t gap = target - p.urban_population;
     // Integer division truncates toward zero in both directions, so the step is
     // symmetric and a gap smaller than 1000/urban_converge_q simply stalls —
     // which is the correct behaviour for a town already at its ground's size.
     p.urban_population = clampi64(p.urban_population + (gap * urban_converge_q) / 1000,
                                   0, 1LL << 40);
-    promote_centres(p, network_ok);
+    promote_centres(p, network_ok, /*shrinking=*/p.urban_population < before);
 }
 
 void sack_region_urban(region& p, int population_loss_q)
@@ -2162,6 +2179,9 @@ void sack_region_urban(region& p, int population_loss_q)
                   * urban_sack_multiple_q) / 1000, 0, 1000);
     p.urban_population = clampi64(
         p.urban_population - (p.urban_population * loss_q) / 1000, 0, 1LL << 40);
+    // BL-1137: the works' people are city people; a sack takes them with the
+    // walls, never more than the city it left.
+    p.industrial_heads = clampi64(p.industrial_heads, 0, p.urban_population);
 
     // What the survivors can still stand up. BL-1130: "stand up" is the same
     // rule growth builds by (one centre, BL-1141), on the same ground, so a sack and a promotion
@@ -2185,6 +2205,57 @@ void sack_region_urban(region& p, int population_loss_q)
         p.centres_razed += size_before - size_after;
 }
 
+// ---------------------------------------------------------------------------
+// The urbanisation stream (BL-1137; INDUSTRIALISATION.md § Beat 2)
+// ---------------------------------------------------------------------------
+
+int urbanisation_rate_q()
+{
+    // The demography's own growth rate, by construction (see the header): the
+    // countryside's natural increase is what the towns take.
+    return static_cast<int>(demog_growth_rate_q);
+}
+
+int64_t urbanisation_outflow(const region& p, int step_years)
+{
+    if (p.population <= 0 || step_years <= 0) return 0;
+    const int64_t countryside = clampi64(p.population - p.urban_population, 0, 1LL << 40);
+    if (countryside <= 0) return 0;
+    // THE PUSH: the strain on the ground — its farm-fed people over what its
+    // farmland feeds, per mille. The industrial heads are fed by the works, so
+    // they strain nothing.
+    const int64_t K_farm   = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
+    const int64_t farm_fed = clampi64(p.population - p.industrial_heads, 0, 1LL << 40);
+    const int64_t strain_q = (K_farm > 0) ? clampi64((farm_fed * 1000) / K_farm, 0, 1000) : 1000;
+    // countryside x rate x strain x years, staged so nothing leaves int64:
+    // countryside <= 2^40, rate x strain <= 12,000, years clamped to 1000.
+    const int64_t years = clampi64(step_years, 0, 1000);
+    const int64_t per_year = (countryside * demog_growth_rate_q * strain_q) / 1000000;
+    return clampi64(per_year * years, 0, countryside);
+}
+
+int64_t take_countryside(region& p, int64_t heads)
+{
+    if (heads <= 0 || p.population <= 0) return 0;
+    const int64_t countryside = clampi64(p.population - p.urban_population, 0, 1LL << 40);
+    const int64_t taken = clampi64(heads, 0, countryside);
+    p.population -= taken;
+    return taken;
+}
+
+void settle_urban_migrants(region& p, int64_t heads)
+{
+    if (heads <= 0) return;
+    p.population       = clampi64(p.population + heads, 0, 1LL << 40);
+    p.urban_population = clampi64(p.urban_population + heads, 0, 1LL << 40);
+    p.industrial_heads = clampi64(p.industrial_heads + heads, 0, p.population);
+}
+
+bool region_stands_a_town(const region& p)
+{
+    return p.urban_population >= static_cast<int64_t>(k_population_for_scale[1]) * 1000;
+}
+
 void advance_region_demography(region& p, int years, int war_pressure_q)
 {
     if (years <= 0) return;
@@ -2194,7 +2265,13 @@ void advance_region_demography(region& p, int years, int war_pressure_q)
     // one-off population grant: it lifts the asymptote the logistic term is
     // growing toward, which is a permanent change in trajectory rather than a
     // step that growth would simply re-flatten.
-    const int64_t K = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
+    //
+    // BL-1137: a town that industrialised feeds more people than its fields —
+    // the heads who came to its works are fed by the works — so its ceiling is
+    // its farmland's plus its industrial heads. Zero everywhere the stream has
+    // not run, which leaves K exactly what it always was.
+    const int64_t K = region_carrying_capacity(p.farm_q, p.work_capacity_mod)
+                    + clampi64(p.industrial_heads, 0, 1LL << 40);
 
     for (int y = 0; y < years; ++y)
     {

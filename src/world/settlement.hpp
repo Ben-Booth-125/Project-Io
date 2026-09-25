@@ -658,6 +658,19 @@ struct region
     /// carve re-reads the final partition itself.
     int urban_ground = -1;
 
+    /// BL-1137 (INDUSTRIALISATION.md § Beat 2, the urbanisation stream) —
+    /// heads who came to this region's centres to WORK, fed by industry rather
+    /// than by its own farmland. A subset of both `population` and
+    /// `urban_population`: they live in the centres (the urban target counts
+    /// them whole, `advance_region_urban`) and they raise the ceiling the
+    /// region's people are held to (`advance_region_demography` adds them to
+    /// the farm's carrying capacity), because a city that industrialises feeds
+    /// more people than its fields do. Written only by the stream
+    /// (`settle_urban_migrants`), cut with the heads a sack or an emptying
+    /// takes. GENERATION SCRATCH, NOT SAVED, on `network_supply_q`'s precedent:
+    /// the campaign reads the urban heads it is part of, never this split.
+    int64_t industrial_heads = 0;
+
     /// BL-872 (CIVILISATION.md "Centres are derived by supply and
     /// governance") — 0-1000, how well THIS region's own seat can still
     /// reach it: `history_sim.cpp`'s terrain-and-road Dijkstra reach from
@@ -1365,29 +1378,33 @@ void draw_region_urban(region& p);
 void draw_urban_map(settlement_state& s);
 
 /// Advance one region's urban headcount by one simulated year: converge a
-/// fraction of the gap toward `population * region_urban_share_q(farm_q)`,
-/// then promote `centres` to whatever the surviving heads stand up —
-/// PROVIDED the network still reaches this ground.
+/// fraction of the gap toward its target — the farm-fed people times
+/// `region_urban_share_q(farm_q)`, plus every industrial head (BL-1137: they
+/// all live in the centres) — then let `centres` follow the heads.
 ///
 /// @param network_ok  BL-872 (CIVILISATION.md "Centres are derived by supply
 ///                    and governance") — whether `region::network_supply_q`
 ///                    is still above the caller's sustainable-settlement
-///                    floor. True is the old behaviour unchanged. False
-///                    FREEZES `centres`: it neither grows nor shrinks here,
-///                    because a network cut is not the deliberate act of
-///                    history `sack_region_urban` exists for.
+///                    floor. False FREEZES GROWTH: no new centre stands on
+///                    ground the network no longer reaches.
 ///
-/// GROWTH ONLY PROMOTES, and only while the network holds. A shrinking city
-/// keeps its centre and a cut-off one keeps its centres too — POPULATION.md's
-/// asymmetry, now covering both kinds of passive failure. Destruction is
-/// `sack_region_urban` alone, a deliberate act of history.
+/// CENTRES FOLLOW THE HEADS BOTH WAYS (Ben, 2026-09-25; POPULATION.md
+/// § Generation, superseding "growth only promotes"; BL-1137). Growing heads
+/// stand the region's one centre once they reach a village's worth, while the
+/// network holds (BL-1141, a region deepens into one place: growth past that
+/// makes the place bigger, never more numerous). SHRINKING heads — this year's
+/// step took the urban headcount down — below a village's worth ABANDON it,
+/// whether or not the network holds. Abandonment is people leaving, not a
+/// sack: `centres_razed` is untouched, and the points it earned pass to the
+/// realm's nearest centre (`run_history_sim`). Only a SHRINKING count abandons
+/// ("we can destroy shrinking centres below a threshold", Ben): the settlement
+/// the draw stands on farmland before its heads reach a village's worth is
+/// kept while it grows.
 ///
-/// GROWTH CONSOLIDATES (BL-1130). What the heads stand up is
-/// `region_centres_wanted` — one centre once the heads reach a village's worth —
-/// and the count never exceeds `region_centres_fit` for the region's
-/// cell. That ceiling applies whether or not the network holds: it is a MERGE
-/// (a newer neighbour's founding cut the cell, and the centres standing fold
-/// together), not a loss, so `centres_razed` is untouched and the heads stay.
+/// The count never exceeds `region_centres_fit` for the region's cell: none on
+/// a cell with no ground a centre can stand on, whether or not the network
+/// holds — a merge into the neighbour a founding gave that ground, not a
+/// loss, so `centres_razed` is untouched and the heads stay.
 void advance_region_urban(region& p, bool network_ok);
 
 /// SACK a region's cities. `population_loss_q` is the per-mille the
@@ -1398,6 +1415,44 @@ void advance_region_urban(region& p, bool network_ok);
 /// of urban heads per razing, plus the last settlement's one when it falls —
 /// whether or not the centre count stepped down.
 void sack_region_urban(region& p, int population_loss_q);
+
+// ---------------------------------------------------------------------------
+// The urbanisation stream (BL-1137; INDUSTRIALISATION.md § Beat 2)
+// ---------------------------------------------------------------------------
+// "The urbanisation stream empties the countryside and its villages into the
+// towns and cities that industrialise." Three pure functions of the region
+// record; the ROUTE — which towns, in which polity, along which held ground,
+// shared by which pull — is the sim's (`run_history_sim`, the Industrialisation
+// span's round), since it reads ownership and the neighbour graph.
+
+/// Per mille of a fully strained countryside that leaves for the towns each
+/// year. EQUAL TO THE DEMOGRAPHY'S OWN GROWTH RATE, by construction
+/// (settlement.cpp `demog_growth_rate_q`): ground at its ceiling grows nothing,
+/// and the stream takes from it what the same ground grows at low density —
+/// the countryside's natural increase goes to the towns. A mechanism, not a
+/// fitted number: it was never read off a centre count.
+int urbanisation_rate_q();
+
+/// The heads region @p p's countryside sends to the towns over one decision
+/// round of @p step_years years: its countryside (people outside its centres)
+/// x the rate x the STRAIN on its ground (its farm-fed people over what its
+/// farmland feeds, per mille — the push; the sim carries no depletion, so
+/// strain is the whole push) x the years. 0 for an empty region.
+int64_t urbanisation_outflow(const region& p, int step_years);
+
+/// Take @p heads from region @p p's countryside (never more than it has).
+/// Returns the heads actually taken.
+int64_t take_countryside(region& p, int64_t heads);
+
+/// Land @p heads in region @p p's centres as INDUSTRIAL heads: they join its
+/// population and its urban headcount, and raise its ceiling with them.
+void settle_urban_migrants(region& p, int64_t heads);
+
+/// True when region @p p is a TOWN OR LARGER in people — its urban heads at
+/// least the town rung (`k_population_for_scale[1]`, 50,000): the places the
+/// stream flows into ("the towns and cities that industrialise"). A place's
+/// size is its people, never its centre count.
+bool region_stands_a_town(const region& p);
 
 /// The manpower ceiling a region's CURRENT population can support — a
 /// bounded fraction (`manpower_ceiling`'s own constant), not additive, so a
