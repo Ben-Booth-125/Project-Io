@@ -32,8 +32,9 @@
 #include "ui/market_ledger.hpp"   // market_city_name
 #include "ui/presentation.hpp"
 #include "world/budget_system.hpp" // k_debt_interest_per_quarter, for the briefing's debt line
-#include "world/era_timelapse.hpp" // owner_change / owner_none -- the origin sentence's realm (BL-1099)
+#include "world/era_timelapse.hpp" // owner_slice_at / owner_none -- the origin sentence's realm (BL-1099)
 #include "world/logistics.hpp"     // body_tile_grid
+#include "world/polity_identity.hpp" // polity_seat_region -- the origin sentence's seat fallback (BL-1088's rule)
 #include "world/market_clearing.hpp"
 #include "world/sentiment.hpp"
 #include "world/settlement.hpp"    // settlement_state::regions -- the origin region's name (BL-1099)
@@ -94,12 +95,16 @@ struct firm_goods
 /// 2026-09-24): "Chartered from <city>'s industry, in <region>, under
 /// <nation>, the realm of <X> since <year>". Read from the firm's own
 /// `founded_year` and `origin_region` and from the record's owner slice at
-/// that year -- never from the charter report. The region is the settlement
-/// record's; the realm is the polity holding that region at the founding
-/// year on whichever of the cradle's records spans it (the Industrialisation
-/// span first, the two before it if the year falls earlier), named by its
-/// seat exactly as the round's board names it (`polity_seat`: the first
-/// region it held); "since" is the year that realm took the region. A firm
+/// that year (`owner_slice_at`) -- never from the charter report. The region
+/// is the settlement record's; the realm is the polity holding that region at
+/// the founding year on whichever of the cradle's records spans it (the
+/// Industrialisation span first, the two before it if the year falls
+/// earlier), NAMED AS THE BOARD AND THE TICKER NAME IT (BL-1088,
+/// CIVILISATION.md § A realm's name): by the record's coined `polity_name`,
+/// carried by id, and only where the tongue could not coin, by its seat
+/// (`polity_seat_region`) -- the rule `polity_name_of` applies on the round,
+/// so one realm reads as one name on the board, the ticker and this line.
+/// "since" is the year that realm took the region on that record. A firm
 /// with no origin (none the search chartered) gets no sentence; a firm whose
 /// year no record spans, or whose ground no realm held, keeps the sentence
 /// short of the realm clause rather than inventing one.
@@ -130,31 +135,38 @@ std::string seat_origin_sentence(const world& w, const generation_report& rep,
         if (rec != nullptr) break;
     }
 
-    // The holder of the origin region at the year, and the year it took it;
-    // each polity's seat is the first region it held in the record.
+    // The holder of the origin region at the year -- the record's own slice,
+    // the fold every reader of a record uses -- and the year it took it: the
+    // last change of that region's owner at or before the year. A region held
+    // from before the record opens changes AT its opening, so "since" floors
+    // at the record's start year (NR-939).
     std::string realm;
     int32_t     since = 0;
     if (rec != nullptr)
     {
-        uint16_t             owner = owner_none;
-        std::vector<int32_t> seat;
-        for (const owner_change& ch : rec->changes)
+        const std::size_t           origin = static_cast<std::size_t>(cc.origin_region);
+        const std::vector<uint16_t> slice  = owner_slice_at(*rec, cc.founded_year);
+        const uint16_t              owner  = origin < slice.size() ? slice[origin] : owner_none;
+        if (owner != owner_none)
         {
-            if (ch.year > cc.founded_year) break; // ascending by year
-            if (ch.owner != owner_none)
+            uint16_t prev = owner_none;
+            for (const owner_change& ch : rec->changes)
             {
-                if (seat.size() <= ch.owner) seat.resize(static_cast<std::size_t>(ch.owner) + 1, -1);
-                if (seat[ch.owner] < 0) seat[ch.owner] = ch.region;
+                if (ch.year > cc.founded_year) break; // ascending by year
+                if (ch.region != origin) continue;
+                if (ch.owner != prev) since = ch.year;
+                prev = ch.owner;
             }
-            if (static_cast<int>(ch.region) == cc.origin_region && ch.owner != owner)
+            if (owner < rec->polity_name.size() && !rec->polity_name[owner].empty())
+                realm = rec->polity_name[owner];
+            else
             {
-                owner = ch.owner;
-                since = ch.year;
+                const std::vector<int32_t> seat = polity_seat_region(*rec, polity_first_region(*rec));
+                if (owner < seat.size() && seat[owner] >= 0
+                    && static_cast<std::size_t>(seat[owner]) < ss->regions.size())
+                    realm = ss->regions[static_cast<std::size_t>(seat[owner])].name;
             }
         }
-        if (owner != owner_none && owner < seat.size() && seat[owner] >= 0
-            && static_cast<std::size_t>(seat[owner]) < ss->regions.size())
-            realm = ss->regions[static_cast<std::size_t>(seat[owner])].name;
     }
 
     std::string s = "Chartered from " + city + "'s industry, in " + region;
