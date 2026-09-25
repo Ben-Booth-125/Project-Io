@@ -104,7 +104,9 @@ struct firm_goods
 /// carried by id, and only where the tongue could not coin, by its seat
 /// (`polity_seat_region`) -- the rule `polity_name_of` applies on the round,
 /// so one realm reads as one name on the board, the ticker and this line.
-/// "since" is the year that realm took the region on that record. A firm
+/// "since" is the realm's tenure of the region, walked back through the
+/// earlier records while the same polity id holds it (NR-939), and the realm
+/// clause reads "its own realm" when it names the nation's own (NR-941). A firm
 /// with no origin (none the search chartered) gets no sentence; a firm whose
 /// year no record spans, or whose ground no realm held, keeps the sentence
 /// short of the realm clause rather than inventing one.
@@ -118,44 +120,75 @@ std::string seat_origin_sentence(const world& w, const generation_report& rep,
         return {};
     const std::string& region = ss->regions[static_cast<std::size_t>(cc.origin_region)].name;
 
-    // The record whose span holds the year: the cradle's, latest first.
-    const era_timelapse* rec = nullptr;
+    // The record whose span holds the year: the cradle's, latest first. The
+    // cradle's three records are kept in that order so the tenure walk below
+    // can step to the one before.
+    const era_timelapse* recs[3] = {nullptr, nullptr, nullptr};
+    int                  at      = -1;
     for (const generation_report::body_entry& be : rep.bodies)
     {
-        for (const era_timelapse* t : {&be.industrialisation_timelapse, &be.exploration_timelapse,
-                                       &be.prehistory_timelapse})
+        const era_timelapse* order[3] = {&be.industrialisation_timelapse,
+                                         &be.exploration_timelapse, &be.prehistory_timelapse};
+        for (int j = 0; j < 3; ++j)
         {
+            const era_timelapse* t = order[j];
             if (t->changes.empty()) continue;
             if (cc.founded_year >= t->start_year && cc.founded_year <= t->start_year + t->years)
             {
-                rec = t;
+                at = j;
                 break;
             }
         }
-        if (rec != nullptr) break;
+        if (at >= 0)
+        {
+            for (int j = 0; j < 3; ++j) recs[j] = order[j];
+            break;
+        }
     }
+    const era_timelapse* rec = at >= 0 ? recs[at] : nullptr;
 
     // The holder of the origin region at the year -- the record's own slice,
     // the fold every reader of a record uses -- and the year it took it: the
-    // last change of that region's owner at or before the year. A region held
-    // from before the record opens changes AT its opening, so "since" floors
-    // at the record's start year (NR-939).
+    // last change of that region's owner at or before the year.
+    const std::size_t origin      = static_cast<std::size_t>(cc.origin_region);
+    const auto        taken_since = [origin](const era_timelapse& t, int32_t year) {
+        int32_t  since = t.start_year;
+        uint16_t prev  = owner_none;
+        for (const owner_change& ch : t.changes)
+        {
+            if (ch.year > year) break; // ascending by year
+            if (ch.region != origin) continue;
+            if (ch.owner != prev) since = ch.year;
+            prev = ch.owner;
+        }
+        return since;
+    };
     std::string realm;
     int32_t     since = 0;
     if (rec != nullptr)
     {
-        const std::size_t           origin = static_cast<std::size_t>(cc.origin_region);
         const std::vector<uint16_t> slice  = owner_slice_at(*rec, cc.founded_year);
         const uint16_t              owner  = origin < slice.size() ? slice[origin] : owner_none;
         if (owner != owner_none)
         {
-            uint16_t prev = owner_none;
-            for (const owner_change& ch : rec->changes)
+            since = taken_since(*rec, cc.founded_year);
+            // "SINCE" IS TENURE, NOT THE RECORD'S OPENING (Ben, 2026-09-25,
+            // NR-939; STARTUP.md § The seat). A region held from before a
+            // record opens changes AT its opening, so while `since` sits on the
+            // opening and the SAME polity id holds the region at the close of
+            // the record before, the walk reads that record too. A polity id
+            // is one table across the three records (a resumed span inherits
+            // its realms by id), so the step is well-defined; a different
+            // holder at the earlier close means the realm took it at the seam.
+            for (int j = at + 1; j < 3; ++j)
             {
-                if (ch.year > cc.founded_year) break; // ascending by year
-                if (ch.region != origin) continue;
-                if (ch.owner != prev) since = ch.year;
-                prev = ch.owner;
+                const era_timelapse* earlier = recs[j];
+                if (earlier == nullptr || earlier->changes.empty()) break;
+                if (since != recs[j - 1]->start_year) break;
+                const int32_t               close = earlier->start_year + earlier->years;
+                const std::vector<uint16_t> held  = owner_slice_at(*earlier, close);
+                if (origin >= held.size() || held[origin] != owner) break;
+                since = taken_since(*earlier, close);
             }
             if (owner < rec->polity_name.size() && !rec->polity_name[owner].empty())
                 realm = rec->polity_name[owner];
@@ -175,7 +208,14 @@ std::string seat_origin_sentence(const world& w, const generation_report& rep,
     // finish dated -- a fixture, or a save from before the pairing) keeps the
     // sentence short of any year: year 0 falls inside the Empires record's
     // span, and reading a realm off it would name a realm the firm never knew.
-    if (cc.founded_year != 0 && !realm.empty())
+    //
+    // ONE NAME WHEN THE TWO AGREE (Ben, 2026-09-25, NR-941). A nation carries
+    // its founding realm's coined name (BL-1089), so on ground the nation's own
+    // realm held the full form names it twice; the sentence then says "its own
+    // realm". The full form stays for ground some other realm held.
+    if (cc.founded_year != 0 && !realm.empty() && nat != nullptr && realm == nat->name)
+        s += ", its own realm since " + ui::lapse_year_label(since);
+    else if (cc.founded_year != 0 && !realm.empty())
         s += ", the realm of " + realm + " since " + ui::lapse_year_label(since);
     else if (cc.founded_year != 0)
         s += ", in " + ui::lapse_year_label(cc.founded_year);

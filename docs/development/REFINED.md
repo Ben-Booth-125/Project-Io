@@ -56,10 +56,13 @@ change built sprint-47 surfaces. Each is small; each is done before its item's l
   DONE 2026-09-25: both frontier passes gate the heavy stroke on both keys >= 0;
   history_lapse_hard.lua 0 golden failures; the 1000 CE capture shows heavy strokes between realms
   and thin coasts. R2 re-read; R3 (live) pending.
-- [ ] C3 BL-1099 (works chartered events): the origin sentence collapses on agreement — "under
+- [x] C3 BL-1099 (works chartered events): the origin sentence collapses on agreement — "under
   <nation>, its own realm since <year>" (NR-941 A) — and "since" walks back through the earlier
   records while the same polity id holds the region (NR-939 B); `seat_screen.cpp`, with
   `seat_pick.lua` and `history_lapse_works.lua` re-read. Before R5's live click.
+  DONE 2026-09-25: seat_pick.lua and history_lapse_works.lua 0 golden failures; the verify
+  world's briefing reads "…under Guashe These, its own realm since 400 BCE." (was "…the realm of
+  Guashe These since 1660 CE").
 - [ ] C4 BL-1085 (Begin retired into round six): a per-tick progress tap on the settle so the
   round-6 bar moves through tick 1 (NR-932 C; the cost itself is BL-1117, settle tick one cost).
 
