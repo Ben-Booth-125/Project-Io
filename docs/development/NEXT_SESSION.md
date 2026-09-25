@@ -29,7 +29,27 @@ to compile-check `src/world` through `build_harness.js` and to say so when the a
 `save_envelope_roundtrip` and each lane's harnesses, then Ben's live click** — assume nothing about a
 self-reported pass (memory `io-cold-review-catches-what-self-report-cannot`).
 
-## How to proceed on the returns
+## Wave 0 returned and is MERGED (2026-09-25, early hours)
+
+All five lanes are on main: G `7bf2bac0` (+ fix round `8889487a`), C `2c5c2746`, W2 `f954a0fc`,
+W1 `747a5bf4`, W3 `cc5e51d1`; bookkeeping `eb6c7563`, `38c5a42a`. Gates after G+C and after W2:
+determinism twice bit-identical on the pinned digits, both round trips green, Begin-adopts and
+seat-pick all pass, `span_seed_isolation` 25/26 (S0 fails by design — NR-931). The gate run on the
+full wave-0 tree (with W1's world content: purchases on 2 library seeds, laws on all 16) plus the
+exploration and industrialisation harnesses was running when this was written — read
+`scratchpad/gates_wave0.log` in the session's transcript or re-run `main_session_gates.sh`.
+Expect the pinned determinism digits to MOVE on that tree (world content moved): that is the
+re-bless, taken once, after the last world-mover. Wave 1 is in flight: lane I2 (BL-1090 → BL-1094)
+and lanes I1 (BL-1087 → 1088 → 1089) / I3 (BL-1106) in worktrees branched from `cc5e51d1`.
+
+Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
+accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
+NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936
+(Next not gated on the running round). Owed to the main session: the stale enactment comment at
+`hard_coded_world.cpp:~1936` (W3's finding), the 16-seed `player_seed_sweep --digest-check` for
+BL-1085's R1 (run it once, before the re-bless, with keep-awake held).
+
+## How to proceed on the returns (as planned at the launch)
 
 1. Read each lane's report and review (the workflow result JSON; `journal.jsonl` in the transcript
    dir if the result is truncated). A `fix-round` verdict means a follow-up agent on that branch
