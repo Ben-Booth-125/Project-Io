@@ -70,6 +70,17 @@ scratchpad's `digest_check_pre47.log`). If its rows equal the G+C rows (`digest_
 BL-1083 and BL-1085 moved nothing and BL-1085 R1 closes; the full wave-0 rows
 (`digest_check_wave0.log`) are then W1/W3's movement and the re-bless re-pins them. If they differ, bisect G (7bf2bac0) against C (2c5c2746) before any re-bless.
 
+**Wave 1 complete on main (04:40):** I1 (BL-1087 colour, BL-1088 name, BL-1089 nation) merged
+`66bdbc0f` after a fix round on its branch (pins derived on demand at the hand-over; the Begin/load
+derivation rasters each record over its own regions; a load never trusts another world's realm
+table; the ROSE start carried by id) and the second review's four low notes taken on main
+`f81d0d05`. BL-1089 is the sprint's ONE intended digest mover (nation names fold into the deep
+digest): world_determinism on the lane read seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC —
+confirm on main in `gates_I1.log`. NR-938 records the clash-rule wording the lane changed. Lane I3
+(BL-1106) merged `4a8848a7` + `84baaa65`. Wave 2: F3 (BL-1099/1100/1104) resumed on its worktree
+after the session limit; F1 (BL-1091/1092) and F2 (BL-1095) launched from `f81d0d05` with kinds 23
+and 24 pre-assigned (20 inherited, 21 works_chartered, 22 rung_crossed are I1's and F3's).
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936
