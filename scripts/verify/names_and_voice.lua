@@ -93,7 +93,10 @@ for _, k in ipairs(kinds) do
             verify.expect(string.find(line, "unnamed", 1, true) == nil,
                           "the " .. label .. " line names its parties off the record: " .. line)
             if label == "schism" then
-                verify.expect(string.find(line, "creed", 1, true) ~= nil,
+                -- The phrase, not the word: "an unnamed creed" carries "creed" too, so the
+                -- fallback branch would pass the check it exists to fail (the cold review).
+                verify.expect(string.find(line, "and its creed, ", 1, true) ~= nil
+                              and string.find(line, "unnamed creed", 1, true) == nil,
                               "the schism line names the creed as well as both parties: " .. line)
             end
         end
@@ -116,6 +119,16 @@ local marks = verify.history_board_marks()
 verify.expect(marks == 0,
               "at " .. first5 .. " no inherited realm carries the entry mark ("
               .. marks .. " marked; -1 means the round never drew)")
+-- A second read inside the span: at the first year every mark is zero by identity (the
+-- lagged slice IS the first slice), so the claim is only tested a twelfth of the way in,
+-- where the unclamped slice used to mark every inherited realm (the cold review).
+local inside5 = first5 + math.floor((last5 - first5) / 12)
+verify.history_year(inside5)
+verify.frames(2)
+local marks_inside = verify.history_board_marks()
+verify.expect(marks_inside == 0,
+              "at " .. inside5 .. " (a twelfth into round 5) no inherited realm carries the entry mark ("
+              .. marks_inside .. " marked)")
 
 -- 4. The clipping ledger over those frames.
 verify.expect_no_clipping("names_and_voice")

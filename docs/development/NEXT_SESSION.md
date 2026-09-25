@@ -55,6 +55,14 @@ civilisation diamond carried across the seam); its two capture scripts and the 1
 scratchpad: `digest_check_wave0.log`). NR-937 asks Ben whether a hard realm's coast draws heavy
 and whether 10% of people (off at 6%) is the pin.
 
+**The re-bless reading (02:56):** `player_seed_sweep --digest-check` on the full wave-0 tree: 0/16 rows
+PASS — every library seed moved on all four digests (the laws on all 16 from BL-1102; purchases on 25 and
+38 from BL-1096); world_determinism's seed B also reads 4F7BBD76AEEF3431 on main now (was
+5ECE9A097D14DACE at v0.1.25); exploration R3b +400 tribute. THE RE-BLESS IS TAKEN ONCE, after lane I1
+(realm becomes nation, which renames nations and may move any digest that folds names) is merged:
+re-pin the 16 sweep rows, R3b's counters, world_determinism's seed B, the seed library, and any
+golden that reads laws or names.
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936

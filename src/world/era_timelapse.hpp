@@ -250,12 +250,16 @@ struct era_timelapse
     /// `creed_name`, and `polity_creed` is polity id -> the creed that realm
     /// adopted (-1 = none), so a `schism` line can name the creed the seceding
     /// people walked out on — the parent's, which no event carries. Filled by
-    /// `as_timelapse` from the sim's own lists, IN INDEX ORDER, so a resumed
-    /// span's numbering continues (history_sim.hpp's civilisation/creed copy);
-    /// read by the ticker and by nothing in world/*. Every name is coined by
-    /// the sim from a generated tongue — never an Earth name. Empty on the
-    /// migration record and on every body the era never ran for
-    /// (save_game_version 22).
+    /// `as_timelapse` from the sim's own lists, IN INDEX ORDER. THE TABLES ARE
+    /// THIS RECORD'S OWN: a resumed span that restarts the civilisation and
+    /// creed lists at zero (the Exploration resume does, BL-1049) numbers its
+    /// events against its own tables, so an index is meaningful only within
+    /// the record that carries it, and a `polity_creed` row on a later round
+    /// names that round's creed list, never round 4's. The prose degrades
+    /// honestly where a table is empty ("an unnamed creed"). Read by the ticker
+    /// and by nothing in world/*. Every name is coined by the sim from a
+    /// generated tongue — never an Earth name. Empty on the migration record
+    /// and on every body the era never ran for (save_game_version 22).
     std::vector<std::string> civilisation_name;
     std::vector<std::string> creed_name;
     std::vector<int32_t>     polity_creed;
