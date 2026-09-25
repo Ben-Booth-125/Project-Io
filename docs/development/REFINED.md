@@ -42,10 +42,14 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
 Ben's close form carried BL-1084 and wave 3 to sprint 48 and ruled the open calls; four rulings
 change built sprint-47 surfaces. Each is small; each is done before its item's live click.
 
-- [ ] C1 BL-1083 (span seeds per round): remove the Culture round's Reroll (NR-931 C, STARTUP.md
+- [x] C1 BL-1083 (span seeds per round): remove the Culture round's Reroll (NR-931 C, STARTUP.md
   § Each pass round is rerollable); `span_seed[0]` stays folded, zero-neutral. R3 is re-read as
   "the Culture round offers no reroll" and `span_seed_isolation` S0 re-scoped to assert the walk is
   seed-free; R7 closes with it (the per-span rule is written).
+  DONE 2026-09-25: the Reroll row carries "The migration follows the ground. Reroll the Life round
+  to change it." at the button's height; `verify.wizard_span_seed(k)` added; span_seed_isolation
+  ALL PASS (S0 re-read), history_lapse_press.lua 0 golden failures; R3 and R7 complete, R6's live
+  text re-read.
 - [ ] C2 BL-1090 (hard borders by people share): the heavy stroke draws on edges between two
   different realms only, never the coast (NR-937 B); the 10% on / 6% off pin is unchanged. Re-run
   its capture scripts.

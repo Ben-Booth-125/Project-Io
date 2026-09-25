@@ -1327,6 +1327,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return std::make_tuple(m_wiz_round, wizard_round_count);
     });
 
+    // THE SEED A LAPSE ROUND'S REROLL MOVES (BL-1083; NR-931). Reads the wizard's
+    // pending `span_seed[k]` (0 the migration .. 3 Industrialisation) and nothing
+    // else. Under --verify a rerun adopts the harness world's record, so a
+    // record left on the round cannot tell a reroll from a no-op; the seed can.
+    // It is how a script proves round N's Reroll moved slot N alone, and that
+    // the Culture round, which carries no Reroll, moved nothing. -1 off range.
+    v.set_function("wizard_span_seed", [this](int k) -> long long {
+        if (k < 0 || k >= 4) return -1;
+        return static_cast<long long>(m_pending_world_params.span_seed[k]);
+    });
+
     // A LAPSE ROUND'S pass, run from the same call site arriving on the round
     // uses (BL-829, generalised to two lapse rounds by BL-860, to three by
     // BL-946). Under --verify the run is SYNCHRONOUS — it adopts the record

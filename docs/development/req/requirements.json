@@ -7334,13 +7334,14 @@
     },
     {
      "id": "R3",
-     "status": "failed",
+     "status": "complete",
      "verification": [
-      "headless: the same check on the migration record"
+      "headless: span_seed_isolation S0",
+      "script: history_lapse_press.lua A4"
      ],
-     "requirement": "span_seed[0]=1 changes the migration (the Culture round's record differs from the zero build).",
+     "requirement": "span_seed[0]=1 leaves the migration record identical (the walk consumes no seed) while Empires, Exploration and Industrialisation differ -- the slot stays folded and zero-neutral -- and the Culture round carries no Reroll (re-read on Ben's ruling, 2026-09-25, NR-931 C).",
      "notes": "",
-     "result_metric": "span_seed[0]=1 leaves the migration record byte-identical (the colonisation walk consumes no seed — COLONISATION.md § No actor); only daughter-culture names, tongue drift, aggression and the furnace lag move, so every later span differs. Left failing deliberately (row S0); NR-931 is Ben's call on what a Culture reroll means."
+     "result_metric": "2026-09-25 (Release, main 0953311a + the four close-form tasks): span_seed_isolation ALL PASS, S0 four rows PASS -- \"migration record is identical to the zero build's\", Empires / Exploration / Industrialisation \"differs\"; history_lapse_press.lua 0 golden failures, A4 \"the Culture round has no Reroll: a press on its slot moves no seed (span_seed[0] = 0)\" and A6 \"round 4's Reroll moved Empires' seed alone\" through the new verify.wizard_span_seed binding (a rerun under --verify adopts the harness record, so only the seed tells a reroll from a no-op). Capture press_03_culture_no_reroll.png: the line \"The migration follows the ground. Reroll the Life round to change it.\" sits in the Reroll row; Back/Next unmoved."
     },
     {
      "id": "R4",
@@ -7370,13 +7371,13 @@
      "verification": [
       "visual: Ben's live click on the Release build"
      ],
-     "requirement": "LIVE: reroll round 5, Back to round 4, Next - round 4's 1200 board and frame are unchanged and round 5 opens on them; reroll round 3 and the migration map visibly changes.",
+     "requirement": "LIVE: reroll round 5, Back to round 4, Next - round 4's 1200 board and frame are unchanged and round 5 opens on them; round 3 (Culture) shows no Reroll, only the line pointing to the Life round's (NR-931 C).",
      "notes": "",
      "result_metric": ""
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: docs/ui/STARTUP.md",
       "code: docs/generation/seed_library.json; tools/verify/harness_params.hpp",
@@ -7384,7 +7385,7 @@
      ],
      "requirement": "STARTUP.md § Each pass round is rerollable and § Rounds stay causal state the per-span rule; the seed library entries carry the four seeds (zero) where the schema records era_seed; harness fixtures that set era_seed still build.",
      "notes": "",
-     "result_metric": "STARTUP.md § Each pass round is rerollable now states the seed-free walk and names NR-931; seed_library.json has no era_seed field (nothing to carry); fixtures build. Closes with NR-931."
+     "result_metric": "2026-09-25: STARTUP.md § Each pass round is rerollable states the per-span rule and the ruling (the Culture round carries no Reroll; span_seed[0] folded, zero-neutral), § Rounds stay causal points to it; seed_library.json has no era_seed field (nothing to carry); harness fixtures build (span_seed_isolation, world_determinism COMPILE_OK this session)."
     }
    ]
   },

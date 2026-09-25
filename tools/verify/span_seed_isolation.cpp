@@ -36,8 +36,12 @@
 //
 // ROWS.
 //   C1  zero-again == zero on all four records (the control).
-//   S0  slot 0 = 1: the migration differs                       (R3 of the group)
-//       and so do Empires, Exploration, Industrialisation.
+//   S0  slot 0 = 1: the migration is IDENTICAL -- the walk consumes no seed
+//       (COLONISATION.md sec No actor) -- while Empires, Exploration and
+//       Industrialisation differ, because the slot still folds into the
+//       daughters' coinings and temper (R3 of the group, re-read on Ben's
+//       2026-09-25 ruling, NR-931: the Culture round carries no Reroll, and the
+//       slot stays folded and zero-neutral).
 //   S1  slot 1 = 1: the migration is identical; Empires, Exploration and
 //       Industrialisation differ.
 //   S2  slot 2 = 1: the migration AND Empires are identical; Exploration
@@ -264,29 +268,25 @@ int main(int argc, char** argv)
               && zero.changes[3] > 0,
           "C2 every span actually ran and left a non-empty record on the zero build");
 
-    expect_reseeded_from(zero, slot[0], 0, "S0 span_seed[0]=1:");
+    expect_reseeded_from(zero, slot[0], 1, "S0 span_seed[0]=1 (the walk is seed-free):");
     expect_reseeded_from(zero, slot[1], 1, "S1 span_seed[1]=1:");
     expect_reseeded_from(zero, slot[2], 2, "S2 span_seed[2]=1:");
     expect_reseeded_from(zero, slot[3], 3, "S3 span_seed[3]=1:");
     // E1 — the legacy term reaches every history span and never the migration.
     expect_reseeded_from(zero, era, 1, "E1 era_seed=1 (legacy):");
 
-    // THE READING BEHIND AN S0 MIGRATION FAIL, so the line is not a mystery.
-    // `run_settlement`'s seed is the only place slot 0 is folded, and inside
-    // that pass the seed reaches the daughters' tongue drift, coined names and
-    // aggression (`derive_daughter_culture`) and the furnace lag
-    // (`tag_furnace`) — never the walk. Founding years, the plurality culture
-    // and the split years, which are ALL the migration record holds, come
-    // from the colonisation diffusion, which COLONISATION.md § No actor pins
-    // as a deterministic function of upstream scalars and never a roll. So a
-    // slot-0 reroll forks every later span (aggression is what the Empires
-    // sim reads) while the Culture round's own record stays byte-identical.
-    // Whether the migration should carry dice is a design call, not a fold.
-    if (zero.d[0] == slot[0].d[0])
-        std::printf("\n  NOTE: S0's migration record is identical under span_seed[0]=1 because the\n"
-                    "        colonisation walk consumes no seed (COLONISATION.md § No actor); the\n"
-                    "        migration's seed reaches daughter-culture names, tongue drift and\n"
-                    "        aggression, and the furnace lag -- which is why every later span moved.\n");
+    // WHY S0 EXPECTS THE MIGRATION UNMOVED. `run_settlement`'s seed is the only
+    // place slot 0 is folded, and inside that pass the seed reaches the
+    // daughters' tongue drift, coined names and aggression
+    // (`derive_daughter_culture`) and the furnace lag (`tag_furnace`) -- never
+    // the walk. Founding years, the plurality culture and the split years,
+    // which are ALL the migration record holds, come from the colonisation
+    // diffusion, which COLONISATION.md § No actor pins as a deterministic
+    // function of upstream scalars and never a roll. So slot 0 forks every
+    // later span (aggression is what the Empires sim reads) while the
+    // migration's own record stays byte-identical -- which is why the Culture
+    // round carries no Reroll (Ben, 2026-09-25, NR-931). A migration that
+    // MOVES under slot 0 means the walk has started consuming the seed.
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");

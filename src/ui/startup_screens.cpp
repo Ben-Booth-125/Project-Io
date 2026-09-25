@@ -2028,8 +2028,24 @@ void app::draw_generation_screen()
         const bool  last  = (m_wiz_round == wizard_round_count - 1);
         const float bar_w = ImGui::GetContentRegionAvail().x;
 
+        // THE CULTURE ROUND CARRIES NO REROLL (Ben, 2026-09-25, NR-931; STARTUP.md
+        // § Each pass round is rerollable). The colonisation walk consumes no seed
+        // (COLONISATION.md § No actor), so a reroll here could re-coin the peoples
+        // but never move the map it shows -- a button that promises a different
+        // migration and cannot give one. The Life round's reroll is how a player
+        // rejects the migration, and the line says so in the button's place.
+        // `span_seed[0]` stays folded and zero-neutral; no control moves it.
+        // The line holds the button's row height, so Back and Next sit where they
+        // sit on every other pass round (the footer geometry scripts press).
+        const bool culture_round = lapse_round && lapse_index == 0;
+        if (culture_round)
+        {
+            const float row_y = ImGui::GetCursorPosY();
+            dim_text("The migration follows the ground. Reroll the Life round to change it.");
+            ImGui::SetCursorPosY(row_y + 34.0f + style.ItemSpacing.y);
+        }
         // Reroll full-width and first — it is the wizard's main verb now.
-        if (ImGui::Button("Reroll##wizroll", {bar_w, 34.0f}))
+        else if (ImGui::Button("Reroll##wizroll", {bar_w, 34.0f}))
         {
             if (planetology_round)
             {

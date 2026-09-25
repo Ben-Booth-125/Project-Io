@@ -116,17 +116,21 @@ verify.click(TRANSPORT_X, TRANSPORT_Y)
 verify.frames(3)
 verify.capture("press_02_after_restart")
 
--- A4 -- REROLL IS A REACHABLE PRESS and re-runs the pass rather than clearing
--- the round. Since 2026-09-09 it also advances a seed of the round's own --
--- world_params::span_seed[lapse_index] since 2026-09-24 (BL-1083), era_seed
--- before that -- so it plays the SAME ground through a different four thousand
--- years; what it must never do is disturb the rounds above it, which is why
--- the span got a seed of its own rather than folding the roll into params.seed.
+-- A4 -- THE CULTURE ROUND CARRIES NO REROLL (Ben, 2026-09-25, NR-931; STARTUP.md
+-- sec Each pass round is rerollable). The walk consumes no seed, so a reroll
+-- here could never move the map; the Life round's reroll is how a player
+-- rejects the migration. A press on the slot where Reroll sits on every other
+-- pass round lands on the explanatory line: span_seed[0] stays at 0, the round
+-- stays put and keeps its record. (Under --verify a rerun adopts the harness
+-- world's record, so only the seed can tell a reroll from a no-op.)
 verify.click(REROLL_X, REROLL_Y)
 verify.frames(6)
-verify.expect(verify.history_powers() > 0,
-              "Reroll re-runs round 3's pass and leaves a record on the round")
-verify.capture("press_03_after_reroll")
+verify.expect(verify.wizard_span_seed(0) == 0,
+              "the Culture round has no Reroll: a press on its slot moves no seed (span_seed[0] = "
+              .. verify.wizard_span_seed(0) .. ")")
+verify.expect(select(1, verify.wizard_round()) == 2 and verify.history_powers() > 0,
+              "the press leaves the wizard on round 3 with its record")
+verify.capture("press_03_culture_no_reroll")
 
 -- ── BL-860: THE HISTORY IS ITS OWN ROUND ──────────────────────────────────
 --
@@ -186,6 +190,9 @@ verify.click(REROLL_X, REROLL_Y)
 verify.frames(6)
 verify.expect(verify.history_powers() > 0,
               "Reroll re-runs round 4's pass and leaves a record on the round")
+verify.expect(verify.wizard_span_seed(1) == 1 and verify.wizard_span_seed(0) == 0,
+              "round 4's Reroll moved Empires' seed alone (span_seed[0] "
+              .. verify.wizard_span_seed(0) .. ", [1] " .. verify.wizard_span_seed(1) .. ")")
 verify.capture("press_05_round5_after_reroll")
 
 -- ── BL-946: EXPLORATION IS THE THIRD LAPSE ROUND ──────────────────────────
