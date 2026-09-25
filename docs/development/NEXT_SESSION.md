@@ -113,6 +113,23 @@ scripts running on the merged tree in `gates_F1F2.log` / `scripts_F1F2.log` (the
 Conflicts on the merge were insertion collisions only (kinds 21-24 in order; verify_api.cpp and
 history_lapse.hpp resolved three-way, F1's block then F2's).
 
+**F1/F2 FIX ROUNDS MERGED (07:25):** gates on the F1+F2 tree green with the digests unmoved
+(`gates_F1F2.log`); ten of eleven scripts green, the eleventh (recipe_workforce.lua) went red
+because verify.new_world really rebuilds now and the pinned seed's facility has no inputs -- the
+old pass was one tick of leftover settle stock; the script stocks its inputs itself through the
+new `verify.stock_building_inputs` and is green (`b7726c90`). F1's fix round `cddf6c08` (re-review
+merge; NR-942 for the kin-dash threshold) merged `23bc50b3`; F2's `3eea9af0` merged `88a080f1`
+with one medium left, fixed on main `894e736e` (a re-binding cut a standing treaty's trade line
+for good: `year_trade_due` carried at the refusal, the cut scoped to the same pair; cold-reviewed,
+merge). BL-1112 (ties inherited across the 1660 seam) filed from F2's documented gap. All lane
+worktrees pruned. **THE RE-BLESS is measuring** (main session, background, keep-awake held):
+`player_seed_sweep --digest` on the 16 seeds (shipped arc), then `--digest-check --arc legacy`,
+then the library sweep + `seed_library.js --check`; exploration_sim_harness R3b's counters read
+from a rebuilt harness. Logs `rebless_measure.log`, `rebless_legacy.log`, `rebless_library.log`
+in the scratchpad. Re-pin the shipped table (and the legacy one only if it moved), R3b's pinned
+counters with the cause named, `seed_library.js --bless`; rebuild the harnesses; `--digest-check`
+both arcs green; one commit.
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936

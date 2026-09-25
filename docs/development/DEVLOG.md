@@ -81,6 +81,15 @@ workflow (5 + 5).
   1660 CE') -- two lanes composing, each right alone. The I1 identity checks on main all green and
   the 16-seed sweep re-read into BL-1087 R5 (75 / 5 pinned clashes, was 101 / 18 over the 1960
   raster). Twenty-two stale worktrees pruned; header_graph is comparable again (329 dangling).
+- **F1 and F2 merged** `46e244d8` / `2ccee936` (06:50) after their cold reviews, both fix-rounds on
+  small findings; the fix rounds ran as one workflow and merged `23bc50b3` / `88a080f1`. The one
+  finding worth the telling: F2's landings leaked onto round 4 (seat_captured has no Exploration
+  gate) -- now gated on a sail in the record. The re-review of F2's fix found the re-binding cut
+  a standing treaty's trade line for good; fixed on main `894e736e` (the line is carried at the
+  refusal to the treaty's own end; cold-reviewed merge). recipe_workforce.lua went red when
+  verify.new_world became a real rebuild and turned out to have been passing on one tick of
+  leftover settle stock; it now stocks its inputs (`b7726c90`). Filed BL-1112 (ties inherited
+  across the seam), NR-941 (the doubled origin sentence), NR-942 (the kin-dash threshold).
 
 ### Open
 - Ben's five live clicks (BL-1068, 1072, 1073, 1076, 1080) — he opened the Release build and walked into
