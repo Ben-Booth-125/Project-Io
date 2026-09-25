@@ -7824,7 +7824,7 @@
       "manual: the CVD check recorded in the item"
      ],
      "requirement": "Pinned clashes are counted across the 16 curated seeds by a history_sweep column and the reading written into the item; the new palette's colour-deficiency safety is checked against the twelve-slot nation table's reasoning (presentation.cpp:371-377) and the check recorded.",
-     "notes": "",
+     "notes": "REVIEW 2026-09-25: the 101 / 18 pinned-clash reading was taken over the 1960 raster the fix round retired (the column now rasters each record over its own regions); the number predates the per-record raster and is owed a re-run of history_sweep over the 16 seeds on the merged tree.",
      "result_metric": "history_sweep's BL-1087 block on the 16 curated seeds (first session): 12 families on every world; pinned clashes 101 pooled at the 1200 seam (0-20 per seed), 18 at 1660, 14 of 16 worlds with at least one; 119 re-slotted, 594 dead-slot inheritances, 0 spills. CVD: tools/session/cvd_palette_check.js (Machado 2009 severity 1.0, CIE76) -- wedge centres 13.6-17 dE deutan / 8.7-36 protan for 4-8 families, the first three kin offsets 10-17 dE up to 6 families, against the nation table's own worst pairs 7.1 / 9.0 / 10.8. Written into the item's design. FIX ROUND (2026-09-25, the cold review): the sweep's column now rasters each record over its own regions (the first region_stride anchors), as the rounds do; the 101 / 18 reading above was taken over the 1960 raster and is to be re-read the next time history_sweep runs on the library (not re-run in the fix round: the sweep is a Lua-basket harness, minutes per seed)."
     },
     {

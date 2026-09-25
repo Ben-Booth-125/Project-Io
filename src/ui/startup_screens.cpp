@@ -687,7 +687,11 @@ void app::poll_wizard_history()
         // record (only its pins move); a landed one is re-coloured whole.
         // The chain stops at one: the successor's own successor is re-pinned
         // when the successor lands, from a record that is whole by then.
-        if (i + 1 < wizard_lapse_round_count && !m_wiz_history[i + 1].empty()
+        // The successor is re-pinned whether or not its tap has published yet
+        // (the second cold review): a rapid double-Next has the successor
+        // launched but empty when this lands, and it must not wait for its own
+        // landing to learn its pins.
+        if (i + 1 < wizard_lapse_round_count
             && !m_wiz_history[i].owners_are_cultures)
         {
             derive_lapse_for_handover(m_wiz_history[i], i + wizard_planetology_round_count + 1,
@@ -2264,11 +2268,16 @@ bool app::pin_realm_colours_from_wizard(const generation_report* rep)
     // (a cold Begin, `--autostart`), and the report path below fills in.
     for (int i = wizard_lapse_round_count - 1; i >= 1; --i)
     {
+        // A ROUND STILL RUNNING holds a partial record (the tap's), and a
+        // partial realm table is not the one the player watched: on the
+        // vouched Begin path the carve would otherwise wear round 6's
+        // half-built table instead of round 5's whole one (the second cold
+        // review). Only a LANDED round is read here.
+        if (m_wiz_history_future[i].valid()) continue;
         // A landed round the player never drew is derived here as at the
         // hand-over: its slots are the derivation's.
-        if (!m_wiz_history_future[i].valid())
-            derive_lapse_for_handover(m_wiz_history[i], i + wizard_planetology_round_count + 1,
-                                      m_wiz_surface, m_wiz_terrain);
+        derive_lapse_for_handover(m_wiz_history[i], i + wizard_planetology_round_count + 1,
+                                  m_wiz_surface, m_wiz_terrain);
         const ui::history_lapse& h = m_wiz_history[i];
         if (h.empty() || !h.derived() || h.owners_are_cultures || h.polity_slot.empty()) continue;
         // THE RECORD MUST BE THIS WORLD'S (the cold review's finding on

@@ -387,7 +387,8 @@ plurality people, read from the record's culture changes. **Slots are pinned:** 
 colour slot lives on the record from the round that seats it, the greedy table fills only the
 slots no pin holds, and a **clash** — two *pinned* realms the new record makes neighbours while
 they share a slot — re-slots the one with the smaller people share at the round's opening step.
-A fresh realm cannot clash: it is coloured around the pins it touches, so the only pair the walk
+A fresh realm cannot clash except on a spill — the palette exhausted around it, where it shares a
+neighbour's slot and no re-slot happens: it is coloured around the pins it touches, so the only pair the walk
 can find sharing a slot is two pins that were never neighbours in the record that slotted them
 (the 2026-09-24 ruling's "pinned/fresh" wording named a case the walk never produces; the
 pinned/pinned reading is the one the rule was built and measured on — 2026-09-25, on the cold
