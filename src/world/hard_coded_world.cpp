@@ -491,13 +491,19 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
     // the bar needs the PROPORTIONS right, not the machine's absolute speed,
     // so this is re-measured when a pass's cost moves materially, not per run.
     //
-    // WHAT THE MEASUREMENT FOUND. The world build after the spans is dominated
+    // WHAT THE MEASUREMENT FOUND. The world build after the spans was dominated
     // by ONE pass: `generate_roads` ran 30-57 s of a 40-70 s build, nearly all
     // of it the village spur walk (~5,900 villages at ~4.7 ms of A* each on
     // seed 28). Next come the old-road stamp (4-7 s, ~1,350-3,300 corridors)
     // and `generate_nations`' density ripple (2-4 s, tiles x centres). Those
     // three are the passes that report progress within themselves; every other
     // step is under a second.
+    //
+    // RE-MEASURED 2026-09-25 (sprint 48, indicative on a loaded machine) after
+    // BL-1119 (the roads tree, spurs only at 40,000 heads) and BL-1117 (the
+    // nearest anchor as one field per body): roads 7-22 s, ~2.1x step 9 in the
+    // same runs; the old-road stamp 7-15 s, ~2.3x step 9; the settle 14-21 s
+    // (its first tick no longer floods the body once per anchor).
     static constexpr int64_t cost[generation_stage_label_count] = {
         1,     //  0 Preparing
         90,    //  1 Forming the system
@@ -509,12 +515,12 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
         12,    //  7 Founding regions (the settlement pass)
         1600,  //  8 Running the ancient era
         3500,  //  9 Drawing borders (generate_nations .. the province anchors)
-        38000, // 10 Laying roads (generate_roads)
+        7500,  // 10 Laying roads (generate_roads; 38000 before BL-1119)
         150,   // 11 Placing companies
         150,   // 12 Finishing (markets, the other bodies, laws, garrisons)
         1500,  // 13 Running the exploration age
         2000,  // 14 Running the Industrialisation span
-        5500,  // 15 Tracing the old roads (stamp_history_roads)
+        8000,  // 15 Tracing the old roads (stamp_history_roads)
         // The two steps finish_campaign_world runs after generation (BL-1085),
         // measured by `gen_step_costs --finish 0 28` on the same footing
         // (Release, 2026-09-24): the search 28,801 / 12,623 ms over 13
@@ -522,7 +528,7 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
         // settle 113,922 / 68,832 ms -- of which ONE tick is 50-90 s and the
         // rest ~1.5 s each (the `[finish_campaign_world]` line names it).
         20000, // 16 Searching the landscape (build_stockpile_budget .. apply)
-        90000, // 17 Proving the field (run_settle, twelve ticks)
+        18000, // 17 Proving the field (run_settle, twelve ticks; 90000 before BL-1117)
     };
     if (label_index < 0 || label_index >= generation_stage_label_count) return 0;
     if (label_index == 8 && !era_minus_one_enabled(params)) return 1;

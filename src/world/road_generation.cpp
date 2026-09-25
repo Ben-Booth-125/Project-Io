@@ -401,7 +401,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
             ++st.villages_below_floor;
     }
 
-    constexpr long long kBorderUnitsPerNation = 12;
+    constexpr long long kBorderUnitsPerNation = 24; // fitted 2026-09-25: 21 / 18 / 45 on seeds 0 / 28 / 46 (BL-1119)
     long long units_done = 0, units_total = 0;
     {
         for (const auto& [nation, members] : by_nation)

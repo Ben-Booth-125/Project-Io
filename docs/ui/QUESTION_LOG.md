@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**57 surfaces** — 8 settled, 49 awaiting Ben's wording.
+**58 surfaces** — 8 settled, 50 awaiting Ben's wording.
 
 ---
 
@@ -389,6 +389,14 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 **Because:** Coastal water and lakes carry an owner, derived from the shore that claims them; open ocean structurally does not (PROVINCES.md § Who owns water). That asymmetry is the load-bearing shape of the water model, and it was invisible on every surface the game had — the hover card reported terrain and habitability and said nothing about title, no lens colours ground by owning nation, and clicking water did not move the Selection band at all. A claim nobody can look at can only be trusted, which is not the standard this project holds a generated world to. It earns its space by reusing the tile element rather than adding one: same header, same hex ring (which is where a shoreline reads at all), same action grid; only the centre column forks, and it forks because four of the five ground sections — buildings, deposits, resources, population — ask questions about ground there is none of. The single most important word on it is 'Unowned', stated positively: an empty owner row and an owner row reading 'Unowned' cost the same pixels and mean opposite things, the first looking like the panel failed and the second being the model's central assertion.
 
 *Demanded by BL-785 · `src/ui/selection_panel.cpp` · id `water_tile_selection`*
+
+### Round 6 tail caption (under the playing Industrialisation map)
+
+**Answers:** The map is already playing, but the world I will be handed is still being built - what step is it on?
+
+**Because:** Round 6 starts playing at the span's close while the same worker builds the tail behind it (borders, roads, companies, the landscape search, the settle), so without a word the player cannot tell a playing lapse from a finished round, or why Begin waits. One caption line under the map, naming the ONE step under way ("Drawing borders", "Laying roads", "Searching the landscape", "Proving the field") and nothing else, is the least surface that answers it; it takes no space from the map or the board, and it disappears when the world lands. STARTUP.md § Round 6 specifies it.
+
+*Demanded by BL-1084, BL-1068 · `src/ui/startup_screens.cpp` · id `wizard_round6_tail_caption`*
 
 ### New World wizard - round 5, Exploration
 

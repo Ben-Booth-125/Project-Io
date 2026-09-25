@@ -50,11 +50,25 @@ the file is 3,027 lines now. Re-read before trusting any `:NNN`.
 - [ ] K3 The reroll path, measured. Release, seeds 0 and 28: holding and copying a closed round's
   cursor against replaying from the Life gate with the fixed span seeds. The cheaper ships (R3).
   consumes: K1.
-- [ ] K4 The wizard moves the world. The Life round builds the real gate world into slot 0;
+- [x] K4 The wizard moves the world. The Life round builds the real gate world into slot 0;
   `launch_wizard_history_run(i)` runs only stage i from slot i-1; `invalidate_wizard_rounds_below`
   drops and stale-marks; **Next waits** (disabled while the round runs, a hover naming what it waits
   on); Begin adopts round 6's slot; round 6 plays at the tap's final publish (R4-R7). Selene and
   Pallas move into Finishing; report any digest that shift moves. consumes: K1, K3's choice.
+  DONE 2026-09-25 (a0e9c9a2, merged b7aeee9a): held-copy slots [0..3] (gate + each round's close),
+  one build at a time, Next disabled with a hover while a round builds, one reroll function;
+  the cursor review's three fixes folded in (per-run progress plan, no in-stage flag reads,
+  resume_sea_legs nulled, content folds + negative controls). Lane readings: autostart-adopt
+  state hash EF627D3AA20F98C8 == cold; peak memory 3.4 GB, dominated by round 6's settled world
+  (slots ~118 MB). Selene/Pallas were already in the tail: no shift. begin_adopts_check's two
+  "finished ONCE" rows failed on main too (it counted every finish log line) — the checker now
+  counts the summary line only. Owed: a question_log entry for round 6's tail caption; the live
+  click (R4-R7). Main-session gates and a cold review running.
+- [x] D5 BL-1119 round 3 (6177cb83, merged 2775ef57): only layable links enter the tree (NR-945);
+  a village is on the network only when its road reaches a town (25-40% had not); R5f live, R5g
+  new; road_generation_harness 21 of 21. NR-944 grew (seed 46: 83 of 174 pairs lay no border
+  link). Loading-bar weights applied in the main session: roads 38,000 -> 7,500, old-road stamp
+  5,500 -> 8,000, the settle 90,000 -> 18,000, `kBorderUnitsPerNation` 12 -> 24.
 - [ ] K5 Cold review and its fix round (R8).
 
 **Roads — BL-1119 (roads tree and detour).**

@@ -868,6 +868,19 @@
     "src/world/spawn_seat.cpp"
    ],
    "status": "drafted"
+  },
+  "wizard_round6_tail_caption": {
+   "surface": "Round 6 tail caption (under the playing Industrialisation map)",
+   "answers": "The map is already playing, but the world I will be handed is still being built - what step is it on?",
+   "because": "Round 6 starts playing at the span's close while the same worker builds the tail behind it (borders, roads, companies, the landscape search, the settle), so without a word the player cannot tell a playing lapse from a finished round, or why Begin waits. One caption line under the map, naming the ONE step under way (\"Drawing borders\", \"Laying roads\", \"Searching the landscape\", \"Proving the field\") and nothing else, is the least surface that answers it; it takes no space from the map or the board, and it disappears when the world lands. STARTUP.md § Round 6 specifies it.",
+   "backlog_item": [
+    "BL-1084",
+    "BL-1068"
+   ],
+   "files": [
+    "src/ui/startup_screens.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

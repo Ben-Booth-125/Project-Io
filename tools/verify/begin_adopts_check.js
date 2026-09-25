@@ -68,7 +68,12 @@ const cold  = run('--autostart');
 
 // BL-1085: where the finish ran, read off the log's order. One finish per
 // world; in the adopt run it precedes Begin, in the cold run it follows it.
-const finishes = (s) => (s.match(/\[finish_campaign_world\]/g) || []).length;
+// Count the ONE line a finish prints exactly once -- its summary, "[finish_campaign_world]
+// searched". The finish also prints per-tick timing lines under the same prefix (the slowest
+// tick's laps, each tick's ms, the flood fields alive: BL-1117), so counting the bare prefix
+// read one finish as several and failed both rows on a correct build.
+const FINISH = '[finish_campaign_world] searched';
+const finishes = (s) => s.split(FINISH).length - 1;
 const before = (s, a, b) => { const i = s.indexOf(a), j = s.indexOf(b); return i >= 0 && j >= 0 && i < j; };
 
 const checks = [
@@ -79,11 +84,11 @@ const checks = [
   ['Begin adopted (logged)', /\[begin\] adopted the wizard's world/.test(adopt.out)],
   ['Begin never built: no [gen budget] in the adopt run', !/\[gen budget\]/.test(adopt.out)],
   ['adopt run finished ONCE, inside round 6 (before Begin)',
-   finishes(adopt.out) === 1 && before(adopt.out, '[finish_campaign_world]', '[begin] adopted')],
+   finishes(adopt.out) === 1 && before(adopt.out, FINISH, '[begin] adopted')],
   ['cold run exited 0', cold.rc === 0],
   ['cold run built (logged)', /\[begin\] no wizard world to adopt/.test(cold.out) && /\[gen budget\]/.test(cold.out)],
   ['cold run finished ONCE, inside the cold worker (after Begin)',
-   finishes(cold.out) === 1 && before(cold.out, '[begin] no wizard world to adopt', '[finish_campaign_world]')],
+   finishes(cold.out) === 1 && before(cold.out, '[begin] no wizard world to adopt', FINISH)],
   ['both runs printed a state hash', !!adopt.hash && !!cold.hash],
   ['adopted == cold state hash', !!adopt.hash && adopt.hash === cold.hash],
 ];

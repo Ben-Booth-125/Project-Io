@@ -6475,7 +6475,7 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice (bit-identical)",
       "headless: player_seed_sweep --digest-check, both arcs",
@@ -6483,27 +6483,27 @@
      ],
      "requirement": "make_hard_coded_world is the composition of resumable stage functions over one generation_cursor, and the composition is byte-identical to the monolith it replaces: every digest and pin holds, or a moved digest is named as the Selene/Pallas entity-id shift and nothing else.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Main-session gates on 4211090c (K1 abda25c6): world_determinism twice ALL PASS, digests unmoved (seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9); player_seed_sweep --digest-check both arcs 16/16 PASS (shipped and legacy); the lane's exploration_sweep on 16 seeds byte-identical to the checked-in seed_library_sweep.json (seed_library.js --check 16 unchanged). The cold review's gap (no cross-tree evidence for the stop paths) closed by the new tools/verify/stop_path_digests: base b03fd52e vs HEAD, seeds 0/28/46 x {migration, ancient era, exploration, industrialisation, full}, world and report digests IDENTICAL on all 15 rows. Selene and Pallas were already built in the tail: no entity-id shift."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: a committed cursor-equivalence harness over the 16 curated seeds"
      ],
      "requirement": "A staged build, each stage run on a faithful copy of the previous stage's cursor, equals the one-call composition at EVERY round boundary (owner_changes, polities, world digest) on the 16 curated seeds.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "world_cursor_equivalence (K2 60ebd0ec) re-run by the main session on 4211090c: 16 curated seeds in two shards, ALL PASS (33 + 33 rows), each stage run on a faithful copy of the previous stage's cursor with the original freed. K4 strengthened it (content folds for the members folded by size; two negative controls per seed must FAIL)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: Release timing, copy vs replay, seeds 0 and 28"
      ],
      "requirement": "The reroll path is measured before it is chosen: the cost of holding and copying a closed round's world against replaying from the Life gate with the fixed span seeds; the cheaper ships and both numbers are recorded.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "K3 (world_cursor_equivalence --measure --seeds 0,28 --reps 5, indicative): a cursor copy costs a flat 30-40 ms at every boundary against a replay from the held gate of 49 ms (culture) to 9.2 s (industrialisation, seed 0). The held copy ships; replay from the Life gate is the fallback."
     },
     {
      "id": "R4",
