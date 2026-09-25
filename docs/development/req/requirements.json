@@ -6512,7 +6512,7 @@
       "live: Ben's walk, rounds 3-6"
      ],
      "requirement": "Next is disabled while the round on screen is running and enables the moment its world lands; its hover names what it waits on; no two pass rounds ever build at once (STARTUP.md, Next waits).",
-     "notes": "",
+     "notes": "Built (K4). Live click owed. The cold review's fix round is in flight (round 6 pace, reroll mid-tail, slots freed at Begin, the report's lean, R6's frame assertion).",
      "result_metric": ""
     },
     {
@@ -6539,14 +6539,14 @@
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: begin_adopts_check.js",
       "headless: run_autostart_adopt"
      ],
      "requirement": "Begin adopts round 6's slot exactly as before; round 6 starts playing at the tap's final publish and its landing swaps only the world slot, with the snapshot and landed paths never both writing the round's record.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Main-session gates on 2775ef57 (K4 merged): begin_adopts_check.js 12/12 PASS (the checker now counts the finish summary line only), adopt state hash == cold; world_cursor_equivalence 16 seeds 49 + 49 PASS with the strengthened content folds and two negative controls per seed; span_seed_isolation ALL PASS; stop_path_digests: the 12 stop rows still identical to base b03fd52e after K4; the 11 wizard/lapse --verify scripts 0 FAIL. Round 6 plays from the span close (the lane's walk: record at ~3.2 s, world at 217 s loaded)."
     },
     {
      "id": "R8",
