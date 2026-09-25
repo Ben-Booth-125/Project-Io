@@ -420,6 +420,14 @@ struct history_lapse
     /// state rather than from soft. Empty when nothing came before.
     std::vector<uint8_t> hard_carry;
 
+    /// A CIVILISATION'S DIAMOND STAYS ACROSS THE HAND-OVER (BL-1094): the
+    /// (coining realm, coining region) pairs marked at the predecessor round's
+    /// close, carried exactly as `hard_carry` is. A resumed span never re-notes
+    /// `civilisation_formed`, so without the carry every diamond vanished at the
+    /// 1200 and 1660 seams. Drawn ahead of this record's own events.
+    struct civ_mark { uint16_t polity; uint16_t region; };
+    std::vector<civ_mark> civ_carry;
+
     /// The map prints its primitive count to stderr ONCE per record, so the
     /// draw-index bound is a measured number in every capture log. Mutable
     /// because the draw takes the record by const reference and this is not
@@ -555,6 +563,11 @@ bool lapse_polity_hard(const history_lapse& h, uint16_t polity, int year);
 /// Polity -> hard at the record's closing step, for the next round's
 /// `hard_carry`. Walks the record itself when @p h was never finished.
 std::vector<uint8_t> lapse_hard_at_close(const history_lapse& h);
+
+/// The civilisation diamonds standing at a record's close -- its own `civ_carry`
+/// plus every `civilisation_formed` it recorded -- for the next round's
+/// `civ_carry` (BL-1094). Deduplicated by (polity, region).
+std::vector<history_lapse::civ_mark> lapse_civ_marks_at_close(const history_lapse& h);
 
 /// The colour @p owner is drawn in on @p h — a culture's lineage hue on the
 /// Culture round, a polity's identity slot elsewhere. Public so one round can

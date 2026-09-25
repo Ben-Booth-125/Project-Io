@@ -274,6 +274,7 @@ void app::launch_wizard_history_run(int lapse_index)
         const ui::history_lapse& prev = m_wiz_history[lapse_index - 1];
         if (prev.empty() || !prev.culture_colour.empty()) return;
         m_wiz_history[lapse_index].hard_carry = ui::lapse_hard_at_close(prev);
+        m_wiz_history[lapse_index].civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094
     };
     inherit_hard();
     // Sentinel, not 0: a signed calendar year of 0 is a real year (0 CE), so
@@ -571,6 +572,7 @@ void app::poll_wizard_history()
             if (prev.culture_colour.empty())
             {
                 m_wiz_history[i].hard_carry = ui::lapse_hard_at_close(prev);
+                m_wiz_history[i].civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094: the diamonds stay
                 m_wiz_history[i].tile_region.clear();
             }
         }

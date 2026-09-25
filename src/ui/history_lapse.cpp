@@ -1447,6 +1447,13 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    to change, `seat_region_of` below. ──
     struct seat_slide { uint16_t polity; float c0, r0, c1, r1, t; };
     std::vector<seat_slide> slides;
+    // THE REST SEAT (BL-1094, the review's fix round): where a polity's dot
+    // SITS between moves -- the region of its last `capital_moved` at or
+    // before the playhead, else `polity_seat`. Read off the record itself,
+    // so a moved capital stays moved after the slide's window and a second
+    // move starts where the first one ended; BL-1088's capital fold reads the
+    // same events and supersedes this table when it lands.
+    std::vector<int32_t> rest_seat;
     {
         const auto region_ok = [&](uint16_t r) {
             return r != lapse_event_none && static_cast<std::size_t>(r) < h.region_col.size();
@@ -1455,41 +1462,59 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             return ImVec2{static_cast<float>(h.region_col[r]) + 0.5f,
                           static_cast<float>(h.region_row[r]) + 0.5f};
         };
-        // A polity's seat region on this record (see the note above).
+        rest_seat.assign(h.polity_seat.size(), -1);
+        for (const lapse_event& e : h.lapse.events)
+        {
+            if (e.year > year) break; // ascending by year
+            if (static_cast<lapse_event_kind>(e.kind) != lapse_event_kind::capital_moved) continue;
+            if (e.polity == lapse_event_none || static_cast<std::size_t>(e.polity) >= rest_seat.size()) continue;
+            if (!region_ok(e.region)) continue;
+            rest_seat[e.polity] = e.region; // the last move at or before the playhead wins
+        }
+        // A polity's seat region on this record at the playhead (see the note above).
         const auto seat_region_of = [&](uint16_t polity) -> int32_t {
             if (polity == lapse_event_none || static_cast<std::size_t>(polity) >= h.polity_seat.size())
                 return -1;
-            return h.polity_seat[polity];
+            const int32_t moved = rest_seat[polity];
+            return moved >= 0 ? moved : h.polity_seat[polity];
         };
         const float d_half   = std::clamp(scale * 1.1f, 4.0f, 7.5f);  // the diamond
         const float ring_r   = std::clamp(scale * 1.7f, 5.0f, 11.0f); // the fallen seat
         const float crack_amp = std::clamp(scale * 0.6f, 2.0f, 5.0f); // the crack's jag
 
+        // THE DIAMOND: two tones -- two peoples settling one way of life: the
+        // coining realm's colour on the west half, a pale tone on the east,
+        // under one dark outline. One drawing for the carried marks and for
+        // this record's own.
+        const auto draw_diamond = [&](uint16_t region, uint16_t polity) {
+            if (!region_ok(region)) return;
+            const ImVec2 a  = anchor(region);
+            const ImVec2 at{px(a.x), py(a.y)};
+            const ImVec2 top{at.x, at.y - d_half}, bot{at.x, at.y + d_half};
+            const ImVec2 lft{at.x - d_half, at.y}, rgt{at.x + d_half, at.y};
+            const ImU32 west = polity == lapse_event_none ? col_bright : owner_colour(h, polity);
+            constexpr ImU32 east = IM_COL32(238, 226, 196, 255);
+            dl->AddTriangleFilled(top, lft, bot, west);
+            dl->AddTriangleFilled(top, bot, rgt, east);
+            dl->AddQuad(top, rgt, bot, lft, col_seat_ring, 1.5f);
+            prims += 3;
+        };
         dl->PushClipRect({tl.x, tl.y}, {tl.x + static_cast<float>(gw) * scale,
                                         tl.y + static_cast<float>(gh) * scale}, true);
+        // THE DIAMONDS THAT CAME BEFORE (BL-1094): coined on an earlier round
+        // and carried by id, drawn from this record's first frame.
+        for (const history_lapse::civ_mark& m : h.civ_carry) draw_diamond(m.region, m.polity);
         for (const lapse_event& e : h.lapse.events)
         {
             if (e.year > year) break; // ascending by year
             const auto kind = static_cast<lapse_event_kind>(e.kind);
 
             // THE DIAMOND STAYS: every civilisation coined at or before the
-            // playhead is marked, from its year on. Two tones -- two peoples
-            // settling one way of life: the coining realm's colour on the
-            // west half, a pale tone on the east, under one dark outline.
+            // playhead is marked, from its year on (and across the hand-over,
+            // through `civ_carry` above).
             if (kind == lapse_event_kind::civilisation_formed)
             {
-                if (!region_ok(e.region)) continue;
-                const ImVec2 a  = anchor(e.region);
-                const ImVec2 at{px(a.x), py(a.y)};
-                const ImVec2 top{at.x, at.y - d_half}, bot{at.x, at.y + d_half};
-                const ImVec2 lft{at.x - d_half, at.y}, rgt{at.x + d_half, at.y};
-                const ImU32 west = e.polity == lapse_event_none ? col_bright
-                                                                : owner_colour(h, e.polity);
-                constexpr ImU32 east = IM_COL32(238, 226, 196, 255);
-                dl->AddTriangleFilled(top, lft, bot, west);
-                dl->AddTriangleFilled(top, bot, rgt, east);
-                dl->AddQuad(top, rgt, bot, lft, col_seat_ring, 1.5f);
-                prims += 3;
+                draw_diamond(e.region, e.polity);
                 continue;
             }
 
@@ -1585,7 +1610,10 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         for (std::size_t o = 0; o < present.size() && o < h.polity_seat.size(); ++o)
         {
             if (!present[o]) continue;
-            const int32_t seat = h.polity_seat[o];
+            // The dot rests at the last moved capital (BL-1094, `rest_seat`),
+            // else at the first region held.
+            const int32_t seat = (o < rest_seat.size() && rest_seat[o] >= 0) ? rest_seat[o]
+                                                                            : h.polity_seat[o];
             if (seat < 0 || static_cast<std::size_t>(seat) >= h.region_col.size()) continue;
             ImVec2 at{px(static_cast<float>(h.region_col[static_cast<std::size_t>(seat)]) + 0.5f),
                       py(static_cast<float>(h.region_row[static_cast<std::size_t>(seat)]) + 0.5f)};
@@ -1940,6 +1968,22 @@ std::vector<uint8_t> lapse_hard_at_close(const history_lapse& h)
     }
     if (stride <= 0 || bits.size() < static_cast<std::size_t>(stride)) return {};
     return std::vector<uint8_t>(bits.end() - stride, bits.end());
+}
+
+std::vector<history_lapse::civ_mark> lapse_civ_marks_at_close(const history_lapse& h)
+{
+    std::vector<history_lapse::civ_mark> marks = h.civ_carry;
+    const auto have = [&](uint16_t p, uint16_t r) {
+        for (const auto& m : marks) if (m.polity == p && m.region == r) return true;
+        return false;
+    };
+    for (const lapse_event& e : h.lapse.events)
+    {
+        if (static_cast<lapse_event_kind>(e.kind) != lapse_event_kind::civilisation_formed) continue;
+        if (e.region == lapse_event_none || static_cast<std::size_t>(e.region) >= h.region_col.size()) continue;
+        if (!have(e.polity, e.region)) marks.push_back({e.polity, e.region});
+    }
+    return marks;
 }
 
 float lapse_industry_heat(const history_lapse& h, uint16_t polity, int year)
