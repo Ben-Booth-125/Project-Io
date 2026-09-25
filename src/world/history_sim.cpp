@@ -7314,6 +7314,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     q.industrial_year = y;
                     ++out.polities_industrialised;
+                    // BL-1100: THE REALM'S CROSSING, on the record the round
+                    // plays (INDUSTRIALISATION.md sec Beat 1 "The span's
+                    // industrial moment is the polity's crossing"; Ben,
+                    // 2026-09-24, R16). Its own kind, at the capital as it
+                    // stands this year -- the region furnaces below never
+                    // light on a generated world, so this is the one
+                    // industrial moment round 6 can narrate. Event layer
+                    // only, gated by `note_event`'s playback switch: read by
+                    // nothing here, in no digest.
+                    note_event(lapse_event_kind::rung_crossed, q.capital, q.id, -1);
+                    if (params.record_playback) ++out.rung_crossings_noted;
                 }
 
                 if (q.industrial_year != k_never_industrialised)

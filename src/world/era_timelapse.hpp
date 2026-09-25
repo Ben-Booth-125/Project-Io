@@ -204,6 +204,7 @@ enum class lapse_event_kind : uint8_t
     // 20 is `inherited`, lane I1's (sprint 47): the value is left to that lane so
     // no two lanes append the same byte; the gap stands until it lands.
     works_chartered     = 21, ///< BL-1099: a region's `industry_points` crossed the next multiple of `works_event_fraction_q` x the RUNNING charter price (the world's stock so far over `k_stockpile_price_divisor`); `region` = the works' region, `polity` = its holder, `other` = the `industrial_focus` a firm chartered there takes (`focus_from_region`). RECORD-ONLY: no point is debited, at most `works_event_region_cap` per region per span (save_game_version 22).
+    rung_crossed        = 22, ///< BL-1100: a POLITY's materials capacity reached the Industrial rung (`polity::industrial_year`, INDUSTRIALISATION.md sec Beat 1 "The span's industrial moment is the polity's crossing"); `region` = its capital that year, `polity` = the polity, `other` = none. ITS OWN KIND, not a reuse of `furnace_lit` (Ben's either/or, 2026-09-24, R16): a region furnace is Stage 4's ground-by-ground lag and never lights on a generated world, while this is the realm's crossing the sim computes -- one kind per fact, so the ember layer can mark the capital without claiming the region's furnace lit. RECORD-ONLY, noted once per polity (save_game_version 22).
     count
 };
 
