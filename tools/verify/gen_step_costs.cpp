@@ -22,7 +22,9 @@
 // so a watched build is the same world as an unwatched one (world_determinism
 // holds the digests).
 //
-// Usage:  gen_step_costs.exe [--finish] [seed ...]   (hex or decimal; default 0 and 28)
+// Usage:  gen_step_costs.exe [--finish | --roads F1,F2,... [--roads-map DIR]] [seed ...]
+//         (seeds hex or decimal; default 0 and 28; floors in heads; DIR receives
+//         roads_seed<S>_built.ppm and roads_seed<S>_floor<F>.ppm, one pixel a tile)
 // Build:  cmd //c tools\verify\build_lua_harness.bat gen_step_costs
 //         Run from the repo root: it loads scripts/world_gen.lua and works.lua.
 //
@@ -31,20 +33,37 @@
 // after its build -- with the watcher still watching, and print what the two
 // steps cost. That is the measurement `generation_step_cost_ms` 16 and 17 are
 // read from, and the still-stretch then covers the whole wait Begin shows.
+//
+// --roads F1,F2,... (BL-1119 D1, the spur floor measured): after each build,
+// REPLAY `generate_roads` on the built world once per floor candidate (heads;
+// see road_generation.hpp § kVillageSpurFloorHeads) and print, per candidate,
+// the road tiles the pass laid, its spurs, the villages it left unspurred and
+// its wall time. Before the ladder it prints the village size distribution the
+// floor reads, and a REPLAY CHECK: the build's own floor replayed, with the
+// history roads re-stamped from the fixture, must reproduce the built world's
+// road field tile for tile — otherwise the replay is not measuring the pass the
+// build ran, and the row says so. Each replay starts from a road-free body and
+// cold A* caches, exactly as the in-generation pass does. Not combinable with
+// --finish (the finish stamps roads and grows centres; the replays leave the body
+// road-free), and it runs after the watcher stops, so it never reads as a still bar.
 
 #include "harness_params.hpp"
 #include "world/era_minus_one.hpp"
 #include "world/finish_campaign_world.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/road_generation.hpp"
 #include "world/works_roster.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -58,18 +77,213 @@ double secs_between(clk::time_point a, clk::time_point b)
     return std::chrono::duration<double>(b - a).count();
 }
 
+/// Every road tier on @p body, by tile id (for the replay check).
+std::map<entity_id, std::uint8_t> road_field(const world& w, entity_id body)
+{
+    std::map<entity_id, std::uint8_t> f;
+    for (const auto& [tid, tc] : w.tiles)
+        if (tc.body == body && tc.road_level != 0)
+            f[tid] = tc.road_level;
+    return f;
+}
+
+/// --roads-map: the body's road field as a binary PPM, one pixel per tile (raster
+/// order, row 0 at the top). Water dark blue, bare land tan; a road on a tile that
+/// hosts a centre (its local STREET) orange; a road on any other tile by tier —
+/// Track brown, Road red, Highway black. Streets and network apart, because the two
+/// answer different questions: how dense the settlement is, and how the roads run.
+void write_road_map(const world& w, entity_id body, const std::set<entity_id>& centre_tiles,
+                    const std::string& path)
+{
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end()) return;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    if (gw <= 0 || gh <= 0) return;
+    std::vector<unsigned char> px(static_cast<std::size_t>(gw) * gh * 3, 0);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body || tc.grid_x < 0 || tc.grid_x >= gw || tc.grid_y < 0 || tc.grid_y >= gh)
+            continue;
+        unsigned char r = 200, g = 188, b = 150;                    // bare land
+        if (is_water(tc.substrate)) { r = 28; g = 48; b = 88; }     // water
+        if (tc.road_level > 0)
+        {
+            if (centre_tiles.count(tid) != 0) { r = 235; g = 140; b = 30; } // street
+            else if (tc.road_level == 1)      { r = 95;  g = 60;  b = 25; } // Track
+            else if (tc.road_level == 2)      { r = 200; g = 25;  b = 25; } // Road
+            else                              { r = 0;   g = 0;   b = 0;  } // Highway
+        }
+        const std::size_t i = (static_cast<std::size_t>(tc.grid_y) * gw + tc.grid_x) * 3;
+        px[i] = r; px[i + 1] = g; px[i + 2] = b;
+    }
+    if (FILE* f = std::fopen(path.c_str(), "wb"))
+    {
+        std::fprintf(f, "P6\n%d %d\n255\n", gw, gh);
+        std::fwrite(px.data(), 1, px.size(), f);
+        std::fclose(f);
+    }
+}
+
+/// A road-free body and cold traversal caches: the state `generate_roads` meets in
+/// generation (only the two road passes write road_level before the finish).
+void clear_roads(world& w, entity_id body)
+{
+    for (auto& [tid, tc] : w.tiles)
+        if (tc.body == body)
+            tc.road_level = 0;
+    w.astar_cost_cache.clear();
+    w.logistics_flood_fields.clear();
+    w.body_reach_cost.clear();
+}
+
+/// BL-1119 D1: the village size distribution the spur floor reads, then one row per
+/// floor candidate (heads). A floor above every village's size is the no-spur
+/// asymptote: what the pass costs with the spur walk gone.
+void measure_road_floors(world& w, const generation_report& rep, const era_minus_one_fixture& fx,
+                         uint32_t seed, const std::vector<long long>& floors,
+                         const std::string& map_dir)
+{
+    const entity_id body = w.home_body;
+
+    // The size distribution, over this body's villages.
+    std::vector<long long> sizes;
+    std::set<entity_id> centre_tiles;
+    int no_slot = 0, anchors = 0, land = 0;
+    for (const auto& [tid, tc] : w.tiles)
+        if (tc.body == body && !is_water(tc.substrate)) ++land;
+    for (const auto& [cid, tile] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tile);
+        if (tit != w.tiles.end() && tit->second.body == body) centre_tiles.insert(tile);
+        const auto pit = w.population_centres.find(cid);
+        if (tit == w.tiles.end() || tit->second.body != body || pit == w.population_centres.end()
+            || pit->second.scale >= 2)
+            continue;
+        sizes.push_back(village_spur_size(w, cid));
+        if (w.gen_carve_centres.find(cid) == w.gen_carve_centres.end()) ++no_slot;
+        if (pit->second.province_anchor) ++anchors;
+    }
+    std::sort(sizes.begin(), sizes.end());
+    std::printf("  ROADS seed %u body: %d land tiles, %zu centre tiles (every one a street)\n",
+                seed, land, centre_tiles.size());
+    auto q = [&](double p) -> long long {
+        if (sizes.empty()) return 0;
+        const std::size_t i = std::min(sizes.size() - 1,
+                                       static_cast<std::size_t>(p * static_cast<double>(sizes.size())));
+        return sizes[i];
+    };
+    std::printf("  ROADS seed %u villages %zu (no carve slot %d, of them anchors %d) size heads: "
+                "min %lld p10 %lld p25 %lld p50 %lld p75 %lld p90 %lld max %lld\n",
+                seed, sizes.size(), no_slot, anchors, sizes.empty() ? 0LL : sizes.front(),
+                q(0.10), q(0.25), q(0.50), q(0.75), q(0.90), sizes.empty() ? 0LL : sizes.back());
+    for (const long long f : floors)
+    {
+        const auto at_or_above = sizes.end() - std::lower_bound(sizes.begin(), sizes.end(), f);
+        std::printf("  ROADS seed %u floor %lld: %lld of %zu villages at or above\n", seed, f,
+                    static_cast<long long>(at_or_above), sizes.size());
+    }
+
+    // REPLAY CHECK: the build's own floor, plus the history roads, reproduces the field.
+    const std::map<entity_id, std::uint8_t> built = road_field(w, body);
+    if (!map_dir.empty()) // the world as built: this pass at the shipped floor + the history roads
+        write_road_map(w, body, centre_tiles,
+                       map_dir + "/roads_seed" + std::to_string(seed) + "_built.ppm");
+    {
+        clear_roads(w, body);
+        generate_roads(w, body);
+        const generation_report::body_entry* be = nullptr;
+        for (const auto& b : rep.bodies)
+            if (b.id == body) be = &b;
+        if (be != nullptr && !fx.setup_corridors.empty())
+        {
+            std::vector<history_road_node> nodes;
+            for (const region& p : be->settlement.regions)
+                nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
+            stamp_history_roads(w, body, nodes, fx.setup_corridors);
+        }
+        const std::map<entity_id, std::uint8_t> replay = road_field(w, body);
+        std::size_t diff = 0;
+        for (const auto& [t, l] : built)
+        {
+            const auto it = replay.find(t);
+            if (it == replay.end() || it->second != l) ++diff;
+        }
+        for (const auto& [t, l] : replay)
+            if (built.find(t) == built.end()) ++diff;
+        std::printf("  ROADS seed %u REPLAY CHECK: built %zu road tiles, replay %zu, %zu differ -> %s\n",
+                    seed, built.size(), replay.size(), diff, diff == 0 ? "FAITHFUL" : "DIVERGES");
+    }
+
+    for (const long long f : floors)
+    {
+        clear_roads(w, body);
+        road_generation_stats st{};
+        const clk::time_point t0 = clk::now();
+        generate_roads(w, body, nullptr, f, &st);
+        const double s = secs_between(t0, clk::now());
+        int tiers[4] = { 0, 0, 0, 0 };
+        int streets = 0; // road tiles hosting a centre: the local streets
+        for (const auto& [tid, tc] : w.tiles)
+            if (tc.body == body && tc.road_level >= 1 && tc.road_level <= 3)
+            {
+                ++tiers[0];
+                ++tiers[tc.road_level];
+                if (centre_tiles.count(tid) != 0) ++streets;
+            }
+        std::printf("  ROADS seed %u TREE floor %lld: %.2f s floods %lld (%lld before the border walk) | road tiles %d (T1 %d T2 %d T3 %d; "
+                    "streets %d network %d) | towns %d mst %d cand %d admitted %d kept %d | "
+                    "villages %d below %d spurs %d failed %d unspurred %d | border %d (%d on a "
+                    "below-floor street)\n",
+                    seed, f, s, st.flood_fields, st.flood_fields_before_border,
+                    tiers[0], tiers[1], tiers[2], tiers[3], streets, tiers[0] - streets,
+                    st.towns, st.mst_links, st.loop_candidates, st.loops_admitted, st.loops_kept,
+                    st.villages, st.villages_below_floor, st.spurs_laid, st.spurs_failed,
+                    st.villages_below_floor + st.spurs_failed, st.border_links,
+                    st.border_links_street_only);
+        std::fflush(stdout);
+        if (!map_dir.empty()) // this pass alone, no history roads
+            write_road_map(w, body, centre_tiles,
+                           map_dir + "/roads_seed" + std::to_string(seed) + "_floor"
+                               + std::to_string(f) + ".ppm");
+    }
+    clear_roads(w, body); // the world is spent; nothing reads it after this
+}
+
 } // namespace
 
 int main(int argc, char** argv)
 {
     std::vector<uint32_t> seeds;
     bool finish = false;
+    std::vector<long long> road_floors; // --roads (BL-1119 D1)
+    std::string road_map_dir;           // --roads-map DIR: a PPM of the road field per row
     for (int i = 1; i < argc; ++i)
     {
         if (std::string(argv[i]) == "--finish") { finish = true; continue; }
+        if (std::string(argv[i]) == "--roads-map" && i + 1 < argc) { road_map_dir = argv[++i]; continue; }
+        if (std::string(argv[i]) == "--roads" && i + 1 < argc)
+        {
+            const std::string list = argv[++i];
+            std::size_t at = 0;
+            while (at <= list.size())
+            {
+                const std::size_t comma = std::min(list.find(',', at), list.size());
+                if (comma > at)
+                    road_floors.push_back(std::strtoll(list.substr(at, comma - at).c_str(), nullptr, 10));
+                at = comma + 1;
+            }
+            continue;
+        }
         seeds.push_back(static_cast<uint32_t>(std::strtoul(argv[i], nullptr, 0)));
     }
     if (seeds.empty()) seeds = {0u, 28u};
+    if (finish && !road_floors.empty())
+    {
+        // The finish stamps roads and grows centres, so a replay after it measures a
+        // different world, and the replays leave the body road-free for the finish.
+        std::fprintf(stderr, "gen_step_costs: --roads and --finish are separate runs\n");
+        return 2;
+    }
 
     lua_state lua;
     lua.load("scripts/world_gen.lua");
@@ -184,6 +398,10 @@ int main(int argc, char** argv)
                         ? generation_stage_labels[longest_label] : "?");
         std::printf("  nations %zu, corps %zu\n", w.nations.size(), w.corporations.size());
         std::fflush(stdout);
+        // BL-1119 D1: after the watcher has stopped, so the replays cannot read as a
+        // still bar; on the built world, before anything else touches it.
+        if (!road_floors.empty())
+            measure_road_floors(w, rep, fx, seed, road_floors, road_map_dir);
     }
     return 0;
 }
