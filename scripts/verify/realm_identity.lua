@@ -38,7 +38,12 @@ local function identity_at(year)
     return out
 end
 
-local function compare(a, b, label)
+-- `reslotted` is the successor's own count of pinned realms its CLASH RULE moved
+-- (STARTUP.md § Identity across the rounds: two pinned realms the new record
+-- makes neighbours while they share a slot — the smaller people share at the
+-- opening step is re-slotted). Those are the ONLY realms allowed to change
+-- slot across the seam, so the check is an identity: shared = kept + moved.
+local function compare(a, b, label, reslotted)
     local shared, same_slot, same_name = 0, 0, 0
     local first_diff = nil
     for p, ia in pairs(a) do
@@ -52,8 +57,10 @@ local function compare(a, b, label)
         end
     end
     verify.expect(shared > 0, label .. ": realms alive on both sides of the seam (" .. shared .. ")")
-    verify.expect(same_slot == shared,
-                  label .. ": every shared realm keeps its colour slot (" .. same_slot .. " of " .. shared
+    verify.expect(shared - same_slot == reslotted,
+                  label .. ": every shared realm keeps its colour slot except the clash rule's re-slots ("
+                  .. same_slot .. " of " .. shared .. " kept, " .. (shared - same_slot) .. " moved, "
+                  .. reslotted .. " re-slotted by the rule"
                   .. (first_diff and ("; first difference " .. first_diff) or "") .. ")")
     verify.expect(same_name == shared,
                   label .. ": every shared realm keeps its name (" .. same_name .. " of " .. shared .. ")")
@@ -80,6 +87,34 @@ local rungs = 0
 for _, ia in pairs(r4_at_1200) do if ia.rung > 0 then rungs = rungs + 1 end end
 verify.expect(rungs > 0, "at least one realm has ratcheted a shade rung by 1200 (" .. rungs .. ")")
 
+-- THE BASE at 800 CE (BL-1087 R3): unorganised peopled ground carries its
+-- people's dull lineage tint under the political fill. Judged on the capture.
+identity_at(800)
+shot("realm_identity_0_round4_800ce")
+
+-- THE RATCHET AT ITS MOMENT (BL-1087 R4): the frame `civilisation_formed`
+-- (kind 6) fires for a realm, its rung steps up by one against the frame
+-- before, and the colour slot does not move — the shade is the ratchet, the
+-- hue is the identity. The last such moment in the span with a frame after it.
+local civ_year = verify.history_event_year(6, -1, r4_last - 1)
+if civ_year >= r4_first then
+    local before = identity_at(civ_year - 1)
+    shot("realm_identity_0_round4_ratchet_before")
+    local after  = identity_at(civ_year)
+    shot("realm_identity_0_round4_ratchet_after")
+    local stepped, slot_moved = 0, 0
+    for p, ib in pairs(before) do
+        local ia = after[p]
+        if ia ~= nil and ia.rung == ib.rung + 1 then
+            stepped = stepped + 1
+            if ia.slot ~= ib.slot then slot_moved = slot_moved + 1 end
+        end
+    end
+    verify.expect(stepped > 0, "a civilisation_formed at " .. civ_year .. " ratchets a realm one rung (" .. stepped .. ")")
+    verify.expect(slot_moved == 0, "the ratchet moves no colour slot (" .. slot_moved .. " moved)")
+end
+identity_at(r4_last)
+
 -- ROUND 5: Exploration, 1200 -> 1660, pinned from round 4.
 verify.history_run(2)
 verify.frames(4)
@@ -89,7 +124,8 @@ local r5_at_1200 = identity_at(r5_first)
 shot("realm_identity_2_round5_open")
 local id5 = verify.history_identity()
 verify.expect(id5.pinned, "round 5 was coloured with round 4's pins")
-compare(r4_at_1200, r5_at_1200, "1200 seam")
+verify.expect(id5.spills == 0, "round 5 spilled no realm past the palette (" .. id5.spills .. ")")
+compare(r4_at_1200, r5_at_1200, "1200 seam", id5.reslotted)
 
 -- No "rises" at the resume: the events at the open are inherited, not founded.
 local founded_at_open = verify.history_event_count(0, r5_first)   -- kind 0 = founded, at or before the open
@@ -126,7 +162,9 @@ local r6_first, r6_last = verify.history_span()
 verify.expect(r6_first == r5_last, "round 6 opens where round 5 closed (" .. r6_first .. ")")
 local r6_at_1660 = identity_at(r6_first)
 shot("realm_identity_5_round6_open")
-compare(r5_at_1660, r6_at_1660, "1660 seam")
+local id6 = verify.history_identity()
+verify.expect(id6.pinned, "round 6 was coloured with round 5's pins")
+compare(r5_at_1660, r6_at_1660, "1660 seam", id6.reslotted)
 identity_at(r6_last)
 shot("realm_identity_6_round6_close")
 
