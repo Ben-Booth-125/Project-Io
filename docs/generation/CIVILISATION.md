@@ -96,6 +96,13 @@ changes hands when its seat does.
 city state that holds other settlements. That is the whole political ladder for this phase, and
 it needs no new actor type — the sim's `polity` already is one.
 
+**A new region founds at a distance, not on the nearest free tile (Ben, 2026-09-25; BL-1132,
+settle spacing).** Founding on the nearest free ground packed the settled cores one region to a
+tile (seed 46: 3,304 of 4,682 regions held a one-tile cell), so every tile of a core was a seat and
+its streets paved it solid — the opposite of sparse. A founding party goes far enough from the
+regions already standing that the new one can grow a hinterland of its own; how far is measured
+on the curated seeds before it is fixed.
+
 **SETTLED (Ben, 2026-09-09, elicitation): a settlement is a SEAT FLAG ON A REGION, and every
 region points at the seat it feeds.** No new table and no new id space. The region already carries
 everything a seat needs to be worth taking — population, `manpower_stock`, `army_stock`, the four

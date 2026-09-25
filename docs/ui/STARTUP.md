@@ -185,6 +185,13 @@ ground the campaign will mine. The round's record
 full run, not only on the wizard's path, and is saved in the app envelope with the report, so
 a later Ages replay can read it (Ben, 2026-09-24).
 
+**The round is worded as the record, not the route (Ben, 2026-09-25).** The migration it replays
+happened millennia before anyone could have traced it, so the round's words do not promise the
+routes; they describe how writing and the keeping of a culture's record emerge — which peoples
+set down their names, their gods and their ground, and what the later ages inherited from that
+record. The map still plays the spread; the question, the captions and the footer speak of what
+was kept.
+
 - **It ends when all land has some culture** — a derived terminating condition, not a
   calendar year, so the round is exactly as long as the filling took on this world. **The world
   then coasts to 400 BCE** holding what the migration left it, because round 4's span is stated
@@ -249,13 +256,18 @@ close-of-round event kind exists, and accepting simply moves on.
 **The Empires map draws less than the rounds after it (Ben, 2026-09-25, after walking the
 round: "the Empires round shows too much").** It draws the ground, the realm fill over the
 culture base, the frontiers and hard borders, the rivers, the promoted roads, the cross-border
-trade links, the seat dots, the schism crack and the civilisation diamond. It does **not** draw
+trade links, the seat dots, the schism crack, the civilisation diamond and the **furnaces lit**
+(an ember square drawn from the round's furnace and rung events; Ben, 2026-09-25, kept at the
+walk). It does **not** draw
 the caravan glyphs, the seat-captured ring, the capital slide (a moved capital's dot simply sits
 at the new seat) or the fleets, harbours and treaty arcs. Those belong to the rounds whose
 subject they are.
 
 **Every lapse round carries a legend (Ben, 2026-09-25):** a key naming each layer its map draws,
-so what is on the map never has to be guessed. **The sea is a deep blue on every lapse round
+so what is on the map never has to be guessed. **The key is decided once per round (Ben,
+2026-09-25):** it lists every layer the round draws at any year of its span, so a layer that
+opens late (the lanes) is named from the first year — the key tells the player what to look
+for, not only what is on screen. **The sea is a deep blue on every lapse round
 (Ben, 2026-09-25)**, so water reads as water and what sails on it reads as being at sea.
 
 **Round 5 — Exploration (BL-946, Ben 2026-09-13).** The span **1200 → 1660 CE**, four
@@ -285,9 +297,10 @@ record, and the span is unmoved by any of it.
 - **The lane.** A sea leg used often enough to open a lane (the sea-lane tier,
   [`EXPLORATION.md`](../generation/EXPLORATION.md)) bakes a persistent **lane line**, distinct
   from a tie: a tie runs between two polities and goes when the bond does; a lane runs between
-  two shores and stays. **The lane is drawn as a wide, soft sea-blue band (Ben, 2026-09-25):**
-  most lanes run the same line as a colonial tie, so the tie reads as dashes on the band rather
-  than hiding a thin lane under it. A corridor the treasury promotes to Post Road pulses once along its
+  two shores and stays. **The lane is drawn as a bowed arc (Ben, 2026-09-25, picked at the live
+  app from three forms):** a soft sea-blue band bent away from the straight capital-to-capital
+  line, because most lanes run the same line as a colonial tie and a straight band hid under it;
+  the tie keeps the straight dashed line, the lane curves off it. A corridor the treasury promotes to Post Road pulses once along its
   length, as it does on round 6.
 
 **Round 6 — Industrialisation.** The span **1660 → 1960 CE**, three hundred years, and its
@@ -330,6 +343,10 @@ over empire flare, and on some worlds one becomes general).
 - **The board** gains an industry column: each polity's industry points at the step, beside
   People, Land, Pop and Might, and only on a record that carries points, so the earlier
   rounds keep their board.
+- **Every round draws the roads the rounds before it laid (Ben, 2026-09-25, walking round 6:
+  "we lost every road between Exploration and Industrialisation").** A road is carried forward
+  like a realm's name and colour: laid in one span, it stays drawn on every later round, and no
+  seam drops it.
 - **Roads pulse when promoted; rail only if laid.** A corridor the treasury promotes to Post
   Road pulses once along its length — a mark on the thing, not a ping over it (§ Identity
   across the rounds). Rail is drawn only if the span lays it; the span's corridors are the

@@ -2878,16 +2878,17 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
             std::unordered_map<entity_id, float>& pools =
                 lp_pool_for_body(lp_pools_by_body, w, body, mil.active_lp_per_anchor_tick);
 
-            // Nearest anchor by intra_body_path cost from the unit's CURRENT
-            // position — reasoned interpretation (LOGISTICS.md does not name
-            // the mid-route locus rule), reusing the same cost function/cache
-            // every other consumer of this pathing does. Deterministic
-            // regardless of `pools`' hash-map iteration order: this is a pure
-            // min-with-tiebreak reduction over (cost, then lowest tile id).
-            // BL-597 factored this reduction into `nearest_lp_anchor`
-            // (logistics.hpp/cpp) so `commit_convoy`'s passive draw
-            // (supply_system.cpp) reuses this exact rule for a convoy's
-            // dispatch tile rather than a second copy of it.
+            // Nearest anchor by path cost from the unit's CURRENT position to
+            // the anchor — reasoned interpretation (LOGISTICS.md does not name
+            // the mid-route locus rule), on the same cost function every other
+            // consumer of this pathing uses. Deterministic regardless of
+            // `pools`' hash-map iteration order: an anchor at least cost with a
+            // fixed choice among exact ties, answered from the body's one
+            // nearest-anchor field (BL-1117), never from the pair cache, so it
+            // is the same warm or cold. BL-597 factored this into
+            // `nearest_lp_anchor` (logistics.hpp/cpp) so `commit_convoy`'s
+            // passive draw (supply_system.cpp) reuses this exact rule for a
+            // convoy's dispatch tile rather than a second copy of it.
             const entity_id nearest_anchor = nearest_lp_anchor(w, body, u.position, pools);
 
             if (nearest_anchor == null_entity)

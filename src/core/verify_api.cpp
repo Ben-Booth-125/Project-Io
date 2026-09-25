@@ -5,6 +5,7 @@
 
 #include <cfloat>
 #include <cstdio>
+#include <functional> // BL-1084: the staged-run hooks' wait
 #include <iterator>
 #include <chrono>
 #include <thread>
@@ -19,6 +20,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <psapi.h> // BL-1084: K32GetProcessMemoryInfo, the autostart-adopt walk's memory line
 #endif
 
 #include "ui/canvas_command.hpp"
@@ -360,16 +362,182 @@ int app::run_autostart_adopt()
     m_pending_world_params = fresh_world_params();
     const int last = wizard_lapse_round_count - 1;
 
-    std::printf("[autostart-adopt] step 1: round 6's own build (async worker)\n");
-    std::fflush(stdout);
-    launch_wizard_history_run(last);
+    // BL-1084: THE WORLD IS BUILT ONCE AND MOVED. The walk is the wizard's own:
+    // the Life round builds the gate world (slot 0), and each pass round runs
+    // ONLY its own stage on a copy of the round before's closing world,
+    // launched only once that round has landed (Next waits). Every call below
+    // is the one the wizard makes; the memory line after each landing is the
+    // process working set, for the peak the item reports.
+    const auto memory_line = [](const char* when) {
+#ifdef _WIN32
+        PROCESS_MEMORY_COUNTERS_EX pmc{};
+        pmc.cb = sizeof(pmc);
+        if (K32GetProcessMemoryInfo(GetCurrentProcess(),
+                                    reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc), sizeof(pmc)))
+            std::printf("[autostart-adopt] memory %-32s working set %6.0f MB, peak %6.0f MB, "
+                        "private %6.0f MB\n", when,
+                        static_cast<double>(pmc.WorkingSetSize) / (1024.0 * 1024.0),
+                        static_cast<double>(pmc.PeakWorkingSetSize) / (1024.0 * 1024.0),
+                        static_cast<double>(pmc.PrivateUsage) / (1024.0 * 1024.0));
+#else
+        (void)when;
+#endif
+        std::fflush(stdout);
+    };
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(900);
-    while (m_wiz_history_future[last].valid() && std::chrono::steady_clock::now() < deadline)
+    memory_line("before the wizard");
+
+    std::printf("[autostart-adopt] step 1: the Life round's gate world (async worker)\n");
+    std::fflush(stdout);
+    launch_wizard_surface_build();
+    while (m_wiz_surface_future.valid() && std::chrono::steady_clock::now() < deadline)
     {
-        poll_wizard_history();
+        poll_wizard_surface();
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
-    if (m_wiz_history_future[last].valid() || !m_wiz_world || !m_wiz_world->ready)
+    if (m_wiz_slot[0] == nullptr)
+    {
+        std::printf("[autostart-adopt] FAILED: the Life round held no gate world\n");
+        return 1;
+    }
+    memory_line("the Life gate held");
+
+    for (int i = 0; i <= last; ++i)
+    {
+        const int round = i + wizard_planetology_round_count + 1;
+        std::printf("[autostart-adopt] step 1.%d: round %d on the round before's world\n", i + 1, round);
+        std::fflush(stdout);
+        const auto t0 = std::chrono::steady_clock::now();
+        launch_wizard_history_run(i);
+        if (!m_wiz_history_future[i].valid())
+        {
+            std::printf("[autostart-adopt] FAILED: round %d did not start\n", round);
+            return 1;
+        }
+        long long record_ms = -1;
+        while (m_wiz_history_future[i].valid() && std::chrono::steady_clock::now() < deadline)
+        {
+            poll_wizard_history();
+            if (record_ms < 0 && m_wiz_record_landed[i])
+                record_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - t0).count();
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        }
+        const long long land_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                      std::chrono::steady_clock::now() - t0).count();
+        if (m_wiz_history_future[i].valid() || !m_wiz_record_landed[i]
+            || (i < last && m_wiz_slot[i + 1] == nullptr))
+        {
+            std::printf("[autostart-adopt] FAILED: round %d did not land its record and world\n", round);
+            return 1;
+        }
+        std::printf("[autostart-adopt] round %d landed: record at %lld ms, world at %lld ms\n",
+                    round, record_ms, land_ms);
+        char when[64];
+        std::snprintf(when, sizeof when, "round %d landed", round);
+        memory_line(when);
+
+        if (i != 2) continue;
+
+        // --- BL-1084 R6: THE REROLL PATH, ON ROUND 5 ------------------------
+        // (1) The Reroll press (the button's own function) re-runs span 5
+        //     alone from a fresh copy of round 4's held world: the record moves,
+        //     round 4's does not, and the new record opens on round 4's close.
+        // (2) A run that goes stale in flight drops its record AND its world.
+        // (3) Back on the original seed, round 5 re-runs from a copy of the
+        //     same held slot and reproduces the first record exactly -- the
+        //     held predecessor was never consumed. The walk then goes on to
+        //     round 6 on that world, so the opening state hash below still has
+        //     to equal a cold build's.
+        const auto wait_round = [&](int k) {
+            while (m_wiz_history_future[k].valid() && std::chrono::steady_clock::now() < deadline)
+            {
+                poll_wizard_history();
+                std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            }
+        };
+        const auto same_changes = [](const era_timelapse& a, const era_timelapse& b) {
+            if (a.changes.size() != b.changes.size() || a.events.size() != b.events.size()
+                || a.start_year != b.start_year || a.years != b.years)
+                return false;
+            for (std::size_t k = 0; k < a.changes.size(); ++k)
+                if (a.changes[k].year != b.changes[k].year || a.changes[k].region != b.changes[k].region
+                    || a.changes[k].owner != b.changes[k].owner)
+                    return false;
+            return true;
+        };
+        const era_timelapse first_r5 = m_wiz_history[2].lapse;
+        const era_timelapse r4       = m_wiz_history[1].lapse;
+        // THE FRAME READ, ASSERTED (the cold review): a round-5 record must open
+        // on round 4's exact 1200 frame. A resumed span writes its opening
+        // ownership first -- one change per owned region at its start year, in
+        // ascending region order (history_sim.cpp, the change list's head) --
+        // and only then the year's own events. So the record's leading changes
+        // must be EXACTLY round 4's closing owners, region for region; the
+        // span's own first-year changes after that prefix are allowed, and any
+        // other difference fails. Tolerance: zero regions.
+        const auto frame_read = [&](const era_timelapse& r5, const char* which) -> bool {
+            const std::vector<uint16_t> close4 = owner_slice_at(r4, r4.start_year + r4.years);
+            std::size_t k = 0, owned = 0, mismatched = 0;
+            int first_bad = -1;
+            for (std::size_t r = 0; r < close4.size(); ++r)
+            {
+                if (close4[r] == owner_none) continue;
+                ++owned;
+                const bool ok = k < r5.changes.size() && r5.changes[k].year == r5.start_year
+                             && r5.changes[k].region == r && r5.changes[k].owner == close4[r];
+                if (!ok) { ++mismatched; if (first_bad < 0) first_bad = static_cast<int>(r); }
+                else ++k;
+            }
+            std::size_t first_year_after = 0;
+            for (std::size_t j = k; j < r5.changes.size(); ++j)
+                if (r5.changes[j].year == r5.start_year) ++first_year_after;
+            const bool ok = mismatched == 0 && r5.start_year == r4.start_year + r4.years;
+            std::printf("[autostart-adopt] %s  frame read: %s round 5 opens at %d on round 4's %d "
+                        "close -- %zu of %zu owned regions open on round 4's owner (%zu differ"
+                        "%s); then %zu of the span's own first-year changes\n",
+                        ok ? "PASS" : "FAIL", which, r5.start_year, r4.start_year + r4.years,
+                        k, owned, mismatched,
+                        first_bad >= 0 ? (", first at region " + std::to_string(first_bad)).c_str() : "",
+                        first_year_after);
+            return ok;
+        };
+        const bool frame_first_ok = frame_read(first_r5, "the unrerolled");
+
+        reroll_wizard_pass_round(2);
+        wait_round(2);
+        const bool rerolled_ok = m_wiz_record_landed[2] && m_wiz_slot[3] != nullptr
+                              && m_pending_world_params.span_seed[2] == 1
+                              && !same_changes(m_wiz_history[2].lapse, first_r5)
+                              && same_changes(m_wiz_history[1].lapse, r4);
+        const bool frame_reroll_ok = frame_read(m_wiz_history[2].lapse, "the rerolled");
+        std::printf("[autostart-adopt] %s  a round-5 reroll re-runs span 5 alone, from a copy of "
+                    "round 4's held world\n", rerolled_ok ? "PASS" : "FAIL");
+
+        // (2) back to the original seed, and the run goes stale in flight: the
+        // lean-change path (invalidate from round 4 down), then an invalidation
+        // above it while it runs.
+        --m_pending_world_params.span_seed[2];
+        invalidate_wizard_rounds_below(wizard_planetology_round_count + 1);
+        launch_wizard_history_run(2);
+        invalidate_wizard_rounds_below(wizard_planetology_round_count + 1); // marks it stale
+        wait_round(2);
+        const bool stale_ok = !m_wiz_record_landed[2] && m_wiz_slot[3] == nullptr
+                           && m_wiz_history[2].empty();
+        std::printf("[autostart-adopt] %s  a run gone stale in flight lands with neither record "
+                    "nor world\n", stale_ok ? "PASS" : "FAIL");
+
+        // (3) the original seed again, for real.
+        launch_wizard_history_run(2);
+        wait_round(2);
+        const bool again_ok = m_wiz_record_landed[2] && m_wiz_slot[3] != nullptr
+                           && same_changes(m_wiz_history[2].lapse, first_r5);
+        std::printf("[autostart-adopt] %s  back on its original seed, round 5 reproduces its "
+                    "first record from the same held slot\n", again_ok ? "PASS" : "FAIL");
+        memory_line("after round 5's rerolls");
+        if (!rerolled_ok || !stale_ok || !again_ok || !frame_first_ok || !frame_reroll_ok) return 1;
+    }
+    if (!m_wiz_world || !m_wiz_world->ready)
     {
         std::printf("[autostart-adopt] FAILED: round 6 landed no world to cache\n");
         return 1;
@@ -381,6 +549,10 @@ int app::run_autostart_adopt()
     // on to step 3 -- the question here is only whether the APP lets go of it.
     {
         const std::shared_ptr<wizard_world_cache> keep = m_wiz_world;
+        // The held slots are kept aside the same way (BL-1084), so Begin below
+        // is the step that releases them and the memory lines measure it.
+        std::shared_ptr<wizard_slot> keep_slots[wizard_lapse_round_count];
+        for (int k = 0; k < wizard_lapse_round_count; ++k) keep_slots[k] = m_wiz_slot[k];
         invalidate_wizard_rounds_below(wizard_planetology_round_count + 1); // Empires rerolled
         const bool dropped_by_reroll = (m_wiz_world == nullptr);
         m_wiz_world = keep;
@@ -392,11 +564,25 @@ int app::run_autostart_adopt()
         std::printf("[autostart-adopt] %s  a planetology move drops the cache\n",
                     dropped_by_chain ? "PASS" : "FAIL");
         if (!dropped_by_reroll || !dropped_by_chain) return 1;
+        for (int k = 0; k < wizard_lapse_round_count; ++k) m_wiz_slot[k] = std::move(keep_slots[k]);
     }
 
+    int slots_held = 0;
+    for (const auto& sl : m_wiz_slot) slots_held += (sl != nullptr) ? 1 : 0;
+    char before_begin[64];
+    std::snprintf(before_begin, sizeof before_begin, "before Begin (%d slots held)", slots_held);
+    memory_line(before_begin);
     std::printf("[autostart-adopt] step 3: begin_new_game (adopts)\n");
     std::fflush(stdout);
     begin_new_game();
+    // BL-1084 (the cold review): Begin commits, so the rounds' held worlds go.
+    int slots_after = 0;
+    for (const auto& sl : m_wiz_slot) slots_after += (sl != nullptr) ? 1 : 0;
+    std::printf("[autostart-adopt] %s  Begin releases the rounds' held worlds (%d slots held "
+                "before, %d after)\n",
+                (slots_held == wizard_lapse_round_count && slots_after == 0) ? "PASS" : "FAIL",
+                slots_held, slots_after);
+    if (slots_after != 0) return 1;
     if (!m_worldgen_adopted)
     {
         std::printf("[autostart-adopt] FAILED: Begin did not adopt the cached world\n");
@@ -414,6 +600,7 @@ int app::run_autostart_adopt()
         std::printf("[autostart-adopt] FAILED: the tail did not reach play\n");
         return 1;
     }
+    memory_line("in play (after Begin)");
     std::printf("[autostart-adopt] OK  bodies=%zu nations=%zu corps=%zu markets=%zu tiles=%zu\n",
                 m_world.bodies.size(), m_world.nations.size(), m_world.corporations.size(),
                 m_world.markets.size(), m_world.tiles.size());
@@ -1363,6 +1550,113 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         refresh_wizard_preview();
         m_wiz_dirty = false;
         launch_wizard_history_run(i);
+    });
+
+    // BL-1084 -- A ROUND'S WAIT, FOR REAL. `history_run` adopts the harness's
+    // world at once, so no capture could ever show a wait. This parks on lapse
+    // round @p which (0-3), builds the round before's closing world on this
+    // thread and HOLDS it, then runs the round's own stage on a worker from a
+    // copy of it -- exactly the wizard's launch -- and returns true once its
+    // wait is on screen (its plan published): the next capture photographs the
+    // wait and its caption. The bars and the year counter are wherever the
+    // worker has got to (not a golden); the caption and the elapsed count
+    // (frozen at 0 s under --verify) are fixed. `history_wait_land` then blocks
+    // until the run lands and lands it, so the script ends on a quiet world.
+    v.set_function("history_wait", [this](sol::optional<int> which) -> bool {
+        const int i = std::clamp(which.value_or(2), 0, wizard_lapse_round_count - 1);
+        m_screen    = app_screen::generating;
+        m_wiz_round = wizard_planetology_round_count + i;
+        refresh_wizard_preview();
+        m_wiz_dirty = false;
+        return verify_stage_wait(i);
+    });
+    v.set_function("history_wait_land", [this]() -> bool {
+        return verify_land_wait(wizard_lapse_index());
+    });
+    // BL-1084 (the cold review) -- the staged run, driven further. Each blocks
+    // on the real worker while polling as the wizard's frame would (so a
+    // superseded run's rerun starts as it would on screen), with a timeout.
+    const auto wait_until = [this](const std::function<bool()>& done, int secs) {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(secs);
+        while (!done() && std::chrono::steady_clock::now() < deadline)
+        {
+            poll_wizard_history();
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        }
+        return done();
+    };
+    // Until the current round's RECORD has landed (round 6: at its span's close,
+    // while its worker still builds the tail).
+    v.set_function("history_wait_record", [this, wait_until]() -> bool {
+        const int i = wizard_lapse_index();
+        return wait_until([this, i] { return m_wiz_record_landed[i]; }, 900);
+    });
+    // Until the round's record has landed AND its worker, still building, has
+    // published an inner bar of its own -- round 6's tail (the nations' rows,
+    // the road walk, the search, the settle). Returns that inner bar's total,
+    // or 0 when the build landed first.
+    v.set_function("history_wait_tail_sub", [this, wait_until]() -> int {
+        const int i = wizard_lapse_index();
+        const auto sub = [this, i] {
+            return m_wiz_history_progress[i].sub_total.load(std::memory_order_relaxed);
+        };
+        wait_until([this, i, sub] {
+            return !m_wiz_history_future[i].valid() || (m_wiz_record_landed[i] && sub() > 0);
+        }, 900);
+        return m_wiz_history_future[i].valid() ? sub() : 0;
+    });
+    // The rate the wizard's playhead advances at on the current round, years per
+    // wall-clock second, beside the record's own span and the pace setting --
+    // what "one constant rate for the whole span" is checked against.
+    v.set_function("history_rate", [this]() {
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        const float secs = m_wiz_history_secs[i] > 0.0f ? m_wiz_history_secs[i]
+                                                         : wizard_lapse_secs_default;
+        return std::make_tuple(static_cast<double>(wizard_playback_rate(i)),
+                               static_cast<double>(h.lapse.years), static_cast<double>(secs));
+    });
+    // A fingerprint of the current round's ownership record (FNV-1a over every
+    // change), so a script can tell one run's record from another's.
+    v.set_function("history_digest", [this]() -> double {
+        const era_timelapse& t = m_wiz_history[wizard_lapse_index()].lapse;
+        uint32_t h = 2166136261u;
+        const auto fold = [&h](uint32_t x) { for (int b = 0; b < 4; ++b) { h ^= (x >> (8 * b)) & 0xFFu; h *= 16777619u; } };
+        fold(static_cast<uint32_t>(t.changes.size()));
+        for (const owner_change& c : t.changes)
+        {
+            fold(static_cast<uint32_t>(c.year));
+            fold(c.region);
+            fold(c.owner);
+        }
+        return static_cast<double>(h);
+    });
+    // The Reroll press on the round the wizard is on -- the button's own function.
+    v.set_function("wizard_reroll", [this]() {
+        const int p = m_wiz_round - wizard_planetology_round_count;
+        if (p >= 0 && p < wizard_pass_round_count) reroll_wizard_pass_round(p);
+    });
+    // End a staged run the script no longer needs: stopped at its next stage
+    // boundary, landed (and dropped as stale), every held world released.
+    v.set_function("history_wait_abandon", [this]() -> bool {
+        const int i = wizard_lapse_index();
+        m_wiz_live_verify = false;
+        if (m_wiz_history_future[i].valid())
+        {
+            m_wiz_history_stale[i] = true;
+            if (m_wiz_run_cancel[i]) m_wiz_run_cancel[i]->store(true, std::memory_order_relaxed);
+            m_wiz_history_future[i].wait();
+        }
+        poll_wizard_history();
+        drop_wizard_slots("verify: the staged run was abandoned");
+        return !m_wiz_history_future[i].valid();
+    });
+
+    // The caption the round's wait shows right now: `generation_stage_labels`
+    // at its sink's label. What a wait-capture script asserts on.
+    v.set_function("history_wait_caption", [this]() -> std::string {
+        const int li = m_wiz_history_progress[wizard_lapse_index()].label.load(std::memory_order_relaxed);
+        return (li >= 0 && li < generation_stage_label_count) ? generation_stage_labels[li] : "";
     });
 
     // Park the CURRENT lapse round's playback at a calendar year, so a check can

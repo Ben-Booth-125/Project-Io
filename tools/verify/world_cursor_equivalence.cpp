@@ -32,8 +32,17 @@
 //   report         the report's counters, lines and body entries.
 //
 // NON-VACUITY: on the shipped params every span runs, so each boundary's
-// owner-change digest must differ from the one before it -- a digest that
-// could not see a stage would pass (a) == (b) while comparing nothing.
+// owner-change digest must differ from the one before it, and each stage must
+// move the cursor's STATE (the digest without the stage counter, which would
+// differ at every boundary by construction) -- a digest that could not see a
+// stage would pass (a) == (b) while comparing nothing.
+//
+// NEGATIVE CONTROLS (the K1/K2 cold review): at the culture and exploration
+// boundaries one member of a copied cursor is perturbed -- a settlement history
+// line, an Exploration sea leg -- and the SAME comparison the proof uses must
+// report the difference. Every record the tail or a later span reads is folded
+// by content, not by size, so a copy that kept a table's count and lost its
+// rows cannot pass for a faithful one.
 //
 // --measure (K3): on the given seeds (default 0 and 28), no tail, the cost of
 // copying a closed stage's cursor at each boundary against the cost of
@@ -282,6 +291,92 @@ void fold_grudges(uint64_t& h, const std::vector<grudge>& gs)
     }
 }
 
+// CONTENT, NOT SIZE (the K1/K2 cold review): every record the tail or a later
+// span reads is folded field by field, so a copy that kept the count and lost
+// the content cannot pass for a faithful one.
+
+void fold_history(uint64_t& h, const std::vector<history_event>& es)
+{
+    fold_u32(h, static_cast<uint32_t>(es.size()));
+    for (const history_event& e : es)
+    {
+        fold_i64(h, e.years_before_epoch);
+        fold_i32(h, static_cast<int32_t>(e.stage));
+        fold_str(h, e.event);
+        fold_str(h, e.consequence);
+        fold_i32(h, static_cast<int32_t>(e.rung));
+    }
+}
+
+void fold_contacts(uint64_t& h, const std::vector<contact>& cs)
+{
+    fold_u32(h, static_cast<uint32_t>(cs.size()));
+    for (const contact& c : cs)
+    {
+        fold_u32(h, c.from);
+        fold_u32(h, c.to);
+        fold_i32(h, c.first.year);
+        fold_u32(h, c.first.region);
+        fold_i32(h, static_cast<int32_t>(c.first.kind));
+    }
+}
+
+void fold_sea_legs(uint64_t& h, const std::vector<sea_leg>& ls)
+{
+    fold_u32(h, static_cast<uint32_t>(ls.size()));
+    for (const sea_leg& l : ls)
+    {
+        fold_u32(h, l.a);
+        fold_u32(h, l.b);
+        fold_i32(h, l.uses);
+    }
+}
+
+void fold_dated(uint64_t& h, const std::vector<dated_object>& ds)
+{
+    fold_u32(h, static_cast<uint32_t>(ds.size()));
+    for (const dated_object& d : ds)
+    {
+        fold_i64(h, d.expires_year);
+        fold_i32(h, d.kind);
+        fold_i32(h, d.a);
+        fold_i32(h, d.b);
+    }
+}
+
+void fold_civilisations(uint64_t& h, const std::vector<civilisation>& cs)
+{
+    fold_u32(h, static_cast<uint32_t>(cs.size()));
+    for (const civilisation& c : cs)
+    {
+        fold_str(h, c.name);
+        fold_ints(h, c.members);
+        fold_i32(h, c.ethic.zeal);
+        fold_i32(h, c.ethic.dominion);
+        fold_i32(h, c.strain_q);
+        fold_i64(h, c.formed_year);
+    }
+}
+
+void fold_creeds(uint64_t& h, const std::vector<universal_creed>& cs)
+{
+    fold_u32(h, static_cast<uint32_t>(cs.size()));
+    for (const universal_creed& c : cs)
+    {
+        fold_str(h, c.name);
+        fold_i64(h, c.founded_year);
+        fold_i32(h, c.origin_polity);
+        fold_i32(h, c.origin_region);
+    }
+}
+
+void fold_tongue(uint64_t& h, const tongue& t)
+{
+    fold_strs(h, t.onsets);
+    fold_strs(h, t.vowels);
+    fold_strs(h, t.codas);
+}
+
 void fold_cultures(uint64_t& h, const std::vector<culture>& cs)
 {
     fold_u32(h, static_cast<uint32_t>(cs.size()));
@@ -297,6 +392,7 @@ void fold_cultures(uint64_t& h, const std::vector<culture>& cs)
         fold_i64(h, c.coined_year);
         fold_i32(h, c.coined_from);
         fold_i32(h, c.folded_into);
+        fold_tongue(h, c.speech);
     }
 }
 
@@ -335,16 +431,17 @@ uint64_t polities_digest(const generation_cursor& c, const era_minus_one_fixture
     return h;
 }
 
-/// The cursor's own members -- everything a stage hands the next that no world
+/// The cursor's own STATE -- everything a stage hands the next that no world
 /// digest can see (and the tile fields the deep digest does not fold, so the
 /// Life gate's boundary is checked on its terrain, not only its deposits).
-uint64_t cursor_digest(const generation_cursor& c)
+/// Folded by content wherever the tail or a later span reads the member. The
+/// stage counter and the three run flags are NOT in it (`cursor_digest` adds
+/// them): a digest led by `reached` differs at every boundary by construction,
+/// so "every stage moves the cursor" read off it could never fail (the K1/K2
+/// cold review's finding).
+uint64_t cursor_state_digest(const generation_cursor& c)
 {
     uint64_t h = 14695981039346656037ull;
-    fold_u8(h, static_cast<uint8_t>(c.reached));
-    fold_bool(h, c.era_ran);
-    fold_bool(h, c.exploration_ran);
-    fold_bool(h, c.history_closed);
     fold_f32(h, c.deposit_scalar);
     fold_str(h, c.naming.star);
     fold_strs(h, c.naming.bodies);
@@ -354,7 +451,7 @@ uint64_t cursor_digest(const generation_cursor& c)
     fold_ints(h, c.kepler_tiles);
     fold_u32(h, static_cast<uint32_t>(c.kepler_pl.endemics.size()));
     for (const endemic_good& e : c.kepler_pl.endemics) fold_i32(h, static_cast<int32_t>(e.good));
-    fold_u32(h, static_cast<uint32_t>(c.kepler_pl.history.size()));
+    fold_history(h, c.kepler_pl.history);
 
     // The homeworld's tiles, in raster order: terrain, rivers, settled.
     for (const entity_id tid : c.kepler_tiles)
@@ -377,20 +474,23 @@ uint64_t cursor_digest(const generation_cursor& c)
         fold_bool(h, c.w.tile_settled.count(tid) != 0);
     }
 
-    fold_u32(h, static_cast<uint32_t>(c.kepler_hist.history.size()));
+    // The ladder, the creeds and the settlement -- their histories by content:
+    // the tail merges all three into the homeworld's biography.
+    fold_history(h, c.kepler_hist.history);
     fold_cultures(h, c.kepler_creeds.cultures);
-    fold_u32(h, static_cast<uint32_t>(c.kepler_creeds.history.size()));
+    fold_history(h, c.kepler_creeds.history);
     fold_regions(h, c.kepler_settlement.regions);
     fold_i64(h, c.kepler_settlement.migration_end_year);
-    fold_u32(h, static_cast<uint32_t>(c.kepler_settlement.spawned_cultures.size()));
+    fold_cultures(h, c.kepler_settlement.spawned_cultures);
     fold_ints(h, c.kepler_settlement.settled_cells);
-    fold_u32(h, static_cast<uint32_t>(c.kepler_settlement.history.size()));
+    fold_history(h, c.kepler_settlement.history);
 
     fold_ints(h, c.kepler_np.seed_tiles);
     fold_ints(h, c.kepler_np.seed_polities);
     fold_ints(h, c.kepler_np.polity_treasuries);
     fold_strs(h, c.kepler_np.polity_names);
     fold_u32(h, static_cast<uint32_t>(c.kepler_np.seed_tongues.size()));
+    for (const tongue& t : c.kepler_np.seed_tongues) fold_tongue(h, t);
     fold_i32(h, c.kepler_np.min_seed_separation);
     fold_i32(h, c.kepler_np.land_tiles_per_seed);
 
@@ -417,19 +517,36 @@ uint64_t cursor_digest(const generation_cursor& c)
         fold_u32(h, c.terrain.river[i]);
     }
 
-    // The two resume structs, beyond their polities (folded under `polities`).
+    // The two resume structs, beyond their polities (folded under `polities`),
+    // by content: every table the next span resumes from.
     fold_regions(h, c.pass_one.regions);
     fold_grudges(h, c.pass_one.grudges);
     fold_corridors(h, c.pass_one.surviving_corridors);
-    fold_u32(h, static_cast<uint32_t>(c.pass_one.contacts.size()));
+    fold_contacts(h, c.pass_one.contacts);
     fold_cultures(h, c.pass_one.cultures);
+    fold_civilisations(h, c.pass_one.civilisations);
+    fold_creeds(h, c.pass_one.universal_creeds);
     fold_timelapse(h, c.pass_one.timelapse);
     fold_regions(h, c.exploration.regions);
     fold_grudges(h, c.exploration.grudges);
     fold_corridors(h, c.exploration.surviving_corridors);
-    fold_u32(h, static_cast<uint32_t>(c.exploration.contacts.size()));
-    fold_u32(h, static_cast<uint32_t>(c.exploration.sea_legs.size()));
-    fold_u32(h, static_cast<uint32_t>(c.exploration.dated_objects.size()));
+    fold_contacts(h, c.exploration.contacts);
+    fold_sea_legs(h, c.exploration.sea_legs);
+    fold_dated(h, c.exploration.dated_objects);
+    fold_civilisations(h, c.exploration.civilisations);
+    fold_creeds(h, c.exploration.universal_creeds);
+    return h;
+}
+
+/// The whole cursor: its state, then where it stands and what has run.
+uint64_t cursor_digest(const generation_cursor& c)
+{
+    uint64_t h = cursor_state_digest(c);
+    fold_u8(h, static_cast<uint8_t>(c.reached));
+    fold_bool(h, c.era_ran);
+    fold_bool(h, c.exploration_ran);
+    fold_bool(h, c.history_closed);
+    fold_bool(h, c.migration_folded);
     return h;
 }
 
@@ -474,7 +591,8 @@ struct boundary_digest
 {
     uint64_t      world         = 0;
     world_metrics metrics;
-    uint64_t      cursor        = 0;
+    uint64_t      cursor        = 0; ///< State plus stage and run flags.
+    uint64_t      cursor_state  = 0; ///< State alone (the non-vacuity reading).
     uint64_t      owner_changes = 0;
     uint64_t      polities      = 0;
     uint64_t      report        = 0;
@@ -487,10 +605,20 @@ boundary_digest digest_at(const generation_cursor& c, const generation_report& r
     d.world         = deep_digest(c.w, fx);
     d.metrics       = measure(c.w);
     d.cursor        = cursor_digest(c);
+    d.cursor_state  = cursor_state_digest(c);
     d.owner_changes = owner_changes_digest(rep);
     d.polities      = polities_digest(c, fx);
     d.report        = report_digest(rep);
     return d;
+}
+
+/// THE ONE COMPARISON the proof and its negative controls both use, so a
+/// control that makes this report a difference proves the proof would.
+bool boundary_equal(const boundary_digest& a, const boundary_digest& b)
+{
+    return a.world == b.world && a.metrics == b.metrics && a.cursor == b.cursor
+        && a.owner_changes == b.owner_changes && a.polities == b.polities
+        && a.report == b.report;
 }
 
 /// One slot of the staged build: a cursor with its own report and fixture. The
@@ -578,6 +706,16 @@ void prove_seed(uint32_t seed, const world_gen_config& cfg, const works_registry
     //     the predecessor freed before the stage runs.
     const clk::time_point tb = clk::now();
     boundary_digest db[k_boundary_count];
+    // NEGATIVE CONTROLS (the K1/K2 cold review): one member of a COPIED cursor
+    // is perturbed at a boundary, and the same comparison the proof uses must
+    // report the difference -- a proof whose digests cannot see a member cannot
+    // prove that member copied. Two members the digests once folded by size
+    // alone: an Exploration sea leg (a span table the Industrialisation span
+    // resumes from) and a settlement history line (the tail merges it into the
+    // homeworld's biography). A member empty on this seed falls back to the
+    // next table in the same struct, and says which it took.
+    std::string control_span_what, control_hist_what;
+    bool        control_span = false, control_hist = false;
     {
         std::unique_ptr<staged_slot> slot(new staged_slot{});
         slot->cursor = begin_generation(params, &slot->report, cfg, nullptr, &works, &slot->fixture);
@@ -591,6 +729,50 @@ void prove_seed(uint32_t seed, const world_gen_config& cfg, const works_registry
             }
             run_generation_to(slot->cursor, k_boundaries[i]);
             db[i] = digest_at(slot->cursor, slot->report, slot->fixture);
+
+            if (k_boundaries[i] == generation_stage::culture)
+            {
+                std::unique_ptr<staged_slot> bad = copy_slot(*slot);
+                generation_cursor& c = bad->cursor;
+                if (!c.kepler_settlement.history.empty())
+                {
+                    c.kepler_settlement.history.front().event += ".";
+                    control_hist_what = "a settlement history line's text";
+                }
+                else if (!c.kepler_creeds.history.empty())
+                {
+                    c.kepler_creeds.history.front().event += ".";
+                    control_hist_what = "a creed history line's text";
+                }
+                else
+                {
+                    c.kepler_hist.history.front().event += ".";
+                    control_hist_what = "a ladder history line's text";
+                }
+                control_hist = !boundary_equal(da[i], digest_at(c, bad->report, bad->fixture));
+            }
+            if (k_boundaries[i] == generation_stage::exploration)
+            {
+                std::unique_ptr<staged_slot> bad = copy_slot(*slot);
+                exploration_output& x = bad->cursor.exploration;
+                if (!x.sea_legs.empty())
+                {
+                    x.sea_legs.front().uses += 1;
+                    control_span_what = "an Exploration sea leg's uses";
+                }
+                else if (!x.contacts.empty())
+                {
+                    x.contacts.front().first.year += 1;
+                    control_span_what = "an Exploration contact's year";
+                }
+                else if (!x.dated_objects.empty())
+                {
+                    x.dated_objects.front().expires_year += 1;
+                    control_span_what = "an Exploration dated object's expiry";
+                }
+                control_span = !control_span_what.empty()
+                            && !boundary_equal(da[i], digest_at(bad->cursor, bad->report, bad->fixture));
+            }
         }
     }
     const double ms_b = ms_since(tb);
@@ -605,7 +787,7 @@ void prove_seed(uint32_t seed, const world_gen_config& cfg, const works_registry
         const bool p_ok = a.polities == b.polities;
         const bool c_ok = a.cursor == b.cursor;
         const bool r_ok = a.report == b.report;
-        all = all && w_ok && o_ok && p_ok && c_ok && r_ok;
+        all = all && boundary_equal(a, b);
         std::printf("  %-18s world %016llX %s | owner_changes %016llX %s | polities %016llX %s"
                     " | cursor %016llX %s | report %016llX %s\n",
                     stage_name(k_boundaries[i]),
@@ -619,10 +801,19 @@ void prove_seed(uint32_t seed, const world_gen_config& cfg, const works_registry
                    + ": every stage on a faithful copy of its predecessor == the composition, at "
                      "every boundary (world, owner_changes, polities, cursor, report)");
 
+    // THE NEGATIVE CONTROLS, reported: each must make the comparison FAIL.
+    check(control_hist, "seed " + std::to_string(seed) + ": negative control -- " + control_hist_what
+                            + " perturbed in a copied culture cursor makes the comparison report FAIL");
+    check(control_span, "seed " + std::to_string(seed) + ": negative control -- "
+                            + (control_span_what.empty() ? std::string("(no Exploration table held a row)")
+                                                         : control_span_what)
+                            + " perturbed in a copied exploration cursor makes the comparison report FAIL");
+
     // Non-vacuity: every digest can see the stages that write what it folds.
     //   * owner_changes: every span boundary (the migration's record at
     //     culture, then one span record each);
-    //   * cursor: every stage;
+    //   * cursor STATE: every stage -- the state digest, never the one led by
+    //     the stage counter, which differs at every boundary by construction;
     //   * report: every stage after culture (culture's one report write is the
     //     migration record, which owner_changes folds);
     //   * world: the tail (the stages before it write tiles, the settled set and
@@ -631,7 +822,7 @@ void prove_seed(uint32_t seed, const world_gen_config& cfg, const works_registry
     for (int i = 1; i <= 4; ++i) // culture, empires, exploration, industrialisation
         moved = moved && da[i].owner_changes != da[i - 1].owner_changes;
     for (int i = 1; i < k_boundary_count; ++i)
-        moved = moved && da[i].cursor != da[i - 1].cursor;
+        moved = moved && da[i].cursor_state != da[i - 1].cursor_state;
     for (int i = 2; i < k_boundary_count; ++i)
         moved = moved && da[i].report != da[i - 1].report;
     moved = moved && da[k_boundary_count - 1].world != da[k_boundary_count - 2].world;

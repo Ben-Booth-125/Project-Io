@@ -39,6 +39,13 @@
 #include <unordered_set>
 #include <vector>
 
+/// BL-1084: one wizard round's closed world -- a `generation_cursor` stopped at
+/// the round's stage, with the report it has written so far (STARTUP.md § The
+/// world cache). Defined in ui/startup_screens.cpp, the one TU that builds and
+/// copies them, so this header does not carry world/generation_cursor.hpp
+/// (history_sim.hpp) to every includer; everywhere else holds it by pointer.
+struct wizard_slot;
+
 /// Top-level application object. Owns the SDL window and renderer, orchestrates
 /// the simulation and economy loops, and holds the Lua state for the lifetime
 /// of the process.
@@ -157,12 +164,20 @@ public:
     /// warm start had no automated coverage at all. Returns 0 on success.
     int run_autostart();
 
-    /// Headless (BL-1073, `--autostart-adopt`): run the wizard's last round's
-    /// own build, check an invalidation drops its cached world, then press
-    /// Begin on it and run the tail to play. Prints the opening state hash,
-    /// which `tools/verify/begin_adopts_check.js` compares against a cold
+    /// Headless (BL-1073, `--autostart-adopt`): walk the wizard's world forward
+    /// round by round as a player would (BL-1084: the Life gate, then each
+    /// round on a copy of the round before's closing world, each waiting for
+    /// the last to land), check an invalidation drops the cached world, then
+    /// press Begin on it and run the tail to play. Prints the opening state
+    /// hash, which `tools/verify/begin_adopts_check.js` compares against a cold
     /// `--autostart` of the same params. Returns 0 on success.
     int run_autostart_adopt();
+
+    /// BL-1073: every field of `world_params`, compared. The guard behind the
+    /// wizard's world cache (Begin's adopt) and, since BL-1084, behind each
+    /// held slot a round starts from. A new field on `world_params` must join
+    /// this list, or a world built under a different value could be adopted.
+    static bool same_world_params(const world_params& a, const world_params& b);
 
 private:
     /// The shared core of run_verify / run_verify_all: one setup + API
@@ -288,6 +303,12 @@ private:
     /// planetology round re-draws the ones below it. Called from the wizard's
     /// reroll and from every planetology recompute — a planetology change moves the
     /// ground both lapse passes run on, so all three pass rounds go with it.
+    ///
+    /// BL-1084: A ROUND'S WORLD GOES WITH ITS RECORD. Each dropped round's
+    /// closing slot (the cursor the round after it would start from) is
+    /// released with the record, and round 6's cached world as before. The
+    /// Life gate's slot is not a pass round's: it goes with the planetology
+    /// (`refresh_wizard_preview`), which calls this for everything below it.
     void invalidate_wizard_rounds_below(int round)
     {
         for (int i = 0; i < wizard_pass_round_count; ++i)
@@ -308,6 +329,9 @@ private:
             if (m_wiz_history_future[i].valid())
             {
                 m_wiz_history_stale[i] = true;
+                // BL-1084: and it stops at its next stage boundary -- a
+                // superseded round 6 skips its tail and finish.
+                if (m_wiz_run_cancel[i]) m_wiz_run_cancel[i]->store(true, std::memory_order_relaxed);
                 // BL-914: a live round already has a partial record drawn from
                 // its tap — that ground is gone the instant the planetology
                 // moved, exactly as much as a landed one would be, so it stops
@@ -316,8 +340,13 @@ private:
                 m_wiz_history[i] = ui::history_lapse{};
             }
             else m_wiz_history[i] = ui::history_lapse{};
+            m_wiz_record_landed[i]   = false;
             m_wiz_history_playing[i] = false;
             m_wiz_history_paused[i]  = false;
+            // BL-1084: this round's closing world, which the round after it
+            // starts from, is a world of the ground that just moved.
+            if (i + 1 < wizard_lapse_round_count)
+                m_wiz_slot[i + 1].reset();
             // BL-1073: the last round's record is a world, and it goes with
             // the record -- a held world that no longer matches the controls
             // is worse than a slow one (STARTUP.md § The seat).
@@ -325,6 +354,36 @@ private:
                 drop_wizard_world("a round above the world moved");
         }
     }
+
+    /// BL-1084: whether any pass round's worker is in flight, stale ones
+    /// included. NO TWO PASS ROUNDS BUILD AT ONCE (STARTUP.md § The wait, then
+    /// the lapse): a launch while this is true is deferred, and
+    /// `poll_wizard_history` starts the round on screen once it is false.
+    bool wizard_any_round_running() const
+    {
+        for (int i = 0; i < wizard_lapse_round_count; ++i)
+            if (m_wiz_history_future[i].valid()) return true;
+        return false;
+    }
+
+    /// BL-1084: NEXT WAITS FOR THE ROUND ON SCREEN (Ben, 2026-09-25; STARTUP.md
+    /// § The wait, then the lapse). Why Next is disabled on wizard round
+    /// @p round -- the hover it shows -- or null when it is enabled. The Life
+    /// round waits on its gate world, a pass round on its own run; the System
+    /// round and round 6 (whose press is Begin) never wait. Under `--verify`
+    /// nothing waits: every round adopts the harness's world synchronously.
+    const char* wizard_next_wait_reason(int round) const;
+
+    /// BL-1084: release every held slot (the gate and each round's closing
+    /// world) and round 6's world, logging @p why when any was held. Leaving
+    /// the wizard for the menu: re-entering re-runs the chain and everything
+    /// below it, so nothing held could be used.
+    void drop_wizard_slots(const char* why);
+    /// The slots alone (not round 6's world, not the records): Begin commits,
+    /// so the pre-tail worlds the rounds were held for are released there --
+    /// round 6's worker, if still running, holds its own copy (the cold
+    /// review's finding: four worlds and their reports outlived Begin).
+    void release_wizard_slots(const char* why);
 
     /// Which lapse record the wizard's CURRENT round owns, clamped into range.
     /// A round that is not a lapse round answers 0 rather than a sentinel: every
@@ -589,6 +648,9 @@ private:
     /// round every ~20 frames and presses Begin from inside its own draw — the
     /// same mid-frame call site the real button uses.
     int  m_autostart_wizard = -1;
+    /// The planetology round the walk last rerolled (BL-1084: once per round,
+    /// or the Life round's gate world never lands and Next never enables).
+    int  m_autostart_rerolled_round = -1;
     bool m_wiz_dirty = true; ///< A control moved (or the wizard just opened) — recompute the preview next frame.
     resolved_world m_wiz_resolved{};              ///< The pending preferences resolved against the seed — the params every preview chart is drawn from, plus the reroll cost (attempts / gave_up).
     body_naming m_wiz_names{};                    ///< The coined body catalogue for the pending seed (BL-257) — what the wizard's charts and orrery label bodies with.
@@ -609,7 +671,38 @@ private:
     // Since BL-915 the build returns TWO rasters: the packed axes the globe
     // samples, and the packed landform + river edges the lapse maps draw their
     // terrain base from (ui::wizard_surface).
-    std::future<ui::wizard_surface> m_wiz_surface_future;
+    //
+    // BL-1084: THE LIFE ROUND BUILDS THE REAL GATE WORLD. The worker is no
+    // longer a scratch preview: it is generation's own Life-gate stage
+    // (`begin_generation` + `run_generation_to(life_gate)`: the star, the
+    // system, the homeworld's tiles with their deposits, its rivers), the
+    // rasters are packed off that world, and the world itself is kept as
+    // slot 0 -- what the Culture round starts from. `--verify` keeps the
+    // synchronous preview (the rounds there adopt the harness's world).
+    struct wizard_gate_build
+    {
+        ui::wizard_surface           surface;
+        std::shared_ptr<wizard_slot> slot; ///< The gate world, stopped at life_gate.
+    };
+    std::future<wizard_gate_build> m_wiz_surface_future;
+
+    /// BL-1084 -- THE WORLD CACHE'S SLOTS (STARTUP.md § The world cache).
+    /// [0] is the Life gate; [k] is lapse round k-1's closing world (Culture,
+    /// Empires, Exploration). Round 6's world is `m_wiz_world` below, the shape
+    /// Begin adopts. A slot is FILLED when its round lands and HELD after it:
+    /// the round after it starts from a faithful copy (BL-1034), so Back keeps
+    /// every world and a reroll re-copies (K3's measured choice: a copy costs
+    /// ~30-40 ms, a replay up to ~9 s). Released with its round's record.
+    std::shared_ptr<wizard_slot> m_wiz_slot[wizard_lapse_round_count];
+    /// What a pass round's worker hands back when it lands: the record, and
+    /// (rounds 3-5) the closing slot the next round starts from. Round 6's
+    /// world travels through `m_wiz_world_pending`, and its record through
+    /// `m_wiz_round6_record`, ahead of the world.
+    struct wizard_landing
+    {
+        ui::history_lapse            record;
+        std::shared_ptr<wizard_slot> slot;
+    };
 
     // --- Async world generation (2026-08-12) --------------------------------
     struct wizard_world_cache; // declared with the wizard's cache below
@@ -646,24 +739,51 @@ private:
     // So arriving on the round runs the pass, it runs inside the round, and the
     // wait IS the content (Ben, 2026-09-08: *a watched wait needs no budget*).
     //
-    // ONE SLOT PER LAPSE ROUND, and today both slots run the SAME pass and hold
-    // the same kind of record — which the rounds say in as many words rather than
-    // implying a separation the code has not made. The generation-side split (a
-    // migration span with its own terminating condition, then a history span to
-    // 1200 CE) is BL-858/BL-861. Indexed by `m_wiz_round -
+    // ONE RECORD PER LAPSE ROUND, indexed by `m_wiz_round -
     // wizard_planetology_round_count`; see `wizard_lapse_index`.
     //
-    // WHAT THE WORKER ACTUALLY RUNS is `make_hard_coded_world` — generation's own
-    // single invocation — and it throws the world away, keeping only the recorded
-    // era. That is the same argument `generate_home_surface_preview` is built on:
-    // the ground the history runs on must be the ground "Begin" hands over. A
-    // partial re-derivation of settlement-plus-era up here would be a SECOND
-    // construction of the Era -1 invocation, which is precisely the drift
-    // `world/era_minus_one.hpp` exists to stop (BL-462, and NR-733 for the last
-    // caller that did it). No caller is added: the record is read off the report
-    // the run already fills.
+    // WHAT THE WORKER ACTUALLY RUNS (BL-1084) is ONE OF GENERATION'S OWN STAGES
+    // -- the stage the single `make_hard_coded_world` call is composed of --
+    // on a faithful copy of the round before's closing world (`m_wiz_slot`),
+    // and it KEEPS the world: that is the slot the round after it starts from.
+    // Nothing is built twice and nothing is built to be discarded (STARTUP.md
+    // § The world cache). The record is read off the report the stage already
+    // fills (`stopped_report`: the report the stop flags always produced), so
+    // no second construction of the Era -1 invocation exists up here -- the
+    // drift `world/era_minus_one.hpp` stops (BL-462, NR-733).
     ui::history_lapse              m_wiz_history[wizard_lapse_round_count];        ///< Each lapse round's record; empty until its run finishes.
-    std::future<ui::history_lapse> m_wiz_history_future[wizard_lapse_round_count]; ///< The run in flight on that round, if any.
+    std::future<wizard_landing>    m_wiz_history_future[wizard_lapse_round_count]; ///< The run in flight on that round, if any.
+    /// BL-1084: the round's record is whole and on screen. Set when it lands --
+    /// for rounds 3-5 with the run, for round 6 at the span's close, ahead of
+    /// its tail -- and cleared with the record. The wait is "a run in flight
+    /// whose record has not landed"; after this, the live tap is never read
+    /// again (the landed record owns the round's record wholesale).
+    bool m_wiz_record_landed[wizard_lapse_round_count] = {};
+    /// BL-1084: ROUND 6 PLAYS AT ITS SPAN'S CLOSE (STARTUP.md § Round 6). The
+    /// worker sets this as soon as the Industrialisation span has run -- the
+    /// record is whole there -- then builds the tail behind the playing map;
+    /// the world lands later on `m_wiz_history_future[3]` and only swaps the
+    /// world slot.
+    std::future<ui::history_lapse> m_wiz_round6_record;
+    /// BL-1084 (the cold review): each run's STOP flag, shared with its worker.
+    /// Set wherever the run is marked stale (an invalidation, a reroll mid-run):
+    /// the worker stops at its next stage boundary -- a superseded round 6
+    /// skips its tail and finish -- so the rerun a player asked for starts
+    /// seconds, not minutes, later. Read only between stages; it never changes
+    /// what a run that is not stopped builds.
+    std::shared_ptr<std::atomic<bool>> m_wiz_run_cancel[wizard_lapse_round_count];
+    /// Verify only: a staged real run is in flight (`verify_stage_wait`), so
+    /// the poll may start a deferred rerun for real, as the wizard would.
+    bool m_wiz_live_verify = false;
+    /// BL-1084: the lapse's years per wall-clock second on lapse round @p i --
+    /// the record's own span over the pace setting, one constant rate (the
+    /// sink's span counter only while the run is still live). The draw and
+    /// the verify API read this one function.
+    float wizard_playback_rate(int lapse_index) const;
+    /// The record just landed on round @p i: park and play it, carry the
+    /// predecessor's close under it and re-pin its successor. One landing for
+    /// every round, whichever channel the record came by.
+    void land_wizard_record(int i, ui::history_lapse record);
     /// The wait's own content per lapse round: which pass, which year.
     ///
     /// ON THE HEAP, AND THAT IS LOAD-BEARING (measured 2026-09-09). A
@@ -715,19 +835,20 @@ private:
     // --- The wizard's world, kept for Begin (BL-1073, BL-1085) ---------------
     //
     // STARTUP.md § The world cache. The last lapse round (Industrialisation)
-    // runs the FULL build -- the same `make_hard_coded_world` call Begin would
-    // make, on the same params, config and works -- AND FINISHES IT
-    // (`finish_campaign_world`: the search, the winner, the settle; BL-1085),
-    // so its world is kept here rather than discarded, and Begin adopts it
-    // instead of building a second.
+    // runs the Industrialisation span and the tail on a copy of round 5's
+    // closing world (BL-1084) -- the same stages the single
+    // `make_hard_coded_world` call Begin would make runs, on the same params,
+    // config and works -- AND FINISHES IT (`finish_campaign_world`: the
+    // search, the winner, the settle; BL-1085), so its world is kept here and
+    // Begin adopts it instead of building a second.
     //
-    // OWNER: the app. ONE world at most: `m_wiz_world_pending` is the slot the
-    // round-6 worker is filling (created at launch, filled on the worker, read
-    // only after its future lands -- the future is the synchronisation), and
-    // `m_wiz_world` is the landed, valid cache. On landing the slot moves into
-    // the cache; a stale landing drops it. Nothing is ever copied: a copied
-    // world does not iterate as its original (see harness_params.hpp's
-    // BL-1034 note), and a world is large -- it is MOVED in and moved out.
+    // OWNER: the app. `m_wiz_world_pending` is the slot the round-6 worker is
+    // filling (created at launch, filled on the worker, read only after its
+    // future lands -- the future is the synchronisation), and `m_wiz_world` is
+    // the landed, valid cache. On landing the slot moves into the cache; a
+    // stale landing drops it. The finished world is MOVED in and moved out,
+    // never copied; the rounds' held slots (`m_wiz_slot`) are the copies, and
+    // BL-1034 is what makes a copy tick as its original.
     // The REGISTRY is the one copy: loaded from Lua on the main thread before
     // the launch (sol2 is not thread-safe), copied into the slot, banded by the
     // worker from the world it built, and moved into `m_registry` at Begin --
@@ -816,7 +937,24 @@ private:
     /// Start lapse round @p lapse_index's pass for the CURRENT pending params.
     /// Synchronous under `--verify` (a capture must never race a worker), exactly
     /// as the wizard's surface build already is.
-    void launch_wizard_history_run(int lapse_index);
+    /// BL-1084: the round runs ONLY its own stage, on a faithful copy of the
+    /// round before's closing world (slot @p lapse_index), else a replay; a
+    /// launch while another round's run is in flight is deferred (the poll
+    /// starts the round on screen once nothing runs). @p live_under_verify
+    /// runs it for real on a worker even under `--verify` (verify_stage_wait).
+    void launch_wizard_history_run(int lapse_index, bool live_under_verify = false);
+    /// The Reroll press on pass round @p pass_index (0 = Culture): a fresh
+    /// span seed for that round alone, the rounds below it invalidated, and
+    /// the round re-run from a fresh copy of the round before's held world.
+    /// One function for the button and the `--autostart-adopt` walk.
+    void reroll_wizard_pass_round(int pass_index);
+    /// BL-1084, verify only: stage a REAL run of lapse round @p lapse_index
+    /// from a held predecessor built on this thread, and return once its wait
+    /// is on screen (its plan published) -- so a script can photograph a wait,
+    /// which the adopt path never shows. `verify_land_wait` blocks until the
+    /// run lands and lands it.
+    bool verify_stage_wait(int lapse_index);
+    bool verify_land_wait(int lapse_index);
     /// Per-frame: adopt any finished run and park its playback at its first year.
     void poll_wizard_history();
     /// Per-frame, BL-914: while a lapse round's run is still in flight, pull

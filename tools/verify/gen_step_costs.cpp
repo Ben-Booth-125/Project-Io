@@ -43,7 +43,10 @@
 // history roads re-stamped from the fixture, must reproduce the built world's
 // road field tile for tile — otherwise the replay is not measuring the pass the
 // build ran, and the row says so. Each replay starts from a road-free body and
-// cold A* caches, exactly as the in-generation pass does. Not combinable with
+// cold A* caches, exactly as the in-generation pass does. Each row is followed by a
+// BAR line (BL-1119 round 2): the loading bar's unit plan per phase against the wall
+// time of the border walk, read off the pass's own report_sub from a sampler thread,
+// and the kBorderUnitsPerNation that would make the bar linear. Not combinable with
 // --finish (the finish stamps roads and grows centres; the replays leave the body
 // road-free), and it runs after the watcher stops, so it never reads as a still bar.
 
@@ -51,6 +54,7 @@
 #include "world/era_minus_one.hpp"
 #include "world/finish_campaign_world.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/logistics.hpp" // invalidate_logistics_caches
 #include "world/recipe_registry.hpp"
 #include "world/road_generation.hpp"
 #include "world/works_roster.hpp"
@@ -124,6 +128,82 @@ void write_road_map(const world& w, entity_id body, const std::set<entity_id>& c
     }
 }
 
+/// BL-1119 round 3 — JOINED TO A TOWN, rebuilt from the trace alone (the same reading
+/// road_generation_harness R5f asserts). Connectivity is the laid routes' own paths:
+/// consecutive tiles of every tree, loop and spur route are joined (water tiles
+/// included, so a strait crossing bridges as the rule says it does); border routes are
+/// left out, so "joined" means joined inside the nation's own network. A centre is
+/// joined when its tile's component holds a town (scale >= 2) of the same nation.
+struct joined_reading
+{
+    int villages_claimed = 0;     ///< villages the pass counts on their network
+    int villages_unjoined = 0;    ///< of them, whose road reaches no same-nation town
+    int border_endpoints = 0;     ///< border-link endpoints (two per link)
+    int border_unjoined = 0;      ///< of them, not joined to a same-nation town
+};
+
+joined_reading read_joined(const world& w, entity_id body, const road_generation_trace& tr)
+{
+    std::map<entity_id, entity_id> parent;
+    auto root = [&](entity_id x) -> entity_id {
+        if (parent.find(x) == parent.end()) { parent.emplace(x, x); return x; }
+        entity_id r = x;
+        while (parent[r] != r) r = parent[r];
+        while (parent[x] != r) { const entity_id nx = parent[x]; parent[x] = r; x = nx; }
+        return r;
+    };
+    auto join = [&](entity_id a, entity_id b) {
+        const entity_id ra = root(a), rb = root(b);
+        if (ra != rb) parent[std::max(ra, rb)] = std::min(ra, rb);
+    };
+    for (const auto& r : tr.routes)
+    {
+        if (r.k == road_generation_trace::kind::border) continue;
+        for (std::size_t i = 1; i < r.path.size(); ++i) join(r.path[i - 1], r.path[i]);
+        if (!r.path.empty()) { join(r.from, r.path.front()); join(r.to, r.path.front()); }
+    }
+    auto nation_at = [&](entity_id t) {
+        const auto it = w.tile_to_nation.find(t);
+        return it != w.tile_to_nation.end() ? it->second : null_entity;
+    };
+    std::map<entity_id, int> scale_at; // centre tile -> scale, on the body
+    std::set<std::pair<entity_id, entity_id>> town_roots; // (component root, nation)
+    for (const auto& [cid, tile] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tile);
+        const auto pit = w.population_centres.find(cid);
+        if (tit == w.tiles.end() || tit->second.body != body || pit == w.population_centres.end())
+            continue;
+        scale_at[tile] = pit->second.scale;
+        if (pit->second.scale >= 2) town_roots.insert({ root(tile), nation_at(tile) });
+    }
+    auto joined = [&](entity_id tile) {
+        const auto s = scale_at.find(tile);
+        if (s != scale_at.end() && s->second >= 2) return true; // a town is the network
+        return town_roots.count({ root(tile), nation_at(tile) }) != 0;
+    };
+    joined_reading jr;
+    for (const entity_id c : tr.on_network)
+    {
+        const auto ct = w.population_centre_tile.find(c);
+        if (ct == w.population_centre_tile.end()) continue;
+        const auto s = scale_at.find(ct->second);
+        if (s == scale_at.end() || s->second >= 2) continue;
+        ++jr.villages_claimed;
+        if (!joined(ct->second)) ++jr.villages_unjoined;
+    }
+    for (const auto& r : tr.routes)
+    {
+        if (r.k != road_generation_trace::kind::border) continue;
+        for (const entity_id e : { r.from, r.to })
+        {
+            ++jr.border_endpoints;
+            if (!joined(e)) ++jr.border_unjoined;
+        }
+    }
+    return jr;
+}
+
 /// A road-free body and cold traversal caches: the state `generate_roads` meets in
 /// generation (only the two road passes write road_level before the finish).
 void clear_roads(world& w, entity_id body)
@@ -131,9 +211,41 @@ void clear_roads(world& w, entity_id body)
     for (auto& [tid, tc] : w.tiles)
         if (tc.body == body)
             tc.road_level = 0;
-    w.astar_cost_cache.clear();
-    w.logistics_flood_fields.clear();
-    w.body_reach_cost.clear();
+    invalidate_logistics_caches(w); // every traversal cache, through its one owner
+}
+
+/// One `generate_roads` call with the loading bar's own sub-progress watched from a
+/// second thread (BL-1119 round 2, the bar's weights): the wall time of the whole pass
+/// and of its BORDER WALK, which starts where the reported units cross the pass's own
+/// border base (`units_backbone + units_spurs`). Read from the sink the loading screen
+/// reads, so it measures exactly what the bar shows; no clock enters world code.
+double timed_generate_roads(world& w, entity_id body, long long floor, road_generation_stats& st,
+                            double& border_s, road_generation_trace* trace)
+{
+    auto bar = std::make_unique<generation_progress>();
+    std::atomic<bool> stop{false};
+    std::vector<std::pair<double, int>> samples; // (seconds, sub_progress)
+    const clk::time_point t0 = clk::now();
+    std::thread sampler([&] {
+        while (!stop.load(std::memory_order_acquire))
+        {
+            samples.emplace_back(secs_between(t0, clk::now()),
+                                 bar->sub_progress.load(std::memory_order_relaxed));
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+    });
+    generate_roads(w, body, bar.get(), floor, &st, trace);
+    const double total = secs_between(t0, clk::now());
+    stop.store(true, std::memory_order_release);
+    sampler.join();
+    // report_sub scales into int range only past a million units; the plans measured
+    // here are far below that, so the reported count IS the unit count.
+    const long long border_base = st.units_backbone + st.units_spurs;
+    double border_from = total;
+    for (const auto& [t, sub] : samples)
+        if (sub >= border_base) { border_from = t; break; }
+    border_s = total - border_from;
+    return total;
 }
 
 /// BL-1119 D1: the village size distribution the spur floor reads, then one row per
@@ -199,7 +311,15 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
             std::vector<history_road_node> nodes;
             for (const region& p : be->settlement.regions)
                 nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
-            stamp_history_roads(w, body, nodes, fx.setup_corridors);
+            // BL-1119 round 4: the old-road stamp's own cost — the in-generation step 15 —
+            // read as floods (load-independent) and wall time (indicative).
+            history_road_stats hs{};
+            const clk::time_point h0 = clk::now();
+            stamp_history_roads(w, body, nodes, fx.setup_corridors, nullptr, &hs);
+            std::printf("  ROADS seed %u HISTORY: %d corridors, %d laid, priced toward %d distinct"
+                        " tiles | floods %lld | %.2f s\n",
+                        seed, hs.corridors, hs.laid, hs.destinations, hs.floods,
+                        secs_between(h0, clk::now()));
         }
         const std::map<entity_id, std::uint8_t> replay = road_field(w, body);
         std::size_t diff = 0;
@@ -218,9 +338,12 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
     {
         clear_roads(w, body);
         road_generation_stats st{};
-        const clk::time_point t0 = clk::now();
-        generate_roads(w, body, nullptr, f, &st);
-        const double s = secs_between(t0, clk::now());
+        double border_s = 0.0;
+        // The trace costs only cache hits (the pass re-reads paths it just laid), so it
+        // moves neither the network nor, measurably, the time.
+        road_generation_trace tr;
+        const double s = timed_generate_roads(w, body, f, st, border_s, &tr);
+        const joined_reading jr = read_joined(w, body, tr);
         int tiers[4] = { 0, 0, 0, 0 };
         int streets = 0; // road tiles hosting a centre: the local streets
         for (const auto& [tid, tc] : w.tiles)
@@ -240,6 +363,34 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
                     st.villages, st.villages_below_floor, st.spurs_laid, st.spurs_failed,
                     st.villages_below_floor + st.spurs_failed, st.border_links,
                     st.border_links_street_only);
+        // THE BAR (BL-1072 weights): units per phase against its wall time. A linear inner
+        // bar wants border units / border seconds == other units / other seconds, so the
+        // fitting kBorderUnitsPerNation is border_s * (other units / other s) / nations.
+        const double    other_s     = s - border_s;
+        const long long other_units = st.units_backbone + st.units_spurs;
+        const int       nations     = st.nation_groups;
+        const double    fit_k = (other_s > 0.0 && nations > 0)
+            ? border_s * (static_cast<double>(other_units) / other_s) / nations : 0.0;
+        std::printf("  ROADS seed %u BAR floor %lld: units backbone %lld spurs %lld border %lld (%d nation"
+                    " groups) | border pairs %d, %d with no network endpoint | border walk %.2f s of"
+                    " %.2f s (%.0f%%), floods %lld of %lld | fitting kBorderUnitsPerNation %.0f\n",
+                    seed, f, st.units_backbone, st.units_spurs, st.units_border, nations,
+                    st.border_pairs, st.border_pairs_no_endpoint, border_s, s,
+                    s > 0.0 ? 100.0 * border_s / s : 0.0,
+                    st.flood_fields - st.flood_fields_before_border, st.flood_fields, fit_k);
+        // BL-1119 round 4: floods built per call site (a path is answered from its
+        // destination's field, so a site's cost is how many destinations it asks).
+        std::printf("  ROADS seed %u FLOODS floor %lld: town pairs %lld | backbone lay %lld | spurs %lld"
+                    " | border %lld | total %lld\n",
+                    seed, f, st.floods_town_pairs, st.floods_backbone_lay, st.floods_spurs,
+                    st.floods_border, st.flood_fields);
+        // BL-1119 round 3: the two cold-review holes, read per row.
+        std::printf("  ROADS seed %u LINKS floor %lld: sea-route candidates %d | refused by the stamp:"
+                    " tree %d, loop %d | villages on the network %d, of them NOT joined to a town %d |"
+                    " border endpoints %d, not joined %d | spurs failed %d\n",
+                    seed, f, st.candidates_unlayable, st.tree_links_refused, st.loops_refused,
+                    jr.villages_claimed, jr.villages_unjoined, jr.border_endpoints,
+                    jr.border_unjoined, st.spurs_failed);
         std::fflush(stdout);
         if (!map_dir.empty()) // this pass alone, no history roads
             write_road_map(w, body, centre_tiles,

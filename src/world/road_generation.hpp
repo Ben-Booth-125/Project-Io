@@ -3,6 +3,7 @@
 #include "era_timelapse.hpp" // history_corridor / history_road_node (BL-768)
 #include "world.hpp"
 
+#include <cstdint>
 #include <vector>
 
 // The loading screen's progress sink (BL-1072), passed by pointer only.
@@ -24,7 +25,9 @@ struct generation_progress;
 //      the lattice for the border links and for the player's place_road to extend.
 //   1. Weighted graph  — terrain-weighted A* cost (intra_body_path) between each
 //      TOWN-AND-UP pair (scale >= 2; BL-620 — at demography density all-centre
-//      pairs were the generation cost wall), one-off at generation.
+//      pairs were the generation cost wall), one-off at generation. Only a pair that
+//      can be LAID is an edge (NR-945): a route across open sea is never a road, so a
+//      nation the sea divides builds one tree per landmass.
 //   2. Backbone        — Kruskal MST over that graph, tie-broken by
 //      (cost, lo-tile-id, hi-tile-id); then the DETOUR TEST (BL-1119): a further
 //      link is laid only where the network's own route between its two towns
@@ -40,12 +43,16 @@ struct generation_progress;
 //      OPEN ocean (a water run longer than a strait) is not stamped at all — that is a sea
 //      route, and stamping it would scatter road fragments on distant shores.
 //   5. Village spurs   — each village (scale 1) AT OR ABOVE the size floor
-//      (BL-1119, `village_spur_size`) lays one TRACK to its nearest already-roaded
-//      same-nation tile, chosen from a grid-distance-prefiltered candidate set
-//      (BL-620): spur tracks, not lattice membership. A village below the floor
-//      keeps only its local street.
+//      (BL-1119, `village_spur_size`) lays one TRACK to its nearest same-nation tile
+//      already JOINED to the backbone (a town's street, the backbone raster, or an
+//      earlier spur that reached one), chosen from a grid-distance-prefiltered
+//      candidate set (BL-620): spur tracks, not lattice membership. A village is on
+//      its nation's network only once its spur reaches such a tile; one below the
+//      floor keeps only its local street.
 // Then, across nations: one TRACK border link between the nearest centre pair of
-// each territorially-adjacent nation pair, so the continent-wide lattice connects.
+// each territorially-adjacent nation pair, so the continent-wide network connects —
+// chosen only among centres ON their nation's network, towns and villages that laid a
+// spur (Ben, 2026-09-25): a link ending on a bare village street joined nothing.
 // Territorial adjacency tolerates a short unowned gap (a strait or an unclaimed margin),
 // so a coastal or island nation is reachable rather than silently left off the lattice.
 //
@@ -83,11 +90,12 @@ inline constexpr double kDetourRatio = 2.0;
 /// A centre with no slot (a coverage founding, a province anchor) reads its own
 /// headcount, `population * 1000` heads. See `village_spur_size`.
 ///
-/// PROVISIONAL (D1 of BL-1119 measures the ladder; the main session fixes it).
-/// 40,000 heads is about the 90th percentile of village size on the curated seeds
-/// (p50 ~16k, p90 ~38-46k): the top tenth of villages spur. Above ~15,000 the spurs
-/// add only tens of road tiles, so the floor trades pass time, not map density.
-/// 0 lays a spur from every village, the pre-BL-1119 behaviour.
+/// 40,000 heads (Ben, 2026-09-25, the density form; LOGISTICS.md § 4), read off the
+/// measured ladder (BL-1119 D1, `gen_step_costs --roads`): about the 90th percentile
+/// of village size on the curated seeds (p50 ~16k, p90 ~38-46k), so the top tenth of
+/// villages spur. Above ~15,000 the spurs add only tens of road tiles, so the floor
+/// buys pass time rather than map density. A floor of 0 lays a spur from every
+/// village, the pre-BL-1119 behaviour.
 inline constexpr long long kVillageSpurFloorHeads = 40000;
 
 /// A village's size for the spur floor, in heads — see kVillageSpurFloorHeads.
@@ -107,8 +115,24 @@ struct road_generation_stats
     int villages_below_floor = 0; ///< villages under the floor: street only, no spur tried
     int spurs_laid           = 0; ///< villages that laid a spur
     int spurs_failed         = 0; ///< at/above the floor, but no target within the cap / by land
+    int border_pairs         = 0; ///< territorially-adjacent nation pairs walked
+    /// Adjacent pairs where one side holds no centre on its network (no town, no
+    /// spurring village), so no link is tried (Ben, 2026-09-25: a border link ends only
+    /// on a town or a spurring village).
+    int border_pairs_no_endpoint = 0;
     int border_links         = 0; ///< cross-nation Track links laid
-    int border_links_street_only = 0; ///< of them, ending on a below-floor village's street
+    /// Of them, ending on a centre OFF its nation's network (a bare village street).
+    /// Zero by rule since the 2026-09-25 ruling; kept so a harness can assert it.
+    int border_links_street_only = 0;
+    int majors               = 0; ///< centres at scale >= 3 (City+) on the body
+    int links_two_major      = 0; ///< backbone links laid (tree or kept loop) between two City+
+    int links_highway        = 0; ///< of them, laid at the Highway tier (percentile-gated)
+    /// The loading bar's plan (BL-1072), in the units `report_sub` counts: one per
+    /// backbone town PAIR, one per spurring village, kBorderUnitsPerNation per nation.
+    long long units_backbone = 0;
+    long long units_spurs    = 0;
+    long long units_border   = 0;
+    int       nation_groups  = 0; ///< nations holding a centre on the body (unowned = one group)
     /// Whole-body flood fields cached when the pass ends — its WORK, independent of
     /// the machine's load: nearly every spur and every A* anchor costs one (a Dijkstra
     /// over the whole body, logistics.cpp § flood_field_for). Includes any field a
@@ -117,6 +141,47 @@ struct road_generation_stats
     /// Of them, cached before the border walk began (backbone + spurs); the rest are
     /// the border links' probes.
     long long flood_fields_before_border = 0;
+    /// Reachable town pairs whose route crosses open sea, so they cannot be laid and
+    /// never enter the tree or the detour test (NR-945, LOGISTICS.md § 4).
+    int candidates_unlayable = 0;
+    /// Backbone links chosen (tree / kept loop) that stamp_edge then refused. Zero by
+    /// construction once only layable links are candidates; kept as the check.
+    int tree_links_refused   = 0;
+    int loops_refused        = 0;
+    /// Whole-body flood fields BUILT, per call site (BL-1119 round 4: a path is directed
+    /// and answered from its destination's field, so which pairs share a destination
+    /// is the pass's cost). Deltas of `world::logistics_flood_fields` around each site.
+    long long floods_town_pairs   = 0; ///< the backbone's town-pair costs (MST + detour test)
+    long long floods_backbone_lay = 0; ///< stamping the chosen tree links and loops
+    long long floods_spurs        = 0; ///< the village spurs (every candidate tried)
+    long long floods_border       = 0; ///< the border probes and links
+};
+
+/// What one `stamp_history_roads` call did (BL-1119 round 4). WRITE-ONLY.
+struct history_road_stats
+{
+    int       corridors   = 0; ///< corridors with both ends on the body
+    int       laid        = 0; ///< of them, stamped (reachable, no open-sea crossing)
+    int       destinations = 0; ///< distinct tiles the corridors were priced TOWARD
+    long long floods      = 0; ///< whole-body flood fields built by the call
+};
+
+/// BL-1119 round 3: every route one `generate_roads` call LAID, whole, for a harness to
+/// rebuild the network's connectivity independently of the pass's own bookkeeping.
+/// WRITE-ONLY like the stats: filled when given one, never read back.
+struct road_generation_trace
+{
+    enum class kind : std::uint8_t { tree, loop, spur, border };
+    struct route
+    {
+        kind      k      = kind::tree;
+        entity_id from   = null_entity; ///< first endpoint tile (a town; the spurring village; a border centre)
+        entity_id to     = null_entity; ///< second endpoint tile (a town; the spur's target; a border centre)
+        entity_id nation = null_entity; ///< the laying nation (a border link: its lower-id nation)
+        std::vector<entity_id> path;    ///< the whole A* route, water tiles included, lo -> hi
+    };
+    std::vector<route>     routes;
+    std::vector<entity_id> on_network; ///< centres the pass counts ON their nation's network
 };
 
 // @param progress  Optional loading-screen sink (BL-1072): the village spur walk,
@@ -127,9 +192,11 @@ struct road_generation_stats
 //                  kVillageSpurFloorHeads. A parameter so a harness can measure a
 //                  ladder of floors on one built world without a recompile.
 // @param stats     Optional, write-only: what the call laid (BL-1119 D1).
+// @param trace     Optional, write-only: every route the call laid, whole (BL-1119 round 3).
 void generate_roads(world& w, entity_id body, generation_progress* progress = nullptr,
                     long long spur_floor_heads = kVillageSpurFloorHeads,
-                    road_generation_stats* stats = nullptr);
+                    road_generation_stats* stats = nullptr,
+                    road_generation_trace* trace = nullptr);
 
 // ---------------------------------------------------------------------------
 // Ancient roads, STAMPED FROM the history (BL-768)
@@ -186,4 +253,5 @@ void generate_roads(world& w, entity_id body, generation_progress* progress = nu
 void stamp_history_roads(world& w, entity_id body,
                          const std::vector<history_road_node>& nodes,
                          const std::vector<history_corridor>&  corridors,
-                         generation_progress* progress = nullptr); // BL-1072: per corridor
+                         generation_progress* progress = nullptr, // BL-1072: per corridor
+                         history_road_stats* stats = nullptr);    // BL-1119 round 4, write-only

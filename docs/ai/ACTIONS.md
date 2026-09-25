@@ -2140,7 +2140,7 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 **Valid when:**
 - App is on the wizard screen.
 
-**Expected output.** On rounds 2-3: steps back one round (a plain revision — there is no per-round snapshot, since rounds are causal). On round 1: returns to the main menu. Leaving costs nothing (nothing is generated until Begin), and preferences survive the trip, so re-entering resumes the same leans from round 1.
+**Expected output.** On any round after the first: steps back one round, keeping every round's record and world it passes (STARTUP.md section The world cache), so Back then Next recomputes nothing. On round 1: returns to the main menu and releases every world the wizard held. Preferences survive the trip, so re-entering resumes the same leans from round 1.
 
 **Reason to select.** To revise an earlier round's preferences, or to abandon world setup and return to the menu.
 
@@ -2157,12 +2157,13 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 
 ### `chrome.wizard_continue` — New World wizard, footer button row (right edge)
 
-**Press.** Click Continue.
+**Press.** Click Next.
 
 **Valid when:**
-- App is on the wizard screen, on round 1 or 2 (any round except the last).
+- App is on the wizard screen, on any round except the last (the last round carries Begin).
+- Next is enabled: on the Life round, its world has finished building; on a pass round (Culture, Empires, Exploration), that round's run has landed. While it is disabled its hover names what it waits on (Ben, 2026-09-25: Next waits for the round on screen).
 
-**Expected output.** Advances to the next round. The button reads Continue on non-final rounds and Begin on the last; this press generates nothing.
+**Expected output.** Advances to the next round. Arriving on a pass round starts its run on the world the round before closed (nothing is rebuilt; STARTUP.md section The world cache), and Next stays disabled until that run lands. Back then Next onto a round that has already landed recomputes nothing.
 
 **Reason to select.** To accept this round's roll and preferences and move to the next batch of decisions.
 

@@ -436,6 +436,7 @@ history_sim_params without_resume_pointers(history_sim_params p)
     p.resume_grudges          = nullptr;
     p.resume_contacts         = nullptr;
     p.resume_corridors        = nullptr;
+    p.resume_sea_legs         = nullptr; // BL-1097's resume; missed until the BL-1084 review
     p.resume_dated_objects    = nullptr;
     p.resume_civilisations    = nullptr;
     p.resume_universal_creeds = nullptr;
@@ -490,13 +491,19 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
     // the bar needs the PROPORTIONS right, not the machine's absolute speed,
     // so this is re-measured when a pass's cost moves materially, not per run.
     //
-    // WHAT THE MEASUREMENT FOUND. The world build after the spans is dominated
+    // WHAT THE MEASUREMENT FOUND. The world build after the spans was dominated
     // by ONE pass: `generate_roads` ran 30-57 s of a 40-70 s build, nearly all
     // of it the village spur walk (~5,900 villages at ~4.7 ms of A* each on
     // seed 28). Next come the old-road stamp (4-7 s, ~1,350-3,300 corridors)
     // and `generate_nations`' density ripple (2-4 s, tiles x centres). Those
     // three are the passes that report progress within themselves; every other
     // step is under a second.
+    //
+    // RE-MEASURED 2026-09-25 (sprint 48, indicative on a loaded machine) after
+    // BL-1119 (the roads tree, spurs only at 40,000 heads) and BL-1117 (the
+    // nearest anchor as one field per body): roads 7-22 s, ~2.1x step 9 in the
+    // same runs; the old-road stamp 7-15 s, ~2.3x step 9; the settle 14-21 s
+    // (its first tick no longer floods the body once per anchor).
     static constexpr int64_t cost[generation_stage_label_count] = {
         1,     //  0 Preparing
         90,    //  1 Forming the system
@@ -508,12 +515,12 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
         12,    //  7 Founding regions (the settlement pass)
         1600,  //  8 Running the ancient era
         3500,  //  9 Drawing borders (generate_nations .. the province anchors)
-        38000, // 10 Laying roads (generate_roads)
+        7500,  // 10 Laying roads (generate_roads; 38000 before BL-1119)
         150,   // 11 Placing companies
         150,   // 12 Finishing (markets, the other bodies, laws, garrisons)
         1500,  // 13 Running the exploration age
         2000,  // 14 Running the Industrialisation span
-        5500,  // 15 Tracing the old roads (stamp_history_roads)
+        1500,  // 15 Tracing the old roads (stamp_history_roads; 8000 before BL-1119 round 4)
         // The two steps finish_campaign_world runs after generation (BL-1085),
         // measured by `gen_step_costs --finish 0 28` on the same footing
         // (Release, 2026-09-24): the search 28,801 / 12,623 ms over 13
@@ -521,7 +528,7 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
         // settle 113,922 / 68,832 ms -- of which ONE tick is 50-90 s and the
         // rest ~1.5 s each (the `[finish_campaign_world]` line names it).
         20000, // 16 Searching the landscape (build_stockpile_budget .. apply)
-        90000, // 17 Proving the field (run_settle, twelve ticks)
+        18000, // 17 Proving the field (run_settle, twelve ticks; 90000 before BL-1117)
     };
     if (label_index < 0 || label_index >= generation_stage_label_count) return 0;
     if (label_index == 8 && !era_minus_one_enabled(params)) return 1;
@@ -625,48 +632,14 @@ int64_t ms_between(gen_clock::time_point a, gen_clock::time_point b)
 //
 // --- The step plan and its clocks (BL-1072) -----------------------------
 //
-// Which captioned steps THIS run will enter, each weighted by its measured
+// Which captioned steps a run will enter, each weighted by its measured
 // Release cost, so the outer bar moves by what a step costs rather than by
-// counting steps as equals. The plan is read off the same flags the gates
-// below read; a planned span that turns out not to run just hands its
-// weight to the next step (a jump forward, never back). The per-step
-// clock beside it is REPORTED ONLY, on the BL-754 footing above.
-void publish_generation_plan(generation_cursor& c)
-{
-    generation_progress* const progress = c.progress;
-    const world_gen_config&    gen_cfg  = c.gen_cfg;
-    const world_params&        params   = c.params;
-    if (progress != nullptr)
-        progress->stage_count.store(generation_stage_count(gen_cfg), std::memory_order_relaxed);
-    if (progress != nullptr)
-    {
-        const bool plan_history    = !gen_cfg.stop_after_migration;
-        const bool plan_explore    = plan_history && !gen_cfg.stop_after_ancient_era
-                                     && exploration_sim_enabled(params);
-        const bool plan_industrial = plan_explore && !gen_cfg.stop_after_exploration
-                                     && params.industrialisation_span_enabled;
-        const bool plan_setup      = generation_stage_count(gen_cfg) == 12;
-        int64_t total = 0;
-        for (int l : {0, 1, 2, 4, 5, 6, 7}) total += generation_step_cost_ms(l, params);
-        if (plan_history)    total += generation_step_cost_ms(8, params);
-        if (plan_explore)    total += generation_step_cost_ms(13, params);
-        if (plan_industrial) total += generation_step_cost_ms(14, params);
-        if (plan_setup)
-        {
-            for (int l : {9, 10, 11, 12}) total += generation_step_cost_ms(l, params);
-            // The old roads are stamped only where a history recorded corridors.
-            if (plan_history && era_minus_one_enabled(params))
-                total += generation_step_cost_ms(15, params);
-        }
-        // BL-1085: the caller's own steps after this build (the search and the
-        // settle, on round 6 and the cold build) are in the plan too, so the
-        // bar has somewhere left to go when generation returns.
-        total += progress->weight_after.load(std::memory_order_relaxed);
-        progress->weight_done.store(0, std::memory_order_relaxed);
-        progress->weight_now.store(0, std::memory_order_relaxed);
-        progress->weight_total.store(total, std::memory_order_relaxed);
-    }
-}
+// counting steps as equals. BL-1084: the plan is `plan_generation_progress`
+// (below, public), published by `run_generation_to` for exactly the stages
+// that call will run -- never read off the stop flags, so a cursor resumed
+// under a new sink plans the stages it resumes, whatever config it was begun
+// with. The per-step clock beside it is REPORTED ONLY, on the BL-754 footing
+// above.
 
 // Enter a captioned step: close the clock on the one being left, fold its
 // weight into the finished sum, then publish the new step's weight and
@@ -705,8 +678,12 @@ void enter_step(generation_cursor& c, int label_index)
 void bump(generation_cursor& c, int label_index)
 {
     enter_step(c, label_index);
+    // COUNTED WITH OR WITHOUT A SINK (BL-1084): a staged build binds a sink per
+    // round, so the count must run through the stages that had none, or the
+    // tail's end-of-build assert would compare a partial count. Reported only.
+    ++c.clocks.gen_stage;
     if (c.progress == nullptr) return;
-    c.progress->stage.store(++c.clocks.gen_stage, std::memory_order_relaxed);
+    c.progress->stage.store(c.clocks.gen_stage, std::memory_order_relaxed);
 }
 
 // Index into the shared prototype body set (planetology.hpp). The wizard's
@@ -852,7 +829,7 @@ void run_life_gate(generation_cursor& c)
     c.clocks.settlement_end   = c.clocks.world_begin;
     c.clocks.era_end          = c.clocks.world_begin;
     c.clocks.step_begin       = c.clocks.world_begin;
-    publish_generation_plan(c);
+    // (The plan was published by `run_generation_to`, BL-1084.)
     bump(c, 0);
 
     // The resource-abundance multiplier every body's deposit pass is scaled by.
@@ -1040,7 +1017,6 @@ void run_culture(generation_cursor& c)
     world&                        w                 = c.w;
     const world_params&           params            = c.params;
     generation_report* const      report            = c.report;
-    const world_gen_config&       gen_cfg           = c.gen_cfg;
     const entity_id               kepler            = c.kepler;
     const planetology_state&      kepler_pl         = c.kepler_pl;
     const std::vector<entity_id>& kepler_tiles      = c.kepler_tiles;
@@ -1319,14 +1295,17 @@ void run_culture(generation_cursor& c)
         // stop path below ALSO hands it forward as `prehistory_timelapse`,
         // which is what round 3 replays.
         // Folded only where something will hold it: a caller with no report
-        // and no stop (a harness building a bare world) would pay the fold for
-        // a record nobody keeps. The world is the same either way.
-        c.migration_lapse =
-            (report != nullptr || gen_cfg.stop_after_migration)
-                ? build_migration_timelapse(kepler_settlement, kepler_creeds,
-                                            colonisation_start_year,
-                                            culture_round_end_year)
-                : era_timelapse{};
+        // (a harness building a bare world) would pay the fold for a record
+        // nobody keeps. The world is the same either way. BL-1084: NO STOP FLAG
+        // IS READ HERE -- a build stopped at this stage with no report folds the
+        // record on demand at its ending (`migration_lapse_of`), from the same
+        // settlement and creeds, which nothing between here and there moves.
+        c.migration_folded = (report != nullptr);
+        c.migration_lapse  = c.migration_folded
+                                 ? build_migration_timelapse(kepler_settlement, kepler_creeds,
+                                                             colonisation_start_year,
+                                                             culture_round_end_year)
+                                 : era_timelapse{};
         const era_timelapse& migration_lapse = c.migration_lapse;
         if (report != nullptr)
             for (generation_report::body_entry& be : report->bodies)
@@ -1338,6 +1317,66 @@ void run_culture(generation_cursor& c)
     }
 }
 
+// WHAT A STOPPED BUILD WRITES ONTO ITS REPORT, and nothing else (BL-1084): the
+// report half of `close_stopped_generation`, onto @p rep. One function for
+// both callers, so the report a stop-flag build hands back and the report the
+// wizard's rounds read their record from (`stopped_report`, a copy) are one
+// derivation. Reads the cursor; writes only @p rep.
+//   * culture: the migration's record -- its counters, the settlement, and
+//     `prehistory_timelapse` (what round 3 replays);
+//   * empires / exploration / industrialisation: the settlement.
+/// The migration's record at the Culture stage's close: the cursor's own fold
+/// where the stage made one (a report was bound), else folded here into
+/// @p scratch from the same settlement and creeds -- valid only at
+/// `reached == culture`, where nothing has moved them since (BL-1084: so no
+/// stage reads a stop flag to decide whether to fold).
+const era_timelapse& migration_lapse_of(const generation_cursor& c, era_timelapse& scratch)
+{
+    if (c.migration_folded) return c.migration_lapse;
+    scratch = build_migration_timelapse(c.kepler_settlement, c.kepler_creeds,
+                                        colonisation_start_year, c.culture_round_end_year);
+    return scratch;
+}
+
+void stamp_stopped_report(generation_report& rep, const generation_cursor& c)
+{
+    const entity_id         kepler            = c.kepler;
+    const settlement_state& kepler_settlement = c.kepler_settlement;
+    switch (c.reached)
+    {
+        case generation_stage::culture:
+        {
+            era_timelapse scratch;
+            const era_timelapse& lapse = migration_lapse_of(c, scratch);
+            rep.prehistory_years     = c.culture_round_end_year
+                                     - colonisation_start_year;
+            rep.prehistory_battles   = 0;   // The migration is a diffusion, not a
+            rep.prehistory_conquests = 0;   // contest — COLONISATION.md owns why
+            rep.prehistory_foundings = static_cast<int64_t>(kepler_settlement.regions.size());
+            for (generation_report::body_entry& be : rep.bodies)
+                if (be.id == kepler)
+                {
+                    be.settlement           = kepler_settlement;
+                    be.prehistory_timelapse = lapse;
+                    break;
+                }
+            break;
+        }
+
+        case generation_stage::empires:
+        case generation_stage::exploration:
+        case generation_stage::industrialisation:
+            for (generation_report::body_entry& be : rep.bodies)
+                if (be.id == kepler) { be.settlement = kepler_settlement; break; }
+            break;
+
+        case generation_stage::none:
+        case generation_stage::life_gate:
+        case generation_stage::tail:
+            break;
+    }
+}
+
 // The Culture round's own ending (BL-871, BL-914): what a build stopped after
 // the migration hands its caller. Nothing else runs it -- a whole build never
 // publishes the migration to the tap, and its report reads the later spans.
@@ -1345,10 +1384,10 @@ void publish_migration_round(generation_cursor& c)
 {
     generation_progress* const progress               = c.progress;
     generation_report* const   report                 = c.report;
-    const entity_id            kepler                 = c.kepler;
     const settlement_state&    kepler_settlement      = c.kepler_settlement;
     const int64_t              culture_round_end_year = c.culture_round_end_year;
-    const era_timelapse&       migration_lapse        = c.migration_lapse;
+    era_timelapse              scratch;
+    const era_timelapse&       migration_lapse        = migration_lapse_of(c, scratch);
 
     // BL-914: round 3 gets the same tap round 4 does. `run_settlement`
     // itself is not instrumented (out of this item's files), so this is
@@ -1384,21 +1423,7 @@ void publish_migration_round(generation_cursor& c)
             static_cast<int32_t>(culture_round_end_year));
     }
 
-    if (report)
-    {
-        report->prehistory_years     = culture_round_end_year
-                                      - colonisation_start_year;
-        report->prehistory_battles   = 0;   // The migration is a diffusion, not a
-        report->prehistory_conquests = 0;   // contest — COLONISATION.md owns why
-        report->prehistory_foundings = static_cast<int64_t>(kepler_settlement.regions.size());
-        for (generation_report::body_entry& be : report->bodies)
-            if (be.id == kepler)
-            {
-                be.settlement           = kepler_settlement;
-                be.prehistory_timelapse = migration_lapse;
-                break;
-            }
-    }
+    if (report) stamp_stopped_report(*report, c);
 }
 
 // ---------------------------------------------------------------------------
@@ -3097,8 +3122,11 @@ void run_tail(generation_cursor& c)
     // seeded) for the border-province test. See nation_generation.hpp.
     seed_nation_garrisons(w);
 
-    // BL-1053: the count published at the first line is the count reported.
-    assert((progress == nullptr || clk.gen_stage == generation_stage_count(gen_cfg))
+    // BL-1053: the count a whole build reports is the count its bumps made.
+    // BL-1084: against the WHOLE build's count, not the cursor's config: a
+    // cursor reaching the tail has run every stage whatever stop flags it was
+    // begun with, and `gen_stage` counts with or without a sink bound.
+    assert(clk.gen_stage == generation_stage_count(world_gen_config{})
            && "generation_stage_count disagrees with the bumps this run made");
 
     // --- The generation budget, reported (BL-754) ---------------------------
@@ -3219,6 +3247,14 @@ generation_cursor begin_generation(const world_params& params, generation_report
 
 void run_generation_to(generation_cursor& c, generation_stage target)
 {
+    // THE PLAN FOLLOWS THE RUN (BL-1084): a sink bound and not yet planned for
+    // is handed the plan for exactly the stages this call runs -- the single
+    // call's whole build, a resumed round's own stage -- never one read off the
+    // stop flags the cursor was begun with. A caller that planned wider (round
+    // 6: its span, the tail and the finish) has already claimed the sink.
+    if (c.progress != nullptr && c.clocks.plan_sink != c.progress && c.reached < target)
+        plan_generation_progress(c, target);
+
     // One stage at a time, in order, each exactly once: the cursor records the
     // last stage run, and a stage whose span does not run still advances it.
     while (c.reached < target)
@@ -3247,7 +3283,6 @@ void gen_tail(generation_cursor& c)              { run_generation_to(c, generati
 void close_stopped_generation(generation_cursor& c)
 {
     generation_report* const report = c.report;
-    const entity_id          kepler = c.kepler;
     switch (c.reached)
     {
         case generation_stage::culture:
@@ -3260,7 +3295,6 @@ void close_stopped_generation(generation_cursor& c)
         case generation_stage::industrialisation:
         {
             close_history(c);
-            const settlement_state& kepler_settlement = c.kepler_settlement;
             //
             // THE ANCIENT ERA HAS RUN. A caller that only wanted the history — the
             // wizard's history round — stops here rather than paying for borders, roads
@@ -3286,10 +3320,12 @@ void close_stopped_generation(generation_cursor& c)
             // the Empires round, on the same contract for the same reason; and
             // BL-1040 one span later again, with the Industrialisation span run
             // (when it was enabled and Exploration ran) and nothing of world
-            // setup. One ending for all three (BL-1084).
-            if (report)
-                for (generation_report::body_entry& be : report->bodies)
-                    if (be.id == kepler) { be.settlement = kepler_settlement; break; }
+            // setup. One ending for all three (BL-1084). The close reads the
+            // settlement and never writes it (population centres and city names
+            // take it const), so the settlement stamped here is the one the span
+            // left -- which is why `stopped_report` can stamp the same one
+            // without closing anything.
+            if (report) stamp_stopped_report(*report, c);
             break;
         }
 
@@ -3298,6 +3334,85 @@ void close_stopped_generation(generation_cursor& c)
         case generation_stage::tail:
             break;
     }
+}
+
+generation_report stopped_report(const generation_cursor& c)
+{
+    generation_report rep = c.report != nullptr ? *c.report : generation_report{};
+    stamp_stopped_report(rep, c);
+    return rep;
+}
+
+void plan_generation_progress(generation_cursor& c, generation_stage target)
+{
+    // ONE PLAN PER RUN, FOR THE STAGES IT RUNS (BL-1084). `run_generation_to`
+    // calls this for a sink it has not planned for -- the single call's whole
+    // build, a resumed round's own stage -- and a caller planning wider than
+    // one call (round 6: its span, the tail and the finish) calls it first,
+    // which claims the sink. The predictions below read the params and what
+    // has already run, never a stop flag. Reported only.
+    generation_progress* const p = c.progress;
+    if (p == nullptr) return;
+    c.clocks.plan_sink = p;
+    const world_params& params = c.params;
+
+    // Whether each span will run: known once its stage has run, predicted
+    // from the params before (the stage gates read the same predicates).
+    const bool era  = c.reached >= generation_stage::empires ? c.era_ran
+                                                             : era_minus_one_enabled(params);
+    const bool expl = c.reached >= generation_stage::exploration
+                          ? c.exploration_ran
+                          : era && exploration_sim_enabled(params);
+    const bool ind  = expl && params.industrialisation_span_enabled
+                   && params.industrialisation_stop_year > params.exploration_stop_year;
+
+    int64_t total = 0;
+    int     first = -1;
+    int     bumps = c.clocks.gen_stage;
+    const auto step = [&](int label) {
+        total += generation_step_cost_ms(label, params);
+        if (first < 0) first = label;
+    };
+    for (uint8_t s = static_cast<uint8_t>(c.reached) + 1; s <= static_cast<uint8_t>(target); ++s)
+    {
+        switch (static_cast<generation_stage>(s))
+        {
+            case generation_stage::life_gate:
+                for (int l : {0, 1, 2, 4, 5}) step(l);
+                bumps += 5;
+                break;
+            case generation_stage::culture:
+                step(6); step(7);
+                bumps += 2;
+                break;
+            case generation_stage::empires:
+                step(8);
+                bumps += 1;
+                break;
+            case generation_stage::exploration:
+                if (expl) step(13);
+                break;
+            case generation_stage::industrialisation:
+                if (ind) step(14);
+                break;
+            case generation_stage::tail:
+                for (int l : {9, 10, 11, 12}) step(l);
+                if (era) step(15); // the old roads, where a history recorded corridors
+                bumps += 4;
+                break;
+            case generation_stage::none:
+                break;
+        }
+    }
+    total += p->weight_after.load(std::memory_order_relaxed);
+    p->weight_done.store(0, std::memory_order_relaxed);
+    p->weight_now.store(0, std::memory_order_relaxed);
+    p->weight_total.store(total, std::memory_order_relaxed);
+    p->stage.store(c.clocks.gen_stage, std::memory_order_relaxed);
+    p->stage_count.store(bumps, std::memory_order_relaxed);
+    // The caption names the round's own first step from the first frame, so a
+    // wait never shows "Preparing" or an earlier span's name ahead of it.
+    if (first >= 0) p->label.store(first, std::memory_order_relaxed);
 }
 
 world make_hard_coded_world(world_params params, generation_report* report,

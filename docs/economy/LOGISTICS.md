@@ -88,13 +88,14 @@ Terrain-weighted A\* over a body's tile grid, respecting the **east-west cylinde
 topology matches `nation_generation.cpp`: 4-cardinal neighbours, raster index
 `grid_y × grid_width + grid_x`. The core pathing design is BL-077 (intra-body pathfinding).
 
-Results cache on `world.astar_cost_cache` under a **canonicalised endpoint key**, so the per-tick
-dispatch loop pays each search once.
+Results cache on `world.astar_cost_cache` under the **ordered** (origin, destination) key, since a
+path is directed (§ 1), so the per-tick dispatch loop pays each search once.
 
-> **A trap worth carrying forward.** Because the cache key is canonicalised, a caller reading a
-> cached path must apply its own orientation. `body_surface_canvas.cpp` copies and conditionally
-> reverses it. Get the orientation wrong and a convoy's head lands at the wrong end of the lane half
-> the time — **invisible on screen, fatal to interdiction.**
+> **A trap worth carrying forward.** A cached path's tiles are stored low tile to high tile
+> whichever way it was asked, so a caller reading one must apply its own orientation.
+> `convoy_route_tiles` orients a convoy's route once for every reader (the canvas, interdiction),
+> and a unit's march orients its own. Get the orientation wrong and a convoy's head lands at the
+> wrong end of the lane half the time — **invisible on screen, fatal to interdiction.**
 
 ### 3. Reach — the placement constraint
 
@@ -167,14 +168,22 @@ between two centres is laid only when the network's own route between them costs
 is never built, and a loop exists only where the tree forces a long way round. This replaces
 the relative-neighbour redundancy edges, which laid the lattice.
 
+The test is read on the **town graph**, not the raster: the network's route is the cheapest chain
+of already-accepted links, each priced at its own direct cost. Candidates are walked
+cheapest-first, and each admitted loop joins the network as it is accepted. **Only a link that
+can be laid is a candidate** (delegated reading, NR-945): a route across open sea is never a road,
+so it never enters the tree or the test, and a nation the sea divides builds one tree per
+landmass.
+
 **Villages join locally, not as lattice members** (BL-620, road generation scales to density):
-**only a village above a size floor lays a spur (Ben, 2026-09-25)**, and the floor is **40,000
-heads** (Ben, 2026-09-25, from the measured ladder: about the 90th percentile of village size on
-the curated seeds). A village's size is its headcount in the population step, the figure that tells
-villages apart when roads are laid. Each such village lays one Track spur to its nearest
-already-roaded same-nation tile — backbone
-raster, another centre's streets, or an earlier spur — chosen from a distance-prefiltered
-candidate set, never all-pairs. A village whose nearest target is beyond the spur cap, or
+**only a village at or above a size floor lays a spur (Ben, 2026-09-25)**, and the floor is
+**40,000 heads** (Ben, 2026-09-25, from the measured ladder: about the 90th percentile of village
+size on the curated seeds). A village's size is its headcount in the population step, the figure
+that tells villages apart when roads are laid. Each such village lays one Track spur to its
+nearest same-nation tile **already joined to the backbone** — backbone raster, a town's streets,
+or an earlier spur that reached the backbone — chosen from a distance-prefiltered candidate set,
+never all-pairs. A spur that only reaches another unjoined village joins nothing, so it does not
+count: a village is on its nation's network only when its road reaches a town. A village whose nearest target is beyond the spur cap, or
 whose every route would cross open sea, keeps only its local street. Low-stratum settlements
 feed the network; they do not define it — which is both the honest historical shape and what
 keeps generation cost linear in village count at demography-derived density (BL-610).

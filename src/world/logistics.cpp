@@ -136,18 +136,23 @@ constexpr int k_flood_off_dc[4] = {  0,  0, -1, 1 };
 constexpr int k_flood_off_dr[4] = { -1,  1,  0, 0 };
 
 /// THE DIRECTED EDGE both intra-body floods relax (flood_field_for and, BL-1117,
-/// build_lp_anchor_field): from the settled cell @p cur_tc (row @p cur_row, node
-/// weight @p cur_cost) toward its neighbour @p n_tc along offset @p i. The river
-/// discount is the LEAVING tile's side (river_edge_discount: downstream is
-/// cheaper than upstream), so the edge is directed — which is why both floods
-/// must share this one expression rather than each writing it out.
-inline float flood_edge_cost(const tile_component& cur_tc, int cur_row, float cur_cost,
-                             const tile_component& n_tc, int i)
+/// build_lp_anchor_field). A flood grows outward from its anchor, but what it
+/// prices is TRAVEL TOWARD the anchor (BL-1126, path cost reads the cache;
+/// LOGISTICS.md § 1: a path is directed, and its cost is always origin ->
+/// destination). So reaching neighbour @p n_tc (row @p n_row) from the settled
+/// cell (node weight @p cur_cost) along offset @p i prices the hop n -> settled:
+/// the mean of the two node weights, times the river discount of the side of
+/// @p n_tc the hop LEAVES by (river_edge_discount reads the tile being left;
+/// downstream is cheaper than upstream). A field anchored at D then holds, at
+/// every cell O, the cost of travelling O -> D, which is what intra_body_path(O,
+/// D) reads. Both floods share this one expression so they cannot disagree.
+inline float flood_edge_cost(float cur_cost, const tile_component& n_tc, int n_row, int i)
 {
     // River discount (BL-170): a river-adjacent edge is cheaper, stacking
     // multiplicatively with the road-tier discount inside tile_traversal_cost.
-    const int hex_side = hex_side_for_offset(k_flood_off_dc[i], k_flood_off_dr[i], (cur_row & 1) != 0);
-    const float river_mult = (hex_side >= 0) ? river_edge_discount(cur_tc, hex_side) : 1.0f;
+    // The hop runs n -> settled: the reverse of offset i, from n's row parity.
+    const int hex_side = hex_side_for_offset(-k_flood_off_dc[i], -k_flood_off_dr[i], (n_row & 1) != 0);
+    const float river_mult = (hex_side >= 0) ? river_edge_discount(n_tc, hex_side) : 1.0f;
     return 0.5f * (cur_cost + tile_traversal_cost(n_tc)) * river_mult;
 }
 
@@ -159,11 +164,12 @@ inline float flood_edge_cost(const tile_component& cur_tc, int cur_row, float cu
 /// tick rate, so the per-pair searches re-flooded the grid hundreds of times
 /// every econ tick — the 2026-08-12 AppHangB1 disease with a new carrier.
 ///
-/// Relaxation order, edge costs and tie-breaks are IDENTICAL to the retired
-/// per-pair search (it was already Dijkstra — the "A*" name carried no
-/// heuristic); the only difference is no early exit, and a settled node's
-/// parent is final, so a pair reconstructed from this field matches what the
-/// early-exit search anchored at the same tile returned.
+/// A Dijkstra (the "A*" name carried no heuristic) with no early exit; a settled
+/// node's parent is final. THE FIELD IS A DESTINATION'S (BL-1126): every edge is
+/// priced as the hop TOWARD the anchor (`flood_edge_cost`), so `dist[i]` is the
+/// cost of travelling cell i -> anchor and `came_from[i]` is cell i's next hop
+/// on that route. `intra_body_path(o, d)` reads d's field at o, never o's field
+/// at d — the two differ wherever a river discounts an edge one way only.
 const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id anchor_tile,
                                              int gw, int gh,
                                              const std::vector<entity_id>& grid,
@@ -225,7 +231,7 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
             if (!n_tc)
                 continue; // absent grid cell — impassable
 
-            const float edge = flood_edge_cost(*cur_tc, cur.row, cur_cost, *n_tc, i);
+            const float edge = flood_edge_cost(cur_cost, *n_tc, nr, i);
             const float nd   = f.dist[static_cast<std::size_t>(idx)] + edge;
             if (nd < f.dist[static_cast<std::size_t>(nidx)])
             {
@@ -249,10 +255,10 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
 {
     logistics_path res;
 
-    // Canonicalise the endpoint pair (the weighted path is symmetric) for the cache key.
-    const entity_id lo = std::min(src_tile, dst_tile);
-    const entity_id hi = std::max(src_tile, dst_tile);
-    const auto key = std::make_tuple(body, lo, hi);
+    // THE ORDERED PAIR (BL-1126, path cost reads the cache). A path is directed
+    // (LOGISTICS.md § 1): a river discounts an edge one way only, so src -> dst
+    // and dst -> src are two answers, and the key names which one this is.
+    const auto key = std::make_tuple(body, src_tile, dst_tile);
     const auto cit = w.astar_cost_cache.find(key);
     if (cit != w.astar_cost_cache.end())
         return cit->second;
@@ -282,53 +288,37 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
         return w.astar_cost_cache.emplace(key, std::move(res)).first->second;
     }
 
-    // Answer from a completed flood field rather than a per-pair search
-    // (2026-08-25 — see flood_field_for above). Prefer a field either endpoint
-    // already anchors; on a double miss, flood from the DESTINATION, because
-    // the hot callers (dispatch's net-price rule, nearest_lp_anchor, the march
-    // pass) ask many origins about the same few destination tiles.
-    const logistics_flood_field* field = nullptr;
-    {
-        const auto dfit = w.logistics_flood_fields.find(std::make_pair(body, dst_tile));
-        if (dfit != w.logistics_flood_fields.end())
-            field = &dfit->second;
-        else
-        {
-            const auto sfit = w.logistics_flood_fields.find(std::make_pair(body, src_tile));
-            if (sfit != w.logistics_flood_fields.end())
-                field = &sfit->second;
-        }
-    }
-    if (!field)
-        field = &flood_field_for(w, body, dst_tile, gw, gh, grid, dit->second);
+    // ONE WAY ONLY: the DESTINATION's completed flood field (2026-08-25 — see
+    // flood_field_for), built if absent, read at the origin. Never the origin's
+    // field, even when it exists: that field prices the reverse route, and
+    // answering from whichever field happened to be cached made the cost a
+    // function of cache state, so a loaded game (caches empty) re-derived some
+    // pairs the other way round and continued differently (lp_anchor_field_check
+    // L1). The hot callers ask many origins about the same few destinations
+    // (dispatch's net-price rule toward market centres, the march toward its
+    // order's tile), so one field per destination is also the cheap shape.
+    const logistics_flood_field& field = flood_field_for(w, body, dst_tile, gw, gh, grid, dit->second);
+    const int src_idx = raster_idx(sit->second.grid_x, sit->second.grid_y, gw);
 
-    // The endpoint the field is NOT anchored at — the walk start. The weighted
-    // path is symmetric (the cache key is the unordered pair for exactly that
-    // reason), so either endpoint's field prices the pair.
-    const bool anchored_at_dst =
-        field->anchor_idx == raster_idx(dit->second.grid_x, dit->second.grid_y, gw);
-    const tile_component& other_tc  = anchored_at_dst ? sit->second : dit->second;
-    const entity_id       other_tile = anchored_at_dst ? src_tile : dst_tile;
-    const int otherIdx = raster_idx(other_tc.grid_x, other_tc.grid_y, gw);
-
-    if (field->dist[static_cast<std::size_t>(otherIdx)] < 1e30f)
+    if (field.dist[static_cast<std::size_t>(src_idx)] < 1e30f)
     {
         res.reachable     = true;
-        res.cost          = field->dist[static_cast<std::size_t>(otherIdx)];
-        res.crosses_ocean = field->crossed[static_cast<std::size_t>(otherIdx)] != 0;
+        res.cost          = field.dist[static_cast<std::size_t>(src_idx)];
+        res.crosses_ocean = field.crossed[static_cast<std::size_t>(src_idx)] != 0;
 
-        // Reconstruct the tile sequence (BL-152): walk parents other→anchor,
-        // then canonicalise to lo→hi (the cache is keyed on the unordered pair)
-        // so every reader sees one stable order regardless of which endpoint
-        // anchored the field.
+        // Reconstruct the tile sequence (BL-152): walk src's next hops to the
+        // anchor (the travel order), then store it lo -> hi. THE STORED ORDER
+        // STAYS CANONICAL even though the key is ordered: every reader that
+        // wants travel order flips it when src is not the lower id
+        // (convoy_route_tiles, body_surface_canvas; LOGISTICS.md § 2's trap).
         std::vector<entity_id> seq;
-        for (int i = otherIdx; i != -1; i = field->came_from[static_cast<std::size_t>(i)])
+        for (int i = src_idx; i != -1; i = field.came_from[static_cast<std::size_t>(i)])
         {
             const entity_id tid = grid[static_cast<std::size_t>(i)];
             if (tid != null_entity) seq.push_back(tid);
-            if (i == field->anchor_idx) break;
+            if (i == field.anchor_idx) break;
         }
-        if (other_tile != lo) // seq runs other→anchor; flip unless other IS lo
+        if (src_tile > dst_tile) // seq runs src -> dst; lo -> hi needs the flip
             std::reverse(seq.begin(), seq.end());
         res.tiles = std::move(seq);
     }
@@ -588,23 +578,26 @@ namespace {
 /// of a settle built one flood field per city: 9,038 on seed 0 (~90 s, ~2.5 GB of
 /// fields), 6,079 on seed 28.
 ///
-/// WHY IT IS THE SAME QUANTITY. The edges are `flood_edge_cost`, relaxed outward
-/// from the seeds — the anchor-rooted direction `intra_body_path` floods on that
-/// double miss. Float addition is monotone and a non-negative edge never lowers a
-/// sum, so Dijkstra settles each cell at the minimum over paths of the left-to-
-/// right float sum from its source; seeding every anchor at 0 is one super-source
-/// with zero edges (exact in float), so `cost[i]` is EXACTLY min over anchors a of
-/// a's own flood distance to cell i. The old per-pair loop took that minimum.
+/// WHY IT IS THE SAME QUANTITY. The edges are `flood_edge_cost` — each hop priced
+/// TOWARD the anchor, exactly as an anchor's own flood field prices it — so a
+/// cell's cost is the cost of travelling cell -> anchor, which is what
+/// `intra_body_path(from, anchor)` reads (BL-1126: the destination's field, read
+/// at the origin). Float addition is monotone and a non-negative edge never
+/// lowers a sum, so Dijkstra settles each cell at the minimum over paths of the
+/// float sum built from its source; seeding every anchor at 0 is one super-
+/// source with zero edges (exact in float), so `cost[i]` is EXACTLY min over
+/// anchors a of a's own flood distance at cell i.
 ///
-/// THE TIE RULE, today's: lowest cost, then lowest anchor tile id. Each label is
-/// the pair (cost, anchor) compared lexicographically, and the queue pops in that
-/// order, so a settled label is final. This returns the lowest-id anchor among the
-/// equal-cost ones exactly whenever no float rounding folds a strictly smaller
-/// partial sum into an equal total along the way (a sum that absorbs the gap only
-/// at a binade boundary); there the cell still gets an anchor AT the minimum cost,
-/// just possibly not the lowest id. lp_anchor_field_check's F2 row counts those
-/// cells against a brute-force flood per anchor: measured 2026-09-25 on seeds 0
-/// and 28 (9,228 and 6,176 anchors), none — every cell's cost and anchor matched.
+/// THE CONTRACT: an anchor at least cost, and a fixed choice among exact ties.
+/// Each label is the pair (cost, anchor) compared in that order and the queue
+/// pops in that order, so a settled label is final and the choice is a pure
+/// function of the inputs. It is USUALLY the lowest-id anchor among the equal-
+/// cost ones, but not always: round-half-to-even can fold a one-ulp gap between
+/// two partial sums into an equal total (inside one binade, not only at a
+/// boundary), and then the cell inherits the anchor the smaller partial sum
+/// carried, which may be the higher id. The cost is exact either way.
+/// lp_anchor_field_check's F2 row counts those cells against a brute-force flood
+/// per anchor and prints the count on its verdict line.
 lp_anchor_field build_lp_anchor_field(world& w, entity_id body, std::vector<entity_id> anchors)
 {
     lp_anchor_field f;
@@ -698,7 +691,7 @@ lp_anchor_field build_lp_anchor_field(world& w, entity_id body, std::vector<enti
             if (!n_tc)
                 continue; // absent grid cell — impassable
 
-            const float edge = flood_edge_cost(*cur_tc, row, cur_cost, *n_tc, i);
+            const float edge = flood_edge_cost(cur_cost, *n_tc, nr, i);
             const float nd   = f.cost[ci] + edge;
             if (nd < f.cost[ni] || (nd == f.cost[ni] && f.nearest[ci] < f.nearest[ni]))
             {
@@ -850,10 +843,10 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
     route.body  = body;
     route.tiles = lp.tiles; // copied: the cache entry stays canonical lo->hi
 
-    // THE ORIENTATION RULE (BL-458). intra_body_path canonicalises its stored
-    // sequence to lo->hi to match its canonicalised (lo, hi) cache key, so the
-    // cached order is source->destination only when the source tile is the
-    // lower id. Flip it when it is not. Skipping this puts a convoy's head at
+    // THE ORIENTATION RULE (BL-458). intra_body_path stores its sequence lo->hi
+    // under its ordered (src, dst) key (BL-1126), so the cached order is
+    // source->destination only when the source tile is the lower id. Flip it
+    // when it is not. Skipping this puts a convoy's head at
     // the far end of its own lane about half the time, and the vision beam
     // renders identically either way, so nothing on screen would report it.
     if (st != std::min(st, dt))

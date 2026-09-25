@@ -242,14 +242,17 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     // that closes the lap, and the count of logistics flood fields lap 1 built
     // (a size read of a const world). Reported only.
     //
-    // Measured 2026-09-25 (Release, seeds 0 and 28): the slow tick is the FIRST
-    // tick in which any convoy is committed (tick 0 commits none: no market has
-    // cleared, so every destination's room is zero). That commit's passive-LP
-    // gate asks `nearest_lp_anchor` for the origin's nearest anchor over every
-    // city on the body, and each pair floods a whole-body Dijkstra from the
-    // anchor: ~6,000-9,000 floods, 65-88 s. It lands in `corp_strategic` when a
-    // rival's directed dispatch commits first (seed 28), in `dispatch` when the
-    // auto-dispatcher does (seed 0) -- so read both columns and the flood count.
+    // WHAT THESE CLOCKS FOUND (2026-09-25, Release, seeds 0 and 28), kept so a
+    // regression reads against it. The slow tick WAS the first tick in which any
+    // convoy is committed (tick 0 commits none: no market has cleared, so every
+    // destination's room is zero). That commit's passive-LP gate asked
+    // `nearest_lp_anchor` for the origin's nearest anchor by a per-pair loop over
+    // every city on the body, and each pair flooded a whole-body Dijkstra: ~6,000-
+    // 9,000 floods, 65-88 s, landing in `corp_strategic` when a rival's directed
+    // dispatch committed first (seed 28), in `dispatch` when the auto-dispatcher
+    // did (seed 0). BL-1117 S2 answers it from one field per body; tick 1 now
+    // costs about what the others do. If a tick again runs 30x its neighbours,
+    // read both columns and the flood count first.
     using econ_row = std::array<std::int64_t, k_economy_step_phase_count + 1>; // + dispatch, us
     struct tick_clock
     {
