@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*44 entries — 23 open, 21 resolved.*
+*45 entries — 24 open, 21 resolved.*
 
 ---
 
@@ -347,6 +347,21 @@ A note fires when a region's industry points cross the next multiple of f x the 
 > **Recommendation:** A for this sprint; D is the smallest change if the dawn-cluster reads wrong at the live click.
 
 *Files: `src/world/history_sim.hpp`, `src/world/history_sim.cpp`, `tools/verify/industrialisation_sim_harness.cpp`*
+
+### NR-941 — CALL: the origin sentence doubles its name once the nation carries its realm's -- 'under Guashe These, the realm of Guashe These since 1660 CE'
+*question · raised 2026-09-25 · from main session, the F3 merge (BL-1099 origin sentence composed with BL-1088/BL-1089 name inheritance), seat_pick.lua seat_02_briefing.png on the verify world*
+
+R22's form is 'under <nation>, the realm of <X> since <year>', where X is the realm the Empires/Exploration/Industrialisation record shows holding the firm's region in its founding year (owner_slice_at). Since BL-1089 every nation with a founding realm carries that realm's coined name verbatim (38 of 38 on seed 0), and a firm is nearly always chartered on ground its own nation's realm held in 1660, so the two names coincide: the capture reads 'under Guashe These, the realm of Guashe These since 1660 CE'. The clause only earns its place when the holder in the founding year is NOT the realm the nation grew from (ground absorbed since; a purchase; a colony's overlord), which is the minority case.
+
+**Why it matters.** The sentence is the one origin line the briefing carries (R22) and Ben's live click on BL-1099 R5 will read it; the doubled form reads as a bug rather than a fact. The information is still right -- the realm the nation is and the realm that held the ground agree -- it is the wording that has no branch for agreement.
+
+- A: collapse on agreement -- when the founding realm's name equals the nation's, write 'under Guashe These, its own realm since 1660 CE'; keep the full form when they differ (one branch in seat_screen.cpp's origin sentence, STARTUP.md's quoted form gains the second reading)
+- B: keep R22's form verbatim -- the repetition is the fact stated twice and the live click decides
+- C: drop the nation clause when the names agree -- 'in Gesher Nehua, the realm of Guashe These since 1660 CE' (shorter, but loses the word 'under' that says whose law you trade beneath, which the line above already states)
+
+> **Recommendation:** A -- the honest sentence in both cases, one branch, no field. Not applied without the call because the form is Ben's ruling (R22, STARTUP.md § The seat).
+
+*Files: `src/ui/seat_screen.cpp`, `docs/ui/STARTUP.md`, `docs/development/drafts/sprint-47-rulings.md`*
 
 ---
 

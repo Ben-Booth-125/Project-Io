@@ -4220,7 +4220,13 @@ void date_chartered_firms(world& w, charter_spend_report& report,
     {
         const auto cit = w.corporations.find(r.corp);
         if (cit == w.corporations.end())
+        {
+            // A charter whose corp the world no longer holds still carries a
+            // year on the report row, so a reader of the report never sees an
+            // unset founding (the close's fill skips the row anyway).
+            r.founded_year = epoch_year;
             continue;
+        }
         corporation_component& c = cit->second;
         int32_t year = epoch_year;
         if (c.origin_region >= 0)

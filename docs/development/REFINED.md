@@ -242,8 +242,10 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
   4834366D19271E5F); `begin_adopts_check` 12/12, adopt == cold BB0457AAD5205D34;
   `realm_identity.lua` 24/24 (1200 seam 64 shared / 63 kept / 1 re-slot; 1660 seam 53 / 52 / 1),
   `seat_pick.lua` and `names_and_voice.lua` green, captures re-eyeballed; `realm_names_check`
-  ALL PASS. Still OWED: Ben's live click (1087 R6, 1088 R6, 1089 R5); a re-read of the sweep's
-  pinned-clash column on the library (its 101 / 18 was over the 1960 raster).
+  ALL PASS. Still OWED: Ben's live click (1087 R6, 1088 R6, 1089 R5). The sweep's pinned-clash
+  column RE-READ on main with I1 merged (2026-09-25, 16 seeds, per-record raster): 75 clashes
+  at 1200, 5 at 1660, on 13 of 16 worlds; 80 re-slotted, 590 dead-slot, 0 spills (was 101 / 18
+  over the 1960 raster) -- written into 1087 R5.
 
 ### Wave 1, lane I2 (frontier and marks) — BL-1090 (hard borders) then BL-1094 (marks). Groups `hard-borders-by-people-share`, `marks-that-earn-their-place`.
 
@@ -340,8 +342,9 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
   ~1670-1673), serialised in the envelope bump. (1104 R1, R2)
   DONE 2026-09-25: the fold lifted above the stop branch (built where a report or the stop will
   hold it), written onto the cradle's entry on both paths, `w_/r_body_entry` tail under v22;
-  `save_envelope_roundtrip` S3 row green; `world_determinism` ALL PASS twice, seedA/on
-  5BA2EE1EE993C201, seedB/on 4F7BBD76AEEF3431 both runs.
+  `save_envelope_roundtrip` S3 row green; `world_determinism` ALL PASS twice, both runs
+  identical. RE-PINNED on the merged tree (main session 2026-09-25): seedA/on 6DBC0094F0B6B0EF,
+  seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F -- main's post-I1 digits, the lane moves nothing.
 - [ ] T6 harness rows; captures; Release build; `world_determinism` twice; the round trips; cold review;
   Ben's live click. (R5, R2)
   2026-09-25: harness rows, captures, Release build, determinism x2, both round trips DONE; a
