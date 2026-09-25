@@ -24,182 +24,13 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*47 entries — 13 open, 34 resolved.*
+*47 entries — 0 open, 47 resolved.*
 
 ---
 
 ## Open
 
-### NR-918 — DECISION TAKEN: the reroll path once the world moves forward — hold the predecessor by a faithful copy, replay from the Life gate as the fallback
-*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-Ben ruled the whole half-built world crosses each seam and rerolls are per stage, and asked to be told if there is a stronger reason to recalculate. There is one: a world moved into round N's worker and mutated is consumed, so a reroll of N needs round N-1's closing world back. Taken: hold the predecessor's closed world by a faithful copy at landing (BL-1034 proved a copy ticks as its original; world_copy_determinism), move a copy into the worker, re-copy on reroll; when the predecessor is not held, replay from the Life gate with the fixed per-span seeds — bit-identical by determinism, about 0.5 s + 1.6 s + 1.5 s in Release. A serialised snapshot was rejected (a save round trip reorders the unordered stores). Copy cost is measured first; if it exceeds the replay it saves, pure replay ships.
-
-**Why it matters.** Nothing displayed is ever inaccurate either way — with per-span seeds a replay IS the same calculation — so the question is only memory against a few seconds on the reroll path. The forward path (Next, Back) never recomputes.
-
-- A: the hybrid (copy held, replay fallback) — taken
-- B: pure replay (no held copies; every reroll costs up to ~3.6 s)
-- C: hold every closed world (25-40 MB each, inferred; simplest invalidation)
-
-> **Recommendation:** A, measured; B if the copy costs more than it saves.
-
-*Files: `src/core/app.hpp`, `src/ui/startup_screens.cpp`, `src/world/hard_coded_world.cpp`*
-
-### NR-919 — DECISION TAKEN: the scope reading — a ruling Ben made by name wins over the general "no sim beats" answer
-*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-On the form Ben answered Scope with "presentation plus record-only kinds and fields plus per-span seeds, no sim beats, no people", and on the same form chose by name: the purchase verb and sea-lane tier ("a sim beat with a re-bless"), the band from the history's industry state, the tariff posture derived by the span, mid-span works-chartered events, and the Industrialisation round absorbing Begin's work. His closing note says his notes "should apply some slightly different readings of some of the options". Taken: the specific rulings are in the sprint as exceptions to the general scope; the sprint takes ONE re-bless after its world-movers land (already authorised in principle, 2026-09-24).
-
-**Why it matters.** Fixes the digest and re-bless budget for the whole sprint; if Ben meant the general answer to exclude any of the five, that item comes out before it is built.
-
-> **Recommendation:** Confirm, or name the exception to withdraw.
-
-### NR-922 — NOVEL WORK: seven new record kinds, two series fields and a name table widen the lapse record's scope
-*novel-work · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-The sprint adds lapse_event_kind entries cradle, inherited, works_chartered, province_bought, sea_lane_opened, sea_leg_campaign and the rung crossing (or a reuse of furnace_lit), navy_stock and port_stock_q on polity_sample, and a polity_name (and civilisation/creed name) table on era_timelapse — all in one save_game_version bump. Each is record-only (write-only from the sim; read by the UI), so digests do not move, but the record stops being "what the span computes about borders" and becomes the wizard's narrative store.
-
-**Why it matters.** The standing rules ask that novelty be chosen, not accreted; this is the one place the sprint grows a data structure's purpose.
-
-> **Recommendation:** Accept as the sprint's one widening; the kinds are append-only and each is documented on the enum.
-
-*Files: `src/world/era_timelapse.hpp`, `src/core/save_game.cpp`*
-
-### NR-923 — DECISION TAKEN: Selene and Pallas stay in Finishing; the Life-gate world is Helios + Cinder + Kepler
-*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-Ben ruled "move the whole half-built world". Selene (moon) and Pallas (asteroid) are authored in Finishing after corporations (hard_coded_world.cpp:2532-2600); moving them to the gate shifts every later entity id (create_entity is monotonic) — a full re-bless for two bodies no wizard round shows. Taken: they stay in Finishing; STARTUP.md § The world cache says so.
-
-**Why it matters.** If Ben wants the gate to be literally the whole system, it rides the sprint's re-bless at no other cost.
-
-- A: stay in Finishing (taken)
-- B: move to the gate in the same re-bless
-
-> **Recommendation:** A.
-
-*Files: `src/world/hard_coded_world.cpp`*
-
-### NR-924 — DECISION TAKEN: folding the landscape search INTO generation at the companies stage is a stretch item (BL-1086), not part of the first wave
-*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-Ben: "completely obsolete that block of code". Taken: BL-1085 moves Begin's work into one world/* function called by the round-6 worker and the cold path (hash gate intact, goldens untouched); folding the search into make_hard_coded_world so the market carve reads the searched roster and no world-gen roster is laid then removed (the literal "work twice") is a world-mover that changes what the carve reads — filed as BL-1086 to ride the sprint's re-bless if BL-1085 lands with time.
-
-**Why it matters.** Two possible readings of "obsolete that block": retire Begin's code (BL-1085) or also retire the double roster (BL-1086). Both are in the sprint; only the order is delegated.
-
-> **Recommendation:** Confirm the order.
-
-*Files: `src/world/hard_coded_world.cpp`, `src/world/landscape_search.cpp`*
-
-### NR-925 — DECISION TAKEN: works-chartered events are record-only in-span at a fraction of the RUNNING price, no points debited, and the close flashes the real charters
-*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-Ben chose "invent mid-span works-chartered events at a fixed fraction of a price". The ruled firm price is the 1960 stock over 650, unknown in 1720, so "a price" inside the span is the running price (stock so far / 650); a fixed points constant was rejected for the close by NR-907. Taken (shape C): the event is emitted from the accrual, record-only, capped per region per round, with the fraction f read off the harness before it is pinned; points are not debited (a Works sink is Beat 1's own force with its own re-bless); once the search runs inside the round (BL-1085) the close flashes the real charters dated by pairing a region's k-th firm with its k-th crossing. Real in-span chartering (firms materialised mid-span) is a sim beat that reopens DENSITY_FOLLOWS_CITIES and every 650:2 pin — not taken.
-
-**Why it matters.** A flash that shows ten to forty times more works than the roster is worse than no flash; the fraction is measured, not guessed.
-
-- A: shape C (taken)
-- B: real in-span chartering — a sim beat, sequenced after BL-1085 with its own re-bless
-
-> **Recommendation:** A.
-
-*Files: `src/world/history_sim.cpp`, `src/ui/history_lapse.cpp`*
-
-### NR-926 — DECISION TAKEN: the culture ground profile is filed record-only with no consumer (BL-1107, stretch)
-*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-Ben's note: materials shaped culture; primitive cultures gain a preference toward amenities. Taken: a per-culture ground profile coined at the cradle (deposits summed, an amenity class of cover) and inherited by daughters, record-only; its consumer (derive_culture_preference, the want table) is a sim beat for a later sprint. Note that "amenity" has no field today — a classifier comes first.
-
-**Why it matters.** Giving it a consumer moves every digest; the profile alone moves none.
-
-> **Recommendation:** Confirm record-only for now.
-
-*Files: `src/world/settlement.cpp`, `src/world/creeds.hpp`*
-
-### NR-927 — DECISION TAKEN: the presentation half of the twelve pre-game settle ticks is dropped when the settle runs inside round 6's worker
-*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-The settle's world half is pure and moves into the worker (BL-1085). Its presentation half — agency comms stamped day 0, record_histories samples, the strategy readout, the last econ report and corp standings — cannot run there. Taken: drop it for the twelve ticks; the balance series is already rebuilt from filed returns at the seat; counsel and battles were already suppressed; ledgers open on the first live tick. Stated in STARTUP.md.
-
-**Why it matters.** The first in-game frame opens with fewer history samples and no "last report"; if that matters, the per-tick flows would have to be kept and replayed on the main thread.
-
-- A: drop (taken)
-- B: keep the flows and replay the presentation half after adopt
-
-> **Recommendation:** A.
-
-*Files: `src/core/app.cpp`*
-
-### NR-928 — DECISION TAKEN: sea lanes split into the RECORD (BL-1097, this sprint) and the STAMP (BL-1098, stretch), and the stamp does not wait for a play-handoff contract
-*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-Ben: build the purchase verb and sea-lane tier this sprint. Taken: the leg record, the tier event and round 5's lane line are one item; the water stamp (a new lane_level tile field, a water-only walker, a traversal multiplier, a digest fold) is a second item of its own weight. The sprint-46 draft row PLAY_HANDOFF_CONTRACT (one struct for every row of What crosses into play) stays unfiled; the stamp lands through the existing stamp_history_roads seam rather than waiting for it.
-
-**Why it matters.** The reader that scoped it said the stamp "should wait for the contract or land with it"; landing it without the contract adds one more loose handoff local of the kind that row exists to end.
-
-- A: stamp through the existing seam (taken)
-- B: file PLAY_HANDOFF_CONTRACT first and land the stamp behind it
-
-> **Recommendation:** A this sprint.
-
-*Files: `src/world/road_generation.cpp`, `src/world/hard_coded_world.cpp`*
-
-### NR-929 — DECISION TAKEN: the recipe band is per WORLD, named by the materials rung; per-nation grain comes through campaign tech, not a second band
-*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-Ben: the band should come from the history's industry state. Taken: industrial iff any living polity's materials capacity reaches the industrial rung at the 1960 fold (the derivation industrial_year already uses); persisted on the world; the epoch reader retired. Per-nation banding would put a second gating system over tech (the BL-692 ruling) and every band consumer takes no actor; the per-corporation earned_techs route (BL-1109, ruled 2026-09-18) is the per-nation grain. The Industry spire ring and raw industry points were the other candidates.
-
-**Why it matters.** A seed whose history never crossed the rung derives ancient and opens without the industrial roster — measured across the 16 seeds before the threshold is fixed, never forced.
-
-- A: per world by the materials rung (taken)
-- B: per nation on nation_component with an actor-aware registry
-- C: per world by the Industry spire ring
-
-> **Recommendation:** A.
-
-*Files: `src/world/era_band.hpp`, `src/world/hard_coded_world.cpp`*
-
-### NR-930 — DECISION TAKEN: the purchase is a fork inside the subjection block and a trade province stays a label; the sim_verb contest and the minted foothold are filed
-*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-Ben: build the purchase verb this sprint. Taken: buy when the native seat is coastal and the price is affordable, take otherwise, inside the existing round-level block (bounded, one function, deterministic); price = max(floor, native seat treasury × rate) paid buyer → native seat; subject_kind is the verb taken. The fuller shapes — a sim_verb::purchase candidate scored against campaign ("one contest with two costs", EXPLORATION.md:314-320) and a minted foothold region beside the native's capital (:279-283) — are filed as continuity-pass items. The seller stays a non-decision (no new actor).
-
-**Why it matters.** The bounded fork is what fits the sprint; the doc keeps the fuller design as design.
-
-- A: the fork (taken)
-- B: the scored verb now
-
-> **Recommendation:** A.
-
-*Files: `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
-
-### NR-933 — DECISION TAKEN: the purchase constants — rate 2000 per mille of the seller's chest, floor as measured — pinned at the first grid point where the purse, not the coast alone, decides
-*decision taken on your behalf · raised 2026-09-24 · from BL-1096 lane W1 (purchase verb), exploration_sweep over the 16 curated seeds at rates 1000 / 2000 / 4000 per mille, 2026-09-24*
-
-Measured bought/taken splits (bought/taken over the library): 1000‰ → 62/48, 2000‰ → the pinned point, 4000‰ → 36/74. At 1000 the coast alone decides (nearly everything coastal is bought); at 4000 few can afford it. 2000 was taken as the first point where the treasury discriminates. Digests moved on 2 of 16 library seeds (25, 38); exploration_sim_harness's R3b regression pin moved by exactly one purchase (+400 tribute) and is left failing for the sprint's single re-bless. A purchase recoups itself through tribute in ~7 rounds at 2000 (read, not hidden).
-
-**Why it matters.** The number shapes how many colonies arrive at 1660 "bought" rather than "taken", which is what the round-5 map and the culture shares read.
-
-- A: keep 2000‰ (taken)
-- B: 1000‰ (more purchases; the coast decides)
-- C: 4000‰ (purchases rare)
-
-> **Recommendation:** A; re-measure with --set subjection_purchase_rate_q if Ben wants a different feel (~2.5 min a run).
-
-*Files: `src/world/history_sim.hpp`, `tools/verify/exploration_sweep.cpp`*
-
-### NR-938 — DECISION TAKEN: the pinned-slot clash rule is pinned-vs-pinned (the 2026-09-24 ruling said pinned-vs-fresh, a case the walk never produces)
-*decision taken on your behalf · raised 2026-09-25 · from BL-1087 lane I1 fix round and its cold review, 2026-09-25*
-
-The ruling (R7) said a pinned/fresh adjacency clash re-slots the smaller people-share realm. In the built walk a FRESH realm is coloured greedily AROUND the pins, so it cannot clash with one; the only clash the seam makes is two PINNED realms that never touched before and now neighbour — that is the case the code resolves (the smaller people share re-slots at the round's opening step; on the verify world 1 re-slot at each of the 1200 and 1660 seams). STARTUP.md § Identity across the rounds was reworded to say so with a dated note; the sentence is qualified: a fresh realm cannot clash except on a spill (the palette exhausted), where it shares a neighbour's slot and no re-slot happens.
-
-**Why it matters.** An authority-doc sentence was changed by a lane on its own reading; Ben should know the rule he ruled is not the rule the walk needs, and confirm the pinned/pinned form.
-
-- A: confirm pinned/pinned (as built and now written)
-- B: keep the ruling's wording and add a fresh-realm re-slot the walk does not need
-
-> **Recommendation:** A.
-
-*Files: `docs/ui/STARTUP.md`, `src/ui/history_lapse.cpp`*
+*Nothing open.*
 
 ---
 
@@ -560,6 +391,34 @@ Dispatch and the march share one Logistic Point pool per tick (BL-597). Dispatch
 
 *Files: `src/core/app.cpp`, `src/main.cpp`, `tools/verify/harness_params.hpp`, `docs/economy/LOGISTICS.md`*
 
+### NR-918 — DECISION TAKEN: the reroll path once the world moves forward — hold the predecessor by a faithful copy, replay from the Life gate as the fallback
+*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+Ben ruled the whole half-built world crosses each seam and rerolls are per stage, and asked to be told if there is a stronger reason to recalculate. There is one: a world moved into round N's worker and mutated is consumed, so a reroll of N needs round N-1's closing world back. Taken: hold the predecessor's closed world by a faithful copy at landing (BL-1034 proved a copy ticks as its original; world_copy_determinism), move a copy into the worker, re-copy on reroll; when the predecessor is not held, replay from the Life gate with the fixed per-span seeds — bit-identical by determinism, about 0.5 s + 1.6 s + 1.5 s in Release. A serialised snapshot was rejected (a save round trip reorders the unordered stores). Copy cost is measured first; if it exceeds the replay it saves, pure replay ships.
+
+**Why it matters.** Nothing displayed is ever inaccurate either way — with per-span seeds a replay IS the same calculation — so the question is only memory against a few seconds on the reroll path. The forward path (Next, Back) never recomputes.
+
+- A: the hybrid (copy held, replay fallback) — taken
+- B: pure replay (no held copies; every reroll costs up to ~3.6 s)
+- C: hold every closed world (25-40 MB each, inferred; simplest invalidation)
+
+> **Recommendation:** A, measured; B if the copy costs more than it saves.
+
+> **RESOLVED.** CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the hybrid -- hold the predecessor by a faithful copy, replay from the Life gate as the fallback. Applies with BL-1084 in sprint 48.
+
+*Files: `src/core/app.hpp`, `src/ui/startup_screens.cpp`, `src/world/hard_coded_world.cpp`*
+
+### NR-919 — DECISION TAKEN: the scope reading — a ruling Ben made by name wins over the general "no sim beats" answer
+*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+On the form Ben answered Scope with "presentation plus record-only kinds and fields plus per-span seeds, no sim beats, no people", and on the same form chose by name: the purchase verb and sea-lane tier ("a sim beat with a re-bless"), the band from the history's industry state, the tariff posture derived by the span, mid-span works-chartered events, and the Industrialisation round absorbing Begin's work. His closing note says his notes "should apply some slightly different readings of some of the options". Taken: the specific rulings are in the sprint as exceptions to the general scope; the sprint takes ONE re-bless after its world-movers land (already authorised in principle, 2026-09-24).
+
+**Why it matters.** Fixes the digest and re-bless budget for the whole sprint; if Ben meant the general answer to exclude any of the five, that item comes out before it is built.
+
+> **Recommendation:** Confirm, or name the exception to withdraw.
+
+> **RESOLVED.** RULED (Ben, the delegated-decision form, 2026-09-25): the named rulings win, AND the blanket "no sim beats" scope answer is OVERRULED -- sim beats are in scope, taken one re-bless at a time. The same form overturned three delegated readings into sim beats (NR-925 B, NR-926, NR-929 B).
+
 ### NR-920 — CALL: what --epoch 0 means once the recipe band is derived from the history, and whether the ancient-roster sandbox keeps an explicit --band override
 *question · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
 
@@ -594,6 +453,142 @@ While reading the sea-lane tier (BL-1097): exploration_sim_params leaves sea_leg
 
 *Files: `src/world/era_minus_one.cpp`, `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
 
+### NR-922 — NOVEL WORK: seven new record kinds, two series fields and a name table widen the lapse record's scope
+*novel-work · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+The sprint adds lapse_event_kind entries cradle, inherited, works_chartered, province_bought, sea_lane_opened, sea_leg_campaign and the rung crossing (or a reuse of furnace_lit), navy_stock and port_stock_q on polity_sample, and a polity_name (and civilisation/creed name) table on era_timelapse — all in one save_game_version bump. Each is record-only (write-only from the sim; read by the UI), so digests do not move, but the record stops being "what the span computes about borders" and becomes the wizard's narrative store.
+
+**Why it matters.** The standing rules ask that novelty be chosen, not accreted; this is the one place the sprint grows a data structure's purpose.
+
+> **Recommendation:** Accept as the sprint's one widening; the kinds are append-only and each is documented on the enum.
+
+> **RESOLVED.** ACCEPTED (Ben, the delegated-decision form, 2026-09-25): the seven record kinds, the navy/port series and the name table are the sprint's one widening of the lapse record.
+
+*Files: `src/world/era_timelapse.hpp`, `src/core/save_game.cpp`*
+
+### NR-923 — DECISION TAKEN: Selene and Pallas stay in Finishing; the Life-gate world is Helios + Cinder + Kepler
+*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+Ben ruled "move the whole half-built world". Selene (moon) and Pallas (asteroid) are authored in Finishing after corporations (hard_coded_world.cpp:2532-2600); moving them to the gate shifts every later entity id (create_entity is monotonic) — a full re-bless for two bodies no wizard round shows. Taken: they stay in Finishing; STARTUP.md § The world cache says so.
+
+**Why it matters.** If Ben wants the gate to be literally the whole system, it rides the sprint's re-bless at no other cost.
+
+- A: stay in Finishing (taken)
+- B: move to the gate in the same re-bless
+
+> **Recommendation:** A.
+
+> **RESOLVED.** CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, Selene and Pallas stay in Finishing.
+
+*Files: `src/world/hard_coded_world.cpp`*
+
+### NR-924 — DECISION TAKEN: folding the landscape search INTO generation at the companies stage is a stretch item (BL-1086), not part of the first wave
+*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+Ben: "completely obsolete that block of code". Taken: BL-1085 moves Begin's work into one world/* function called by the round-6 worker and the cold path (hash gate intact, goldens untouched); folding the search into make_hard_coded_world so the market carve reads the searched roster and no world-gen roster is laid then removed (the literal "work twice") is a world-mover that changes what the carve reads — filed as BL-1086 to ride the sprint's re-bless if BL-1085 lands with time.
+
+**Why it matters.** Two possible readings of "obsolete that block": retire Begin's code (BL-1085) or also retire the double roster (BL-1086). Both are in the sprint; only the order is delegated.
+
+> **Recommendation:** Confirm the order.
+
+> **RESOLVED.** CONFIRMED (Ben, the delegated-decision form, 2026-09-25): the order stands -- Begin's work moved first (BL-1085), the search folds into generation later (BL-1086, sprint 48).
+
+*Files: `src/world/hard_coded_world.cpp`, `src/world/landscape_search.cpp`*
+
+### NR-925 — DECISION TAKEN: works-chartered events are record-only in-span at a fraction of the RUNNING price, no points debited, and the close flashes the real charters
+*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+Ben chose "invent mid-span works-chartered events at a fixed fraction of a price". The ruled firm price is the 1960 stock over 650, unknown in 1720, so "a price" inside the span is the running price (stock so far / 650); a fixed points constant was rejected for the close by NR-907. Taken (shape C): the event is emitted from the accrual, record-only, capped per region per round, with the fraction f read off the harness before it is pinned; points are not debited (a Works sink is Beat 1's own force with its own re-bless); once the search runs inside the round (BL-1085) the close flashes the real charters dated by pairing a region's k-th firm with its k-th crossing. Real in-span chartering (firms materialised mid-span) is a sim beat that reopens DENSITY_FOLLOWS_CITIES and every 650:2 pin — not taken.
+
+**Why it matters.** A flash that shows ten to forty times more works than the roster is worse than no flash; the fraction is measured, not guessed.
+
+- A: shape C (taken)
+- B: real in-span chartering — a sim beat, sequenced after BL-1085 with its own re-bless
+
+> **Recommendation:** A.
+
+> **RESOLVED.** OVERTURNED (Ben, the delegated-decision form, 2026-09-25): B, real in-span chartering -- a firm is chartered when its region's stock crosses the running price and the points are debited; a sim beat with its own re-bless. Written into INDUSTRIALISATION.md (Firms are chartered in the span) and STARTUP.md (Company creation flashes); the work is BL-1122 (in-span chartering).
+
+*Files: `src/world/history_sim.cpp`, `src/ui/history_lapse.cpp`*
+
+### NR-926 — DECISION TAKEN: the culture ground profile is filed record-only with no consumer (BL-1107, stretch)
+*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+Ben's note: materials shaped culture; primitive cultures gain a preference toward amenities. Taken: a per-culture ground profile coined at the cradle (deposits summed, an amenity class of cover) and inherited by daughters, record-only; its consumer (derive_culture_preference, the want table) is a sim beat for a later sprint. Note that "amenity" has no field today — a classifier comes first.
+
+**Why it matters.** Giving it a consumer moves every digest; the profile alone moves none.
+
+> **Recommendation:** Confirm record-only for now.
+
+> **RESOLVED.** OVERTURNED (Ben, the delegated-decision form, 2026-09-25): give the ground profile its reader -- derive_culture_preference reads it (an amenity classifier first). COLONISATION.md already names the reader; the marker now records the ruling. The work widens BL-1107 (culture ground profile, sprint 48) into a sim beat.
+
+*Files: `src/world/settlement.cpp`, `src/world/creeds.hpp`*
+
+### NR-927 — DECISION TAKEN: the presentation half of the twelve pre-game settle ticks is dropped when the settle runs inside round 6's worker
+*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+The settle's world half is pure and moves into the worker (BL-1085). Its presentation half — agency comms stamped day 0, record_histories samples, the strategy readout, the last econ report and corp standings — cannot run there. Taken: drop it for the twelve ticks; the balance series is already rebuilt from filed returns at the seat; counsel and battles were already suppressed; ledgers open on the first live tick. Stated in STARTUP.md.
+
+**Why it matters.** The first in-game frame opens with fewer history samples and no "last report"; if that matters, the per-tick flows would have to be kept and replayed on the main thread.
+
+- A: drop (taken)
+- B: keep the flows and replay the presentation half after adopt
+
+> **Recommendation:** A.
+
+> **RESOLVED.** CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the settle's presentation half stays dropped.
+
+*Files: `src/core/app.cpp`*
+
+### NR-928 — DECISION TAKEN: sea lanes split into the RECORD (BL-1097, this sprint) and the STAMP (BL-1098, stretch), and the stamp does not wait for a play-handoff contract
+*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+Ben: build the purchase verb and sea-lane tier this sprint. Taken: the leg record, the tier event and round 5's lane line are one item; the water stamp (a new lane_level tile field, a water-only walker, a traversal multiplier, a digest fold) is a second item of its own weight. The sprint-46 draft row PLAY_HANDOFF_CONTRACT (one struct for every row of What crosses into play) stays unfiled; the stamp lands through the existing stamp_history_roads seam rather than waiting for it.
+
+**Why it matters.** The reader that scoped it said the stamp "should wait for the contract or land with it"; landing it without the contract adds one more loose handoff local of the kind that row exists to end.
+
+- A: stamp through the existing seam (taken)
+- B: file PLAY_HANDOFF_CONTRACT first and land the stamp behind it
+
+> **Recommendation:** A this sprint.
+
+> **RESOLVED.** CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the lane stamp (BL-1098) lands through the existing seam.
+
+*Files: `src/world/road_generation.cpp`, `src/world/hard_coded_world.cpp`*
+
+### NR-929 — DECISION TAKEN: the recipe band is per WORLD, named by the materials rung; per-nation grain comes through campaign tech, not a second band
+*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+Ben: the band should come from the history's industry state. Taken: industrial iff any living polity's materials capacity reaches the industrial rung at the 1960 fold (the derivation industrial_year already uses); persisted on the world; the epoch reader retired. Per-nation banding would put a second gating system over tech (the BL-692 ruling) and every band consumer takes no actor; the per-corporation earned_techs route (BL-1109, ruled 2026-09-18) is the per-nation grain. The Industry spire ring and raw industry points were the other candidates.
+
+**Why it matters.** A seed whose history never crossed the rung derives ancient and opens without the industrial roster — measured across the 16 seeds before the threshold is fixed, never forced.
+
+- A: per world by the materials rung (taken)
+- B: per nation on nation_component with an actor-aware registry
+- C: per world by the Industry spire ring
+
+> **Recommendation:** A.
+
+> **RESOLVED.** OVERTURNED (Ben, the delegated-decision form, 2026-09-25): B, the recipe band is PER NATION with an actor-aware registry -- a corporation's roster is masked on its own nation's band. Written into ERAS.md (Where the ladder starts, the owner), INDUSTRIALISATION.md, PRODUCTION.md, GENERATION_STRATEGY.md and the epoch action entry; the work is BL-1123 (band per nation). Supersedes the per-world premise of NR-934's reading.
+
+*Files: `src/world/era_band.hpp`, `src/world/hard_coded_world.cpp`*
+
+### NR-930 — DECISION TAKEN: the purchase is a fork inside the subjection block and a trade province stays a label; the sim_verb contest and the minted foothold are filed
+*decision taken on your behalf · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+Ben: build the purchase verb this sprint. Taken: buy when the native seat is coastal and the price is affordable, take otherwise, inside the existing round-level block (bounded, one function, deterministic); price = max(floor, native seat treasury × rate) paid buyer → native seat; subject_kind is the verb taken. The fuller shapes — a sim_verb::purchase candidate scored against campaign ("one contest with two costs", EXPLORATION.md:314-320) and a minted foothold region beside the native's capital (:279-283) — are filed as continuity-pass items. The seller stays a non-decision (no new actor).
+
+**Why it matters.** The bounded fork is what fits the sprint; the doc keeps the fuller design as design.
+
+- A: the fork (taken)
+- B: the scored verb now
+
+> **Recommendation:** A.
+
+> **RESOLVED.** CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the purchase stays a fork inside the subjection block.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
+
 ### NR-931 — CALL: what does the Culture round's reroll re-roll, when the migration walk is seed-free by design?
 *question · raised 2026-09-24 · from BL-1083 lane G (span seeds), its harness span_seed_isolation row S0 and the cold review, 2026-09-24*
 
@@ -627,6 +622,23 @@ Inside the twelve-tick settle that now runs in round 6's worker, tick 1 costs 44
 > **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): C, both -- a per-tick progress tap on the settle now (a sprint-47 task under BL-1085, Begin retired into round six), and tick 1 instrumented for the economy lane as BL-1117 (settle tick one cost).
 
 *Files: `src/world/campaign_settle.cpp`, `src/world/finish_campaign_world.cpp`*
+
+### NR-933 — DECISION TAKEN: the purchase constants — rate 2000 per mille of the seller's chest, floor as measured — pinned at the first grid point where the purse, not the coast alone, decides
+*decision taken on your behalf · raised 2026-09-24 · from BL-1096 lane W1 (purchase verb), exploration_sweep over the 16 curated seeds at rates 1000 / 2000 / 4000 per mille, 2026-09-24*
+
+Measured bought/taken splits (bought/taken over the library): 1000‰ → 62/48, 2000‰ → the pinned point, 4000‰ → 36/74. At 1000 the coast alone decides (nearly everything coastal is bought); at 4000 few can afford it. 2000 was taken as the first point where the treasury discriminates. Digests moved on 2 of 16 library seeds (25, 38); exploration_sim_harness's R3b regression pin moved by exactly one purchase (+400 tribute) and is left failing for the sprint's single re-bless. A purchase recoups itself through tribute in ~7 rounds at 2000 (read, not hidden).
+
+**Why it matters.** The number shapes how many colonies arrive at 1660 "bought" rather than "taken", which is what the round-5 map and the culture shares read.
+
+- A: keep 2000‰ (taken)
+- B: 1000‰ (more purchases; the coast decides)
+- C: 4000‰ (purchases rare)
+
+> **Recommendation:** A; re-measure with --set subjection_purchase_rate_q if Ben wants a different feel (~2.5 min a run).
+
+> **RESOLVED.** CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the purchase rate stays 2000 per mille.
+
+*Files: `src/world/history_sim.hpp`, `tools/verify/exploration_sweep.cpp`*
 
 ### NR-934 — OBSERVATION → CALL: the ruled band threshold discriminates nothing on the library — every curated seed reaches materials capacity 6 by 1200 CE, so all 16 derive industrial
 *question · raised 2026-09-24 · from BL-1101 lane W2 (band from history), history_sweep over the 16 curated seeds, 2026-09-24*
@@ -691,6 +703,22 @@ The pin was measured over the 16 curated seeds at every recorded Empires step (8
 > **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): B, keep 10% on / 6% off and draw heavy on edges between two different realms only -- a coast is not a frontier. Written into STARTUP.md (a hard border is people share); the work is a sprint-47 task under BL-1090 (hard borders by people share).
 
 *Files: `src/ui/history_lapse.hpp`, `src/ui/history_lapse.cpp`, `tools/verify/history_sweep.cpp`*
+
+### NR-938 — DECISION TAKEN: the pinned-slot clash rule is pinned-vs-pinned (the 2026-09-24 ruling said pinned-vs-fresh, a case the walk never produces)
+*decision taken on your behalf · raised 2026-09-25 · from BL-1087 lane I1 fix round and its cold review, 2026-09-25*
+
+The ruling (R7) said a pinned/fresh adjacency clash re-slots the smaller people-share realm. In the built walk a FRESH realm is coloured greedily AROUND the pins, so it cannot clash with one; the only clash the seam makes is two PINNED realms that never touched before and now neighbour — that is the case the code resolves (the smaller people share re-slots at the round's opening step; on the verify world 1 re-slot at each of the 1200 and 1660 seams). STARTUP.md § Identity across the rounds was reworded to say so with a dated note; the sentence is qualified: a fresh realm cannot clash except on a spill (the palette exhausted), where it shares a neighbour's slot and no re-slot happens.
+
+**Why it matters.** An authority-doc sentence was changed by a lane on its own reading; Ben should know the rule he ruled is not the rule the walk needs, and confirm the pinned/pinned form.
+
+- A: confirm pinned/pinned (as built and now written)
+- B: keep the ruling's wording and add a fresh-realm re-slot the walk does not need
+
+> **Recommendation:** A.
+
+> **RESOLVED.** CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the clash rule is pinned-vs-pinned, as built and written.
+
+*Files: `docs/ui/STARTUP.md`, `src/ui/history_lapse.cpp`*
 
 ### NR-939 — CALL: the origin sentence's 'since <year>' reads the one record that spans the founding year, so a realm that held the region across the whole span reads 'since 1660 CE'
 *question · raised 2026-09-25 · from BL-1099 lane F3 (the seat briefing's origin sentence, R22) and its review, 2026-09-25*

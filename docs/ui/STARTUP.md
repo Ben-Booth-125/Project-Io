@@ -283,7 +283,9 @@ record, and the span is unmoved by any of it.
 - **The lane.** A sea leg used often enough to open a lane (the sea-lane tier,
   [`EXPLORATION.md`](../generation/EXPLORATION.md)) bakes a persistent **lane line**, distinct
   from a tie: a tie runs between two polities and goes when the bond does; a lane runs between
-  two shores and stays. A corridor the treasury promotes to Post Road pulses once along its
+  two shores and stays. **The lane is drawn as a wide, soft sea-blue band (Ben, 2026-09-25):**
+  most lanes run the same line as a colonial tie, so the tie reads as dashes on the band rather
+  than hiding a thin lane under it. A corridor the treasury promotes to Post Road pulses once along its
   length, as it does on round 6.
 
 **Round 6 — Industrialisation.** The span **1660 → 1960 CE**, three hundred years, and its
@@ -302,9 +304,10 @@ over empire flare, and on some worlds one becomes general).
   time the region's industry points cross the next multiple of a fixed fraction of the
   **running** price — the world's stock so far over the charter divisor, the same price the
   close settles on, so an early charter and a late one are priced by one rule — capped per
-  region per round and gated exactly as a furnace crossing is. The event is record-only — a
-  crossing of the running price is noted and no points are debited, so the span is unmoved
-  (delegated reading, 2026-09-24, NEEDS_REVIEW). The fraction is measured against the 1960 firm
+  region per round and gated exactly as a furnace crossing is. **Each is a real charter (Ben,
+  2026-09-25, NR-925):** the firm is founded at that crossing and its points are debited, so a
+  flash in 1720 is a firm that exists from 1720 (INDUSTRIALISATION.md § Firms are chartered in
+  the span; BL-1122). The fraction is measured against the 1960 firm
   count before it is fixed. **At the close the
   flashes are the real charters** — the firms the search chartered from each city's budget,
   richest centre first, each at its anchor tile, each dated by pairing a region's k-th real

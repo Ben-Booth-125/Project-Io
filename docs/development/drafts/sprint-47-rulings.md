@@ -324,3 +324,14 @@ carries the resolution.
 - **NR-920 → C.** Epoch 0 is retired (BL-1114).
 - **NR-932 → C.** A settle progress tap now; tick 1 instrumented as BL-1117.
 - **NR-943 → B.** Conditional range checks in both validators (BL-1116, Light).
+
+## G. The delegated-decision form (Ben, 2026-09-25)
+
+- **NR-919: the blanket "no sim beats" is overruled.** Sim beats are in scope, one re-bless each.
+- **Confirmed as taken:** NR-918 (copy + replay), NR-923 (Selene and Pallas in Finishing), NR-924
+  (the order), NR-927 (settle presentation dropped), NR-928 (stamp through the existing seam),
+  NR-930 (the purchase fork), NR-933 (2000 per mille), NR-938 (pinned-vs-pinned). NR-922 accepted.
+- **Overturned into sim beats:** NR-925 → real in-span chartering (BL-1122); NR-926 → the ground
+  profile gets its reader (BL-1107 widened); NR-929 → the band is per nation, the registry
+  actor-aware (BL-1123; ERAS.md owns the rule).
+- **The lane reads as a wide soft sea-blue band** under the colonial tie (built; BL-1097 R3 owes a look).

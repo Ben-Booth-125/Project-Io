@@ -1155,7 +1155,7 @@
     "src/world/creeds.hpp",
     "src/world/creeds.cpp"
    ],
-   "design": "CARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nFILED (Ben's note, 2026-09-24: \"materials shaped culture, and even primitive cultures can gain a preference towards certain amenities\"; record-only this sprint, no consumer — delegated reading, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R24). Stretch in sprint 47: built if BL-1084's cursor lands early.\n\nTHE WORK. Beside the package at the cradle (settlement.cpp:859-875), a ground profile read off the cradle window's tiles: a survey_endowment-shaped sum over deposits plus an amenity class of cover (forest, coastal grass, marsh-in-valley per TILES.md; a classify function in the shape of classify_farm_class — no amenity field exists today), stored on culture beside origin_farm_class (creeds.hpp:145), inherited through derive_daughter_culture (creeds.cpp:630-641). Its later reader is derive_culture_preference (history_sim.hpp:4637). Digests unmoved while nothing reads it.\n\nDONE WHEN. Every culture on the 16 seeds carries a non-empty profile, daughters inherit their parent's, and the profile is printed per cradle by colonisation_harness."
+   "design": "WIDENED (Ben, the delegated-decision form, 2026-09-25, NR-926 overturned): the profile gets its READER this item -- derive_culture_preference (EXPLORATION.md § A good acquires a cultural preference) reads it as the first of its two inputs, which needs an amenity classifier over cover first (TILES.md § Amenity tiles). A sim beat now, not record-only: read the preference tables on the 16 seeds before and after, and take its re-bless.\n\nCARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nFILED (Ben's note, 2026-09-24: \"materials shaped culture, and even primitive cultures can gain a preference towards certain amenities\"; record-only this sprint, no consumer — delegated reading, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R24). Stretch in sprint 47: built if BL-1084's cursor lands early.\n\nTHE WORK. Beside the package at the cradle (settlement.cpp:859-875), a ground profile read off the cradle window's tiles: a survey_endowment-shaped sum over deposits plus an amenity class of cover (forest, coastal grass, marsh-in-valley per TILES.md; a classify function in the shape of classify_farm_class — no amenity field exists today), stored on culture beside origin_farm_class (creeds.hpp:145), inherited through derive_daughter_culture (creeds.cpp:630-641). Its later reader is derive_culture_preference (history_sim.hpp:4637). Digests unmoved while nothing reads it.\n\nDONE WHEN. Every culture on the 16 seeds carries a non-empty profile, daughters inherit their parent's, and the profile is printed per cradle by colonisation_harness."
   },
   {
    "status": "designed",
@@ -1321,7 +1321,7 @@
     "tools/verify/world_determinism.cpp",
     "docs/ai/ACTIONS.json"
    ],
-   "design": "FILED 2026-09-25 from NR-920 (Ben: C, retire epoch 0). Not in sprint 47.\n\nTHE WORK. Refuse an epoch of 0 at the flag (a clear error, never a silent clamp) and remove the path by which epoch 0 once selected the ancient roster (industrial_band_from_year and any caller that still reads it); the band is derive-only. world_determinism's seedA/on/epoch0 digest row goes or is re-scoped to a non-zero epoch; grep the harnesses, the verify scripts and the seed library for an epoch of 0 and move each to 1960. The epoch action entry already states the ruling.\n\nDONE WHEN. --epoch 0 is refused with a message; no code path maps an epoch to a band; world_determinism twice bit-identical with the epoch row re-scoped; save_roundtrip green."
+   "design": "FILED 2026-09-25 from NR-920 (Ben: C, retire epoch 0). Not in sprint 47.\n\nTHE WORK. Refuse an epoch of 0 at the flag (a clear error, never a silent clamp) and remove the path by which epoch 0 once selected the ancient roster (industrial_band_from_year and any caller that still reads it); the band is derive-only, and per nation (NR-929; BL-1123). world_determinism's seedA/on/epoch0 digest row goes or is re-scoped to a non-zero epoch; grep the harnesses, the verify scripts and the seed library for an epoch of 0 and move each to 1960. The epoch action entry already states the ruling.\n\nDONE WHEN. --epoch 0 is refused with a message; no code path maps an epoch to a band; world_determinism twice bit-identical with the epoch row re-scoped; save_roundtrip green."
   },
   {
    "status": "designed",
@@ -1483,6 +1483,58 @@
     "src/ui/history_lapse.cpp"
    ],
    "design": "FILED 2026-09-25 (Ben: \"what we don't see, but really should, is the colonial conquest of smaller nations, exploiting them to bring wealth back to larger polities\"; he chose A -- measure, then show what the sim has, before any new mechanism). EXPLORATION.md § the tribute table: tribute is already a remittance from subject to overlord.\n\nTHE WORK. (1) READ FIRST (Rule 0b): on the 16 curated seeds, how many subjects stand overseas vs home, how much tribute flows per round and to whom, and how often a large polity subjects a small one across water -- a column in exploration_sweep. (2) If the flow is there, draw it: tribute running subject -> overlord along the tie, weighted by the amount, on round 5. (3) If it is not there, that is the finding: report it and the colonial-drive mechanism becomes its own call for Ben (the B he did not pick yet).\n\nDONE WHEN. The reading recorded per seed; the flow drawn where it exists; Ben's live click."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (the delegated-decision form, 2026-09-25); filed by Claude",
+   "id": "BL-1122",
+   "short_name": "IN_SPAN_CHARTERING",
+   "sprint": null,
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "Firms are chartered in the Industrialisation span when a region's stock crosses the running price, with the points debited",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/charter_budget.hpp",
+    "tools/verify/industrialisation_sim_harness.cpp"
+   ],
+   "design": "FILED 2026-09-25 from NR-925 (Ben: B, real in-span chartering, overturning the record-only reading). INDUSTRIALISATION.md § Firms are chartered in the span.\n\nTHE SHIFT. Today the span only NOTES works_chartered crossings (record-only, f = 2) and the firms are chartered at the 1960 close from each city's budget, dated by pairing. Ruled: the crossing IS the charter -- the firm exists from that year and the points are debited.\n\nOPEN DESIGN (a design pass first): (1) how the close's charter budget (BL-1032, the charter budget seam) and the landscape search reconcile with firms already chartered -- the search re-scores a fixed roster or charters only the remainder; (2) whether an in-span firm acts in the span or waits for 1960 (acting is a far larger beat); (3) the dawn cluster NR-940 accepted -- at the running price most crossings land 1660-1760, so most firms would be founded early; re-read with the debit in place, since a debit slows the next crossing; (4) the seat briefing's founding year becomes the charter year itself (no pairing).\n\nA WORLD-MOVER with its own re-bless: read firm counts, founding-year spread and treasury on the 16 seeds before and after (Rule 0b); tune nothing to make a seed behave."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (the delegated-decision form, 2026-09-25); filed by Claude",
+   "id": "BL-1123",
+   "short_name": "BAND_PER_NATION",
+   "sprint": null,
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "The recipe band is per nation and the registry actor-aware: each corporation's roster is masked on its own nation's band",
+   "authority_doc": "docs/economy/ERAS.md",
+   "files": [
+    "src/world/recipe_registry.hpp",
+    "src/world/recipe_registry.cpp",
+    "src/world/components.hpp",
+    "src/world/world_save.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/core/app.cpp",
+    "src/world/corp_ai.cpp"
+   ],
+   "design": "FILED 2026-09-25 from NR-929 (Ben: B, per nation, overturning the per-world reading of 2026-09-24 and the BL-692 reasoning that per-nation banding is a second gate over tech). ERAS.md § Where the ladder starts owns the rule.\n\nTHE WORK. (1) Derive each nation's band at the 1960 fold from the realm it grew from (roster_band_for_capacity) -- DELEGATED READING: \"the realm it grew from\" rather than any realm folded into the nation; Ben may overturn. (2) Persist it on nation_component (a world save bump) and retire the world-wide world::campaign_band. (3) Make the registry actor-aware: every consumer of the band -- the browse roster, construction validity, the recipe pass, corp_ai's build choices, --serve/MCP validation -- asks for the acting corporation's nation's band. (4) The Industry mask (BL-1109) still seeds earned_techs within a band.\n\nREAD FIRST (Rule 0b): per seed, how many nations derive ancient -- NR-934 found every library seed industrial at WORLD grain, which says nothing of the spread per nation.\n\nDONE WHEN. Two nations on one world can open on different bands; a firm in an ancient nation is refused an industrial building through every front door (UI, command, MCP); save round trip carries the per-nation band; one re-bless if any digest moves."
   }
  ]
 }

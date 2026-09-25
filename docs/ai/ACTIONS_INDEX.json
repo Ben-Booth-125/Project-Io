@@ -599,7 +599,7 @@
   ],
   [
    "chrome.epoch_cli",
-   "Command line. The only route to a start other than the default 1960 one (BL-705 opened the flag; the 0 CE start remains supported)."
+   "Command line. The only route to a start other than the default 1960 one (BL-705 opened the flag; epoch 0 is retired, NR-920)."
   ],
   [
    "canvas.border_band_select",

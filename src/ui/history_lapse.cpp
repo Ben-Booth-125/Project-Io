@@ -1457,33 +1457,25 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    a lane is drawn from the frame its leg earned the tier to the
     //    round's end, and never before — the crossings that fell short stay
     //    invisible, as the walked-once settle tree does on land. Drawn as a
-    //    DASHED stroke, so a lane reads as traffic over water rather than a
-    //    road painted onto it or a trade link's solid green; the dash length
-    //    scales with the map so the rhythm holds at every zoom. Seam-crossing
-    //    lanes are stroked twice like the corridors above. ──
+    //    WIDE, SOFT SEA-BLUE BAND (Ben, 2026-09-25): most lane uses come from
+    //    the tribute leg, so a lane nearly always runs the same capital-to-
+    //    capital line as its colonial tie, and a thin dashed lane vanished
+    //    under the tie's dashes at the live click. A shipping lane is a swath;
+    //    the tie, drawn later, reads as dashes on top of it. The width scales
+    //    with the map. Seam-crossing lanes are stroked twice like the
+    //    corridors above. ──
     for (const lapse_lane_seg& s : h.lane_segs)
     {
         if (year < s.year_open) continue; // not yet a lane at this playhead
-        const float w = std::max(1.25f, scale * 0.20f);
-        const float dash = std::max(4.0f, scale * 1.5f);
-        const auto dashed = [&](float x0, float y0, float x1, float y1) {
-            const float dx = x1 - x0, dy = y1 - y0;
-            const float len = std::sqrt(dx * dx + dy * dy);
-            if (len <= 0.0f) return;
-            const float ux = dx / len, uy = dy / len;
-            for (float t = 0.0f; t < len; t += dash * 2.0f)
-            {
-                const float e = std::min(t + dash, len);
-                dl->AddLine({x0 + ux * t, y0 + uy * t}, {x0 + ux * e, y0 + uy * e},
-                            col_sea_lane, w);
-                ++prims;
-            }
-        };
-        dashed(px(s.c0), py(s.r0), px(s.c1), py(s.r1));
+        const float w    = std::max(5.0f, scale * 1.4f);
+        const ImU32 band = with_alpha(col_sea_lane, 80);
+        dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, band, w);
+        ++prims;
         if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw)) // the seam, drawn off the other edge
         {
             const float shift = s.c1 < 0.0f ? world_w : -world_w;
-            dashed(px(s.c0) + shift, py(s.r0), px(s.c1) + shift, py(s.r1));
+            dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)}, band, w);
+            ++prims;
         }
     }
 

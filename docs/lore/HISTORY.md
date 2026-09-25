@@ -20,7 +20,7 @@ generation stack hangs dated history lines off. Companion to `../generation/PLAN
 
 **The ladder runs to 1960, whatever the epoch** (Ben, 2026-08-31; the epoch flip, 2026-09-18).
 The epoch is the campaign's calendar, not the run's stop: the spans close on their own fixed years,
-so a 0 CE start (Ben, 2026-09-24) opens the same world dated 0 CE
+so an epoch other than 1960 would open the same world re-dated — and epoch 0 is retired (Ben, 2026-09-25, NR-920)
 (`../generation/INDUSTRIALISATION.md`). Stages 0–3 — agrarian surplus, the enforceable promise,
 fragmentation-with-connectivity, capital disciplines the sovereign — are pre-industrial in
 mechanism and sit inside the run. The old Stages 5 and 6 (the rupture and saturation) lie past the

@@ -43,17 +43,19 @@ superseding the reading under which the epoch picked the band): generation reads
 world it builds is the one the Industrialisation span closes on at 1960 whatever start is asked for
 (`../generation/INDUSTRIALISATION.md`).
 
-**The recipe band comes from the history's industry state.** The world is `industrial` iff any
-living polity's materials capacity reaches the industrial rung at the 1960 fold —
+**The recipe band comes from the history's industry state, PER NATION (Ben, 2026-09-25,
+NR-929, overturning the per-world reading of 2026-09-24).** A nation is `industrial` iff the realm
+it grew from reaches the industrial rung of the capacity ladder at the 1960 fold —
 `roster_band_for_capacity`, the same derivation that dates a polity's `industrial_year`
-(`docs/lore/HISTORY.md` § Stage 4) — and `ancient` otherwise. The verdict is persisted on the world
-(`world::campaign_band`) and applied to the registry on a new game and on a loaded save alike, so a
-save never opens on a band its world did not earn. A seed on which no polity crosses derives
-`ancient` and loses the industrial roster; that is the world the history made, and the sim is never
-reshaped to force the other answer (delegated reading, 2026-09-24, NEEDS_REVIEW). The 0 CE start
-(Ben, 2026-09-24) remains supported: the same world, dated 0 CE. Whether that start also names a
-band — the calendar only, or an override that buys the ancient roster as a sandbox — is Ben's call
-(NEEDS_REVIEW). `docs/development/ROADMAP.md` § The two arcs owns which is the commercial product,
+(`docs/lore/HISTORY.md` § Stage 4) — and `ancient` otherwise. The verdict is persisted on the nation
+and applied on a new game and on a loaded save alike, so no nation opens on a band its history did
+not earn. **The registry is actor-aware:** a corporation's browsable roster is masked on its own
+nation's band, so an ancient nation's firms are never offered the Launchpad, the petroleum and
+propellant chains or the spacecraft chain while an industrial neighbour's are. A world on which
+every nation derives `ancient` is a legitimate world, and the sim is never reshaped to force the
+other answer. Grain finer than the nation still reaches play as campaign tech (the Industry mask).
+The design of the actor-aware registry is BL-1123's (band per nation). **Epoch 0 is retired (Ben,
+2026-09-25, NR-920):** the epoch names the calendar only. `docs/development/ROADMAP.md` § The two arcs owns which is the commercial product,
 and this document owns only the Era structure, which is the same on both.
 
 **The prehistory is a generator, not a play layer.** Generation runs a pre-epoch history sim that
@@ -122,13 +124,13 @@ history; the search itself is BL-770 (Era 0 candidate search).
 ## Three things that say "era" in code, and which one this is
 
 - **`era_band`** (`src/world/recipe_registry.hpp`) tags each authored building type and recipe
-  `any` / `ancient` / `industrial`, and the registry masks its browsable roster on the band the
-  world carries (`world::campaign_band`): `industrial` iff any living polity's materials capacity
-  reaches the industrial rung at the 1960 fold, `ancient` otherwise (§ Where the ladder starts;
-  Ben, 2026-09-24). The band is read off the finished history and never by it, so the band moves
-  no generated world and no epoch moves the band. It answers *which product is this* — a
-  world-wide fact fixed at generation (BL-433, era band) and saved with the world, so a loaded
-  save opens on the band its history earned. Per-nation grain is not a second band: it reaches
+  `any` / `ancient` / `industrial`, and the registry masks each corporation's browsable roster on
+  its own nation's band: `industrial` iff the realm the nation grew from reaches the industrial
+  rung at the 1960 fold, `ancient` otherwise (§ Where the ladder starts; Ben, 2026-09-25,
+  NR-929). The band is read off the finished history and never by it, so the band moves no
+  generated world and no epoch moves the band. It answers *which product is this nation playing*
+  — a per-nation fact fixed at generation (BL-433, era band) and saved with the world, so a
+  loaded save opens on the bands its history earned. Grain finer than the nation reaches
   play as campaign tech state, the Industry tree mask seeding each corporation's `earned_techs`
   (`../generation/INDUSTRIALISATION.md`). It is **not** the Era of this document.
 - **`condition_subject::era`** (`src/world/condition_set.cpp`) is the predicate subject the laws

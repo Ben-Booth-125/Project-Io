@@ -1059,16 +1059,17 @@ silent fallback, because a typo would quietly re-admit a space-era entry to the 
 
 The campaign's band is derived from the history the world was generated with, never from the
 epoch (Ben, 2026-09-24, superseding the reading under which `world_params::epoch_year` picked it):
-the world is `industrial` iff any living polity's materials capacity reaches the industrial rung at
+each NATION is `industrial` iff the realm it grew from reaches the industrial rung at
 the 1960 fold — `roster_band_for_capacity`, the same derivation that dates a polity's
 `industrial_year` (`../lore/HISTORY.md` § Stage 4) — and `ancient` otherwise. The verdict is
-persisted on the world as `world::campaign_band` and applied to the registry on a new game
+persisted on each nation and applied to the registry on a new game
 (`app::load_economy`) and on a loaded save (`load_game_from`) alike, so a save never opens on a
 band its world did not earn. A seed on which no polity crosses is an ancient-band campaign — it is
 never offered a Launchpad, the petroleum and propellant chains, or the spacecraft chain — and the
 sim is never reshaped to force the industrial answer (delegated reading, 2026-09-24, NEEDS_REVIEW).
-The epoch names the calendar only; what the 0 CE start means for the band is `ERAS.md` § Where the
-ladder starts' open call.
+**The band is per nation and the registry actor-aware (Ben, 2026-09-25, NR-929):** a
+corporation's roster is masked on its own nation's band, and the per-world verdict above is
+read per nation — `ERAS.md` § Where the ladder starts owns the rule. Epoch 0 is retired (NR-920).
 
 **The band masks; it never removes.** A recipe's id is its index in the authored list and that id
 is *stored* in `building_component.recipe`, so a filter that compacted the list would silently

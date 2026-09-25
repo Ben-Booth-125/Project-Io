@@ -275,8 +275,8 @@ otherwise only ever the thing that ends it.
 
 ### The ground profile
 
-**Materials shape culture (Ben, 2026-09-24; the profile's composition below is a delegated
-reading, NEEDS_REVIEW).** A cradle coins a **ground profile** beside its
+**Materials shape culture (Ben, 2026-09-24; the profile's composition below confirmed and its
+reader ruled in, 2026-09-25, NR-926).** A cradle coins a **ground profile** beside its
 package, from the same window: the deposits the window holds, summed in the four classes the
 founding survey reads — farm, ore, energy, water — plus one **amenity class** read off the
 window's cover, the ground `../economy/TILES.md` § Amenity tiles names (forest, coastal grass,

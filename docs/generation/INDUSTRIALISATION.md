@@ -68,22 +68,23 @@ that belonged to one (the ruptures, the Charter Act, the 1951 common tongue), an
 whatever the epoch: Ben, 2026-09-08 and 2026-09-18, NR-869; `GENERATION_STRATEGY.md` § Pass 2).
 
 The recipe band is derived from the history's industry state, never from the epoch (Ben,
-2026-09-24). At the 1960 fold the world is read once: it is `industrial` iff a living polity's
-materials capacity reaches the Industrial rung of the capacity ladder — the same derivation that
+2026-09-24), **and per nation (Ben, 2026-09-25, NR-929)**. At the 1960 fold each nation is read
+once: it is `industrial` iff the realm it grew from reaches the Industrial rung of the capacity
+ladder — the same derivation that
 dates a polity's crossing (§ Beat 1; `../lore/HISTORY.md` § Stage 4) — and `ancient` otherwise.
-The band is per world, persisted on the world and read on a new game and a loaded save alike, so
-a world opens on the band its history earned, never on one a calendar implies (the per-world grain
-and the persistence: delegated reading, 2026-09-24, NEEDS_REVIEW). The per-nation grain of
-technology crosses through the Industry mask into each corporation's earned techs (§ What crosses
-into play), not through a second band. A world on which no polity crosses by 1960 derives
-`ancient` and opens with the industrial roster masked — a legitimate world, counted by the seed
+The band is per nation, persisted on the nation and read on a new game and a loaded save alike,
+so a nation opens on the band its history earned, never on one a calendar implies, and each
+corporation's roster is masked on its own nation's band (`../economy/ERAS.md` § Where the ladder
+starts). Grain finer than the nation crosses through the Industry mask into each corporation's
+earned techs (§ What crosses into play). A nation whose realm never crosses by 1960 derives
+`ancient` and its firms open with the industrial roster masked — a legitimate world, counted by the seed
 spread and never reshaped until it crosses. Which of the three axes that say "era" in code this
 is: `../economy/ERAS.md` § Three things that say "era" in code.
 
 **Epoch 0 is retired (Ben, 2026-09-25, NR-920).** The band is the history's and not the
 calendar's, so a 0 CE opening would only have re-dated the 1960 map, and there is no band override
-and no ancient sandbox. Play opens at 1960 on the band the world's history earned; an ancient
-opening exists only where a world's history never crossed the rung.
+and no ancient sandbox. Play opens at 1960 on the bands the world's history earned; a nation
+opens ancient only where its own history never crossed the rung.
 
 **SETTLED (Ben, 2026-09-17, NR-888): the span runs on Exploration's 4-year band.** One decision
 round every four years, 75 rounds from 1660 to 1960. Measured on Exploration's forces alone, that
@@ -594,6 +595,14 @@ ground's lag — is Stage 4's design (`../lore/HISTORY.md` § Stage 4) and the r
 *left behind* reads; the polity rung is what the span computes, and the polity rung is what the
 round shows.
 
+**Firms are chartered IN the span (Ben, 2026-09-25, NR-925, overturning the record-only reading).**
+When a region's stock crosses the running charter price the firm is chartered then and there and
+the points are debited — a real sink, a sim beat with its own re-bless — so the firms the player
+meets at 1960 are the ones the span founded, each with its true year. How the close's charter
+budget and the search reconcile with charters already made is BL-1122's design (in-span
+chartering). The paragraph below keeps its price rule (the running price, NR-907), its cap and
+its dating; its record-only clause ("points are not debited") is overturned.
+
 **Works chartered: the moment a city's stock crosses a charter's price (Ben, 2026-09-24).** A firm
 is chartered at the epoch, from a centre's stockpile (§ 1); the span shows *when* the capital that
 charters it was built. After each year's accrual, when a region's accumulated industry points cross
@@ -824,7 +833,7 @@ Readings taken at **1960 CE** over a **seed spread**, never per world — the di
 | **Inequality** | GDP per head spread wide across nations; output spread wide across a nation's cities |
 | **Far trade** | A material share of seeded trade relationships skip the seller's nearest market |
 | **Industry points** | Industry points unevenly distributed, with the fuel gate visible in who holds them |
-| **Industrial crossing** | At least one living polity crosses the Industrial rung by 1960 in most worlds, so the band derives `industrial`; a world that derives `ancient` is reported, never reshaped |
+| **Industrial crossing** | Each nation's band is read off its own realm's crossing by 1960 (per nation, NR-929); a nation that derives `ancient` is reported, never reshaped |
 | **Works notes** | Works-chartered notes per region track the 1960 firm count per seed, which is what pins *f* |
 | **Migration** | Urban share rising across the span; at least one cross-border stream in most worlds |
 | **Decolonisation** | Fewer subjects at 1960 than at 1660, not zero, and at least one lost without a war |
@@ -915,7 +924,7 @@ Measured rather than argued:
   cross to note a works chartered, read on the seed spread as notes against 1960 firm count,
   starting at 1 (§ Beat 1).
 - **How many worlds cross the Industrial rung by 1960** — measured across the library before the
-  rung's threshold is fixed; a world that derives `ancient` loses its industrial roster, and the sim
+  rung's threshold is fixed; a nation that derives `ancient` loses its industrial roster, and the sim
   is never reshaped to force the band.
 
 Owed from Ben when they bite, not before:
