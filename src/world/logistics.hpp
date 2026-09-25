@@ -125,6 +125,8 @@ inline void invalidate_logistics_caches(world& w)
     w.astar_cost_cache.clear();
     w.logistics_flood_fields.clear(); // same contract: any traversal/anchor change stales it
     w.body_reach_cost.clear();
+    w.lp_anchor_fields.clear();       // BL-1117: road-weighted and anchor-keyed, so it stales
+                                      // on exactly the events the three above do
 }
 
 /// True when a state change on this building TYPE can alter a cached logistics
@@ -193,7 +195,7 @@ std::unordered_map<entity_id, float>& lp_pool_for_body(lp_pool_map& pools_by_bod
                                                         entity_id body, float lp_per_anchor_tick);
 
 /// The anchor tile in @p pool (a body's per-anchor LP pool) nearest to
-/// @p from_tile by `intra_body_path` cost — deterministic tiebreak: lowest
+/// @p from_tile by intra-body path cost — deterministic tiebreak: lowest
 /// cost, then lowest tile id, so hash-map iteration over @p pool cannot
 /// matter. Returns `null_entity` if none of @p pool's anchors is reachable
 /// from @p from_tile. Factored out of BL-596's `run_unit_march` (its own
@@ -201,8 +203,25 @@ std::unordered_map<entity_id, float>& lp_pool_for_body(lp_pool_map& pools_by_bod
 /// so BL-597's `commit_convoy` reuses it for a convoy's dispatch tile rather
 /// than inventing a second anchor-selection rule (LOGISTICS.md rule 2: adopt
 /// the node half, refuse a second distance model).
+///
+/// ONE FIELD PER BODY (BL-1117, settle tick one). Answered from the body's
+/// `lp_anchor_field` — one multi-source Dijkstra over @p pool's anchors, built
+/// on first use and cached on `world::lp_anchor_fields` — never from the
+/// per-pair path cache. The cost is the anchor's own flood distance to
+/// @p from_tile (edges relaxed outward from the anchor, which is what
+/// `intra_body_path` computes for this pair on a double miss), so the answer is
+/// a pure function of the body's tiles and @p pool's KEY SET: identical warm or
+/// cold, before or after a load. Builds no `logistics_flood_fields` entry.
 entity_id nearest_lp_anchor(world& w, entity_id body, entity_id from_tile,
                             const std::unordered_map<entity_id, float>& pool);
+
+/// The nearest-anchor field @p nearest_lp_anchor answers from, over @p pool's
+/// key set (built or rebuilt as needed). Exposed for the purity/exactness
+/// harness (tools/verify/lp_anchor_field_check.cpp) and for a future
+/// Throughput lens; the reference is valid until the next logistics-cache clear
+/// or the next call for this body with a different anchor set.
+const lp_anchor_field& body_lp_anchor_field(world& w, entity_id body,
+                                            const std::unordered_map<entity_id, float>& pool);
 
 // ---------------------------------------------------------------------------
 // Physical scale and travel time (Ben, 2026-08-12)

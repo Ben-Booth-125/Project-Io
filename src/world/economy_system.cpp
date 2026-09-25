@@ -1,6 +1,5 @@
 #include "economy_system.hpp"
 
-#include "finish_campaign_world.hpp" // economy_step_phase_clock (BL-1117: reported only)
 #include "battle_system.hpp"   // run_battles (BL-467 engagement trigger)
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability (BL-181 solver)
 #include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
@@ -903,7 +902,7 @@ economy_step_phase_clock*& economy_step_phase_clock_sink()
 economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating,
                                 lp_pool_map* shared_lp_pools)
 {
-    // BL-1117: the phase clock, WRITE-ONLY (finish_campaign_world.hpp). Null
+    // BL-1117: the phase clock, WRITE-ONLY (economy_system.hpp). Null
     // outside a finish's settle; nothing below reads a stamp back.
     economy_step_phase_clock* const phase_clock = economy_step_phase_clock_sink();
     const auto phase_stamp = [phase_clock](int i) {

@@ -2,6 +2,7 @@
 
 #include "world/campaign_settle.hpp"
 #include "world/corporation_generation.hpp" // assign_default_recipes
+#include "world/economy_system.hpp"        // economy_step_phase_clock (BL-1117)
 #include "world/hard_coded_world.hpp"       // generation_progress, generation_step_cost_ms
 #include "world/history_log.hpp"            // seed_genesis_history
 #include "world/recipe_registry.hpp"
@@ -237,7 +238,7 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     // times are kept so the slowest tick's line names the lap that costs it.
     //
     // BL-1117, THE PHASE CLOCK: lap 1 split by run_economy_step's own phases
-    // (`economy_step_phase_clock`, finish_campaign_world.hpp) plus the dispatch
+    // (`economy_step_phase_clock`, economy_system.hpp) plus the dispatch
     // that closes the lap, and the count of logistics flood fields lap 1 built
     // (a size read of a const world). Reported only.
     //
@@ -260,6 +261,7 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
         std::vector<econ_row>      econ_us;
         std::size_t                floods_before = 0;
         std::vector<std::size_t>   floods_built;
+        std::vector<std::size_t>   floods_alive; ///< After each tick: the memory the fields hold.
     } tc{t_settle, &out.settle_tick_ms};
     settle_tick_hooks hooks;
     hooks.ctx       = &tc;
@@ -292,6 +294,7 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
             return;
         }
         if (lap != k_campaign_settle_lap_count - 1) return;
+        c->floods_alive.push_back(hw.logistics_flood_fields.size());
         const fin_clock::time_point now = fin_clock::now();
         c->ms->push_back(ms_between(c->last, now));
         c->last = now;
@@ -365,6 +368,20 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
         });
         if (!order.empty() && order[order.size() / 2] != slowest)
             print_phases(order[order.size() / 2], "median");
+    }
+    std::printf("[finish_campaign_world] each settle tick, ms:");
+    for (const std::int64_t ms : out.settle_tick_ms)
+        std::printf(" %lld", static_cast<long long>(ms));
+    std::printf("\n[finish_campaign_world] each settle tick's lap 1 dispatch, ms:");
+    for (const econ_row& r : tc.econ_us)
+        std::printf(" %lld", static_cast<long long>(r[k_economy_step_phase_count] / 1000));
+    std::printf("\n");
+    if (!tc.floods_alive.empty())
+    {
+        std::printf("[finish_campaign_world] flood fields alive after each settle tick:");
+        for (const std::size_t n : tc.floods_alive)
+            std::printf(" %zu", n);
+        std::printf("\n");
     }
     std::fflush(stdout);
     return out;

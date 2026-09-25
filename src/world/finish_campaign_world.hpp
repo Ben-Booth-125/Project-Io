@@ -46,8 +46,6 @@
 #include "world/landscape_search.hpp"  // landscape_search_result, landscape_search_params
 #include "world/stockpile_budget.hpp"  // stockpile_budget
 
-#include <array>
-#include <chrono>
 #include <cstdint>
 #include <vector>
 
@@ -104,34 +102,6 @@ struct finish_campaign_result
     /// `[finish_campaign_world]` line for whoever takes the tick tail up.
     std::vector<std::int64_t> settle_tick_ms;
 };
-
-/// THE ECONOMY STEP'S PHASE CLOCK (BL-1117, settle tick one) -- REPORTED ONLY.
-/// One settle tick of the twelve costs 30-40x the others, and the lap clock
-/// (campaign_settle.hpp) puts all of it inside lap 1. These stamps split lap 1
-/// by `run_economy_step`'s own phases, in its call order, so the settle's
-/// `[finish_campaign_world]` lines name the phase and the milliseconds.
-///
-/// DETERMINISM. The sink is the calling thread's (`thread_local`), null except
-/// while `finish_campaign_world` runs its settle; `run_economy_step` WRITES
-/// steady-clock stamps into it and nothing in `world/*` reads one back, on the
-/// BL-754 footing the lap clock already stands on. Unarmed, a phase costs one
-/// null check.
-inline constexpr int k_economy_step_phase_count = 13;
-inline constexpr const char* k_economy_step_phase_names[k_economy_step_phase_count] = {
-    "construction", "credits+contracts", "labour", "stacks+solve", "production",
-    "growth", "migration", "reflex_agency", "corp_strategic", "battles", "march",
-    "unit_upkeep", "building_upkeep" };
-
-struct economy_step_phase_clock
-{
-    /// stamps[0] at entry, stamps[i+1] after phase i: phase i is
-    /// stamps[i+1] - stamps[i].
-    std::array<std::chrono::steady_clock::time_point, k_economy_step_phase_count + 1> stamps{};
-};
-
-/// The calling thread's sink (defined in economy_system.cpp beside the writer).
-/// Armed and disarmed by `finish_campaign_world` around its settle only.
-economy_step_phase_clock*& economy_step_phase_clock_sink();
 
 /// The measured weight of the two steps this function adds to a wait, for the
 /// caller to publish into `generation_progress::weight_after` before its
