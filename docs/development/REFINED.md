@@ -236,6 +236,10 @@ slip to sprint 49 from the END of a chain, never the middle.
   BL-1107 (culture ground profile) -> BL-1139 (centres abandoned in play).
 - **Sea (`ocean_currents.*`, history_sim's sea-leg cost and trade record):** BL-1120 (ocean
   currents) -> BL-1140 (sea lanes from trade) -> BL-1098 (the lane tier stamped).
+  BL-1120 stage 1 MERGED 2026-09-26 (b80a5b5d): the field, weight 500, wet crossings priced;
+  lanes barely move because tribute writes ~90% of uses -- currents bite through trade (BL-1140,
+  running) and the stamp's walker (BL-1098). realm_identity's ratchet expect failed after
+  BL-1130 moved the history -> the UI lane is finding whether script or ratchet.
 - **UI (`history_lapse.*`, text in `startup_screens.cpp`):** U3 (the bowed arc only), BL-1134
   (roads carried across rounds), BL-1135 (the Culture round worded as the record).
 - **Search (`landscape_search.*`):** BL-1136's curve -> Ben picks the round count -> BL-1086
