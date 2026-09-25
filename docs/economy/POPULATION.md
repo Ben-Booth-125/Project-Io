@@ -72,6 +72,10 @@ RNG anywhere on the path:
   rank-size share of its own urban heads, as many as keep the smallest a village's worth. **A
   region whose cell holds no land carries no centre** (Ben, 2026-09-25): it has no ground to stand
   one on, so nothing spills.
+  **A 1960 world aims at roughly 500 centres (Ben, 2026-09-25)** — about a dozen for each
+  market, most land open country between them. It is the aim the forces are calibrated against
+  (settle spacing, consolidation, industrial urbanisation, abandonment), measured on the curated
+  seeds, never a count any rule enforces.
 - **The sack destroys.** A conquest costs the taken region's cities a multiple of what it
   costs its countryside, because a sack falls on the walls and not the fields. Centres fall to
   what the surviving heads can stand up, and every one lost is recorded in `centres_razed` —
@@ -223,8 +227,11 @@ Decline is asymmetric by design: **passive failure only shrinks a centre — it 
 one.** Outright destruction is a deliberate agent action (razing, in occupation), and it should
 be rare because the occupier almost always prefers to occupy. **This rule is play's.** In the
 history the centre follows its heads both ways and is abandoned below a village's worth (Ben,
-2026-09-25; § Generation); whether play follows it too — where a centre is its province's capture
-anchor — is open (NR-947).
+2026-09-25; § Generation), and **play follows it too (Ben, 2026-09-25, NR-947; BL-1139,
+centres abandoned in play)**: a centre whose population falls below a village's worth is
+abandoned. In play it drops to the **razed tier** below rather than vanishing (delegated reading,
+NR-948), because a centre is its province's capture anchor and the ruin keeps the anchor: the
+place stops being a place, and the province can still be taken and cheaply re-settled.
 
 **A razed settlement is a TIER, not an erasure** (Ben, 2026-08-25; BL-624, razed settlement
 tier). Razing demotes the centre to the **razed** state: population zeroed, no labour, no

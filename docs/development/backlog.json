@@ -322,7 +322,9 @@
    "sprint": 48,
    "written": "2026-09-24",
    "requires": [
-    "BL-1097"
+    "BL-1097",
+    "BL-1120",
+    "BL-1140"
    ],
    "blocked_on": null,
    "parked": false,
@@ -344,7 +346,7 @@
     "src/world/hard_coded_world.cpp",
     "tools/verify/world_determinism.cpp"
    ],
-   "design": "CARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nRULED (Ben, 2026-09-24: the sea-lane tier this sprint; the stamp is its own item behind the record, BL-1097; docs/development/drafts/sprint-47-rulings.md R14). Stretch in sprint 47: lands in the re-bless if BL-1097 lands with time.\n\nTHE WORK. stamp_sea_lanes(w, body, nodes, legs) beside stamp_history_roads (road_generation.cpp:626): a water-only walker (stamp_edge skips water and the strait rule refuses open ocean — a straight-line raster crosses land on a concave coast, so an A* restricted to water is the honest walker) writing a NEW tile_component::lane_level (world save bump, claimed through next_save_version.js --kind world), read by one multiplier line in tile_traversal_cost (logistics.cpp:96-99: water base × lane multiplier), folded into world_determinism's deep digest beside road_level, stamped at hard_coded_world.cpp:2063-2070 with junction degree extended for the search's seed candidate.\n\nDONE WHEN. Lane tiles on a 1960 world > 0 and counted in the report; A* cost between two lane-joined ports falls below the unlaned cost; reach crosses the lane; the road lens draws no road on water."
+   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form): the lane tier is RESHAPED by the lanes-as-currents-and-trade vision -- it stamps a world whose lanes come from BL-1140 (trade writes a use) priced by BL-1120 (currents), so it lands after both. The stamp design below is unchanged.\n\nCARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nRULED (Ben, 2026-09-24: the sea-lane tier this sprint; the stamp is its own item behind the record, BL-1097; docs/development/drafts/sprint-47-rulings.md R14). Stretch in sprint 47: lands in the re-bless if BL-1097 lands with time.\n\nTHE WORK. stamp_sea_lanes(w, body, nodes, legs) beside stamp_history_roads (road_generation.cpp:626): a water-only walker (stamp_edge skips water and the strait rule refuses open ocean — a straight-line raster crosses land on a concave coast, so an A* restricted to water is the honest walker) writing a NEW tile_component::lane_level (world save bump, claimed through next_save_version.js --kind world), read by one multiplier line in tile_traversal_cost (logistics.cpp:96-99: water base × lane multiplier), folded into world_determinism's deep digest beside road_level, stamped at hard_coded_world.cpp:2063-2070 with junction degree extended for the search's seed candidate.\n\nDONE WHEN. Lane tiles on a 1960 world > 0 and counted in the report; A* cost between two lane-joined ports falls below the unlaned cost; reach crosses the lane; the road lens draws no road on water."
   },
   {
    "status": "designed",
@@ -665,9 +667,9 @@
    "author": "Ben (2026-09-25, the round-feedback form after the sprint-47 live clicks); filed by Claude",
    "id": "BL-1120",
    "short_name": "OCEAN_CURRENTS",
-   "sprint": null,
+   "sprint": 48,
    "category": "Generation",
-   "priority": "B",
+   "priority": "A",
    "difficulty": 4,
    "title": "Ocean currents: generated from the planet, they cheapen sea legs that run with them, and the Exploration round charts them",
    "authority_doc": "docs/generation/EXPLORATION.md",
@@ -676,7 +678,7 @@
     "src/world/history_sim.cpp",
     "src/ui/history_lapse.cpp"
    ],
-   "design": "CONTINUITY PASS (Ben, 2026-09-25): filed from the round-feedback form -- \"chart ocean currents as part of the exploration stage\"; Ben chose a FORCE over a drawing (\"currents shape sea legs\"). EXPLORATION.md § Currents are a force, not a picture.\n\nOPEN DESIGN (a design pass before build): what generates a current (latitude bands and the body's rotation, the continents' shape -- PLANETOLOGY.md / CONTINENTS.md own the inputs), its grain (per ocean region), and its weight on a sea leg's cost with and against. A sim beat: it moves sea legs, lanes, displacement and every pin -- read on the 16 seeds first, one re-bless. Pairs with BL-1115 (sea legs in the later spans), which should land first so currents act on legs that run."
+   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form): BUILD THIS SPRINT, reshaping the lane tier now. EXPLORATION.md § Currents are a force, not a picture, now states the generation as a DELEGATED READING (NR-949): each ocean region's current follows its latitude band's prevailing wind (easterly in the tropics, westerly in the mid-latitudes, sense set by the body's rotation) and is turned along the coasts the continents present, so a basin circulates; a leg with its current costs less and against it more, by one weight measured on the curated seeds. PLANETOLOGY.md / CONTINENTS.md own the inputs. Measure first: legs, lanes and displacement on the 16 seeds before and after, and the weight's ladder. A sim beat and a world-mover.\n\nCONTINUITY PASS (Ben, 2026-09-25): filed from the round-feedback form -- \"chart ocean currents as part of the exploration stage\"; Ben chose a FORCE over a drawing (\"currents shape sea legs\"). EXPLORATION.md § Currents are a force, not a picture.\n\nOPEN DESIGN (a design pass before build): what generates a current (latitude bands and the body's rotation, the continents' shape -- PLANETOLOGY.md / CONTINENTS.md own the inputs), its grain (per ocean region), and its weight on a sea leg's cost with and against. A sim beat: it moves sea legs, lanes, displacement and every pin -- read on the 16 seeds first, one re-bless. Pairs with BL-1115 (sea legs in the later spans), which should land first so currents act on legs that run."
   },
   {
    "status": "designed",
@@ -1048,7 +1050,82 @@
     "tools/verify/centre_census.cpp",
     "tools/verify/industrialisation_sim_harness.cpp"
    ],
-   "design": "SET (Ben, 2026-09-25): INDUSTRIALISATION.md § Beat 2 (the urbanisation stream, now set) and POPULATION.md § Generation (\"Centres follow the heads both ways\": a centre below a village's worth is abandoned in the history; NR-947 holds the threshold reading and whether play follows). THE WORK: build Beat 2's URBANISATION stream (a region's countryside and villages -> a centre in the same polity, pulled by industry-point output at the centre, pushed by depleted or strained ground, along held corridors); let a centre's count follow its heads both ways so an emptied village is abandoned. Emigration (between polities) is Beat 2's other stream and is NOT in this item unless the reading shows urbanisation alone cannot thin the map. Measure first and after on the 16 seeds: centres per seed by scale, land under centres, the history's counters. Tune nothing to hit a count; report and stop for Ben if the stream leaves the map far from \"dramatically fewer\". A sim beat and a world-mover."
+   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form): THE AIM IS ~500 CENTRES a 1960 world (POPULATION.md), about a dozen per market -- an aim the forces are calibrated against, never a count enforced. \"Dramatically fewer\" is read against it; report the per-seed count after the stream and stop for Ben if it is far from the aim.\n\nSET (Ben, 2026-09-25): INDUSTRIALISATION.md § Beat 2 (the urbanisation stream, now set) and POPULATION.md § Generation (\"Centres follow the heads both ways\": a centre below a village's worth is abandoned in the history; NR-947 holds the threshold reading and whether play follows). THE WORK: build Beat 2's URBANISATION stream (a region's countryside and villages -> a centre in the same polity, pulled by industry-point output at the centre, pushed by depleted or strained ground, along held corridors); let a centre's count follow its heads both ways so an emptied village is abandoned. Emigration (between polities) is Beat 2's other stream and is NOT in this item unless the reading shows urbanisation alone cannot thin the map. Measure first and after on the 16 seeds: centres per seed by scale, land under centres, the history's counters. Tune nothing to hit a count; report and stop for Ben if the stream leaves the map far from \"dramatically fewer\". A sim beat and a world-mover."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-25",
+   "blocked_on": null,
+   "parked": false,
+   "requires": [
+    "BL-1125"
+   ],
+   "id": "BL-1138",
+   "short_name": "ROADS_PULL_TO_MARKETS",
+   "author": "Ben (2026-09-25, the open-calls notes and the centres-and-routes form: \"B, build this sprint, after the market folds\"); filed by Claude",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "Roads pull toward each nation's market centres, and a trunk bridges neighbouring markets for larger trades",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/road_generation.cpp",
+    "src/world/road_generation.hpp",
+    "tools/verify/road_generation_harness.cpp",
+    "tools/verify/gen_step_costs.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form). LOGISTICS.md § 4, \"Roads pull toward markets\", states it: within a nation every market centre is on the backbone and a town's road is weighed by how much nearer it brings the town to its market; across markets a trunk joins each market centre to its neighbouring market centres (over a border where the neighbour lies across one), at Road tier or above, the detour test still refusing a trunk link a serviceable route already gives. DELEGATED READING (NR-950): the trunk's neighbours are each market centre's nearest market centres by traversal cost (a Delaunay-like neighbour set, not all pairs), and its tier is Road. SEQUENCE: after BL-1125 (markets can die) leaves the world its tens of markets. Measure old -> new: road tiles, trunk links, market-to-market traversal cost and haulage. A world-mover."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-25",
+   "blocked_on": null,
+   "parked": false,
+   "requires": [],
+   "id": "BL-1139",
+   "short_name": "CENTRES_ABANDONED_IN_PLAY",
+   "author": "Ben (2026-09-25, the centres-and-routes form: \"NR-947: play follows too\"); filed by Claude",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "In play, a centre whose population falls below a village's worth is abandoned to the razed tier",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/corp_command.cpp",
+    "tools/verify/econ_harness.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form). POPULATION.md § Growth, decline and razing states it: play follows the history's abandonment rule. DELEGATED READING (NR-948): in play an abandoned centre drops to the existing RAZED tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle) rather than vanishing, because a centre is its province's capture anchor. THE WORK: the runtime decline check (the ordinary growth pass) demotes a centre below a village's worth to razed; no province loses its anchor; a save round-trips it. The last item in the sprint's order; the first to slip if the wave runs long. Not a generation world-mover (play only), but it moves every settled world whose centres decline in the settle -- measure the settle digests."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-25",
+   "blocked_on": null,
+   "parked": false,
+   "requires": [
+    "BL-1120"
+   ],
+   "id": "BL-1140",
+   "short_name": "SEA_LANES_FROM_TRADE",
+   "author": "Ben (2026-09-25, the open-calls notes: \"sea lanes as more than just coastal change - ocean currents, and inter-continental trade\"; the form: \"B, this sprint\"); filed by Claude",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Trade between realms across water earns sea lanes, so a world's lanes follow its inter-continental trade",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/exploration_sim_harness.cpp",
+    "scripts/verify/sea_lanes.lua"
+   ],
+   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form). EXPLORATION.md § The colonial tie is a sea lane, \"A lane is a route of the ocean's currents and of trade between continents\": a fourth writer of a sea-leg use -- trade between realms whose goods cross water writes one use per decision round it runs -- and every leg is priced with its current (BL-1120). THE WORK, measure first: find the spans' trade links between realms on different landmasses (Exploration and Industrialisation), read how many legs and lanes trade would write on the 16 seeds, then write them; the lane record (BL-1097) and the lapse draw them unchanged. Lanes old -> new per seed (count, tribute-written vs trade-written). A sim beat and a world-mover. Pairs with BL-1098 (the lane tier stamped), which then stamps a world whose lanes are trade routes."
   }
  ]
 }
