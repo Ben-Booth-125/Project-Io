@@ -1249,6 +1249,22 @@ inline constexpr int region_centre_limit = 32;
 // No new tuning constant either — the village rung, the rank-size share, the
 // scale bands and the footprint table are all the doc's existing quantities.
 
+/// A PLACE'S SIZE IS ITS PEOPLE (Ben, 2026-09-25; POPULATION.md § Generation,
+/// BL-1130 round 3). The size a history reader values a region by — the
+/// campaign prize, the reach relay — in CENTRE-EQUIVALENTS of its urban heads:
+/// one per `region_centre_heads`, capped at `region_centre_limit`. It is the
+/// pre-consolidation promotion rung read backwards (that rule stood exactly
+/// this many centres on these heads), so a reader calibrated per centre keeps
+/// its constants and gives the same heads the same value it always did,
+/// however the hierarchy now divides them into villages and towns.
+/// Pure: heads in, count out; never reads `region::centres`.
+inline int region_centre_equivalents(int64_t urban_heads)
+{
+    if (urban_heads <= 0) return 0;
+    const int64_t n = urban_heads / region_centre_heads;
+    return static_cast<int>(n < region_centre_limit ? n : region_centre_limit);
+}
+
 /// How many centres a region's urban heads stand up as a rank-size hierarchy:
 /// the largest n (<= `region_centre_limit`) whose SMALLEST centre, U/(n*H_n),
 /// is still at least `region_centre_heads`. 0 below one village's heads.

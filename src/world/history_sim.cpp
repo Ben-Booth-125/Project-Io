@@ -150,9 +150,19 @@ int region_value_q(const region& p)
 /// `run_history_sim` read it).
 int nation_tree_mod_q(const std::vector<polity>& ps, int nation, io::tree_modifier_term t);
 
+/// Per-mille of prize one centre's worth of urban heads carries in the
+/// settlement term, saturating at five (50,000 heads). BL-1130 round 3 (Ben,
+/// 2026-09-25: "a place's size is its people, never how many centres they are
+/// split into"): the term reads `region_centre_equivalents` of the urban heads,
+/// not `region::centres`. The 200 was sized when the count WAS one centre per
+/// 10,000 heads, and the equivalents are that rung read backwards, so the same
+/// heads keep the same prize while consolidation merges villages into towns.
+constexpr int prize_per_centre_q = 200;
+
 int campaign_prize_q(const region& p)
 {
-    const int centre_q = clampi(p.centres * 200, 0, 1000);
+    const int centre_q = clampi(region_centre_equivalents(p.urban_population)
+                                * prize_per_centre_q, 0, 1000);
     const int urban_q  = clampi(static_cast<int>(p.urban_population / 100), 0, 1000);
     const int works_q  = clampi((p.work_capacity_mod + p.work_manpower_mod
                                 + p.work_industrial_mod) / 3, 0, 1000);
@@ -1941,11 +1951,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
     int roads_version = 0;
 
     // BL-887 — THE SAME TRICK FOR THE CENTRE MAP. With `centre_chain_reach`
-    // on, a region's `centres` is an input to `rebuild_reach`, and towns turn
-    // over constantly (promoted in the demography loop, razed by a sack). This
-    // counter moves only when a count ACTUALLY CHANGES, so a quiet century
+    // on, a region's size is an input to `rebuild_reach`, and towns turn
+    // over constantly (grown in the demography loop, razed by a sack). This
+    // counter moves only when a size ACTUALLY CHANGES, so a quiet century
     // costs no rebuilds at all and the BL-834 cache survives. With the model
     // off nothing ever bumps it and the cache behaves exactly as it did.
+    // BL-1130 round 3: the size is `region_centre_equivalents` of the urban
+    // heads (a place's size is its people), no longer `region::centres`.
     int centres_version = 0;
 
     // BL-1130 (POPULATION.md "Growth consolidates") — THE GROUND EACH REGION'S
@@ -2811,14 +2823,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // THE REBATE. A fraction of what it COST to get here, never a
             // credit against nothing -- the capital sits at `best_c == 0` and
             // refunds zero, which is what stops a centre bootstrapping its own
-            // reach. The fraction rises with the town count (LOGISTICS.md's
+            // reach. The fraction rises with the town's SIZE (LOGISTICS.md's
             // "cities generate it", a bigger node moving more) and is capped
             // strictly below the whole cost.
+            //
+            // BL-1130 round 3 (Ben, 2026-09-25: a place's size is its people):
+            // the size is the centre-equivalents of the region's urban heads,
+            // not `region::centres` — the per-centre rebate was calibrated on
+            // one centre per 10,000 heads, and the equivalents are that rung,
+            // so the same heads relay exactly as they did before consolidation.
             int out_c = best_c;
-            if (relay && best != capital && bp.centres >= relay_min)
+            const int bp_size = region_centre_equivalents(bp.urban_population);
+            if (relay && best != capital && bp_size >= relay_min)
             {
                 const int64_t frac = std::min<int64_t>(
-                    static_cast<int64_t>(bp.centres) * relay_per, relay_cap);
+                    static_cast<int64_t>(bp_size) * relay_per, relay_cap);
                 out_c = best_c - static_cast<int>((static_cast<int64_t>(best_c) * frac) / 1000);
                 if (out_c < 0) out_c = 0; // Unreachable given frac < 1000; belt and braces.
             }
@@ -3437,10 +3456,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // `rebuild_reach`, so the centre count is watched across the call
             // and `centres_version` bumped only when it actually moved. Most
             // years it does not, which is what keeps the BL-834 cache alive.
-            const int centres_before = ss.regions[i].centres;
+            // BL-1130 round 3: what the relay reads is the region's size in
+            // centre-equivalents of its urban heads, so THAT is what is
+            // watched — it moves both ways with the heads, where the old
+            // count only ever ratcheted up.
+            const int size_before = region_centre_equivalents(ss.regions[i].urban_population);
             advance_region_urban(ss.regions[i],
                 ss.regions[i].network_supply_q > params.sustainable_settlement_floor_q);
-            if (ss.regions[i].centres != centres_before) ++centres_version;
+            if (region_centre_equivalents(ss.regions[i].urban_population) != size_before)
+                ++centres_version;
             // BL-835 — ONE YEAR OF THE MUSTER, for every region whether or not
             // anyone is fighting over it. This is what makes an undefended
             // region a TEMPORARY state: a region stripped by a march away, or
@@ -6322,9 +6346,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // on the epoch map.
                     // BL-887: a razed city is a relay REMOVED from the
                     // network, the mirror of the demography loop's bump.
-                    const int sacked_centres_before = tgt.centres;
+                    // BL-1130 round 3: the relay reads the heads' size, as above.
+                    const int sacked_size_before = region_centre_equivalents(tgt.urban_population);
                     sack_region_urban(tgt, params.sack_population_loss_q);
-                    if (tgt.centres != sacked_centres_before) ++centres_version;
+                    if (region_centre_equivalents(tgt.urban_population) != sacked_size_before)
+                        ++centres_version;
 
                     // BL-835 — THE ARMY THAT TOOK IT IS THE ARMY THAT HOLDS IT,
                     // and this is the line that breaks the ping-pong.
