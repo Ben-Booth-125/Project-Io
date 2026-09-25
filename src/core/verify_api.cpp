@@ -3695,6 +3695,42 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return true;
     });
 
+    // recipe_workforce.lua (main session, 2026-09-25): stock EVERY input of a
+    // building's ACTIVE recipe, `qty` each, in the pool THAT BUILDING draws from
+    // (`pool_key_for_tile`, the tile's market -- not the home pool `grant_stock`
+    // feeds). A processing facility's output is gated on its inputs by design
+    // (PRODUCTION.md) and the player's corp procures nothing on its own, so a
+    // script proving that the WORKFORCE lever reaches production must remove the
+    // input confound itself: measured 2026-09-25, the reference world's facility
+    // produced once off the settle's leftover stock and then starved for eleven
+    // ticks, and seed 0x3C6EF362's never had any -- the old pass was that one
+    // tick. Returns the number of inputs stocked; 0 for a type with no recipe;
+    // -1 when the tile holds no building or the player has no corp.
+    v.set_function("stock_building_inputs", [this](unsigned tile_u, double qty) -> int {
+        const entity_id tile = static_cast<entity_id>(tile_u);
+        if (m_world.corporations.find(m_world.player_entity) == m_world.corporations.end())
+            return -1;
+        for (const auto& [bid, b] : m_world.buildings)
+        {
+            if (b.tile != tile) continue;
+            const int n = m_registry.recipe_count(b.type);
+            if (n <= 0) return 0;
+            const recipe& r = m_registry.recipe_at(b.type, std::clamp(b.active_recipe_index, 0, n - 1));
+            auto& pool = m_world.pool_at(m_world.player_entity, pool_key_for_tile(m_world, tile));
+            int stocked = 0;
+            for (std::size_t i = 0; i < r.inputs.size(); ++i)
+            {
+                if (r.inputs[i] <= 0.0f) continue;
+                pool.quantities[i] += static_cast<float>(qty);
+                ++stocked;
+            }
+            SDL_Log("verify.stock_building_inputs: tile=%u recipe=%s inputs=%d qty=%.1f",
+                    tile_u, r.name.c_str(), stocked, qty);
+            return stocked;
+        }
+        return -1;
+    });
+
     v.set_function("set_balance", [this](float value) {
         const auto it = m_world.corporations.find(m_world.player_entity);
         if (it != m_world.corporations.end())
