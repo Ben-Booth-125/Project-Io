@@ -29,6 +29,10 @@ namespace {
 constexpr ImU32 col_sea      = IM_COL32( 16,  24,  38, 255);
 constexpr ImU32 col_void     = IM_COL32( 10,  11,  15, 255);
 constexpr ImU32 col_frontier = IM_COL32(  8,   9,  12, 200); ///< The line between holders.
+/// BL-1090: the 2 px dark of a HARD border -- opaque where the soft line is
+/// translucent, so the two read as different weights and not as one line
+/// drawn twice.
+constexpr ImU32 col_frontier_hard = IM_COL32(  8,   9,  12, 255);
 constexpr ImU32 col_dim      = IM_COL32(120, 128, 145, 255);
 constexpr ImU32 col_bright   = IM_COL32(225, 230, 240, 255);
 
@@ -687,6 +691,10 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
         h.industry_density_peak = std::max(h.industry_density_peak, d);
     }
 
+    // The hard-border bitmap (BL-1090): the hysteresis walk over the steps,
+    // from the carried state. Empty on the Culture round (no samples).
+    lapse_hard_walk(h);
+
     // The Culture round's record carries a lineage palette (BL-919); its hue
     // families seed the slot walk so kin start near one another on the wheel.
     assign_polity_colours(h, h.culture_family.empty() ? nullptr : &h.culture_family);
@@ -922,13 +930,29 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    frame cheap.) Unclaimed land gets no tint: the bare ground IS the
     //    "nobody here yet" colour. ──
     //
-    // Owner keys: -1 sea (nothing drawn, nothing bordered), -2 wild, else the
-    // polity index. The frontier is drawn between any two DIFFERENT non-sea
-    // keys, on both axes.
+    // Owner keys: -1 sea (nothing drawn), -2 wild, else the polity index. The
+    // frontier is drawn between any two DIFFERENT keys on both axes -- the
+    // `>= -2` tests below admit sea, so a coast is outlined too (which is what
+    // every capture has shown); a hard realm's coast draws heavy like the
+    // rest of its outline (BL-1090), since only the land side can be hard.
     const float carry_fade = lapse_carry_fade(h, year);
     std::vector<int32_t> row(static_cast<std::size_t>(gw));
     std::vector<int32_t> above(static_cast<std::size_t>(gw), -1);
     std::vector<char>    present; // owner -> holds ground in this slice
+
+    // BL-1090: owner -> hard at this frame, read once per owner. The bitmap
+    // lookup is one binary search over the steps; cached because a frontier
+    // asks it per edge and a political map has thousands of edges.
+    std::vector<int8_t> hard_cache; // -1 unread, 0 soft, 1 hard
+    const auto hard_of = [&](int32_t key) -> bool {
+        if (key < 0) return false; // sea and wild ground carry no share
+        const std::size_t o = static_cast<std::size_t>(key);
+        if (hard_cache.size() <= o) hard_cache.resize(o + 1, -1);
+        if (hard_cache[o] < 0)
+            hard_cache[o] = lapse_polity_hard(h, static_cast<uint16_t>(key), year) ? 1 : 0;
+        return hard_cache[o] == 1;
+    };
+
     for (int r = 0; r < gh; ++r)
     {
         for (int c = 0; c < gw; ++c)
@@ -1014,11 +1038,39 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 const int32_t west = row[static_cast<std::size_t>(c - 1)];
                 if (west >= -2 && west != key)
                 {
-                    // +0.5: a 1 px line centred ON the pixel column, not
-                    // anti-aliased across two.
-                    dl->AddLine({px(static_cast<float>(c)) + 0.5f, y0},
-                                {px(static_cast<float>(c)) + 0.5f, y1}, col_frontier, 1.0f);
-                    ++prims;
+                    const bool hk = hard_of(key), hw = hard_of(west);
+                    if (hk || hw)
+                    {
+                        // BL-1090: A HARD BORDER. 2 px of dark centred on the
+                        // tile edge (pixel columns c-1 and c), then a 1 px
+                        // stroke one pixel INSIDE each hard realm's ground in
+                        // its own colour -- so the weight reads as the realm's,
+                        // not the edge's, and two hard neighbours each keep
+                        // their own stroke on their own side.
+                        const float x = px(static_cast<float>(c));
+                        dl->AddLine({x, y0}, {x, y1}, col_frontier_hard, 2.0f);
+                        ++prims;
+                        if (hk)
+                        {
+                            dl->AddLine({x + 1.5f, y0}, {x + 1.5f, y1},
+                                        owner_colour(h, static_cast<uint16_t>(key)), 1.0f);
+                            ++prims;
+                        }
+                        if (hw)
+                        {
+                            dl->AddLine({x - 1.5f, y0}, {x - 1.5f, y1},
+                                        owner_colour(h, static_cast<uint16_t>(west)), 1.0f);
+                            ++prims;
+                        }
+                    }
+                    else
+                    {
+                        // +0.5: a 1 px line centred ON the pixel column, not
+                        // anti-aliased across two.
+                        dl->AddLine({px(static_cast<float>(c)) + 0.5f, y0},
+                                    {px(static_cast<float>(c)) + 0.5f, y1}, col_frontier, 1.0f);
+                        ++prims;
+                    }
                 }
             }
             c = e;
@@ -1044,9 +1096,38 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                               && row[static_cast<std::size_t>(e)] == row[static_cast<std::size_t>(s)]
                               && above[static_cast<std::size_t>(e)] == above[static_cast<std::size_t>(s)])
                     ++e;
-                dl->AddLine({px(static_cast<float>(s)), y0 + 0.5f},
-                            {px(static_cast<float>(e)) + 1.0f, y0 + 0.5f}, col_frontier, 1.0f);
-                ++prims;
+                {
+                    // BL-1090: the same hard rule on the north-south edge --
+                    // 2 px of dark on pixel rows r-1 and r, the inner stroke
+                    // one pixel into whichever side is hard.
+                    const int32_t south = row[static_cast<std::size_t>(s)];
+                    const int32_t north = above[static_cast<std::size_t>(s)];
+                    const bool hs = hard_of(south), hn = hard_of(north);
+                    const float x0 = px(static_cast<float>(s));
+                    const float x1 = px(static_cast<float>(e)) + 1.0f;
+                    if (hs || hn)
+                    {
+                        dl->AddLine({x0, y0}, {x1, y0}, col_frontier_hard, 2.0f);
+                        ++prims;
+                        if (hs)
+                        {
+                            dl->AddLine({x0, y0 + 1.5f}, {x1, y0 + 1.5f},
+                                        owner_colour(h, static_cast<uint16_t>(south)), 1.0f);
+                            ++prims;
+                        }
+                        if (hn)
+                        {
+                            dl->AddLine({x0, y0 - 1.5f}, {x1, y0 - 1.5f},
+                                        owner_colour(h, static_cast<uint16_t>(north)), 1.0f);
+                            ++prims;
+                        }
+                    }
+                    else
+                    {
+                        dl->AddLine({x0, y0 + 0.5f}, {x1, y0 + 0.5f}, col_frontier, 1.0f);
+                        ++prims;
+                    }
+                }
                 s = e;
             }
         }
@@ -1140,23 +1221,52 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // width away, inside the map's own clip rect — the half that belongs on
     // each edge survives, and nothing escapes the map.
     const float world_w = static_cast<float>(gw) * scale;
+    // One screen-second of playback, in years: every mark below fades over it.
+    const int marker_window = lapse_marker_window_years(h);
     dl->PushClipRect({tl.x, tl.y}, {tl.x + static_cast<float>(gw) * scale,
                                     tl.y + static_cast<float>(gh) * scale}, true);
     for (const lapse_road_seg& s : h.road_segs)
     {
         if (year < s.year_track) continue; // not promoted yet at this playhead
         const bool at_road = year >= s.year_road;
-        const float w = at_road ? std::max(1.5f, scale * 0.30f)
-                                : std::max(1.0f, scale * 0.16f);
+        float w = at_road ? std::max(1.5f, scale * 0.30f)
+                          : std::max(1.0f, scale * 0.16f);
         const ImU32 col = at_road ? col_road : col_road_track;
         const bool  wrapped = s.c1 < 0.0f || s.c1 > static_cast<float>(gw);
         const float shift   = s.c1 < 0.0f ? world_w : -world_w;
+
+        // BL-1094: THE POST ROAD PULSE (Ben, 2026-09-24, R10). A layer's
+        // transition is a mark ON THE THING, not a ping over it (STARTUP.md
+        // § Identity across the rounds): for one marker window after a
+        // corridor reaches Post Road it draws heavier and with a bright core,
+        // decaying to its steady stroke -- one pulse along its length, and
+        // then the road it now is. Track and Road promotions draw nothing
+        // extra; the tier they reach is the stroke itself.
+        float pulse = 0.0f;
+        if (s.year_post_road != 0x7FFFFFFF && year >= s.year_post_road
+         && year - s.year_post_road < marker_window)
+            pulse = 1.0f - static_cast<float>(year - s.year_post_road)
+                         / static_cast<float>(marker_window);
+        w += w * 1.5f * pulse;
+
         dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, col, w);
         ++prims;
         if (wrapped)
         {
             dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)}, col, w);
             ++prims;
+        }
+        if (pulse > 0.0f)
+        {
+            const ImU32 core = with_alpha(col_bright, static_cast<int>(230.0f * pulse));
+            const float cw   = std::max(1.0f, w * 0.45f);
+            dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, core, cw);
+            ++prims;
+            if (wrapped)
+            {
+                dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)}, core, cw);
+                ++prims;
+            }
         }
         for (const lapse_bridge& br : s.bridges)
         {
@@ -1310,6 +1420,161 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         }
     }
 
+    // ── 3f. THE MARKS THAT EARN THEIR PLACE (BL-1094; Ben, 2026-09-24, R10;
+    //    STARTUP.md § Identity across the rounds). There is NO blanket ring
+    //    (Ben, 2026-09-16, watching round 4 run -- see the note at the end of
+    //    this function): a mark is earned BY KIND, each with its own glyph, so
+    //    the eye is not pulled off the borders by fifteen kinds wearing one
+    //    white ring. Four kinds earn one:
+    //      seat_captured        a ring in the WINNER's colour at the fallen
+    //                           seat, fading over the marker window;
+    //      broke_away / schism  a CRACK from the parent's seat to the
+    //                           successor's, fading the same way;
+    //      civilisation_formed  a two-tone DIAMOND at the coining region that
+    //                           STAYS -- a state, like the furnace marks;
+    //      capital_moved        the seat dot SLIDES old -> new over the window
+    //                           (a slide table filled here, read by the seats
+    //                           pass below).
+    //    And a layer's transition is a mark on the thing, not a ping over it:
+    //    the Post Road pulse in 3b. `realm_ended` and `creed_preached` draw
+    //    NOTHING, and neither does any other kind -- the ticker names them.
+    //
+    //    SEATS ON THIS RECORD sit at `polity_seat` (the first region held), so
+    //    a crack's parent end and a slide's endpoints are read there and off
+    //    the event's own regions; when the UI-side capital fold lands
+    //    (BL-1088, the name lane) the seat dot follows the capital and the
+    //    parent end reads the fold at the event's year instead -- one lookup
+    //    to change, `seat_region_of` below. ──
+    struct seat_slide { uint16_t polity; float c0, r0, c1, r1, t; };
+    std::vector<seat_slide> slides;
+    {
+        const auto region_ok = [&](uint16_t r) {
+            return r != lapse_event_none && static_cast<std::size_t>(r) < h.region_col.size();
+        };
+        const auto anchor = [&](uint16_t r) {
+            return ImVec2{static_cast<float>(h.region_col[r]) + 0.5f,
+                          static_cast<float>(h.region_row[r]) + 0.5f};
+        };
+        // A polity's seat region on this record (see the note above).
+        const auto seat_region_of = [&](uint16_t polity) -> int32_t {
+            if (polity == lapse_event_none || static_cast<std::size_t>(polity) >= h.polity_seat.size())
+                return -1;
+            return h.polity_seat[polity];
+        };
+        const float d_half   = std::clamp(scale * 1.1f, 4.0f, 7.5f);  // the diamond
+        const float ring_r   = std::clamp(scale * 1.7f, 5.0f, 11.0f); // the fallen seat
+        const float crack_amp = std::clamp(scale * 0.6f, 2.0f, 5.0f); // the crack's jag
+
+        dl->PushClipRect({tl.x, tl.y}, {tl.x + static_cast<float>(gw) * scale,
+                                        tl.y + static_cast<float>(gh) * scale}, true);
+        for (const lapse_event& e : h.lapse.events)
+        {
+            if (e.year > year) break; // ascending by year
+            const auto kind = static_cast<lapse_event_kind>(e.kind);
+
+            // THE DIAMOND STAYS: every civilisation coined at or before the
+            // playhead is marked, from its year on. Two tones -- two peoples
+            // settling one way of life: the coining realm's colour on the
+            // west half, a pale tone on the east, under one dark outline.
+            if (kind == lapse_event_kind::civilisation_formed)
+            {
+                if (!region_ok(e.region)) continue;
+                const ImVec2 a  = anchor(e.region);
+                const ImVec2 at{px(a.x), py(a.y)};
+                const ImVec2 top{at.x, at.y - d_half}, bot{at.x, at.y + d_half};
+                const ImVec2 lft{at.x - d_half, at.y}, rgt{at.x + d_half, at.y};
+                const ImU32 west = e.polity == lapse_event_none ? col_bright
+                                                                : owner_colour(h, e.polity);
+                constexpr ImU32 east = IM_COL32(238, 226, 196, 255);
+                dl->AddTriangleFilled(top, lft, bot, west);
+                dl->AddTriangleFilled(top, bot, rgt, east);
+                dl->AddQuad(top, rgt, bot, lft, col_seat_ring, 1.5f);
+                prims += 3;
+                continue;
+            }
+
+            // Everything else marks for one marker window, then is gone.
+            if (year - e.year >= marker_window) continue;
+            const float t = static_cast<float>(year - e.year) / static_cast<float>(marker_window);
+            const int   a = static_cast<int>(255.0f * (1.0f - t));
+
+            switch (kind)
+            {
+            case lapse_event_kind::seat_captured:
+            {
+                // A ring in the winner's colour at the fallen seat, widening a
+                // little as it fades -- the one glyph here that is a ring, so
+                // "a seat fell" reads as itself.
+                if (!region_ok(e.region) || e.polity == lapse_event_none) continue;
+                const ImVec2 an = anchor(e.region);
+                const ImVec2 at{px(an.x), py(an.y)};
+                const float  r  = ring_r * (1.0f + 0.35f * t);
+                dl->AddCircle(at, r + 1.0f, with_alpha(col_seat_ring, a), 16, 3.5f);
+                dl->AddCircle(at, r, with_alpha(owner_colour(h, e.polity), a), 16, 2.0f);
+                prims += 2;
+                break;
+            }
+            case lapse_event_kind::broke_away:
+            case lapse_event_kind::schism:
+            {
+                // A crack from the parent's seat to the successor's: a jagged
+                // pale line over a dark underline, its jag a fixed hash of the
+                // event so it never shimmers frame to frame. Drawn the short
+                // way round the seam and again a world width away, inside the
+                // map's clip, as the corridors are.
+                const int32_t ps = seat_region_of(e.other);
+                if (ps < 0 || !region_ok(e.region)) continue;
+                const ImVec2 p0 = anchor(static_cast<uint16_t>(ps));
+                ImVec2 p1 = anchor(e.region);
+                p1.x = lapse_unwrap_col(p0.x, p1.x, gw);
+                const bool  wrapped = p1.x < 0.0f || p1.x > static_cast<float>(gw);
+                const float shift   = p1.x < 0.0f ? world_w : -world_w;
+                constexpr int segs = 6;
+                ImVec2 pts[segs + 1];
+                const float dx = px(p1.x) - px(p0.x), dy = py(p1.y) - py(p0.y);
+                const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+                const float nx = -dy / len, ny = dx / len; // the perpendicular
+                uint32_t k = static_cast<uint32_t>(e.year) * 2654435761u
+                           ^ (static_cast<uint32_t>(e.region) << 16) ^ e.other;
+                for (int i = 0; i <= segs; ++i)
+                {
+                    const float u = static_cast<float>(i) / static_cast<float>(segs);
+                    k ^= k >> 13; k *= 2246822519u; k ^= k >> 16;
+                    const float off = (i == 0 || i == segs) ? 0.0f
+                                    : (static_cast<float>(k & 0xFFFFu) / 32768.0f - 1.0f) * crack_amp;
+                    pts[i] = {px(p0.x) + dx * u + nx * off, py(p0.y) + dy * u + ny * off};
+                }
+                const ImU32 under = with_alpha(col_seat_ring, a);
+                const ImU32 over  = with_alpha(col_bright, a);
+                for (int pass = 0; pass < (wrapped ? 2 : 1); ++pass)
+                {
+                    const float sx = pass == 0 ? 0.0f : shift;
+                    for (int i = 0; i < segs; ++i)
+                        dl->AddLine({pts[i].x + sx, pts[i].y}, {pts[i + 1].x + sx, pts[i + 1].y}, under, 3.0f);
+                    for (int i = 0; i < segs; ++i)
+                        dl->AddLine({pts[i].x + sx, pts[i].y}, {pts[i + 1].x + sx, pts[i + 1].y}, over, 1.25f);
+                    prims += 2 * segs;
+                }
+                break;
+            }
+            case lapse_event_kind::capital_moved:
+            {
+                // The seat dot slides from the OLD capital (`other`) to the new
+                // (`region`) over the window; the seats pass reads this table.
+                if (!region_ok(e.region) || !region_ok(e.other) || e.polity == lapse_event_none) continue;
+                const ImVec2 from = anchor(e.other);
+                ImVec2 to = anchor(e.region);
+                to.x = lapse_unwrap_col(from.x, to.x, gw);
+                slides.push_back({e.polity, from.x, from.y, to.x, to.y, t});
+                break;
+            }
+            default:
+                break; // realm_ended, creed_preached and every other kind: nothing
+            }
+        }
+        dl->PopClipRect();
+    }
+
     // ── 4. SEATS: one dot per polity HOLDING GROUND in this slice, at the
     //    region it first held. Seats only, not every region — the in-game Ages
     //    view draws a dot per region, and at blob granularity that is a rash;
@@ -1322,8 +1587,24 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             if (!present[o]) continue;
             const int32_t seat = h.polity_seat[o];
             if (seat < 0 || static_cast<std::size_t>(seat) >= h.region_col.size()) continue;
-            const ImVec2 at{px(static_cast<float>(h.region_col[static_cast<std::size_t>(seat)]) + 0.5f),
-                            py(static_cast<float>(h.region_row[static_cast<std::size_t>(seat)]) + 0.5f)};
+            ImVec2 at{px(static_cast<float>(h.region_col[static_cast<std::size_t>(seat)]) + 0.5f),
+                      py(static_cast<float>(h.region_row[static_cast<std::size_t>(seat)]) + 0.5f)};
+            // BL-1094: A CAPITAL MOVED slides the dot from the old seat to the
+            // new over the marker window (3f fills the table; the LAST move in
+            // the window wins). Eased, and folded back into the raster where
+            // the short way round crosses the seam.
+            for (std::size_t k = slides.size(); k-- > 0;)
+            {
+                if (slides[k].polity != static_cast<uint16_t>(o)) continue;
+                const float u  = slides[k].t;
+                const float ez = u * u * (3.0f - 2.0f * u); // smoothstep
+                float cx = slides[k].c0 + (slides[k].c1 - slides[k].c0) * ez;
+                const float cy = slides[k].r0 + (slides[k].r1 - slides[k].r0) * ez;
+                if (cx < 0.0f)                        cx += static_cast<float>(gw);
+                else if (cx >= static_cast<float>(gw)) cx -= static_cast<float>(gw);
+                at = {px(cx), py(cy)};
+                break;
+            }
             dl->AddCircleFilled(at, rad, owner_colour(h, static_cast<uint16_t>(o)), 10);
             dl->AddCircle(at, rad, col_seat_ring, 10, 1.0f);
             prims += 2;
@@ -1411,9 +1692,15 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // events still cross in `lapse.events`, the ticker still names them with
     // their year and place, the arc readout still counts them, and the road and
     // trade-link overlays above still draw on the corridors they belong to --
-    // those are lines on a thing, not pulses over it. A future surface that
-    // wants a mark back should ask which kinds earn one rather than restore
-    // the blanket (STARTUP.md § Rounds 4 and 5).
+    // those are lines on a thing, not pulses over it.
+    //
+    // FOUR KINDS EARN A MARK, EACH ITS OWN GLYPH (BL-1094; Ben, 2026-09-24,
+    // R10; STARTUP.md § Identity across the rounds) -- pass 3f above:
+    // `seat_captured`, `broke_away` / `schism`, `civilisation_formed` and
+    // `capital_moved`; and the Post Road pulse in 3b is a layer transition
+    // marked on the thing. `realm_ended`, `creed_preached` and every other
+    // kind draw nothing. Adding a kind here means asking whether it earns a
+    // glyph of its own, never restoring the blanket.
 
     ImGui::Dummy(avail);
 }
@@ -1565,7 +1852,95 @@ const char* polity_name_of(const history_lapse& h, uint16_t polity)
     return region_name_of(h, static_cast<uint16_t>(h.polity_seat[polity]));
 }
 
+// --- BL-1090: the hard-border walk ------------------------------------------
+
+/// The forward walk with hysteresis over one record's steps, from a carried
+/// state. Shared by the finish (which stores the bitmap on the record) and by
+/// the hand-over (which needs only the closing row of a record that may never
+/// have been finished), so the two cannot compute the flag differently.
+void hard_walk_record(const era_timelapse& t, const std::vector<uint8_t>& carry,
+                      std::vector<uint8_t>& out, int32_t& stride)
+{
+    out.clear();
+    stride = 0;
+    if (t.steps.empty() || t.samples.empty()) return;
+
+    // The bitmap's width: one past the highest polity id a sample or the
+    // carry names. Ids are one table across the spans (the slot inheritance
+    // relies on the same fact), so a carried id addresses the same realm.
+    int32_t n_pol = static_cast<int32_t>(carry.size());
+    for (const polity_sample& s : t.samples)
+        n_pol = std::max<int32_t>(n_pol, static_cast<int32_t>(s.polity) + 1);
+    stride = n_pol;
+    out.assign(t.steps.size() * static_cast<std::size_t>(n_pol), 0);
+
+    std::vector<uint8_t> on(static_cast<std::size_t>(n_pol), 0);
+    for (std::size_t p = 0; p < carry.size(); ++p) on[p] = carry[p] ? 1 : 0;
+    std::vector<uint8_t> living(static_cast<std::size_t>(n_pol), 0);
+    for (std::size_t s = 0; s < t.steps.size(); ++s)
+    {
+        const timelapse_step& st = t.steps[s];
+        int64_t total = 0;
+        for (int i = 0; i < st.sample_count; ++i)
+        {
+            const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
+            if (k < t.samples.size()) total += t.samples[k].population;
+        }
+        std::fill(living.begin(), living.end(), uint8_t{0});
+        for (int i = 0; i < st.sample_count; ++i)
+        {
+            const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
+            if (k >= t.samples.size()) continue;
+            const polity_sample& smp = t.samples[k];
+            // The board's own per-mille arithmetic (`share_q_of` in the sweep).
+            const int q = total > 0 ? static_cast<int>((smp.population * 1000) / total) : 0;
+            uint8_t& flag = on[smp.polity];
+            if (!flag && q >= lapse_hard_on_q)       flag = 1;
+            else if (flag && q < lapse_hard_off_q)   flag = 0;
+            living[smp.polity] = 1;
+        }
+        for (int32_t p = 0; p < n_pol; ++p)
+        {
+            const std::size_t up = static_cast<std::size_t>(p);
+            if (!living[up]) on[up] = 0; // absent -- dead or unborn -- is never hard
+            out[s * static_cast<std::size_t>(n_pol) + up] = on[up];
+        }
+    }
+}
+
 } // namespace
+
+void lapse_hard_walk(history_lapse& h)
+{
+    hard_walk_record(h.lapse, h.hard_carry, h.polity_hard, h.hard_stride);
+}
+
+bool lapse_polity_hard(const history_lapse& h, uint16_t polity, int year)
+{
+    const int step = step_at_or_before(h.lapse, year);
+    if (step < 0 || h.hard_stride <= 0 || polity >= h.hard_stride)
+        return polity < h.hard_carry.size() && h.hard_carry[polity] != 0;
+    const std::size_t k = static_cast<std::size_t>(step) * static_cast<std::size_t>(h.hard_stride)
+                        + static_cast<std::size_t>(polity);
+    return k < h.polity_hard.size() && h.polity_hard[k] != 0;
+}
+
+std::vector<uint8_t> lapse_hard_at_close(const history_lapse& h)
+{
+    std::vector<uint8_t> bits;
+    int32_t stride = 0;
+    if (h.hard_stride > 0 && !h.polity_hard.empty())
+    {
+        bits   = h.polity_hard;
+        stride = h.hard_stride;
+    }
+    else
+    {
+        hard_walk_record(h.lapse, h.hard_carry, bits, stride);
+    }
+    if (stride <= 0 || bits.size() < static_cast<std::size_t>(stride)) return {};
+    return std::vector<uint8_t>(bits.end() - stride, bits.end());
+}
 
 float lapse_industry_heat(const history_lapse& h, uint16_t polity, int year)
 {
@@ -1659,6 +2034,7 @@ void draw_lapse_scoreboard(const history_lapse& h,
     {
         const board_row& b = now[static_cast<std::size_t>(i)];
         ImGui::TableNextRow();
+        const bool hard = lapse_polity_hard(h, b.owner, year); // BL-1090: the row is bold
 
         // Rank, and the movement against the lagged board. A polity CLIMBING INTO
         // the board and DROPPING OUT of it is the whole story of the round, so the
@@ -1711,10 +2087,21 @@ void draw_lapse_scoreboard(const history_lapse& h,
             else if (delta < 0) std::snprintf(cell, sizeof cell, "%s  %d",  nm, delta);
             else                std::snprintf(cell, sizeof cell, "%s", nm);
 
-            if (entered) ImGui::PushStyleColor(ImGuiCol_Text, col_bright);
-            ui::fit_text(text_box::table_cell, "wizard.round4.seat", cell,
-                         std::max(24.0f, name_avail - swatch_w));
-            if (entered) ImGui::PopStyleColor();
+            // BL-1090: A HARD-BORDERED REALM'S ROW IS BOLD -- the same flag the
+            // map draws its heavy border from, so the row and the ground agree.
+            // The UI carries ONE face (fonts.cpp), so bold is the fitted
+            // string drawn a second time one pixel to the right, the faux-bold
+            // every single-face renderer uses: the ledger measures the one
+            // `fit_text` draw, and the overlay is the same fitted text at the
+            // same width, so nothing is drawn that was not measured.
+            const float  name_w  = std::max(24.0f, name_avail - swatch_w);
+            const ImVec2 name_at = ImGui::GetCursorScreenPos();
+            if (entered || hard) ImGui::PushStyleColor(ImGuiCol_Text, col_bright);
+            ui::fit_text(text_box::table_cell, "wizard.round4.seat", cell, name_w);
+            if (entered || hard) ImGui::PopStyleColor();
+            if (hard)
+                ImGui::GetWindowDrawList()->AddText({name_at.x + 1.0f, name_at.y}, col_bright,
+                                                    ui::fitted(cell, name_w).c_str());
         }
 
         // The rank column: this polity's share of everyone held at the step.
@@ -1728,7 +2115,17 @@ void draw_lapse_scoreboard(const history_lapse& h,
         if (smp != nullptr && people_total > 0)
         {
             const int q = static_cast<int>((smp->population * 1000) / people_total);
-            ImGui::Text("%d.%d%%", q / 10, q % 10);
+            char share[16];
+            std::snprintf(share, sizeof share, "%d.%d%%", q / 10, q % 10);
+            // The rank figure is bold on a hard row too (BL-1090), the same way.
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            if (hard) ImGui::PushStyleColor(ImGuiCol_Text, col_bright);
+            ImGui::TextUnformatted(share);
+            if (hard)
+            {
+                ImGui::PopStyleColor();
+                ImGui::GetWindowDrawList()->AddText({at.x + 1.0f, at.y}, col_bright, share);
+            }
         }
         else
         {

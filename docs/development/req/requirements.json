@@ -8000,24 +8000,24 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: history_sweep column"
      ],
      "requirement": "A history_sweep column reports the people-share distribution per world across the 16 curated seeds and how many realms a candidate threshold would bold on each; the threshold and hysteresis are fixed from that reading and written into the item. (item-spanning gate)",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "history_sweep's BL-1090 block, 16 curated seeds at --epoch 1960, every recorded step of the Empires span (87,900 polity-steps): top people share peaks 8-17% and stands 6-15% at 1000 CE and the close; shares 88% <5%, 11% 5-10%, 0.7% 10-15%, 0.1% 15-20%. 20%+ bolds nothing on any world; 15% one realm on one world (28); 10% on 6/16 worlds at 1000 CE (46:1, 28:6, 40:2, 25:1, 38:3, 0:1), 5 at the close, none on the city-state worlds (11, 31, 13, 10, 9). Dips at 10%: 35 (15 single-step), deepest single-step 39 per-mille, deepest <=3 steps 54; on->off 69 raw > 36 (margin 30) > 22 (margin 50). Fixed: lapse_hard_on_q 100 / lapse_hard_off_q 60 (history_lapse.hpp), written into the item's design; the sweep includes the header and walks the pinned pair beside the candidates."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp frontier passes and board",
       "visual: capture at 1000 CE"
      ],
      "requirement": "A per-owner hard flag from people share at the frame with hysteresis across steps; both frontier passes draw 2 px dark plus a 1 px inner stroke in the realm's colour when either side is hard; the board bolds the same rows; the flag carries into round 5 by id.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "lapse_hard_walk (history_lapse.cpp) bakes a per-step hard bitmap at finish from the samples with hysteresis, seeded from hard_carry; both frontier passes read it per edge and draw 2 px opaque dark plus a 1 px inner stroke in the hard realm's colour on its side; the board faux-bolds the seat and share of hard rows (one face only); the carry is set at launch, at landing and on the --verify adopted path (startup_screens.cpp). Capture scripts/verify/history_lapse_hard.lua PASS (6/6 expects, clipping ledger 0 failures): at 1000 CE on seed 0 Zeihei Meize (10.5%) and Tume Memma (9.0%, held by hysteresis from an earlier step above 10%) draw hard and bold, Ruke Rate (9.5%) plain; round 5 opens at 1200 with three rows bold by the carry alone (Galshe Kakha 9.5%, Sesho Suathua 9.5%, Sesho Hesei 6.0% -- none above 10% at that step; the pinned walk on seed 0 reads 3 hard at round 4's close, where the raw 10% count reads 0)."
     },
     {
      "id": "R3",
@@ -8026,7 +8026,7 @@
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: at 1000 CE the realms over the threshold carry the heavier border, a peaceable seed of city states shows none, the flag holds across a single-step dip and carries into round 5 at 1200.",
-     "notes": "",
+     "notes": "OWES Ben's live click (2026-09-25). Seed 28 is the world to click: 6 realms hard at 1000 CE and 6 at the close under the pinned pair (9 ever); the verify world (seed 0) bolds two at 1000 CE and carries three into round 5 at 1200.",
      "result_metric": ""
     }
    ]
@@ -8045,25 +8045,25 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp marks",
       "visual: captures at each kind on a library seed"
      ],
      "requirement": "seat_captured draws a winner-colour ring at the fallen seat; broke_away and schism draw a crack from parent seat to successor seat; civilisation_formed draws a two-tone diamond that stays at the coining region; capital_moved slides the seat dot old -> new over the marker window (on the capital fold); road_promoted to tier 3 thickens and flashes the corridor; realm_ended and creed_preached draw nothing. (item-spanning gate)",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "draw_lapse_map pass 3f (history_lapse.cpp): seat_captured a ring in owner_colour(polity) at e.region over a dark ring, fading over lapse_marker_window_years; broke_away/schism a six-segment crack from the parent's seat (polity_seat[other] on this base) to e.region, pale over dark, jag hashed from the event, drawn twice across the seam inside the map's clip; civilisation_formed a two-tone diamond (realm colour west half, pale east half, dark outline) at e.region from its year on, never removed; capital_moved a slide table read by the seats pass, the dot eased from anchor(other) to anchor(region) over the window; pass 3b: a corridor with year_post_road inside the window draws 2.5x wide with a bright core decaying to its stroke. realm_ended, creed_preached and every other kind fall to the switch's default and draw nothing. Captures scripts/verify/history_lapse_marks.lua PASS on seed 0 (every kind present, 54 clipping records, 0 failures): rings and cracks at the event and half faded a half window on, diamonds still present two windows on, the Post Road pulse on round 6 seen on corridor 780-795 at 1700 and decayed at 1705 (probe crops). The slide's mid-frame is captured but not identified by eye; the I1 capital fold was not on the base, so the seat dot returns to polity_seat after the window until the fold lands (one lookup, seat_region_of)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: docs/ui/STARTUP.md",
       "code: grep of the marker switch"
      ],
      "requirement": "STARTUP.md § Identity across the rounds' mark list matches the built set; no other kind draws a mark.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "STARTUP.md § Identity across the rounds lists seat captured (winner-colour ring), break-away/schism (crack), civilisation formed (two-tone diamond that stays), capital moved (sliding seat dot), the Post Road pulse and tie tint as marks on a thing, realm ended and creed preached as nothing; the built switch in pass 3f has exactly those four cases plus default: break, and the pulse in 3b; the closing comment of draw_lapse_map restates the ruling. No doc edit was needed. grep 'case lapse_event_kind::' in draw_lapse_map: seat_captured, broke_away, schism, capital_moved (civilisation_formed handled before the window check)."
     },
     {
      "id": "R3",
@@ -8072,7 +8072,7 @@
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: scrub round 4 to a seat_captured line and see the ring fade within a screen-second; a schism shows the crack; the diamond stays; a Post Road promotion pulses on round 6.",
-     "notes": "",
+     "notes": "OWES Ben's live click (2026-09-25): the ring fading within a screen-second under playback, a schism's crack, the diamond staying, a Post Road pulse on round 6. Note: at 1920x1080 the map's right 116 px sit past the pane's clip (map_nudge_x), so a mark there is off-screen on that layout.",
      "result_metric": ""
     }
    ]

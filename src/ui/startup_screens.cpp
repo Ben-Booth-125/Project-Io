@@ -263,6 +263,19 @@ void app::launch_wizard_history_run(int lapse_index)
     m_wiz_history_playing[lapse_index] = false;
     m_wiz_history_paused[lapse_index]  = false;
     m_wiz_history_carry[lapse_index]   = 0.0f;
+
+    // BL-1090: THE HARD BORDER CARRIES BY ID from the round before, from the
+    // FIRST live frame. The landing sets it again (`poll_wizard_history`), but
+    // the tap plays the record's opening years long before the future lands,
+    // and the `--verify` adopted path below never lands at all. Polity rounds
+    // only: the migration's owners are cultures.
+    const auto inherit_hard = [this, lapse_index]() {
+        if (lapse_index <= 0) return;
+        const ui::history_lapse& prev = m_wiz_history[lapse_index - 1];
+        if (prev.empty() || !prev.culture_colour.empty()) return;
+        m_wiz_history[lapse_index].hard_carry = ui::lapse_hard_at_close(prev);
+    };
+    inherit_hard();
     // Sentinel, not 0: a signed calendar year of 0 is a real year (0 CE), so
     // it cannot double as "never parked yet". `poll_wizard_history_tap`'s
     // first live update and `poll_wizard_history`'s landing both snap this to
@@ -303,6 +316,7 @@ void app::launch_wizard_history_run(int lapse_index)
         {
             m_wiz_history[lapse_index]      = std::move(adopted);
             m_wiz_history_year[lapse_index] = m_wiz_history[lapse_index].lapse.start_year;
+            inherit_hard(); // BL-1090: the adopted record carries the flag too
             return;
         }
     }
@@ -544,6 +558,20 @@ void app::poll_wizard_history()
                 const std::size_t n = std::min(slot.size(), prev.polity_slot.size());
                 for (std::size_t p = 0; p < n; ++p)
                     if (prev.polity_slot[p] >= 0) slot[p] = prev.polity_slot[p];
+            }
+
+            // AND THE HARD BORDER CARRIES BY ID (BL-1090; STARTUP.md § Identity
+            // across the rounds): a realm hard at the predecessor's close opens
+            // this round hard, so the hysteresis walk starts where the last
+            // round left it rather than from soft -- a realm sitting inside the
+            // band at 1200 keeps its weight across the hand-over. Read off the
+            // predecessor's record itself (`lapse_hard_at_close` walks it if it
+            // was never finished), and the landed record is re-derived so its
+            // own walk reads the carry. Polity rounds only, as the slots above.
+            if (prev.culture_colour.empty())
+            {
+                m_wiz_history[i].hard_carry = ui::lapse_hard_at_close(prev);
+                m_wiz_history[i].tile_region.clear();
             }
         }
 

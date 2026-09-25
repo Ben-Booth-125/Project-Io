@@ -26,6 +26,7 @@
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
 #include "scripting/lua_state.hpp"
+#include "ui/history_lapse.hpp"     // BL-1090: the pinned hard-border pair (imgui-free header)
 
 #include "culture_footprint.hpp" // BL-968 step 1: the cultures that never hold ground
 
@@ -266,6 +267,48 @@ struct sweep_row
     int64_t hegemony_year_pop    = -1; ///< First century a polity held the threshold share of population, or -1.
     int64_t smallest_holding_pop = 0;  ///< Population held by the weakest surviving power at the epoch.
     bool    pop_recorded         = false; ///< False when the run carried no playback record (column reads 0).
+
+    // --- BL-1090: THE HARD-BORDER READING (Ben, 2026-09-24; rulings R9) ----
+    //
+    // A realm draws a HARD border on the wizard's map when its share of the
+    // world's people stands above a fixed threshold, with hysteresis so a realm
+    // sitting on the line does not flicker. The threshold is MEASURED here
+    // before it is fixed (Rule 0b): the distribution of living polities'
+    // people share over every recorded step, and what each candidate
+    // threshold would bold. Same arithmetic as the board and `top_share_pop_q`
+    // above -- a polity's sampled population over every living polity's at the
+    // step -- read at every step the record carries rather than by century.
+    // The candidates bracket the measured distribution: the 2026-09-25
+    // reading ran 10/15/20/25/30% and found nothing at 20% or above on any
+    // curated world, so the set is re-centred on where the realms are.
+    static constexpr int hard_candidates = 5;
+    static constexpr int hard_candidate_q[hard_candidates] = { 70, 100, 120, 150, 200 };
+    static constexpr int hard_margins = 2;
+    static constexpr int hard_margin_q[hard_margins] = { 30, 50 };
+    /// THE PINNED PAIR (`ui::lapse_hard_on_q` / `lapse_hard_off_q`), walked
+    /// exactly as the map walks it: on at >= on, off under off. What the
+    /// built border bolds on this world, so the header cannot drift from the
+    /// reading unnoticed.
+    int     pinned_1000  = 0; ///< Realms hard at the step at or before 1000 CE.
+    int     pinned_close = 0; ///< ...at the closing step.
+    int     pinned_max   = 0; ///< ...at the step that bolds the most.
+    int     pinned_ever  = 0; ///< Distinct realms ever hard.
+    int     pinned_off   = 0; ///< Living on->off transitions under the pinned hysteresis.
+    /// Living polities' share over all steps, binned: <5, 5-10, 10-15, 15-20, 20-30, 30+ %.
+    int64_t share_hist[6] = {0, 0, 0, 0, 0, 0};
+    int     share_top_peak_q = 0;  ///< The largest share at any recorded step, per-mille.
+    int     share_top_1000_q = 0;  ///< The largest share at the step at or before 1000 CE.
+    int     powers_1000      = 0;  ///< Living polities at that step.
+    int     hard_close[hard_candidates] = {};   ///< Realms above T at the closing step.
+    int     hard_1000[hard_candidates]  = {};   ///< ...at the step at or before 1000 CE.
+    int     hard_max[hard_candidates]   = {};   ///< ...at the step that bolds the most.
+    int     hard_ever[hard_candidates]  = {};   ///< Distinct realms above T at any step.
+    int     dips[hard_candidates]       = {};   ///< Episodes below T bounded by >= T on both sides (living throughout).
+    int     dips_single[hard_candidates]= {};   ///< ...of which one step long: what hysteresis must hold.
+    int     dip_depth_q[hard_candidates]= {};   ///< The deepest single-step dip, per-mille under T.
+    int     dip_depth_short_q[hard_candidates] = {}; ///< The deepest dip of at most three steps.
+    int     off_raw[hard_candidates]    = {};   ///< Living on->off transitions with no hysteresis.
+    int     off_hyst[hard_candidates][hard_margins] = {}; ///< ...with off = T - margin.
 
     int64_t battles   = 0;
     int64_t conquests = 0;
@@ -1860,6 +1903,148 @@ int main(int argc, char** argv)
             }
         }
 
+        // --- BL-1090: the hard-border reading, every recorded step ---------
+        //
+        // The wizard's map bolds a realm's border by people share with
+        // hysteresis (STARTUP.md § Identity across the rounds). What the
+        // threshold should be is a fact about the worlds, so it is read here
+        // before it is fixed: each living polity's share at EVERY recorded
+        // step (20-year cadence, so a single-step dip is a twenty-year one),
+        // binned; and per candidate threshold, how many realms it bolds at
+        // 1000 CE (the done-when's year), at the close and at most, how many
+        // dip under it and come back (what hysteresis exists to hold), and
+        // how many on->off transitions a margin removes. Reported, never
+        // asserted: a peaceable world of city states legitimately bolds none.
+        {
+            const int n_pol = static_cast<int>(sim.polities.size());
+            const int n_steps = static_cast<int>(sim.steps.size());
+            // share_at[step][polity], -1 for a polity absent (dead or unborn).
+            std::vector<int> share_at(static_cast<std::size_t>(n_steps) * static_cast<std::size_t>(std::max(1, n_pol)), -1);
+            const auto at = [&](int s, int p) -> int& {
+                return share_at[static_cast<std::size_t>(s) * static_cast<std::size_t>(std::max(1, n_pol))
+                                + static_cast<std::size_t>(p)];
+            };
+            const int step_1000 = n_steps > 0 ? step_at_or_before(sim, 1000) : -1;
+            for (int s = 0; s < n_steps; ++s)
+            {
+                const timelapse_step& st = sim.steps[static_cast<std::size_t>(s)];
+                int64_t total = 0;
+                for (int k = 0; k < st.sample_count; ++k)
+                    total += sim.samples[static_cast<std::size_t>(st.first_sample + k)].population;
+                int top = 0, living = 0;
+                for (int k = 0; k < st.sample_count; ++k)
+                {
+                    const polity_sample& smp = sim.samples[static_cast<std::size_t>(st.first_sample + k)];
+                    if (smp.polity >= static_cast<uint16_t>(n_pol)) continue;
+                    const int q = share_q_of(smp.population, total);
+                    at(s, smp.polity) = q;
+                    ++living;
+                    if (q > top) top = q;
+                    const int bin = q < 50 ? 0 : q < 100 ? 1 : q < 150 ? 2 : q < 200 ? 3 : q < 300 ? 4 : 5;
+                    ++row.share_hist[bin];
+                }
+                if (top > row.share_top_peak_q) row.share_top_peak_q = top;
+                if (s == step_1000) { row.share_top_1000_q = top; row.powers_1000 = living; }
+                for (int c = 0; c < sweep_row::hard_candidates; ++c)
+                {
+                    const int T = sweep_row::hard_candidate_q[c];
+                    int bold = 0;
+                    for (int k = 0; k < st.sample_count; ++k)
+                    {
+                        const polity_sample& smp = sim.samples[static_cast<std::size_t>(st.first_sample + k)];
+                        if (smp.polity < static_cast<uint16_t>(n_pol) && at(s, smp.polity) >= T) ++bold;
+                    }
+                    if (bold > row.hard_max[c]) row.hard_max[c] = bold;
+                    if (s == step_1000)  row.hard_1000[c]  = bold;
+                    if (s == n_steps - 1) row.hard_close[c] = bold;
+                }
+            }
+            // Per polity, per candidate: ever bold; the dip episodes; the
+            // transitions raw and under each margin.
+            for (int c = 0; c < sweep_row::hard_candidates; ++c)
+            {
+                const int T = sweep_row::hard_candidate_q[c];
+                for (int p = 0; p < n_pol; ++p)
+                {
+                    bool ever = false;
+                    for (int s = 0; s < n_steps; ++s) if (at(s, p) >= T) { ever = true; break; }
+                    if (!ever) continue;
+                    ++row.hard_ever[c];
+                    // Raw transitions and dip episodes (living on both sides).
+                    for (int s = 1; s < n_steps; ++s)
+                    {
+                        const int q0 = at(s - 1, p), q1 = at(s, p);
+                        if (q0 < 0 || q1 < 0) continue;
+                        if (q0 >= T && q1 < T)
+                        {
+                            ++row.off_raw[c];
+                            // Measure the episode: how long it stays under, and
+                            // how deep, until it comes back (or dies / ends).
+                            int len = 0, deepest = 0, e = s;
+                            bool returned = false;
+                            for (; e < n_steps; ++e)
+                            {
+                                const int q = at(e, p);
+                                if (q < 0) break;                 // died under the line
+                                if (q >= T) { returned = true; break; }
+                                ++len;
+                                if (T - q > deepest) deepest = T - q;
+                            }
+                            if (returned)
+                            {
+                                ++row.dips[c];
+                                if (len == 1)
+                                {
+                                    ++row.dips_single[c];
+                                    if (deepest > row.dip_depth_q[c]) row.dip_depth_q[c] = deepest;
+                                }
+                                if (len <= 3 && deepest > row.dip_depth_short_q[c])
+                                    row.dip_depth_short_q[c] = deepest;
+                            }
+                        }
+                    }
+                    // The hysteresis walk: on at >= T, off under T - margin.
+                    for (int m = 0; m < sweep_row::hard_margins; ++m)
+                    {
+                        const int off_q = T - sweep_row::hard_margin_q[m];
+                        bool on = false;
+                        for (int s = 0; s < n_steps; ++s)
+                        {
+                            const int q = at(s, p);
+                            if (q < 0) { on = false; continue; } // absent: not a living transition
+                            if (!on && q >= T) on = true;
+                            else if (on && q < off_q) { on = false; ++row.off_hyst[c][m]; }
+                        }
+                    }
+                }
+            }
+            // THE PINNED PAIR, walked as `ui::lapse_hard_walk` walks it
+            // (history_lapse.cpp `hard_walk_record`): on at >= on, off under
+            // off, absent is off. Per step the count it bolds; per polity
+            // whether it was ever hard and how often it went soft while living.
+            {
+                std::vector<uint8_t> on(static_cast<std::size_t>(std::max(1, n_pol)), 0);
+                std::vector<uint8_t> ever(static_cast<std::size_t>(std::max(1, n_pol)), 0);
+                for (int s = 0; s < n_steps; ++s)
+                {
+                    int bold = 0;
+                    for (int p = 0; p < n_pol; ++p)
+                    {
+                        const std::size_t up = static_cast<std::size_t>(p);
+                        const int q = at(s, p);
+                        if (q < 0) { on[up] = 0; continue; }
+                        if (!on[up] && q >= ui::lapse_hard_on_q) on[up] = 1;
+                        else if (on[up] && q < ui::lapse_hard_off_q) { on[up] = 0; ++row.pinned_off; }
+                        if (on[up]) { ++bold; ever[up] = 1; }
+                    }
+                    if (bold > row.pinned_max) row.pinned_max = bold;
+                    if (s == step_1000)  row.pinned_1000  = bold;
+                    if (s == n_steps - 1) row.pinned_close = bold;
+                }
+                for (int p = 0; p < n_pol; ++p) if (ever[static_cast<std::size_t>(p)]) ++row.pinned_ever;
+            }
+        }
+
         // --- BL-767 R2: the rise-peak-fall shape, per polity ---------------
         //
         // A SEPARATE, FINER WALK than the century sampler above, deliberately.
@@ -2199,6 +2384,97 @@ int main(int argc, char** argv)
                     static_cast<long long>(r.epoch_population),
                     static_cast<long long>(r.ms),
                     static_cast<long long>(r.works_raised), r.regions_with_works);
+    }
+
+    // --- BL-1090: THE HARD-BORDER READING, per seed and pooled ------------
+    //
+    // Read before the threshold is fixed (Rule 0b). The first table is the
+    // distribution: every living polity's share at every recorded step,
+    // binned, beside the top share at 1000 CE, at the close and at its peak.
+    // The second is what each candidate threshold DOES: realms bolded at
+    // 1000 CE / at the close / at most / ever; the dip episodes under it that
+    // came back (single-step ones in brackets, with the deepest single-step
+    // dip in per-mille); and the living on->off transitions raw, then under
+    // a 30 and a 50 per-mille hysteresis margin. The pooled block under them
+    // is the reading the item's design cites.
+    {
+        std::printf("\n--- BL-1090  THE HARD-BORDER READING: people share per living polity, every recorded step ---\n");
+        std::printf("seed  powers@1000  top@1000  top@close  top@peak   shares <5%%  5-10  10-15  15-20  20-30   30+\n");
+        std::printf("----  -----------  --------  ---------  --------   ---------- ----- ------ ------ ------ -----\n");
+        for (const sweep_row& r : rows)
+            std::printf("%4u  %11d  %7d%%  %8d%%  %7d%%   %10lld %5lld %6lld %6lld %6lld %5lld\n",
+                        r.seed, r.powers_1000,
+                        r.share_top_1000_q / 10, r.top_share_pop_q / 10, r.share_top_peak_q / 10,
+                        static_cast<long long>(r.share_hist[0]), static_cast<long long>(r.share_hist[1]),
+                        static_cast<long long>(r.share_hist[2]), static_cast<long long>(r.share_hist[3]),
+                        static_cast<long long>(r.share_hist[4]), static_cast<long long>(r.share_hist[5]));
+
+        std::printf("\nper candidate threshold T: bold@1000/close/max/ever  dips(single) deepest1  off raw>h30>h50\n");
+        std::printf("seed ");
+        for (int c = 0; c < sweep_row::hard_candidates; ++c)
+            std::printf("| T=%2d%%: 1000/cls/max/evr dip(1) dp  off       ", sweep_row::hard_candidate_q[c] / 10);
+        std::printf("\n");
+        for (const sweep_row& r : rows)
+        {
+            std::printf("%4u ", r.seed);
+            for (int c = 0; c < sweep_row::hard_candidates; ++c)
+                std::printf("| %2d/%2d/%2d/%2d %3d(%2d) %3d %3d>%3d>%3d ",
+                            r.hard_1000[c], r.hard_close[c], r.hard_max[c], r.hard_ever[c],
+                            r.dips[c], r.dips_single[c], r.dip_depth_q[c],
+                            r.off_raw[c], r.off_hyst[c][0], r.off_hyst[c][1]);
+            std::printf("\n");
+        }
+
+        std::printf("\nthe PINNED pair (ui::lapse_hard_on_q %d / lapse_hard_off_q %d per-mille), walked as the map walks it:\n",
+                    ui::lapse_hard_on_q, ui::lapse_hard_off_q);
+        std::printf("seed  hard@1000  hard@close  hard@max  ever hard  soft-again(living)\n");
+        for (const sweep_row& r : rows)
+            std::printf("%4u  %9d  %10d  %8d  %9d  %18d\n",
+                        r.seed, r.pinned_1000, r.pinned_close, r.pinned_max, r.pinned_ever, r.pinned_off);
+        {
+            int w1000 = 0, wclose = 0, off = 0;
+            std::vector<int64_t> b1000;
+            for (const sweep_row& r : rows)
+            {
+                if (r.pinned_1000 > 0) ++w1000;
+                if (r.pinned_close > 0) ++wclose;
+                b1000.push_back(r.pinned_1000);
+                off += r.pinned_off;
+            }
+            std::printf("  pinned: %d of %d worlds hard at 1000 CE, %d at the close, median %lld realms at 1000 CE, %d soft-again transitions in all\n",
+                        w1000, static_cast<int>(rows.size()), wclose,
+                        static_cast<long long>(median_of(b1000)), off);
+        }
+
+        std::printf("\npooled over %d worlds:\n", static_cast<int>(rows.size()));
+        std::printf("  T     worlds bold@1000  worlds bold@close  median bold@1000  max bold@any  dips(single)  deepest1  deepest<=3  off raw>h30>h50\n");
+        for (int c = 0; c < sweep_row::hard_candidates; ++c)
+        {
+            int w1000 = 0, wclose = 0, maxany = 0, dips = 0, dips1 = 0, deep1 = 0, deep3 = 0;
+            int raw = 0, h30 = 0, h50 = 0;
+            std::vector<int64_t> b1000;
+            for (const sweep_row& r : rows)
+            {
+                if (r.hard_1000[c] > 0) ++w1000;
+                if (r.hard_close[c] > 0) ++wclose;
+                if (r.hard_max[c] > maxany) maxany = r.hard_max[c];
+                b1000.push_back(r.hard_1000[c]);
+                dips  += r.dips[c];
+                dips1 += r.dips_single[c];
+                if (r.dip_depth_q[c] > deep1) deep1 = r.dip_depth_q[c];
+                if (r.dip_depth_short_q[c] > deep3) deep3 = r.dip_depth_short_q[c];
+                raw += r.off_raw[c];
+                h30 += r.off_hyst[c][0];
+                h50 += r.off_hyst[c][1];
+            }
+            std::printf("  %2d%%   %16d  %17d  %16lld  %12d  %8d(%3d)  %8d  %10d  %3d>%3d>%3d\n",
+                        sweep_row::hard_candidate_q[c] / 10, w1000, wclose,
+                        static_cast<long long>(median_of(b1000)), maxany,
+                        dips, dips1, deep1, deep3, raw, h30, h50);
+        }
+        std::printf("  (a dip is an episode under T that came back while living; 'deepest' is per-mille under T,\n"
+                    "   so a hysteresis margin at least that deep holds every such dip. off = living on->off\n"
+                    "   transitions: raw, then with the off line at T-30 and T-50 per-mille.)\n");
     }
 
     // --- BL-760 (1): raised and fielded, by roster band -------------------

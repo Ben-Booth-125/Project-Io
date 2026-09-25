@@ -196,16 +196,37 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
 
 ### Wave 1, lane I2 (frontier and marks) — BL-1090 (hard borders) then BL-1094 (marks). Groups `hard-borders-by-people-share`, `marks-that-earn-their-place`.
 
-- [ ] T1 (1090) history_sweep column: the people-share distribution per world on the 16 seeds and the
+- [x] T1 (1090) history_sweep column: the people-share distribution per world on the 16 seeds and the
   count a candidate threshold bolds; the threshold and hysteresis fixed from it and written into the
-  item. (1090 R1)
-- [ ] T2 (1090) the per-owner hard flag with hysteresis; both frontier passes (history_lapse.cpp:~979-985,
+  item. (1090 R1) DONE 2026-09-25: the BL-1090 block (distribution, five candidates, dips, hysteresis
+  margins, and the PINNED pair walked as the map walks it); 16-seed reading in the item's design —
+  20%+ bolds nothing anywhere, 15% one realm on one world, 10% on 6 of 16 worlds and none on the
+  city-state worlds; deepest single-step dip 39‰. Pinned on 100 / off 60 (history_lapse.hpp).
+- [x] T2 (1090) the per-owner hard flag with hysteresis; both frontier passes (history_lapse.cpp:~979-985,
   ~1000-1013) draw 2 px dark + 1 px inner stroke in the realm's colour; the board bolds; the flag
-  carries by id into round 5. (1090 R2)
-- [ ] T3 (1094) the four marks with their glyphs, the capital-moved slide (on I1's fold — if I1 has
+  carries by id into round 5. (1090 R2) DONE 2026-09-25: `lapse_hard_walk` bakes a per-step bitmap
+  at finish (seeded from `hard_carry`), both passes read it per edge, the board faux-bolds the seat
+  and share (one face only); the carry is set at launch, at landing and on the `--verify` adopted
+  path (startup_screens.cpp, beside the slot inheritance). Capture history_lapse_hard.lua: at
+  1000 CE on seed 0, Zeihei Meize (10.5%) and Tume Memma (9.0%, held by hysteresis) draw hard and
+  bold; Ruke Rate at 9.5% stays plain; round 5 opens at 1200 with three rows bold by the carry alone
+  (none above 10% at that step). The pinned pair walked on the six bolding worlds agrees with the
+  captures (seed 0: 2 at 1000 CE, 3 at the close).
+- [x] T3 (1094) the four marks with their glyphs, the capital-moved slide (on I1's fold — if I1 has
   not landed, slide old → new from the event's `other` region directly), the Post Road pulse; no
-  other kind marks; STARTUP.md § Identity across the rounds matches. (1094 R1, R2)
+  other kind marks; STARTUP.md § Identity across the rounds matches. (1094 R1, R2) DONE 2026-09-25:
+  pass 3f in draw_lapse_map (ring / crack / diamond / slide table) and the pulse in 3b; I1's fold was
+  not on the base, so the slide's endpoints are the event's `other` → `region` and the crack's parent
+  end is `polity_seat` (one lookup, `seat_region_of`, to re-point when the fold lands); the marker
+  switch comment restated; the doc's list matches the built set, no edit needed.
 - [ ] T4 captures per kind on a library seed; Release build; cold review; Ben's live click. (R3s)
+  2026-09-25: Release build green in the lane's worktree; `history_lapse_hard.lua` (round 4 at
+  1000 CE and the close, round 5's opening) and `history_lapse_marks.lua` (every kind on seed 0 at
+  the event and half a window later, the diamond two windows on, the Post Road on round 6) both
+  PASS with the clipping ledger clean; the marks are eyeballed on the crops (ring / crack / diamond /
+  pulse; the slide's mid-frame is captured but not identified by eye). OWES the cold review and
+  Ben's live click (1090 R3, 1094 R3). Note for the click: at 1920x1080 the map's right 116 px sit
+  past the pane's clip (`map_nudge_x`), so a mark there is off-screen on that layout.
 
 ### Wave 2 (opens as wave 1's lanes land), lane F1 (Culture) — BL-1091 (from Life to people) → BL-1092 (routes and splits). Groups `from-life-to-people`, `routes-and-splits-on-the-map`.
 
