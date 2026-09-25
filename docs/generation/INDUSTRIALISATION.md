@@ -628,6 +628,14 @@ NEEDS_REVIEW).
 **SET (Ben, 2026-09-15):** *"mass migration and growth of larger centres (either within or to
 another polity), causing technological innovation centred around larger population centres."*
 
+**SET (Ben, 2026-09-25, after Begin opened on "massive road networks with population centres on
+every tile"): this span encourages more migration, and migration is how the map thins.** The
+urbanisation stream empties the countryside and its villages into the towns and cities that
+industrialise, and a village emptied below a village's worth is abandoned
+(`../economy/POPULATION.md` § Generation, "Centres follow the heads both ways"), so the 1960 world
+carries far fewer, larger centres than the ages before it left. BL-1137 (industrial urbanisation)
+owns the build.
+
 **PROPOSED: migration moves people and culture shares along a line, toward work.** Two streams on
 one rule:
 

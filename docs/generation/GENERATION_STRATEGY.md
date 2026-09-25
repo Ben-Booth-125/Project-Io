@@ -786,6 +786,13 @@ A convergence test makes the amount of work depend on the landscape, so two worl
 search for different lengths and a threshold becomes a hidden tuning knob. A fixed round count
 makes the search a pure function of (world, seed, round count) with a cost known before it starts.
 
+**The round count is cut to fit round 6's wait (Ben, 2026-09-25; BL-1136, fewer search
+evaluations).** The search runs inside round 6's tail, which lands within 35 s of the round's
+arrival (`../ui/STARTUP.md` § Round 6); on the densest curated world thirteen evaluations cost
+about 17 s of it. The count stays fixed and stays one number for every world, but it is chosen
+from a measured curve — how much score each further round buys on the curated seeds — not left
+at a count set before the tail had a budget.
+
 **What keeps it deterministic**, and every clause is load-bearing: perturbations are drawn from a
 seeded stream in a fixed axis order; a round's proposals are scored independently and never in
 completion order; the argmax runs over a **total** order with an explicit tie-break, so an exact

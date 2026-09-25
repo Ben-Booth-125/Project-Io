@@ -629,7 +629,7 @@
     "src/ui/startup_screens.cpp",
     "docs/ui/question_log.json"
    ],
-   "design": "FILED 2026-09-25 (Ben: \"we also probably need a legend for each round, just in case it isn't clear what is shown on the map\"; timing: sprint 48, AFTER the Empires cut). STARTUP.md § Round 4 states the ruling.\n\nTHE WORK. A key per lapse round (Culture, Empires, Exploration, Industrialisation) listing exactly the layers that round draws -- read from the same predicates the painter uses, so a layer cut from a round (the Empires cut, 2026-09-25) drops from its legend by construction and a legend can never name a layer the round does not draw. Glyphs drawn by the painter's own calls, not re-drawn icons. The question log gains the surface.\n\nDONE WHEN. Each round's legend lists its layers and only those; a capture per round; Ben's live click. BL-1097's lane line was not found at the 2026-09-25 click -- the legend is where a player finds it."
+   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app): the key is decided once per round (built; STARTUP.md § Round 4), and the Empires map KEEPS \"Furnaces lit\" (written into § Round 4). The four drafted labels stand.\n\nFILED 2026-09-25 (Ben: \"we also probably need a legend for each round, just in case it isn't clear what is shown on the map\"; timing: sprint 48, AFTER the Empires cut). STARTUP.md § Round 4 states the ruling.\n\nTHE WORK. A key per lapse round (Culture, Empires, Exploration, Industrialisation) listing exactly the layers that round draws -- read from the same predicates the painter uses, so a layer cut from a round (the Empires cut, 2026-09-25) drops from its legend by construction and a legend can never name a layer the round does not draw. Glyphs drawn by the painter's own calls, not re-drawn icons. The question log gains the surface.\n\nDONE WHEN. Each round's legend lists its layers and only those; a capture per round; Ben's live click. BL-1097's lane line was not found at the 2026-09-25 click -- the legend is where a player finds it."
   },
   {
    "status": "designed",
@@ -772,7 +772,7 @@
     "src/ui/history_lapse.cpp",
     "scripts/verify/sea_lanes.lua"
    ],
-   "design": "SPRINT 48 CUT (Ben, 2026-09-25, the cut form): the form is chosen NOW, on today's lanes (seed 32: 16); BL-1115 (sea legs in later spans) stays unscheduled and the form may be revisited when it lands. Delegated reading: the UI lane builds the three candidates (a brighter core line inside the band, a shipping glyph at each end, an arc bowed away from the tie), captures each at seed 32's close frame, and Ben picks with the live app open; the two not picked are removed before the commit.\n\nFILED 2026-09-25 from BL-1097 R3 (moved here; Ben: \"I don't clearly see the sea lanes on exploration. Perhaps that is for sprint 48?\"). The record is built and the lane draws (sea_lanes.lua, seed 32: 16 lanes), first as a thin dashed line that hid under the colonial ties, then as a wide soft sea-blue band under them -- and the band was still not clearly seen at the live app.\n\nWHY IT HIDES. The tribute leg writes most lane uses (seed 46: 619 of 663), so almost every lane runs the same capital-to-capital line as its tie, and the lanes open late in the span.\n\nTHE WORK, with BL-1118 (round legends) beside it: the legend names the lane; the lane gets a form of its own that reads at a glance (candidates: a brighter core line inside the band, a shipping-route glyph at each end, or an arc bowed away from the tie). Once BL-1115 (sea legs in the later spans) lands, wet campaigns write lanes off the ties too -- read how many before choosing.\n\nDONE WHEN. Ben finds a lane at the live app without a pointer."
+   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app): Ben picked (c) the BOWED ARC at the live app (form (a) core line and (b) end anchors are removed with the temporary selector; STARTUP.md § Round 5 states it). R2 done. R3 (\"finds a lane without a pointer\") is read at the next walk.\n\nSPRINT 48 CUT (Ben, 2026-09-25, the cut form): the form is chosen NOW, on today's lanes (seed 32: 16); BL-1115 (sea legs in later spans) stays unscheduled and the form may be revisited when it lands. Delegated reading: the UI lane builds the three candidates (a brighter core line inside the band, a shipping glyph at each end, an arc bowed away from the tie), captures each at seed 32's close frame, and Ben picks with the live app open; the two not picked are removed before the commit.\n\nFILED 2026-09-25 from BL-1097 R3 (moved here; Ben: \"I don't clearly see the sea lanes on exploration. Perhaps that is for sprint 48?\"). The record is built and the lane draws (sea_lanes.lua, seed 32: 16 lanes), first as a thin dashed line that hid under the colonial ties, then as a wide soft sea-blue band under them -- and the band was still not clearly seen at the live app.\n\nWHY IT HIDES. The tribute leg writes most lane uses (seed 46: 619 of 663), so almost every lane runs the same capital-to-capital line as its tie, and the lanes open late in the span.\n\nTHE WORK, with BL-1118 (round legends) beside it: the legend names the lane; the lane gets a form of its own that reads at a glance (candidates: a brighter core line inside the band, a shipping-route glyph at each end, or an arc bowed away from the tie). Once BL-1115 (sea legs in the later spans) lands, wet campaigns write lanes off the ties too -- read how many before choosing.\n\nDONE WHEN. Ben finds a lane at the live app without a pointer."
   },
   {
    "status": "designed",
@@ -888,7 +888,7 @@
     "tools/verify/market_census.cpp",
     "tools/verify/road_generation_harness.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the density form) (POPULATION.md § Generation, \"Growth consolidates\"). FOUND BY THE ROADS LANE (BL-1119 D1, 2026-09-25): population centres cover 49-100% of land on the 16 curated seeds (seed 46: 15,240 centres on 15,240 land tiles), every centre is a street, so the \"lattice\" Ben saw is streets and no road rule can thin it; the carve markets (75% of ~311 a world, BL-1125's census) follow the same density. POPULATION.md already wants \"a few cities over many towns over a train of villages\" and records that the remaining displacements are regions \"wanting more cities than it has ground\".\n\nTHE RULE. As a region's urban heads rise, its villages merge into a town rather than a new village standing beside them; a region never carries more centres than its ground holds (their urban footprints fit inside its own cell); a built-out cell promotes a centre it already has instead of spilling one into a neighbour's cell. Pure integer functions of the region record, no RNG, as the rest of the demography.\n\nTHE WORK, measure first (Rule 0b). (1) Read where the region's `centres` integer grows (the history's urban growth and promotion) and where generate_population_centres spills; report centres per seed, land share covered by centres, scale distribution, spills -- old. (2) Build the rule. (3) Report the same -- new -- plus the carve's market count (market_census) and road tiles (gen_step_costs --roads), because both follow. Tune nothing to hit a count; if the rule as written leaves density far from the doc's shape, report and stop for Ben.\n\nA WORLD-MOVER AND A SIM BEAT: a named cause in the sprint's one re-bless, measured in its own worktree. DONE WHEN the rule runs, POPULATION.md states it (done at the ruling), the per-seed centre count and land share are recorded old -> new, and the densest seed's road lens shows land that is not street."
+   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app): EXPLAIN FIRST, THEN MERGE -- find why the history moved (a synthetic run's battles 7 -> 98; seed 40's regions 1,461 -> 2,703; candidates: campaign_prize_q's centres x 200 term, the relay rule centres >= relay_min) before the branch merges. Keep the per-region size hierarchy; a region whose cell holds no land carries NO centre (POPULATION.md). Follow-ons this sprint: BL-1132 (settle spacing), BL-1133 (anchors reuse a centre), BL-1137 (industrial urbanisation, the \"dramatically fewer\" lever), with the market folds (BL-1125) calibrated after them.\n\nSETTLED (Ben, 2026-09-25, the density form) (POPULATION.md § Generation, \"Growth consolidates\"). FOUND BY THE ROADS LANE (BL-1119 D1, 2026-09-25): population centres cover 49-100% of land on the 16 curated seeds (seed 46: 15,240 centres on 15,240 land tiles), every centre is a street, so the \"lattice\" Ben saw is streets and no road rule can thin it; the carve markets (75% of ~311 a world, BL-1125's census) follow the same density. POPULATION.md already wants \"a few cities over many towns over a train of villages\" and records that the remaining displacements are regions \"wanting more cities than it has ground\".\n\nTHE RULE. As a region's urban heads rise, its villages merge into a town rather than a new village standing beside them; a region never carries more centres than its ground holds (their urban footprints fit inside its own cell); a built-out cell promotes a centre it already has instead of spilling one into a neighbour's cell. Pure integer functions of the region record, no RNG, as the rest of the demography.\n\nTHE WORK, measure first (Rule 0b). (1) Read where the region's `centres` integer grows (the history's urban growth and promotion) and where generate_population_centres spills; report centres per seed, land share covered by centres, scale distribution, spills -- old. (2) Build the rule. (3) Report the same -- new -- plus the carve's market count (market_census) and road tiles (gen_step_costs --roads), because both follow. Tune nothing to hit a count; if the rule as written leaves density far from the doc's shape, report and stop for Ben.\n\nA WORLD-MOVER AND A SIM BEAT: a named cause in the sprint's one re-bless, measured in its own worktree. DONE WHEN the rule runs, POPULATION.md states it (done at the ruling), the per-seed centre count and land share are recorded old -> new, and the densest seed's road lens shows land that is not street."
   },
   {
    "status": "designed",
@@ -910,6 +910,145 @@
     "tools/verify/logistics_harness.cpp"
    ],
    "design": "FOUND 2026-09-25 by the settle lane (BL-1126 review fixes): six logistics_harness T7-T10 rows FAIL on main and identically on the pre-sprint logistics code (b03fd52e) -- \"intra-body shortfall dispatches one convoy\" and the cost, city-discount and hub-discount rows. Their fixture has no Logistic Point anchor, so the passive-LP gate (LOGISTICS.md § the LP split) refuses the convoy before any cost is priced, and the rows read a refusal as a failed dispatch. logistics_harness therefore exits 1 (35 PASS, 6 FAIL) and cannot gate anything. THE WORK: give the fixture an anchor (a city on the origin's body, or a built hub) and re-derive the expected discounts from the doc, not from the output; keep one row that asserts the refusal on an anchorless body. DONE WHEN logistics_harness exits 0 on main."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1132",
+   "short_name": "SETTLE_SPACING",
+   "author": "Ben (2026-09-25, the open-calls form: \"Settle spacing, this sprint\"); filed by Claude",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 3,
+   "title": "A new region founds at a distance from the regions already standing, so the settled cores are not paved one region to a tile",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/settlement.cpp",
+    "tools/verify/centre_census.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app). CIVILISATION.md § The unit is the city state, and settlements are sparse states the rule. FOUND by the centres lane (BL-1130): the settle verb founds each new region on the nearest free tile, so on seed 46 3,304 of 4,682 regions hold a one-tile cell and 3,012 centres (49%) stand in such cells -- each rightly one centre, so the cores stay solid street. THE WORK, measure first: find every path that founds a region (the settlement pass and the sims' Settle verb); a spacing candidate ladder (minimum distance from standing regions, in tiles or traversal cost) on the 16 curated seeds -- regions, one-tile cells, centres, land under centres, the history's battles/conquests/foundings; then Ben fixes the spacing. A sim beat and a world-mover (the one re-bless). DONE WHEN the spacing is fixed and recorded old -> new per seed with the history readings."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1133",
+   "short_name": "ANCHORS_REUSE_A_CENTRE",
+   "author": "Ben (2026-09-25, the open-calls form); filed by Claude",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A province with no centre is anchored by one that already stands, not by a newly founded village",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "src/world/population_generation.cpp",
+    "src/world/province.cpp",
+    "tools/verify/centre_census.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app). POPULATION.md § Generation, \"Every province is anchored by a centre\". FOUND by the centres lane (BL-1130): ensure_province_anchor_centres founds a village for every centre-less province, which grew to 22-39% of all centres after consolidation (seed 46: 0 -> 1,320). DELEGATED READING (NR-946): a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, so the merged province's centre anchors it; a scale-1 founding only where no such neighbour exists. PROVINCES.md § The partition owns the merge. THE WORK: read the anchors founded per seed (old); build the join; record provinces, anchors founded and centres old -> new; the conquest unit invariant (every province has a centre) holds. A world-mover."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1134",
+   "short_name": "ROADS_CARRIED_ACROSS_ROUNDS",
+   "author": "Ben (2026-09-25, walking round 6: \"we lost every road between Exploration and Industrialisation\"); filed by Claude",
+   "category": "UI",
+   "priority": "S",
+   "difficulty": 2,
+   "title": "Every lapse round draws the roads the rounds before it laid; no seam drops them",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/history_lapse.cpp",
+    "src/world/history_sim.cpp",
+    "src/world/era_timelapse.hpp"
+   ],
+   "design": "A DEFECT Ben saw at the live walk (2026-09-25): every road on the Exploration round is gone on the Industrialisation round. STARTUP.md § Round 6 (roads carried forward like a realm's name and colour) states the rule. THE WORK: find where the carry breaks -- the Industrialisation record not carrying the corridor/road set it inherited, the painter drawing only its own span's corridors, or the K4 wizard handing round 6 a record without the prior roads -- fix it at the cause, and add a --verify expect that a road present at the close of round 5 is drawn on round 6's first frame. DONE WHEN the expect passes and Ben sees the roads carry at the walk."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1135",
+   "short_name": "CULTURE_ROUND_WORDED_AS_THE_RECORD",
+   "author": "Ben (2026-09-25, the open-calls form notes); filed by Claude",
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 1,
+   "title": "The Culture round's words describe how writing and the keeping of a culture's record emerge, not the migration routes",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/ui/history_lapse.cpp",
+    "docs/ui/question_log.json"
+   ],
+   "design": "Ben, 2026-09-25: \"change the cultures wording to describe how written records are stored, so the idea is less to trace migration routes (which happened millennia earlier), and more to show how writing and preservation of culture emerges.\" STARTUP.md § Round 3 states it. THE WORK: the round's question (today \"Who reached this ground first, and by which routes?\"), its wait caption and description, its ticker framing and a footer, reworded in GLOSSARY.md terms; the map and its record unchanged. Draft for Ben's read at the walk. DONE WHEN the words are in and Ben reads them at the app."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1136",
+   "short_name": "SEARCH_FEWER_EVALUATIONS",
+   "author": "Ben (2026-09-25, the open-calls form: \"Fewer search evaluations\"); filed by Claude",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "The landscape search's fixed round count is cut, from a measured curve, to fit round 6's wait",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/world/landscape_search.cpp",
+    "tools/verify/landscape_search_harness.cpp",
+    "tools/verify/gen_step_costs.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app). GENERATION_STRATEGY.md § Phase 6 states the rule. The quiet reading (2026-09-25): seed 0's round 6 lands in ~48 s against 35 s; the search is 13 evaluations, ~17.3 s (1.33 s each). THE WORK, measure first: the search's score per round count (1..6 rounds) on the 16 curated seeds -- the winner's composite and whether it validates -- and the time per evaluation; recommend the smallest count whose curve has flattened; Ben fixes it. Re-read after BL-1130 and BL-1137 land (fewer centres shrink the charter budget). A world-mover if a winner changes."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1137",
+   "short_name": "INDUSTRIAL_URBANISATION",
+   "author": "Ben (2026-09-25, after Begin: \"reduce the number of population centres dramatically, and we should encourage more migration in the industrialisation round\"; \"we can destroy shrinking centres below a threshold\"); filed by Claude",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 4,
+   "title": "The Industrialisation span's migration empties the countryside into the towns and cities that industrialise, and an emptied village is abandoned",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/settlement.cpp",
+    "tools/verify/centre_census.cpp",
+    "tools/verify/industrialisation_sim_harness.cpp"
+   ],
+   "design": "SET (Ben, 2026-09-25): INDUSTRIALISATION.md § Beat 2 (the urbanisation stream, now set) and POPULATION.md § Generation (\"Centres follow the heads both ways\": a centre below a village's worth is abandoned in the history; NR-947 holds the threshold reading and whether play follows). THE WORK: build Beat 2's URBANISATION stream (a region's countryside and villages -> a centre in the same polity, pulled by industry-point output at the centre, pushed by depleted or strained ground, along held corridors); let a centre's count follow its heads both ways so an emptied village is abandoned. Emigration (between polities) is Beat 2's other stream and is NOT in this item unless the reading shows urbanisation alone cannot thin the map. Measure first and after on the 16 seeds: centres per seed by scale, land under centres, the history's counters. Tune nothing to hit a count; report and stop for Ben if the stream leaves the map far from \"dramatically fewer\". A sim beat and a world-mover."
   }
  ]
 }

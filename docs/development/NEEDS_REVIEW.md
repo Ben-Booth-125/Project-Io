@@ -24,41 +24,41 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*49 entries — 2 open, 47 resolved.*
+*51 entries — 2 open, 49 resolved.*
 
 ---
 
 ## Open
 
-### NR-944 — CALL: a nation with no town and no spurring village now gets no border link at all - off the continental network. Accept, fall back, or read after centres consolidate?
-*question · raised 2026-09-25 · from BL-1119 (roads tree and detour) round 2, 2026-09-25, following Ben's density-form ruling that a border link ends only on a town or a spurring village*
+### NR-946 — DECISION TAKEN: "province anchors reuse a centre" is read as a centre-less province joining its nearest neighbouring province of the same nation
+*decision · raised 2026-09-25 · from Ben's open-calls form, 2026-09-25 (BL-1133, anchors reuse a centre)*
 
-The ruling removed every border link that ended on a bare village street (seed 46: 106 -> 0; seed 28: 26 -> 0). But a nation pair where one side has NO centre on its network now lays no link at all: 49 of 174 pairs on seed 46, 13 of 48 on seed 28, 30 of 94 on seed 0. Such a nation is off the continental network entirely; earlier road work (every centre gets a street, the border link) existed to keep every nation connected. Border links fell 151 -> 118 (seed 46), 46 -> 33 (seed 28), 91 -> 62 (seed 0). UPDATED 2026-09-25 after round 3 (on the network now means a road that reaches a town; 25-40% of villages the pass had called on-network never did): pairs with no network endpoint seed 0 30 -> 37 of 94, seed 28 13 of 48, seed 46 49 -> 83 of 174; border links laid seed 0 62 -> 55, seed 46 118 -> 83. A nation with no town now has no road network at all, so no border link.
+A centre already stands in exactly one province, so a province without one cannot "take" another's. Taken on your behalf: a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, and the merged province's centre anchors it; a scale-1 founding happens only where no such neighbour exists. POPULATION.md § Generation states it; PROVINCES.md § The partition owns the merge.
 
-**Why it matters.** A nation with no link cannot be reached by road across the border: its trade and any march into or out of it price as off-road. BL-1130 (centres consolidate) merges villages into towns this sprint, which should give many of these nations a town and so a network endpoint.
+**Why it matters.** It lowers the province count as well as the centre count, so conquest units get larger in thinly settled country.
 
-- A: accept - a nation with nothing on its network lays no border road
-- B: fall back - such a nation links from its largest centre even if it is a bare street, so every nation stays connected
-- C: read after BL-1130 lands, then choose between A and B on the consolidated worlds
+- A: keep the reading (join the nearest neighbouring province)
+- B: keep provinces, and anchor the empty one on the nearest centre across its border (a province anchored outside itself)
+- C: other
 
-> **Recommendation:** C, leaning B: the ruling was about links that join nothing, and a nation left wholly off the network is the opposite case.
+> **Recommendation:** A: a province is the ground a centre can hold; one with nothing to hold it is hinterland of its neighbour.
 
-*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
+*Files: `src/world/population_generation.cpp`, `docs/economy/POPULATION.md`, `docs/generation/PROVINCES.md`*
 
-### NR-945 — DECISION TAKEN: only a road that can be laid enters the roads tree and the detour test, so a nation the sea divides builds one tree per landmass
-*decision · raised 2026-09-25 · from BL-1119 (roads tree and detour) cold review, 2026-09-25, finding 1*
+### NR-947 — DECISION TAKEN + CALL: the threshold below which a shrinking centre is abandoned is a village's worth; and does play follow the history?
+*decision · raised 2026-09-25 · from Ben, 2026-09-25: "Let's supersede that POPULATION.md rule, we can destroy shrinking centres below a threshold"*
 
-The tree and the detour test took every town pair the path flood could reach, and that flood crosses water at the sea-leg cost. Road rasterisation then refuses any open-ocean route. So a tree link across a bay was never laid (stranding a town from its nation's road), and an admitted sea loop sat in the test network refusing real land loops near it. Taken on your behalf: a route that crosses open sea (other than a strait) is not a road candidate at all -- it never enters the Kruskal tree or the detour test, so a nation the sea divides builds one tree per landmass. Also written down: the detour test reads the town graph (cheapest chain of accepted links, each at its own direct cost), not the raster. LOGISTICS.md § 4 states both.
+Taken on your behalf: the threshold is the smallest rung, a village's worth -- the size hierarchy (BL-1130) already sizes a region's centres from its heads with the smallest a village's worth, so a centre whose share falls below it is abandoned, no new number. Written for the HISTORY (POPULATION.md § Generation). OPEN: play keeps "passive failure never destroys a centre" (§ Growth, decline and razing), because a centre is its province's capture anchor and razing is a tier, not an erasure; superseding it in play too would need an anchor hand-off.
 
-**Why it matters.** It changes which links form a divided nation's tree, so it moves the road digests (inside the sprint's one re-bless). The alternative keeps sea pairs in the tree and accepts stranded towns.
+**Why it matters.** The history rule is what thins the generated map (with BL-1137, industrial urbanisation). The play rule decides whether a campaign's villages can empty and vanish too.
 
-- A: keep the reading (layable links only; one tree per landmass)
-- B: keep sea pairs as candidates but skip them in the detour test only
-- C: something else
+- A: keep both readings (village threshold; history only, play unchanged)
+- B: village threshold, and play follows (with an anchor hand-off to the nearest centre)
+- C: a different threshold (say which)
 
-> **Recommendation:** A: a road that cannot be built should not decide which roads are built.
+> **Recommendation:** A for this sprint; B is its own item if wanted.
 
-*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
+*Files: `docs/economy/POPULATION.md`, `src/world/history_sim.cpp`*
 
 ---
 
@@ -834,4 +834,38 @@ The harness gate (industrialisation_sim_harness --fidelity, the BL-1049 section)
 > **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): B, range-check the civilisation and creed indices in both validators, conditional on a non-empty table, and fill the exploration_sim_harness fixtures' tables. The work is BL-1116 (handoff validators range-check), Light.
 
 *Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sim_harness.cpp`*
+
+### NR-944 — CALL: a nation with no town and no spurring village now gets no border link at all - off the continental network. Accept, fall back, or read after centres consolidate?
+*question · raised 2026-09-25 · from BL-1119 (roads tree and detour) round 2, 2026-09-25, following Ben's density-form ruling that a border link ends only on a town or a spurring village*
+
+The ruling removed every border link that ended on a bare village street (seed 46: 106 -> 0; seed 28: 26 -> 0). But a nation pair where one side has NO centre on its network now lays no link at all: 49 of 174 pairs on seed 46, 13 of 48 on seed 28, 30 of 94 on seed 0. Such a nation is off the continental network entirely; earlier road work (every centre gets a street, the border link) existed to keep every nation connected. Border links fell 151 -> 118 (seed 46), 46 -> 33 (seed 28), 91 -> 62 (seed 0). UPDATED 2026-09-25 after round 3 (on the network now means a road that reaches a town; 25-40% of villages the pass had called on-network never did): pairs with no network endpoint seed 0 30 -> 37 of 94, seed 28 13 of 48, seed 46 49 -> 83 of 174; border links laid seed 0 62 -> 55, seed 46 118 -> 83. A nation with no town now has no road network at all, so no border link.
+
+**Why it matters.** A nation with no link cannot be reached by road across the border: its trade and any march into or out of it price as off-road. BL-1130 (centres consolidate) merges villages into towns this sprint, which should give many of these nations a town and so a network endpoint.
+
+- A: accept - a nation with nothing on its network lays no border road
+- B: fall back - such a nation links from its largest centre even if it is a bare street, so every nation stays connected
+- C: read after BL-1130 lands, then choose between A and B on the consolidated worlds
+
+> **Recommendation:** C, leaning B: the ruling was about links that join nothing, and a nation left wholly off the network is the opposite case.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the open-calls form): C, read after BL-1130 (centres consolidate) and its follow-ons land, leaning B (a nation with nothing on its network links from its largest centre). The reading and the fallback are BL-1119 (roads tree and detour) follow-up work.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-945 — DECISION TAKEN: only a road that can be laid enters the roads tree and the detour test, so a nation the sea divides builds one tree per landmass
+*decision · raised 2026-09-25 · from BL-1119 (roads tree and detour) cold review, 2026-09-25, finding 1*
+
+The tree and the detour test took every town pair the path flood could reach, and that flood crosses water at the sea-leg cost. Road rasterisation then refuses any open-ocean route. So a tree link across a bay was never laid (stranding a town from its nation's road), and an admitted sea loop sat in the test network refusing real land loops near it. Taken on your behalf: a route that crosses open sea (other than a strait) is not a road candidate at all -- it never enters the Kruskal tree or the detour test, so a nation the sea divides builds one tree per landmass. Also written down: the detour test reads the town graph (cheapest chain of accepted links, each at its own direct cost), not the raster. LOGISTICS.md § 4 states both.
+
+**Why it matters.** It changes which links form a divided nation's tree, so it moves the road digests (inside the sprint's one re-bless). The alternative keeps sea pairs in the tree and accepts stranded towns.
+
+- A: keep the reading (layable links only; one tree per landmass)
+- B: keep sea pairs as candidates but skip them in the detour test only
+- C: something else
+
+> **Recommendation:** A: a road that cannot be built should not decide which roads are built.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the open-calls form): A, keep -- only a layable link enters the tree; a sea-divided nation builds one tree per landmass. LOGISTICS.md § 4 states it.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
 
