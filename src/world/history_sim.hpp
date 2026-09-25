@@ -2562,6 +2562,19 @@ struct polity
     int culture = -1; ///< Index into `creed_state::cultures`.
     int capital = -1; ///< Region index; the origin supply decays from.
 
+    /// BL-1088 — THE REALM'S NAME, coined ONCE at founding in the founding
+    /// culture's tongue (`coin_realm_name` over `culture::speech`, a pure
+    /// function of the tongue and this realm — no draw from the sim's stream)
+    /// and never changed after: not by a re-seating, not by losing the seat,
+    /// not by a span boundary (CIVILISATION.md sec A realm's name). Carried by
+    /// id across a resume with the rest of the table, and copied onto the
+    /// record's `polity_name` by `as_timelapse` so the board, the ticker and
+    /// Pass 5 print one name. READ BY NOTHING IN THE SIM: a string on the
+    /// struct that no decision, no digest and no handoff validator folds.
+    /// Empty when the culture's tongue cannot coin, and the reader then falls
+    /// back to the seat's name as it always did.
+    std::string name;
+
     /// Doctrine lean, 0-1000, from the culture's `aggression_q` (BL-277 Q5).
     int aggression_q = 0;
 
@@ -4434,6 +4447,10 @@ inline era_timelapse as_timelapse(const history_sim_state& s)
     t.samples         = s.samples;
     t.culture_changes = s.culture_changes;
     t.events          = s.events;
+    // BL-1088: the name table, by id, dead realms included — an index that
+    // names one stays valid, and a resumed span carries the whole table.
+    t.polity_name.reserve(s.polities.size());
+    for (const polity& q : s.polities) t.polity_name.push_back(q.name);
     t.region_stride = s.region_stride;
     t.start_year    = static_cast<int32_t>(s.start_year);
     t.years         = static_cast<int32_t>(s.years);

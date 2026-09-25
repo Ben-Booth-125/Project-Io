@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstdlib>   // std::abs — the card's nearest-region read (BL-1089)
 #include <string>
 #include <vector>
 
@@ -214,6 +215,23 @@ void app::draw_seat_screen()
     ImGui::Text("%d corporations, ranked by the ground they stand on. %d clear the viability "
                 "floor; the marked ones do not, and you may still take one.",
                 static_cast<int>(cands.size()), m_seat_result.shortlist_size);
+    // BL-1089: THE NATION COUNT EXPLAINS THE MERGES (NATION_GENERATION.md
+    // § Pass 2d): how many of the map's nations are realms of the close, how
+    // many realms the size floor folded into a neighbour, and how many are
+    // ground no realm held. Read off the saved report's fold record.
+    for (const generation_report::body_entry& b : m_generation_report.bodies)
+    {
+        if (!b.is_homeworld || b.nation_ids.empty()) continue;
+        int realms = 0, absorbed = 0, ownerless = 0;
+        for (std::size_t n = 0; n < b.nation_polity.size(); ++n)
+        {
+            if (b.nation_polity[n] >= 0) ++realms; else ++ownerless;
+            if (n < b.nation_absorbed_count.size()) absorbed += std::max<int32_t>(0, b.nation_absorbed_count[n]);
+        }
+        ImGui::Text("%zu nations: %d realms of the close, %d realms absorbed under the floor, %d of ground no realm held.",
+                    b.nation_ids.size(), realms, absorbed, ownerless);
+        break;
+    }
     ImGui::PopStyleColor();
     ImGui::Dummy({1.0f, 6.0f});
 
@@ -474,6 +492,84 @@ void app::draw_seat_screen()
         nat = &nit->second;
     const sentiment_value read = sentiment_toward(m_world.sentiment, scc->home_nation, sc.corp);
 
+    // --- BL-1089: WHICH REALM THE NATION IS, and the region under the city --
+    // Read off the saved report's fold record (NATION_GENERATION.md § Pass 2d):
+    // the nation's founding realm, the realms the size floor folded into it
+    // (merge rule A — the absorber kept its name, these are listed under it),
+    // or that the ground had no realm at the close. Names come off the last
+    // span's own name table, by polity id. The city's REGION is the settled
+    // region nearest the HQ tile on the wrapped grid — the same "whose ground"
+    // read the city's own name was coined by.
+    std::string realm_line;   // appended to the nation line
+    std::string city_region;  // "(in <region>)" on the HQ line
+    {
+        const generation_report::body_entry* home = nullptr;
+        for (const generation_report::body_entry& b : m_generation_report.bodies)
+            if (b.is_homeworld) { home = &b; break; }
+        if (home != nullptr && nat != nullptr)
+        {
+            const std::vector<std::string>* names =
+                !home->industrialisation_timelapse.polity_name.empty() ? &home->industrialisation_timelapse.polity_name
+              : !home->exploration_timelapse.polity_name.empty()       ? &home->exploration_timelapse.polity_name
+              : !home->prehistory_timelapse.polity_name.empty()        ? &home->prehistory_timelapse.polity_name
+                                                                        : nullptr;
+            const auto realm_name = [&](int32_t pol) -> std::string {
+                if (names != nullptr && pol >= 0 && static_cast<std::size_t>(pol) < names->size()
+                    && !(*names)[static_cast<std::size_t>(pol)].empty())
+                    return (*names)[static_cast<std::size_t>(pol)];
+                return "an unnamed realm";
+            };
+            for (std::size_t n = 0; n < home->nation_ids.size() && n < home->nation_polity.size(); ++n)
+            {
+                if (home->nation_ids[n] != scc->home_nation) continue;
+                const int32_t pol = home->nation_polity[n];
+                if (pol < 0)
+                {
+                    realm_line = " Ground no realm held at the close; named at the fold.";
+                }
+                else
+                {
+                    const int32_t first = n < home->nation_absorbed_first.size() ? home->nation_absorbed_first[n] : 0;
+                    const int32_t count = n < home->nation_absorbed_count.size() ? home->nation_absorbed_count[n] : 0;
+                    if (count <= 0)
+                        realm_line = " The realm as it stood at the close.";
+                    else
+                    {
+                        realm_line = " Absorbed under the floor: ";
+                        for (int32_t k = 0; k < count; ++k)
+                        {
+                            const std::size_t at = static_cast<std::size_t>(first + k);
+                            if (at >= home->nation_absorbed.size()) break;
+                            if (k > 0) realm_line += k + 1 == count ? " and " : ", ";
+                            realm_line += realm_name(home->nation_absorbed[at]);
+                        }
+                        realm_line += ".";
+                    }
+                }
+                break;
+            }
+        }
+        if (home != nullptr && hq_tile != null_entity && !home->settlement.regions.empty())
+        {
+            if (const auto t = m_world.tiles.find(hq_tile); t != m_world.tiles.end())
+            {
+                const int gw = home->tiles.gw > 0 ? home->tiles.gw : home_grid_width;
+                int best = -1; long best_d = 0;
+                for (std::size_t r = 0; r < home->settlement.regions.size(); ++r)
+                {
+                    const region& rg = home->settlement.regions[r];
+                    int dc = std::abs(rg.col - t->second.grid_x);
+                    if (gw > 0 && dc > gw / 2) dc = gw - dc;
+                    const int  dr = std::abs(rg.row - t->second.grid_y);
+                    const long d  = static_cast<long>(dc) * dc + static_cast<long>(dr) * dr;
+                    if (best < 0 || d < best_d) { best = static_cast<int>(r); best_d = d; }
+                }
+                if (best >= 0 && !home->settlement.regions[static_cast<std::size_t>(best)].name.empty())
+                    city_region = " (in " + home->settlement.regions[static_cast<std::size_t>(best)].name + ")";
+            }
+        }
+    }
+
     if (m_seat_ui.briefing == null_entity)
     {
         // --- THE CARD: four lines, and no more -----------------------------
@@ -487,7 +583,7 @@ void app::draw_seat_screen()
                         ? "; draws " : "",
                     std::any_of(goods.draws.begin(), goods.draws.end(), [](bool b) { return b; })
                         ? goods_list(goods.draws).c_str() : "");
-        ImGui::Text("HQ and home market: %s. Prices there: %s%s%s.", city.c_str(),
+        ImGui::Text("HQ and home market: %s%s. Prices there: %s%s%s.", city.c_str(), city_region.c_str(),
                     price_list(hm, goods.makes).c_str(),
                     std::any_of(goods.draws.begin(), goods.draws.end(), [](bool b) { return b; })
                         ? "; inputs " : "",
@@ -501,9 +597,10 @@ void app::draw_seat_screen()
             ImGui::Text("Cash %.0f cr, debt %.0f cr, assets %d holdings.",
                         static_cast<double>(cash), static_cast<double>(debt), sc.holdings);
         if (nat)
-            ImGui::Text("Nation: %s, %s and %s. Its stance toward the firm: Access %+.2f, Trust %+.2f.",
+            ImGui::Text("Nation: %s, %s and %s. Its stance toward the firm: Access %+.2f, Trust %+.2f.%s",
                         nat->name.c_str(), politics_word(nat->politics), posture_word(nat->posture),
-                        static_cast<double>(read.access), static_cast<double>(read.trust));
+                        static_cast<double>(read.access), static_cast<double>(read.trust),
+                        realm_line.c_str());
         else
             ImGui::TextUnformatted("Nation: none. The firm answers to no national law.");
         ImGui::PopTextWrapPos();

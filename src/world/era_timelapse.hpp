@@ -201,6 +201,7 @@ enum class lapse_event_kind : uint8_t
     furnace_lit         = 17, ///< BL-1080: a region crossed the furnace (`region::industrial_year`); `polity` = its holder. A resumed span notes the crossings it inherits, dated at their own (earlier) year, ahead of its first event (save_game_version 21).
     province_bought     = 18, ///< BL-1096: a native was BOUGHT rather than taken (EXPLORATION.md sec Two ways to claim ground across water); `region` = the native seat, `polity` = the native, `other` = the buyer. Noted INSTEAD of `subject_bound` for that binding (save_game_version 22).
     sea_lane_opened     = 19, ///< BL-1097: a sea leg's uses crossed `sea_lane_tier1_uses`; `region`/`other` = its ends (lo, hi), `polity` = the tier (1). The water analogue of `road_promoted` (save_game_version 22).
+    inherited           = 20, ///< BL-1088: a RESUMED span restating a living realm it inherited from the span before — `region` = its capital at the resume, `polity` = the realm, dated `start_year`. Ticker-silent: nothing rose (CIVILISATION.md sec A realm's name). Replaces the `founded` re-emit on the resume path only (save_game_version 22).
     count
 };
 
@@ -243,6 +244,22 @@ struct era_timelapse
     /// with `record_playback` off and on every body the era never ran for; the
     /// migration record carries `culture_split` alone.
     std::vector<lapse_event>     events;
+
+    /// THE NAME TABLE (BL-1088) — one coined name per polity id, parallel to
+    /// the polity table the record's owners index, as `region_name` on the tap
+    /// and the settlement is parallel to the regions. THE ONE STRING ARRAY on
+    /// the record, and it is here rather than resolved read-side from the seat
+    /// because a realm's name is not its seat's: it is coined ONCE at founding
+    /// in the founding culture's tongue (`coin_realm_name`, a pure function of
+    /// the tongue and the realm) and never follows the capital or a span
+    /// boundary (CIVILISATION.md sec A realm's name). A resumed span carries
+    /// every earlier realm's entry by id, dead ones included, so an index that
+    /// names them stays valid. Empty on the migration record (its owners are
+    /// cultures) and on a body the era never ran for; filled from the polity
+    /// table whether or not the playback was recorded, since the names live on
+    /// the polities. Never read by the sim: record data, not world state
+    /// (save_game_version 22).
+    std::vector<std::string>     polity_name;
 
     /// Ownership alone. The playback record can be present with no ownership
     /// change ever recorded, and a caller replaying colour wants to know about
@@ -336,6 +353,11 @@ struct era_lapse_tap
     std::vector<int32_t>     region_row;
     std::vector<std::string> region_name;
 
+    /// BL-1088: the polity name table as it grows — `polity::name`, indexed by
+    /// polity id, the same append-only tail-copy contract as the region
+    /// geometry above (a polity table only ever grows for the life of a run).
+    std::vector<std::string> polity_name;
+
     int32_t start_year   = 0;  ///< Year of the first publish this run.
     int32_t year_reached = 0;  ///< The highest year folded into the three lists above.
     bool    started      = false;
@@ -391,6 +413,19 @@ struct era_lapse_tap
         epoch.fetch_add(1, std::memory_order_release);
     }
 
+    /// Worker side, the name table (BL-1088). @p all_names is the caller's own
+    /// append-only mirror of `polity::name` by id; only the new tail is copied
+    /// in, same contract as `publish_regions`. Called beside `publish`, since a
+    /// realm rises far less often than a year advances and a name never
+    /// changes once coined.
+    void publish_polity_names(const std::vector<std::string>& all_names)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        for (std::size_t i = polity_name.size(); i < all_names.size(); ++i)
+            polity_name.push_back(all_names[i]);
+        epoch.fetch_add(1, std::memory_order_release);
+    }
+
     /// Renderer side. Lock-free peek: has anything published since `last_seen`
     /// (a value this same function returned before)? Callers skip `snapshot`
     /// entirely when this comes back equal.
@@ -408,6 +443,7 @@ struct era_lapse_tap
                        std::vector<int32_t>&        out_region_col,
                        std::vector<int32_t>&        out_region_row,
                        std::vector<std::string>&    out_region_name,
+                       std::vector<std::string>&    out_polity_name,
                        int32_t& out_start_year, int32_t& out_year_reached) const
     {
         std::lock_guard<std::mutex> lock(mutex);
@@ -417,6 +453,7 @@ struct era_lapse_tap
         out_region_col      = region_col;
         out_region_row      = region_row;
         out_region_name     = region_name;
+        out_polity_name     = polity_name;
         out_start_year      = start_year;
         out_year_reached    = year_reached;
         return epoch.load(std::memory_order_relaxed);
@@ -434,6 +471,7 @@ struct era_lapse_tap
         region_col.clear();
         region_row.clear();
         region_name.clear();
+        polity_name.clear();
         start_year   = 0;
         year_reached = 0;
         started      = false;

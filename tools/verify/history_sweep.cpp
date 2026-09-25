@@ -27,6 +27,7 @@
 #include "world/world.hpp"
 #include "scripting/lua_state.hpp"
 #include "ui/history_lapse.hpp"     // BL-1090: the pinned hard-border pair (imgui-free header)
+#include "world/polity_identity.hpp" // BL-1087: the pinned-slot assignment the wizard's rounds call
 
 #include "culture_footprint.hpp" // BL-968 step 1: the cultures that never hold ground
 
@@ -233,6 +234,22 @@ struct take_cost
 struct sweep_row
 {
     uint32_t seed = 0;
+
+    // --- BL-1087: THE PINNED-CLASH READING (Ben, 2026-09-24, R7; Rule 0b) --
+    // Read BEFORE the clash rule was fixed: across the two seams the wizard
+    // carries slots over (Empires -> Exploration at 1200, Exploration ->
+    // Industrialisation at 1660), how many PINNED pairs the successor record
+    // makes neighbours while they share a slot — the case the rule exists for
+    // — and what the walk then had to do. Off the same pure assignment the
+    // wizard's rounds call (world/polity_identity.hpp), over the same raster.
+    int pin_clash_1200   = 0; ///< Pinned pairs sharing a slot and adjacent on the Exploration record.
+    int pin_clash_1660   = 0; ///< ... on the Industrialisation record.
+    int pin_reslot       = 0; ///< Pinned realms the rule re-slotted, both seams.
+    int pin_dead_slot    = 0; ///< Newcomers seated in a dead realm's ground that took its slot, all three records.
+    int pin_spills       = 0; ///< Realms that found no free slot, all three records.
+    int pin_families     = 0; ///< Wedges (root cradles) the palette had.
+    int pin_realms_1200  = 0; ///< Realms pinned into the Exploration record.
+    int pin_realms_1660  = 0; ///< Realms pinned into the Industrialisation record.
 
     int regions_start = 0;
     int regions_end   = 0;
@@ -1256,6 +1273,86 @@ int main(int argc, char** argv)
         const entity_id kepler_id = k->id; // the report entry names its own entity (BL-257)
         const sim_terrain_arrays terr = build_sim_terrain(w, kepler_id,
                                                           home_grid_width, home_grid_height);
+
+        // --- BL-1087: PINNED CLASHES ACROSS THE SEAMS (Rule 0b) --------------
+        //
+        // The wizard's rounds hand each successor record the slots the
+        // predecessor assigned; a pair of pinned realms that were never
+        // neighbours before and share a slot is a CLASH, and the design's rule
+        // (re-slot the smaller people share at the round's opening step) was
+        // to be sized against how often that happens. Measured here off the
+        // report's own three records, over the raster the map draws (the
+        // world's water, the settlement's anchors) and the lineage tree the
+        // settlement carries, through the same pure assignment the rounds call.
+        // Reported, never asserted.
+        {
+            std::vector<uint8_t> water(terr.substrate.size(), 0);
+            for (std::size_t t = 0; t < terr.substrate.size(); ++t)
+                water[t] = is_water(terr.substrate[t]) ? 1 : 0;
+            std::vector<int32_t> rcol, rrow;
+            for (const region& rg : k->settlement.regions) { rcol.push_back(rg.col); rrow.push_back(rg.row); }
+            const std::vector<int32_t> tile_region =
+                nearest_region_raster(water, home_grid_width, home_grid_height, rcol, rrow);
+            const std::vector<std::vector<int32_t>> nbrs =
+                region_adjacency(tile_region, home_grid_width, home_grid_height, rcol.size());
+
+            // The lineage tree, as lapse_from_report rebuilds it (cradles first,
+            // daughters after, BL-856; folded daughters take no wedge, BL-1017).
+            int32_t cradles = 0;
+            for (const auto& [cid, year] : k->settlement.cradle_coined_year)
+                if (cid >= cradles) cradles = cid + 1;
+            std::vector<int32_t> parent(static_cast<std::size_t>(cradles), -1);
+            std::vector<int32_t> folded(static_cast<std::size_t>(cradles), -1);
+            for (const culture& c : k->settlement.spawned_cultures)
+            {
+                parent.push_back(c.parent);
+                folded.push_back(c.folded_into);
+            }
+            const lineage_wedges lw = lineage_wedges_of(parent, &folded);
+            row.pin_families = lw.count;
+
+            const era_timelapse* records[3] = { &k->prehistory_timelapse, &k->exploration_timelapse,
+                                                &k->industrialisation_timelapse };
+            polity_pins pins;
+            bool has_pins = false;
+            for (int ri = 0; ri < 3; ++ri)
+            {
+                const era_timelapse& rec = *records[ri];
+                if (rec.empty()) continue;
+                const std::vector<int32_t> first = polity_first_region(rec);
+                const std::vector<int32_t> seat  = polity_seat_region(rec, first);
+                std::vector<int32_t> wedge;
+                if (lw.count > 0)
+                {
+                    const std::vector<int32_t> culture = polity_founding_culture(rec, seat, first);
+                    wedge.assign(culture.size(), -1);
+                    for (std::size_t p = 0; p < culture.size(); ++p)
+                        if (culture[p] >= 0 && static_cast<std::size_t>(culture[p]) < lw.wedge.size())
+                            wedge[p] = lw.wedge[static_cast<std::size_t>(culture[p])];
+                }
+                polity_identity_input in;
+                in.rec          = &rec;
+                in.region_nbrs  = &nbrs;
+                in.family       = lw.count > 0 ? &wedge : nullptr;
+                in.family_count = lw.count;
+                in.pins         = has_pins ? &pins : nullptr;
+                const polity_identity id = assign_polity_identity(in);
+                if (ri == 1) { row.pin_clash_1200 = id.pinned_clashes; }
+                if (ri == 2) { row.pin_clash_1660 = id.pinned_clashes; }
+                if (has_pins)
+                {
+                    int pinned_here = 0;
+                    for (std::size_t p = 0; p < pins.slot.size(); ++p) if (pins.slot[p] >= 0) ++pinned_here;
+                    if (ri == 1) row.pin_realms_1200 = pinned_here;
+                    if (ri == 2) row.pin_realms_1660 = pinned_here;
+                }
+                row.pin_reslot    += id.reslotted;
+                row.pin_dead_slot += id.inherited_dead_slot;
+                row.pin_spills    += id.spills;
+                pins     = pins_from(id, rec, has_pins ? &pins : nullptr);
+                has_pins = true;
+            }
+        }
 
         // BL-757 R1 — SIX AXES, NOT TWO. Deriving the params closes only the
         // span and the clock. The deriving path now also takes generation's
@@ -2384,6 +2481,36 @@ int main(int argc, char** argv)
                     static_cast<long long>(r.epoch_population),
                     static_cast<long long>(r.ms),
                     static_cast<long long>(r.works_raised), r.regions_with_works);
+    }
+
+    // --- BL-1087: THE PINNED-CLASH READING, per seed and pooled -----------
+    //
+    // Read before the clash rule is fixed (Rule 0b). Per seed: the pinned
+    // pairs the Exploration and Industrialisation records made neighbours
+    // while sharing a slot, the realms pinned into each, and what the walk
+    // did about it. The pooled line is the reading the item's design cites.
+    {
+        std::printf("\n--- BL-1087  PINNED CLASHES ACROSS THE SEAMS: pinned pairs sharing a slot and adjacent in the successor record ---\n");
+        std::printf("  seed   families   pinned@1200  clash@1200   pinned@1660  clash@1660   re-slotted   dead-slot taken   spills\n");
+        int64_t tot_clash_1200 = 0, tot_clash_1660 = 0, tot_reslot = 0, tot_dead = 0, tot_spill = 0;
+        int seeds_with_clash = 0;
+        for (const sweep_row& r : rows)
+        {
+            std::printf("  %4u   %8d   %11d  %10d   %11d  %10d   %10d   %15d   %6d\n",
+                        r.seed, r.pin_families, r.pin_realms_1200, r.pin_clash_1200,
+                        r.pin_realms_1660, r.pin_clash_1660, r.pin_reslot, r.pin_dead_slot, r.pin_spills);
+            tot_clash_1200 += r.pin_clash_1200;
+            tot_clash_1660 += r.pin_clash_1660;
+            tot_reslot     += r.pin_reslot;
+            tot_dead       += r.pin_dead_slot;
+            tot_spill      += r.pin_spills;
+            if (r.pin_clash_1200 + r.pin_clash_1660 > 0) ++seeds_with_clash;
+        }
+        std::printf("  pooled over %zu seed(s): %lld clash(es) at 1200, %lld at 1660, on %d seed(s); "
+                    "%lld re-slotted, %lld took a dead realm's slot on its ground, %lld spilled\n",
+                    rows.size(), static_cast<long long>(tot_clash_1200), static_cast<long long>(tot_clash_1660),
+                    seeds_with_clash, static_cast<long long>(tot_reslot), static_cast<long long>(tot_dead),
+                    static_cast<long long>(tot_spill));
     }
 
     // --- BL-1090: THE HARD-BORDER READING, per seed and pooled ------------

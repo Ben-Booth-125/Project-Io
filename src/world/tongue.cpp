@@ -73,6 +73,37 @@ tongue_lexicon coin_lexicon(const tongue& t)
     return lex;
 }
 
+std::string coin_realm_name(const tongue& t, uint64_t salt)
+{
+    if (!t.usable())
+        return std::string{};
+
+    // The tongue's own stream, crossed with the realm: `signature` is what
+    // seeds `coin_lexicon`, so the words below and the lexicon's morphemes come
+    // out of one sound system, and the salt keeps two realms of one people
+    // from coining the same word.
+    rng r(signature(t) ^ splitmix64(salt ^ 0x5EA10F0A11u));
+    const tongue_lexicon lex = coin_lexicon(t);
+
+    const int   form = r.pick(3);
+    std::string name = tongue_word(r, t, 2 + r.pick(2));
+    if (name.empty()) return name;
+
+    switch (form)
+    {
+        case 0:
+            return name;
+        case 1:
+            if (lex.qualifier.empty()) return name;
+            return lex.qualifier[static_cast<std::size_t>(r.pick(static_cast<int>(lex.qualifier.size())))]
+                 + " " + name;
+        default:
+            if (lex.polity.empty()) return name;
+            return name + " "
+                 + lex.polity[static_cast<std::size_t>(r.pick(static_cast<int>(lex.polity.size())))];
+    }
+}
+
 std::string tongue_lower(const std::string& w)
 {
     std::string out = w;

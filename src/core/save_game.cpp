@@ -486,6 +486,9 @@ void w_timelapse(std::ostream& o, const era_timelapse& t)
         w_u16(s, v.polity);
         w_u16(s, v.other);
     });
+    // save_game_version 22 (BL-1088, the realm name table) -- keep r_timelapse
+    // in step. One string per polity id, after the event layer.
+    w_vec(o, t.polity_name, [](std::ostream& s, const std::string& v) { w_str(s, v); });
 }
 
 bool r_timelapse(std::istream& i, era_timelapse& t)
@@ -577,6 +580,9 @@ bool r_timelapse(std::istream& i, era_timelapse& t)
         if (e.region != lapse_event_none && t.region_stride > 0
          && e.region >= static_cast<uint16_t>(t.region_stride))
             return false;
+    // save_game_version 22 (BL-1088) -- keep w_timelapse in step.
+    if (!r_vec(i, t.polity_name, [](std::istream& s, std::string& v) { return r_str(s, v); }))
+        return false;
     return true;
 }
 
@@ -598,11 +604,19 @@ void w_body_entry(std::ostream& o, const generation_report::body_entry& b)
     w_timelapse(o, b.prehistory_timelapse); // save_game_version 3 (NR-733)
     w_timelapse(o, b.exploration_timelapse); // save_game_version 14 (BL-946)
     w_timelapse(o, b.industrialisation_timelapse); // save_game_version 18 (BL-1068)
+    // save_game_version 22 (BL-1089, the polity fold's record) -- keep
+    // r_body_entry in step. Five flat arrays; the reader checks the flattened
+    // absorbed ranges against what it read.
+    w_vec(o, b.nation_ids,            [](std::ostream& s, const entity_id& v) { w_id(s, v); });
+    w_vec(o, b.nation_polity,         [](std::ostream& s, const int32_t& v)   { w_i32(s, v); });
+    w_vec(o, b.nation_absorbed_first, [](std::ostream& s, const int32_t& v)   { w_i32(s, v); });
+    w_vec(o, b.nation_absorbed_count, [](std::ostream& s, const int32_t& v)   { w_i32(s, v); });
+    w_vec(o, b.nation_absorbed,       [](std::ostream& s, const int32_t& v)   { w_i32(s, v); });
 }
 
 bool r_body_entry(std::istream& i, generation_report::body_entry& b)
 {
-    return r_str(i, b.name) && r_id(i, b.id) && r_bool(i, b.is_homeworld)
+    if (!(r_str(i, b.name) && r_id(i, b.id) && r_bool(i, b.is_homeworld)
         && r_planetology_state(i, b.state) && r_planetology_state(i, b.undrawn)
         && r_continents(i, b.continents) && r_settlement(i, b.settlement)
         && r_bool(i, b.tiles.valid) && r_u32(i, b.tiles.seed)
@@ -610,7 +624,29 @@ bool r_body_entry(std::istream& i, generation_report::body_entry& b)
         && r_bool(i, b.tiles.used_convergent)
         && r_timelapse(i, b.prehistory_timelapse) // save_game_version 3 (NR-733)
         && r_timelapse(i, b.exploration_timelapse) // save_game_version 14 (BL-946)
-        && r_timelapse(i, b.industrialisation_timelapse); // save_game_version 18 (BL-1068)
+        && r_timelapse(i, b.industrialisation_timelapse))) // save_game_version 18 (BL-1068)
+        return false;
+    // save_game_version 22 (BL-1089) -- keep w_body_entry in step. The four
+    // per-nation arrays must agree in length, and every absorbed range must
+    // lie inside the flat list: a stream that says otherwise is corrupt, not
+    // odd, since the writer builds them from one record.
+    if (!(r_vec(i, b.nation_ids,            [](std::istream& s, entity_id& v) { return r_id(s, v); })
+       && r_vec(i, b.nation_polity,         [](std::istream& s, int32_t& v)   { return r_i32(s, v); })
+       && r_vec(i, b.nation_absorbed_first, [](std::istream& s, int32_t& v)   { return r_i32(s, v); })
+       && r_vec(i, b.nation_absorbed_count, [](std::istream& s, int32_t& v)   { return r_i32(s, v); })
+       && r_vec(i, b.nation_absorbed,       [](std::istream& s, int32_t& v)   { return r_i32(s, v); })))
+        return false;
+    const std::size_t n = b.nation_ids.size();
+    if (b.nation_polity.size() != n || b.nation_absorbed_first.size() != n
+     || b.nation_absorbed_count.size() != n)
+        return false;
+    for (std::size_t k = 0; k < n; ++k)
+    {
+        const int64_t first = b.nation_absorbed_first[k], count = b.nation_absorbed_count[k];
+        if (first < 0 || count < 0 || first + count > static_cast<int64_t>(b.nation_absorbed.size()))
+            return false;
+    }
+    return true;
 }
 
 void w_report(std::ostream& o, const generation_report& g)

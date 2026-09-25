@@ -1569,6 +1569,33 @@ history_sim_state run_history_sim(settlement_state&         ss,
         tap->publish_regions(tap_region_col, tap_region_row, tap_region_name);
     }
 
+    // BL-1088 -- A REALM IS NAMED ONCE, AT FOUNDING, IN ITS FOUNDING CULTURE'S
+    // TONGUE (CIVILISATION.md sec A realm's name; the register in
+    // NATION_GENERATION.md sec Pass 5). Called at every site that pushes a new
+    // polity onto the table, and nowhere else: a resumed span inherits its
+    // realms' names with the rest of the table and coins nothing for them.
+    // `coin_realm_name` is a pure function of the tongue and the realm -- its
+    // stream is the tongue's own signature crossed with (id, seat), never this
+    // run's RNG -- so naming draws nothing from the decision loop and moves no
+    // digest. The name is read by nothing below; it rides the table onto the
+    // record (`as_timelapse`) and into nation generation.
+    const auto coin_name_for = [&](polity& q) {
+        if (cs == nullptr || q.culture < 0 || q.culture >= static_cast<int>(cs->cultures.size()))
+            return;
+        const uint64_t salt = (static_cast<uint64_t>(static_cast<uint32_t>(q.id)) << 20)
+                            ^ static_cast<uint64_t>(static_cast<uint32_t>(q.capital < 0 ? 0 : q.capital));
+        q.name = coin_realm_name(cs->cultures[static_cast<std::size_t>(q.culture)].speech, salt);
+    };
+    // The tap's append-only mirror of the name table (same contract as the
+    // region geometry above); refreshed beside each `publish`.
+    std::vector<std::string> tap_polity_name;
+    const auto publish_names = [&]() {
+        if (tap == nullptr) return;
+        for (std::size_t i = tap_polity_name.size(); i < out.polities.size(); ++i)
+            tap_polity_name.push_back(out.polities[i].name);
+        tap->publish_polity_names(tap_polity_name);
+    };
+
     // Region -> owning polity, -1 for unorganised or unowned ground.
     std::vector<int> owner(ss.regions.size(), -1);
 
@@ -1690,6 +1717,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             p.is_seat     = true;
             p.seat_region = static_cast<int>(i);
             owner[i]      = q.id;
+            coin_name_for(q); // BL-1088
             out.polities.push_back(q);
         }
         // NO EARLY RETURN ON AN EMPTY OPENING (BL-920, superseding the old
@@ -1745,6 +1773,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (p.settle_score_q > best_q) { best_q = p.settle_score_q; best = static_cast<int>(i); }
             }
             q.capital = best;
+            coin_name_for(q); // BL-1088
             out.polities.push_back(q);
         }
         if (out.polities.empty()) return out;
@@ -2849,10 +2878,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
         event_year = year_before;
     }
 
+    // BL-1088 -- A RESUMED SPAN INHERITS, IT DOES NOT RE-FOUND. A living realm
+    // this span takes over from the span before is noted as `inherited` at its
+    // capital, dated at this span's open: the record still states where every
+    // living realm sits (the only place a resumed record does), the UI's
+    // capital fold reads it exactly as a founding, and the ticker stays silent
+    // on it because nothing rose (CIVILISATION.md sec A realm's name). The
+    // fresh opening keeps `founded`. The event layer only; no digest moves.
     for (const polity& q : out.polities)
     {
         if (params.resume_polities != nullptr && !q.alive) continue;
-        note_event(lapse_event_kind::founded, q.capital, q.id, -1);
+        note_event(params.resume_polities != nullptr ? lapse_event_kind::inherited
+                                                     : lapse_event_kind::founded,
+                   q.capital, q.id, -1);
     }
 
 
@@ -3094,8 +3132,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // be mid-append, so a renderer reading it can never run ahead of what
         // is actually settled. Write-only: nothing below ever reads `tap` back.
         if (tap != nullptr)
+        {
+            publish_names(); // BL-1088: the name table's new tail, first
             tap->publish(out.owner_changes, out.culture_changes, out.events,
                         static_cast<int32_t>(y - 1));
+        }
 
         const std::size_t century =
             static_cast<std::size_t>((y - params.start_year) / 100);
@@ -3207,6 +3248,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             : 500;
                     q.capital = static_cast<int>(ss.regions.size());
                     np_owner  = q.id;
+                    coin_name_for(q); // BL-1088
                     out.polities.push_back(q);
                     note_event(lapse_event_kind::founded, q.capital, q.id, -1);
                 }
@@ -3598,6 +3640,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             r.is_seat     = true;
             r.seat_region = static_cast<int>(i);
             owner[i]      = q.id;
+            coin_name_for(q); // BL-1088
             out.polities.push_back(q);
 
             out.owner_changes.push_back(owner_change{
@@ -7401,6 +7444,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     np.cohesion_q      = out.polities[pi].cohesion_q;
                     np.industrial_year = out.polities[pi].industrial_year;
                     np.parent          = qid; // BL-926/BL-916: the lineage hook, written here only.
+                    coin_name_for(np); // BL-1088
                     out.polities.push_back(np);
                     note_event(lapse_event_kind::broke_away, seat, np.id, qid); // BL-916
 
@@ -7786,6 +7830,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         // `np.universal_creed` stays -1 (the struct default):
                         // the whole point of a schism is a people that left
                         // the institution its former realm still holds.
+                        coin_name_for(np); // BL-1088
                         out.polities.push_back(np);
                         note_event(lapse_event_kind::schism, seat, np.id, qid);
 
@@ -8208,8 +8253,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // year, so the last year simulated is never folded in inside the loop —
     // this is the one place that year's record reaches the tap.
     if (tap != nullptr)
+    {
+        publish_names(); // BL-1088
         tap->publish(out.owner_changes, out.culture_changes, out.events,
                     static_cast<int32_t>(params.stop_year - 1));
+    }
 
     return out;
 }

@@ -212,11 +212,19 @@ inline constexpr uint32_t save_game_magic =
 ///     insertion, so a v21 stream misreads everything from `abundance` on.
 ///   - EVENT KINDS appended to `lapse_event_kind` (each moves `count` and so
 ///     the event-kind range check; no field changes width):
-///     `province_bought` (BL-1096, a native bought rather than taken) and
-///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier);
-///     later sprint-47 lanes append theirs under this same number.
+///     `province_bought` (BL-1096, a native bought rather than taken),
+///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier) and
+///     `inherited` (BL-1088, a resumed span restating a living realm at its
+///     capital, ticker-silent; replaces the `founded` re-emit on the resume
+///     path only); later sprint-47 lanes append theirs under this same number.
+///   - THE REALM NAME TABLE on every `era_timelapse` (BL-1088): one string per
+///     polity id, written by `w_timelapse` directly after the event layer.
+///   - THE POLITY FOLD'S RECORD on every `generation_report::body_entry`
+///     (BL-1089): five flat arrays after the three time-lapses — nation ids,
+///     each nation's founding realm, and the absorbed-realm ranges — read by
+///     the seat card and the per-world nation -> colour table.
 /// A v21 stream is refused whole on the same strict-equality contract.
-inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened
+inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened, inherited, realm names, the polity fold's record
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.
