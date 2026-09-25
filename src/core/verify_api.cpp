@@ -1599,16 +1599,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // The current lapse round's own span, so a script walks the years the run
     // actually produced rather than the years a doc says it should have.
     // BL-1099: the works on the current lapse round -- (close marks filled for
-    // the record's last frame, `works_chartered` notes on the record) -- so a
-    // script can assert the close flashes exactly the charters the spend made
-    // rather than hoping a frame shows them.
+    // the record's last frame, `works_chartered` notes on the record, and the
+    // charter count of the dated report the marks were filled from) -- so a
+    // script can assert the close flashes EXACTLY the charters the spend made
+    // (marks == charters) rather than hoping a frame shows some: a mark the
+    // home-body filter or the grid mapping dropped is a miss the third value
+    // exposes and a bare `> 0` would not.
     v.set_function("history_works", [this]() {
         const int i = wizard_lapse_index();
         int notes = 0;
         if (!m_wiz_history[i].empty())
             for (const lapse_event& e : m_wiz_history[i].lapse.events)
                 if (e.kind == static_cast<uint8_t>(lapse_event_kind::works_chartered)) ++notes;
-        return std::make_tuple(static_cast<int>(m_wiz_history[i].works_close.size()), notes);
+        return std::make_tuple(static_cast<int>(m_wiz_history[i].works_close.size()), notes,
+                               static_cast<int>(m_verify_charter.charters.size()));
     });
 
     v.set_function("history_span", [this]() {

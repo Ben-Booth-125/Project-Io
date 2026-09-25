@@ -95,9 +95,14 @@ end
 verify.history_year(last)
 shot("history_lapse_works_close")
 do
-    local marks, notes = verify.history_works()
-    print("history_lapse_works: " .. marks .. " close marks, " .. notes .. " works notes on the record")
-    verify.expect(marks > 0, "the close flashes the real charters (" .. marks .. " marks)")
+    local marks, notes, charters = verify.history_works()
+    print("history_lapse_works: " .. marks .. " close marks for " .. charters
+          .. " charters in the dated report, " .. notes .. " works notes on the record")
+    -- EXACTLY the spend's charters, not merely some: a mark the home-body
+    -- filter or the grid mapping dropped would pass a `> 0` and fail this.
+    verify.expect(charters > 0, "the dated report holds charters to flash (" .. charters .. ")")
+    verify.expect(marks == charters, "the close flashes exactly the real charters ("
+                  .. marks .. " marks for " .. charters .. " charters)")
 end
 
 verify.expect_no_clipping("history_lapse_works")
