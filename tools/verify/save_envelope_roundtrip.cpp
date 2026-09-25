@@ -312,6 +312,13 @@ save_envelope make_envelope()
     be.prehistory_timelapse.events.push_back(lapse_event{-3900, 0, 0, 3, lapse_event_none});
     be.prehistory_timelapse.events.push_back(lapse_event{-1200, 2, 1, 7, 3});
     be.prehistory_timelapse.events.push_back(lapse_event{-1150, 5, 0, 2, 1});
+    // BL-1106, save_game_version 22 -- the name table. Two names per list so
+    // an off-by-one between the lists is visible, an empty string in the
+    // middle so a zero-length prefix survives, and a polity_creed row with the
+    // -1 sentinel beside real indices (the reader's floor is -1).
+    be.prehistory_timelapse.civilisation_name = {"Vharenu", "", "Kesh-Tolm"};
+    be.prehistory_timelapse.creed_name        = {"Solun", "Irathe"};
+    be.prehistory_timelapse.polity_creed      = {-1, 1, -1, 0, 1, -1, -1, 0};
 
     // BL-1068, save_game_version 18 -- the Industrialisation span's own
     // record, written AFTER exploration_timelapse. Distinct from the
@@ -608,6 +615,16 @@ int main()
                      && t.events[i].other  == o.events[i].other;
             check(ev_ok && o.events.size() == 3,
                   "S3 the event layer survives whole, field for field, sentinel included (BL-916)");
+            // BL-1106, save_game_version 22 -- the name table, list for list
+            // and slot for slot, the empty name and the -1 sentinel included.
+            check(t.civilisation_name == o.civilisation_name
+                      && t.creed_name == o.creed_name
+                      && t.polity_creed == o.polity_creed
+                      && o.civilisation_name.size() == 3 && o.creed_name.size() == 2
+                      && o.polity_creed.size() == 8,
+                  "S3 the name table survives whole -- civilisation and creed names in "
+                  "index order, the empty name, and polity_creed with its -1 sentinel "
+                  "(BL-1106)");
         }
         // BL-1068, save_game_version 18 -- the Industrialisation span's own
         // record and counters, field for field, and NOT the prehistory

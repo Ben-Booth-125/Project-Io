@@ -213,7 +213,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-06-13 | [Layer 2: Primary canvases](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 1: ECS data model](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 0: Engine scaffolding](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
-| ? | [2026-09-24 (evening) — Sprint 47 cut: one history, told through the rounds](DEVLOG.md) | BL-1068 BL-1083 BL-1084 BL-1085 BL-1096 BL-1097 BL-1101 BL-1102 BL-1108 BL-1109 | DEVLOG.md |
+| ? | [2026-09-24 (evening) — Sprint 47 cut: one history, told through the rounds](DEVLOG.md) | BL-1068 BL-1083 BL-1084 BL-1085 BL-1090 BL-1094 BL-1096 BL-1097 BL-1101 BL-1102 BL-1106 BL-1108 BL-1109 | DEVLOG.md |
 | ? | [2026-09-16 (late) — The queue emptied, the backlog cut, wave A built, and the rest archived](DEVLOG.md) | BL-1006 BL-1008 BL-1009 BL-1010 BL-1016 BL-1017 BL-1018 BL-1020 BL-1021 BL-1022 BL-1023 BL-841 BL-842 BL-880 BL-982 BL-996 | DEVLOG.md |
 | ? | [2026-09-16 (after the sprint) — Measurement parity, sixteen saved worlds, and an evening at the live app](DEVLOG.md) | BL-1000 BL-1007 BL-1011 BL-1012 BL-1013 BL-1014 BL-914 BL-948 | DEVLOG.md |
 | ? | [2026-09-10 (sprint 37 closes) — The seven owed items, and a delegation bug caught mid-flight](DEVLOG.md) | BL-844 BL-849 BL-852 BL-853 BL-854 BL-855 BL-857 BL-859 BL-861 BL-868 BL-888 | DEVLOG.md |

@@ -245,20 +245,41 @@ struct era_timelapse
     /// migration record carries `culture_split` alone.
     std::vector<lapse_event>     events;
 
-    /// THE NAME TABLE (BL-1088) — one coined name per polity id, parallel to
-    /// the polity table the record's owners index, as `region_name` on the tap
-    /// and the settlement is parallel to the regions. THE ONE STRING ARRAY on
-    /// the record, and it is here rather than resolved read-side from the seat
-    /// because a realm's name is not its seat's: it is coined ONCE at founding
-    /// in the founding culture's tongue (`coin_realm_name`, a pure function of
-    /// the tongue and the realm) and never follows the capital or a span
-    /// boundary (CIVILISATION.md sec A realm's name). A resumed span carries
-    /// every earlier realm's entry by id, dead ones included, so an index that
-    /// names them stays valid. Empty on the migration record (its owners are
-    /// cultures) and on a body the era never ran for; filled from the polity
-    /// table whether or not the playback was recorded, since the names live on
-    /// the polities. Never read by the sim: record data, not world state
-    /// (save_game_version 22).
+    /// THE NAME TABLE (BL-1106) — the names prose needs that no region can
+    /// give. A `civilisation_formed` event's `other` indexes
+    /// `civilisation_name`, a `creed_preached` event's `other` indexes
+    /// `creed_name`, and `polity_creed` is polity id -> the creed that realm
+    /// adopted (-1 = none), so a `schism` line can name the creed the seceding
+    /// people walked out on — the parent's, which no event carries. Filled by
+    /// `as_timelapse` from the sim's own lists, IN INDEX ORDER. THE TABLES ARE
+    /// THIS RECORD'S OWN: a resumed span that restarts the civilisation and
+    /// creed lists at zero (the Exploration resume does, BL-1049) numbers its
+    /// events against its own tables, so an index is meaningful only within
+    /// the record that carries it, and a `polity_creed` row on a later round
+    /// names that round's creed list, never round 4's. The prose degrades
+    /// honestly where a table is empty ("an unnamed creed"). Read by the ticker
+    /// and by nothing in world/*. Every name is coined by the sim from a
+    /// generated tongue — never an Earth name. Empty on the migration record
+    /// and on every body the era never ran for (save_game_version 22).
+    std::vector<std::string> civilisation_name;
+    std::vector<std::string> creed_name;
+    std::vector<int32_t>     polity_creed;
+
+    /// THE REALM NAME TABLE (BL-1088) — one coined name per polity id,
+    /// parallel to the polity table the record's owners index, as
+    /// `region_name` on the tap and the settlement is parallel to the regions.
+    /// It is here rather than resolved read-side from the seat because a
+    /// realm's name is not its seat's: it is coined ONCE at founding in the
+    /// founding culture's tongue (`coin_realm_name`, a pure function of the
+    /// tongue and the realm) and never follows the capital or a span boundary
+    /// (CIVILISATION.md sec A realm's name). UNLIKE the tables above, a
+    /// resumed span carries every earlier realm's entry by id, dead ones
+    /// included, so an index that names them stays valid across records.
+    /// Empty on the migration record (its owners are cultures) and on a body
+    /// the era never ran for; filled from the polity table whether or not the
+    /// playback was recorded, since the names live on the polities. Never read
+    /// by the sim: record data, not world state. Written after the three
+    /// tables above (save_game_version 22).
     std::vector<std::string>     polity_name;
 
     /// Ownership alone. The playback record can be present with no ownership
@@ -459,6 +480,47 @@ struct era_lapse_tap
         return epoch.load(std::memory_order_relaxed);
     }
 
+    // The name table (BL-1106) — `era_timelapse::civilisation_name` /
+    // `creed_name` / `polity_creed`, so a live round names a civilisation or
+    // a creed in the year it is coined rather than only once the future lands.
+    // Its own pair of calls rather than a widening of `publish`/`snapshot`,
+    // for the same reason `publish_regions` has its own: names are coined a
+    // few dozen times a run, and a caller publishing a year has no reason to
+    // re-copy them. The two name lists are append-only, tail-copied under the
+    // same contract as every list above; `polity_creed` is not (a realm's -1
+    // becomes an index the year it adopts), so it is copied whole — a few
+    // hundred ints at most.
+    std::vector<std::string> civilisation_name;
+    std::vector<std::string> creed_name;
+    std::vector<int32_t>     polity_creed;
+
+    /// Worker side. `all_*` are the sim's own lists; only the tail past what
+    /// this tap already holds is copied in. `all_polity_creed` is polity id ->
+    /// adopted creed, copied whole.
+    void publish_names(const std::vector<std::string>& all_civilisation_name,
+                       const std::vector<std::string>& all_creed_name,
+                       const std::vector<int32_t>&     all_polity_creed)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        for (std::size_t i = civilisation_name.size(); i < all_civilisation_name.size(); ++i)
+            civilisation_name.push_back(all_civilisation_name[i]);
+        for (std::size_t i = creed_name.size(); i < all_creed_name.size(); ++i)
+            creed_name.push_back(all_creed_name[i]);
+        polity_creed = all_polity_creed;
+        epoch.fetch_add(1, std::memory_order_release);
+    }
+
+    /// Renderer side. Copies the name table out under the lock.
+    void snapshot_names(std::vector<std::string>& out_civilisation_name,
+                        std::vector<std::string>& out_creed_name,
+                        std::vector<int32_t>&     out_polity_creed) const
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        out_civilisation_name = civilisation_name;
+        out_creed_name        = creed_name;
+        out_polity_creed      = polity_creed;
+    }
+
     /// Owner side, between runs (a fresh round, or a reroll). Never called from
     /// `world/*` — only the app resets a tap it owns, before handing a fresh
     /// pointer to the next worker.
@@ -472,6 +534,9 @@ struct era_lapse_tap
         region_row.clear();
         region_name.clear();
         polity_name.clear();
+        civilisation_name.clear();
+        creed_name.clear();
+        polity_creed.clear();
         start_year   = 0;
         year_reached = 0;
         started      = false;

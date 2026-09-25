@@ -42,6 +42,34 @@ Expect the pinned determinism digits to MOVE on that tree (world content moved):
 re-bless, taken once, after the last world-mover. Wave 1 is in flight: lane I2 (BL-1090 → BL-1094)
 and lanes I1 (BL-1087 → 1088 → 1089) / I3 (BL-1106) in worktrees branched from `cc5e51d1`.
 
+**Gate run on the full wave-0 tree (02:06):** world_determinism twice ALL PASS with the pinned
+digits UNCHANGED (the harness world runs the ancient arc to 1200, so purchases and laws never
+reach it); save_roundtrip and save_envelope_roundtrip green; Begin-adopts (adopt == cold) and
+seat-pick all pass; `span_seed_isolation` 25/26 (S0, NR-931); exploration_sim_harness fails
+exactly R3b (its regression pin, +400 tribute — the re-bless); industrialisation fidelity 16/16 on
+all three gates with the sea-leg producer wired; BL-1056 self-check pass. Wave-0 requirement rows
+are closed accordingly (`fa7e3a7f`). Lane I2 (BL-1090 hard borders, BL-1094 marks) merged
+`27154072` with a main-session fix round `70b2759e` (the rest seat read off the record; the
+civilisation diamond carried across the seam); its two capture scripts and the 16-seed
+`player_seed_sweep --digest-check` were running when this was written (logs in the session
+scratchpad: `digest_check_wave0.log`). NR-937 asks Ben whether a hard realm's coast draws heavy
+and whether 10% of people (off at 6%) is the pin.
+
+**The re-bless reading (02:56):** `player_seed_sweep --digest-check` on the full wave-0 tree: 0/16 rows
+PASS — every library seed moved on all four digests (the laws on all 16 from BL-1102; purchases on 25 and
+38 from BL-1096); world_determinism's seed B also reads 4F7BBD76AEEF3431 on main now (was
+5ECE9A097D14DACE at v0.1.25); exploration R3b +400 tribute. THE RE-BLESS IS TAKEN ONCE, after lane I1
+(realm becomes nation, which renames nations and may move any digest that folds names) is merged:
+re-pin the 16 sweep rows, R3b's counters, world_determinism's seed B, the seed library, and any
+golden that reads laws or names.
+
+**Attribution of the moved pins (03:55):** the G+C-only tree ALSO reads 0/16 against the sweep's pins — which
+were already stale from sprint 46 (never re-pinned). So the pins cannot say who moved what; row-for-row
+comparison can. Running: the digest check on the pre-sprint tree 1d401e8c (the session
+scratchpad's `digest_check_pre47.log`). If its rows equal the G+C rows (`digest_check_GC.log`),
+BL-1083 and BL-1085 moved nothing and BL-1085 R1 closes; the full wave-0 rows
+(`digest_check_wave0.log`) are then W1/W3's movement and the re-bless re-pins them. If they differ, bisect G (7bf2bac0) against C (2c5c2746) before any re-bless.
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936

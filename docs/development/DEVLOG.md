@@ -46,10 +46,29 @@ workflow (5 + 5).
 - **Quitting during a build crashes on exit** (0xC0000005, both the cold Begin build and a wizard
   round): `~app` never joins the workers and their progress/works objects die first. BL-1108.
 
+### The overnight merges (2026-09-25, 00:00–03:30)
+- **Wave 0 all merged**: G `7bf2bac0` + fix round `8889487a` (stale-run relaunch), C `2c5c2746`
+  (Begin retired into round six; BL-1108 join on quit), W2 `f954a0fc` (the band's one body is
+  `campaign_band_from_world`; a fold-less fixture bands industrial), W1 `747a5bf4` (the sea-leg
+  producer line and the Empires-span gate added on merge; the two envelope claims reconciled to
+  ONE v22), W3 `cc5e51d1`. Gates after each: determinism twice bit-identical, both round trips,
+  Begin-adopts, seat-pick; on the full tree the exploration harness fails exactly its R3b pin
+  (+400 tribute) and industrialisation fidelity is 16/16 with the producer wired.
+- **Wave 1**: I2 (hard borders, marks) `27154072` + fix round `70b2759e` (rest seat off the record,
+  civilisation diamonds carried); I3 (names and voice) `4a8848a7` + fix round `84baaa65`. I1
+  (colour, name, nation) and wave 2's F3 (works chartered, rung, Culture record) were cut off by
+  the session limit mid-build and RESUMED on their own worktrees.
+- **The re-bless reading**: `player_seed_sweep --digest-check` 0/16 on the full wave-0 tree — every
+  pin moved (laws on all sixteen seeds); world_determinism's seed B reads 4F7BBD76AEEF3431 on main
+  now. The re-bless is taken once, after I1 merges. A second digest check runs on the G+C-only tree
+  to settle whether the settle promotion alone moved anything (BL-1085 R1).
+- Filed NR-937 (the hard-border pin and the heavy coast).
+
 ### Open
 - Ben's five live clicks (BL-1068, 1072, 1073, 1076, 1080) — he opened the Release build and walked into
-  round 4 but did not file the answers on the form.
-- The lanes' returns, their fix rounds, the merges, the re-bless once after wave 0's world-movers.
+  round 4 but did not file the answers on the form — plus the sprint-47 clicks the merged lanes
+  owe (BL-1083 R5/R6, BL-1085 R8, BL-1090 R3, BL-1094 R3, BL-1097 R3, BL-1106 R3).
+- The resumed lanes' returns, the re-bless, BL-1084 (the cursor) and the rest of wave 2.
 - NR-918..NR-930 for Ben; the header_graph tool is polluted by 14 stale `.claude/worktrees/agent-*`
   copies (its counts are not comparable to the baseline until they are pruned) — `worktree_prune.js`.
 

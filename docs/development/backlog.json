@@ -1129,7 +1129,7 @@
     "src/ui/startup_screens.cpp",
     "src/world/history_sim.cpp"
    ],
-   "design": "FILED (2026-09-24, the survey's names-and-voice item, unchanged by the form except that no per-round close is added — Ben, 2026-09-24; docs/development/drafts/sprint-47-rulings.md R20).\n\nWHY. Culture uses 'powers / Seat' and '0 battles, 0 conquests'; creed, civilisation and schism names never reach a ticker line (civilisation_formed and creed_preached discard e.other, history_lapse.cpp:1954-1959; coined civilisation names go only to the history log, history_sim.cpp:4160-4166); schism prints 'Something happens at X' (:2002); footers cite repository paths (startup_screens.cpp:1510-1518); five-round newcomer marks come from the unclamped lagged slice (:1151-1153); trade and treaty churn crowd the ticker (history_lapse.cpp:2028-2035).\n\nTHE WORK. Culture: 'peoples / Homeland', no battle cells (with BL-1092's census); a civilisation and creed name table on the report so prose can name them (record-only, in the envelope bump); schism names both parties and the creed; in-world footers; priority by kind so rare arc events beat trade churn; the lagged-slice clamp; the quiet-age sentence fixed; 'research speed' retired from the board's description in STARTUP.md.\n\nDONE WHEN (live). The Culture board header reads 'peoples' and prints no battle count; a schism line names both parties and the creed; no footer contains 'docs/'; at 1200 no inherited realm shows a '*'."
+   "design": "FILED (2026-09-24, the survey's names-and-voice item, unchanged by the form except that no per-round close is added — Ben, 2026-09-24; docs/development/drafts/sprint-47-rulings.md R20).\n\nWHY. Culture uses 'powers / Seat' and '0 battles, 0 conquests'; creed, civilisation and schism names never reach a ticker line (civilisation_formed and creed_preached discard e.other, history_lapse.cpp:1954-1959; coined civilisation names go only to the history log, history_sim.cpp:4160-4166); schism prints 'Something happens at X' (:2002); footers cite repository paths (startup_screens.cpp:1510-1518); five-round newcomer marks come from the unclamped lagged slice (:1151-1153); trade and treaty churn crowd the ticker (history_lapse.cpp:2028-2035).\n\nTHE WORK. Culture: 'peoples / Homeland', no battle cells (with BL-1092's census); a civilisation and creed name table on the report so prose can name them (record-only, in the envelope bump); schism names both parties and the creed; in-world footers; priority by kind so rare arc events beat trade churn; the lagged-slice clamp; the quiet-age sentence fixed; 'research speed' retired from the board's description in STARTUP.md.\n\nDONE WHEN (live). The Culture board header reads 'peoples' and prints no battle count; a schism line names both parties and the creed; no footer contains 'docs/'; at 1200 no inherited realm shows a '*'.\n\nBUILT (2026-09-25, lane I3). Two calls made in the build, for Ben's eye. (1) The schism's CREED is on no event — its three slots hold seat, successor and parent — so the record's name table carries `polity_creed` (polity id -> the creed the realm adopted, -1 none) beside `civilisation_name` and `creed_name`, and the schism line reads the PARENT's creed; a realm adopts at most once, so the closing table is the table the schism year saw. (2) The ticker's priority window is the last 4 x rows narrated events — an event count, not a span of years — so it scales with how busy the world is and a millennium-old founding never sits on the ticker; inside it the arc kinds are taken first, newest first, and churn (trade links, treaties, waystations, sea lanes) fills what is left. The record and the live tap both carry the table, so a live round names a civilisation in the year it is coined. The board's noun on rounds 4-6 reads 'realms' (was 'powers') to match the ticker's voice. 'research speed' was already absent from STARTUP.md's board description when the lane opened. The verify API gained `history_ticker` and `history_board_marks`, backed by public `lapse_ticker_rows` / `lapse_lagged_year` / `lapse_board_entered_count`, so scripts/verify/names_and_voice.lua asserts the wording and the marks rather than only photographing them."
   },
   {
    "status": "designed",
@@ -1203,6 +1203,51 @@
     "src/world/corporation_generation.cpp"
    ],
    "design": "FILED 2026-09-24 from the sprint-46 draft row CAMPAIGN_TECH_STATE (Ben, 2026-09-18, NR-898 (7): per CORPORATION through the existing earned_techs gates, not per nation). Not in sprint 47: the IN-node → campaign-tech mapping needs a design session with Ben first (no per-nation consumer and no IN-* → E*-* mapping exists). It is also the per-nation grain of the recipe band (BL-1101).\n\nTHE WORK (after the design session). Polity → nation by the representative-polity tally used for grudges (hard_coded_world.cpp:1761-1790); seed each corporation from its home nation's mask AFTER the search winner is applied (the regeneration wipes earned_techs, corporation_generation.cpp:2084), through a helper that also appends the tech's modifiers; check whether state_hash folds earned_techs.\n\nDONE WHEN. On a 1960 world corporations of a nation holding the mapped IN node have the mapped tech and its modifiers; corporations of one without it do not."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1110",
+   "short_name": "REGION_NAME_DOUBLES_QUARTER_WORD",
+   "author": "Claude (lane I1, BL-1089, 2026-09-25); found on the seat card",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 1,
+   "title": "A daughter region founded in a span is named with its quarter word twice (\"Maluam Tutu Reach Reach\") beside its parent \"Maluam Tutu Reach\"",
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "FOUND 2026-09-25 by lane I1 while building the seat card's origin line: a region founded during a span (settle verb) takes its name from the parent region's full name plus the quarter word, so the quarter word doubles. NATION_GENERATION.md § Pass 5 — Naming rules a region is <People> <Region> with both halves native and the region word positional; a span founding must coin from the people half and its own position, never from the parent's finished string.\n\nTHE WORK. Find the span-founding name path (history_sim.cpp settle → the region name coin) and give it the people half + the region's own positional word, as settlement.cpp coins a migration founding; a harness row asserting no region name repeats its final word.\n\nDONE WHEN. On the 16 curated seeds no region name ends in a doubled word; the seat card's HQ line reads one quarter word."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1111",
+   "short_name": "TILE_INPUTS_GRID_MISMATCH",
+   "author": "Claude (lane I1, BL-1089, 2026-09-25)",
+   "category": "Engine",
+   "priority": "C",
+   "difficulty": 1,
+   "title": "generation_report::body_entry::tile_inputs.gw/gh read 180 x 84 for a homeworld carrying 261 x 121 tiles on a --verify world",
+   "authority_doc": "docs/generation/GENERATION_LEDGER.md",
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "src/world/hard_coded_world.hpp",
+    "src/core/verify_api.cpp"
+   ],
+   "design": "FOUND 2026-09-25 by lane I1: on a --verify world the report's tile_inputs grid (180 x 84) does not match the body's tile raster (261 x 121); the lane stopped reading the field. Either the report records the PREVIEW raster (the wizard's scratch surface) rather than the built body's, or the --verify adopted path fills it from a different world. A reader that trusts it (the Generation Ledger, any raster fold) is wrong by construction.\n\nTHE WORK. Find who writes tile_inputs on the verify path and on the app path; make it the built body's grid; a harness assertion that tile_inputs.gw x gh equals the body's tile count on every path.\n\nDONE WHEN. The assertion holds on --verify, --autostart and the wizard's adopted world."
   }
  ]
 }

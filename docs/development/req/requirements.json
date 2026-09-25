@@ -7409,7 +7409,7 @@
       "headless: player_seed_sweep --digest-check 16/16 (D_settle/D_seat unchanged before the band change lands)"
      ],
      "requirement": "ONE settle function in src/world (run_settle_tick / run_settle) is called by app::step_economy's world half, by the worker and by every harness that mirrored it; harness_params.hpp no longer restates the tick body; D_settle and D_seat pins are unchanged by the promotion alone (item-spanning gate: begin_adopts_check.js PASS, adopt hash == cold hash).",
-     "notes": "2026-09-24 (lane C worktree): the 16-seed --digest-check is OWED to the main session on merge -- the lane brief bars player_seed_sweep in a worktree (memory). The tick body moved verbatim (same calls, same order); run_app_validation_tick, run_app_validation_settle and run_app_live_window are wrappers over run_settle_tick. REVIEW 2026-09-24: the 16-seed player_seed_sweep --digest-check named as the gate was not run in the lane; pending until the main session records 16/16 on the merged tree. The harness_params.hpp mirror still restates steps 1-5 (search-and-apply, the setup halves) deliberately so the D_search / D_land pins keep their seams; the settle half calls the promoted run_settle_tick.",
+     "notes": "2026-09-24 (lane C worktree): the 16-seed --digest-check is OWED to the main session on merge -- the lane brief bars player_seed_sweep in a worktree (memory). The tick body moved verbatim (same calls, same order); run_app_validation_tick, run_app_validation_settle and run_app_live_window are wrappers over run_settle_tick. REVIEW 2026-09-24: the 16-seed player_seed_sweep --digest-check named as the gate was not run in the lane; pending until the main session records 16/16 on the merged tree. The harness_params.hpp mirror still restates steps 1-5 (search-and-apply, the setup halves) deliberately so the D_search / D_land pins keep their seams; the settle half calls the promoted run_settle_tick. READING 2026-09-25 02:56: player_seed_sweep --digest-check on the full wave-0 tree (fa7e3a7f): 0/16 rows PASS — every seed moved on D_search, D_land, D_settle and D_seat, as BL-1102's laws on all 16 seeds and BL-1096's purchases predict; this is the re-bless reading, not this item's. The promotion's own neutrality is being read on the tree with only G and C merged (2c5c2746, a detached worktree, digest_check_GC.log). READING 2026-09-25 03:50: the digest check on the G+C-only tree (2c5c2746) also reads 0/16 — but the sweep's 16 pins were already stale before sprint 47 (the handoff: digests moved all of sprint 46 and were not re-pinned), so a FAIL against the pins attributes nothing. The honest test is row-for-row equality with the pre-sprint tree: a digest check on 1d401e8c (v0.1.25 + the handoff) runs in a detached worktree (digest_check_pre47.log); if its rows equal 2c5c2746's, the seeds and the promotion moved nothing and R1 closes; if they differ, the mover is found by bisecting G (7bf2bac0) against C. By reading, G's folds are zero-neutral and C keeps the search keying and the band identical.",
      "result_metric": "begin_adopts_check.js 12/12 PASS on build_rel (worktree Release): adopt 19575BBC3B912558 == cold 19575BBC3B912558 (231 s / 221 s); world_determinism 17/17 PASS twice, digests identical (5BA2EE1EE993C201 / 5ECE9A097D14DACE / 4834366D19271E5F)"
     },
     {
@@ -7536,14 +7536,14 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: era_timelapse.hpp; history_lapse.cpp caption",
       "headless: save_envelope_roundtrip"
      ],
      "requirement": "Round 5's ticker distinguishes 'X buys Y's province' from 'falls under the overlordship of' (a caption for province_bought); the new kind is append-only on lapse_event_kind and rides the sprint's envelope bump.",
      "notes": "",
-     "result_metric": "province_bought = kind 18 (append-only) under the shared envelope v22; round-5 caption written. save_envelope_roundtrip on the merged tree: in the 2026-09-25 wave-0 gate run."
+     "result_metric": "province_bought = kind 18 under the shared envelope v22 (save_game.hpp LAYOUT 22 lists the seeds and both kinds); save_envelope_roundtrip PASS (0 failures) on the full wave-0 tree, 2026-09-25 01:12."
     },
     {
      "id": "R5",
@@ -7558,14 +7558,14 @@
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "build",
       "headless: world_determinism x2"
      ],
      "requirement": "Release build; world_determinism twice on the same params (bit-identical to itself); digests move only against the pre-change pins and are recorded for the sprint's single re-bless.",
      "notes": "",
-     "result_metric": "Release build on the merged tree passes (cc5e51d1); world_determinism x2 in the 2026-09-25 gate run; R3b in exploration_sim_harness moves by +400 tribute and is left for the sprint's single re-bless."
+     "result_metric": "Release build cc5e51d1 green; world_determinism x2 on the full wave-0 tree ALL PASS, digests unchanged (seedA/on 5BA2EE1EE993C201 — the harness world runs the ancient arc only, so purchases do not reach it); exploration_sim_harness fails exactly its R3b regression pin (+400 tribute), left for the sprint's single re-bless; the 16 library pins move at the re-bless."
     }
    ]
   },
@@ -7594,14 +7594,14 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: era_timelapse.hpp; history_sim.cpp",
       "headless: save_envelope_roundtrip"
      ],
      "requirement": "A sea_lane_opened event (region/other = the ends, polity = the tier) is noted when a leg's uses cross sea_lane_tier1_uses (default 4, mirroring road_tier1_uses); the kind is append-only and rides the envelope bump.",
      "notes": "",
-     "result_metric": "sea_lane_opened = kind 19 at sea_lane_tier1_uses (default 4); save_envelope_roundtrip on the merged tree: in the 2026-09-25 gate run."
+     "result_metric": "sea_lane_opened = kind 19 at sea_lane_tier1_uses 4; save_envelope_roundtrip PASS on the full wave-0 tree, 2026-09-25."
     },
     {
      "id": "R3",
@@ -7626,14 +7626,14 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: docs/generation/EXPLORATION.md",
       "headless: industrialisation_sim_harness --fidelity"
      ],
      "requirement": "EXPLORATION.md § The colonial tie is a sea lane names the three sites and the tier threshold; the industrialisation resume carries the table (fidelity mode compares it).",
      "notes": "",
-     "result_metric": "EXPLORATION.md § The colonial tie is a sea lane names the three sites and the tier threshold; industrialisation_sim_harness --fidelity gate 3 on the merged tree (with the producer line): in the 2026-09-25 gate run."
+     "result_metric": "EXPLORATION.md § The colonial tie is a sea lane names the three sites and the tier; industrialisation_sim_harness --fidelity on the merged tree with the producer line: gate 1 16/16, gate 2 16/16, gate 3 (shipped span == the resume) 16/16 — FIDELITY PASS, 2026-09-25 01:36."
     }
    ]
   },
@@ -7750,13 +7750,13 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism x2"
      ],
      "requirement": "Digests move only where a law is written; recorded for the sprint's single re-bless; world_determinism twice bit-identical to itself.",
      "notes": "",
-     "result_metric": "Every curated seed now writes laws, so the 16 --digest-check pins move at the re-bless; world_determinism x2 on the merged tree: in the 2026-09-25 gate run."
+     "result_metric": "world_determinism x2 on the full wave-0 tree ALL PASS, pinned digits unchanged (the harness world stops at 1200; the laws land at the 1960 close); industrialisation_sim_harness BL-1056 SELF-CHECK PASS; the 16 library pins move at the re-bless."
     }
    ]
   },
@@ -8016,7 +8016,7 @@
       "visual: capture at 1000 CE"
      ],
      "requirement": "A per-owner hard flag from people share at the frame with hysteresis across steps; both frontier passes draw 2 px dark plus a 1 px inner stroke in the realm's colour when either side is hard; the board bolds the same rows; the flag carries into round 5 by id.",
-     "notes": "",
+     "notes": "MAIN 2026-09-25 02:20: scripts/verify/history_lapse_hard.lua on the merged tree (27154072 + 70b2759e) — 0 golden failures, no clipping (31 records, 418 text draws).",
      "result_metric": "lapse_hard_walk (history_lapse.cpp) bakes a per-step hard bitmap at finish from the samples with hysteresis, seeded from hard_carry; both frontier passes read it per edge and draw 2 px opaque dark plus a 1 px inner stroke in the hard realm's colour on its side; the board faux-bolds the seat and share of hard rows (one face only); the carry is set at launch, at landing and on the --verify adopted path (startup_screens.cpp). Capture scripts/verify/history_lapse_hard.lua PASS (6/6 expects, clipping ledger 0 failures): at 1000 CE on seed 0 Zeihei Meize (10.5%) and Tume Memma (9.0%, held by hysteresis from an earlier step above 10%) draw hard and bold, Ruke Rate (9.5%) plain; round 5 opens at 1200 with three rows bold by the carry alone (Galshe Kakha 9.5%, Sesho Suathua 9.5%, Sesho Hesei 6.0% -- none above 10% at that step; the pinned walk on seed 0 reads 3 hard at round 4's close, where the raw 10% count reads 0)."
     },
     {
@@ -8051,7 +8051,7 @@
       "visual: captures at each kind on a library seed"
      ],
      "requirement": "seat_captured draws a winner-colour ring at the fallen seat; broke_away and schism draw a crack from parent seat to successor seat; civilisation_formed draws a two-tone diamond that stays at the coining region; capital_moved slides the seat dot old -> new over the marker window (on the capital fold); road_promoted to tier 3 thickens and flashes the corridor; realm_ended and creed_preached draw nothing. (item-spanning gate)",
-     "notes": "FIX ROUND 2026-09-25 (main session, from the cold review): the seat dot now RESTS at the last moved capital read off the record (rest_seat: the region of the last capital_moved at or before the playhead, else polity_seat), so a slide no longer snaps back after its window and a second move starts where the first ended; the civilisation diamond is CARRIED across the hand-over (history_lapse::civ_carry, set beside hard_carry at launch and landing from lapse_civ_marks_at_close), so it no longer vanishes at 1200 and 1660. Release build and captures re-run on the merged tree.",
+     "notes": "FIX ROUND 2026-09-25 (main session, from the cold review): the seat dot now RESTS at the last moved capital read off the record (rest_seat: the region of the last capital_moved at or before the playhead, else polity_seat), so a slide no longer snaps back after its window and a second move starts where the first ended; the civilisation diamond is CARRIED across the hand-over (history_lapse::civ_carry, set beside hard_carry at launch and landing from lapse_civ_marks_at_close), so it no longer vanishes at 1200 and 1660. Release build and captures re-run on the merged tree. MAIN 2026-09-25 02:22: scripts/verify/history_lapse_marks.lua on the merged tree with the fix round (rest seat, civ_carry) — 0 golden failures, no clipping (54 records, 1078 text draws).",
      "result_metric": "draw_lapse_map pass 3f (history_lapse.cpp): seat_captured a ring in owner_colour(polity) at e.region over a dark ring, fading over lapse_marker_window_years; broke_away/schism a six-segment crack from the parent's seat (polity_seat[other] on this base) to e.region, pale over dark, jag hashed from the event, drawn twice across the seam inside the map's clip; civilisation_formed a two-tone diamond (realm colour west half, pale east half, dark outline) at e.region from its year on, never removed; capital_moved a slide table read by the seats pass, the dot eased from anchor(other) to anchor(region) over the window; pass 3b: a corridor with year_post_road inside the window draws 2.5x wide with a bright core decaying to its stroke. realm_ended, creed_preached and every other kind fall to the switch's default and draw nothing. Captures scripts/verify/history_lapse_marks.lua PASS on seed 0 (every kind present, 54 clipping records, 0 failures): rings and cracks at the event and half faded a half window on, diamonds still present two windows on, the Post Road pulse on round 6 seen on corridor 780-795 at 1700 and decayed at 1705 (probe crops). The slide's mid-frame is captured but not identified by eye; the I1 capital fold was not on the base, so the seat dot returns to polity_seat after the window until the fold lands (one lookup, seat_region_of)."
     },
     {
@@ -8091,25 +8091,25 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp prose table; era_timelapse.hpp name table",
       "visual: capture of a schism line"
      ],
      "requirement": "The Culture board reads 'peoples / Homeland' and prints no battle cells; a civilisation and creed name table on the report lets prose name them; a schism line names both parties and the creed; 'Something happens at X' is gone. (item-spanning gate)",
-     "notes": "",
-     "result_metric": ""
+     "notes": "The schism's creed is on no event, so the table carries polity_creed (polity id -> adopted creed) beside civilisation_name / creed_name; the line reads the parent's. The ticker elides a long line at the column width (fit_text, hover for the whole), so a three-name schism line may show its creed only on hover. FIX ROUND 2026-09-25 (main session, from the cold review): the schism assertion now requires the phrase \"and its creed, \" and refuses \"unnamed creed\" (the fallback branch could pass the old word check); era_timelapse.hpp's name-table comment states the tables are each record's own (a resumed span restarts the creed list, BL-1049). MAIN 2026-09-25 03:20: save_envelope_roundtrip PASS (0 failures) on main with the name tables merged (4a8848a7); names_and_voice.lua on the merged tree (e7be5466, 03:45): 0 golden failures, no clipping, with the strengthened schism assertion.",
+     "result_metric": "2026-09-25 lane I3: names_and_voice.lua (seed 0, Release, 1920x1080) -- Culture board header '22 peoples hold ground', column 'Homeland', footer '841 BCE - 23 peoples across 2623 regions in the full run' (no battle cells); ticker '1156 CE Thidua is settled as a shared way of life at Ruathvei Vuathai', '76 BCE Ramimo is preached at Taruth Raikaith, and claims every people', '1196 CE Meirei Shumruk breaks with Khililki Liki and its creed, Vemvuasher'; every enum kind has a prose case, the default is unreachable. save_envelope_roundtrip PASS (name table list-for-list, empty name and -1 sentinel). Captures names_and_voice_1_culture_board / _2_civilisation / _2_creed / _2_schism."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: startup_screens.cpp footers; history_lapse.cpp priority and clamp",
       "visual: capture at 1200"
      ],
      "requirement": "Footers are in-world (no 'docs/' string on any wizard surface); ticker priority by kind puts rare arc events ahead of trade churn; the lagged-slice clamp removes the five-round newcomer marks (no inherited realm shows a * at 1200); the quiet-age sentence no longer calls polities peoples.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "Priority is three tiers inside a window of the last 4 x rows narrated events: the rarest kinds (civilisation, creed, schism, furnace) first, then the arc's common kinds, then churn. Two tiers were measured first and the civilisation settled in 1156 was crowded off by six same-year foundings and captures (a sim round dates every event in it to one year), which is why the rare kinds got their own tier. The lag rule moved into history_lapse.cpp (lapse_lagged_year) so the draw and the verify read share it. FIX ROUND 2026-09-25: the review asked for a second board-marks read a twelfth in; tried and REVERTED — a realm that climbs onto the board there is meant to carry the mark, so the first-year read (zero only because of the clamp, non-zero without it) is the honest guard; the script now says why.",
+     "result_metric": "2026-09-25 lane I3: grep of src/ui/*.cpp string literals for 'docs/' -- 0 (was 2, both round footers); names_and_voice.lua -- at 1200 on round 5, 64 realms on the board and history_board_marks() == 0 (was every inherited realm '*' for the first twelfth); the civilisation line shows at 1156 beside five same-year break-aways; the arc readout reads '64 realms, 14 destroyed' on round 5 and the quiet-age sentence takes the same noun; expect_no_clipping 0 failures over 516 draws. Capture names_and_voice_3_1200."
     },
     {
      "id": "R3",
@@ -8118,8 +8118,8 @@
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click on the Culture board and a schism line.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "Owed to Ben after the merge: round 3's board on a live run, and a schism line on round 4 (seed 0 has one at 1196 CE; hover the elided line for the creed). The cold review is the main session's (author != reviewer).",
+     "result_metric": "PENDING 2026-09-25: Release build clean on the lane's branch; the scripted run is green (names_and_voice.lua); the live click and the cold review are not the lane's to take."
     }
    ]
   },

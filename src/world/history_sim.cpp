@@ -1586,10 +1586,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             ^ static_cast<uint64_t>(static_cast<uint32_t>(q.capital < 0 ? 0 : q.capital));
         q.name = coin_realm_name(cs->cultures[static_cast<std::size_t>(q.culture)].speech, salt);
     };
-    // The tap's append-only mirror of the name table (same contract as the
-    // region geometry above); refreshed beside each `publish`.
+    // The tap's append-only mirror of the realm name table (same contract as
+    // the region geometry above); refreshed beside each `publish`. Distinct
+    // from the tap's own `publish_names` (BL-1106's civilisation and creed
+    // tables), which rides after the publish.
     std::vector<std::string> tap_polity_name;
-    const auto publish_names = [&]() {
+    const auto publish_polity_names = [&]() {
         if (tap == nullptr) return;
         for (std::size_t i = tap_polity_name.size(); i < out.polities.size(); ++i)
             tap_polity_name.push_back(out.polities[i].name);
@@ -3133,9 +3135,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // is actually settled. Write-only: nothing below ever reads `tap` back.
         if (tap != nullptr)
         {
-            publish_names(); // BL-1088: the name table's new tail, first
+            publish_polity_names(); // BL-1088: the realm name table's new tail, first
             tap->publish(out.owner_changes, out.culture_changes, out.events,
                         static_cast<int32_t>(y - 1));
+            // BL-1106: the name table rides the same publish, so a live ticker
+            // names a civilisation or creed in the year it is coined. A pure
+            // read of `out`; the tap copies only the tail.
+            std::vector<std::string> tap_civ, tap_creed;
+            std::vector<int32_t>     tap_polity_creed;
+            fill_lapse_name_table(out, tap_civ, tap_creed, tap_polity_creed);
+            tap->publish_names(tap_civ, tap_creed, tap_polity_creed);
         }
 
         const std::size_t century =
@@ -8254,9 +8263,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // this is the one place that year's record reaches the tap.
     if (tap != nullptr)
     {
-        publish_names(); // BL-1088
+        publish_polity_names(); // BL-1088
         tap->publish(out.owner_changes, out.culture_changes, out.events,
                     static_cast<int32_t>(params.stop_year - 1));
+        // BL-1106: the closing name table, same as the per-year publish.
+        std::vector<std::string> tap_civ, tap_creed;
+        std::vector<int32_t>     tap_polity_creed;
+        fill_lapse_name_table(out, tap_civ, tap_creed, tap_polity_creed);
+        tap->publish_names(tap_civ, tap_creed, tap_polity_creed);
     }
 
     return out;
