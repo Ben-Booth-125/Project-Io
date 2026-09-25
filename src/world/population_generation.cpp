@@ -72,21 +72,10 @@ static_assert(k_demography_heads_per_centre == region_centre_heads,
               "BL-766: the sim-grain centre rung and the campaign-era carve rung "
               "must be the same headcount");
 
-/// Scale banding thresholds in RAW HEADS: the geometric midpoints between the
-/// `k_population_for_scale` rungs (10k/50k/200k/1M/5M heads), so a carved share
-/// lands on the NEAREST rung in log space rather than always rounding down.
-/// sqrt(10k*50k)=22,360; sqrt(50k*200k)=100,000; sqrt(200k*1M)=447,213;
-/// sqrt(1M*5M)=2,236,067. Constants, so no float sqrt runs in a gate path.
-constexpr int64_t k_scale_band_heads[4] = { 22360, 100000, 447213, 2236067 };
-
-int scale_for_share(int64_t share_heads)
-{
-    int s = 1;
-    for (int i = 0; i < 4; ++i)
-        if (share_heads >= k_scale_band_heads[i])
-            s = i + 2;
-    return s;
-}
+/// Scale banding: `scale_for_heads` (population_generation.hpp), the nearest
+/// `k_population_for_scale` rung in log space. Moved to the header for BL-1130
+/// so the Era -1 sim's ground fit bands on the same rungs.
+int scale_for_share(int64_t share_heads) { return scale_for_heads(share_heads); }
 
 /// One carved centre: WHICH REGION grew it, and how large it stands.
 ///
@@ -113,12 +102,12 @@ struct carved_centre
 /// Carve a body's Era -1 demography into centre scales (BL-610), each BOUND to
 /// the region that grew it (BL-783).
 ///
-/// COUNT is per region: a living region's urban headcount over
-/// `k_demography_heads_per_centre`, floored at one — a region history kept
-/// alive has at least a village; a razed region (population 0) contributes
-/// nothing. Summing per region rather than carving the body total is what
-/// makes the count the DISTRIBUTION's consequence: a world of many thin
-/// regions towns differently from one of few fat ones.
+/// COUNT is per region: the centres the region's history stood up
+/// (`region::centres` — since BL-1130 a hierarchy of its urban heads held to
+/// its ground, not one per `k_demography_heads_per_centre`); a razed region
+/// (population 0) contributes nothing. Summing per region rather than carving
+/// the body total is what makes the count the DISTRIBUTION's consequence: a
+/// world of many thin regions towns differently from one of few fat ones.
 ///
 /// SCALES are rank-size over the whole body's urban headcount: rank i of n
 /// receives U/(i*H_n), H_n the harmonic number — one hierarchy of a few
@@ -139,8 +128,21 @@ struct carved_centre
 /// All integer (harmonic sum in millionths), no RNG: a pure function of the
 /// region populations, so count, scale and binding are the demography's
 /// consequence and nothing else's.
+///
+/// THE GROUND HOLDS THE COUNT (BL-1130, POPULATION.md "Growth consolidates").
+/// With @p cell_land and @p cell_place (per region: its cell's land tiles, and
+/// the tiles in it that pass the placement gate), a region enters no more slots
+/// than its ground holds: `region_centres_fit` on the FINAL partition — the
+/// sim's own rule, re-read here because a founding in the sim's last round
+/// cut a neighbour's cell after that neighbour's last urban step — and never
+/// more than its cell can place, so every one of them stands in its own cell.
+/// A region whose cell has no placeable tile at all keeps the one centre it
+/// stands (the rule's floor), and only that centre can spill. Null keeps the
+/// sim's count as it stands (a caller with no grid).
 std::vector<carved_centre> carve_demography_centres(const settlement_state& settlement,
-                                                    int heads_per_centre)
+                                                    int heads_per_centre,
+                                                    const std::vector<int>* cell_land = nullptr,
+                                                    const std::vector<int>* cell_place = nullptr)
 {
     std::vector<carved_centre> out;
     if (heads_per_centre <= 0)
@@ -173,9 +175,14 @@ std::vector<carved_centre> carve_demography_centres(const settlement_state& sett
             const region& p = settlement.regions[ri];
             if (p.population <= 0 || p.centres <= 0)
                 continue; // A razed or emptied region towns nobody.
+            int stands = p.centres;
+            if (cell_land != nullptr && ri < cell_land->size())
+                stands = region_centres_fit(p.urban_population, stands, (*cell_land)[ri]);
+            if (cell_place != nullptr && ri < cell_place->size() && (*cell_place)[ri] > 0)
+                stands = std::min(stands, (*cell_place)[ri]);
             urban_total += p.urban_population;
-            count       += p.centres;
-            for (int k = 1; k <= p.centres; ++k)
+            count       += stands;
+            for (int k = 1; k <= stands; ++k)
                 slots.push_back({ p.urban_population / k, static_cast<int>(ri), k });
         }
     }
@@ -392,10 +399,52 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
     // REGION that grew it. The carve comes back descending by rank, so the
     // largest cities are placed first and the adjacency weighting below
     // clusters the train of villages around them.
+    //
+    // BL-1130 adds the ground: the partition is read ONCE, here, before the
+    // carve, because the carve now holds each region to what its own cell
+    // holds (POPULATION.md "Growth consolidates"). A region is an anchor, not a
+    // stored tile set — the Voronoi over anchors IS its extent, and
+    // `nearest_region` is the canonical read of it (city_names.cpp names a
+    // centre in its nearest region's tongue, and the sim's
+    // `update_urban_ground` measures the same cells). Per region: its cell's
+    // LAND (what its footprints must fit) and its PLACEABLE tiles (what the
+    // placement gate lets a centre stand on), and the placeable tiles
+    // themselves, ascending, for the placement below.
+    const bool have_regions = settlement != nullptr && !settlement->regions.empty();
+    const std::size_t region_count = have_regions ? settlement->regions.size() : 0;
+    std::vector<int> cell_land(region_count, 0), cell_place(region_count, 0);
+    std::vector<std::vector<int>> region_candidates(region_count);
+    if (have_regions)
+    {
+        std::vector<char> is_candidate(static_cast<std::size_t>(total), 0);
+        for (const int idx : candidates)
+            is_candidate[static_cast<std::size_t>(idx)] = 1;
+        for (int i = 0; i < total; ++i)
+        {
+            const entity_id tid = tile_ids[static_cast<std::size_t>(i)];
+            if (tid == null_entity)
+                continue;
+            const auto it = w.tiles.find(tid);
+            if (it == w.tiles.end() || is_water(it->second.substrate))
+                continue;
+            const int ri = nearest_region(*settlement, i % gw, i / gw, gw);
+            if (ri < 0 || ri >= static_cast<int>(region_count))
+                continue;
+            ++cell_land[static_cast<std::size_t>(ri)];
+            if (is_candidate[static_cast<std::size_t>(i)])
+            {
+                ++cell_place[static_cast<std::size_t>(ri)];
+                region_candidates[static_cast<std::size_t>(ri)].push_back(i);
+            }
+        }
+    }
+
     std::vector<carved_centre> demography_centres;
     if (settlement != nullptr)
         demography_centres = carve_demography_centres(*settlement,
-                                                      k_demography_heads_per_centre);
+                                                      k_demography_heads_per_centre,
+                                                      have_regions ? &cell_land : nullptr,
+                                                      have_regions ? &cell_place : nullptr);
     const bool from_demography = !demography_centres.empty();
 
     // The FALLBACK: land area over a divisor (BL-463: land area, not grid
@@ -518,16 +567,9 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
         // over plain integers. No RNG on this path, matching the urban draw it
         // materialises, and no container walk whose order could vary: the
         // buckets are filled in ascending raster order from the ascending
-        // `candidates` list (src/world/CLAUDE.md — no hash-layout-dependent
-        // iteration, and no "same process" carve-out on that rule).
-        const std::size_t region_count = settlement->regions.size();
-        std::vector<std::vector<int>> region_candidates(region_count);
-        for (const int idx : candidates)
-        {
-            const int ri = nearest_region(*settlement, idx % gw, idx / gw, gw);
-            if (ri >= 0 && ri < static_cast<int>(region_count))
-                region_candidates[static_cast<std::size_t>(ri)].push_back(idx);
-        }
+        // raster walk above (src/world/CLAUDE.md — no hash-layout-dependent
+        // iteration, and no "same process" carve-out on that rule). The
+        // buckets are `region_candidates`, read with the carve's ground above.
 
         // Best unoccupied candidate in one region, or -1 when it has none left.
         auto best_in_region = [&](int ri) -> int {
@@ -556,8 +598,12 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
         };
 
         // Regions ordered by anchor distance from a given region — the spill
-        // order for the rare region that grew more cities than its own ground
-        // can host. Built lazily and cached, since most regions never spill.
+        // order. BL-1130: the carve holds every region to the placeable tiles
+        // of its own cell, so the ONE region that can reach this is one whose
+        // cell holds no placeable tile at all (an anchor on the shore whose
+        // land all lies nearer other anchors) and keeps the single centre the
+        // rule's floor leaves it. Built lazily and cached, since almost no
+        // region spills.
         std::unordered_map<int, std::vector<int>> spill_order;
         auto spill_for = [&](int ri) -> const std::vector<int>& {
             auto it = spill_order.find(ri);
@@ -581,24 +627,49 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
             return spill_order.emplace(ri, std::move(order)).first->second;
         };
 
-        // BL-1042: where the placement stopped. Every carved centre from here
-        // to the end of the carve is DROPPED — the whole body was built out, or
-        // the carve handed back more centres than the body has candidate tiles
-        // (`centre_count` never attempts those) — and is recorded as such, so
-        // the industry points its slot would have held are counted under their
-        // own unspent reason rather than silently spread over its siblings.
-        int stopped_at = centre_count;
+        // BL-1042: a carved centre that is never founded is DROPPED and
+        // recorded as such — the whole body was built out, or the carve handed
+        // back more centres than the body has candidate tiles (`centre_count`
+        // never attempts those) — so the industry points its slot would have
+        // held are counted under their own unspent reason rather than silently
+        // spread over its siblings. Recorded in carve order at the end.
+        enum : char { kept = 0, drop_built_out = 1, drop_no_tile = 2 };
+        std::vector<char> fate(demography_centres.size(), kept);
+        for (int d = centre_count; d < static_cast<int>(demography_centres.size()); ++d)
+            fate[static_cast<std::size_t>(d)] = drop_built_out;
+
+        // BL-1130 — TWO PASSES, SO A SPILL NEVER CASCADES. Pass one founds
+        // every carved centre in its OWN cell, in carve order, and defers any
+        // that finds no free tile there. The carve holds each region to its
+        // cell's placeable tiles, so only a region whose cell has none defers.
+        // Pass two then SPILLS the deferred, in carve order, onto the nearest
+        // region with ground left — after every region's own centres already
+        // stand, so a spill can no longer take the one tile a neighbour's cell
+        // had and push that neighbour out in turn (a single-tile cell is the
+        // common case where regions pack densely: measured, the one-pass order
+        // turned 177 placeless regions into 568 spills on seed 0).
+        //
+        // SPILL, counted by construction rather than hidden: a region whose
+        // cell holds no placeable ground still materialises the one centre it
+        // keeps. The alternative is to drop it, which would silently lose a
+        // settlement history grew. (Before BL-1130 this was most of the carve:
+        // 80.8% of carved centres over the 16 curated seeds, the regions
+        // wanting more centres than their cells held.)
+        std::vector<int> deferred;
         for (int placed = 0; placed < centre_count; ++placed)
         {
             const carved_centre& cc = demography_centres[static_cast<std::size_t>(placed)];
-            int chosen_idx = best_in_region(cc.region);
-
-            // SPILL, counted by construction rather than hidden: a region whose
-            // whole extent is already built out still materialises its city, on
-            // the nearest region that has ground left. The alternative is to
-            // drop it, which would silently lose a settlement history grew.
-            if (chosen_idx < 0 && cc.region >= 0
-                && cc.region < static_cast<int>(region_count))
+            const int chosen_idx = best_in_region(cc.region);
+            if (chosen_idx < 0) { deferred.push_back(placed); continue; }
+            if (found_centre(chosen_idx, cc.scale, &cc) == null_entity)
+                fate[static_cast<std::size_t>(placed)] = drop_no_tile;
+        }
+        bool built_out = false;
+        for (const int placed : deferred)
+        {
+            const carved_centre& cc = demography_centres[static_cast<std::size_t>(placed)];
+            int chosen_idx = -1;
+            if (!built_out && cc.region >= 0 && cc.region < static_cast<int>(region_count))
             {
                 for (const int alt : spill_for(cc.region))
                 {
@@ -606,22 +677,25 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
                     if (chosen_idx >= 0) break;
                 }
             }
-
             if (chosen_idx < 0)
             {
-                stopped_at = placed;
-                break; // The whole body is built out.
+                // No region has ground left: the whole body is built out, and
+                // every deferred centre after this one is too.
+                built_out = true;
+                fate[static_cast<std::size_t>(placed)] = drop_built_out;
+                continue;
             }
-
             if (found_centre(chosen_idx, cc.scale, &cc) == null_entity)
-                w.gen_carve_dropped.push_back(
-                    { cc.region, cc.rank, cc.key, carve_drop_reason::no_tile });
+                fate[static_cast<std::size_t>(placed)] = drop_no_tile;
         }
-        for (int d = stopped_at; d < static_cast<int>(demography_centres.size()); ++d)
+        for (std::size_t d = 0; d < demography_centres.size(); ++d)
         {
-            const carved_centre& dc = demography_centres[static_cast<std::size_t>(d)];
+            if (fate[d] == kept) continue;
+            const carved_centre& dc = demography_centres[d];
             w.gen_carve_dropped.push_back(
-                { dc.region, dc.rank, dc.key, carve_drop_reason::body_built_out });
+                { dc.region, dc.rank, dc.key,
+                  fate[d] == drop_no_tile ? carve_drop_reason::no_tile
+                                          : carve_drop_reason::body_built_out });
         }
     }
     else

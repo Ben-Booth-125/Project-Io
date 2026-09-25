@@ -27,11 +27,12 @@ inline constexpr int k_land_tiles_per_centre = 410;
 inline constexpr int k_population_for_scale[5] = { 10, 50, 200, 1000, 5000 };
 
 /// URBAN heads per population centre on the CAMPAIGN path (BL-610, centres
-/// from demography). A living region's urban headcount (its simulated
-/// population times the urban share, population_generation.cpp
-/// § k_demography_urban_share_q) divided by this figure is how many centres
-/// it contributes, floored at one — density is history's consequence, not a
-/// land-area divisor.
+/// from demography): the village rung. Since BL-1130 (centres consolidate) it
+/// is the SMALLEST centre a region's hierarchy may stand, not the size of every
+/// one: a region's urban heads stand up as many centres as keep the last of a
+/// rank-size hierarchy at this rung (`region_centres_wanted`, settlement.hpp),
+/// held to what its cell's land holds — density is history's consequence, not
+/// a land-area divisor.
 ///
 /// The figure is scale 1's own headcount (`k_population_for_scale[0]` = 10
 /// thousand heads): one centre per village's-worth of townsfolk, so the
@@ -41,6 +42,26 @@ inline constexpr int k_population_for_scale[5] = { 10, 50, 200, 1000, 5000 };
 /// tiles the province-anchor ruling needs (BL-611; measured by
 /// tools/verify/settlement_density.cpp — run it before moving this).
 inline constexpr int k_demography_heads_per_centre = 10000;
+
+/// Scale banding thresholds in RAW HEADS: the geometric midpoints between the
+/// `k_population_for_scale` rungs (10k/50k/200k/1M/5M heads), so a share lands
+/// on the NEAREST rung in log space rather than always rounding down.
+/// sqrt(10k*50k)=22,360; sqrt(50k*200k)=100,000; sqrt(200k*1M)=447,213;
+/// sqrt(1M*5M)=2,236,067. Constants, so no float sqrt runs in a gate path.
+/// Exported (was file-local to the carve) for BL-1130: the Era -1 sim's
+/// ground fit bands a region's own hierarchy on the SAME rungs the carve
+/// bands the body's, so the two cannot disagree about what a share paves.
+inline constexpr int64_t k_scale_band_heads[4] = { 22360, 100000, 447213, 2236067 };
+
+/// The scale (1-5) a share of @p share_heads raw heads bands to.
+inline constexpr int scale_for_heads(int64_t share_heads)
+{
+    int s = 1;
+    for (int i = 0; i < 4; ++i)
+        if (share_heads >= k_scale_band_heads[i])
+            s = i + 2;
+    return s;
+}
 
 /// Generates initial population centres for the given body and attaches them
 /// to the world as entities with a `population_centre_component` on the chosen

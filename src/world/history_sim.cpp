@@ -1948,6 +1948,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // off nothing ever bumps it and the cache behaves exactly as it did.
     int centres_version = 0;
 
+    // BL-1130 (POPULATION.md "Growth consolidates") — THE GROUND EACH REGION'S
+    // CENTRES MUST FIT. The land of every region's cell of the settlement
+    // partition, kept up to date as foundings append regions (each one claims
+    // the tiles nearer its anchor, so older cells only shrink), and written
+    // onto `region::urban_ground` once a year before the urban step reads it.
+    // Local to this call: a resumed span re-measures on its first year. With
+    // no substrate (a synthetic fixture) nothing is measured and nothing caps.
+    urban_ground_field urban_ground;
+
     const auto edge_key = [](int a, int b) -> uint64_t {
         const uint32_t lo = static_cast<uint32_t>(a < b ? a : b);
         const uint32_t hi = static_cast<uint32_t>(a < b ? b : a);
@@ -3389,6 +3398,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (q.alive)
                     ++out.realm_years_by_trade_bucket[trade_bucket_of(q.id)];
         }
+
+        // BL-1130: this year's cells, after this year's foundings, so a region
+        // whose cell a founding just cut holds its centres to what is left of
+        // it in the same year's urban step below.
+        if (terrain.substrate != nullptr)
+            update_urban_ground(ss, urban_ground, *terrain.substrate, gw, gh);
 
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {

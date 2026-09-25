@@ -1,11 +1,13 @@
 #include "settlement.hpp"
 
 #include "colonisation.hpp" // BL-846/848: the diffusion that dates and colours a founding
+#include "population_generation.hpp" // BL-1130: the scale bands and footprint table the ground fit reads
 #include "tongue.hpp"       // BL-348: quarter words are coined, not borrowed
 
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <limits>
 #include <unordered_map>
 #include <utility>
 
@@ -1953,27 +1955,152 @@ int region_urban_share_q(int farm_q)
     return urban_share_floor_q + (q * urban_share_farm_q) / 1000;
 }
 
+// ---------------------------------------------------------------------------
+// Growth consolidates (BL-1130) — a region's centres are a hierarchy that fits
+// its own ground
+// ---------------------------------------------------------------------------
+
 namespace {
 
+/// H_n in millionths — the carve's own integer harmonic
+/// (population_generation.cpp `carve_demography_centres`), so the region's
+/// hierarchy and the body's are the same arithmetic.
+int64_t harmonic_millionths(int n)
+{
+    int64_t h = 0;
+    for (int i = 1; i <= n; ++i) h += 1000000 / i;
+    return h;
+}
+
+/// The urban-heads domain every function below works in: 2^40, the same
+/// ceiling `advance_region_urban` clamps `urban_population` to, so a product
+/// with 10^6 stays below 2^60.
+constexpr int64_t urban_heads_domain = int64_t{1} << 40;
+
 /// Promote `centres` to whatever `urban_population` now stands up, never
-/// demote. POPULATION.md's asymmetry: passive failure shrinks a centre and
-/// never destroys one, so only `sack_region_urban` takes a centre off the map.
+/// demote on growth. POPULATION.md's asymmetry: passive failure shrinks a
+/// centre and never destroys one, so only `sack_region_urban` razes one.
 ///
-/// BL-872 — `network_ok` false FREEZES this outright: the ground the network
-/// can no longer feed or govern stands up no NEW centre, but nothing already
-/// standing is touched here either. Freeze, not raze — `sack_region_urban`
-/// stays the only place `centres` goes down, and a supply cut is not the
-/// deliberate act of history that function represents.
+/// BL-1130 — what the heads stand up is a HIERARCHY (`region_centres_wanted`),
+/// not one centre per village's worth, so growth deepens the centres standing
+/// before it founds another; and the count is held to what the cell's land
+/// holds (`region_centres_fit`). The hold is a MERGE, not a loss: when a newer
+/// neighbour's founding cuts the cell, the centres standing fold together and
+/// the heads stay, so `centres_razed` is not touched.
+///
+/// BL-872 — `network_ok` false FREEZES growth: the ground the network can no
+/// longer feed or govern stands up no NEW centre. The ground hold still
+/// applies — a cell that shrank holds fewer whether or not the seat reaches it
+/// — and `sack_region_urban` stays the only place a centre is destroyed.
 void promote_centres(region& p, bool network_ok)
 {
-    if (!network_ok) return;
-    const int stood = static_cast<int>(
-        clampi64(p.urban_population / region_centre_heads, 0, region_centre_limit));
-    if (stood > p.centres)
-        p.centres = stood;
+    int c = p.centres;
+    if (network_ok)
+        c = std::max(c, region_centres_wanted(p.urban_population));
+    p.centres = region_centres_fit(p.urban_population, c, p.urban_ground);
 }
 
 } // namespace
+
+int region_centres_wanted(int64_t urban_heads)
+{
+    if (urban_heads < region_centre_heads) return 0;
+    const int64_t u = std::min(urban_heads, urban_heads_domain);
+    int     n = 0;
+    int64_t h = 0;
+    for (int k = 1; k <= region_centre_limit; ++k)
+    {
+        h += 1000000 / k;
+        // The k-th and smallest centre of a k-hierarchy stands u / (k * H_k)
+        // heads; it must still be a village's worth. Cross-multiplied in
+        // millionths. k * H_k only rises with k, so the first miss ends it.
+        if (u * 1000000 < region_centre_heads * static_cast<int64_t>(k) * h) break;
+        n = k;
+    }
+    return n;
+}
+
+int region_centre_footprint(int64_t urban_heads, int n)
+{
+    if (n <= 0) return 0;
+    n = std::min(n, region_centre_limit);
+    const int64_t u = clampi64(urban_heads, 0, urban_heads_domain);
+    const int64_t h = harmonic_millionths(n);
+    int tiles = 0;
+    for (int k = 1; k <= n; ++k)
+    {
+        const int64_t share = (u * 1000000) / (static_cast<int64_t>(k) * h);
+        tiles += k_urban_footprint_tiles[scale_for_heads(share) - 1];
+    }
+    return tiles;
+}
+
+int region_centres_fit(int64_t urban_heads, int want, int ground)
+{
+    // Descending from what the heads want, so a region its ground does not
+    // bind pays one footprint sum and no more; never below one.
+    int m = std::min(want, region_centre_limit);
+    if (ground < 0 || m <= 1) return m;
+    while (m > 1 && region_centre_footprint(urban_heads, m) > ground) --m;
+    return m;
+}
+
+bool update_urban_ground(settlement_state& ss, urban_ground_field& f,
+                         const std::vector<terrain_substrate>& substrate, int gw, int gh)
+{
+    if (gw <= 0 || gh <= 0
+     || substrate.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return false;
+    const std::size_t n = ss.regions.size();
+
+    // A fresh field, a different body, or a table that SHRANK (regions are
+    // only ever appended during a run, so this is defensive): measure again
+    // from nothing. Adding the regions one at a time in index order with a
+    // strict `<` IS `nearest_region`'s argmin with its lowest-index tie-break.
+    if (f.raster_size != substrate.size() || f.measured > n)
+    {
+        f.land_tiles.clear();
+        for (std::size_t t = 0; t < substrate.size(); ++t)
+            if (!is_water(substrate[t])) f.land_tiles.push_back(static_cast<int32_t>(t));
+        f.owner.assign(f.land_tiles.size(), -1);
+        f.owner_dist.assign(f.land_tiles.size(), std::numeric_limits<int32_t>::max());
+        f.land.clear();
+        f.raster_size = substrate.size();
+        f.measured    = 0;
+    }
+    if (f.measured < n)
+    {
+        f.land.resize(n, 0);
+        for (std::size_t ri = f.measured; ri < n; ++ri)
+        {
+            const region& p = ss.regions[ri];
+            for (std::size_t li = 0; li < f.land_tiles.size(); ++li)
+            {
+                const int t = f.land_tiles[li];
+                const int d = grid_dist(t % gw, t / gw, p.col, p.row, gw);
+                if (d >= f.owner_dist[li]) continue;
+                if (f.owner[li] >= 0) --f.land[static_cast<std::size_t>(f.owner[li])];
+                f.owner[li]      = static_cast<int32_t>(ri);
+                f.owner_dist[li] = d;
+                ++f.land[ri];
+            }
+        }
+        f.measured = n;
+    }
+
+    bool changed = false;
+    for (std::size_t ri = 0; ri < n; ++ri)
+    {
+        if (ss.regions[ri].urban_ground == f.land[ri]) continue;
+        ss.regions[ri].urban_ground = f.land[ri];
+        changed = true;
+    }
+    return changed;
+}
+
+// ---------------------------------------------------------------------------
+// The urban record's three rules (BL-766): the draw, growth, the sack
+// ---------------------------------------------------------------------------
 
 void draw_region_urban(region& p)
 {
@@ -2062,8 +2189,11 @@ void sack_region_urban(region& p, int population_loss_q)
     // What the survivors can still stand up. The difference is destruction, and
     // it is RECORDED — a razed city that is later rebuilt still says it was
     // razed, which is the only way the epoch map can read as historied.
-    const int stands = static_cast<int>(
-        clampi64(p.urban_population / region_centre_heads, 0, region_centre_limit));
+    // BL-1130: "stand up" is the same hierarchy growth builds, on the same
+    // ground, so a sack and a promotion read one rule in both directions.
+    const int stands = region_centres_fit(p.urban_population,
+                                          region_centres_wanted(p.urban_population),
+                                          p.urban_ground);
     if (stands < p.centres)
     {
         p.centres_razed += p.centres - stands;

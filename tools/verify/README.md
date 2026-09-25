@@ -1129,6 +1129,32 @@ bash tools/verify/build_lua_harness.sh market_census
 ./build_gen/verify/market_census.exe [--seeds 46,28] [--live-ticks 4] [--no-traversal] [--list 10]
 ```
 
+## centre_census (BL-1130)
+
+The population-centre census on the world generation hands the landscape search: the shipped
+arc, built by `build_app_base_world` (generation, setup, recipes; no search — the search founds
+no centre). Per curated seed, on the home body: the sim record (regions, the sum of
+`region::centres`, the per-region count histogram); every centre, the land tiles hosting one and
+the land stamped urban; the scale mix by `k_population_for_scale` rung; the fit of the carve
+against each region's cell of the settlement partition (`nearest_region`) — spills out of the
+source cell, regions whose carved footprints outrun the cell's land (the one-centre regions the
+rule's floor keeps split out), regions with no placeable tile, and the sim record's own
+hierarchy against the final cell; where the density is (regions packed one to a land tile, and
+the carved centres standing in such cells); then road tiles (streets on a centre's tile vs the
+network) and markets. `--map DIR` writes one road-field PPM per seed in `gen_step_costs
+--roads-map`'s colours, and one centre map per seed coloured by origin (carved by scale, province
+anchor, national coverage).
+
+**A report.** Its one failing row is its own: a world with no urban map or no carved centre,
+which would make every fit row vacuous.
+
+Registered as a **`sweep`**: a full world per seed.
+
+```
+bash tools/verify/build_lua_harness.sh centre_census
+./build_gen/verify/centre_census.exe [--seeds 46,28] [--map DIR]
+```
+
 ## Which builder?
 
 Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:
