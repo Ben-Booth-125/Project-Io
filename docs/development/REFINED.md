@@ -225,6 +225,25 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
   `industrialisation_sim_harness --seeds 0 --through 1960` exit 0. OWES the cold review (no reviewer
   agent is reachable from this lane) and Ben's live click across the 1200/1660 seams and into the
   seat (1087 R6, 1088 R6, 1089 R5).
+  COLD REVIEW DONE and its FIX ROUND landed 2026-09-25 (main merged at 1889f642 first; both name
+  tables sit at the record's tail, BL-1106's three then BL-1088's `polity_name`, in `w_timelapse`
+  and `r_timelapse` alike; `inherited` is silent under the tiered ticker). Six findings, six fixes,
+  one commit each: (high) a landed round is derived on demand at the hand-over
+  (`derive_lapse_for_handover`) and an already-open successor is re-pinned when its predecessor
+  lands, so Next-during-the-wait keeps the seam; (medium) every record rasters over its own
+  regions (`lapse_from_report` cuts the anchors to `region_stride`) in the wizard, the Begin/load
+  derivation and the sweep, and the adopt path prints how many realms the wizard's table and the
+  derivation disagree on; (medium) a load checks the wizard's record against the loaded report
+  before trusting its table, and a cold build after a wizard run wears none; (low) STARTUP.md and
+  the item say pinned/pinned as the code does; (low) ROSE reads the founding size carried by id
+  (`rose_start` / `rose_fired`), once per life; (low) the requirement rows name their scripts.
+  GATES on the fixed tree: Release build green; `save_envelope_roundtrip` and `save_roundtrip`
+  PASS; `world_determinism` twice ALL PASS, digests unmoved (6DBC0094F0B6B0EF / 95EEAD1204FD31AC /
+  4834366D19271E5F); `begin_adopts_check` 12/12, adopt == cold BB0457AAD5205D34;
+  `realm_identity.lua` 24/24 (1200 seam 64 shared / 63 kept / 1 re-slot; 1660 seam 53 / 52 / 1),
+  `seat_pick.lua` and `names_and_voice.lua` green, captures re-eyeballed; `realm_names_check`
+  ALL PASS. Still OWED: Ben's live click (1087 R6, 1088 R6, 1089 R5); a re-read of the sweep's
+  pinned-clash column on the library (its 101 / 18 was over the 1960 raster).
 
 ### Wave 1, lane I2 (frontier and marks) — BL-1090 (hard borders) then BL-1094 (marks). Groups `hard-borders-by-people-share`, `marks-that-earn-their-place`.
 
