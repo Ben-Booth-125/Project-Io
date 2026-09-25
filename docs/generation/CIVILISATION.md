@@ -1068,8 +1068,8 @@ resumed from the last handoff carries every living realm's name forward unchange
 inherits, it does not coin.
 
 **Where the seat stands is a fact about a year; the name is not.** A realm's capital at a given
-year is a read-side fold of `founded` and `capital_moved`, and every mark that sits on a seat takes
-its place from that fold (`../ui/STARTUP.md` owns what is drawn). **The name never follows the
+year is a read-side fold of `founded`, the resume's `inherited` restatement and `capital_moved`, and
+every mark that sits on a seat takes its place from that fold (`../ui/STARTUP.md` owns what is drawn). **The name never follows the
 capital.** A realm that re-seats is the realm it was — "X re-seats itself at Y" — and the name on
 the board does not move.
 

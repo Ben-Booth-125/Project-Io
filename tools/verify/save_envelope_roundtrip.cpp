@@ -334,6 +334,26 @@ save_envelope make_envelope()
         be.industrialisation_timelapse.samples.push_back(ip);
     }
 
+    // BL-1088, save_game_version 22 -- the realm name table, one string per
+    // polity id, written after the event layer of EACH record. Distinct
+    // strings on the two records, an EMPTY entry in the middle of the first
+    // (a tongue that could not coin is a legal empty and must come back empty
+    // and in place), and different lengths, so a reader that dropped the table
+    // on one record would desynchronise the next.
+    be.prehistory_timelapse.polity_name = { "Oru Vethal", "", "Kasra Meen", "Thessa" };
+    be.industrialisation_timelapse.polity_name = { "Oru Vethal", "Dunmarr", "Kasra Meen", "Thessa",
+                                                   "Ilvane Holt" };
+
+    // BL-1089, save_game_version 22 -- the polity fold's record after the three
+    // time-lapses: five flat arrays at DISTINCT values. Two nations; the first
+    // is ownerless ground (-1, so the sentinel survives as a sentinel), the
+    // second is realm 3 and absorbed realms 1 and 4.
+    be.nation_ids            = { 907, 911 };
+    be.nation_polity         = { -1, 3 };
+    be.nation_absorbed_first = { 0, 0 };
+    be.nation_absorbed_count = { 0, 2 };
+    be.nation_absorbed       = { 1, 4 };
+
     e.report.bodies.push_back(be);
     e.report.industrialisation_years     = 300;
     e.report.industrialisation_battles   = 417;
@@ -479,6 +499,26 @@ int main()
         check(le.report.bodies.size() == 1 && le.report.bodies[0].name == "Vhessari Prime"
                   && le.report.bodies[0].id == 41 && le.report.bodies[0].is_homeworld,
               "S3 the generation report's body entry survives (name, id, homeworld flag)");
+        // BL-1088, save_game_version 22 -- the realm name table on each record,
+        // pinned to literals: the empty entry must come back empty and in
+        // place, and the two records' tables must not swap or truncate.
+        check(le.report.bodies.size() == 1
+                  && le.report.bodies[0].prehistory_timelapse.polity_name
+                         == std::vector<std::string>{ "Oru Vethal", "", "Kasra Meen", "Thessa" }
+                  && le.report.bodies[0].industrialisation_timelapse.polity_name
+                         == std::vector<std::string>{ "Oru Vethal", "Dunmarr", "Kasra Meen", "Thessa",
+                                                      "Ilvane Holt" },
+              "S3 the realm name table survives on each record, an empty entry in place (BL-1088, v22)");
+        // BL-1089, save_game_version 22 -- the polity fold's record, pinned to
+        // literals: the ownerless sentinel, the absorbed range on the second
+        // nation and the flat list, each in its own slot.
+        check(le.report.bodies.size() == 1
+                  && le.report.bodies[0].nation_ids == std::vector<entity_id>{ 907, 911 }
+                  && le.report.bodies[0].nation_polity == std::vector<int32_t>{ -1, 3 }
+                  && le.report.bodies[0].nation_absorbed_first == std::vector<int32_t>{ 0, 0 }
+                  && le.report.bodies[0].nation_absorbed_count == std::vector<int32_t>{ 0, 2 }
+                  && le.report.bodies[0].nation_absorbed == std::vector<int32_t>{ 1, 4 },
+              "S3 the polity fold's record survives in its slots (BL-1089, v22)");
 
         // BL-766: the urban record. Pinned to LITERALS rather than compared
         // field-to-field, for the reason the year-slot row above gives — a
