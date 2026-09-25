@@ -62,7 +62,15 @@ workflow (5 + 5).
   pin moved (laws on all sixteen seeds); world_determinism's seed B reads 4F7BBD76AEEF3431 on main
   now. The re-bless is taken once, after I1 merges. A second digest check runs on the G+C-only tree
   to settle whether the settle promotion alone moved anything (BL-1085 R1).
-- Filed NR-937 (the hard-border pin and the heavy coast).
+- Filed NR-937 (the hard-border pin and the heavy coast), NR-938 (the clash rule is
+  pinned-vs-pinned), BL-1110 and BL-1111 (two defects lane I1 met in passing).
+- **I1 merged** `66bdbc0f` after a branch-side fix round (main merged in first, so the identity
+  files' collisions were resolved on the branch) and four low notes taken on main `f81d0d05`.
+- **Attribution by row comparison, not by pins.** The sweep's 16 pins were stale since sprint 46,
+  so every tree read 0/16 against them and the FAIL said nothing. Running the digest check on the
+  pre-sprint tree and on the G+C-only tree gave identical rows on all 16 seeds: the seeds and the
+  settle promotion moved nothing (BL-1085 R1 closed). Against the full wave-0 tree the laws move
+  every seed from the landing digest on and the purchases move five seeds from the search digest.
 
 ### Open
 - Ben's five live clicks (BL-1068, 1072, 1073, 1076, 1080) — he opened the Release build and walked into
