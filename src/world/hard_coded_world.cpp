@@ -520,7 +520,7 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
         150,   // 12 Finishing (markets, the other bodies, laws, garrisons)
         1500,  // 13 Running the exploration age
         2000,  // 14 Running the Industrialisation span
-        8000,  // 15 Tracing the old roads (stamp_history_roads)
+        1500,  // 15 Tracing the old roads (stamp_history_roads; 8000 before BL-1119 round 4)
         // The two steps finish_campaign_world runs after generation (BL-1085),
         // measured by `gen_step_costs --finish 0 28` on the same footing
         // (Release, 2026-09-24): the search 28,801 / 12,623 ms over 13
