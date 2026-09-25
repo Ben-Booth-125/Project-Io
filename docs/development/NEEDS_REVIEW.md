@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*41 entries — 20 open, 21 resolved.*
+*42 entries — 21 open, 21 resolved.*
 
 ---
 
@@ -302,6 +302,20 @@ The pin was measured over the 16 curated seeds at every recorded Empires step (8
 > **Recommendation:** B: the coast is not a frontier, and the pin as measured is honest. Take at the live click with the crop.
 
 *Files: `src/ui/history_lapse.hpp`, `src/ui/history_lapse.cpp`, `tools/verify/history_sweep.cpp`*
+
+### NR-938 — DECISION TAKEN: the pinned-slot clash rule is pinned-vs-pinned (the 2026-09-24 ruling said pinned-vs-fresh, a case the walk never produces)
+*decision taken on your behalf · raised 2026-09-25 · from BL-1087 lane I1 fix round and its cold review, 2026-09-25*
+
+The ruling (R7) said a pinned/fresh adjacency clash re-slots the smaller people-share realm. In the built walk a FRESH realm is coloured greedily AROUND the pins, so it cannot clash with one; the only clash the seam makes is two PINNED realms that never touched before and now neighbour — that is the case the code resolves (the smaller people share re-slots at the round's opening step; on the verify world 1 re-slot at each of the 1200 and 1660 seams). STARTUP.md § Identity across the rounds was reworded to say so with a dated note; the sentence is qualified: a fresh realm cannot clash except on a spill (the palette exhausted), where it shares a neighbour's slot and no re-slot happens.
+
+**Why it matters.** An authority-doc sentence was changed by a lane on its own reading; Ben should know the rule he ruled is not the rule the walk needs, and confirm the pinned/pinned form.
+
+- A: confirm pinned/pinned (as built and now written)
+- B: keep the ruling's wording and add a fresh-realm re-slot the walk does not need
+
+> **Recommendation:** A.
+
+*Files: `docs/ui/STARTUP.md`, `src/ui/history_lapse.cpp`*
 
 ---
 
