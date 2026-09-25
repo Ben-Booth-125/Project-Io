@@ -1033,6 +1033,27 @@
     "tools/verify/exploration_sim_harness.cpp"
    ],
    "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): B, range-check the civilisation and creed indices in both validators, conditional on a non-empty table, and fill the exploration_sim_harness fixtures' tables. The work is BL-1116 (handoff validators range-check), Light."
+  },
+  {
+   "id": "NR-944",
+   "title": "CALL: a nation with no town and no spurring village now gets no border link at all - off the continental network. Accept, fall back, or read after centres consolidate?",
+   "raised": "2026-09-25",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1119 (roads tree and detour) round 2, 2026-09-25, following Ben's density-form ruling that a border link ends only on a town or a spurring village",
+   "what": "The ruling removed every border link that ended on a bare village street (seed 46: 106 -> 0; seed 28: 26 -> 0). But a nation pair where one side has NO centre on its network now lays no link at all: 49 of 174 pairs on seed 46, 13 of 48 on seed 28, 30 of 94 on seed 0. Such a nation is off the continental network entirely; earlier road work (every centre gets a street, the border link) existed to keep every nation connected. Border links fell 151 -> 118 (seed 46), 46 -> 33 (seed 28), 91 -> 62 (seed 0).",
+   "why_it_matters": "A nation with no link cannot be reached by road across the border: its trade and any march into or out of it price as off-road. BL-1130 (centres consolidate) merges villages into towns this sprint, which should give many of these nations a town and so a network endpoint.",
+   "options": [
+    "A: accept - a nation with nothing on its network lays no border road",
+    "B: fall back - such a nation links from its largest centre even if it is a bare street, so every nation stays connected",
+    "C: read after BL-1130 lands, then choose between A and B on the consolidated worlds"
+   ],
+   "recommendation": "C, leaning B: the ruling was about links that join nothing, and a nation left wholly off the network is the opposite case.",
+   "files": [
+    "src/world/road_generation.cpp",
+    "docs/economy/LOGISTICS.md"
+   ],
+   "resolution": null
   }
  ]
 }

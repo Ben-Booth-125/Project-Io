@@ -152,10 +152,16 @@ LOGISTICS.md §§ 1, 4, 6.
   destination's field only; L1 matches without the control; plus BL-1117's S2 review fix round
   (tie contract restated, F1 non-vacuous, stale comments). Files: `logistics.*`,
   `lp_anchor_field_check.cpp`. The settle lane.
-- [ ] D4 BL-1119 round 2: the floor constant; border links only on towns and spurring villages;
+- [x] D4 BL-1119 round 2: the floor constant; border links only on towns and spurring villages;
   `invalidate_logistics_caches` in road generation; the loading-bar weights measured (applied by
   the main session after K4); the highway-tier row's cause. Files: `road_generation.*`, its
   harness, `gen_step_costs.cpp`. The roads lane.
+  DONE 2026-09-25 (15ef577a, merged bbf89652): road_generation_harness ALL OK (the Highway row's
+  cause was the harness banding nations by id); border links on a bare street 106 -> 0 (seed
+  46), but 49 of 174 pairs now have no network endpoint and lay no link -> NR-944. Road pass
+  (indicative) seed 0 10.1 s, 28 6.6 s, 46 21.7 s. TO APPLY AFTER K4 MERGES (hard_coded_world.cpp
+  progress weights): roads step 38,000 -> ~7,500; step 15 (history roads) 5,500 -> ~8,000;
+  `kBorderUnitsPerNation` 12 -> ~24. Cold review running.
 - [ ] C1 BL-1130 (centres consolidate): a committed centre census old -> new; villages merge into
   towns; no region carries more centres than its cell holds. Files: `settlement.*`,
   `population_generation.*`, `history_sim.cpp` (urban growth only). A new lane.

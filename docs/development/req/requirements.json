@@ -6574,23 +6574,23 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: gen_step_costs and a road census per floor candidate, 16 curated seeds, Release"
      ],
      "requirement": "The village spur floor is measured before it is fixed: road tiles, spur count and road pass time per floor candidate on the 16 curated seeds.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "D1 (e0267b2b), 16 curated seeds, Release, indicative: road tiles / off-street tiles / spurs / unspurred / floods / pass time per floor candidate (old lattice, tree at 0, 10,001, 15,000, 20,000, 30,000, 40,000, no spurs); table in scratchpad lane-roads/d1_table.md. Size = the population step headcount (every village reads population 10k when roads are laid). Ben fixed 40,000 heads (density form, 2026-09-25)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: road_generation_harness"
      ],
      "requirement": "After the Kruskal MST a candidate link is laid only when the network route between its centres costs more than twice the direct A* route (one named constant); the relative-neighbour lattice is gone; connectivity holds.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Round 2 (15ef577a, merged bbf89652): Kruskal MST + detour test (kDetourRatio 2.0) + the spur floor at 40,000 + border links only on towns and spurring villages; road_generation_harness ROAD GEN AUDIT OK, 0 failures (R3 connectivity, R4 determinism, R5a-f incl. no border link on a bare street at either floor; the Highway row passes on 8 of 8 after the harness banded its qualified nations by urban weight instead of id)."
     },
     {
      "id": "R3",
@@ -6599,7 +6599,7 @@
       "visual: a capture of the densest curated seed's road lens"
      ],
      "requirement": "No lattice: the densest seed's capture shows a tree with occasional detour loops.",
-     "notes": "",
+     "notes": "Read after BL-1130 (centres consolidate): the remaining street carpet is centre density, not roads.",
      "result_metric": ""
     },
     {
@@ -6609,7 +6609,7 @@
       "headless: gen_step_costs --finish, 16 curated seeds, Release"
      ],
      "requirement": "Road tiles and road pass time are recorded old -> new per seed, and generate_roads runs under ~10 s Release on the library seeds (BL-1077's target, folded in).",
-     "notes": "",
+     "notes": "Round 2, indicative: road pass at 40,000 seed 0 10.1 s, seed 28 6.6 s, seed 46 21.7 s -- the ~10 s target is met on seed 28 only; re-read after BL-1130 thins the centres.",
      "result_metric": ""
     },
     {

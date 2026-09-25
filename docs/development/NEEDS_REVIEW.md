@@ -24,13 +24,26 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*47 entries — 0 open, 47 resolved.*
+*48 entries — 1 open, 47 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-944 — CALL: a nation with no town and no spurring village now gets no border link at all - off the continental network. Accept, fall back, or read after centres consolidate?
+*question · raised 2026-09-25 · from BL-1119 (roads tree and detour) round 2, 2026-09-25, following Ben's density-form ruling that a border link ends only on a town or a spurring village*
+
+The ruling removed every border link that ended on a bare village street (seed 46: 106 -> 0; seed 28: 26 -> 0). But a nation pair where one side has NO centre on its network now lays no link at all: 49 of 174 pairs on seed 46, 13 of 48 on seed 28, 30 of 94 on seed 0. Such a nation is off the continental network entirely; earlier road work (every centre gets a street, the border link) existed to keep every nation connected. Border links fell 151 -> 118 (seed 46), 46 -> 33 (seed 28), 91 -> 62 (seed 0).
+
+**Why it matters.** A nation with no link cannot be reached by road across the border: its trade and any march into or out of it price as off-road. BL-1130 (centres consolidate) merges villages into towns this sprint, which should give many of these nations a town and so a network endpoint.
+
+- A: accept - a nation with nothing on its network lays no border road
+- B: fall back - such a nation links from its largest centre even if it is a bare street, so every nation stays connected
+- C: read after BL-1130 lands, then choose between A and B on the consolidated worlds
+
+> **Recommendation:** C, leaning B: the ruling was about links that join nothing, and a nation left wholly off the network is the opposite case.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
 
 ---
 
