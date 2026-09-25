@@ -130,6 +130,21 @@ in the scratchpad. Re-pin the shipped table (and the legacy one only if it moved
 counters with the cause named, `seed_library.js --bless`; rebuild the harnesses; `--digest-check`
 both arcs green; one commit.
 
+**THE RE-BLESS IS HELD FOR ITS RIDERS (08:40):** the first measurement is in -- shipped arc: all 16
+rows moved (`rebless_measure.log.digest.txt`); legacy arc: all 16 moved from D_search on, the mover
+being BL-1089's name inheritance (runs on every arc; I1's A/B is the attribution); exploration
+R3b: tribute +400 and nothing else (BL-1096, one purchase on the fixture) -- re-pinned in the
+working tree and the harness ALL PASS; library sweep: seeds 25 and 38 moved (expl_battles 613 ->
+609, flows 72 -> 76, treasury median 477 -> 18697; 8602106 -> 8599359), 14 unchanged. NOT
+COMMITTED, because BL-1082 (the state hash folds the seat) and BL-1049 (the civilisation and
+creed tables passed to the 1200 resume) were ruled to RIDE this re-bless and were still unbuilt:
+committing now would have forced a second. Both launched as workflow `wf_5d71bddc-67d` (two
+worktrees off main, cold-reviewed). When they land: merge, rebuild, gates, then re-measure all
+four (`main_session_rebless_measure.sh`, the legacy `--digest-check`, the library sweep,
+exploration_sim_harness), re-pin with `repin_sweep_table.py`, `seed_library.js --bless`,
+`--digest-check` both arcs green, ONE commit. The riders' own digest movement is recorded
+old -> new in their requirement rows.
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936
