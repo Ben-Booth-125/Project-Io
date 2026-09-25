@@ -765,6 +765,25 @@ target_link_libraries(player_seed_sweep PRIVATE io_world_obj lua54)
 target_compile_features(player_seed_sweep PRIVATE cxx_std_20)
 target_compile_options(player_seed_sweep PRIVATE ${IO_WARNING_FLAGS})
 
+# world_cursor_equivalence (BL-1084, 2026-09-25) — live-Lua for player_seed_sweep's
+# reason: it builds worlds from the app's generation inputs (the PARSED
+# scripts/world_gen.lua and scripts/works.lua, harness_params.hpp's
+# load_app_generation_inputs), so it names the same Lua TUs.
+add_executable(world_cursor_equivalence
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/world_cursor_equivalence.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(world_cursor_equivalence PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(world_cursor_equivalence PRIVATE io_world_obj lua54)
+target_compile_features(world_cursor_equivalence PRIVATE cxx_std_20)
+target_compile_options(world_cursor_equivalence PRIVATE ${IO_WARNING_FLAGS})
+
 # tier_margin (BL-436, 2026-08-16) — live-Lua for the same reason: it asks
 # whether REFINING PAYS in the shipped economy, so it must read the authored
 # prices, rates and recipes rather than a hand-built mirror of them. It also
@@ -1218,6 +1237,16 @@ set(IO_TEST_SWEEP_HARNESSES
     # landscape search per curated seed, sixteen of them. Reports, never gates.
     industrialisation_sim_harness
 
+    # Added 2026-09-25 (BL-1084): the generation cursor's proof -- per curated
+    # seed, the composition in place, the staged build on faithful copies and
+    # the one call, compared at every round boundary. Three full shipped worlds
+    # per seed, sixteen seeds: an hour-scale run in Release, so it cannot sit in
+    # the 240 s tier. Its breadth IS the check (the sixteen worlds are the
+    # library's), so it is not thinned to fit; run it by name whenever
+    # hard_coded_world's stages or world/generation_cursor.hpp change
+    # (`--seeds 0 --no-one-call` is the one-world smoke form).
+    world_cursor_equivalence
+
     # CATEGORY (1), added 2026-09-08 with BL-825. history_span_cost prices the
     # Era -1 span: it builds a world per seed and then re-runs the era at 400 /
     # 1000 / 2000 / 4000 years plus a step_years sweep, so its runtime is the
@@ -1320,6 +1349,7 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     era_roster
     haulage_measure
     player_seed_sweep
+    world_cursor_equivalence # BL-1084: scripts/*.lua and docs/generation/seed_library.json
     interbody_pull_harness
     pregame_balance_harness
     persona_counsel_harness

@@ -1077,6 +1077,33 @@ reading under the rows when it sees it; whether the migration should carry dice 
 node tools/verify/build_harness.js span_seed_isolation --run
 ```
 
+## world_cursor_equivalence — BL-1084, does a stage run on a COPY build what the single call builds?
+
+`make_hard_coded_world` is a composition of six stage functions over one `generation_cursor`
+(`src/world/generation_cursor.hpp`): life_gate, culture, empires, exploration, industrialisation,
+tail. The wizard moves one world forward by running each round's stage on the slot the round before
+it closed, so a stage on a copy must build exactly what the single call builds. Per curated seed
+(`docs/generation/seed_library.json`), with the app's generation inputs (the parsed world_gen.lua and
+works.lua): **(a)** the composition in place, digested at every boundary; **(b)** the staged build — at
+every boundary the cursor, report and fixture are copied, the copy rebound, the ORIGINAL FREED, and the
+next stage run on the copy; **(c)** `make_hard_coded_world` itself against (a)'s tail. (a) and (b) must
+agree at every boundary on the ownership records (every span's `era_timelapse`), the polity tables, the
+world (world_determinism's deep digest, shared through `world_deep_digest.hpp`), the cursor's own
+members, and the report. A non-vacuity row asserts the digests can see every stage.
+
+`--measure` (default seeds 0 and 28, no tail) prices the reroll path: copying a closed stage's cursor
+against replaying to it from a held Life-gate cursor and from the params, and asserts each replay lands
+on the walk's own digests. Timings are wall clock, reported and never asserted.
+
+Three full shipped worlds per seed: an hour-scale run in Release on the sixteen seeds, so it is a
+`sweep`-labelled ctest. `--seeds 0 --no-one-call` is the one-world smoke form.
+
+```
+bash tools/verify/build_lua_harness.sh world_cursor_equivalence
+build_gen/verify/world_cursor_equivalence.exe                       # K2: the 16 library seeds
+build_gen/verify/world_cursor_equivalence.exe --measure --seeds 0,28 # K3: copy vs replay
+```
+
 ## Which builder?
 
 Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:
