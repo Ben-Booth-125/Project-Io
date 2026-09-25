@@ -582,6 +582,9 @@ static void fill_works_close(ui::history_lapse& h, const world& w, const generat
     h.works_close.reserve(charter.charters.size());
     for (const charter_record& r : charter.charters)
     {
+        // A row whose corp the world no longer holds is not a firm to flash
+        // (`date_chartered_firms` skips it too, so it carries no year).
+        if (w.corporations.find(r.corp) == w.corporations.end()) continue;
         const auto t = w.tiles.find(r.anchor_tile);
         if (t == w.tiles.end() || t->second.body != home) continue;
         h.works_close.push_back(ui::history_lapse::works_mark{
