@@ -128,6 +128,82 @@ void write_road_map(const world& w, entity_id body, const std::set<entity_id>& c
     }
 }
 
+/// BL-1119 round 3 — JOINED TO A TOWN, rebuilt from the trace alone (the same reading
+/// road_generation_harness R5f asserts). Connectivity is the laid routes' own paths:
+/// consecutive tiles of every tree, loop and spur route are joined (water tiles
+/// included, so a strait crossing bridges as the rule says it does); border routes are
+/// left out, so "joined" means joined inside the nation's own network. A centre is
+/// joined when its tile's component holds a town (scale >= 2) of the same nation.
+struct joined_reading
+{
+    int villages_claimed = 0;     ///< villages the pass counts on their network
+    int villages_unjoined = 0;    ///< of them, whose road reaches no same-nation town
+    int border_endpoints = 0;     ///< border-link endpoints (two per link)
+    int border_unjoined = 0;      ///< of them, not joined to a same-nation town
+};
+
+joined_reading read_joined(const world& w, entity_id body, const road_generation_trace& tr)
+{
+    std::map<entity_id, entity_id> parent;
+    auto root = [&](entity_id x) -> entity_id {
+        if (parent.find(x) == parent.end()) { parent.emplace(x, x); return x; }
+        entity_id r = x;
+        while (parent[r] != r) r = parent[r];
+        while (parent[x] != r) { const entity_id nx = parent[x]; parent[x] = r; x = nx; }
+        return r;
+    };
+    auto join = [&](entity_id a, entity_id b) {
+        const entity_id ra = root(a), rb = root(b);
+        if (ra != rb) parent[std::max(ra, rb)] = std::min(ra, rb);
+    };
+    for (const auto& r : tr.routes)
+    {
+        if (r.k == road_generation_trace::kind::border) continue;
+        for (std::size_t i = 1; i < r.path.size(); ++i) join(r.path[i - 1], r.path[i]);
+        if (!r.path.empty()) { join(r.from, r.path.front()); join(r.to, r.path.front()); }
+    }
+    auto nation_at = [&](entity_id t) {
+        const auto it = w.tile_to_nation.find(t);
+        return it != w.tile_to_nation.end() ? it->second : null_entity;
+    };
+    std::map<entity_id, int> scale_at; // centre tile -> scale, on the body
+    std::set<std::pair<entity_id, entity_id>> town_roots; // (component root, nation)
+    for (const auto& [cid, tile] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tile);
+        const auto pit = w.population_centres.find(cid);
+        if (tit == w.tiles.end() || tit->second.body != body || pit == w.population_centres.end())
+            continue;
+        scale_at[tile] = pit->second.scale;
+        if (pit->second.scale >= 2) town_roots.insert({ root(tile), nation_at(tile) });
+    }
+    auto joined = [&](entity_id tile) {
+        const auto s = scale_at.find(tile);
+        if (s != scale_at.end() && s->second >= 2) return true; // a town is the network
+        return town_roots.count({ root(tile), nation_at(tile) }) != 0;
+    };
+    joined_reading jr;
+    for (const entity_id c : tr.on_network)
+    {
+        const auto ct = w.population_centre_tile.find(c);
+        if (ct == w.population_centre_tile.end()) continue;
+        const auto s = scale_at.find(ct->second);
+        if (s == scale_at.end() || s->second >= 2) continue;
+        ++jr.villages_claimed;
+        if (!joined(ct->second)) ++jr.villages_unjoined;
+    }
+    for (const auto& r : tr.routes)
+    {
+        if (r.k != road_generation_trace::kind::border) continue;
+        for (const entity_id e : { r.from, r.to })
+        {
+            ++jr.border_endpoints;
+            if (!joined(e)) ++jr.border_unjoined;
+        }
+    }
+    return jr;
+}
+
 /// A road-free body and cold traversal caches: the state `generate_roads` meets in
 /// generation (only the two road passes write road_level before the finish).
 void clear_roads(world& w, entity_id body)
@@ -144,7 +220,7 @@ void clear_roads(world& w, entity_id body)
 /// border base (`units_backbone + units_spurs`). Read from the sink the loading screen
 /// reads, so it measures exactly what the bar shows; no clock enters world code.
 double timed_generate_roads(world& w, entity_id body, long long floor, road_generation_stats& st,
-                            double& border_s)
+                            double& border_s, road_generation_trace* trace)
 {
     auto bar = std::make_unique<generation_progress>();
     std::atomic<bool> stop{false};
@@ -158,7 +234,7 @@ double timed_generate_roads(world& w, entity_id body, long long floor, road_gene
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
     });
-    generate_roads(w, body, bar.get(), floor, &st);
+    generate_roads(w, body, bar.get(), floor, &st, trace);
     const double total = secs_between(t0, clk::now());
     stop.store(true, std::memory_order_release);
     sampler.join();
@@ -255,7 +331,11 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
         clear_roads(w, body);
         road_generation_stats st{};
         double border_s = 0.0;
-        const double s = timed_generate_roads(w, body, f, st, border_s);
+        // The trace costs only cache hits (the pass re-reads paths it just laid), so it
+        // moves neither the network nor, measurably, the time.
+        road_generation_trace tr;
+        const double s = timed_generate_roads(w, body, f, st, border_s, &tr);
+        const joined_reading jr = read_joined(w, body, tr);
         int tiers[4] = { 0, 0, 0, 0 };
         int streets = 0; // road tiles hosting a centre: the local streets
         for (const auto& [tid, tc] : w.tiles)
@@ -290,6 +370,13 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
                     st.border_pairs, st.border_pairs_no_endpoint, border_s, s,
                     s > 0.0 ? 100.0 * border_s / s : 0.0,
                     st.flood_fields - st.flood_fields_before_border, st.flood_fields, fit_k);
+        // BL-1119 round 3: the two cold-review holes, read per row.
+        std::printf("  ROADS seed %u LINKS floor %lld: sea-route candidates %d | refused by the stamp:"
+                    " tree %d, loop %d | villages on the network %d, of them NOT joined to a town %d |"
+                    " border endpoints %d, not joined %d | spurs failed %d\n",
+                    seed, f, st.candidates_unlayable, st.tree_links_refused, st.loops_refused,
+                    jr.villages_claimed, jr.villages_unjoined, jr.border_endpoints,
+                    jr.border_unjoined, st.spurs_failed);
         std::fflush(stdout);
         if (!map_dir.empty()) // this pass alone, no history roads
             write_road_map(w, body, centre_tiles,

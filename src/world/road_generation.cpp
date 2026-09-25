@@ -264,9 +264,24 @@ long long village_spur_size(const world& w, entity_id centre)
 }
 
 void generate_roads(world& w, entity_id body, generation_progress* progress,
-                    long long spur_floor_heads, road_generation_stats* stats)
+                    long long spur_floor_heads, road_generation_stats* stats,
+                    road_generation_trace* trace)
 {
     road_generation_stats st{}; // BL-1119 D1: filled as the pass goes, copied out at the end
+    // BL-1119 round 3: a laid route, whole, into the caller's trace (write-only). The
+    // path is the one stamp_edge just laid — the pair cache answers it again unchanged.
+    const auto record = [&](road_generation_trace::kind k, entity_id from, entity_id to,
+                            entity_id nation) {
+        if (trace == nullptr)
+            return;
+        road_generation_trace::route r;
+        r.k      = k;
+        r.from   = from;
+        r.to     = to;
+        r.nation = nation;
+        r.path   = intra_body_path(w, body, from, to).tiles;
+        trace->routes.push_back(std::move(r));
+    };
     // Grid geometry (BL-620: the spur and border prefilters measure wrapped grid
     // distance, so they need the body's dimensions up front).
     const auto bit = w.bodies.find(body);
@@ -366,8 +381,9 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     // BL-1119: the floor is decided here, once per village, and the count reads
     // it — a village below the floor lays no spur, so it is no unit of work.
     std::vector<char> spurs(nodes.size(), 0); // 1 = a village at/above the spur floor
-    // 1 = a centre ON its nation's network: every town, and a village once its spur is
-    // laid. The border links end only on these (Ben, 2026-09-25).
+    // 1 = a centre ON its nation's network: every town, and a village once its spur has
+    // reached a tile joined to a town (the spur targets are only such tiles, BL-1119
+    // round 3). The border links end only on these (Ben, 2026-09-25).
     std::vector<char> on_network(nodes.size(), 0);
     for (std::size_t i = 0; i < nodes.size(); ++i)
     {
@@ -425,15 +441,17 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
         if (const auto pit = qual_percentile.find(nation); pit != qual_percentile.end())
             qualification = pit->second;
 
-        // Spur target set: this nation's already-roaded tiles — every member centre's own
-        // street (stamped in 1b) plus, below, the backbone raster and earlier spurs. The
-        // std::set only dedupes; candidate order never depends on it (the nearest-target
-        // scan is over the vector with a strict (distance^2, tile-id) comparison).
+        // Spur target set: this nation's tiles ALREADY JOINED TO THE BACKBONE (BL-1119
+        // round 3; LOGISTICS.md § 4) — every town's own street, then below the backbone
+        // raster, then each spur once it has reached one of these. The std::set only
+        // dedupes; candidate order never depends on it (the nearest-target scan is over
+        // the vector with a strict (distance^2, tile-id) comparison).
         //
-        // BL-1119: a village BELOW the spur floor is not a target. Its street never joins
-        // the network, so a spur ending on it would join two villages to each other and
-        // to nothing else. At floor 0 every village spurs and the set is exactly the
-        // pre-BL-1119 one.
+        // No village's street is a target until its own spur has joined, below-floor or
+        // not: a spur ending on an unjoined village joined nothing, and two such villages
+        // could each spur onto the other and both read as on the network while neither
+        // touched a town. So a village is on its nation's network exactly when its road
+        // reaches a town, and the spur walk can only extend what is already joined.
         struct spur_target { entity_id tile; int gx; int gy; };
         std::vector<spur_target> targets;
         std::set<entity_id>      target_seen;
@@ -446,7 +464,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
             targets.push_back({ t, it->second.grid_x, it->second.grid_y });
         };
         for (const int m : members)
-            if (nodes[m].scale >= kMidScale || spurs[static_cast<std::size_t>(m)])
+            if (nodes[m].scale >= kMidScale)
                 add_target(nodes[m].tile);
 
         // --- Backbone: towns-and-up only (BL-620) ---------------------------------
@@ -467,8 +485,20 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                 {
                     const logistics_path& p =
                         intra_body_path(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile);
+                    // ONLY A LINK THAT CAN BE LAID IS A CANDIDATE (NR-945, LOGISTICS.md
+                    // § 4). The flood crosses water at sea-leg cost, so an open-sea pair is
+                    // "reachable" — and stamp_edge refuses it. Kept as a candidate it became
+                    // a tree link that stranded a town, or an admitted loop in the test
+                    // network that refused the real land loops beside it. Filtered here with
+                    // stamp_edge's own rule, so a nation the sea divides builds one tree per
+                    // landmass.
                     if (p.reachable)
-                        edges.push_back({ p.cost, a, b });
+                    {
+                        if (p.crosses_ocean && !crossings_are_straits(w, p))
+                            ++st.candidates_unlayable;
+                        else
+                            edges.push_back({ p.cost, a, b });
+                    }
                     report_units(++units_done); // BL-1072
                 }
 
@@ -543,19 +573,28 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
             const int loops_kept =
                 static_cast<int>(static_cast<float>(loops.size()) * loop_frac);
             st.loops_kept += loops_kept;
+            const std::size_t tree_count = chosen.size(); // chosen[0, tree_count) is the tree
             for (int i = 0; i < loops_kept; ++i)
                 chosen.push_back(loops[static_cast<std::size_t>(i)]);
 
             // Rasterise: tier by the two towns' scales gated by qualification (BL-618),
             // and feed this nation's stamped tiles into the spur target set.
             std::vector<entity_id> stamped;
-            for (const auto& [a, b] : chosen)
+            for (std::size_t ci = 0; ci < chosen.size(); ++ci)
             {
+                const auto [a, b] = chosen[ci];
+                const bool is_tree = ci < tree_count;
                 const std::uint8_t tier =
                     edge_tier(nodes[towns[a]].scale, nodes[towns[b]].scale, qualification);
                 stamped.clear();
                 const bool laid =
                     stamp_edge(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile, tier, &stamped);
+                if (!laid)
+                    ++(is_tree ? st.tree_links_refused : st.loops_refused);
+                else
+                    record(is_tree ? road_generation_trace::kind::tree
+                                   : road_generation_trace::kind::loop,
+                           nodes[towns[a]].tile, nodes[towns[b]].tile, nation);
                 if (laid && nodes[towns[a]].scale >= kMajorScale
                     && nodes[towns[b]].scale >= kMajorScale)
                 {
@@ -570,9 +609,10 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
 
         // --- Village spurs (BL-620) -----------------------------------------------
         // Villages in tile-id order (members are already sorted), each laying one Track
-        // to its nearest same-nation roaded tile. A stamped spur's tiles join the target
-        // set, so later villages branch off earlier feeders rather than each running its
-        // own long track — the incremental order is deterministic because the walk is.
+        // to its nearest same-nation tile already JOINED to the backbone. A stamped spur's
+        // tiles join the target set — they are joined, since the spur ends on a joined
+        // tile — so later villages branch off earlier feeders rather than each running its
+        // own long track; the incremental order is deterministic because the walk is.
         if (gw > 0)
         {
             constexpr long long kMaxSpurD2 =
@@ -613,6 +653,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                     for (const entity_id t : stamped)
                         if (nation_of(w, t) == nation)
                             add_target(t);
+                    record(road_generation_trace::kind::spur, nodes[m].tile, best[s].tile, nation);
                     laid = true;
                     break;
                 }
@@ -750,6 +791,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
         }
         if (best_a != null_entity && stamp_edge(w, body, best_a, best_b, kTrack))
         {
+            record(road_generation_trace::kind::border, best_a, best_b, na);
             ++st.border_links;
             if (street_only.count(best_a) != 0 || street_only.count(best_b) != 0)
                 ++st.border_links_street_only;
@@ -758,6 +800,10 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
 
     report_units(units_total); // BL-1072: whole, whatever the border walk found
     st.flood_fields = static_cast<long long>(w.logistics_flood_fields.size());
+    if (trace != nullptr)
+        for (std::size_t i = 0; i < nodes.size(); ++i)
+            if (on_network[i])
+                trace->on_network.push_back(nodes[i].centre);
     if (stats != nullptr)
         *stats = st; // BL-1119 D1: write-only, read by nothing in this pass
 
