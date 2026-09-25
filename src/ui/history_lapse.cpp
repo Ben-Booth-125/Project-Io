@@ -1565,6 +1565,34 @@ const char* polity_name_of(const history_lapse& h, uint16_t polity)
     return region_name_of(h, static_cast<uint16_t>(h.polity_seat[polity]));
 }
 
+/// BL-1106: a civilisation's coined name off the record's name table
+/// (era_timelapse.hpp § The name table), or an honest placeholder.
+const char* civilisation_name_of(const history_lapse& h, uint16_t idx)
+{
+    if (idx == lapse_event_none || static_cast<std::size_t>(idx) >= h.lapse.civilisation_name.size()
+     || h.lapse.civilisation_name[idx].empty())
+        return "an unnamed civilisation";
+    return h.lapse.civilisation_name[idx].c_str();
+}
+
+/// BL-1106: a creed's coined name off the same table, or a placeholder.
+const char* creed_name_of(const history_lapse& h, int32_t idx)
+{
+    if (idx < 0 || static_cast<std::size_t>(idx) >= h.lapse.creed_name.size()
+     || h.lapse.creed_name[static_cast<std::size_t>(idx)].empty())
+        return "an unnamed creed";
+    return h.lapse.creed_name[static_cast<std::size_t>(idx)].c_str();
+}
+
+/// BL-1106: the creed a polity adopted, off the record's `polity_creed`
+/// table; -1 where the table does not say.
+int32_t creed_of_polity(const history_lapse& h, uint16_t polity)
+{
+    if (polity == lapse_event_none || static_cast<std::size_t>(polity) >= h.lapse.polity_creed.size())
+        return -1;
+    return h.lapse.polity_creed[polity];
+}
+
 } // namespace
 
 float lapse_industry_heat(const history_lapse& h, uint16_t polity, int year)
@@ -1608,9 +1636,12 @@ void draw_lapse_scoreboard(const history_lapse& h,
         return;
     }
 
+    // BL-1106: THE BOARD'S NOUN FOLLOWS THE RECORD. On the Culture round the
+    // owners are peoples and the column is each one's homeland (STARTUP.md
+    // § Round 3 — Culture); on the three pass rounds they are realms.
     ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
-    ImGui::Text("%d powers hold ground; the top %d are listed.",
-                static_cast<int>(now.size()), k_board_rows);
+    ImGui::Text("%d %s hold ground; the top %d are listed.",
+                static_cast<int>(now.size()), h.peoples ? "peoples" : "realms", k_board_rows);
     ImGui::PopStyleColor();
     ImGui::Spacing();
 
@@ -1645,7 +1676,7 @@ void draw_lapse_scoreboard(const history_lapse& h,
     // its column simply clips ("Popul...") with nothing recording that it did.
     // "People" is the rank column and reads as a share; "Pop" is the headcount.
     ImGui::TableSetupColumn("#",      ImGuiTableColumnFlags_WidthFixed, 22.0f);
-    ImGui::TableSetupColumn("Seat",   ImGuiTableColumnFlags_WidthStretch);
+    ImGui::TableSetupColumn(h.peoples ? "Homeland" : "Seat", ImGuiTableColumnFlags_WidthStretch);
     ImGui::TableSetupColumn("People", ImGuiTableColumnFlags_WidthFixed, 48.0f);
     ImGui::TableSetupColumn("Land",   ImGuiTableColumnFlags_WidthFixed, 48.0f);
     ImGui::TableSetupColumn("Pop",    ImGuiTableColumnFlags_WidthFixed, 46.0f);
@@ -1791,6 +1822,38 @@ void draw_lapse_scoreboard(const history_lapse& h,
                     static_cast<int>(now.size()) - shown);
         ImGui::PopStyleColor();
     }
+}
+
+int lapse_lagged_year(const history_lapse& h, int year)
+{
+    // A twelfth of the span back: far enough that a rank move means something,
+    // near enough that the marks are not permanently lit. CLAMPED TO THE
+    // RECORD'S FIRST YEAR (BL-1106): a resumed span's inherited realms are
+    // written at its start year, and a lagged slice taken before it holds
+    // nobody — which marked every realm on the board as a newcomer for the
+    // first twelfth of rounds 5 and 6.
+    const int first = h.lapse.start_year;
+    const int lag   = std::max(1, h.lapse.years / 12);
+    return std::max(first, year - lag);
+}
+
+int lapse_board_entered_count(const history_lapse& h, int year)
+{
+    // THE SAME PREDICATE draw_lapse_scoreboard MARKS BY, over the same two
+    // ranked slices, so the verify read and the drawn '*' cannot disagree.
+    const int lagged_year = lapse_lagged_year(h, year);
+    const std::vector<board_row> now  = rank_slice(h, owner_slice_at(h.lapse, year), year);
+    const std::vector<board_row> then = rank_slice(h, owner_slice_at(h.lapse, lagged_year), lagged_year);
+    const int shown = std::min(k_board_rows, static_cast<int>(now.size()));
+    int entered = 0;
+    for (int i = 0; i < shown; ++i)
+    {
+        int was = -1;
+        for (std::size_t j = 0; j < then.size(); ++j)
+            if (then[j].owner == now[static_cast<std::size_t>(i)].owner) { was = static_cast<int>(j); break; }
+        if (was < 0 || was >= k_board_rows) ++entered;
+    }
+    return entered;
 }
 
 
@@ -1957,16 +2020,20 @@ void draw_lapse_arc(const history_lapse& h)
     const bool by_people = a.peak_share_pop_q > 0;
     const int  peak_q    = by_people ? a.peak_share_pop_q : a.peak_share_q;
     const int  end_q     = by_people ? a.end_share_pop_q  : a.biggest_end_q;
+    // BL-1106: THE NOUN FOLLOWS THE RECORD, as the board's does. A polity is
+    // a realm; only the Culture round's owners are peoples, and the old
+    // sentence called every round's polities peoples.
+    const char* noun = h.peoples ? "peoples" : "realms";
     if (a.eliminated == 0 && a.rose_and_fell == 0 && peak_q < 100)
     {
         ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
-        ImGui::TextWrapped("A quiet age. %d peoples held ground and none of them "
-                           "grew large or was destroyed.", a.polities);
+        ImGui::TextWrapped("A quiet age. %d %s held ground and none of them "
+                           "grew large or was destroyed.", a.polities, noun);
         ImGui::PopStyleColor();
     }
     else
     {
-        ImGui::Text("%d polities, %d destroyed.", a.polities, a.eliminated);
+        ImGui::Text("%d %s, %d destroyed.", a.polities, noun, a.eliminated);
         // Wrapped, not Text: "people" made this line the column's longest, and
         // an unwrapped line clips at the column edge with nothing recording it.
         ImGui::TextWrapped("The largest empire held %d%% of the world's %s; %d rose and fell back.",
@@ -2022,11 +2089,32 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
                       e.polity >= 2 ? "road" : "track", R, region_name_of(h, e.other));
         break;
     case lapse_event_kind::civilisation_formed:
-        std::snprintf(buf, sizeof buf, "Two peoples settle a shared way of life at %s.", R);
+        // BL-1106: `other` is the civilisation index; its coined name is on
+        // the record's name table. The wording is the history log's own.
+        std::snprintf(buf, sizeof buf, "%s is settled as a shared way of life at %s.",
+                      civilisation_name_of(h, e.other), R);
         break;
     case lapse_event_kind::creed_preached:
-        std::snprintf(buf, sizeof buf, "A creed is preached at %s, and claims every people.", R);
+        // BL-1106: `other` is the creed index, named off the same table.
+        std::snprintf(buf, sizeof buf, "%s is preached at %s, and claims every people.",
+                      creed_name_of(h, static_cast<int32_t>(e.other)), R);
         break;
+    case lapse_event_kind::schism:
+    {
+        // BL-1106: both parties and the creed. `polity` is the realm that
+        // walked out, seated at `region` (its name today, as broke_away's
+        // idiom names the successor by its seat); `other` is the parent, and
+        // the creed is the parent's — the institution the seceding people
+        // left, read off `polity_creed` since no event carries it.
+        const int32_t creed = creed_of_polity(h, e.other);
+        if (creed >= 0)
+            std::snprintf(buf, sizeof buf, "%s breaks with %s and its creed, %s.",
+                          R, polity_name_of(h, e.other), creed_name_of(h, creed));
+        else
+            std::snprintf(buf, sizeof buf, "%s breaks with %s over its creed.",
+                          R, polity_name_of(h, e.other));
+        break;
+    }
     case lapse_event_kind::culture_split:
         if (e.region == lapse_event_none)
             std::snprintf(buf, sizeof buf, "A new people parts from its kin on the march.");
@@ -2080,18 +2168,64 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
                       R, region_name_of(h, e.other));
         break;
     default:
-        std::snprintf(buf, sizeof buf, "Something happens at %s.", R);
+        // Unreachable on a record this build wrote: every kind above `count`
+        // has its own line, and a newer writer's kind is refused with the
+        // save (save_game.cpp's range check). Named honestly if it ever is.
+        std::snprintf(buf, sizeof buf, "An unrecorded kind of moment at %s.", R);
         break;
     }
     return lapse_year_label(e.year) + "  " + buf;
 }
 
-void draw_lapse_ticker(const history_lapse& h, int year, int max_rows)
+namespace {
+
+/// BL-1106: which kinds the ticker narrates, and at what priority, by how
+/// RARE the kind is — the ticker has six rows and a sim round dates every
+/// event in it to one year, so on a busy year something must drop, and it
+/// should never be the moment that happens twice a world. 0 = the RAREST
+/// moments (a civilisation settled, a creed preached, a schism, a furnace
+/// lit: a handful per world); 1 = the arc's common kinds (foundings, seats
+/// falling, realms ending: hundreds per world); 2 = CHURN, the trade and
+/// treaty kinds that fire several a year and were crowding the arc off the
+/// ticker; -1 = never narrated. Measured on the reference world: with two
+/// tiers, the civilisation settled in 1156 was crowded off by six same-year
+/// foundings and captures.
+int ticker_priority(const lapse_event& e)
 {
-    if (h.lapse.events.empty() || max_rows <= 0) return;
+    switch (static_cast<lapse_event_kind>(e.kind))
+    {
+    // ROADS ARE RINGED, NOT NARRATED. A road promotion is the commonest event
+    // by far — on a full-span world they outnumber every other kind together —
+    // and a ticker that prints them shows nothing else for the last centuries
+    // of the replay (measured on the first capture: eight road lines, no
+    // realm). They still pulse on the map; the ticker is for the moments of
+    // the ARC, which is what the round exists to show.
+    case lapse_event_kind::road_promoted:        return -1;
+    case lapse_event_kind::civilisation_formed:
+    case lapse_event_kind::creed_preached:
+    case lapse_event_kind::schism:
+    case lapse_event_kind::furnace_lit:          return 0;
+    case lapse_event_kind::supply_site_upgraded:
+    case lapse_event_kind::trade_link_opened:
+    case lapse_event_kind::trade_link_closed:
+    case lapse_event_kind::treaty_formed:
+    case lapse_event_kind::treaty_broken:
+    case lapse_event_kind::sea_lane_opened:      return 2;
+    default:                                     return 1;
+    }
+}
+
+constexpr int k_ticker_tiers = 3;
+
+} // namespace
+
+std::vector<int> lapse_ticker_rows(const history_lapse& h, int year, int max_rows)
+{
+    std::vector<int> rows;
+    if (h.lapse.events.empty() || max_rows <= 0) return rows;
 
     // The last event at or before the playhead: one binary search over the
-    // ascending list, then up to `max_rows` NARRATED events back from it.
+    // ascending list.
     int lo = 0, hi = static_cast<int>(h.lapse.events.size()) - 1, last = -1;
     while (lo <= hi)
     {
@@ -2100,20 +2234,37 @@ void draw_lapse_ticker(const history_lapse& h, int year, int max_rows)
         else hi = mid - 1;
     }
 
-    // ROADS ARE RINGED, NOT NARRATED. A road promotion is the commonest event
-    // by far — on a full-span world they outnumber every other kind together —
-    // and a ticker that prints them shows nothing else for the last centuries
-    // of the replay (measured on the first capture: eight road lines, no
-    // realm). They still pulse on the map; the ticker is for the moments of
-    // the ARC, which is what the round exists to show.
-    const auto narrated = [](const lapse_event& e) {
-        return e.kind != static_cast<uint8_t>(lapse_event_kind::road_promoted);
-    };
+    // PRIORITY BY KIND INSIDE A RECENT WINDOW (BL-1106). The window is the
+    // last `4 * max_rows` narrated events back from the playhead — an event
+    // count rather than a span of years, so it scales with how busy the world
+    // is and never reaches back to a founding a millennium old. Inside it each
+    // tier is taken in turn, newest first — the rarest moments, then the arc's
+    // common kinds, then churn — until the rows are full; on a quiet world
+    // with one kind of event this is exactly the old "last max_rows narrated
+    // events".
+    std::vector<int> tier[k_ticker_tiers]; // Each newest first.
+    const int window = max_rows * 4;
+    int seen = 0;
+    for (int i = last; i >= 0 && seen < window; --i)
+    {
+        const int pr = ticker_priority(h.lapse.events[static_cast<std::size_t>(i)]);
+        if (pr < 0) continue;
+        tier[pr].push_back(i);
+        ++seen;
+    }
+    for (int t = 0; t < k_ticker_tiers; ++t)
+        for (std::size_t k = 0; k < tier[t].size() && static_cast<int>(rows.size()) < max_rows; ++k)
+            rows.push_back(tier[t][k]);
+    std::sort(rows.begin(), rows.end()); // Oldest first; the newest shown is last.
+    return rows;
+}
+
+void draw_lapse_ticker(const history_lapse& h, int year, int max_rows)
+{
+    if (h.lapse.events.empty() || max_rows <= 0) return;
 
     ImGui::SeparatorText("As it happened");
-    std::vector<int> rows; // Indices, newest last.
-    for (int i = last; i >= 0 && static_cast<int>(rows.size()) < max_rows; --i)
-        if (narrated(h.lapse.events[static_cast<std::size_t>(i)])) rows.push_back(i);
+    const std::vector<int> rows = lapse_ticker_rows(h, year, max_rows);
     if (rows.empty())
     {
         ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
@@ -2121,7 +2272,6 @@ void draw_lapse_ticker(const history_lapse& h, int year, int max_rows)
         ImGui::PopStyleColor();
         return;
     }
-    std::reverse(rows.begin(), rows.end());
 
     const float avail = ImGui::GetContentRegionAvail().x;
     for (std::size_t k = 0; k < rows.size(); ++k)

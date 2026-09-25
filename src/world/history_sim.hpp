@@ -4426,6 +4426,31 @@ inline int64_t event_record_bytes(const history_sim_state& s)
 /// becomes the thing generation stores and the Ages view replays (NR-733).
 /// Everything else in `history_sim_state` (the narration, the counters, the
 /// scorer's working set) stays behind; a record is not a snapshot of the run.
+/// BL-1106 -- the record's name table off the live state (era_timelapse.hpp
+/// § The name table): civilisation and creed names in index order, and polity
+/// id -> adopted creed. One function for both the recorded time-lapse below
+/// and the live tap's `publish_names`, so the record and the live view carry
+/// the same table. A pure read of the state, in index order throughout.
+inline void fill_lapse_name_table(const history_sim_state&   s,
+                                  std::vector<std::string>&  civilisation_name,
+                                  std::vector<std::string>&  creed_name,
+                                  std::vector<int32_t>&      polity_creed)
+{
+    civilisation_name.clear();
+    civilisation_name.reserve(s.civilisations.size());
+    for (const civilisation& cv : s.civilisations) civilisation_name.push_back(cv.name);
+    creed_name.clear();
+    creed_name.reserve(s.universal_creeds.size());
+    for (const universal_creed& uc : s.universal_creeds) creed_name.push_back(uc.name);
+    // A polity's id is its index (`polity::id`), and a realm adopts at most
+    // once (history_sim.cpp's adoption pass skips a realm already holding
+    // one), so the table at any publish is the table the schism year saw.
+    polity_creed.assign(s.polities.size(), -1);
+    for (const polity& p : s.polities)
+        if (p.id >= 0 && static_cast<std::size_t>(p.id) < polity_creed.size())
+            polity_creed[static_cast<std::size_t>(p.id)] = p.universal_creed;
+}
+
 inline era_timelapse as_timelapse(const history_sim_state& s)
 {
     era_timelapse t;
@@ -4437,6 +4462,7 @@ inline era_timelapse as_timelapse(const history_sim_state& s)
     t.region_stride = s.region_stride;
     t.start_year    = static_cast<int32_t>(s.start_year);
     t.years         = static_cast<int32_t>(s.years);
+    fill_lapse_name_table(s, t.civilisation_name, t.creed_name, t.polity_creed); // BL-1106
     return t;
 }
 

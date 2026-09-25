@@ -486,6 +486,11 @@ void w_timelapse(std::ostream& o, const era_timelapse& t)
         w_u16(s, v.polity);
         w_u16(s, v.other);
     });
+    // save_game_version 22 (BL-1106, the name table) -- keep r_timelapse in
+    // step. Two string lists in index order and one i32 per polity id.
+    w_vec(o, t.civilisation_name, [](std::ostream& s, const std::string& v) { w_str(s, v); });
+    w_vec(o, t.creed_name,        [](std::ostream& s, const std::string& v) { w_str(s, v); });
+    w_vec(o, t.polity_creed,      [](std::ostream& s, int32_t v) { w_i32(s, v); });
 }
 
 bool r_timelapse(std::istream& i, era_timelapse& t)
@@ -577,6 +582,21 @@ bool r_timelapse(std::istream& i, era_timelapse& t)
         if (e.region != lapse_event_none && t.region_stride > 0
          && e.region >= static_cast<uint16_t>(t.region_stride))
             return false;
+
+    // save_game_version 22 (BL-1106) -- keep w_timelapse in step. `r_str`
+    // refuses a hostile length prefix before allocating; a creed index under
+    // -1 cannot have been written. An index PAST the creed list is not
+    // refused here: the read side prints a placeholder for it, and refusing a
+    // whole save over a name the ticker cannot resolve would be the wrong
+    // trade.
+    if (!r_vec(i, t.civilisation_name, [](std::istream& s, std::string& v) { return r_str(s, v); }))
+        return false;
+    if (!r_vec(i, t.creed_name, [](std::istream& s, std::string& v) { return r_str(s, v); }))
+        return false;
+    if (!r_vec(i, t.polity_creed, [](std::istream& s, int32_t& v) {
+            return r_i32(s, v) && v >= -1;
+        }))
+        return false;
     return true;
 }
 
