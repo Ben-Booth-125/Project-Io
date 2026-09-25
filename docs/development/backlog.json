@@ -1026,7 +1026,7 @@
     "tools/verify/landscape_search_harness.cpp",
     "tools/verify/gen_step_costs.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app). GENERATION_STRATEGY.md § Phase 6 states the rule. The quiet reading (2026-09-25): seed 0's round 6 lands in ~48 s against 35 s; the search is 13 evaluations, ~17.3 s (1.33 s each). THE WORK, measure first: the search's score per round count (1..6 rounds) on the 16 curated seeds -- the winner's composite and whether it validates -- and the time per evaluation; recommend the smallest count whose curve has flattened; Ben fixes it. Re-read after BL-1130 and BL-1137 land (fewer centres shrink the charter budget). A world-mover if a winner changes."
+   "design": "RULED (Ben, 2026-09-26, the review form): A -- keep 6 rounds; score each round's proposals on 2 threads (thread_count 2 in campaign_search_params; the lane measured -8.6 s on seed 0, -5.8 s on seed 28, winners bit-identical); re-read the count after the market folds (scoring is ~90% of an evaluation and grows with the market count). GENERATION_STRATEGY.md § Phase 6 states it.\n\nSETTLED (Ben, 2026-09-25, the open-calls form at the live app). GENERATION_STRATEGY.md § Phase 6 states the rule. The quiet reading (2026-09-25): seed 0's round 6 lands in ~48 s against 35 s; the search is 13 evaluations, ~17.3 s (1.33 s each). THE WORK, measure first: the search's score per round count (1..6 rounds) on the 16 curated seeds -- the winner's composite and whether it validates -- and the time per evaluation; recommend the smallest count whose curve has flattened; Ben fixes it. Re-read after BL-1130 and BL-1137 land (fewer centres shrink the charter budget). A world-mover if a winner changes."
   },
   {
    "status": "designed",
@@ -1085,7 +1085,9 @@
    "written": "2026-09-25",
    "blocked_on": null,
    "parked": false,
-   "requires": [],
+   "requires": [
+    "BL-1133"
+   ],
    "id": "BL-1139",
    "short_name": "CENTRES_ABANDONED_IN_PLAY",
    "author": "Ben (2026-09-25, the centres-and-routes form: \"NR-947: play follows too\"); filed by Claude",
@@ -1096,10 +1098,12 @@
    "authority_doc": "docs/economy/POPULATION.md",
    "files": [
     "src/world/economy_system.cpp",
+    "src/world/province.cpp",
     "src/world/corp_command.cpp",
+    "src/world/world_save.cpp",
     "tools/verify/econ_harness.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form). POPULATION.md § Growth, decline and razing states it: play follows the history's abandonment rule. DELEGATED READING (NR-948): in play an abandoned centre drops to the existing RAZED tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle) rather than vanishing, because a centre is its province's capture anchor. THE WORK: the runtime decline check (the ordinary growth pass) demotes a centre below a village's worth to razed; no province loses its anchor; a save round-trips it. The last item in the sprint's order; the first to slip if the wave runs long. Not a generation world-mover (play only), but it moves every settled world whose centres decline in the settle -- measure the settle digests."
+   "design": "OVERTURNED (Ben, 2026-09-26, the review form, NR-948): in play an abandoned centre is DELETED and its province merges into the adjacent province of its own nation whose centre is nearest (the BL-1133 join, at runtime); only a province with no such neighbour keeps its centre as a ruin at the razed tier (NR-952). THE WORK now: the runtime decline check abandons a centre below a village's worth; the province join at runtime moves ownership records, provinces, anchors, any buildings on the centre's tile and the map's province lens consistently; a save round-trips it. Heavier than the ruin reading: it touches the province partition in play, so it waits for BL-1133 and slips first.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form). POPULATION.md § Growth, decline and razing states it: play follows the history's abandonment rule. DELEGATED READING (NR-948): in play an abandoned centre drops to the existing RAZED tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle) rather than vanishing, because a centre is its province's capture anchor. THE WORK: the runtime decline check (the ordinary growth pass) demotes a centre below a village's worth to razed; no province loses its anchor; a save round-trips it. The last item in the sprint's order; the first to slip if the wave runs long. Not a generation world-mover (play only), but it moves every settled world whose centres decline in the settle -- measure the settle digests."
   },
   {
    "status": "designed",

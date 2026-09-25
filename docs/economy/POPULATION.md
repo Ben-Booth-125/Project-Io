@@ -240,9 +240,12 @@ be rare because the occupier almost always prefers to occupy. **This rule is pla
 history the centre follows its heads both ways and is abandoned below a village's worth (Ben,
 2026-09-25; § Generation), and **play follows it too (Ben, 2026-09-25, NR-947; BL-1139,
 centres abandoned in play)**: a centre whose population falls below a village's worth is
-abandoned. In play it drops to the **razed tier** below rather than vanishing (delegated reading,
-NR-948), because a centre is its province's capture anchor and the ruin keeps the anchor: the
-place stops being a place, and the province can still be taken and cheaply re-settled.
+abandoned. **In play an abandoned centre is deleted, and its province merges into a neighbour
+(Ben, 2026-09-26, NR-948):** it joins the adjacent province of its own nation whose centre is
+nearest, the same join generation makes for a centre-less province (§ Generation), so the merged
+province's centre is its capture anchor. Only a province with no such neighbour keeps its centre
+as a ruin at the **razed tier** below, so no province is ever left without an anchor (delegated
+fallback, NR-952). Abandonment is not razing: razing stays a deliberate act and stays a tier.
 
 **A razed settlement is a TIER, not an erasure** (Ben, 2026-08-25; BL-624, razed settlement
 tier). Razing demotes the centre to the **razed** state: population zeroed, no labour, no
