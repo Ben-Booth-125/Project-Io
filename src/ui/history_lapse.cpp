@@ -1017,8 +1017,9 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // Owner keys: -1 sea (nothing drawn), -2 wild, else the polity index. The
     // frontier is drawn between any two DIFFERENT keys on both axes -- the
     // `>= -2` tests below admit sea, so a coast is outlined too (which is what
-    // every capture has shown); a hard realm's coast draws heavy like the
-    // rest of its outline (BL-1090), since only the land side can be hard.
+    // every capture has shown). A hard border draws heavy only BETWEEN TWO
+    // REALMS (BL-1090; Ben, 2026-09-25, NR-937: a coast is not a frontier) --
+    // a hard realm's edge against sea or wild ground is the ordinary line.
     const float carry_fade = lapse_carry_fade(h, year);
 
     // THE CULTURE BASE (BL-1087 R3; Ben, 2026-09-24, R7 "both"): on the
@@ -1177,7 +1178,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 if (west >= -2 && west != key)
                 {
                     const bool hk = hard_of(key), hw = hard_of(west);
-                    if (hk || hw)
+                    if ((hk || hw) && key >= 0 && west >= 0) // realm against realm only
                     {
                         // BL-1090: A HARD BORDER. 2 px of dark centred on the
                         // tile edge (pixel columns c-1 and c), then a 1 px
@@ -1243,7 +1244,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     const bool hs = hard_of(south), hn = hard_of(north);
                     const float x0 = px(static_cast<float>(s));
                     const float x1 = px(static_cast<float>(e)) + 1.0f;
-                    if (hs || hn)
+                    if ((hs || hn) && south >= 0 && north >= 0) // realm against realm only
                     {
                         dl->AddLine({x0, y0}, {x1, y0}, col_frontier_hard, 2.0f);
                         ++prims;

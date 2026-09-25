@@ -50,9 +50,12 @@ change built sprint-47 surfaces. Each is small; each is done before its item's l
   to change it." at the button's height; `verify.wizard_span_seed(k)` added; span_seed_isolation
   ALL PASS (S0 re-read), history_lapse_press.lua 0 golden failures; R3 and R7 complete, R6's live
   text re-read.
-- [ ] C2 BL-1090 (hard borders by people share): the heavy stroke draws on edges between two
+- [x] C2 BL-1090 (hard borders by people share): the heavy stroke draws on edges between two
   different realms only, never the coast (NR-937 B); the 10% on / 6% off pin is unchanged. Re-run
   its capture scripts.
+  DONE 2026-09-25: both frontier passes gate the heavy stroke on both keys >= 0;
+  history_lapse_hard.lua 0 golden failures; the 1000 CE capture shows heavy strokes between realms
+  and thin coasts. R2 re-read; R3 (live) pending.
 - [ ] C3 BL-1099 (works chartered events): the origin sentence collapses on agreement — "under
   <nation>, its own realm since <year>" (NR-941 A) — and "since" walks back through the earlier
   records while the same polity id holds the region (NR-939 B); `seat_screen.cpp`, with
