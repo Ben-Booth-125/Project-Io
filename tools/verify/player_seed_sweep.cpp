@@ -654,24 +654,41 @@ struct world_digest_pin
 // the tree the shipped pins were taken on; the old values are recorded in the
 // DEVLOG entry of that day.
 // D_search and D_land are the 2026-09-17 values, untouched.
+//
+// RE-PINNED 2026-09-25 (Ben, sprint 47's one re-bless, authorised in principle
+// 2026-09-24): taken by player_seed_sweep --digest --arc legacy over the
+// sixteen library seeds on a build of the final sprint-47 tree (d6558647, the
+// riders merged; exe built 10:22), same toolchain; every row seated exactly
+// one player. All sixteen rows moved from D_search on. THE MOVER on a span-off
+// world is BL-1089 (a nation inherits its founding realm's coined name at
+// nation generation, which runs on every arc): lane I1's A/B on the harness
+// world -- the one inheritance line switched off returns the previous digests
+// exactly -- is the attribution, not a per-row re-measure on this arc;
+// BL-1096's purchases (an Exploration-span verb, which this arc still runs)
+// may also reach D_search on the five seeds they moved on the shipped arc. The
+// riders (BL-1082 the seat in the state hash, BL-1049 the tables across the
+// 1200 resume) then moved D_land and D_seat on fifteen seeds (all but 32) and
+// D_settle on all sixteen, D_search on none. The charter budget seam (BL-1032)
+// is untouched: this table is not re-pinned by the change it checks. The
+// 2026-09-17/22 values are one commit back in git history.
 const std::vector<world_digest_pin> k_world_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-    { 46u, 0xE0620F5777CB3637ull, 0x326DFD72ED01E15Dull, 0x01B28F9955D0EC29ull, 0x51AF24CE2939B4D0ull },
-    { 28u, 0xA99FFD1314AFDD65ull, 0x7271F0D606D576C8ull, 0x4D338B0202264D5Cull, 0x2C463C3DD4724685ull },
-    { 11u, 0x1F277B425CC6D6F5ull, 0x6D66DCD90344A565ull, 0x4C97C1C842D23C3Bull, 0x66427046BACBC06Cull },
-    { 31u, 0x4DCC349DEBD4278Dull, 0x568DBED7FCAB0473ull, 0x2D4BD68AE2B9E70Bull, 0x15694B8A93C3CD06ull },
-    { 40u, 0xACCB76968FC11F44ull, 0x350CE11A11C2EF16ull, 0xF336C089F6EEBFEBull, 0xD7275BB13B29AB2Dull },
-    { 12u, 0x9171B81F5F1DB6CEull, 0x14FC25A425F1D81Eull, 0x111F81D5AFEEA576ull, 0x602E807556398990ull },
-    { 37u, 0xE55EBAB721B6A6E6ull, 0xF38B46012662363Cull, 0x928B123846974CAAull, 0xCEA516E07DFF3356ull },
-    { 13u, 0x8B45E33F6171F121ull, 0xBEBED327CE2A955Cull, 0xBC9A8253728E77CCull, 0x13D563007848185Cull },
-    { 41u, 0x19A91514D3C43BCAull, 0x8DFD164F25D5150Bull, 0x9D7DBA35957885A1ull, 0x2676C5DC78EEAF10ull },
-    { 43u, 0xCB2F7D3D81A8A0C1ull, 0x53BB483612EFB3CDull, 0xE4D38BA322A56963ull, 0x0D441274814EE0CDull },
-    { 32u, 0x6D64F3AD914488BDull, 0x4EDBFF18370691B6ull, 0x953F9A92426452FFull, 0x4FC2A8BD099DD3ABull },
-    { 10u, 0xF8244965F92A0FF1ull, 0x809C8D803DF19C14ull, 0x2F69415005705C94ull, 0x50DF22739DFC7D73ull },
-    { 25u, 0x63A5BE80FB7DF06Aull, 0x84A597D8EBE7EDFFull, 0x22C20B2D79B86944ull, 0xA2046D98550FBDACull },
-    { 38u, 0x4C17AE81C065C5F2ull, 0xAA0F18A56767FC70ull, 0x87EE17644608DB65ull, 0x9FD043C8BB29D902ull },
-    {  9u, 0x0E9AD780ACBB9B84ull, 0x7C85420229BFEE4Dull, 0x9D8F22AD82E026E7ull, 0xFBDBDC152D43D4AEull },
-    {  0u, 0x893B6977B1E9DC1Full, 0x1A24D230FDDF2C7Eull, 0xAF3BDD5524ED9FF3ull, 0x08F13299905A405Aull },
+    { 46u, 0xB01320655D4BE99Bull, 0xCE0759A1021D42DEull, 0x943B500E6BACA53Eull, 0x2255E0FA29F84B37ull },
+    { 28u, 0x6147552AE45BC384ull, 0x6945C8FD0630F62Bull, 0x6421FAE0D54B08C8ull, 0x34207AB36AACBE19ull },
+    { 11u, 0x347D1FC2F3414944ull, 0x49E952EEB82638B6ull, 0x97AF74843097D0B0ull, 0xB1F03569405B3499ull },
+    { 31u, 0x8222E1FC2E699B75ull, 0x30E354906C6683E6ull, 0x6B1D3466230B69BDull, 0xE0403E96D32375F4ull },
+    { 40u, 0x675BE71426C41855ull, 0xE6DA3DE7391A91A5ull, 0x5A41B0F860559779ull, 0x8AFE71BAD882F586ull },
+    { 12u, 0x9797ADFB249251D2ull, 0x35DA779C3A2D0377ull, 0x99DBA6C406C1EA4Cull, 0xAD04BD8F4D730186ull },
+    { 37u, 0xEFB311383F01645Aull, 0x5DAA228B371EFB8Aull, 0x453EFADF8D1E6B3Dull, 0xE08894B43B9A2B85ull },
+    { 13u, 0xC7B777CA0FD159E6ull, 0x71C82015587C12C6ull, 0xABC4B0335C819C6Eull, 0xD1D38669D2CE5948ull },
+    { 41u, 0xA05441E37A179C0Full, 0xDAFBFBF5FF1FDFDBull, 0x07D808D0285565F3ull, 0x7CA3B2D323F52729ull },
+    { 43u, 0x326144637C766315ull, 0x001B77C98DC69050ull, 0xCF71E1AF1CCEC50Cull, 0x8A0598264EF33472ull },
+    { 32u, 0x808D9D6939315793ull, 0x0FEC8B3A1FD72AFCull, 0x16079F89B73132E6ull, 0xE4979C16408E5B1Eull },
+    { 10u, 0x6AC29D77FA59D8DFull, 0x374F4DF634E78FA0ull, 0xE06752EA5BC0A215ull, 0x04BC1F2DF67C4F44ull },
+    { 25u, 0x0DBABB3FACE37ABCull, 0x93B92BFFC30698BEull, 0x9E81C9E7EB037F05ull, 0x67BB0397644A428Bull },
+    { 38u, 0x1B69ED64D13CB22Bull, 0xE338A5503F445F73ull, 0x174215F4B3B99E0Full, 0x15B9D1123D7C00B8ull },
+    {  9u, 0x465FB80B0F56317Bull, 0x367C311E788EB6A0ull, 0xF399AF5750EB1CF8ull, 0x64D0529BD6BB47A5ull },
+    {  0u, 0xA69C27D61A1F3F83ull, 0xDFFE435C03F75E29ull, 0x9551A80942BA0761ull, 0x3690DB05EA78806Full },
 };
 
 // THE SHIPPED ARC'S PINS (BL-1044) — the same sixteen library worlds on the
@@ -687,24 +704,43 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 // `bash tools/verify/build_lua_harness.sh player_seed_sweep`.
 //
 // NEVER RE-PINNED by the change a pin exists to check, as the legacy table.
+//
+// RE-PINNED 2026-09-25 (Ben, sprint 47's one re-bless, authorised in principle
+// 2026-09-24): taken by player_seed_sweep --digest --seeds
+// 46,28,11,31,40,12,37,13,41,43,32,10,25,38,9,0 on a build of the final
+// sprint-47 tree (d6558647, the riders merged; exe built 10:22), same
+// toolchain. Every row seated exactly one player and none fell back. THE
+// MOVERS, attributed by row comparison on 2026-09-25 (the pins were stale
+// since sprint 46, so a FAIL count attributed nothing): the tariff posture
+// derived per nation at the Industrialisation fold (BL-1102) moves every seed
+// from D_land on; the purchase verb (BL-1096) moves D_search on seeds 13, 25,
+// 31, 32 and 46 (a province bought or a sea leg walked before the search); the
+// realm-to-nation name inheritance (BL-1089) and the firms' dated origins
+// (BL-1099) move the seat and settle digests; the riders then moved D_land and
+// D_seat on fifteen seeds (all but 32) and D_settle on all sixteen, D_search
+// on none -- BL-1082 folds the seat into the state hash and BL-1049 carries
+// the civilisation and creed tables across the 1200 resume (a pre-rider
+// reading of 894e736e is superseded). BL-1083's per-span seeds and BL-1085's
+// settle promotion moved nothing (the G+C-only tree read row-identical to the
+// pre-sprint tree). The 2026-09-22 values are one commit back in git history.
 const std::vector<world_digest_pin> k_shipped_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-    { 46u, 0x34B0DBD0962DCC08ull, 0x6AF97712EFB7B27Cull, 0x27882A7239EFF44Eull, 0xB5E0AB9360F592D8ull },
-    { 28u, 0xE460EA9D22FB1BB2ull, 0x885D026D4E8A4790ull, 0xDA53FC483AFA2676ull, 0xAB5232995643A9E0ull },
-    { 11u, 0xF93FE23934C92CE3ull, 0xE862173A54B2499Full, 0x47558C8330FFD946ull, 0x9F309A2316FACE6Bull },
-    { 31u, 0x979900E26BAE8916ull, 0xA4199F3C1658A812ull, 0x39E48B78A4ED3A53ull, 0xC23DBD891EB81272ull },
-    { 40u, 0x3963C3B5CFA8D056ull, 0x9AED43DFA02BB855ull, 0x89E5EAE8EB0AB995ull, 0x42AB2DE4839A6067ull },
-    { 12u, 0xA745437FA9EBFA21ull, 0xE6E34BD8CB8711F1ull, 0x1DCA581C2A97436Eull, 0xBB426132E8B19DB3ull },
-    { 37u, 0x46B0F3FC99C7B762ull, 0x7C6934D44D08D210ull, 0xE24B97E713FFE246ull, 0xE66DBE0DE6DC6C95ull },
-    { 13u, 0x53F29DFB1BF8D9A7ull, 0x033767ED1CA47BB7ull, 0x126521D92E48FD0Aull, 0xFE1B2CA6CFCC03EFull },
-    { 41u, 0x662A6DEFB8143BA1ull, 0x51A67CB5F18DF708ull, 0x6E2A5DE3B391A88Dull, 0xEC2110AE8FE4A41Eull },
-    { 43u, 0x4D0A7D9CE087FD61ull, 0x0EC25FDE87B157E9ull, 0xE5C169734A8B5F8Aull, 0x4B7396D052A7BF5Full },
-    { 32u, 0x0893318979000103ull, 0x208CC08E95567315ull, 0x1511B42294AD65FBull, 0xC540FE814C4002F3ull },
-    { 10u, 0xE05CE7F0F04058E6ull, 0xFF445EC68059BB1Dull, 0x68EB1FBA68DD1020ull, 0xF84BA30FA0FCDF82ull },
-    { 25u, 0x4D56278DB292E0A5ull, 0x538E3805EF21B449ull, 0xF5528F5D75DE10ADull, 0xDAA7CA5899611D3Cull },
-    { 38u, 0x3B5A385B3A236527ull, 0x0CAB7DB9F623AFDEull, 0x7D0EFD8569F74C36ull, 0xE81FC4A28BBCA157ull },
-    {  9u, 0x03DA06E9D80DC0A5ull, 0x921DBBCB9C451B6Bull, 0x663BB44CC737E7AAull, 0xB1D37669AA16EAAAull },
-    {  0u, 0x36967D8EB4B9D363ull, 0x338CC4E185E4E82Aull, 0x2A8DC72A6FCA305Bull, 0xFA11C3BE51897F5Full },
+    { 46u, 0x9163D7627D2D707Dull, 0xCF296FEBDA8A5CF6ull, 0x0C18C7D28527C748ull, 0xAFE6EDBBF94E7A39ull },
+    { 28u, 0xE3EE2CA3DBDCACF1ull, 0x88DCF45E0F51F723ull, 0x14DA34AB7D5E9719ull, 0xBC353A3566E70D46ull },
+    { 11u, 0x4B6DBCCC2EF92437ull, 0x68943644E32B85E5ull, 0x41A932A61B505B1Cull, 0x1ADFC4BB030D719Bull },
+    { 31u, 0x913EF0928777CA9Cull, 0x374B79FA1FBDA488ull, 0x27C96798E750F5E9ull, 0x6A114436D0FD4B54ull },
+    { 40u, 0x805FEFE1957B607Eull, 0xA83B418C29D1C916ull, 0xE135C9BB98CF3AADull, 0x7590195E7273E2E7ull },
+    { 12u, 0x136EED72EDF61794ull, 0x3E4417AAF25A1C50ull, 0x7145C4FEF61EEBCCull, 0x5E9AF445AF7AE251ull },
+    { 37u, 0x00375FA217E03123ull, 0xF1068B129FF0A982ull, 0xD07FFE966B18DAE3ull, 0x79FE5F32C70F3C8Full },
+    { 13u, 0xBE4F1C03BBD7C761ull, 0x2BA02C74CAB7BCCAull, 0x76F0E3015717C22Aull, 0x51ECD04465AC030Bull },
+    { 41u, 0x9DFBAD10E7B26C86ull, 0x3A3D7CC57633AA05ull, 0x106A11B2857FB197ull, 0x789EAACB3BA1DD28ull },
+    { 43u, 0x057CA694B1A2930Cull, 0x4076E9787D238074ull, 0x519028D648B0C6FBull, 0x0AE0D0491F073614ull },
+    { 32u, 0xB1336A041598EDDEull, 0x8666E7FB97AFA045ull, 0x92978C54EA9B06DEull, 0xCAE16F6F852699EFull },
+    { 10u, 0xEE9F4CEBDD5209D7ull, 0x0940315A86A33D66ull, 0x09E81548A473ADEDull, 0x0CE1C0DE18B708E5ull },
+    { 25u, 0x79B43A9C38921727ull, 0xBFCA1924FE329582ull, 0x5A45D5CA513848D5ull, 0xF2B07B6F9FE57771ull },
+    { 38u, 0x364B4435C0856DF1ull, 0xC87E83A20E93B463ull, 0x413D4F82DD6E449Cull, 0x815166FF9B09673Dull },
+    {  9u, 0xC99EA3CD68B5A279ull, 0x7B16B1823F122F54ull, 0x663D59BBCD98A8C7ull, 0xE9C081E25B7EB933ull },
+    {  0u, 0x74D765F3BAD8759Bull, 0x854427AF3B6BB2B1ull, 0x6816A20C4269D530ull, 0x23A9FC8EF3C5EFD7ull },
 };
 
 const std::vector<world_digest_pin>& digest_pins(world_arc arc)

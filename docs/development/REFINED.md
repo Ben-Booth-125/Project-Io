@@ -446,13 +446,14 @@ the re-bless after the merge.
   `ACTIONS.json` gameplay.take_seat (mirror regenerated) and MULTIPLAYER_PRINCIPLES.md § the hash.
 - [x] T4 `world_determinism` twice, bit-identical; the moved digests recorded old -> new. (R4)
   DONE 2026-09-25: world_determinism run 1 and run 2 (build_gen/verify/world_determinism.exe, Release /O2 /MD): both ALL PASS (0 failures); both print "digest seedA/on  = 0570E3900D0BD53F and 0570E3900D0BD53F", "digest seedB/on  = D5616442F561DDD3", "digest seedA/off = B89B87C393B06FC9", "digest seedA/on/epoch0 = 0570E3900D0BD53F" -- bit-identical run to run. OLD (main, 6855a3cf): seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F. NEW: seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9 (all three moved).
-- [ ] T5 main session: merge, the one re-bless (player_seed_sweep pins), cold review. (R4)
+- [x] T5 main session: merge, the one re-bless (player_seed_sweep pins), cold review. (R4)
   2026-09-25: MERGED `14cd0004` (cold review: merge, one low -- the fold comment's re-bless wording
   trimmed on main); BL-1049 merged `67993f80` beside it (cold review: merge, four lows applied on
   main: the fidelity gate now demands the carried civilisation AND creed prefixes, the DATA CONTRACT
   row, the two dated-object comments softened; NR-943 and BL-1113 filed from its open questions).
-  OWED: the re-bless measurement on this tree (`main_session_rebless_final.sh`), the re-pin, the
-  library bless, `--digest-check` both arcs -- one commit.
+  DONE 2026-09-25 (13:38): the final measurement on `d6558647` (`main_session_rebless_final.sh`)
+  re-pinned both tables, 16/16 rows each; `seed_library.js --bless` took seeds 25 and 38; rebuilt,
+  `--digest-check` 16/16 PASS shipped and 16/16 PASS legacy, none threw -- one commit.
 ### Re-bless riders
 
 #### BL-1049 (civilisation index reuse at 1200) — a digest mover by design. Group `civilisation-index-reuse-at-1200`.

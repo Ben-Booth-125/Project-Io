@@ -156,6 +156,15 @@ library sweep); then `repin_sweep_table.py` both tables, `seed_library.js --bles
 both arcs, one commit -- the earlier (pre-rider) readings in `rebless_measure.log` / `rebless_legacy.log`
 are superseded. Gates on the riders' tree in `gates_riders.log`.
 
+**THE RE-BLESS IS TAKEN (13:38, a fresh session after the overnight one ran out):** both tables
+re-pinned from `rebless_final.log`, 16/16 rows each; `seed_library.js --bless` took seeds 25 and
+38; rebuilt, `--digest-check` 16/16 PASS on both arcs. One commit. **What is left of sprint 47:**
+Ben's live clicks (the five carried plus every merged lane's `visual` row), the open calls below
+plus NR-937..NR-943, BL-1083 R7 (the per-span rule in STARTUP.md and the seed library), and
+the decision on BL-1084 (the world built once and moved) -- unstarted, the sprint's named risk
+and a done-when clause -- build it now or carry it to sprint 48. Wave 3 (BL-1086, BL-1098,
+BL-1107) is unstarted stretch. Local main is not pushed.
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936

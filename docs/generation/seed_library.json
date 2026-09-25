@@ -439,12 +439,12 @@
    },
    "fingerprint": {
     "empire_battles": 18776,
-    "expl_battles": 613,
-    "flows": 72,
-    "treasury_median": 477,
+    "expl_battles": 609,
+    "flows": 76,
+    "treasury_median": 18697,
     "living_polities": 73
    },
-   "fingerprint_blessed": "2026-09-22"
+   "fingerprint_blessed": "2026-09-25"
   },
   {
    "seed": 38,
@@ -474,10 +474,10 @@
     "empire_battles": 4453,
     "expl_battles": 176,
     "flows": 27,
-    "treasury_median": 8602106,
+    "treasury_median": 8599359,
     "living_polities": 30
    },
-   "fingerprint_blessed": "2026-09-17",
+   "fingerprint_blessed": "2026-09-25",
    "replaces": "seed 19 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {

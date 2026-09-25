@@ -101,6 +101,15 @@ workflow (5 + 5).
   unless the 1660 table begins with the whole 1200 table (16/16 PASS). Gates green on that tree;
   exploration R3b re-pinned to BL-1096's +400 tribute, the one counter that moved. The final
   measurement (shipped and legacy digests, the library sweep) runs on this tree for the one commit.
+- **THE RE-BLESS, taken once** (10:22-13:38). The final reading (exe built 10:22 on `d6558647`)
+  re-pins both `player_seed_sweep` tables: all sixteen rows move on both arcs. Against the pre-rider
+  reading of `894e736e`, the riders moved D_land and D_seat on fifteen seeds (all but 32) and
+  D_settle on all sixteen, D_search on none. The library sweep moved seeds 25 (expl_battles
+  613 -> 609, flows 72 -> 76, treasury median 477 -> 18697) and 38 (treasury median 8602106 ->
+  8599359); `seed_library.js --bless` took both, fourteen unchanged. Rebuilt on the re-pinned
+  source, `--digest-check` reads 16/16 PASS on the shipped arc and 16/16 PASS on the legacy arc,
+  none threw. A draft re-pin from the pre-rider reading sat uncommitted in the tree and was
+  discarded, not stacked.
 
 ### Open
 - Ben's five live clicks (BL-1068, 1072, 1073, 1076, 1080) — he opened the Release build and walked into
