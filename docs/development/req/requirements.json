@@ -6659,24 +6659,24 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: gen_step_costs --finish, seeds 0 and 28, Release"
      ],
      "requirement": "Tick 1 of the settle is timed by phase on seeds 0 and 28 in Release and the phase that costs it is named with its milliseconds.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "S1 (4e7d3cb4), Release, indicative on a loaded machine, seeds 0 and 28 twice each: tick 1 is the settle's FIRST CONVOY COMMIT -- passive_lp_admit -> nearest_lp_anchor looped every LP anchor and, on a double miss, flooded the whole body from each (9,038 floods on seed 0, 6,079 on seed 28, ~10 ms each; lap 1 ~93 s and ~70 s). Not the corp AI. Tick 0 commits nothing; ticks 2-11 reuse the fields."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: gen_step_costs --finish",
       "headless: world_determinism twice"
      ],
      "requirement": "The named phase is cut: tick 1's cost old -> new on both seeds; the digests hold, or the movement is named as a cause in the sprint's re-bless.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "S2 (1510870b, merged aed6c790): nearest_lp_anchor answers from one multi-source field per body. Tick 1 93 s -> 1.9 s (seed 0), 68-72 s -> 1.3 s (seed 28); settle 116 s -> 21 s and 85 s -> 14 s; flood fields alive 9,238 -> 217 and 6,181 -> 119 (~1.7 GB -> ~34 MB). 0 of 1,000+ answers changed (probe); world_determinism unmoved; D_settle/D_seat moved on seed 28 only (14DA34AB7D5E9719 -> 68E53E5123A0D55A), attributed to the flood fields no longer built -- a named cause in the re-bless. Main-session gates at 3d802dac: app builds, world_determinism ALL PASS, save_roundtrip OK, lp_anchor_field_check ALL PASS."
     },
     {
      "id": "R3",

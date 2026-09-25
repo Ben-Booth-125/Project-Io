@@ -141,11 +141,35 @@ the file is 3,027 lines now. Re-read before trusting any `:NNN`.
   already gone (BL-1101); centre_region_bind and chain_conversion_probe moved to 1960; R3.8 now
   compares epoch 1900 to 1960; world_determinism ALL PASS twice, digests unmoved; save_roundtrip OK.
 
-### Wave 2 (opens behind BL-1084's merge)
+### Wave 2a (opened 2026-09-25, after Ben's density form)
 
-BL-1086 (search inside generation), BL-1098 (sea-lane tier stamped; also behind BL-1119),
-BL-1107 (culture ground profile, the sprint's one sim beat), BL-1125's build. Then the one
-re-bless, each cause named with its own before/after.
+Ben ruled: markets die by twins, gravity (aim ~20-40 a world) and conquest; centres consolidate
+upstream this sprint (BL-1130); the spur floor 40,000 and border links on the network (BL-1119);
+the path-cost cache dependence fixed this sprint (BL-1126). Docs: MARKETS.md, POPULATION.md,
+LOGISTICS.md §§ 1, 4, 6.
+
+- [ ] P1 BL-1126 (path cost reads the cache): `intra_body_path` pure in the ordered pair, the
+  destination's field only; L1 matches without the control; plus BL-1117's S2 review fix round
+  (tie contract restated, F1 non-vacuous, stale comments). Files: `logistics.*`,
+  `lp_anchor_field_check.cpp`. The settle lane.
+- [ ] D4 BL-1119 round 2: the floor constant; border links only on towns and spurring villages;
+  `invalidate_logistics_caches` in road generation; the loading-bar weights measured (applied by
+  the main session after K4); the highway-tier row's cause. Files: `road_generation.*`, its
+  harness, `gen_step_costs.cpp`. The roads lane.
+- [ ] C1 BL-1130 (centres consolidate): a committed centre census old -> new; villages merge into
+  towns; no region carries more centres than its cell holds. Files: `settlement.*`,
+  `population_generation.*`, `history_sim.cpp` (urban growth only). A new lane.
+- [ ] M4 BL-1125 build, after C1 lands: twins fold and gravity fold at the carve (the reach
+  calibrated on the consolidated world), conquest consolidates in the history (`history_sim.cpp`,
+  the market marking). The markets lane, opened when C1 reports.
+
+### Wave 2b (behind K4's merge)
+
+BL-1086 (search inside generation), BL-1098 (sea-lane tier stamped; also behind D4),
+BL-1107 (culture ground profile). Then the one re-bless, each cause named with its own
+before/after: roads (BL-1119), the nearest-anchor field (BL-1117), path cost (BL-1126), centres
+(BL-1130), markets (BL-1125), the search (BL-1086), the lane tier (BL-1098), the ground profile
+(BL-1107).
 
 ## Sprint 47 — one history, told through the rounds (opened 2026-09-24)
 
