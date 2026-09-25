@@ -136,8 +136,12 @@ the file is 3,027 lines now. Re-read before trusting any `:NNN`.
   "Sea lane form (temporary, for the pick)", default (a). FOR BEN BEFORE HE PICKS: 13 of seed 32's
   16 lanes draw under 8 px (short hops inside one archipelago); only three are long (136, 81, 36
   px), and only form (b) marks the short ones.
-- [ ] U3 Ben picks at the live app; the other two forms and the selector are removed; the walk
+- [x] U3 Ben picks at the live app; the other two forms and the selector are removed; the walk
   (BL-1124 R2, R3; BL-1118 R3).
+  DONE 2026-09-25 (70cb329d, merged 9313e35a): Ben picked the bowed arc; (a), (b) and the
+  selector removed. Same commit: BL-1134 (roads carried at both seams; roads_carried.lua) and
+  BL-1135 (the Culture round's words as the record — a draft for the next walk). BL-1124 R3
+  ("finds a lane without a pointer") is read at the next walk.
 
 **Census — BL-1125 (markets can die), BL-1003 (pools per market).**
 - [ ] M1 `market_census` on the flipped 1960 world, 16 curated seeds: markets by source (capital
