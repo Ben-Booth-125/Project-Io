@@ -1953,6 +1953,26 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // drawn the round), so a vacuous zero cannot pass as a check. The first
     // hop's year is meaningful only when the water count is above zero: a
     // year is signed (2374 BCE is -2374), so no year value can be a sentinel.
+    // BL-1134 (roads carried across rounds): the road corridors the CURRENT
+    // lapse round's map draws at its playhead -- `ui::lapse_roads_drawn_at`,
+    // the road pass's own predicate -- as a table { count, carried, keys },
+    // `keys` a set of "a-b" region-pair strings, and `carried` how many
+    // corridors the round was handed by the round before. Region indices
+    // only, as `history_polity_capital` returns: no tile is exposed. A script
+    // compares a round's close against its successor's first frame.
+    v.set_function("history_roads", [this]() {
+        sol::table out = m_lua.state().create_table();
+        sol::table keys = m_lua.state().create_table();
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        const auto drawn = ui::lapse_roads_drawn_at(h, m_wiz_history_year[i]);
+        for (const auto& p : drawn)
+            keys[std::to_string(p.first) + "-" + std::to_string(p.second)] = true;
+        out["count"]   = static_cast<int>(drawn.size());
+        out["carried"] = static_cast<int>(h.road_carry.size());
+        out["keys"]    = keys;
+        return out;
+    });
     v.set_function("history_kin", [this]() {
         const int i = wizard_lapse_index();
         const ui::history_lapse& h = m_wiz_history[i];

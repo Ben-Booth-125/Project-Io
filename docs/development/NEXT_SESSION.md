@@ -1,40 +1,55 @@
 # Sprint 48 running handoff — the world moves forward (OPEN)
 
-Written 2026-09-25 at the cut, updated as the sprint moves. Read this, then the sprint 48 row in
-`sprints.json` (`node tools/session/render_sprints.js` renders `SPRINTS.md`) and `REFINED.md` §
-Sprint 48, then the owning doc of whatever you pick up. The DEVLOG's 2026-09-25 (evening) entry is
-the session record.
+Updated 2026-09-25 late evening. Read this, then `REFINED.md` § Sprint 48 (wave 3 lists the
+chains in order) and the sprint 48 row in `sprints.json`. The DEVLOG's 2026-09-25 (evening) entry
+is the session record so far.
 
-## Where things stand
+## Landed on main (all gated there)
 
-- **Sprint 48 is CUT and OPEN** (`b03fd52e`). Ben's form took all seven tagged items, BL-1117
-  (settle tick one) with its fix, BL-1003's close-out, BL-1114, and filed BL-1125 (markets can die)
-  from his note. BL-1077 (village roads cost) folded into BL-1119 (roads tree).
-- **Rulings written:** Next waits for its round (STARTUP.md § The wait, then the lapse); round 6's
-  35 s is the whole tail (STARTUP.md § Round 6); the lane form is chosen now on today's lanes.
-- **BL-1114 (epoch 0 retired) is DONE** (`a723f25e`).
-- **Wave 1 lanes** run in worktrees: cursor (BL-1084 K1-K3), roads (BL-1119 tree + floor table),
-  settle (BL-1117 S1 reading), UI (BL-1118 U1 + BL-1124 U2), census (BL-1125 M1 + BL-1003 M2).
+- **BL-1084 (world built once and moved):** the cursor (K1-K2), the wizard (K4) and its review
+  fixes. Byte-identical proof: world_determinism, both digest-check arcs 16/16, the 16-seed
+  cursor equivalence with negative controls, and `stop_path_digests` (base vs HEAD, identical).
+  Next waits; reroll works mid-tail; round 6 keeps its pace; slots freed at Begin. Live clicks
+  R4-R6 still owed at a walk.
+- **BL-1117 (settle tick one):** one nearest-anchor field per body; settle 116 s -> ~18 s on seed 0.
+- **BL-1126 (path cost reads the cache): CLOSED.** A path is directed; a save/load continues
+  identically.
+- **BL-1119 (roads tree and detour), rounds 1-4:** Kruskal + detour test, the 40,000-head spur
+  floor, border links on the network, layable links only (NR-945 kept), flood reuse (step 15
+  21.7 -> 2.0 s). R5 (35 s) FAILED on seed 0 (~48 s quiet; seed 28 ~31 s) — the search and the
+  corps' strategy step remain; BL-1136 cuts the search.
+- **BL-1114 (epoch 0 retired): CLOSED.** **BL-1118/BL-1124** legends and the lane forms (Ben picked
+  the bowed arc). Market census and centre census harnesses committed.
 
-## What comes next, in order
+## In flight (worktree lanes)
 
-1. Merge each lane as it reports; the main session runs the gates (Release build,
-   `world_determinism` twice, `save_roundtrip`, the item's harnesses) and a cold `code-reviewer`.
-2. **The census result goes to Ben as a form**: BL-1125's mechanism (a capital market dies with its
-   capital, a gravity fold into a larger market, a runtime death), with the roads lane's floor table
-   beside it so the spur floor is fixed in the same pass.
-3. S2 (the settle fix) from the settle lane's reading; then the whole-tail 35 s reading (BL-1119 R5).
-4. K4 (the wizard moves the world, Next waits) once K1-K3 merge; then wave 2 (BL-1086, BL-1098,
-   BL-1107, BL-1125's build) behind it.
-5. U3: Ben picks a lane form at the live app; the walk.
-6. The one re-bless, last, each cause named with its own before/after.
+- **Centres:** BL-1130 round 2 — explain why the history moved (battles 7 -> 98 on a test run),
+  water regions carry no centre. Explain first, then merge (Ben).
+- **UI:** U3 (the arc only), BL-1134 (roads carried across rounds — a defect Ben saw), BL-1135
+  (the Culture round worded as the record).
+- **Search:** BL-1136's round-count curve; stops for Ben's pick; then BL-1086.
+- **Sea:** BL-1120 (ocean currents, the NR-949 reading); stops with a weight ladder; then BL-1140
+  (lanes from trade), then BL-1098 (the stamp).
 
-## Hazards this sprint already taught
+## Then, in order (the density chain is the headline)
 
-- **Five lanes share one PC.** Every timing an agent reports is indicative; re-take headline
-  numbers quiet in the main session before recording a requirement result.
-- **Worktree agents may reuse scratchpad scripts.** The main session's build is
-  `scratchpad/main_session_build_rel.bat` (do-not-edit header; it writes `BUILD_REL_EXIT`). Check
-  its `cd` line before trusting a build.
-- A background command list scopes its variables: `X=... && ( ... ) &` sets X only inside the
-  backgrounded list. Put multi-step gate runs in a script file.
+BL-1137 (industrial urbanisation + abandonment, aiming at ~500 centres a world) with BL-1132
+(settle spacing) and BL-1133 (anchors join a neighbour) -> BL-1125 (markets fold: twins, gravity
+aimed at 20-40, conquest) -> BL-1138 (roads pull to markets) -> NR-944 re-read (nations off the
+road network) -> BL-1107 -> BL-1139 (abandonment in play). Then ONE re-bless with every cause
+named, split if it grows too wide.
+
+## Open for Ben
+
+NR-948 (abandoned in play = the razed tier), NR-949 (currents from wind bands and coasts), NR-950
+(the market trunk: nearest neighbours, Road tier) — all decisions taken on his behalf.
+
+## Hazards this sprint taught
+
+- Five lanes on one PC: every agent timing is indicative; take headline numbers quiet.
+- A background `X=... && (...) &` scopes X to the list; a keep-awake holder inside a script's
+  `wait` deadlocks on its own lock — release the lock before waiting on it.
+- `--verify-all` carries state between scripts; run a failing wizard script alone before
+  believing it.
+- Main-session build: `scratchpad/main_session_build_rel.bat` (writes BUILD_REL_EXIT). Close the
+  live app before rebuilding.

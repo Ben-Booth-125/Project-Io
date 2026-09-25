@@ -175,6 +175,18 @@ can be laid is a candidate** (delegated reading, NR-945): a route across open se
 so it never enters the tree or the test, and a nation the sea divides builds one tree per
 landmass.
 
+**Roads pull toward markets (Ben, 2026-09-25: "roads make trade easier, they should pull towards
+market centres per nation, and across markets to bridge and provide logistics extension for
+larger trades"; BL-1138, roads pull to markets).** Two pulls, read after the market folds leave a
+world its tens of markets (`MARKETS.md` § Market centres and seeding). **Within a nation** the
+network is drawn toward its market centres: every market centre is on the backbone, and a town's
+road is weighed by how much nearer it brings the town to its market. **Across markets** a trunk
+joins each market centre to its neighbouring market centres, over a border where the neighbour
+lies across one, so a larger trade has a road to travel beyond its own catchment; the trunk is
+laid at Road tier or above and the detour test still refuses a trunk link a serviceable route
+already gives. The trunk's shape (which neighbours, and the tier) is a delegated reading, NR-950,
+measured on the curated seeds.
+
 **Villages join locally, not as lattice members** (BL-620, road generation scales to density):
 **only a village at or above a size floor lays a spur (Ben, 2026-09-25)**, and the floor is
 **40,000 heads** (Ben, 2026-09-25, from the measured ladder: about the 90th percentile of village

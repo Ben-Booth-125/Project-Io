@@ -788,8 +788,9 @@ makes the search a pure function of (world, seed, round count) with a cost known
 
 **The round count is cut to fit round 6's wait (Ben, 2026-09-25; BL-1136, fewer search
 evaluations).** The search runs inside round 6's tail, which lands within 35 s of the round's
-arrival (`../ui/STARTUP.md` § Round 6); on the densest curated world thirteen evaluations cost
-about 17 s of it. The count stays fixed and stays one number for every world, but it is chosen
+arrival (`../ui/STARTUP.md` § Round 6); thirteen evaluations cost about 17 s of it on seed 0 and
+about 31 s on the curated worlds with the most markets (scoring is most of an evaluation, and it
+grows with the market count). The count stays fixed and stays one number for every world, but it is chosen
 from a measured curve — how much score each further round buys on the curated seeds — not left
 at a count set before the tail had a budget.
 

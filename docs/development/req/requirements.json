@@ -6724,13 +6724,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "live: Ben's walk"
      ],
      "requirement": "Ben reads each round's legend at the live app.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Ben read the legends at the live app, 2026-09-25: kept one key per round, kept Furnaces lit on Empires, kept the four drafted labels."
     }
    ]
   },
@@ -6758,13 +6758,13 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "live: Ben picks with the live app open"
      ],
      "requirement": "Ben picks one form; the other two are removed before the commit.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Ben picked (c) the bowed arc at the live app, 2026-09-25 (the open-calls form). U3 (70cb329d, merged 9313e35a) removed forms (a) and (b), the enum and the selector; the legend swatch is the arc."
     },
     {
      "id": "R3",
@@ -7006,6 +7006,74 @@
      "requirement": "A cold review of the merged change, fix round included, before the commit.",
      "notes": "",
      "result_metric": "Cold review of a2b3e948 (2026-09-25): no logic defect; the direction flip hand-checked on an east-west river hop and a row crossing; purity and every orientation reader confirmed. Fix round 5236d8fb (merged b82b0957): logistics_harness T4b/T4c/T4d test the direction (they FAIL when the flip is reverted; T4c alone fails a parity-only mutation), T4's symmetry assertion retired; lp_anchor_field_check L1 is a check (exits 1 on divergence, shown against 95bfb22a); F1 counts every anchored body (1 of 1 per seed); stale comments fixed. world_determinism unmoved by the fix round. Main: logistics_harness direction rows PASS."
+    }
+   ]
+  },
+  {
+   "brief": "roads-carried-across-rounds",
+   "title": "BL-1134 - Every lapse round draws the roads the rounds before it laid",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1134 - sprint 48 (the live walk, 2026-09-25)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "visual: scripts/verify/roads_carried.lua"
+     ],
+     "requirement": "Every road drawn at a round's close is drawn on the next round's first frame, at both seams (Empires -> Exploration, Exploration -> Industrialisation).",
+     "notes": "",
+     "result_metric": "70cb329d: the painter carries the predecessor's whole road network at the seam (road_carry, lapse_roads_at_close), a road's tier only moving earlier. roads_carried.lua 8/8 in the lane (seed 32: 480 carried into Exploration, 542 into Industrialisation); re-run on main pending the gate."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "live: Ben's walk"
+     ],
+     "requirement": "Ben sees the roads carry from round to round.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "culture-round-worded-as-the-record",
+   "title": "BL-1135 - The Culture round's words describe how writing and the keeping of a record emerge",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1135 - sprint 48 (the live walk, 2026-09-25)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "visual: round_legends_3_culture capture"
+     ],
+     "requirement": "The question, captions, counters, census line and footer speak of the record, not the routes; map and record unchanged.",
+     "notes": "",
+     "result_metric": "70cb329d: question \"Which peoples first set down their names, their gods and their ground?\"; footer \"2400 to 400 BCE: the first peoples set down their names, their gods and their ground, and the ages after inherit what they kept.\"; counters/census/overrun/no-reroll lines reworded. The ticker's event prose (\"The X part from the Y at Z\") is the record's and was left unchanged -- Ben to say at the walk."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "live: Ben's walk"
+     ],
+     "requirement": "Ben reads the draft at the app and accepts or rewords it.",
+     "notes": "",
+     "result_metric": ""
     }
    ]
   }

@@ -400,6 +400,14 @@ earned leg onto the water as a **sea lane**: a lane level on each water tile the
 which traversal cost reads as one more multiplier, the water analogue of the ancient road. Purely
 additive; land tiles are untouched.
 
+**A lane is a route of the ocean's currents and of trade between continents, not only a coastal
+hop (Ben, 2026-09-25; BL-1140, sea lanes from trade).** A **fourth writer** of a sea-leg use:
+trade between realms whose goods cross water — the span's trade links between realms on different
+landmasses — writes one use per decision round it runs, so a world's lanes follow where its trade
+goes, not only where its tribute flows. And every sea leg is priced with its current (§ Currents
+are a force, not a picture), so a lane bends along the currents the planet generates rather than
+hugging the shortest line between two shores.
+
 **What reads it is everything that reads traversal cost**, because traversal cost is one weight
 function (`../economy/LOGISTICS.md` § 1). A convoy between a colony's market and its metropole's
 is cheaper than one to a stranger's, so a colony's chains close through its metropole *first*
@@ -465,8 +473,12 @@ real option and the lane record reads wet campaigns as well as the tribute leg.
 
 **Currents are a force, not a picture (Ben, 2026-09-25).** The sea carries currents generated
 from the planet, and a leg that runs with one costs less than a leg run against it, so routes,
-lanes and staging follow them; the Exploration round charts them. How they are generated and
-how much they weigh is BL-1120's (ocean currents).
+lanes and staging follow them; the Exploration round charts them. **They are generated from the planet (delegated reading,
+NR-949; BL-1120, ocean currents):** each ocean region's current follows its latitude band's
+prevailing wind (easterly in the tropics, westerly in the mid-latitudes, its sense set by the
+body's rotation) and is turned along the coasts the continents present, so a basin circulates; a
+leg run with its current costs less and against it more, by one weight measured on the curated
+seeds. Built this sprint (Ben, 2026-09-25).
 
 **The record keeps the fleet and the harbour, year by year (Ben, 2026-09-24).** Each polity's
 sample on the round's record carries its standing navy and its capital's port stock at every

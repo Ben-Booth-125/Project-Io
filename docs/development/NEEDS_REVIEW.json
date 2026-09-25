@@ -1081,7 +1081,7 @@
    "title": "DECISION TAKEN: \"province anchors reuse a centre\" is read as a centre-less province joining its nearest neighbouring province of the same nation",
    "raised": "2026-09-25",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "source": "Ben's open-calls form, 2026-09-25 (BL-1133, anchors reuse a centre)",
    "what": "A centre already stands in exactly one province, so a province without one cannot \"take\" another's. Taken on your behalf: a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, and the merged province's centre anchors it; a scale-1 founding happens only where no such neighbour exists. POPULATION.md § Generation states it; PROVINCES.md § The partition owns the merge.",
    "why_it_matters": "It lowers the province count as well as the centre count, so conquest units get larger in thinly settled country.",
@@ -1096,14 +1096,14 @@
     "docs/economy/POPULATION.md",
     "docs/generation/PROVINCES.md"
    ],
-   "resolution": null
+   "resolution": "RULED (Ben, 2026-09-25, the centres-and-routes form): A, keep -- a centre-less province joins its nearest neighbouring province of the same nation. BL-1133 builds it."
   },
   {
    "id": "NR-947",
    "title": "DECISION TAKEN + CALL: the threshold below which a shrinking centre is abandoned is a village's worth; and does play follow the history?",
    "raised": "2026-09-25",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "source": "Ben, 2026-09-25: \"Let's supersede that POPULATION.md rule, we can destroy shrinking centres below a threshold\"",
    "what": "Taken on your behalf: the threshold is the smallest rung, a village's worth -- the size hierarchy (BL-1130) already sizes a region's centres from its heads with the smallest a village's worth, so a centre whose share falls below it is abandoned, no new number. Written for the HISTORY (POPULATION.md § Generation). OPEN: play keeps \"passive failure never destroys a centre\" (§ Growth, decline and razing), because a centre is its province's capture anchor and razing is a tier, not an erasure; superseding it in play too would need an anchor hand-off.",
    "why_it_matters": "The history rule is what thins the generated map (with BL-1137, industrial urbanisation). The play rule decides whether a campaign's villages can empty and vanish too.",
@@ -1116,6 +1116,68 @@
    "files": [
     "docs/economy/POPULATION.md",
     "src/world/history_sim.cpp"
+   ],
+   "resolution": "RULED (Ben, 2026-09-25, the centres-and-routes form): the threshold stays a village's worth, AND play follows too (he picked both \"history only\" and \"play follows too\"; read together: the village threshold, applied in play as well). The play half is BL-1139 (centres abandoned in play), with the anchor hand-off read as the razed tier (NR-948)."
+  },
+  {
+   "id": "NR-948",
+   "title": "DECISION TAKEN: in play an abandoned centre drops to the razed tier (a ruin that keeps its province anchor) rather than vanishing",
+   "raised": "2026-09-25",
+   "kind": "decision",
+   "status": "open",
+   "source": "Ben's centres-and-routes form, 2026-09-25",
+   "what": "Play follows the history's abandonment rule (NR-947). But a centre is its province's capture anchor, and razing is already a tier, not an erasure. Taken on your behalf: a centre whose population falls below a village's worth in play drops to the razed tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle), so no province loses its anchor. POPULATION.md § Growth, decline and razing states it.",
+   "why_it_matters": "The alternative -- deleting the centre and handing the province to a neighbour at runtime -- changes ownership and conquest mid-campaign.",
+   "options": [
+    "A: keep (abandoned = razed tier)",
+    "B: delete the centre and merge its province into its nearest neighbour at runtime",
+    "C: other"
+   ],
+   "recommendation": "A.",
+   "files": [
+    "docs/economy/POPULATION.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-949",
+   "title": "DECISION TAKEN: ocean currents follow each latitude band's prevailing wind and turn along the coasts, so a basin circulates",
+   "raised": "2026-09-25",
+   "kind": "decision",
+   "status": "open",
+   "source": "Ben's centres-and-routes form, 2026-09-25",
+   "what": "Ben ruled currents are built this sprint and shape the lanes (BL-1120). The generation was open. Taken on your behalf: each ocean region's current follows its latitude band's prevailing wind (easterly in the tropics, westerly in the mid-latitudes, its sense set by the body's rotation) and is turned along the coasts the continents present; a leg with its current costs less, against it more, by one measured weight. Real ocean circulation is the mechanism reference, never a name source. EXPLORATION.md § Currents states it.",
+   "why_it_matters": "It decides where every lane bends and how far trade across water reaches.",
+   "options": [
+    "A: keep the wind-band-and-coast reading",
+    "B: a simpler field (one prevailing current per hemisphere)",
+    "C: other"
+   ],
+   "recommendation": "A: it gives basins that circulate, which is what makes a return route differ from the outbound.",
+   "files": [
+    "docs/generation/EXPLORATION.md",
+    "src/world/history_sim.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-950",
+   "title": "DECISION TAKEN: the market trunk links each market centre to its nearest neighbouring market centres, at Road tier",
+   "raised": "2026-09-25",
+   "kind": "decision",
+   "status": "open",
+   "source": "Ben's centres-and-routes form, 2026-09-25",
+   "what": "Ben ruled roads pull toward market centres and bridge across markets (BL-1138). The trunk's shape was open. Taken on your behalf: each market centre is joined to its nearest neighbouring market centres by traversal cost (a Delaunay-like neighbour set, never all pairs), over a border where the neighbour lies across one, laid at Road tier; the detour test still refuses a trunk link a serviceable route already gives. LOGISTICS.md § 4 states it.",
+   "why_it_matters": "It decides how connected the world's markets are by road and so how far a large trade reaches.",
+   "options": [
+    "A: keep (nearest neighbours, Road tier)",
+    "B: a spanning tree over market centres only (fewer links)",
+    "C: Highway tier for the trunk"
+   ],
+   "recommendation": "A.",
+   "files": [
+    "docs/economy/LOGISTICS.md",
+    "src/world/road_generation.cpp"
    ],
    "resolution": null
   }

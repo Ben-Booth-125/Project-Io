@@ -24,41 +24,56 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*51 entries — 2 open, 49 resolved.*
+*54 entries — 3 open, 51 resolved.*
 
 ---
 
 ## Open
 
-### NR-946 — DECISION TAKEN: "province anchors reuse a centre" is read as a centre-less province joining its nearest neighbouring province of the same nation
-*decision · raised 2026-09-25 · from Ben's open-calls form, 2026-09-25 (BL-1133, anchors reuse a centre)*
+### NR-948 — DECISION TAKEN: in play an abandoned centre drops to the razed tier (a ruin that keeps its province anchor) rather than vanishing
+*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
 
-A centre already stands in exactly one province, so a province without one cannot "take" another's. Taken on your behalf: a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, and the merged province's centre anchors it; a scale-1 founding happens only where no such neighbour exists. POPULATION.md § Generation states it; PROVINCES.md § The partition owns the merge.
+Play follows the history's abandonment rule (NR-947). But a centre is its province's capture anchor, and razing is already a tier, not an erasure. Taken on your behalf: a centre whose population falls below a village's worth in play drops to the razed tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle), so no province loses its anchor. POPULATION.md § Growth, decline and razing states it.
 
-**Why it matters.** It lowers the province count as well as the centre count, so conquest units get larger in thinly settled country.
+**Why it matters.** The alternative -- deleting the centre and handing the province to a neighbour at runtime -- changes ownership and conquest mid-campaign.
 
-- A: keep the reading (join the nearest neighbouring province)
-- B: keep provinces, and anchor the empty one on the nearest centre across its border (a province anchored outside itself)
+- A: keep (abandoned = razed tier)
+- B: delete the centre and merge its province into its nearest neighbour at runtime
 - C: other
 
-> **Recommendation:** A: a province is the ground a centre can hold; one with nothing to hold it is hinterland of its neighbour.
+> **Recommendation:** A.
 
-*Files: `src/world/population_generation.cpp`, `docs/economy/POPULATION.md`, `docs/generation/PROVINCES.md`*
+*Files: `docs/economy/POPULATION.md`*
 
-### NR-947 — DECISION TAKEN + CALL: the threshold below which a shrinking centre is abandoned is a village's worth; and does play follow the history?
-*decision · raised 2026-09-25 · from Ben, 2026-09-25: "Let's supersede that POPULATION.md rule, we can destroy shrinking centres below a threshold"*
+### NR-949 — DECISION TAKEN: ocean currents follow each latitude band's prevailing wind and turn along the coasts, so a basin circulates
+*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
 
-Taken on your behalf: the threshold is the smallest rung, a village's worth -- the size hierarchy (BL-1130) already sizes a region's centres from its heads with the smallest a village's worth, so a centre whose share falls below it is abandoned, no new number. Written for the HISTORY (POPULATION.md § Generation). OPEN: play keeps "passive failure never destroys a centre" (§ Growth, decline and razing), because a centre is its province's capture anchor and razing is a tier, not an erasure; superseding it in play too would need an anchor hand-off.
+Ben ruled currents are built this sprint and shape the lanes (BL-1120). The generation was open. Taken on your behalf: each ocean region's current follows its latitude band's prevailing wind (easterly in the tropics, westerly in the mid-latitudes, its sense set by the body's rotation) and is turned along the coasts the continents present; a leg with its current costs less, against it more, by one measured weight. Real ocean circulation is the mechanism reference, never a name source. EXPLORATION.md § Currents states it.
 
-**Why it matters.** The history rule is what thins the generated map (with BL-1137, industrial urbanisation). The play rule decides whether a campaign's villages can empty and vanish too.
+**Why it matters.** It decides where every lane bends and how far trade across water reaches.
 
-- A: keep both readings (village threshold; history only, play unchanged)
-- B: village threshold, and play follows (with an anchor hand-off to the nearest centre)
-- C: a different threshold (say which)
+- A: keep the wind-band-and-coast reading
+- B: a simpler field (one prevailing current per hemisphere)
+- C: other
 
-> **Recommendation:** A for this sprint; B is its own item if wanted.
+> **Recommendation:** A: it gives basins that circulate, which is what makes a return route differ from the outbound.
 
-*Files: `docs/economy/POPULATION.md`, `src/world/history_sim.cpp`*
+*Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`*
+
+### NR-950 — DECISION TAKEN: the market trunk links each market centre to its nearest neighbouring market centres, at Road tier
+*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
+
+Ben ruled roads pull toward market centres and bridge across markets (BL-1138). The trunk's shape was open. Taken on your behalf: each market centre is joined to its nearest neighbouring market centres by traversal cost (a Delaunay-like neighbour set, never all pairs), over a border where the neighbour lies across one, laid at Road tier; the detour test still refuses a trunk link a serviceable route already gives. LOGISTICS.md § 4 states it.
+
+**Why it matters.** It decides how connected the world's markets are by road and so how far a large trade reaches.
+
+- A: keep (nearest neighbours, Road tier)
+- B: a spanning tree over market centres only (fewer links)
+- C: Highway tier for the trunk
+
+> **Recommendation:** A.
+
+*Files: `docs/economy/LOGISTICS.md`, `src/world/road_generation.cpp`*
 
 ---
 
@@ -868,4 +883,38 @@ The tree and the detour test took every town pair the path flood could reach, an
 > **RESOLVED.** RULED (Ben, 2026-09-25, the open-calls form): A, keep -- only a layable link enters the tree; a sea-divided nation builds one tree per landmass. LOGISTICS.md § 4 states it.
 
 *Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-946 — DECISION TAKEN: "province anchors reuse a centre" is read as a centre-less province joining its nearest neighbouring province of the same nation
+*decision · raised 2026-09-25 · from Ben's open-calls form, 2026-09-25 (BL-1133, anchors reuse a centre)*
+
+A centre already stands in exactly one province, so a province without one cannot "take" another's. Taken on your behalf: a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, and the merged province's centre anchors it; a scale-1 founding happens only where no such neighbour exists. POPULATION.md § Generation states it; PROVINCES.md § The partition owns the merge.
+
+**Why it matters.** It lowers the province count as well as the centre count, so conquest units get larger in thinly settled country.
+
+- A: keep the reading (join the nearest neighbouring province)
+- B: keep provinces, and anchor the empty one on the nearest centre across its border (a province anchored outside itself)
+- C: other
+
+> **Recommendation:** A: a province is the ground a centre can hold; one with nothing to hold it is hinterland of its neighbour.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the centres-and-routes form): A, keep -- a centre-less province joins its nearest neighbouring province of the same nation. BL-1133 builds it.
+
+*Files: `src/world/population_generation.cpp`, `docs/economy/POPULATION.md`, `docs/generation/PROVINCES.md`*
+
+### NR-947 — DECISION TAKEN + CALL: the threshold below which a shrinking centre is abandoned is a village's worth; and does play follow the history?
+*decision · raised 2026-09-25 · from Ben, 2026-09-25: "Let's supersede that POPULATION.md rule, we can destroy shrinking centres below a threshold"*
+
+Taken on your behalf: the threshold is the smallest rung, a village's worth -- the size hierarchy (BL-1130) already sizes a region's centres from its heads with the smallest a village's worth, so a centre whose share falls below it is abandoned, no new number. Written for the HISTORY (POPULATION.md § Generation). OPEN: play keeps "passive failure never destroys a centre" (§ Growth, decline and razing), because a centre is its province's capture anchor and razing is a tier, not an erasure; superseding it in play too would need an anchor hand-off.
+
+**Why it matters.** The history rule is what thins the generated map (with BL-1137, industrial urbanisation). The play rule decides whether a campaign's villages can empty and vanish too.
+
+- A: keep both readings (village threshold; history only, play unchanged)
+- B: village threshold, and play follows (with an anchor hand-off to the nearest centre)
+- C: a different threshold (say which)
+
+> **Recommendation:** A for this sprint; B is its own item if wanted.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the centres-and-routes form): the threshold stays a village's worth, AND play follows too (he picked both "history only" and "play follows too"; read together: the village threshold, applied in play as well). The play half is BL-1139 (centres abandoned in play), with the anchor hand-off read as the razed tier (NR-948).
+
+*Files: `docs/economy/POPULATION.md`, `src/world/history_sim.cpp`*
 

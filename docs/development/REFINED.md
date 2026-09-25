@@ -136,8 +136,12 @@ the file is 3,027 lines now. Re-read before trusting any `:NNN`.
   "Sea lane form (temporary, for the pick)", default (a). FOR BEN BEFORE HE PICKS: 13 of seed 32's
   16 lanes draw under 8 px (short hops inside one archipelago); only three are long (136, 81, 36
   px), and only form (b) marks the short ones.
-- [ ] U3 Ben picks at the live app; the other two forms and the selector are removed; the walk
+- [x] U3 Ben picks at the live app; the other two forms and the selector are removed; the walk
   (BL-1124 R2, R3; BL-1118 R3).
+  DONE 2026-09-25 (70cb329d, merged 9313e35a): Ben picked the bowed arc; (a), (b) and the
+  selector removed. Same commit: BL-1134 (roads carried at both seams; roads_carried.lua) and
+  BL-1135 (the Culture round's words as the record — a draft for the next walk). BL-1124 R3
+  ("finds a lane without a pointer") is read at the next walk.
 
 **Census — BL-1125 (markets can die), BL-1003 (pools per market).**
 - [ ] M1 `market_census` on the flipped 1960 world, 16 curated seeds: markets by source (capital
@@ -198,17 +202,40 @@ LOGISTICS.md §§ 1, 4, 6.
   packed one region per tile, province anchors grown 2-3x. THE HISTORY MOVED (synthetic R1 battles
   7 -> 98; seed 40 regions 1,461 -> 2,703), cause not isolated. Calls put to Ben (the BL-1130
   form).
+  ROUND 2 (db75a1c2, not merged): the move is three readers of region::centres, measured by
+  switching each back to main's count — the campaign prize's centres x 200 term (P) and the
+  reach relay's 150/centre rebate (R) look like scale artefacts (sized for the old count); the
+  re-settlement gate on razed centres (Z) is a legitimate consequence; the four "stands a centre"
+  gates are inert. Water-anchored regions carry no centre: spills 127,226 -> 0. Pooled 16 seeds:
+  centres 164,982 -> 69,447, land under centres 70.4% -> 29.6%, road tiles 168,582 -> 86,383,
+  markets 4,984 -> 5,329. P and R's reading put to Ben before the merge.
 - [ ] M4 BL-1125 build, after C1 lands: twins fold and gravity fold at the carve (the reach
   calibrated on the consolidated world), conquest consolidates in the history (`history_sim.cpp`,
   the market marking). The markets lane, opened when C1 reports.
 
-### Wave 2b (behind K4's merge)
+### Wave 3 — the chains (opened 2026-09-25, after the live walk and Ben's two forms)
 
-BL-1086 (search inside generation), BL-1098 (sea-lane tier stamped; also behind D4),
-BL-1107 (culture ground profile). Then the one re-bless, each cause named with its own
-before/after: roads (BL-1119), the nearest-anchor field (BL-1117), path cost (BL-1126), centres
-(BL-1130), markets (BL-1125), the search (BL-1086), the lane tier (BL-1098), the ground profile
-(BL-1107).
+Ben at the app and after Begin: "massive road networks with population centres on every tile";
+centres aim at ~500 a world; more migration in the Industrialisation span; shrinking centres
+abandoned below a village's worth (history and play); roads pull toward markets; sea lanes as
+currents and inter-continental trade; the lane a bowed arc. The chains run in this order; items
+slip to sprint 49 from the END of a chain, never the middle.
+
+- **Density (serial on `settlement.*` / `history_sim.cpp` / `population_generation.*`):**
+  C2 BL-1130 round 2 (explain the history move; water regions carry no centre) -> merge ->
+  BL-1137 (industrial urbanisation + abandonment; the ~500 lever) with BL-1132 (settle spacing)
+  and BL-1133 (anchors join a neighbour) -> BL-1125 (markets: twins, gravity, conquest,
+  calibrated on the thinned world) -> BL-1138 (roads pull to markets) -> NR-944's re-read ->
+  BL-1107 (culture ground profile) -> BL-1139 (centres abandoned in play).
+- **Sea (`ocean_currents.*`, history_sim's sea-leg cost and trade record):** BL-1120 (ocean
+  currents) -> BL-1140 (sea lanes from trade) -> BL-1098 (the lane tier stamped).
+- **UI (`history_lapse.*`, text in `startup_screens.cpp`):** U3 (the bowed arc only), BL-1134
+  (roads carried across rounds), BL-1135 (the Culture round worded as the record).
+- **Search (`landscape_search.*`):** BL-1136's curve -> Ben picks the round count -> BL-1086
+  (search inside generation).
+
+Then the one re-bless, each cause named with its own before/after (split it before any cause
+goes unmeasured).
 
 ## Sprint 47 — one history, told through the rounds (opened 2026-09-24)
 
