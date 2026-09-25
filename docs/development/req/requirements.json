@@ -6460,6 +6460,402 @@
    "batch": "sprint-47",
    "resolved": "2026-09-25",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "world-built-once-and-moved",
+   "title": "BL-1084 - The world is built once at the Life gate and moves forward through every wizard round instead of being rebuilt",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1084 - sprint 48 (cut 2026-09-25, Ben's cut form)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice (bit-identical)",
+      "headless: player_seed_sweep --digest-check, both arcs",
+      "headless: seed_library.js --check"
+     ],
+     "requirement": "make_hard_coded_world is the composition of resumable stage functions over one generation_cursor, and the composition is byte-identical to the monolith it replaces: every digest and pin holds, or a moved digest is named as the Selene/Pallas entity-id shift and nothing else.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: a committed cursor-equivalence harness over the 16 curated seeds"
+     ],
+     "requirement": "A staged build, each stage run on a faithful copy of the previous stage's cursor, equals the one-call composition at EVERY round boundary (owner_changes, polities, world digest) on the 16 curated seeds.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: Release timing, copy vs replay, seeds 0 and 28"
+     ],
+     "requirement": "The reroll path is measured before it is chosen: the cost of holding and copying a closed round's world against replaying from the Life gate with the fixed span seeds; the cheaper ships and both numbers are recorded.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "live: Ben's walk, rounds 3-6"
+     ],
+     "requirement": "Next is disabled while the round on screen is running and enables the moment its world lands; its hover names what it waits on; no two pass rounds ever build at once (STARTUP.md, Next waits).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "live: Ben's walk",
+      "visual: a capture of round 5's wait"
+     ],
+     "requirement": "The wait caption on round 5 names only the Exploration span (never an earlier one), and round 5's elapsed count is the Exploration span's own cost; Back then Next on any round recomputes nothing.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: verify.wizard_span_seed and a frame read",
+      "live: Ben's walk"
+     ],
+     "requirement": "Rerolling round 5 re-runs only span 5 and opens on round 4's exact 1200 frame; a planetology move drops every slot below it; a stale landing drops record and world.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "headless: begin_adopts_check.js",
+      "headless: run_autostart_adopt"
+     ],
+     "requirement": "Begin adopts round 6's slot exactly as before; round 6 starts playing at the tap's final publish and its landing swaps only the world slot, with the snapshot and landed paths never both writing the round's record.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R8",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change, fix round included, before the commit.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "roads-tree-and-detour",
+   "title": "BL-1119 - Roads are a tree with detours, not a lattice: Kruskal plus a detour test, spurs only for villages above a size",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1119 - sprint 48 (cut 2026-09-25, Ben's cut form)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: gen_step_costs and a road census per floor candidate, 16 curated seeds, Release"
+     ],
+     "requirement": "The village spur floor is measured before it is fixed: road tiles, spur count and road pass time per floor candidate on the 16 curated seeds.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: road_generation_harness"
+     ],
+     "requirement": "After the Kruskal MST a candidate link is laid only when the network route between its centres costs more than twice the direct A* route (one named constant); the relative-neighbour lattice is gone; connectivity holds.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: a capture of the densest curated seed's road lens"
+     ],
+     "requirement": "No lattice: the densest seed's capture shows a tree with occasional detour loops.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: gen_step_costs --finish, 16 curated seeds, Release"
+     ],
+     "requirement": "Road tiles and road pass time are recorded old -> new per seed, and generate_roads runs under ~10 s Release on the library seeds (BL-1077's target, folded in).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: gen_step_costs --finish, seeds 0 and 28, Release",
+      "live: Ben's walk, round 6"
+     ],
+     "requirement": "Round 6's whole tail lands within 35 s of the round's arrival on seeds 0 and 28 in Release (shared with BL-1117, settle tick one).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: haulage_measure against the 1055/802 baseline"
+     ],
+     "requirement": "Trade is read before and after, since goldens cannot see it: convoy traffic and far-trade on the library seeds, old -> new.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change, fix round included, before the commit.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "settle-tick-one-cost",
+   "title": "BL-1117 - The settle's first tick is named by phase, then cut, so round 6's tail fits its 35 s",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1117 - sprint 48 (cut 2026-09-25, Ben's cut form)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: gen_step_costs --finish, seeds 0 and 28, Release"
+     ],
+     "requirement": "Tick 1 of the settle is timed by phase on seeds 0 and 28 in Release and the phase that costs it is named with its milliseconds.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: gen_step_costs --finish",
+      "headless: world_determinism twice"
+     ],
+     "requirement": "The named phase is cut: tick 1's cost old -> new on both seeds; the digests hold, or the movement is named as a cause in the sprint's re-bless.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change, fix round included, before the commit.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "round-legends",
+   "title": "BL-1118 - Each lapse round carries a legend naming exactly the layers it draws",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1118 - sprint 48 (cut 2026-09-25, Ben's cut form)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: a capture per lapse round (Culture, Empires, Exploration, Industrialisation)"
+     ],
+     "requirement": "Each lapse round's legend lists the layers that round draws and only those, read from the painter's own predicates, with glyphs drawn by the painter's calls.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "doc: docs/ui/question_log.json + render_question_log.js"
+     ],
+     "requirement": "The legend has its question-log entry.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "live: Ben's walk"
+     ],
+     "requirement": "Ben reads each round's legend at the live app.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "sea-lanes-seen",
+   "title": "BL-1124 - A player sees the sea lanes on the Exploration round without being told where to look",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1124 - sprint 48 (cut 2026-09-25, Ben's cut form)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: sea_lanes.lua, seed 32 close frame, one capture per candidate"
+     ],
+     "requirement": "Three candidate lane forms (a brighter core line inside the band, a shipping glyph at each end, an arc bowed away from the tie) are captured at seed 32's close frame.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "live: Ben picks with the live app open"
+     ],
+     "requirement": "Ben picks one form; the other two are removed before the commit.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "live: Ben's walk"
+     ],
+     "requirement": "Ben finds a lane at the live app without a pointer.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "markets-can-die",
+   "title": "BL-1125 - A market can be destroyed, so the world handed to the player never carries too many markets",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1125 - sprint 48 (cut 2026-09-25, Ben's cut form)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: a committed market census harness, 16 curated seeds, the flipped 1960 world"
+     ],
+     "requirement": "A census per curated seed: markets by source (capital shell, carve, junction-lowered), shells standing where the polity died after 1200, catchment tiles and population per market, and the share that clear nothing in the first play year.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "design: Ben rules the mechanism against R1"
+     ],
+     "requirement": "The mechanism that destroys a market is ruled by Ben against the census and written into MARKETS.md; the rows that verify it are added then.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "epoch-zero-retired",
+   "title": "BL-1114 - Epoch 0 is retired: the flag refuses it and no code path maps an epoch to a band",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1114 - sprint 48 (cut 2026-09-25, Ben's cut form)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: ProjectIo --epoch 0 (and the harness flag)"
+     ],
+     "requirement": "--epoch 0 is refused with a clear message, never silently clamped.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "review: grep + compile"
+     ],
+     "requirement": "No code path maps an epoch to a band (industrial_band_from_year and its callers are gone); every harness, verify script and seed-library entry that used epoch 0 is moved to 1960 and named in the commit.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice",
+      "headless: save_roundtrip"
+     ],
+     "requirement": "world_determinism is bit-identical twice with its epoch row re-scoped to a non-zero epoch; save_roundtrip green.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

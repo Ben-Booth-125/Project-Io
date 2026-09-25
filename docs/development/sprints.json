@@ -178,18 +178,24 @@
   {
    "id": "48",
    "theme": "the world moves forward",
-   "state": "proposed",
-   "status_line": "PROPOSED 2026-09-25 (Ben, closing sprint 47): the carried seam and the round feedback. The handoff is docs/development/NEXT_SESSION.md; the cut is the next session's.",
-   "opened_date": null,
+   "state": "open",
+   "status_line": "OPENED 2026-09-25 (Ben's cut form): all seven tagged items, BL-1117 (settle tick one) with its fix, BL-1125 (markets can die) from Ben's note, BL-1003's close-out and BL-1114 (epoch 0 retired). Next waits; the lane form is chosen now; BL-1077 (village roads cost) folded into BL-1119.",
+   "opened_date": "2026-09-25",
    "closed_date": null,
-   "author": "Ben (2026-09-25); Claude (handoff at the sprint-47 close)",
-   "goal": "The world is built once and moves forward through the rounds, and each round reads at a glance: fewer roads and a faster round 6, a legend on every round, and sea lanes a player can find.",
+   "author": "Ben (2026-09-25, the cut form); Claude (handoff and cut)",
+   "goal": "The world is built once and moves forward through the rounds, and each round reads at a glance: Next waits for its round and nothing is built twice, roads are a tree and round 6 lands inside 35 s, a legend on every round, sea lanes a player can find, and a world that never hands the player too many markets.",
    "planned": [
-    "Cut at the next session from NEXT_SESSION.md."
+    "WAVE 1 - five lanes on disjoint files, plus one Light item in the main session. CURSOR: BL-1084 (world built once and moved), the cursor and its proof first, then the wizard (Next waits, the reroll path measured, round 6 plays at the final publish). ROADS: BL-1119 (roads tree and detour), with BL-1077 folded in: floor measured, then the detour test. SETTLE: BL-1117 (settle tick one), the reading, then the fix. UI: BL-1118 (round legends) + BL-1124 (sea lanes seen), three lane forms captured, Ben picks live. CENSUS: BL-1125 (markets can die) census + BL-1003 (pools per market) R6, read before anything moves the market set. MAIN: BL-1114 (epoch 0 retired).",
+    "RULING - BL-1125's mechanism, put to Ben against the census as soon as it lands.",
+    "WAVE 2 - behind BL-1084's merge (and BL-1119's, for the stamp): BL-1086 (search inside generation), BL-1098 (sea-lane tier stamped), BL-1107 (culture ground profile, the sprint's one sim beat), BL-1125's build.",
+    "THE ONE RE-BLESS - last, after every world-mover, with each cause named and measured in isolation: roads (BL-1119), the search (BL-1086), the lane tier (BL-1098), the ground profile (BL-1107), markets (BL-1125), and any of BL-1084 (the Selene/Pallas shift), BL-1117 or BL-1114 that moves a digest."
    ],
-   "risk": "",
-   "done_when": "Set at the cut.",
-   "notes": ""
+   "risk": "THE CURSOR again. BL-1084 splits a 3,000-line function whose locals thread through every stage; the composition must hold every pin, and the staged build must equal it at every round boundary, before any wave-2 lane or the wizard builds on it. SECOND: five or more world-movers share one re-bless, so each measures its own before/after in its worktree when it lands, or the description cannot attribute them. THIRD: BL-1125 has no mechanism yet; the census and Ben's ruling gate it, and it slips before anything else does.",
+   "done_when": "The world is built once at the Life gate: no round recomputes an earlier span, Next waits for its round, a reroll re-runs only its own span, and the staged build equals the composition on 16 seeds. Round 6's tail lands within 35 s of arrival on seeds 0 and 28 in Release; roads are a tree with detours. Every lapse round has a legend naming exactly its layers, and Ben finds a sea lane without a pointer. The search runs inside generation, the lane tier prices the water, cultures carry a ground profile their preference reads. A market can die, and the 1960 market count per seed is what the ruled rule leaves. Epoch 0 is refused. One re-bless, taken once.",
+   "notes": [
+    "THE CUT (2026-09-25). Ben's form: scope C (all seven tagged), the lane form chosen now on today's lanes (BL-1115, sea legs later, stays unscheduled), Next waits (STARTUP.md), the 35 s judged on the whole tail with BL-1117's fix in, BL-1077 folded into BL-1119, plus BL-1003's close-out and BL-1114. His note filed BL-1125 (markets can die); its mechanism is ruled after the census.",
+    "FOUND AT THE CUT: STARTUP.md said round 6's time goes to the road pass; BL-1117's reading (settle ~56 s on seed 0, tick 1 38.5 s) says half of it is the settle. The doc now names both."
+   ]
   }
  ],
  "next_up": "SPRINT 47 OPEN (2026-09-24): wave 0 first — BL-1083 then BL-1084 in one generation lane, BL-1085 in a core lane, BL-1101/BL-1096/BL-1097/BL-1102 as world-mover lanes; the identity wave opens as soon as BL-1083 lands. Re-bless once after wave 0's world-movers.",

@@ -1,5 +1,111 @@
 # REFINED — active worklist
 
+## Sprint 48 — the world moves forward (opened 2026-09-25)
+
+**Goal.** The world is built once at the Life gate and moves forward through the rounds; Next waits
+for its round and nothing is built twice; roads are a tree and round 6's tail lands inside 35 s; a
+legend on every lapse round and sea lanes a player can find; a world that never hands the player
+too many markets. The sprint row in `sprints.json` carries the waves, the risk and the done-when.
+Wave 2's tasks are written here when its lanes open, behind BL-1084's merge.
+
+**Lanes, by file (keep them disjoint):**
+- **Cursor** — `hard_coded_world.*`, `world_gen_config.hpp`, `harness_params.hpp`, a new
+  `tools/verify/world_cursor_equivalence.cpp`; then the wizard: `app.*`, `startup_screens.cpp`,
+  `generation_preview.cpp`. BL-1084 (world built once and moved). Serial inside the lane.
+- **Roads** — `road_generation.cpp`, `road_generation_harness.cpp`, `gen_step_costs.cpp`:
+  BL-1119 (roads tree and detour), BL-1077's target folded in.
+- **Settle** — the economy step's clocks (`economy_system.cpp`, `finish_campaign_world.*`), then
+  wherever S1 points: BL-1117 (settle tick one).
+- **UI** — `history_lapse.*`, `scripts/verify/sea_lanes.lua`, new legend scripts,
+  `question_log.json`: BL-1118 (round legends) + BL-1124 (sea lanes seen).
+- **Census** — a new `tools/verify/market_census.cpp`, read-only over `world/*`: BL-1125 (markets
+  can die) R1, BL-1003 (pools per market) R6.
+- **Main session** — BL-1114 (epoch 0 retired): the flag, `era_band.hpp`, `era_roster.cpp`, the
+  harness rows.
+
+**Gates.** Every merge: Release build, `world_determinism` twice (bit-identical),
+`save_roundtrip`, the item's harnesses, a cold `code-reviewer` pass, then Ben's live click for
+any UI item. World-movers measure their own before/after in their worktree and land behind the
+sprint's ONE re-bless, taken last. Save versions: one world bump for the sprint (BL-1098's
+`lane_level`, and BL-1125's if its rule reaches the save), claimed by the first lane that needs it
+(`next_save_version.js --kind world --claim`). Check `BUILD_REL_EXIT` and `tasklist` before trusting
+a Release script's result (a running app locks `build_rel`).
+
+### Wave 1
+
+**Cursor — BL-1084 (world built once and moved).** The item's line anchors predate sprint 47;
+the file is 3,027 lines now. Re-read before trusting any `:NNN`.
+- [ ] K1 The cursor. `make_hard_coded_world` becomes the composition of resumable stage functions
+  over one `generation_cursor` holding what the tail reads as locals today (world, report, naming,
+  the Kepler tiles/planet/history/creeds/settlement, corridors, grudges, region polity, treasuries,
+  capital market shells, the last span's resume struct). The `stop_after_*` flags become "run the
+  composition up to stage N". Byte-identical: every pin holds (R1).
+  provides: `generation_cursor`, `gen_life_gate`, `gen_culture`, `gen_empires`,
+  `gen_exploration`, `gen_industrialisation`, `gen_tail`, `run_generation_to(stage)`.
+  consumes: —.
+- [ ] K2 The staged proof. `world_cursor_equivalence`: on the 16 curated seeds, run each stage on a
+  faithful copy of the previous stage's cursor and compare to the one-call composition at every
+  round boundary (owner_changes, polities, world digest) (R2). consumes: K1's cursor and a cursor
+  copy (the world's faithful copy, BL-1034).
+- [ ] K3 The reroll path, measured. Release, seeds 0 and 28: holding and copying a closed round's
+  cursor against replaying from the Life gate with the fixed span seeds. The cheaper ships (R3).
+  consumes: K1.
+- [ ] K4 The wizard moves the world. The Life round builds the real gate world into slot 0;
+  `launch_wizard_history_run(i)` runs only stage i from slot i-1; `invalidate_wizard_rounds_below`
+  drops and stale-marks; **Next waits** (disabled while the round runs, a hover naming what it waits
+  on); Begin adopts round 6's slot; round 6 plays at the tap's final publish (R4-R7). Selene and
+  Pallas move into Finishing; report any digest that shift moves. consumes: K1, K3's choice.
+- [ ] K5 Cold review and its fix round (R8).
+
+**Roads — BL-1119 (roads tree and detour).**
+- [ ] D1 The floor, measured. Road tiles, spur count and road pass time per village-size floor
+  candidate on the 16 curated seeds, Release (R1). The lane stops and reports; the main session
+  fixes the floor.
+- [ ] D2 The tree. Kruskal MST, then the detour test (`kDetourRatio`, 2.0: a link only where the
+  network route costs more than twice the direct A* route); the percentile rationing applies to the
+  loops it admits; the border link rule unchanged; spurs above the fixed floor only (R2, R3).
+  provides: `kDetourRatio`, the floor constant. consumes: D1's floor.
+- [ ] D3 Old -> new per seed: road tiles, pass time, spurs; `generate_roads` under ~10 s Release,
+  else BL-1077's bound as a second step; haulage read against the baseline (R4, R6).
+- R5 (the whole tail inside 35 s) closes in the main session with S2.
+
+**Settle — BL-1117 (settle tick one).**
+- [ ] S1 Time tick 1 by phase inside `run_economy_step` (write-only clocks; the corp AI cadence is
+  the first suspect), seeds 0 and 28, Release. Name the phase with its milliseconds (R1). The lane
+  stops and reports.
+- [ ] S2 The fix, written here from S1's reading (R2), then the whole-tail reading with D3 (BL-1119
+  R5).
+
+**UI — BL-1118 (round legends) + BL-1124 (sea lanes seen).**
+- [ ] U1 A legend per lapse round (Culture, Empires, Exploration, Industrialisation) listing the
+  layers that round draws, read from the painter's own predicates, glyphs by the painter's calls;
+  its question-log entry; a capture per round (BL-1118 R1, R2).
+  provides: the legend's layer predicates. consumes: —.
+- [ ] U2 Three lane forms on seed 32's close frame: a brighter core line inside the band, a
+  shipping glyph at each end, an arc bowed away from the tie; one capture each, and a temporary
+  selector so the live app can show each (BL-1124 R1). The legend names the lane. consumes: U1.
+- [ ] U3 Ben picks at the live app; the other two forms and the selector are removed; the walk
+  (BL-1124 R2, R3; BL-1118 R3).
+
+**Census — BL-1125 (markets can die), BL-1003 (pools per market).**
+- [ ] M1 `market_census` on the flipped 1960 world, 16 curated seeds: markets by source (capital
+  shell, carve, junction-lowered), shells standing where the polity died after 1200, catchment
+  tiles and population per market, the share that clear nothing in the first play year. Read-only
+  over `world/*` (BL-1125 R1).
+- [ ] M2 BL-1003 R6: generated firms that straddle a catchment line, and whether the landscape
+  search winner still validates, on the same world.
+- [ ] M3 Ben rules BL-1125's mechanism against M1 (BL-1125 R2); its build joins wave 2.
+
+**Main session — BL-1114 (epoch 0 retired).**
+- [ ] E1 `--epoch 0` refused with a message; no path maps an epoch to a band; harnesses, verify
+  scripts and the seed library moved to 1960; `world_determinism`'s epoch row re-scoped (R1-R3).
+
+### Wave 2 (opens behind BL-1084's merge)
+
+BL-1086 (search inside generation), BL-1098 (sea-lane tier stamped; also behind BL-1119),
+BL-1107 (culture ground profile, the sprint's one sim beat), BL-1125's build. Then the one
+re-bless, each cause named with its own before/after.
+
 ## Sprint 47 — one history, told through the rounds (opened 2026-09-24)
 
 **CLOSED 2026-09-25 (Ben: "I'll accept this as sprint 47 complete"; v0.1.26).** Every task below

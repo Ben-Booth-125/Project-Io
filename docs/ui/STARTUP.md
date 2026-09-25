@@ -348,8 +348,10 @@ year, and **the lapse starts playing there while the same worker builds the tail
 into § The world cache. Landing swaps only the world slot; a caption beside the playing map
 names the one step under way ("Drawing borders", "Searching the landscape", "Proving the
 field") and nothing else. **The tail lands within 35 s of the round's arrival (Ben,
-2026-09-25, after a round 6 that took "just over one minute")**; the road pass is where the
-time goes, and the road rule (LOGISTICS.md § 4, the detour test) is how it gets there. Its record
+2026-09-25, after a round 6 that took "just over one minute")**, and the whole tail is held to
+it. The time goes to two places: the road pass, which the road rule (LOGISTICS.md § 4, the
+detour test) cuts, and the settle's first tick, which costs more than the other eleven together
+(its phase is named by measurement before it is cut). Its record
 (`generation_report::body_entry::industrialisation_timelapse`, with its own
 battle/conquest/founding counters) is recorded once, at the call site that runs the span, and
 plays on the same map as rounds 3–5. The span runs only when Exploration ran and
@@ -516,6 +518,11 @@ watched wait must be **worth watching**; a round that shows a frozen globe for n
 seconds is worse than a bar, not better.
 **The round after is not built ahead while this one plays (Ben, 2026-09-24).** Arriving is
 the instruction, and nothing runs before it is given.
+**Next waits for the round on screen (Ben, 2026-09-25).** A round's span begins on the world
+the round before it closed (§ The world cache), so the next round has nothing to start from
+until this one lands. Next is disabled while this round's run is in flight and enables the
+moment its world lands; its hover names what it waits on. No two pass rounds ever build at
+once, and none is built twice.
 
 **Rounds stay causal, downward only** — the per-stage reroll rule is stated once, at § Each pass
 round is rerollable.
