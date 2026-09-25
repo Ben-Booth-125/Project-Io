@@ -97,8 +97,11 @@ the file is 3,027 lines now. Re-read before trusting any `:NNN`.
 - [ ] M3 Ben rules BL-1125's mechanism against M1 (BL-1125 R2); its build joins wave 2.
 
 **Main session — BL-1114 (epoch 0 retired).**
-- [ ] E1 `--epoch 0` refused with a message; no path maps an epoch to a band; harnesses, verify
+- [x] E1 `--epoch 0` refused with a message; no path maps an epoch to a band; harnesses, verify
   scripts and the seed library moved to 1960; `world_determinism`'s epoch row re-scoped (R1-R3).
+  DONE 2026-09-25: refused with exit 1 and a message (Release, 18:00 build); the band path was
+  already gone (BL-1101); centre_region_bind and chain_conversion_probe moved to 1960; R3.8 now
+  compares epoch 1900 to 1960; world_determinism ALL PASS twice, digests unmoved; save_roundtrip OK.
 
 ### Wave 2 (opens behind BL-1084's merge)
 

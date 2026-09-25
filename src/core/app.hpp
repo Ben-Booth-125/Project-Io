@@ -88,15 +88,13 @@ public:
     /// generates (`--epoch <year>`). Absent = the struct's own default.
     ///
     /// WHAT IT MOVES (BL-1047, the epoch flip; BL-1101, band from history): the
-    /// calendar and nothing else. The default is 1960; `--epoch 0` opens the
-    /// SAME generated world dated 0 CE, on the SAME band — the band is the
-    /// world's own, derived at the 1960 fold from its history's industry state
-    /// (`world::campaign_band`), never from the year. Generation reads no epoch,
-    /// so no history, span or settlement year moves with it. Both starts are
-    /// supported (`docs/economy/ERAS.md` § Where the ladder starts), so selecting
-    /// between them belongs at the command line. Whether a 0 CE start may ALSO
-    /// ask for the ancient roster as a sandbox is Ben's open call (NR-920); no
-    /// band override exists.
+    /// calendar and nothing else. The default is 1960, and another year opens the
+    /// SAME generated world on the SAME band, dated differently — the band is
+    /// derived at the 1960 fold from the history's industry state, never from
+    /// the year. Generation reads no epoch, so no history, span or settlement
+    /// year moves with it. Epoch 0 is retired (Ben, 2026-09-25, NR-920; BL-1114):
+    /// main.cpp refuses it, and there is no band override or ancient-roster
+    /// sandbox (`docs/generation/INDUSTRIALISATION.md` § The epoch and the band).
     ///
     /// Applies to a NEW world only; a save carries its own epoch and the load
     /// path is not overridden. Call before run() / run_autostart().

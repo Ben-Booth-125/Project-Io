@@ -136,7 +136,7 @@ razed_tally sweep_seed(uint32_t seed, bool print_rows)
     razed_tally t;
     world_params wp{};
     wp.seed = seed;
-    wp.epoch_year = 0;
+    wp.epoch_year = 1960;
 
     generation_report rep{};
     world w = make_hard_coded_world(wp, &rep);
@@ -200,7 +200,7 @@ int main()
     // the sim-grain figures printed here are directly comparable to it.
     world_params wp{};
     wp.seed = 0xABCDEF01u;
-    wp.epoch_year = 0;
+    wp.epoch_year = 1960;
 
     generation_report rep_a{}, rep_b{};
     world wa = make_hard_coded_world(wp, &rep_a);
@@ -244,7 +244,7 @@ int main()
         sim_centres += p.centres;
         sim_urban   += p.urban_population;
     }
-    std::printf("\n-- sim grain (seed ABCDEF01, epoch 0) --\n");
+    std::printf("\n-- sim grain (seed ABCDEF01, epoch 1960) --\n");
     std::printf("   regions %d (%d living)   centres %" PRId64
                 "   razed %" PRId64 "   urban heads %" PRId64 "\n",
                 static_cast<int>(regions.size()), living, sim_centres, sim_razed, sim_urban);

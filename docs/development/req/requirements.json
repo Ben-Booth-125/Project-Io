@@ -6818,42 +6818,42 @@
    "difficulty": 2,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1114 - sprint 48 (cut 2026-09-25, Ben's cut form)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-09-25",
+   "resolution": "Complete 2026-09-25 in the main session (sprint 48 wave 1, task E1): --epoch 0 refused with a message, the harness rows re-scoped, digests unmoved.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: ProjectIo --epoch 0 (and the harness flag)"
      ],
      "requirement": "--epoch 0 is refused with a clear message, never silently clamped.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "build_rel ProjectIo.exe (Release, BUILD_REL_EXIT 0, 18:00): `--epoch 0` prints \"ProjectIo: --epoch 0 is retired. It no longer selects the ancient roster: the band comes from each nation's own history. Omit --epoch for the 1960 start.\" and exits 1; a malformed year still exits 1 with the range message. No clamp."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: grep + compile"
      ],
      "requirement": "No code path maps an epoch to a band (industrial_band_from_year and its callers are gone); every harness, verify script and seed-library entry that used epoch 0 is moved to 1960 and named in the commit.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "No code path maps an epoch to a band: the year-to-band function was already removed by BL-1101 (era_band.hpp's note); the only src readers of epoch_year left are the calendar (app.cpp set_campaign_epoch_year, format.cpp), the save field and verify_api's founded-year read. Moved off epoch 0: centre_region_bind (two worlds, 0 -> 1960) and chain_conversion_probe (default 0 -> 1960); stale epoch-0 comments fixed in main.cpp, app.hpp, format.hpp, tile_inspector.cpp and steel_chain_probe.cpp. No verify script or seed-library entry used epoch 0 (grep). continent_drift's \"epoch 0\" is a geological drift epoch, a different concept, and stays. All five edited harnesses compile."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice",
       "headless: save_roundtrip"
      ],
      "requirement": "world_determinism is bit-identical twice with its epoch row re-scoped to a non-zero epoch; save_roundtrip green.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "world_determinism (build_gen/verify, Release) run twice: ALL PASS (0 failures) both; digests seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9 (unmoved from sprint 47's close), and the re-scoped R3.8 row seedA/on/epoch1900 = 0570E3900D0BD53F (equal to the 1960 world). save_roundtrip: SAVE ROUND TRIP OK."
     }
    ]
   }

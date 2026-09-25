@@ -27,7 +27,8 @@
 //         3.5 the sim's own reported outcome (battles/conquests/foundings) is
 //             identical across the two same-seed runs;
 //         3.8 THE EPOCH IS A CALENDAR ALONE (BL-1047): the same seed at epoch
-//             0 builds the byte-identical world the default 1960 epoch does.
+//             1900 builds the byte-identical world the default 1960 epoch does
+//             (epoch 0 until it was retired, BL-1114).
 //
 //       R3 deliberately uses the REAL default of 400 years, not a shortened
 //       run: a determinism guarantee measured over a span nobody ships is not
@@ -710,23 +711,25 @@ int main()
           "R3.7 the carve index is populated and identical across two same-seed builds (BL-1042)");
 
     // 3.8 — BL-1047, THE EPOCH FLIP: the epoch is the campaign's calendar and
-    //       nothing else generation reads. Epoch 0 stays a supported start
-    //       (Ben, 2026-09-24), and it must be the SAME world dated differently
-    //       — every span runs on its own fixed years. A mechanism that still
-    //       keyed on the epoch (the settlement stop, the Empires start, an arc
-    //       predicate) would show here as a digest that differs.
+    //       nothing else generation reads, so another epoch must build the SAME
+    //       world dated differently — every span runs on its own fixed years. A
+    //       mechanism that still keyed on the epoch (the settlement stop, the
+    //       Empires start, an arc predicate) would show here as a digest that
+    //       differs. RE-SCOPED TO 1900 (BL-1114): epoch 0 is retired (Ben,
+    //       2026-09-25, NR-920) and the flag refuses it, so the row compares the
+    //       default against a year a player can still ask for.
     {
-        world_params pre_a0 = pre_a;
-        pre_a0.epoch_year   = 0;
-        generation_report     rep_a0{};
-        era_minus_one_fixture fx_a0;
-        const world    w_a0 = timed_world(pre_a0, &rep_a0, "seed A, prehistory ON, epoch 0", fx_a0);
-        const uint64_t d_a0 = deep_digest(w_a0, fx_a0);
-        std::printf("     digest seedA/on/epoch0 = %016llX\n", static_cast<unsigned long long>(d_a0));
-        check(d_a0 == d_a1 && measure(w_a0) == m_a1
-                  && rep_a0.prehistory_years == rep_a1.prehistory_years
-                  && rep_a0.prehistory_battles == rep_a1.prehistory_battles,
-              "R3.8 epoch 0 and epoch 1960 build the byte-identical world (the flip moves the calendar alone)");
+        world_params pre_ae = pre_a;
+        pre_ae.epoch_year   = 1900;
+        generation_report     rep_ae{};
+        era_minus_one_fixture fx_ae;
+        const world    w_ae = timed_world(pre_ae, &rep_ae, "seed A, prehistory ON, epoch 1900", fx_ae);
+        const uint64_t d_ae = deep_digest(w_ae, fx_ae);
+        std::printf("     digest seedA/on/epoch1900 = %016llX\n", static_cast<unsigned long long>(d_ae));
+        check(d_ae == d_a1 && measure(w_ae) == m_a1
+                  && rep_ae.prehistory_years == rep_a1.prehistory_years
+                  && rep_ae.prehistory_battles == rep_a1.prehistory_battles,
+              "R3.8 epoch 1900 and epoch 1960 build the byte-identical world (the epoch moves the calendar alone)");
     }
 
     // -----------------------------------------------------------------------

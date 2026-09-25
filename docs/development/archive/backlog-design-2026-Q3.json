@@ -21680,6 +21680,50 @@
         "files",
         "design"
       ]
+    },
+    "BL-1114": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": 48,
+      "written": "2026-09-25",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "author": "Ben (2026-09-25, the sprint-47 close form); filed by Claude",
+      "id": "BL-1114",
+      "short_name": "EPOCH_ZERO_RETIRED",
+      "category": "Engine",
+      "priority": "B",
+      "difficulty": 2,
+      "title": "Epoch 0 is retired: --epoch 0 is refused and its ancient-roster path removed, so the band is only ever the history's",
+      "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+      "files": [
+        "src/world/era_band.hpp",
+        "src/core/app.hpp",
+        "src/world/era_roster.cpp",
+        "tools/verify/world_determinism.cpp",
+        "docs/ai/ACTIONS.json"
+      ],
+      "design": "LANDED 2026-09-25 (sprint 48, main session): --epoch 0 is refused with a message; the band path was already gone (BL-1101); centre_region_bind and chain_conversion_probe moved to 1960; world_determinism R3.8 re-scoped to epoch 1900; digests unmoved; the epoch action entry updated.\n\nSPRINT 48 CUT (Ben, 2026-09-25, the cut form): IN. Grep for an epoch of 0 across tools/verify, scripts/verify and the seed library first; every harness moved to 1960 is named in the commit.\n\nFILED 2026-09-25 from NR-920 (Ben: C, retire epoch 0). Not in sprint 47.\n\nTHE WORK. Refuse an epoch of 0 at the flag (a clear error, never a silent clamp) and remove the path by which epoch 0 once selected the ancient roster (industrial_band_from_year and any caller that still reads it); the band is derive-only, and per nation (NR-929; BL-1123). world_determinism's seedA/on/epoch0 digest row goes or is re-scoped to a non-zero epoch; grep the harnesses, the verify scripts and the seed library for an epoch of 0 and move each to 1960. The epoch action entry already states the ruling.\n\nDONE WHEN. --epoch 0 is refused with a message; no code path maps an epoch to a band; world_determinism twice bit-identical with the epoch row re-scoped; save_roundtrip green.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "requires",
+        "blocked_on",
+        "parked",
+        "author",
+        "id",
+        "short_name",
+        "category",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design"
+      ]
     }
   }
 }

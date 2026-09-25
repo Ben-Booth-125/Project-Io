@@ -87,7 +87,7 @@ int main(int argc, char** argv)
 {
     std::uint32_t seed       = 0;
     int           warm_ticks = 80;
-    std::int64_t  epoch      = 0;
+    std::int64_t  epoch      = 1960; // the shipped epoch; epoch 0 is retired (BL-1114)
     // The app seeds survey state at campaign start (app.cpp, start_new_game tail).
     // demand_census and the other make_hard_coded_world harnesses do NOT, which
     // leaves every body `hidden` — including home. Default ON here, because the

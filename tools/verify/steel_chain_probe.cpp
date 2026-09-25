@@ -22,8 +22,9 @@
 // Run (repo root):
 //   build_gen/verify/steel_chain_probe.exe [--seeds 0,1,2] [--ticks 20] [--fast]
 //        [--good steel] [--quiet] [--epoch Y]
-//   --epoch  campaign epoch year (default: world_params' own, the shipped 0 CE =
-//            ANCIENT band; 1960 = the industrial arc)
+//   --epoch  campaign epoch year (default: world_params' own, 1960). It names the
+//            calendar only: the band comes from the history (BL-1101), and epoch
+//            0 is retired (BL-1114). The first reading below predates both.
 //   --fast   no pre-epoch history (NOT the shipped world; quick iteration only)
 //   --good   follow another processed good's makers instead of steel
 //   --quiet  suppress the per-maker rows; print the per-tick aggregates only
