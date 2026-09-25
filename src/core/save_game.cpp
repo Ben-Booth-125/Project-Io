@@ -618,6 +618,9 @@ void w_body_entry(std::ostream& o, const generation_report::body_entry& b)
     w_timelapse(o, b.prehistory_timelapse); // save_game_version 3 (NR-733)
     w_timelapse(o, b.exploration_timelapse); // save_game_version 14 (BL-946)
     w_timelapse(o, b.industrialisation_timelapse); // save_game_version 18 (BL-1068)
+    // ---- BL-1104 (save_game_version 22): the Culture round's own record ----
+    w_timelapse(o, b.migration_timelapse); // keep r_body_entry in step
+    // ---- end BL-1104 ----
 }
 
 bool r_body_entry(std::istream& i, generation_report::body_entry& b)
@@ -630,7 +633,10 @@ bool r_body_entry(std::istream& i, generation_report::body_entry& b)
         && r_bool(i, b.tiles.used_convergent)
         && r_timelapse(i, b.prehistory_timelapse) // save_game_version 3 (NR-733)
         && r_timelapse(i, b.exploration_timelapse) // save_game_version 14 (BL-946)
-        && r_timelapse(i, b.industrialisation_timelapse); // save_game_version 18 (BL-1068)
+        && r_timelapse(i, b.industrialisation_timelapse) // save_game_version 18 (BL-1068)
+        // ---- BL-1104 (save_game_version 22): the Culture round's own record ----
+        && r_timelapse(i, b.migration_timelapse); // keep w_body_entry in step
+        // ---- end BL-1104 ----
 }
 
 void w_report(std::ostream& o, const generation_report& g)

@@ -713,6 +713,21 @@ struct generation_report
         /// same build).
         era_timelapse industrialisation_timelapse;
 
+        /// THE CULTURE ROUND'S OWN RECORD (BL-1104; Ben, 2026-09-24, R21;
+        /// STARTUP.md § Round 3) -- the migration's replay, folded by
+        /// `build_migration_timelapse` from the settled map BEFORE the Empires
+        /// sim runs, on EVERY run of the cradle: the wizard's stop-after-
+        /// migration build (where it is also what `prehistory_timelapse`
+        /// carries, since no Empires record exists to overwrite it) and the
+        /// full build alike, so the adopted world and its save keep the
+        /// migration past that `prehistory_timelapse` loses to the Empires
+        /// record. Same shape and discipline as the three above: recorded at
+        /// the one site that ran the fold, never re-simulated, read by nothing
+        /// at world setup (a watched and an unwatched build are the same
+        /// build). Empty on any body but the cradle. Serialised after
+        /// `industrialisation_timelapse` (save_game_version 22).
+        era_timelapse migration_timelapse;
+
         /// Exactly what `generate_body_tiles` was called with for this body — the
         /// arguments that are NOT recoverable from anything else the report or the
         /// world holds (the seed above all: Kepler's is chosen by the BL-276

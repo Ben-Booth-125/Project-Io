@@ -214,10 +214,17 @@ inline constexpr uint32_t save_game_magic =
 ///     the event-kind range check; no field changes width):
 ///     `province_bought` (BL-1096, a native bought rather than taken),
 ///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier)
-///     and `works_chartered` (BL-1099, a region's industry points crossing the
+///     `works_chartered` (BL-1099, a region's industry points crossing the
 ///     next multiple of a fraction of the running charter price; kind 21, the
-///     gap at 20 is lane I1's `inherited`);
+///     gap at 20 is lane I1's `inherited`) and `rung_crossed` (BL-1100, a
+///     polity's materials capacity reaching the Industrial rung, at its
+///     capital; kind 22);
 ///     later sprint-47 lanes append theirs under this same number.
+///   - THE CULTURE ROUND'S OWN RECORD AT THE TAIL OF EVERY BODY ENTRY (BL-1104):
+///     `generation_report::body_entry::migration_timelapse`, one more
+///     `w_timelapse` record after `industrialisation_timelapse`, folded on every
+///     full build so the adopted world keeps its migration past (empty on any
+///     body but the cradle). Record-only: read by nothing at world setup.
 ///   - THE NAME TABLE AT THE TAIL OF EVERY TIME-LAPSE RECORD (BL-1106, the
 ///     ticker names civilisations and creeds): `era_timelapse::civilisation_name`
 ///     and `::creed_name` (two string lists, index order) and `::polity_creed`

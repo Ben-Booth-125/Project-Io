@@ -340,6 +340,35 @@ save_envelope make_envelope()
         ip.cap_military = 3; ip.cap_materials = 6; ip.industry_points = 41250000;
         be.industrialisation_timelapse.samples.push_back(ip);
     }
+    // BL-1099 / BL-1100, save_game_version 22 -- a works note (kind 21, its
+    // `other` the focus) and a realm's rung crossing (kind 22, the HIGHEST
+    // kind: the reader's range check must admit it), after the crossing above
+    // so the list stays ascending by year.
+    be.industrialisation_timelapse.events.push_back(
+        lapse_event{1940, static_cast<uint8_t>(lapse_event_kind::works_chartered), 1, 9, 2});
+    be.industrialisation_timelapse.events.push_back(
+        lapse_event{1947, static_cast<uint8_t>(lapse_event_kind::rung_crossed), 0, 4, lapse_event_none});
+
+    // BL-1104, save_game_version 22 -- the Culture round's own record, written
+    // AFTER industrialisation_timelapse. Distinct from the prehistory record
+    // in every field a misplaced read would land on (a different stride,
+    // span, owner, culture id and event kind), so the check below tells the
+    // migration record from the prehistory one read into the wrong slot.
+    be.migration_timelapse.region_stride = 3;
+    be.migration_timelapse.start_year    = -9000;
+    be.migration_timelapse.years         = 8600;
+    be.migration_timelapse.changes.push_back(owner_change{-8800, 2, 1});
+    be.migration_timelapse.changes.push_back(owner_change{-6100, 0, 2});
+    {
+        culture_change mc;
+        mc.year = -6100; mc.region = 2;
+        mc.id[0] = 7; mc.id[1] = 3; mc.id[2] = -1;
+        mc.weight_q[0] = 700; mc.weight_q[1] = 250; mc.weight_q[2] = 0;
+        mc.other_q = 50;
+        be.migration_timelapse.culture_changes.push_back(mc);
+    }
+    be.migration_timelapse.events.push_back(
+        lapse_event{-7300, static_cast<uint8_t>(lapse_event_kind::culture_split), 2, 3, 7});
 
     e.report.bodies.push_back(be);
     e.report.industrialisation_years     = 300;
@@ -597,7 +626,7 @@ int main()
                 const era_timelapse& o = env.report.bodies[0].industrialisation_timelapse;
                 ind_ok = t.region_stride == 2 && t.start_year == 1660 && t.years == 300
                       && t.changes.size() == o.changes.size()
-                      && t.events.size() == 2 && t.events[0].year == 1914
+                      && t.events.size() == 4 && t.events[0].year == 1914
                       && t.events[0].region == 1 && t.events[0].polity == 9
                       && t.events[0].other == 6
                       // BL-1080: the furnace crossing and the industry sample.
@@ -605,6 +634,17 @@ int main()
                       && t.events[1].kind == static_cast<uint8_t>(lapse_event_kind::furnace_lit)
                       && t.events[1].region == 0 && t.events[1].polity == 4
                       && t.events[1].other == lapse_event_none
+                      // BL-1099 / BL-1100 (save_game_version 22): the works
+                      // note and the rung crossing, kinds 21 and 22, admitted
+                      // by the range check and read back field for field.
+                      && t.events[2].year == 1940
+                      && t.events[2].kind == static_cast<uint8_t>(lapse_event_kind::works_chartered)
+                      && t.events[2].region == 1 && t.events[2].polity == 9
+                      && t.events[2].other == 2
+                      && t.events[3].year == 1947
+                      && t.events[3].kind == static_cast<uint8_t>(lapse_event_kind::rung_crossed)
+                      && t.events[3].region == 0 && t.events[3].polity == 4
+                      && t.events[3].other == lapse_event_none
                       && t.samples.size() == 1 && t.samples[0].industry_points == 41250000
                       && t.samples[0].cap_materials == 6;
                 for (std::size_t i = 0; ind_ok && i < o.changes.size(); ++i)
@@ -618,6 +658,41 @@ int main()
                       && le.report.industrialisation_foundings == 29,
                   "S3 the Industrialisation span's record and its four counters survive "
                   "whole (BL-1068)");
+        }
+        // BL-1104, save_game_version 22 -- the Culture round's own record,
+        // field for field, and NOT the prehistory record (stride 2, -4000)
+        // or the Industrialisation one read into the wrong slot: every
+        // scalar here is distinct from both.
+        {
+            bool mig_ok = le.report.bodies.size() == 1;
+            if (mig_ok)
+            {
+                const era_timelapse& t = le.report.bodies[0].migration_timelapse;
+                const era_timelapse& o = env.report.bodies[0].migration_timelapse;
+                mig_ok = t.region_stride == 3 && t.start_year == -9000 && t.years == 8600
+                      && t.changes.size() == 2 && o.changes.size() == 2
+                      && t.changes[0].year == -8800 && t.changes[0].region == 2
+                      && t.changes[0].owner == 1
+                      && t.changes[1].year == -6100 && t.changes[1].region == 0
+                      && t.changes[1].owner == 2
+                      && t.culture_changes.size() == 1
+                      && t.culture_changes[0].year == -6100
+                      && t.culture_changes[0].region == 2
+                      && t.culture_changes[0].id[0] == 7 && t.culture_changes[0].id[1] == 3
+                      && t.culture_changes[0].id[2] == -1
+                      && t.culture_changes[0].weight_q[0] == 700
+                      && t.culture_changes[0].weight_q[1] == 250
+                      && t.culture_changes[0].other_q == 50
+                      && t.events.size() == 1 && t.events[0].year == -7300
+                      && t.events[0].kind == static_cast<uint8_t>(lapse_event_kind::culture_split)
+                      && t.events[0].region == 2 && t.events[0].polity == 3
+                      && t.events[0].other == 7
+                      && t.steps.empty() && t.samples.empty();
+            }
+            check(mig_ok,
+                  "S3 the Culture round's own record survives whole after the "
+                  "Industrialisation one -- span, owners, the culture change and its "
+                  "event, none of it the prehistory record misplaced (BL-1104)");
         }
         check(le.report.bodies.size() == 1
                   && le.report.bodies[0].settlement.median_industrial_year == 1843
