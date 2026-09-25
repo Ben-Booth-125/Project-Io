@@ -170,8 +170,14 @@ LOGISTICS.md §§ 1, 4, 6.
   control. Each hop is priced toward the anchor, so a destination's field holds O -> D. F2
   reports 2 exact-tie cells on seed 28 (costs identical; within the restated contract).
   Generation floods +50% on seed 0, step 15 doubled -> D6. Cold review running.
-- [ ] D6 BL-1119 round 4: road generation asks its directed path queries so each destination's
+- [x] D6 BL-1119 round 4: road generation asks its directed path queries so each destination's
   flood is reused (one deterministic direction per unordered town pair, stated). The roads lane.
+  DONE 2026-09-25 (8b921ee6, merged 1364a0ba): town pairs lower tile id -> higher (n-1 floods
+  per nation), spurs village -> target, border probes toward the side with fewer endpoints,
+  history corridors toward their busier end. History-corridor floods 2,531 -> 288 (seed 0);
+  step 15 21.7 -> 2.0 s (seed 0), 37.7 -> 4.2 s (seed 46), indicative; road tiles unchanged
+  within 4; harness 21 of 21; its weight 8,000 -> 1,500. Finish on seed 0 (loaded): search 19 s
+  + settle 24.5 s — the whole-tail 35 s reading (R5) is owed quiet.
 - [x] D4 BL-1119 round 2: the floor constant; border links only on towns and spurring villages;
   `invalidate_logistics_caches` in road generation; the loading-bar weights measured (applied by
   the main session after K4); the highway-tier row's cause. Files: `road_generation.*`, its
