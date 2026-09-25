@@ -329,8 +329,9 @@ that crosses a body's ground.
 
 ### 6. Cache invalidation — narrowed, for a real reason
 
-`invalidate_logistics_caches` clears both caches together. An over-clear costs one Dijkstra; **a
-missed clear is a reach field that lies.**
+`invalidate_logistics_caches` clears every derived logistics cache together: the reach field, the
+per-pair paths and the flood fields behind them, and the per-body nearest-anchor field. An
+over-clear costs one Dijkstra; **a missed clear is a reach field that lies.**
 
 Ben's 2026-08-08 ruling chose a simple every-event rule because *"each of these is rare against the
 per-frame reads."* That premise fails in a world where the corp AI builds every tick and hundreds of
@@ -473,7 +474,10 @@ Each rejected an earlier cut. Two are structural.
    is how a golden gets blessed dishonestly.
 2. **LP must have a spatial locus.** A rate justified as *"how much can move through HERE"* and
    then pooled per `(corp, body)` is a per-corp haul allowance — **the exact abstraction
-   `military_points` was deleted for.** Cities are the locus.
+   `military_points` was deleted for.** Cities are the locus. A draw lands on the anchor nearest
+   its origin by traversal cost, ties to the lowest anchor tile id; one multi-source field per body
+   answers that for every tile at once, so the answer depends on the body's tiles and anchors and
+   on nothing a cache happens to hold.
 3. **Specify the LP cost formula before the allocation sort key**, which is a function of it. If
    cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
    **Settled (Ben, 2026-08-25): the draw is what MOVES, not how far.** A passive convoy draw is

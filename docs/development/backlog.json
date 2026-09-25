@@ -796,7 +796,96 @@
     "src/world/market_clearing.cpp",
     "docs/economy/MARKETS.md"
    ],
-   "design": "FILED 2026-09-25 (Ben, the sprint 48 cut form's notes: \"We should also work on making sure markets can be destroyed, so that the end result never has too many markets\"). In sprint 48. The intent is ruled; the mechanism is Ben's, against a census.\n\nWHAT STANDS TODAY. MARKETS.md says a market never disappears: nothing removes an entry from world::markets, the BL-768 junction rule only ever lowers the gate, and an idle off-world market goes dormant. The home body's markets come from two sources: a shell at the capital of every polity alive at the 1200 close (history_sim.cpp ~8262-8281 marks region::has_market; hard_coded_world.cpp ~1882-1915 spawns it; the capital premium prices it, ~2695-2716), and the carve over population centres (~2574-2617). Nothing after 1200 un-marks a capital that fell in a later span. BL-1003's reading (2026-09-23) found 255 markets on the shipped home body; MARKETS.md § Market centres still says nine on seed 0.\n\nTHE WORK, measure first (Rule 0b). (1) A census per curated seed on the flipped 1960 world: markets by source (capital shell, carve, junction-lowered), how many shells stand where the polity died after 1200, catchment tiles and population per market, and the share that clear nothing in the first play year. Built as a committed harness, not a probe. (2) Ben rules the mechanism against it. Candidates, not exclusive: a capital's market dies with its capital unless the carve would place one there; a market inside a larger one's reach folds into it (a gravity rule over traversal cost); a runtime death for a market that clears nothing for a span, which moves save format, per-market pools, convoys, standing orders and trades onto a successor. Whatever the rule, it is an in-world cause a player could read, never a count cap. (3) Build it, write the rule into MARKETS.md (retiring \"a market never disappears\" wherever it stops holding), and correct the stale nine.\n\nA WORLD-MOVER: a named cause in the sprint's one re-bless.\n\nDONE WHEN. The census is committed and recorded per seed; the ruled mechanism runs; the 1960 market count per seed is recorded old -> new; MARKETS.md states the rule; every harness that reads markets is green."
+   "design": "CENSUS READ 2026-09-25 (market_census, 16 curated seeds, the handed-over 1960 world; tools/verify/market_census.cpp). 4,984 markets, 311.5 a seed (148-538; seed 0's 255 is ordinary). By source: capital shells 1,246 (25%), carve 3,738 (75%), of which 2,532 (68% of the carve) exist only because the junction rule lowered the gate. Shells are marked at EVERY span close, not only 1200 (1,168 at 1200, 68 at 1660, 10 at 1960; the mark is sticky); at 1960 the maker still holds 829, holds its capital elsewhere 98, is dead 319 -- 417 lost, 392 of them standing on no living capital. TWINS: 1,043 markets (21%) are centred on the same tile as a lower-id market and can never win a tile (market_for_tile breaks ties to the lowest id): 826 carve under carve, 217 carve under a shell. Catchment median 15 tiles (carve 9, shells 100); nearest other market centre median 1.0 tile (0.4 traversal cost). 4,442 of 4,984 have no building in their catchment at the handoff; 3,523 (71%) clear nothing across the first play year (shells 41%, carve 81%). The count is the carve, and the carve follows population-centre density (the roads lane found centres on 49-100% of land). Also found and filed: BL-1127 (market_for_tile ignores the column wrap, 3.1% of tiles misroute).\n\nFILED 2026-09-25 (Ben, the sprint 48 cut form's notes: \"We should also work on making sure markets can be destroyed, so that the end result never has too many markets\"). In sprint 48. The intent is ruled; the mechanism is Ben's, against a census.\n\nWHAT STANDS TODAY. MARKETS.md says a market never disappears: nothing removes an entry from world::markets, the BL-768 junction rule only ever lowers the gate, and an idle off-world market goes dormant. The home body's markets come from two sources: a shell at the capital of every polity alive at the 1200 close (history_sim.cpp ~8262-8281 marks region::has_market at every span close, not only 1200; hard_coded_world.cpp ~1882-1915 spawns it; the capital premium prices it, ~2695-2716), and the carve over population centres (~2574-2617). Nothing after 1200 un-marks a capital that fell in a later span. BL-1003's reading (2026-09-23) found 255 markets on the shipped home body; MARKETS.md § Market centres still says nine on seed 0.\n\nTHE WORK, measure first (Rule 0b). (1) A census per curated seed on the flipped 1960 world: markets by source (capital shell, carve, junction-lowered), how many shells stand where the polity died after 1200, catchment tiles and population per market, and the share that clear nothing in the first play year. Built as a committed harness, not a probe. (2) Ben rules the mechanism against it. Candidates, not exclusive: a capital's market dies with its capital unless the carve would place one there; a market inside a larger one's reach folds into it (a gravity rule over traversal cost); a runtime death for a market that clears nothing for a span, which moves save format, per-market pools, convoys, standing orders and trades onto a successor. Whatever the rule, it is an in-world cause a player could read, never a count cap. (3) Build it, write the rule into MARKETS.md (retiring \"a market never disappears\" wherever it stops holding), and correct the stale nine.\n\nA WORLD-MOVER: a named cause in the sprint's one re-bless.\n\nDONE WHEN. The census is committed and recorded per seed; the ruled mechanism runs; the 1960 market count per seed is recorded old -> new; MARKETS.md states the rule; every harness that reads markets is green."
+  },
+  {
+   "glyph": "✓",
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (sprint 48 wave 1 lanes, 2026-09-25)",
+   "status": "designed",
+   "sprint": null,
+   "id": "BL-1126",
+   "short_name": "PATH_COST_READS_THE_CACHE",
+   "category": "Economy",
+   "priority": "S",
+   "difficulty": 3,
+   "title": "A path's cost is a function of its two ends, never of which flood field happens to be cached, so a loaded game continues as the unsaved one does",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/logistics.cpp",
+    "src/world/logistics.hpp",
+    "tools/verify/lp_anchor_field_check.cpp",
+    "docs/economy/LOGISTICS.md"
+   ],
+   "design": "FOUND 2026-09-25 by the settle lane (BL-1117 S2, row L1 of lp_anchor_field_check). A save and load after settle tick 1, then both worlds ticked in lockstep: the settle digest DIVERGES (seed 0 first at tick 2; seed 28 at tick 3 and through tick 11). Control: clearing the unsaved world's four logistics caches at the save point makes both match on every tick 2-11, so the cause is cache state, not the save's bytes.\n\nWHY. river_edge_discount makes an edge DIRECTED (downstream is cheaper than upstream), so the float sum of a path differs by direction; intra_body_path answers a pair from whichever endpoint's flood field exists (or which pair was asked first), and a load empties those caches, so the continuation re-derives some pairs from the other end. LOGISTICS.md § 1 still says \"an edge cost is the mean of its two nodes, which is what makes a path symmetric\" -- false against the code. The one-field nearest anchor (BL-1117) is already pure; the pair cache and flood fields are not.\n\nTHE WORK. Make intra_body_path(a, b) a pure function of (a, b): the cost of a path origin -> destination is always read from the destination's flood field (built if absent), never from the origin's; the pair cache keys the ordered pair. Measure the flood count this adds on the settle and on a play year. Correct LOGISTICS.md § 1 (edges are directed where a river discounts them; the path cost is origin -> destination). A world-mover: digests move wherever a read used to come off the origin's field.\n\nDONE WHEN. lp_anchor_field_check L1 matches on every tick 2-11 on seeds 0 and 28 WITHOUT the --cold-original control; flood count and settle time old -> new recorded; LOGISTICS.md states the direction."
+  },
+  {
+   "glyph": "✓",
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (sprint 48 wave 1 lanes, 2026-09-25)",
+   "status": "designed",
+   "sprint": null,
+   "id": "BL-1127",
+   "short_name": "MARKET_FOR_TILE_IGNORES_WRAP",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "A tile clears at the physically nearest market across the map's column wrap",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "tools/verify/market_census.cpp"
+   ],
+   "design": "FOUND 2026-09-25 by the market census (BL-1125 M1): market_for_tile measures distance without the homeworld's column wrap, so 15,711 of 505,296 tiles (3.1%, pooled over the 16 curated seeds) route to a market other than the physically nearest one -- tiles near the seam clear on the far side of the map. MARKETS.md § Market centres says a tile clears against the market whose centre_tile is NEAREST. THE WORK: wrap-aware distance in market_for_tile (the same column-wrap rule the rest of the grid uses); the census prints the misroute count, which must read 0. A world-mover (catchments, pools per market, every settle digest) -- lands behind a re-bless. DONE WHEN the census reads 0 misrouted tiles on the 16 seeds and the digest movement is recorded."
+  },
+  {
+   "glyph": "✓",
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (sprint 48 wave 1 lanes, 2026-09-25)",
+   "status": "designed",
+   "sprint": null,
+   "id": "BL-1128",
+   "short_name": "SEARCH_SCORES_BEFORE_RECIPES",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "The landscape search scores the world it hands over, not one whose processors have no recipe yet",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/landscape_search.cpp",
+    "tools/verify/market_census.cpp"
+   ],
+   "design": "FOUND 2026-09-25 by the market census (BL-1003 M2, V6): apply_landscape_candidate runs its recipe pass BEFORE it lays the firms, so in the world the search scores, the firms' processors carry no recipe; the app's second pass gives them one. On seeds 12 and 10 the handed-over world scores higher than the search's own score for its winner (0.000324 vs 0.000270; 0.000241 vs 0.000219). The winner still validates in the search's own sense (V1-V5 pass on all 16 seeds). THE WORK: lay the firms, then run the recipe pass, inside apply_landscape_candidate, so the scored world is the handed-over world; read whether any seed's winner changes. A world-mover if a winner changes. DONE WHEN V6 reads \"same\" on the 16 seeds."
+  },
+  {
+   "glyph": "✓",
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (sprint 48 wave 1 lanes, 2026-09-25)",
+   "status": "designed",
+   "sprint": null,
+   "id": "BL-1129",
+   "short_name": "HARNESS_MIRROR_SKIPS_FOUNDING_DATES",
+   "category": "Tooling",
+   "priority": "C",
+   "difficulty": 1,
+   "title": "The harness mirror of the campaign finish dates the chartered firms as the app does",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/harness_params.hpp"
+   ],
+   "design": "FOUND 2026-09-25 by the market census: finish_campaign_world calls date_chartered_firms, which stamps founded_year on chartered firms (serialised); harness_params.hpp's mirror of the finish does not, so player_seed_sweep's pins cover a world that differs from the app's in those bytes. Only the seat briefing reads the field, so no economic figure moves. DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds. THE WORK: call it in the mirror (or route the mirror through finish_campaign_world); the D_seat pins will move and ride the next re-bless. DONE WHEN the mirror and the app agree on founded_year on the 16 seeds."
   }
  ]
 }
