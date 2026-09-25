@@ -1077,6 +1077,32 @@ reading under the rows when it sees it; whether the migration should carry dice 
 node tools/verify/build_harness.js span_seed_isolation --run
 ```
 
+## market_census (BL-1125 M1, BL-1003 R6)
+
+The market census on the world the player is handed: the shipped arc, built in app order as
+`player_seed_sweep` builds it (the search, the settle, the seat), then a four-tick play year. Per
+curated seed: markets per body by source (capital shell / carve, and the carve's junction-lowered
+count from the report); which close marked each shell and whether its maker still holds it at
+1960; catchment tiles and population per market (`market_for_tile`), the distribution and the
+smallest ten; the share that clear nothing over the play year (the exchange record, read after
+every clear); nearest-neighbour spacing in tiles and traversal cost. Then BL-1003 R6: corporations
+whose home-body buildings route to two or more markets, and the search's own invariants (V1-V5)
+on this world's walk, with V6 reporting whether the handed-over world re-scores as the search
+scored it.
+
+**A report.** Its failing rows are its own identification checks (a shell is identified three
+ways: id order and anchor tile, the capital price premium, and the has_market region table) and
+the search's invariants. The header states how every reading is taken. It prints D_land and
+D_settle for comparison against `player_seed_sweep`'s shipped pins: the one departure from that
+path is an `era_minus_one_fixture` handed to generation, which generation only writes.
+
+Registered as a **`sweep`**: a full world, a search and a settle per seed.
+
+```
+bash tools/verify/build_lua_harness.sh market_census
+./build_gen/verify/market_census.exe [--seeds 46,28] [--live-ticks 4] [--no-traversal] [--list 10]
+```
+
 ## Which builder?
 
 Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:

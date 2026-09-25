@@ -765,6 +765,27 @@ target_link_libraries(player_seed_sweep PRIVATE io_world_obj lua54)
 target_compile_features(player_seed_sweep PRIVATE cxx_std_20)
 target_compile_options(player_seed_sweep PRIVATE ${IO_WARNING_FLAGS})
 
+# market_census (BL-1125 M1, BL-1003 R6; sprint 48) — live-Lua for exactly
+# player_seed_sweep's reason: it builds the shipped 1960 world in app order
+# (harness_params.hpp's builder, which parses world_gen.lua and works.lua and
+# loads recipes/economy), so it names the same four Lua TUs. A research sweep
+# (a full world, the search and a settle per curated seed), labelled below.
+add_executable(market_census
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/market_census.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(market_census PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(market_census PRIVATE io_world_obj lua54)
+target_compile_features(market_census PRIVATE cxx_std_20)
+target_compile_options(market_census PRIVATE ${IO_WARNING_FLAGS})
+
 # tier_margin (BL-436, 2026-08-16) — live-Lua for the same reason: it asks
 # whether REFINING PAYS in the shipped economy, so it must read the authored
 # prices, rates and recipes rather than a hand-built mirror of them. It also
@@ -1217,6 +1238,11 @@ set(IO_TEST_SWEEP_HARNESSES
     # CATEGORY (1), added 2026-09-16 (BL-982): a full shipped world plus the
     # landscape search per curated seed, sixteen of them. Reports, never gates.
     industrialisation_sim_harness
+    # CATEGORY (1), added 2026-09-25 (BL-1125 M1, BL-1003 R6): the market
+    # census — the shipped world, the search, the settle, the seat and a play
+    # year per curated seed. It reports; its only failing rows are its own
+    # identification checks and the search's own invariants.
+    market_census
 
     # CATEGORY (1), added 2026-09-08 with BL-825. history_span_cost prices the
     # Era -1 span: it builds a world per seed and then re-runs the era at 400 /
@@ -1370,6 +1396,9 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # docs/generation/seed_library.json by relative path; from build/ it finds
     # no seed library and FATALs.
     industrialisation_sim_harness
+    # ADDED 2026-09-25 (BL-1125 M1). The same four scripts and the seed library
+    # by relative path, for the same reason.
+    market_census
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})
