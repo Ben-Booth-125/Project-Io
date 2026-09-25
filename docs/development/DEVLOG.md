@@ -71,14 +71,24 @@ workflow (5 + 5).
   pre-sprint tree and on the G+C-only tree gave identical rows on all 16 seeds: the seeds and the
   settle promotion moved nothing (BL-1085 R1 closed). Against the full wave-0 tree the laws move
   every seed from the landing digest on and the purchases move five seeds from the search digest.
+- **F3 merged** `845c3fde` + its fix round on main `b596747c` (05:30-06:20). The second cold review
+  found only evidence faults -- rows pinning pre-I1 digests, R3/R4 quoting pre-fix text -- and one
+  low: a report row whose corp is gone now takes the epoch year. Determinism three times on the
+  merged tree: seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F,
+  main's own post-I1 digits, so F3 moves nothing; every other gate green; the works close flashes
+  exactly 40 marks for 40 charters. **NR-941**: the origin sentence doubles its name now that
+  nations carry their realm's coined name ('under Guashe These, the realm of Guashe These since
+  1660 CE') -- two lanes composing, each right alone. The I1 identity checks on main all green and
+  the 16-seed sweep re-read into BL-1087 R5 (75 / 5 pinned clashes, was 101 / 18 over the 1960
+  raster). Twenty-two stale worktrees pruned; header_graph is comparable again (329 dangling).
 
 ### Open
 - Ben's five live clicks (BL-1068, 1072, 1073, 1076, 1080) — he opened the Release build and walked into
   round 4 but did not file the answers on the form — plus the sprint-47 clicks the merged lanes
   owe (BL-1083 R5/R6, BL-1085 R8, BL-1090 R3, BL-1094 R3, BL-1097 R3, BL-1106 R3).
-- The resumed lanes' returns, the re-bless, BL-1084 (the cursor) and the rest of wave 2.
-- NR-918..NR-930 for Ben; the header_graph tool is polluted by 14 stale `.claude/worktrees/agent-*`
-  copies (its counts are not comparable to the baseline until they are pruned) — `worktree_prune.js`.
+- F1 (BL-1091/1092) and F2 (BL-1095) committed on their branches, their cold review running;
+  then the re-bless, BL-1084 (the cursor) and the stretch items.
+- NR-918..NR-941 for Ben (NR-941 before the live click on the seat briefing).
 
 ---
 

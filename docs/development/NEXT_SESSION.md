@@ -81,12 +81,30 @@ confirm on main in `gates_I1.log`. NR-938 records the clash-rule wording the lan
 after the session limit; F1 (BL-1091/1092) and F2 (BL-1095) launched from `f81d0d05` with kinds 23
 and 24 pre-assigned (20 inherited, 21 works_chartered, 22 rung_crossed are I1's and F3's).
 
+**F3 MERGED (06:20):** `845c3fde` (the lane, clean merge) + `b596747c` (its fix round on main: the
+three item-spanning rows and REFINED re-pinned to the merged tree's digits; a report row whose corp
+is gone still takes the epoch year). Gates in `gates_F3.log`: world_determinism THREE times,
+bit-identical -- seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F,
+main's own post-I1 digits, so F3 moves no digest; save_roundtrip OK; save_envelope_roundtrip PASS;
+span_seed_isolation 25/26 (S0, NR-931); begin_adopts_check 12/12 adopted == cold; seat_pick_check
+ALL PASS; history_lapse_works.lua (40 marks for 40 charters, 124 notes at f = 2) and seat_pick.lua
+green. **NR-941 raised:** the seat briefing's origin sentence now reads 'under Guashe These, the
+realm of Guashe These since 1660 CE' -- nations carry their realm's coined name, so the two clauses
+agree; collapse or keep is Ben's call before the live click on BL-1099 R5. The I1 identity checks
+on main all green (five scripts 0 golden failures, realm_names_check ALL PASS) and the 16-seed
+history_sweep re-read written into BL-1087 R5 (75 / 5 clashes, was 101 / 18). Twenty-two stale
+worktrees pruned (all merged, none ahead); header_graph now reads 329 dangling / 0 state-dependent.
+**F1 and F2 have committed on their branches** (F1 `855bdd12` BL-1091 + `7280a9c7` BL-1092 on
+`worktree-wf_dc944402-d08-1`; F2 `a5847574` BL-1095 on `-2`) and their workflow's cold review was
+still running when this was written -- merge in that order after reading the reviews, then the
+single re-bless (F1/F2 are record-only kinds 23/24 and should move no digest; confirm).
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936
-(Next not gated on the running round). Owed to the main session: the stale enactment comment at
-`hard_coded_world.cpp:~1936` (W3's finding), the 16-seed `player_seed_sweep --digest-check` for
-BL-1085's R1 (run it once, before the re-bless, with keep-awake held).
+(Next not gated on the running round). Owed to the main session (both DONE 2026-09-25): the stale enactment comment at
+`hard_coded_world.cpp:~1936` (rewritten with the F3 merge prep) and the 16-seed
+`player_seed_sweep --digest-check` for BL-1085's R1 (the attribution run above).
 
 ## How to proceed on the returns (as planned at the launch)
 
