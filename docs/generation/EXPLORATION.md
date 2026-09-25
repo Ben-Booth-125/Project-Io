@@ -478,7 +478,26 @@ NR-949; BL-1120, ocean currents):** each ocean region's current follows its lati
 prevailing wind (easterly in the tropics, westerly in the mid-latitudes, its sense set by the
 body's rotation) and is turned along the coasts the continents present, so a basin circulates; a
 leg run with its current costs less and against it more, by one weight measured on the curated
-seeds. Built this sprint (Ben, 2026-09-25).
+seeds.
+
+**The field is a stream function over the sea (BL-1120).** Each sea tile carries a value set by
+its latitude band's wind profile (a smooth rise and fall within each 30-degree band: westward in
+the tropics, eastward in the mid-latitudes, westward near the poles, calm at the band edges) and
+scaled down toward the shore, so every coast is a streamline and the water between two continents
+circulates — one sense in the north, the other in the south, and both reversed on a body that
+spins the other way (the rotation sense is a body property, `PLANETOLOGY.md`'s). The current is
+read per ocean region of seven by seven tiles, one arrow each. A leg's alignment is its line
+sampled tile by tile against the current, so the return leg reads exactly the negation of the
+outbound; its cost is scaled by `1 - weight x alignment`, the weight 500 per mille, the knee of the
+measured ladder (the share of crossings that run with the current stops rising there, and heavier
+weights start to swing whole worlds).
+
+**Where currents bite.** A wet campaign's crossing is priced with its current in the Exploration
+and Industrialisation spans; the Empires span is not (its record is the round-4 map, fixed before
+currents). Tribute is standing traffic, not a choice, so a current cannot decide it; it decides
+trade instead — which trades across water are worth making (§ The colonial tie is a sea lane, the
+fourth writer) — and where a lane physically runs, because the lane stamp's water walker prices
+its path with the current, so a lane bends along it rather than hugging the straight line.
 
 **The record keeps the fleet and the harbour, year by year (Ben, 2026-09-24).** Each polity's
 sample on the round's record carries its standing navy and its capital's port stock at every
