@@ -604,6 +604,7 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         cur.has_pins = !cur.pins.slot.empty();
         cur.hard_carry = ui::lapse_hard_at_close(prev);
         cur.civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094
+        cur.road_carry = ui::lapse_roads_at_close(prev);     // BL-1134: the roads the rounds before laid
     };
     inherit_hard();
     // Sentinel, not 0: a signed calendar year of 0 is a real year (0 CE), so
@@ -1253,6 +1254,7 @@ void app::land_wizard_record(int i, ui::history_lapse record)
             cur.has_pins   = !cur.pins.slot.empty();
             cur.hard_carry = ui::lapse_hard_at_close(prev);
             cur.civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094: the diamonds stay
+            cur.road_carry = ui::lapse_roads_at_close(prev);     // BL-1134: and the roads
             cur.tile_region.clear();
         }
     }
@@ -1283,6 +1285,7 @@ void app::land_wizard_record(int i, ui::history_lapse record)
         nxt.has_pins   = !nxt.pins.slot.empty();
         nxt.hard_carry = ui::lapse_hard_at_close(prev);
         nxt.civ_carry  = ui::lapse_civ_marks_at_close(prev);
+        nxt.road_carry = ui::lapse_roads_at_close(prev); // BL-1134: the roads carry too
         nxt.tile_region.clear();
         std::printf("[identity] round %d re-pinned from round %d's landing (it was already open)\n",
                     i + 1 + wizard_planetology_round_count + 1, i + wizard_planetology_round_count + 1);
@@ -1664,8 +1667,11 @@ wizard_round_head wizard_round_head_at(int r)
         // failed twice over: it drew conquest with the migration already finished
         // off-screen, then — once migration moved inside it — migration with no
         // conquest at all. Two subjects, two rounds.
+        // WORDED AS THE RECORD, NOT THE ROUTE (BL-1135; Ben, 2026-09-25;
+        // STARTUP.md § Round 3): the spread it replays happened millennia
+        // before anyone could trace it, so the question asks what was kept.
         { "Culture",
-          "Who reached this ground first, and by which routes?" },
+          "Which peoples first set down their names, their gods and their ground?" },
         { "Empires",
           // THIS ROUND'S OWN SPAN, SEPARATE FROM ROUND 3's (BL-871). Before the
           // split both rounds replayed the same fused record — colonisation and
@@ -2193,10 +2199,10 @@ void app::draw_generation_screen()
                 // frame draws; see the navigation block below. This branch is
                 // only reached if a run has not been started or has been cleared.
                 dim_text(lapse_index == 0
-                    ? "The peopling of an empty world, run here rather than previewed: "
-                      "the pass behind it is the most expensive in the project, and it "
-                      "cannot be re-rolled on every keystroke the way the planetology "
-                      "rounds are."
+                    ? "How the first peoples came to keep a record of themselves, run "
+                      "here rather than previewed: the pass behind it is the most "
+                      "expensive in the project, and it cannot be re-rolled on every "
+                      "keystroke the way the planetology rounds are."
                     : lapse_index == 1
                     ? "Claim and counter-claim from 400 BCE, run here rather than "
                       "previewed: the history is the most expensive pass in the "
@@ -2315,8 +2321,9 @@ void app::draw_generation_screen()
                     // holding ground, over the regions it settled.
                     int peoples = 0;
                     for (const int32_t seat : rec.polity_seat) if (seat >= 0) ++peoples;
-                    std::snprintf(buf, sizeof buf, "%s  -  %d peoples across %d regions "
-                                                   "in the full run",
+                    // BL-1135: worded as the record (STARTUP.md § Round 3).
+                    std::snprintf(buf, sizeof buf, "%s  -  %d peoples on the record, across "
+                                                   "%d regions in the full run",
                                   ui::lapse_year_label(m_wiz_history_year[lapse_index]).c_str(),
                                   peoples, static_cast<int>(rec.lapse.region_stride));
                 }
@@ -2335,8 +2342,8 @@ void app::draw_generation_screen()
                 if (lapse_index == 0 && true_last_y > last_y)
                 {
                     std::snprintf(buf, sizeof buf,
-                                  "The migration ran %d years past %s; the Empires round "
-                                  "opens there, on the ground as the migration left it.",
+                                  "The record runs %d years past %s; the Empires round "
+                                  "opens there, on the ground as these peoples left it.",
                                   true_last_y - last_y, ui::lapse_year_label(last_y).c_str());
                     dim_text(buf);
                 }
@@ -2365,8 +2372,13 @@ void app::draw_generation_screen()
                 // round plays, in the history's own words; it cites no
                 // repository path, because the player is not reading the
                 // repository. Each names its own span, and the spans meet
-                // end to end (STARTUP.md § Rounds).
-                if (lapse_index == 1)
+                // end to end (STARTUP.md § Rounds). The Culture round's is
+                // worded as the record, not the route (BL-1135; STARTUP.md
+                // § Round 3).
+                if (lapse_index == 0)
+                    dim_text("2400 to 400 BCE: the first peoples set down their names, their "
+                             "gods and their ground, and the ages after inherit what they kept.");
+                else if (lapse_index == 1)
                     dim_text("400 BCE to 1200 CE: the realms that rose on the ground the "
                              "migration left, and what became of them.");
                 else if (lapse_index == 2)
@@ -2513,7 +2525,7 @@ void app::draw_generation_screen()
         if (culture_round)
         {
             const float row_y = ImGui::GetCursorPosY();
-            dim_text("The migration follows the ground. Reroll the Life round to change it.");
+            dim_text("These peoples follow the ground. Reroll the Life round to change them.");
             ImGui::SetCursorPosY(row_y + 34.0f + style.ItemSpacing.y);
         }
         // Reroll full-width and first — it is the wizard's main verb now.
@@ -2711,8 +2723,8 @@ void app::draw_generation_screen()
                 const bool running = m_wiz_history_future[lapse_index].valid();
                 if (lapse_index == 0)
                     ImGui::TextWrapped(running
-                        ? "  The migration is starting."
-                        : "  The migration has not been run for this world yet.");
+                        ? "  The first records are being set down."
+                        : "  No record has been kept for this world yet.");
                 else if (lapse_index == 1)
                     ImGui::TextWrapped(running
                         ? "  The history is starting."

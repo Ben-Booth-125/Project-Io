@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdio>
 #include <deque>
+#include <iterator>
 
 namespace ui {
 
@@ -213,6 +214,43 @@ bool lapse_corridor_over_water(const std::vector<uint8_t>& band, int gw, int gh,
     return total > 0 && water * 2 > total;
 }
 
+/// BL-917 / BL-1134: apply a record's `road_promoted` events to a road network
+/// -- the one walk both the bake and `lapse_roads_at_close` take, so the
+/// network a round hands on is the one it drew. A pair the network does not
+/// hold yet opens at the event's year; a pair it holds only ever moves a tier
+/// year EARLIER (`std::min`), so a road carried in at Road never drops back to
+/// Track and a Post Road never re-pulses. A Post Road event is also a Road
+/// event (the ladder has no gap). Touches the tier years and `promoted_here`
+/// only; geometry is the bake's. Pairs outside [0, @p region_count) are skipped.
+void apply_road_promotions(std::vector<lapse_road_seg>& segs, const era_timelapse& t,
+                           std::size_t region_count)
+{
+    for (lapse_road_seg& s : segs) s.promoted_here = false;
+    for (const lapse_event& e : t.events)
+    {
+        if (e.kind != static_cast<uint8_t>(lapse_event_kind::road_promoted)) continue;
+        if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
+        const uint16_t a = e.region, b = e.other; // note_corridor: region = lo, other = hi
+        if (static_cast<std::size_t>(a) >= region_count
+         || static_cast<std::size_t>(b) >= region_count) continue;
+        auto it = std::find_if(segs.begin(), segs.end(),
+                               [&](const lapse_road_seg& s) { return s.region_a == a && s.region_b == b; });
+        if (it == segs.end())
+        {
+            lapse_road_seg seg;
+            seg.region_a   = a;
+            seg.region_b   = b;
+            seg.year_track = e.year;
+            segs.push_back(std::move(seg));
+            it = std::prev(segs.end());
+        }
+        it->year_track = std::min(it->year_track, e.year);
+        if (e.polity >= 2) it->year_road      = std::min(it->year_road, e.year);      // BL-917
+        if (e.polity >= 3) it->year_post_road = std::min(it->year_post_road, e.year); // BL-940/BL-943
+        it->promoted_here = true;
+    }
+}
+
 /// BL-1092: the KIN arrow's dash threshold -- how many INTERIOR water tiles the
 /// straight line between two foundings' anchors must sample before the arrow is
 /// dashed as a crossing. The sampler is `finish_history_lapse`'s own
@@ -289,11 +327,6 @@ constexpr ImU32 col_treaty        = IM_COL32(196, 172, 244, 205);
 constexpr ImU32 col_harbour_stone = IM_COL32(226, 224, 212, 240);
 constexpr ImU32 col_harbour_silt  = IM_COL32(176, 138,  92, 240);
 constexpr int32_t lapse_never = 0x7FFFFFFF;
-
-/// BL-1124: the lane's hue at full strength -- candidate (a)'s core line and
-/// candidate (b)'s anchors. Paler and more opaque than the band it sits in, so
-/// the band reads as the swath and this as the line down it.
-constexpr ImU32 col_sea_lane_core = IM_COL32(205, 236, 255, 240);
 
 ImU32 lerp_col(ImU32 a, ImU32 b, float u)
 {
@@ -468,94 +501,39 @@ void paint_trade_line(ImDrawList* dl, ImVec2 a, ImVec2 b, float scale, int alpha
     dl->AddLine(a, b, with_alpha(col_trade_link, alpha), std::max(1.25f, scale * 0.22f));
 }
 
-/// BL-1124 candidate (b)'s shipping glyph: an ANCHOR -- ring, shank, stock and
-/// a curved crown -- in @p colour over a dark underline, centred on @p centre,
-/// @p r its half-height. The icon contract's (dl, centre, r, colour) shape, so
-/// if Ben picks it the glyph moves to icons.cpp unchanged.
-void paint_lane_anchor(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
-{
-    const auto strokes = [&](ImU32 c, float th) {
-        dl->AddCircle({centre.x, centre.y - r * 0.72f}, r * 0.28f, c, 8, th);                 // ring
-        dl->AddLine({centre.x, centre.y - r * 0.44f}, {centre.x, centre.y + r}, c, th);        // shank
-        dl->AddLine({centre.x - r * 0.5f, centre.y - r * 0.22f},
-                    {centre.x + r * 0.5f, centre.y - r * 0.22f}, c, th);                       // stock
-        dl->PathArcTo({centre.x, centre.y + r * 0.2f}, r * 0.8f, 0.35f, 3.14159265f - 0.35f, 10);
-        dl->PathStroke(c, 0, th);                                                              // crown
-    };
-    strokes(col_seat_ring, 3.2f);
-    strokes(colour, 1.4f);
-}
-
-/// BL-1097 / BL-1124: ONE SEA LANE's swath, a to b, in the candidate @p form.
-/// Every form keeps the lane's own pale sea-blue; they differ in what makes it
-/// read against the colonial tie that usually runs the same line:
-///   core_line  the wide soft band with a bright core line down it -- the tie,
-///              drawn later, dashes over the core, so the lane shows between
-///              the dashes;
-///   end_glyphs the wide soft band alone here; its anchors are
-///              `paint_lane_marks`, drawn after the ties so they sit on top;
-///   bowed_arc  the band bowed SOUTH off the chord (treaty arcs bow north),
-///              and more opaque, because it no longer lies under the tie and
-///              need not let the tie's dashes read through it.
+/// BL-1097 / BL-1124: ONE SEA LANE, a to b, as a BOWED ARC (Ben, 2026-09-25,
+/// picked at the live app from three forms; STARTUP.md § Round 5, "The lane"):
+/// a soft sea-blue band bent SOUTH off the straight capital-to-capital line.
+/// Most lane uses come from the tribute leg, so a lane nearly always runs the
+/// same line as its colonial tie, and a straight band hid under the tie's
+/// dashes; the tie keeps the straight line and the lane curves off it. South,
+/// because treaty arcs bow north and the two arcs must never meet. Opaque
+/// enough to read on its own, since it no longer lies under the tie.
 /// Returns the primitives drawn.
-int paint_lane(ImDrawList* dl, ImVec2 a, ImVec2 b, float scale, lapse_lane_form form)
+int paint_lane(ImDrawList* dl, ImVec2 a, ImVec2 b, float scale)
 {
     const float w = std::max(5.0f, scale * 1.4f);
-    if (form == lapse_lane_form::bowed_arc)
+    const float dx = b.x - a.x, dy = b.y - a.y;
+    const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+    float nx = -dy / len, ny = dx / len;
+    if (ny < 0.0f) { nx = -nx; ny = -ny; } // bow south
+    // A quadratic's apex sits HALF its control offset off the chord, so a
+    // floor of three band widths keeps the apex a band and a half clear of
+    // the tie on the shortest lane; the ceiling stops a long lane swinging
+    // into the next coast.
+    const float bulge = std::clamp(len * 0.30f, 3.0f * w, 60.0f);
+    const ImVec2 c{(a.x + b.x) * 0.5f + nx * bulge, (a.y + b.y) * 0.5f + ny * bulge};
+    constexpr int segs = 18;
+    ImVec2 pts[segs + 1];
+    for (int i = 0; i <= segs; ++i)
     {
-        const float dx = b.x - a.x, dy = b.y - a.y;
-        const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
-        float nx = -dy / len, ny = dx / len;
-        if (ny < 0.0f) { nx = -nx; ny = -ny; } // bow south
-        // A quadratic's apex sits HALF its control offset off the chord, so a
-        // floor of three band widths keeps the apex a band and a half clear of
-        // the tie on the shortest lane; the ceiling stops a long lane swinging
-        // into the next coast.
-        const float bulge = std::clamp(len * 0.30f, 3.0f * w, 60.0f);
-        const ImVec2 c{(a.x + b.x) * 0.5f + nx * bulge, (a.y + b.y) * 0.5f + ny * bulge};
-        constexpr int segs = 18;
-        ImVec2 pts[segs + 1];
-        for (int i = 0; i <= segs; ++i)
-        {
-            const float u = static_cast<float>(i) / static_cast<float>(segs);
-            const float v = 1.0f - u;
-            pts[i] = {v * v * a.x + 2.0f * v * u * c.x + u * u * b.x,
-                      v * v * a.y + 2.0f * v * u * c.y + u * u * b.y};
-        }
-        dl->AddPolyline(pts, segs + 1, with_alpha(col_sea_lane, 130), ImDrawFlags_None, w);
-        return 1;
+        const float u = static_cast<float>(i) / static_cast<float>(segs);
+        const float v = 1.0f - u;
+        pts[i] = {v * v * a.x + 2.0f * v * u * c.x + u * u * b.x,
+                  v * v * a.y + 2.0f * v * u * c.y + u * u * b.y};
     }
-    dl->AddLine(a, b, with_alpha(col_sea_lane, 80), w);
-    if (form == lapse_lane_form::core_line)
-    {
-        dl->AddLine(a, b, col_sea_lane_core, std::max(1.5f, scale * 0.32f));
-        return 2;
-    }
+    dl->AddPolyline(pts, segs + 1, with_alpha(col_sea_lane, 130), ImDrawFlags_None, w);
     return 1;
-}
-
-/// Candidate (b)'s marks: an anchor near each end of the lane, set in along it
-/// so it clears the seat dot, the hull and the harbour drawn at the capital
-/// the end usually is. A lane too short for two gets one, at its middle.
-/// Drawn over the ties (the anchors are the point of the form, and a tie's
-/// dash crossing one would hide it). Nothing for the other two forms.
-int paint_lane_marks(ImDrawList* dl, ImVec2 a, ImVec2 b, float scale, lapse_lane_form form)
-{
-    if (form != lapse_lane_form::end_glyphs) return 0;
-    const float r   = std::clamp(scale * 1.5f, 5.0f, 8.0f);
-    const float dx  = b.x - a.x, dy = b.y - a.y;
-    const float len = std::sqrt(dx * dx + dy * dy);
-    if (len < 1.0f) return 0;
-    const float ux = dx / len, uy = dy / len;
-    const float in = std::max(r * 3.0f, 14.0f);
-    if (len >= 3.0f * in)
-    {
-        paint_lane_anchor(dl, {a.x + ux * in, a.y + uy * in}, r, col_sea_lane_core);
-        paint_lane_anchor(dl, {b.x - ux * in, b.y - uy * in}, r, col_sea_lane_core);
-        return 16;
-    }
-    paint_lane_anchor(dl, {(a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f}, r, col_sea_lane_core);
-    return 8;
 }
 
 /// BL-1080: one spark of the industry heat -- a dark ring under a bright core,
@@ -828,9 +806,6 @@ int  draw_lapse_fleets(const history_lapse& h, const lapse_layer_set& L,
                        ImDrawList* dl, ImVec2 tl, float scale, int year);
 lapse_fleet_frame fleets_at(const history_lapse& h, const lapse_layer_set& L,
                             const std::vector<uint16_t>& slice, int year);
-
-/// BL-1124: the candidate the map draws now. Presentation state only.
-lapse_lane_form g_lane_form = lapse_lane_form::core_line;
 
 } // namespace
 
@@ -1105,51 +1080,39 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // era only walked never gets an event and never gets a segment here — see
     // `lapse_road_seg`. The Culture round's record carries no such events, so
     // this loop leaves `road_segs` empty there without a round flag to check.
-    h.road_segs.clear();
-    for (const lapse_event& e : h.lapse.events)
+    // BL-1134: the network STARTS from the roads the rounds before this one
+    // laid (`road_carry`), and this record's promotions land on top of it --
+    // one walk, shared with `lapse_roads_at_close`, so the network a round
+    // hands on is the network it drew. The geometry is then drawn for every
+    // corridor alike against THIS round's regions and rivers.
+    h.road_segs = h.road_carry;
+    apply_road_promotions(h.road_segs, h.lapse, h.region_col.size());
+    h.road_segs.erase(std::remove_if(h.road_segs.begin(), h.road_segs.end(),
+                                     [&](const lapse_road_seg& s) {
+                                         return static_cast<std::size_t>(s.region_a) >= h.region_col.size()
+                                             || static_cast<std::size_t>(s.region_b) >= h.region_col.size();
+                                     }),
+                      h.road_segs.end());
+    for (lapse_road_seg& seg : h.road_segs)
     {
-        if (e.kind != static_cast<uint8_t>(lapse_event_kind::road_promoted)) continue;
-        if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
-        const uint16_t a = e.region, b = e.other; // note_corridor: region = lo, other = hi
-        if (static_cast<std::size_t>(a) >= h.region_col.size()
-         || static_cast<std::size_t>(b) >= h.region_col.size()) continue;
-
-        auto it = std::find_if(h.road_segs.begin(), h.road_segs.end(),
-                               [&](const lapse_road_seg& s) { return s.region_a == a && s.region_b == b; });
-        if (it == h.road_segs.end())
+        const uint16_t a = seg.region_a, b = seg.region_b;
+        seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
+        seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
+        seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[b]) + 0.5f, gw);
+        seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
+        seg.over_water = lapse_corridor_over_water(band, gw, gh, seg.c0, seg.r0, seg.c1, seg.r1);
+        // Bridges: where this corridor's straight line crosses a river
+        // edge — a pure geometric fact, tested once against every river
+        // segment already baked above.
+        seg.bridges.clear();
+        for (const lapse_river_seg& r : h.river_segs)
         {
-            lapse_road_seg seg;
-            seg.region_a = a;
-            seg.region_b = b;
-            seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
-            seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
-            seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[b]) + 0.5f, gw);
-            seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
-            seg.year_track = e.year;
-            if (e.polity >= 2) seg.year_road      = e.year; // robust to a corridor's first event already being Road
-            if (e.polity >= 3) seg.year_post_road = e.year; // ...or already Post Road (BL-940/BL-943)
-            seg.over_water = lapse_corridor_over_water(band, gw, gh, seg.c0, seg.r0, seg.c1, seg.r1);
-            // Bridges: where this corridor's straight line crosses a river
-            // edge — a pure geometric fact, tested once against every river
-            // segment already baked above.
-            for (const lapse_river_seg& r : h.river_segs)
-            {
-                float ix = 0.0f, iy = 0.0f;
-                if (lapse_segments_cross(seg.c0, seg.r0, seg.c1, seg.r1,
-                                         static_cast<float>(r.c0), static_cast<float>(r.r0),
-                                         static_cast<float>(r.c1), static_cast<float>(r.r1),
-                                         ix, iy))
-                    seg.bridges.push_back({ix, iy});
-            }
-            h.road_segs.push_back(std::move(seg));
-        }
-        else if (e.polity >= 3)
-        {
-            it->year_post_road = e.year; // BL-940/BL-943: a later crossing to Post Road
-        }
-        else if (e.polity >= 2)
-        {
-            it->year_road = e.year; // the second crossing this pair can ever get
+            float ix = 0.0f, iy = 0.0f;
+            if (lapse_segments_cross(seg.c0, seg.r0, seg.c1, seg.r1,
+                                     static_cast<float>(r.c0), static_cast<float>(r.r0),
+                                     static_cast<float>(r.c1), static_cast<float>(r.r1),
+                                     ix, iy))
+                seg.bridges.push_back({ix, iy});
         }
     }
 
@@ -1532,22 +1495,44 @@ lapse_layer_set lapse_layers_drawn(const history_lapse& h)
     };
     s.set(L::kin_line,       any_kin(false));
     s.set(L::kin_line_water, any_kin(true));
-    s.set(L::track, !h.road_segs.empty());
-    s.set(L::road, std::any_of(h.road_segs.begin(), h.road_segs.end(),
-                               [](const lapse_road_seg& r) { return r.year_road != lapse_never; }));
-    s.set(L::post_road, std::any_of(h.road_segs.begin(), h.road_segs.end(),
-                                    [](const lapse_road_seg& r) { return r.year_post_road != lapse_never; }));
-    s.set(L::bridge, std::any_of(h.road_segs.begin(), h.road_segs.end(),
-                                 [](const lapse_road_seg& r) { return !r.bridges.empty(); }));
+    // THE ROAD RUNGS, read over the round's own span (BL-1134): a corridor
+    // carried in from an earlier round may already stand at Road on the first
+    // frame, so "the record holds a corridor" no longer means "a Track is
+    // drawn". A rung is listed when some year of the span shows it:
+    // `shows(from, until)` is "some y in [first, last] with from <= y < until".
+    {
+        const int64_t y0 = h.lapse.start_year, y1 = int64_t{h.lapse.start_year} + h.lapse.years;
+        const int64_t never = int64_t{lapse_never} + 1;
+        const auto shows = [&](int64_t from, int64_t until) {
+            return std::max(y0, from) < std::min(y1 + 1, until);
+        };
+        const auto any_road = [&](auto pred) {
+            return std::any_of(h.road_segs.begin(), h.road_segs.end(), pred);
+        };
+        const int window = lapse_marker_window_years(h);
+        s.set(L::track, any_road([&](const lapse_road_seg& r) {
+            return shows(r.year_track, r.year_road == lapse_never ? never : r.year_road); }));
+        s.set(L::road, any_road([&](const lapse_road_seg& r) {
+            return r.year_road != lapse_never && shows(std::max(r.year_track, r.year_road), never); }));
+        // The Post Road the legend names is its PULSE (a steady Post Road is
+        // drawn as a Road), so it is listed when a pulse falls in the span.
+        s.set(L::post_road, any_road([&](const lapse_road_seg& r) {
+            return r.year_post_road != lapse_never
+                && shows(r.year_post_road, int64_t{r.year_post_road} + window); }));
+        s.set(L::bridge, any_road([&](const lapse_road_seg& r) {
+            return !r.bridges.empty() && shows(r.year_track, never); }));
+    }
     // The trade line a freed colony's treaty leaves is the trade link's own
     // stroke (`paint_trade_line`), so it is the same row.
     const bool tie_trade = at_sea && std::any_of(h.tie_segs.begin(), h.tie_segs.end(),
         [](const lapse_tie_seg& t) { return t.year_trade != lapse_never; });
     s.set(L::trade_link, !h.trade_segs.empty() || tie_trade);
-    // The corridor exemplar: a caravan over land, a sail over water.
+    // The corridor exemplar: a caravan over land, a sail over water. It reads
+    // this record's own promotions, so a corridor only carried in (BL-1134)
+    // carries no exemplar and does not list one.
     const auto any_exemplar = [&](bool water) {
         return std::any_of(h.road_segs.begin(), h.road_segs.end(),
-                           [&](const lapse_road_seg& r) { return r.over_water == water; })
+                           [&](const lapse_road_seg& r) { return r.promoted_here && r.over_water == water; })
             || std::any_of(h.trade_segs.begin(), h.trade_segs.end(),
                            [&](const lapse_trade_seg& t) { return t.over_water == water; });
     };
@@ -1624,13 +1609,6 @@ const char* lapse_layer_label(const history_lapse& h, lapse_layer l)
     return "";
 }
 
-lapse_lane_form lapse_lane_form_current() { return g_lane_form; }
-
-void lapse_lane_form_select(lapse_lane_form f)
-{
-    if (static_cast<unsigned>(f) < static_cast<unsigned>(lapse_lane_form::count)) g_lane_form = f;
-}
-
 namespace {
 
 // ---------------------------------------------------------------------------
@@ -1703,7 +1681,7 @@ legend_palette legend_colours(const history_lapse& h, const std::vector<uint16_t
 
     const auto road_over = [&](bool water) {
         return std::any_of(h.road_segs.begin(), h.road_segs.end(),
-                           [&](const lapse_road_seg& r) { return r.over_water == water; });
+                           [&](const lapse_road_seg& r) { return r.promoted_here && r.over_water == water; });
     };
     p.caravan_on_road = road_over(false);
     p.sail_on_road    = road_over(true);
@@ -1714,7 +1692,7 @@ legend_palette legend_colours(const history_lapse& h, const std::vector<uint16_t
 /// sits on on the map -- land for the things on land, sea for the things at
 /// sea -- so a mark reads on the key as it reads on the map.
 int legend_swatch(ImDrawList* dl, lapse_layer l, ImVec2 a, ImVec2 b, float scale,
-                  const legend_palette& p, lapse_lane_form form)
+                  const legend_palette& p)
 {
     const float cx = (a.x + b.x) * 0.5f, cy = (a.y + b.y) * 0.5f;
     const float w = b.x - a.x;
@@ -1868,10 +1846,9 @@ int legend_swatch(ImDrawList* dl, lapse_layer l, ImVec2 a, ImVec2 b, float scale
     case lapse_layer::sea_lane:
     {
         sea();
-        // The bowed candidate bows south, so its chord sits high in the cell.
-        const float ly = form == lapse_lane_form::bowed_arc ? a.y + 3.5f : cy;
-        prims += paint_lane(dl, {a.x + 2.0f, ly}, {b.x - 2.0f, ly}, scale, form);
-        prims += paint_lane_marks(dl, {a.x + 2.0f, ly}, {b.x - 2.0f, ly}, scale, form);
+        // The arc bows south, so its chord sits high in the cell.
+        const float ly = a.y + 3.5f;
+        prims += paint_lane(dl, {a.x + 2.0f, ly}, {b.x - 2.0f, ly}, scale);
         break;
     }
     case lapse_layer::colonial_tie:
@@ -2029,7 +2006,6 @@ int paint_lapse_legend(const history_lapse& h, const legend_layout& g, ImDrawLis
     int prims = 2;
 
     constexpr ImU32 col_label = IM_COL32(196, 202, 214, 255);
-    const lapse_lane_form form = g_lane_form;
     for (std::size_t i = 0; i < g.cols.size(); ++i)
     {
         const float x = o.x + g.at[i].x;
@@ -2040,7 +2016,7 @@ int paint_lapse_legend(const history_lapse& h, const legend_layout& g, ImDrawLis
         {
             const ImVec2 a{x, std::floor(y + (g.row_h - sh) * 0.5f)};
             const ImVec2 b{x + legend_sw, a.y + sh};
-            prims += legend_swatch(dl, r.first, a, b, scale, pal, form);
+            prims += legend_swatch(dl, r.first, a, b, scale, pal);
             dl->AddText({x + legend_sw + legend_label, y + (g.row_h - g.line) * 0.5f}, col_label, r.second.c_str()); // fit-exempt: legend label; its column is sized by CalcTextSize
             prims += 2;
             if (listed)
@@ -2052,31 +2028,6 @@ int paint_lapse_legend(const history_lapse& h, const legend_layout& g, ImDrawLis
         }
     }
     return prims;
-}
-
-/// BL-1124 -- THE TEMPORARY LANE-FORM SELECTOR, over the map's top edge (or
-/// just under the year stamp when the pane leaves no band above the map). The
-/// one widget this surface carries, drawn only on a round that draws a lane;
-/// removed with the two candidates Ben does not pick (sprint 48, U3). A radio
-/// row, as the Pace control beside it is.
-void draw_lane_form_selector(ImVec2 origin, ImVec2 tl)
-{
-    const float fh = ImGui::GetFrameHeight();
-    const float y  = (tl.y - origin.y >= fh + 12.0f) ? tl.y - fh - 6.0f : tl.y + 34.0f;
-    const ImVec2 keep = ImGui::GetCursorScreenPos();
-    ImGui::SetCursorScreenPos({tl.x, y});
-    ImGui::PushID("lapse_lane_form");
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Sea lane form (temporary, for the pick):");
-    static const char* const names[] = {"(a) Core line", "(b) End anchors", "(c) Bowed arc"};
-    for (int i = 0; i < static_cast<int>(lapse_lane_form::count); ++i)
-    {
-        ImGui::SameLine();
-        if (ImGui::RadioButton(names[i], static_cast<int>(g_lane_form) == i))
-            g_lane_form = static_cast<lapse_lane_form>(i);
-    }
-    ImGui::PopID();
-    ImGui::SetCursorScreenPos(keep);
 }
 
 } // namespace
@@ -2106,7 +2057,6 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // disagree -- the Empires cut is made inside `lapse_layers_drawn` and
     // nowhere here.
     const lapse_layer_set L = lapse_layers_drawn(h);
-    const lapse_lane_form lane_form = g_lane_form;
 
     // Fit the raster into the pane, aspect preserved: a political map stretched
     // to a pane is a map of a different world's shape.
@@ -2512,10 +2462,10 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     const int marker_window = lapse_marker_window_years(h);
     dl->PushClipRect({tl.x, tl.y}, {tl.x + static_cast<float>(gw) * scale,
                                     tl.y + static_cast<float>(gh) * scale}, true);
-    if (L.has(lapse_layer::track))
+    if (L.has(lapse_layer::track) || L.has(lapse_layer::road)) // BL-1134: a carried Road draws with no Track frame
     for (const lapse_road_seg& s : h.road_segs)
     {
-        if (year < s.year_track) continue; // not promoted yet at this playhead
+        if (!lapse_road_drawn(s, year)) continue; // not promoted yet at this playhead
         const bool at_road = year >= s.year_road;
         const bool  wrapped = s.c1 < 0.0f || s.c1 > static_cast<float>(gw);
         const float shift   = s.c1 < 0.0f ? world_w : -world_w;
@@ -2573,27 +2523,23 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // ── 3c'. SEA LANES (BL-1097), its own water layer beside the two above:
     //    a lane is drawn from the frame its leg earned the tier to the
     //    round's end, and never before — the crossings that fell short stay
-    //    invisible, as the walked-once settle tree does on land. Drawn as a
-    //    WIDE, SOFT SEA-BLUE BAND (Ben, 2026-09-25): most lane uses come from
-    //    the tribute leg, so a lane nearly always runs the same capital-to-
-    //    capital line as its colonial tie, and a thin dashed lane vanished
-    //    under the tie's dashes at the live click. A shipping lane is a swath;
-    //    the tie, drawn later, reads as dashes on top of it. The width scales
-    //    with the map. Seam-crossing lanes are stroked twice like the
-    //    corridors above.
-    //    BL-1124: and the band was STILL not seen at the live click, so the
-    //    lane is drawn in one of three candidate forms (`paint_lane`) until
-    //    Ben picks; candidate (b)'s anchors go down after the ties (3h). ──
+    //    invisible, as the walked-once settle tree does on land. Most lane
+    //    uses come from the tribute leg, so a lane nearly always runs the same
+    //    capital-to-capital line as its colonial tie: a thin dashed lane and
+    //    then a straight soft band both vanished under the tie at the live
+    //    click. So the lane is a BOWED ARC (BL-1124; Ben, 2026-09-25, picked
+    //    from three forms at the live app; `paint_lane`): the tie keeps the
+    //    straight line and the lane curves south off it. Seam-crossing lanes
+    //    are stroked twice like the corridors above. ──
     if (L.has(lapse_layer::sea_lane))
     for (const lapse_lane_seg& s : h.lane_segs)
     {
         if (year < s.year_open) continue; // not yet a lane at this playhead
-        prims += paint_lane(dl, {px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, scale, lane_form);
+        prims += paint_lane(dl, {px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, scale);
         if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw)) // the seam, drawn off the other edge
         {
             const float shift = s.c1 < 0.0f ? world_w : -world_w;
-            prims += paint_lane(dl, {px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)},
-                                scale, lane_form);
+            prims += paint_lane(dl, {px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)}, scale);
         }
     }
 
@@ -2935,26 +2881,6 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    (Ben, 2026-09-25) through `L`, each of its six layers on its own bit. ──
     prims += draw_lapse_fleets(h, L, slice, dl, tl, scale, year);
 
-    // ── 3h. BL-1124 candidate (b)'s lane anchors, OVER the ties: the anchor is
-    //    the whole point of that form, and a tie's dash across one hid it.
-    //    Nothing for the other two candidates. ──
-    if (L.has(lapse_layer::sea_lane) && lane_form == lapse_lane_form::end_glyphs)
-    {
-        dl->PushClipRect({tl.x, tl.y}, {tl.x + world_w, tl.y + static_cast<float>(gh) * scale}, true);
-        for (const lapse_lane_seg& s : h.lane_segs)
-        {
-            if (year < s.year_open) continue;
-            prims += paint_lane_marks(dl, {px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, scale, lane_form);
-            if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw))
-            {
-                const float shift = s.c1 < 0.0f ? world_w : -world_w;
-                prims += paint_lane_marks(dl, {px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)},
-                                          scale, lane_form);
-            }
-        }
-        dl->PopClipRect();
-    }
-
     // ── 4. SEATS: one dot per polity HOLDING GROUND in this slice, at the
     //    region it first held. Seats only, not every region — the in-game Ages
     //    view draws a dot per region, and at blob granularity that is a rash;
@@ -3084,9 +3010,6 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         prims += paint_lapse_legend(h, legend, dl, o, scale, year, slice, base_colour,
                                     h.prim_report_done ? nullptr : &listed);
     }
-
-    // BL-1124: the temporary lane-form selector, on a round that draws a lane.
-    if (L.has(lapse_layer::sea_lane)) draw_lane_form_selector(origin, tl);
 
     // The draw cost, reported once per record under the capture harness so the
     // bound is a measured number rather than an assumption. Never in play.
@@ -4011,6 +3934,31 @@ std::vector<history_lapse::civ_mark> lapse_civ_marks_at_close(const history_laps
     return marks;
 }
 
+std::vector<lapse_road_seg> lapse_roads_at_close(const history_lapse& h)
+{
+    std::vector<lapse_road_seg> roads = h.road_carry;
+    apply_road_promotions(roads, h.lapse, h.region_col.size());
+    // The pairs and the tier years are the hand-over; the geometry and the
+    // "promoted on this record" flag are the successor's to draw and to set.
+    for (lapse_road_seg& s : roads)
+    {
+        s.c0 = s.r0 = s.c1 = s.r1 = 0.0f;
+        s.over_water    = false;
+        s.promoted_here = false;
+        s.bridges.clear();
+    }
+    return roads;
+}
+
+std::vector<std::pair<uint16_t, uint16_t>> lapse_roads_drawn_at(const history_lapse& h, int year)
+{
+    std::vector<std::pair<uint16_t, uint16_t>> out;
+    if (!h.derived()) return out;
+    for (const lapse_road_seg& s : h.road_segs)
+        if (lapse_road_drawn(s, year)) out.emplace_back(s.region_a, s.region_b);
+    return out;
+}
+
 float lapse_industry_heat(const history_lapse& h, uint16_t polity, int year)
 {
     if (!h.industry_recorded || h.industry_density_peak <= 0.0) return 0.0f;
@@ -4276,12 +4224,14 @@ void draw_lapse_scoreboard(const history_lapse& h,
     // people from one region to another by this year (the kin arrows drawn
     // so far, `lapse_kin_arrows_at`). The counts are the settlement's own
     // census, read at the record's construction, never re-derived here.
+    // BL-1135: worded as the record, not the route (STARTUP.md § Round 3) --
+    // the same four counts, named as what the record keeps.
     if (h.peoples && (h.peoples_cradles > 0 || h.peoples_coined > 0))
     {
         ImGui::Spacing();
         ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
-        ImGui::TextWrapped("%d cradles; %d peoples coined on the march, %d of them folded "
-                           "back into an ancestor; %d migrations so far.",
+        ImGui::TextWrapped("%d cradles; %d peoples named in the record, %d of them folded "
+                           "back into an ancestor; %d foundings so far.",
                            h.peoples_cradles, h.peoples_coined, h.peoples_folded,
                            lapse_kin_arrows_at(h, year));
         ImGui::PopStyleColor();

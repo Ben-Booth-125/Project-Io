@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -184,6 +185,13 @@ struct lapse_road_seg
     /// so the fleet/caravan exemplar always reads the same fact a bridge
     /// glyph would.
     bool over_water = false;
+
+    /// BL-1134: THIS record noted a promotion on the corridor. A corridor
+    /// carried in from an earlier round (`history_lapse::road_carry`) and never
+    /// promoted here is drawn but has no event, so the caravan exemplar -- which
+    /// reads the events -- never marks it; the legend's "Caravan" row reads
+    /// this flag so it names only what the round draws.
+    bool promoted_here = false;
 
     /// Where this corridor's straight line crosses a river edge — a pure
     /// geometric fact, computed once against `history_lapse::river_segs`.
@@ -560,10 +568,24 @@ struct history_lapse
     std::vector<lapse_river_seg>  river_segs;
     std::vector<lapse_relief_seg> relief_segs;
 
-    /// The promoted road network (BL-917), baked from `lapse.events` once at
-    /// record time — see `lapse_road_seg`. Empty on the Culture round, whose
-    /// record carries no `road_promoted` events.
+    /// The promoted road network (BL-917), baked once at record time from the
+    /// roads the rounds before this one laid (`road_carry`) and this record's
+    /// own `road_promoted` events — see `lapse_road_seg`. Empty on the Culture
+    /// round, which has nothing behind it and promotes nothing.
     std::vector<lapse_road_seg> road_segs;
+
+    /// BL-1134 (roads carried across rounds; Ben, 2026-09-25, walking round 6:
+    /// "we lost every road between Exploration and Industrialisation";
+    /// STARTUP.md § Round 6, "Every round draws the roads the rounds before it
+    /// laid"). A resumed span notes only the promotions IT makes, so a record
+    /// read alone opened every round with no road the earlier rounds laid. The
+    /// round before hands its whole network over at the seam
+    /// (`lapse_roads_at_close`), exactly as the civilisation diamonds are
+    /// (`civ_carry`): the pairs and the years each reached Track, Road and Post
+    /// Road, which are calendar years and so mean the same on every round. The
+    /// bake re-derives the geometry against this round's own regions and
+    /// rivers. Empty when nothing came before.
+    std::vector<lapse_road_seg> road_carry;
 
     /// Amicable cross-border trade corridors (BL-925), baked from
     /// `lapse.events` once at record time — see `lapse_trade_seg`. Empty on
@@ -898,24 +920,6 @@ lapse_layer_set lapse_layers_drawn(const history_lapse& h);
 /// "Homeland", as its board says.
 const char* lapse_layer_label(const history_lapse& h, lapse_layer l);
 
-/// BL-1124 (sea lanes seen) -- THE THREE CANDIDATE LANE FORMS, TEMPORARY.
-/// Ben picks one at the live app (sprint 48, U3); the other two, this enum's
-/// spare values and the selector are removed then. Why a lane hides: the
-/// tribute leg writes most lane uses, so a lane nearly always runs the same
-/// capital-to-capital line as its colonial tie, and the soft band alone read
-/// as nothing under the tie's dashes.
-///   core_line   the soft band with a bright core line inside it;
-///   end_glyphs  the soft band with an anchor at each end, over the ties;
-///   bowed_arc   the band bowed SOUTH off the straight line the tie takes
-///               (treaty arcs bow north, so the two arcs never meet).
-enum class lapse_lane_form : uint8_t { core_line = 0, end_glyphs = 1, bowed_arc = 2, count = 3 };
-
-/// The candidate the map draws now (default `core_line`), and the selector's
-/// write. Presentation state only: a static in this translation unit, read by
-/// the painter and the legend, never saved and never read by the sim.
-lapse_lane_form lapse_lane_form_current();
-void            lapse_lane_form_select(lapse_lane_form f);
-
 /// Paint the political map for one already-materialised ownership slice into the
 /// current window's remaining content region.
 ///
@@ -927,9 +931,7 @@ void            lapse_lane_form_select(lapse_lane_form f);
 /// THE LEGEND (BL-1118) is painted here too, in the pane's band under the map
 /// -- draw list only, like the map. Where the band is too shallow for it, the
 /// map is framed in the height left above the key; the key never covers the
-/// map. The ONE widget is BL-1124's temporary lane-form selector over the
-/// map's top edge, drawn only on a round that draws a lane and removed with
-/// the two candidates Ben does not pick.
+/// map.
 void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     int year);
 
@@ -993,6 +995,24 @@ std::vector<uint8_t> lapse_hard_at_close(const history_lapse& h);
 /// plus every `civilisation_formed` it recorded -- for the next round's
 /// `civ_carry` (BL-1094). Deduplicated by (polity, region).
 std::vector<history_lapse::civ_mark> lapse_civ_marks_at_close(const history_lapse& h);
+
+/// BL-1134: the road network standing at a record's close -- its own
+/// `road_carry` with every `road_promoted` it recorded applied on top -- for
+/// the next round's `road_carry`. The pairs and their tier years only (the
+/// successor's bake draws the geometry). A pure function of the record and its
+/// carry, so it needs no derivation and reads an undrawn round as well as a
+/// drawn one. Deduplicated by (region_a, region_b); a tier year is only ever
+/// moved EARLIER, so a carried Road never drops back to Track.
+std::vector<lapse_road_seg> lapse_roads_at_close(const history_lapse& h);
+
+/// BL-1134: is @p s drawn at @p year -- the road pass's own test, from the
+/// year the corridor first reached Track. One predicate for the pass and for
+/// `lapse_roads_drawn_at`, so the verify read counts what the map draws.
+inline bool lapse_road_drawn(const lapse_road_seg& s, int year) { return year >= s.year_track; }
+
+/// BL-1134: the (region_a, region_b) pairs the road pass draws at @p year, in
+/// bake order. Empty before the record is derived. For the verify API.
+std::vector<std::pair<uint16_t, uint16_t>> lapse_roads_drawn_at(const history_lapse& h, int year);
 
 /// The colour @p owner is drawn in on @p h — a culture's lineage hue on the
 /// Culture round, a polity's identity slot elsewhere. Public so one round can
