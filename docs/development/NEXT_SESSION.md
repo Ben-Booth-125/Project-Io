@@ -68,7 +68,7 @@ were already stale from sprint 46 (never re-pinned). So the pins cannot say who 
 comparison can. Running: the digest check on the pre-sprint tree 1d401e8c (the session
 scratchpad's `digest_check_pre47.log`). If its rows equal the G+C rows (`digest_check_GC.log`),
 BL-1083 and BL-1085 moved nothing and BL-1085 R1 closes; the full wave-0 rows
-(`digest_check_wave0.log`) are then W1/W3's movement and the re-bless re-pins them. If they differ, bisect G (7bf2bac0) against C (2c5c2746) before any re-bless.
+(`digest_check_wave0.log`) are then W1/W3's movement and the re-bless re-pins them. RESULT (04:43): pre-sprint and G+C rows are IDENTICAL on all 16 seeds — BL-1083 and BL-1085 moved nothing; BL-1085 R1 closed. Against the full wave-0 tree: D_land/D_settle/D_seat move on every seed (BL-1102's laws) and D_search on 13, 25, 31, 32, 46 (BL-1096/1097). Those, plus BL-1089's name inheritance, are the re-bless.
 
 **Wave 1 complete on main (04:40):** I1 (BL-1087 colour, BL-1088 name, BL-1089 nation) merged
 `66bdbc0f` after a fix round on its branch (pins derived on demand at the hand-over; the Begin/load
