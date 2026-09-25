@@ -76,7 +76,11 @@ connected body — and **whether the cheapest path touches water is what selects
 
 Roads discount it: `road_traversal_multiplier` = `1 / (1 + 0.5 × tier)`.
 
-An **edge** cost is the mean of its two nodes, which is what makes a path symmetric.
+An **edge** cost is the mean of its two nodes, but a river discounts an edge in one direction only
+(downstream is cheaper than upstream), so **a path is directed**. Its cost is always the origin →
+destination cost, read one way only — never whichever direction a cache happens to hold (Ben,
+2026-09-25; BL-1126, path cost reads the cache). A cost that depended on what was cached would
+make a loaded game continue differently from the one that was saved.
 
 ### 2. Pathfinding — `intra_body_path`
 
@@ -164,8 +168,10 @@ is never built, and a loop exists only where the tree forces a long way round. T
 the relative-neighbour redundancy edges, which laid the lattice.
 
 **Villages join locally, not as lattice members** (BL-620, road generation scales to density):
-**only a village above a size floor lays a spur (Ben, 2026-09-25)**; the floor is measured on
-the curated seeds before it is fixed. Each such village lays one Track spur to its nearest
+**only a village above a size floor lays a spur (Ben, 2026-09-25)**, and the floor is **40,000
+heads** (Ben, 2026-09-25, from the measured ladder: about the 90th percentile of village size on
+the curated seeds). A village's size is its headcount in the population step, the figure that tells
+villages apart when roads are laid. Each such village lays one Track spur to its nearest
 already-roaded same-nation tile — backbone
 raster, another centre's streets, or an earlier spur — chosen from a distance-prefiltered
 candidate set, never all-pairs. A village whose nearest target is beyond the spur cap, or
@@ -175,12 +181,16 @@ keeps generation cost linear in village count at demography-derived density (BL-
 
 **Three tiers** (Ben, 2026-07-11): **Highway** (3) between two major centres, **Road** (2) when at
 least one endpoint is Town+, **Track** (1) otherwise. Then one Track border link between the nearest
-centre pair of each territorially-adjacent nation pair, so the lattice connects across the continent.
+centre pair of each territorially-adjacent nation pair, so the network connects across the
+continent. **A border link ends only on a town or a spurring village** (Ben, 2026-09-25): a link
+that ended on a bare village street joined nothing, so the nearest pair is chosen among the centres
+that are on their nation's network.
 
 **The network scales with the nation's qualification** (Ben, 2026-08-25; BL-618, roads scale with
 qualification): a nation's qualification fraction (`docs/economy/POPULATION.md` § Qualification)
-modulates its redundancy-edge count and tier promotion, so a low-qualification nation generates a
-sparser, lower-tier lattice. A national development level the map already shows, not a new dial.
+modulates how many of its detour loops it keeps and its tier promotion, so a low-qualification
+nation generates a sparser, lower-tier network. A national development level the map already
+shows, not a new dial.
 
 The gates are **era-relative** (Ben, 2026-08-25, ruling on NR-641; BL-621, era-relative road
 gates): they read the nation's qualification **percentile among the world's nations** — mid-rank
@@ -474,10 +484,11 @@ Each rejected an earlier cut. Two are structural.
    is how a golden gets blessed dishonestly.
 2. **LP must have a spatial locus.** A rate justified as *"how much can move through HERE"* and
    then pooled per `(corp, body)` is a per-corp haul allowance — **the exact abstraction
-   `military_points` was deleted for.** Cities are the locus. A draw lands on the anchor nearest
-   its origin by traversal cost, ties to the lowest anchor tile id; one multi-source field per body
-   answers that for every tile at once, so the answer depends on the body's tiles and anchors and
-   on nothing a cache happens to hold.
+   `military_points` was deleted for.** Cities are the locus. A draw lands on an anchor at the
+   least traversal cost from its origin, with a fixed choice among exact ties (the lower anchor
+   tile id wherever the costs can tell them apart); one multi-source field per body answers that
+   for every tile at once, so the answer depends on the body's tiles and anchors and on nothing a
+   cache happens to hold.
 3. **Specify the LP cost formula before the allocation sort key**, which is a function of it. If
    cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
    **Settled (Ben, 2026-08-25): the draw is what MOVES, not how far.** A passive convoy draw is

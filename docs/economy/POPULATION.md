@@ -56,6 +56,13 @@ RNG anywhere on the path:
   fraction of the way toward its target, and centres are promoted as the heads cross a rung.
   A shrinking city keeps its centre — the same asymmetry § Growth, decline and razing states
   for play: passive failure shrinks a centre and never destroys one.
+- **Growth consolidates (Ben, 2026-09-25; BL-1130, centres consolidate).** As a region's
+  urban heads rise, its villages **merge into a town** rather than a new village standing beside
+  them, and a region never carries more centres than its ground holds: their urban footprints
+  (§ Generation, urban ground) fit inside the region's own cell. So growth deepens a place
+  before it widens it — a few cities over many towns over a train of villages — and a region whose
+  cell is built out promotes a centre it already has instead of spilling a new one. The streets
+  and the markets that follow the centres thin with them.
 - **The sack destroys.** A conquest costs the taken region's cities a multiple of what it
   costs its countryside, because a sack falls on the walls and not the fields. Centres fall to
   what the surviving heads can stand up, and every one lost is recorded in `centres_razed` —
@@ -65,8 +72,8 @@ RNG anywhere on the path:
 - **A centre stands in the region that grew it.** Each carved centre is **bound to its source
   region** and placed inside that region's own cell of the settlement partition
   (`nearest_region` — the same partition city naming already reads, so a centre's name and its
-  ground now agree by construction rather than by luck). A region whose cell is built out
-  spills to its nearest neighbour rather than losing the settlement.
+  ground now agree by construction rather than by luck). A region never wants more centres than
+  its cell holds (§ Growth consolidates), so no centre spills into a neighbour's cell.
 
   Without the binding the causal chain died at its last step: history grew and sacked *specific*
   regions, and an undifferentiated body-wide scatter then threw that away, so a player could not

@@ -6802,11 +6802,51 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "design: Ben rules the mechanism against R1"
      ],
      "requirement": "The mechanism that destroys a market is ruled by Ben against the census and written into MARKETS.md; the rows that verify it are added then.",
+     "notes": "",
+     "result_metric": "Ruled by Ben 2026-09-25 (the density form): twins fold + gravity fold (calibrated to ~20-40 markets a 1960 world) + conquest consolidates (his note). Written into MARKETS.md § Market centres and seeding."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: market_census on the 16 curated seeds"
+     ],
+     "requirement": "Twins fold: no two markets share a centre tile on any seed (the census's twin count reads 0), and a folded twin's catchment, inventory and pools pass to the market it folds into.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: market_census, old -> new per seed"
+     ],
+     "requirement": "Gravity fold: a market inside a larger one's reach folds into it; the reach constant is named and its calibration recorded (markets per seed old -> new, on the world BL-1130 consolidated), aiming at roughly 20-40 a 1960 world without enforcing a count.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness or market_census's shell fate columns"
+     ],
+     "requirement": "Conquest consolidates: conquering the region a rival's market stands on destroys that market in the history; the census's \"maker dead\" shells fall to the markets the rule leaves, recorded old -> new.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change, fix round included, before the commit.",
      "notes": "",
      "result_metric": ""
     }
@@ -6854,6 +6894,118 @@
      "requirement": "world_determinism is bit-identical twice with its epoch row re-scoped to a non-zero epoch; save_roundtrip green.",
      "notes": "",
      "result_metric": "world_determinism (build_gen/verify, Release) run twice: ALL PASS (0 failures) both; digests seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9 (unmoved from sprint 47's close), and the re-scoped R3.8 row seedA/on/epoch1900 = 0570E3900D0BD53F (equal to the 1960 world). save_roundtrip: SAVE ROUND TRIP OK."
+    }
+   ]
+  },
+  {
+   "brief": "centres-consolidate",
+   "title": "BL-1130 - Villages consolidate into towns as a region grows, and no region carries more centres than its ground holds",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1130 - sprint 48 (Ben's density form, 2026-09-25)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: a centre census per curated seed (centres, land share, scale distribution, spills)"
+     ],
+     "requirement": "The old density is recorded per seed before the rule changes it.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: world_determinism twice"
+     ],
+     "requirement": "Villages merge into towns as heads rise and no region carries more centres than its cell holds; pure integer functions of the region record, no RNG; world_determinism bit-identical run to run.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: the census old -> new",
+      "headless: market_census",
+      "headless: gen_step_costs --roads"
+     ],
+     "requirement": "Centres per seed, land share, scale distribution, road tiles and the carve's market count are recorded old -> new on the 16 seeds.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "visual: a capture of the densest curated seed's road lens"
+     ],
+     "requirement": "The densest seed shows land that is not street.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change, fix round included, before the commit.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "path-cost-reads-the-cache",
+   "title": "BL-1126 - A path's cost is a function of its two ends, never of which flood field is cached",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1126 - sprint 48 (Ben's density form, 2026-09-25)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: lp_anchor_field_check L1, seeds 0 and 28"
+     ],
+     "requirement": "A save and load after settle tick 1 continues identically to the unsaved run on every tick 2-11, WITHOUT the --cold-original control.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: gen_step_costs --finish 0 28",
+      "headless: player_seed_sweep --digest-check"
+     ],
+     "requirement": "Flood count and settle time old -> new are recorded; the digest movement is named as a cause in the sprint's re-bless.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change, fix round included, before the commit.",
+     "notes": "",
+     "result_metric": ""
     }
    ]
   }

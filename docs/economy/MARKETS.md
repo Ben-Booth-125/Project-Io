@@ -32,8 +32,8 @@ markets anchor to population-centre tiles, and how finely a nation's territory f
 markets follows its tradeable-resource concentration — a resource-rich nation admits smaller
 centres (more markets), a barren one folds into its neighbour's. One pass at world-gen,
 deterministic, with a seeded jitter on the borderline. If no centre qualifies, one unanchored
-fallback market is seeded. On seed 0 the home body carries nine carved markets, and *no single one
-of them stands for the body*.
+fallback market is seeded. The home body carries many markets, and *no single one of them stands
+for the body*.
 
 **A living polity's capital carries a market, priced at a premium (Ben, 2026-09-23).** The Era −1
 history marks a market at every living polity's capital at the 1200 close (`CIVILISATION.md`), and
@@ -68,6 +68,24 @@ What it produces is the **entrepôt on poor ground** — a barren nation that wo
 into its neighbour keeps a market where the routes cross. BL-768 (roads and markets from
 history) owns the design.
 
+**A market can die, so the world a player is handed carries tens of markets, not hundreds (Ben,
+2026-09-25; BL-1125, markets can die).** Emergence alone left most of a world's markets adjacent
+to another, idle and unbuilt. Three in-world causes remove them, and none is a count cap:
+
+1. **Twins fold.** A market centred on the same tile as another folds into the lower-id one. Two
+   centres whose best site is the same tile have one market place; a twin could never win a tile
+   anyway, since catchment ties go to the lowest id.
+2. **Gravity fold.** A market inside a larger market's reach folds into it: trade goes where it
+   concentrates. "Larger" is catchment population; "reach" is a traversal cost, calibrated so a
+   1960 world carries roughly **20–40 markets, about one per major city**. That aim sets the
+   constant, measured on the curated seeds; the rule never enforces a count.
+3. **Conquest consolidates.** When a realm conquers the region its rival's market stands on, the
+   conquered market is destroyed to consolidate the conqueror's strength (Ben, 2026-09-25). The
+   history's markets are the survivors' markets, not a monument to every realm that ever stood.
+
+A folded market's catchment, inventory and pools pass to the market that absorbs it. The junction
+rule above still only lowers the gate; the folds run after it, on the whole set.
+
 **Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
 (`market_for_tile`). **A corporation clears in every market it holds a pool in** (Ben, 2026-09-15):
 goods pools are per `(corp, market)` (`PRODUCTION.md` § Stockpile and output flow), so a building
@@ -87,8 +105,9 @@ independent (`docs/ui/DISCOVERY.md`). **Any** corporation can cause one; the pla
 of a rival-created market for free — it enters at the activity fog's Unknown tier like any other
 undiscovered activity. Exactly **one market per body** off-world (population-anchored carving does
 not apply — an outpost has no population to anchor to); the home body's own carved multi-market
-seeding is separate. A market **never disappears** — nothing in the engine removes an entry from
-`world::markets`; an outpost whose last building is decommissioned goes dormant (clears nothing,
+seeding is separate. **In play** a market never disappears — nothing in the tick removes an entry
+from `world::markets` (the folds of § Market centres run in generation and history only); an
+outpost whose last building is decommissioned goes dormant (clears nothing,
 per the ordinary zero-supply/zero-demand case), which the activity fog's Stale tier models. The
 design is BL-263 (spontaneous market emergence).
 
