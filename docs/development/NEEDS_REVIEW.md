@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*42 entries — 21 open, 21 resolved.*
+*44 entries — 23 open, 21 resolved.*
 
 ---
 
@@ -316,6 +316,37 @@ The ruling (R7) said a pinned/fresh adjacency clash re-slots the smaller people-
 > **Recommendation:** A.
 
 *Files: `docs/ui/STARTUP.md`, `src/ui/history_lapse.cpp`*
+
+### NR-939 — CALL: the origin sentence's 'since <year>' reads the one record that spans the founding year, so a realm that held the region across the whole span reads 'since 1660 CE'
+*question · raised 2026-09-25 · from BL-1099 lane F3 (the seat briefing's origin sentence, R22) and its review, 2026-09-25*
+
+seat_origin_sentence reads the holder of the firm's origin region at its founding year off the record whose span holds that year (Industrialisation first, then Exploration, then Empires) and takes 'since' as the year of that record's last owner change of the region at or before the founding year. A region held from before the span opens has its first change AT the span's open, so the sentence reads 'the realm of X since 1660 CE' for most firms (the capture: 'Chartered from Guagua's industry, in Gesher Nehua, under Tuarthuage Thuathe, the realm of Gesher Nehua since 1660 CE'). The three records are separate resumes, but a polity id is ONE TABLE across them -- a resumed span inherits its realms by id and restates their seats as `inherited` rather than coining (CIVILISATION.md sec A realm's name; `hard_walk_record` and the slot inheritance rely on the same fact) -- so a walk back into the earlier records is well-defined; it is simply not what the sentence reads today. The realm is named by the record's coined `polity_name`, as the board and the ticker name it.
+
+**Why it matters.** The sentence is 'the whole of the history the seat carries' (STARTUP.md § The seat); 'since 1660 CE' is the record's opening, not the realm's tenure, and a player who watched round 5 may know the realm took that ground earlier.
+
+- A: accept as built -- 'since' is the year the record the sentence reads from first shows the holder (honest about the record, silent about earlier ones)
+- B: walk back into the earlier records while the same polity id holds the region at their close -- well-defined, since ids carry across the spans; two more slices per briefing, and 'since' then reads as tenure rather than as the record's opening
+- C: drop the year when it equals the record's opening: '...the realm of X' with no 'since'
+
+> **Recommendation:** C at low cost, or A: both are honest about the record the sentence reads. B is the one that makes 'since' mean tenure; whether the sentence should claim tenure is the call.
+
+*Files: `src/ui/seat_screen.cpp`*
+
+### NR-940 — CALL: the works-chartered notes cluster in the span's first century because the RUNNING price is tiny at the open -- is that the moment the round should show?
+*question · raised 2026-09-25 · from BL-1099 lane F3, the 16-seed reading that pinned f = 2 (industrialisation_sim_harness --through 1960 --works-fractions ..., 2026-09-25)*
+
+A note fires when a region's industry points cross the next multiple of f x the running price, the world's stock so far over the charter divisor (R15, self-consistent with the close's price per NR-907). At the span's open the world's stock is near zero, so the price is near zero and a region with any points crosses its four multiples in the first decades: on most seeds the notes run 1660 -> ~1760 (seed 28: 1660 -> 1760 at f = 1; the verify world: 27 of 40 charters dated 1660 -> 1716), and the seat briefing's origin year lands early in the span for nearly every firm. At the pinned f = 2 the library notes 3233 works and dates 894 of 1297 charters; the four-per-region cap is what binds thereafter, not the price.
+
+**Why it matters.** The round is meant to show WHEN the capital that charters a firm was built; a close of works flashing in the 1660s reads as the age's dawn rather than its industrial century, and the briefing's 'since 1660 CE' / early founding years follow from it.
+
+- A: accept -- the early crossings are the honest reading of a price that grows with the stock (built)
+- B: floor the running price at a fraction of the CLOSE's price (needs the 1960 stock, which NR-907 ruled out applying backwards) -- not available without a second pass
+- C: read the region's points against ITS OWN running share (the region's k-th multiple of f x the world's mean stock per region so far), which spreads the crossings across the span; a different rule, Ben's to choose
+- D: keep the rule and space the notes: at most one note per region per N years (a rate on top of the cap), so the k-th note lands later without changing what it measures
+
+> **Recommendation:** A for this sprint; D is the smallest change if the dawn-cluster reads wrong at the live click.
+
+*Files: `src/world/history_sim.hpp`, `src/world/history_sim.cpp`, `tools/verify/industrialisation_sim_harness.cpp`*
 
 ---
 

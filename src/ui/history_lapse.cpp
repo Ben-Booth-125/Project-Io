@@ -662,10 +662,17 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // A region's first `furnace_lit` is its crossing; the list is ascending, so
     // the first seen is the earliest. Industry points are read off the samples
     // at draw time (they are a series, not a bake); here only whether any exist.
+    //
+    // BL-1100: a REALM's crossing (`rung_crossed`, at its capital) marks the
+    // capital the same way from the same year (STARTUP.md § Round 6, "The rung
+    // crossing is narrated") -- a generated world lights no region furnace,
+    // so on the shipped world this is the only mark the layer carries. On a
+    // seed where no realm crosses the layer stays honestly empty.
     h.region_lit_year.assign(h.region_col.size(), INT32_MAX);
     for (const lapse_event& e : h.lapse.events)
     {
-        if (e.kind != static_cast<uint8_t>(lapse_event_kind::furnace_lit)) continue;
+        if (e.kind != static_cast<uint8_t>(lapse_event_kind::furnace_lit)
+         && e.kind != static_cast<uint8_t>(lapse_event_kind::rung_crossed)) continue;
         if (e.region == lapse_event_none || e.region >= h.region_lit_year.size()) continue;
         int32_t& y = h.region_lit_year[e.region];
         if (e.year < y) y = e.year;
@@ -1454,6 +1461,30 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    to change, `seat_region_of` below. ──
     struct seat_slide { uint16_t polity; float c0, r0, c1, r1, t; };
     std::vector<seat_slide> slides;
+    // THE WORKS (BL-1099): the one glyph here that is a building -- a low
+    // BRIGHT block with a furnace-toned stack rising from its right shoulder,
+    // over a dark underline. The stack ties it to the ember squares as the
+    // same family of fact (industry); the bright block is what tells it from
+    // them and from the heat sparks, which are plain furnace-hued squares (the
+    // first capture drew it all in the furnace tone and it vanished into the
+    // stipple: a flash must read apart from the ground it lands on). A
+    // specialist's stands a little taller. Shared by the in-span note in 3f
+    // and the close's real charters in 3g, so the two read as one kind of
+    // thing.
+    const auto draw_works = [&](ImVec2 at, int alpha, bool specialist) {
+        const float s   = std::clamp(scale * (specialist ? 0.9f : 0.75f), 2.5f, 5.5f);
+        const float bw  = s * 1.4f, bh = s * 0.8f;          // the block
+        const float sw  = s * 0.45f, sh = s * (specialist ? 2.4f : 2.0f); // the stack
+        const ImU32 under = with_alpha(col_seat_ring, alpha);
+        const ImU32 block = with_alpha(col_bright, alpha);
+        const ImU32 stack = with_alpha(col_furnace, alpha);
+        // the underline first, one pixel proud all round
+        dl->AddRectFilled({at.x - bw - 1.0f, at.y - bh - 1.0f}, {at.x + bw + 1.0f, at.y + bh + 1.0f}, under);
+        dl->AddRectFilled({at.x + bw - sw - 1.0f, at.y - sh - 1.0f}, {at.x + bw + 1.0f, at.y + 1.0f}, under);
+        dl->AddRectFilled({at.x - bw, at.y - bh}, {at.x + bw, at.y + bh}, block);
+        dl->AddRectFilled({at.x + bw - sw, at.y - sh}, {at.x + bw, at.y}, stack);
+        prims += 4;
+    };
     // THE REST SEAT (BL-1094, the review's fix round): where a polity's dot
     // SITS between moves -- the region of its last `capital_moved` at or
     // before the playhead, else `polity_seat`. Read off the record itself,
@@ -1610,9 +1641,54 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 slides.push_back({e.polity, from.x, from.y, to.x, to.y, t});
                 break;
             }
+            case lapse_event_kind::works_chartered:
+            {
+                // BL-1099: a works at the region's anchor, from its note's year,
+                // fading over the window (STARTUP.md § Round 6, "Company
+                // creation flashes"). A ping in the sense the 2026-09-16 ruling
+                // allows: its own glyph for its own kind, never a ring.
+                if (!region_ok(e.region)) continue;
+                const ImVec2 an = anchor(e.region);
+                draw_works({px(an.x), py(an.y)}, a, /*specialist=*/false);
+                break;
+            }
             default:
                 break; // realm_ended, creed_preached and every other kind: nothing
             }
+        }
+        dl->PopClipRect();
+    }
+
+    // ── 3g. THE REAL CHARTERS AT THE CLOSE (BL-1099; Ben, 2026-09-24, R15).
+    //    On the record's LAST frame, and only once the finish has landed
+    //    (`works_close` is filled then), the firms the search actually
+    //    chartered flash in at their anchor tiles, richest centre first,
+    //    over a short wall-clock stagger -- the one place this map animates
+    //    against the clock rather than the year, because the year has
+    //    stopped. Each carries the year the pairing dated it to; nothing is
+    //    read off the world-gen roster. Frozen under --verify. ──
+    if (!h.works_close.empty() && year < h.lapse.start_year + h.lapse.years)
+        h.works_close_t0 = -1.0; // off the close: the next arrival flashes again (cold review)
+    if (!h.works_close.empty() && year >= h.lapse.start_year + h.lapse.years)
+    {
+        constexpr double stagger_s = 0.04; // per charter, in report order
+        constexpr double ramp_s    = 0.5;  // to full strength
+        const double now = ImGui::GetTime();
+        if (h.works_close_t0 < 0.0) h.works_close_t0 = now;
+        const double since = now - h.works_close_t0;
+        dl->PushClipRect({tl.x, tl.y}, {tl.x + static_cast<float>(gw) * scale,
+                                        tl.y + static_cast<float>(gh) * scale}, true);
+        for (std::size_t i = 0; i < h.works_close.size(); ++i)
+        {
+            const history_lapse::works_mark& m = h.works_close[i];
+            int a = 255;
+            if (!h.works_close_frozen)
+            {
+                const double t = (since - stagger_s * static_cast<double>(i)) / ramp_s;
+                if (t <= 0.0) break; // in order: none after this one is due yet
+                a = static_cast<int>(255.0 * std::min(1.0, t));
+            }
+            draw_works({px(m.col + 0.5f), py(m.row + 0.5f)}, a, m.specialist);
         }
         dl->PopClipRect();
     }
@@ -1744,10 +1820,12 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // FOUR KINDS EARN A MARK, EACH ITS OWN GLYPH (BL-1094; Ben, 2026-09-24,
     // R10; STARTUP.md § Identity across the rounds) -- pass 3f above:
     // `seat_captured`, `broke_away` / `schism`, `civilisation_formed` and
-    // `capital_moved`; and the Post Road pulse in 3b is a layer transition
-    // marked on the thing. `realm_ended`, `creed_preached` and every other
-    // kind draw nothing. Adding a kind here means asking whether it earns a
-    // glyph of its own, never restoring the blanket.
+    // `capital_moved`; a fifth, `works_chartered` (BL-1099), earns the works
+    // glyph -- a building, not a ring -- and the close's real charters wear
+    // the same glyph in 3g; and the Post Road pulse in 3b is a layer
+    // transition marked on the thing. `realm_ended`, `creed_preached` and
+    // every other kind draw nothing. Adding a kind here means asking whether
+    // it earns a glyph of its own, never restoring the blanket.
 
     ImGui::Dummy(avail);
 }
@@ -2638,6 +2716,16 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
             std::snprintf(buf, sizeof buf, "%s, in the realm of %s, lights its furnaces.",
                           R, polity_name_of(h, e.polity));
         break;
+    case lapse_event_kind::rung_crossed:
+        // BL-1100: the realm's crossing, named by the realm and by the capital
+        // it crossed at (STARTUP.md § Round 6: "the realm of Y lights its
+        // furnaces at X").
+        if (e.polity == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "A realm lights its furnaces at %s.", R);
+        else
+            std::snprintf(buf, sizeof buf, "The realm of %s lights its furnaces at %s.",
+                          polity_name_of(h, e.polity), R);
+        break;
     case lapse_event_kind::subject_freed:
         std::snprintf(buf, sizeof buf, "%s refuses renewal and breaks from %s.",
                       polity_name_of(h, e.polity), polity_name_of(h, e.other));
@@ -2653,6 +2741,20 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "A sea lane opens between %s and %s.",
                       R, region_name_of(h, e.other));
         break;
+    case lapse_event_kind::works_chartered:
+    {
+        // BL-1099: the note, named by region and by the focus a firm chartered
+        // there takes (`other` = industrial_focus: 0 extraction, 1 processing,
+        // 2 trade); a holder, when the ground has one.
+        const char* kind = e.other == 0 ? "An extraction works" : e.other == 1 ? "A processing works"
+                         : e.other == 2 ? "A trading house"     : "A works";
+        if (e.polity == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "%s is chartered at %s.", kind, R);
+        else
+            std::snprintf(buf, sizeof buf, "%s is chartered at %s, in the realm of %s.",
+                          kind, R, polity_name_of(h, e.polity));
+        break;
+    }
     default:
         // Unreachable on a record this build wrote: every kind above `count`
         // has its own line, and a newer writer's kind is refused with the
@@ -2695,7 +2797,12 @@ int ticker_priority(const lapse_event& e)
     case lapse_event_kind::civilisation_formed:
     case lapse_event_kind::creed_preached:
     case lapse_event_kind::schism:
-    case lapse_event_kind::furnace_lit:          return 0;
+    case lapse_event_kind::furnace_lit:
+    case lapse_event_kind::rung_crossed:         return 0; // BL-1100: a realm's crossing, a handful per world
+    // BL-1099: a works note is CHURN on a busy world (up to four per region),
+    // so it takes the ticker only when the arc is quiet; its glyph on the map
+    // is the primary telling.
+    case lapse_event_kind::works_chartered:      return 2;
     case lapse_event_kind::supply_site_upgraded:
     case lapse_event_kind::trade_link_opened:
     case lapse_event_kind::trade_link_closed:

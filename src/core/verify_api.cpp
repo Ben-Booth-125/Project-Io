@@ -635,6 +635,39 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     {
         // The spend replaced world-gen's roster: frame on the player it seated.
         frame_launch_view();
+        // BL-1099: DATE THE CHARTERS as the worker's finish does
+        // (`finish_campaign_world` -> `date_chartered_firms`, against the
+        // cradle's Industrialisation record), and keep the dated report so the
+        // adopted round-6 record can flash the close marks and the seat
+        // briefing can read a founding year. Record-only writes onto the
+        // firms' origin pair; nothing here re-runs the spend.
+        {
+            m_verify_charter = scs.report;
+            const std::vector<lapse_event>* events = nullptr;
+            for (const generation_report::body_entry& be : m_generation_report.bodies)
+                if (!be.industrialisation_timelapse.events.empty())
+                {
+                    events = &be.industrialisation_timelapse.events;
+                    break;
+                }
+            static const std::vector<lapse_event> none;
+            date_chartered_firms(m_world, m_verify_charter, events ? *events : none,
+                                 static_cast<int32_t>(m_active_world_params.epoch_year));
+            // The dating, on the log, so a capture of the briefing can be read
+            // against what the pairing actually wrote (verify-only).
+            int dated = 0, lo = 0, hi = 0;
+            for (const charter_record& r : m_verify_charter.charters)
+            {
+                if (r.founded_year == static_cast<int32_t>(m_active_world_params.epoch_year)) continue;
+                if (dated == 0 || r.founded_year < lo) lo = r.founded_year;
+                if (dated == 0 || r.founded_year > hi) hi = r.founded_year;
+                ++dated;
+            }
+            std::printf("[charter dating] run_verify: %zu charters, %d dated in-span (%d -> %d), "
+                        "%zu record events, epoch %lld\n",
+                        m_verify_charter.charters.size(), dated, lo, hi, events ? events->size() : 0u,
+                        static_cast<long long>(m_active_world_params.epoch_year));
+        }
         std::printf("[stockpile_budget] run_verify: %lld points spent on the seed candidate "
                     "(%zu specialists, %zu firms)%s\n",
                     static_cast<long long>(scs.report.points_spent),
@@ -1453,7 +1486,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                                        INT32_MAX);
             for (const lapse_event& e : t.events)
             {
-                if (e.kind != static_cast<uint8_t>(lapse_event_kind::furnace_lit)) continue;
+                // BL-1100: a realm's crossing marks its capital the same way
+                // the map does (history_lapse.cpp's industry bake), so `lit`
+                // is the count of ember marks drawn, region furnace or realm.
+                if (e.kind != static_cast<uint8_t>(lapse_event_kind::furnace_lit)
+                 && e.kind != static_cast<uint8_t>(lapse_event_kind::rung_crossed)) continue;
                 ++crossings;
                 if (e.region < first.size() && e.year < first[e.region]) first[e.region] = e.year;
             }
@@ -1561,6 +1598,23 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
 
     // The current lapse round's own span, so a script walks the years the run
     // actually produced rather than the years a doc says it should have.
+    // BL-1099: the works on the current lapse round -- (close marks filled for
+    // the record's last frame, `works_chartered` notes on the record, and the
+    // charter count of the dated report the marks were filled from) -- so a
+    // script can assert the close flashes EXACTLY the charters the spend made
+    // (marks == charters) rather than hoping a frame shows some: a mark the
+    // home-body filter or the grid mapping dropped is a miss the third value
+    // exposes and a bare `> 0` would not.
+    v.set_function("history_works", [this]() {
+        const int i = wizard_lapse_index();
+        int notes = 0;
+        if (!m_wiz_history[i].empty())
+            for (const lapse_event& e : m_wiz_history[i].lapse.events)
+                if (e.kind == static_cast<uint8_t>(lapse_event_kind::works_chartered)) ++notes;
+        return std::make_tuple(static_cast<int>(m_wiz_history[i].works_close.size()), notes,
+                               static_cast<int>(m_verify_charter.charters.size()));
+    });
+
     v.set_function("history_span", [this]() {
         const int i = wizard_lapse_index();
         return std::make_tuple(m_wiz_history[i].lapse.start_year,

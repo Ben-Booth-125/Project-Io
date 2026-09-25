@@ -44,6 +44,7 @@
 // ---------------------------------------------------------------------------
 
 #include "charter_budget.hpp"
+#include "charter_price.hpp"  // k_stockpile_price_divisor, charter_running_price (BL-1099)
 #include "entity.hpp"
 #include "world.hpp"   // carve_slot, carve_dropped_slot (the carve index's types)
 
@@ -166,37 +167,12 @@ inline constexpr std::int64_t stockpile_slot_key_max = 1LL << 31;
 inline constexpr std::int64_t stockpile_region_keys_max = 1LL << 32;
 
 // --- THE PRICE (BL-1064) -------------------------------------------------------
-
-/// The divisor a world's whole stockpile is split by into the price of ONE firm
-/// charter (Ben, 2026-09-21, NR-907: "a charter's price is the world's whole
-/// industry stockpile divided by a constant"; INDUSTRIALISATION.md § 1).
-///
-/// TWO KNOBS, TWO JOBS (Ben, 2026-09-21, NR-908; INDUSTRIALISATION.md § 1).
-/// A centre affords a specialist when its points cover
-/// `k_stockpile_specialist_firm_charters` / this of the world's stock, so the
-/// SEAT MENU turns on the ratio of the two alone, and the specialist's price in
-/// firm charters is the knob set against it. THIS divisor sets how many firm
-/// charters a world's stock buys — its density, and so its tick — and is the
-/// knob set against LIVE-PLAY COST.
-///
-/// PINNED AT 650. THE RULE is Ben's (2026-09-21, NR-910): with the specialist at
-/// two firm charters (below), the divisor at which the median library world opens
-/// the seat-menu anchor's nine seats. THE NUMBER is that rule read on the SHIPPED
-/// world (Ben, 2026-09-22, NR-914): 580 was its reading on a seat curve taken
-/// with BL-1037's corridor tier off, and turning the tier on moved every
-/// stockpile (on the shipped world 580:2 opens a median 6.5). The shipped seat
-/// curve (`stockpile_budget_check --seat-curve`, 16 library seeds, m = 2,
-/// centres affording a specialist): median 7.5 / 7.5 / 8 / 8.5 / 8.5 / 9 / 13.5
-/// at d = 600 / 610 / 620 / 630 / 640 / 650 / 660 — 650 is the first divisor at
-/// nine — and no library world opens none anywhere on it. A LARGER ratio d/m is
-/// a CHEAPER seat and MORE seats, and the step at 660 is steep (seed 12 goes 4 ->
-/// 52): worlds with many near-equal cities cross the price together. The spread
-/// is ACCEPTED, not capped (NR-910) — 4 to 98 seats across the library at 650:2:
-/// the anchor is a median. Live-play cost: the divisor alone sets the tick
-/// (BL-1043 stage 2: x0.43 / x0.91 / x1.70 the legacy world at 325 / 650 /
-/// 1300), so 650 runs near x0.91 the legacy tick.
-inline constexpr std::int64_t k_stockpile_price_divisor = 650;
-static_assert(k_stockpile_price_divisor > 0, "the price divisor must be > 0");
+//
+// `k_stockpile_price_divisor` (650, NR-907/NR-910/NR-914) and the running-price
+// arithmetic live in `charter_price.hpp` (included above) since BL-1099: the
+// Industrialisation span prices its works-chartered notes by the same divisor
+// every year, and the sim cannot include this header. The ruling and its
+// readings are on the constant there; nothing about the price moved.
 
 /// Build the charter budget from @p w's stockpile, its firm price derived by
 /// @p price_divisor (the shipped constant unless an instrument names another).

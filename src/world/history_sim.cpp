@@ -1,5 +1,6 @@
 #include "history_sim.hpp"
 
+#include "charter_price.hpp"  // BL-1099: the running charter price the works notes are read against
 #include "unit_roster.hpp"
 #include "terrain_combat.hpp" // BL-384 trace: the defence term the scorer never sees
 
@@ -2943,6 +2944,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
     std::vector<int32_t> step_regions(out.polities.size(), 0);
     // BL-1080: industry points standing on each polity's ground at the step.
     std::vector<int64_t> step_industry(out.polities.size(), 0);
+    // BL-1099: `works_chartered` notes taken per region so far THIS RUN. Local
+    // to the loop, never a region field: the count is a fact about the record
+    // being written, not about the ground (a resumed span starts it at zero,
+    // exactly as its other counters). Grown to the region table where read.
+    std::vector<uint8_t> works_noted;
 
     const auto record_step = [&](int64_t y_now) {
         if (!params.record_playback) return;
@@ -3709,6 +3715,95 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     accrue_industry_points(ss.regions, out.polities, params, step_years);
                 out.industry_points_from_scale += pr.credited;
                 out.industry_points_refused    += pr.refused;
+
+                // ---- BL-1099: WORKS CHARTERED, A RECORD-ONLY NOTE ------------
+                //
+                // INDUSTRIALISATION.md sec Beat 1 "Works chartered" (Ben,
+                // 2026-09-24, R15). After the year's accrual and before the
+                // upkeep, every region with centres is read against the
+                // RUNNING charter price -- the world's stock so far over the
+                // charter divisor, the same arithmetic the close prices by
+                // (`charter_running_price`), never a constant and never the
+                // 1960 price applied backwards (NR-907) -- and a note fires for
+                // each multiple of `works_event_fraction_q` per mille of that
+                // price the region's points have crossed, up to
+                // `works_event_region_cap` in the span. The k-th note is what
+                // the close pairs the region's k-th real charter with.
+                //
+                // NOTHING MOVES: no point is debited (a Works sink is Beat 1's
+                // own force, and a note is not a sink), the counter is the
+                // loop's, and the note goes through `note_event`, which the
+                // playback switch gates -- so a suppressed run, or one with
+                // the fraction at 0, is bit-identical on every other output.
+                // Read AFTER the accrual so this year's credit can cross, and
+                // only when the accrual itself ran (its own rejection above
+                // leaves the stock unmoved, and an unmoved stock crosses
+                // nothing new). A fraction outside its domain notes nothing
+                // for the whole run and says so -- rejected, never clamped.
+                if (params.record_playback && params.works_event_fraction_q != 0)
+                {
+                    if (!works_event_params_valid(params))
+                    {
+                        out.works_event_params_rejected = true;
+                    }
+                    else
+                    {
+                        // The stock so far: every region's points, the ones
+                        // no centre will take included ("the world's whole
+                        // industry stockpile"). Each is inside
+                        // [0, industry_points_ceiling] (the accrual refuses a
+                        // credit past it), and a sum past 2^62 -- the close's
+                        // own refusal bound -- prices nothing this year.
+                        constexpr int64_t total_max = 1LL << 62;
+                        int64_t total = 0;
+                        bool    priced = true;
+                        for (const region& r : ss.regions)
+                        {
+                            if (r.industry_points < 0 || r.industry_points > total_max - total)
+                            {
+                                priced = false;
+                                break;
+                            }
+                            total += r.industry_points;
+                        }
+                        if (priced)
+                        {
+                            const int64_t price = charter_running_price(total);
+                            // f per mille of the price, split so the product
+                            // stays inside int64 at the domain's ceiling
+                            // (price <= 2^62 / 650, f <= 10^6), and never
+                            // below one point -- a price of 1 at f = 1 is a
+                            // threshold of 1, as the close's floor is.
+                            const int64_t f    = params.works_event_fraction_q;
+                            const int64_t step = std::max<int64_t>(
+                                1, (price / 1000) * f + ((price % 1000) * f) / 1000);
+                            if (works_noted.size() < ss.regions.size())
+                                works_noted.resize(ss.regions.size(), 0);
+                            for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
+                            {
+                                const region& r = ss.regions[ri];
+                                if (r.centres <= 0) continue; // only ground that stands centres charters works
+                                uint8_t& k = works_noted[ri];
+                                // pts >= (k + 1) * step, written as a division
+                                // so the product can never overflow.
+                                while (k < works_event_region_cap
+                                       && r.industry_points / step >= static_cast<int64_t>(k) + 1)
+                                {
+                                    // `other` = the focus a firm chartered here
+                                    // takes: the same derivation the charter
+                                    // walk makes for a specialist, against the
+                                    // median as it stands (0 on a generated
+                                    // world, where no region lights).
+                                    note_event(lapse_event_kind::works_chartered, static_cast<int>(ri),
+                                               r.nation,
+                                               static_cast<int>(focus_from_region(r, ss.median_industrial_year)));
+                                    ++out.works_chartered_noted;
+                                    ++k;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -7262,6 +7357,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     q.industrial_year = y;
                     ++out.polities_industrialised;
+                    // BL-1100: THE REALM'S CROSSING, on the record the round
+                    // plays (INDUSTRIALISATION.md sec Beat 1 "The span's
+                    // industrial moment is the polity's crossing"; Ben,
+                    // 2026-09-24, R16). Its own kind, at the capital as it
+                    // stands this year -- the region furnaces below never
+                    // light on a generated world, so this is the one
+                    // industrial moment round 6 can narrate. Event layer
+                    // only, gated by `note_event`'s playback switch: read by
+                    // nothing here, in no digest.
+                    note_event(lapse_event_kind::rung_crossed, q.capital, q.id, -1);
+                    if (params.record_playback) ++out.rung_crossings_noted;
                 }
 
                 if (q.industrial_year != k_never_industrialised)
@@ -8957,6 +9063,11 @@ bool industry_points_params_valid(const history_sim_params& p)
         && p.industry_points_per_treasury_unit >= 1 && p.industry_points_per_treasury_unit <= 10000
         && p.industry_points_fuel_floor_q     >= 0 && p.industry_points_fuel_floor_q     <= 1000
         && p.industry_points_treasury_share_q >= 0 && p.industry_points_treasury_share_q <= 1000;
+}
+
+bool works_event_params_valid(const history_sim_params& p)
+{
+    return p.works_event_fraction_q >= 0 && p.works_event_fraction_q <= 1000000;
 }
 
 int industry_fuel_reading_q(const region& r)

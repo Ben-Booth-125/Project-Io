@@ -625,9 +625,12 @@ void w_body_entry(std::ostream& o, const generation_report::body_entry& b)
     w_timelapse(o, b.prehistory_timelapse); // save_game_version 3 (NR-733)
     w_timelapse(o, b.exploration_timelapse); // save_game_version 14 (BL-946)
     w_timelapse(o, b.industrialisation_timelapse); // save_game_version 18 (BL-1068)
+    // save_game_version 22 (BL-1104, the Culture round's own record) -- keep
+    // r_body_entry in step. The fourth time-lapse, BEFORE BL-1089's arrays.
+    w_timelapse(o, b.migration_timelapse);
     // save_game_version 22 (BL-1089, the polity fold's record) -- keep
-    // r_body_entry in step. Five flat arrays; the reader checks the flattened
-    // absorbed ranges against what it read.
+    // r_body_entry in step. Five flat arrays after the four time-lapses; the
+    // reader checks the flattened absorbed ranges against what it read.
     w_vec(o, b.nation_ids,            [](std::ostream& s, const entity_id& v) { w_id(s, v); });
     w_vec(o, b.nation_polity,         [](std::ostream& s, const int32_t& v)   { w_i32(s, v); });
     w_vec(o, b.nation_absorbed_first, [](std::ostream& s, const int32_t& v)   { w_i32(s, v); });
@@ -645,7 +648,8 @@ bool r_body_entry(std::istream& i, generation_report::body_entry& b)
         && r_bool(i, b.tiles.used_convergent)
         && r_timelapse(i, b.prehistory_timelapse) // save_game_version 3 (NR-733)
         && r_timelapse(i, b.exploration_timelapse) // save_game_version 14 (BL-946)
-        && r_timelapse(i, b.industrialisation_timelapse))) // save_game_version 18 (BL-1068)
+        && r_timelapse(i, b.industrialisation_timelapse) // save_game_version 18 (BL-1068)
+        && r_timelapse(i, b.migration_timelapse))) // save_game_version 22 (BL-1104) -- keep w_body_entry in step: the fourth time-lapse, before BL-1089's arrays
         return false;
     // save_game_version 22 (BL-1089) -- keep w_body_entry in step. The four
     // per-nation arrays must agree in length, and every absorbed range must

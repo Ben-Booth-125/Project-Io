@@ -213,10 +213,20 @@ inline constexpr uint32_t save_game_magic =
 ///   - EVENT KINDS appended to `lapse_event_kind` (each moves `count` and so
 ///     the event-kind range check; no field changes width):
 ///     `province_bought` (BL-1096, a native bought rather than taken),
-///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier) and
+///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier),
 ///     `inherited` (BL-1088, a resumed span restating a living realm at its
 ///     capital, ticker-silent; replaces the `founded` re-emit on the resume
-///     path only); later sprint-47 lanes append theirs under this same number.
+///     path only; kind 20), `works_chartered` (BL-1099, a region's industry
+///     points crossing the next multiple of a fraction of the running charter
+///     price; kind 21) and `rung_crossed` (BL-1100, a polity's materials
+///     capacity reaching the Industrial rung, at its capital; kind 22); later
+///     sprint-47 lanes append theirs under this same number.
+///   - THE CULTURE ROUND'S OWN RECORD ON EVERY BODY ENTRY (BL-1104):
+///     `generation_report::body_entry::migration_timelapse`, a fourth
+///     `w_timelapse` record straight after `industrialisation_timelapse` and
+///     BEFORE the polity fold's arrays below, folded on every full build so the
+///     adopted world keeps its migration past (empty on any body but the
+///     cradle). Record-only: read by nothing at world setup.
 ///   - THE NAME TABLES AT THE TAIL OF EVERY TIME-LAPSE RECORD, in this order,
 ///     written by `w_timelapse` after the event list in all three records and
 ///     read back in the same place by `r_timelapse`:
@@ -228,7 +238,7 @@ inline constexpr uint32_t save_game_magic =
 ///       2. `era_timelapse::polity_name` (BL-1088, the realm name table): one
 ///          string per polity id.
 ///   - THE POLITY FOLD'S RECORD on every `generation_report::body_entry`
-///     (BL-1089): five flat arrays after the three time-lapses — nation ids,
+///     (BL-1089): five flat arrays after the four time-lapses — nation ids,
 ///     each nation's founding realm, and the absorbed-realm ranges — read by
 ///     the seat card and the per-world nation -> colour table.
 /// A v21 stream is refused whole on the same strict-equality contract.

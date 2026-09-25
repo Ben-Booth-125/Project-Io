@@ -27,13 +27,17 @@
 
 #include <imgui.h>
 
+#include "ui/history_lapse.hpp"   // lapse_year_label, for the briefing's origin sentence (BL-1099)
 #include "ui/icons.hpp"
 #include "ui/market_ledger.hpp"   // market_city_name
 #include "ui/presentation.hpp"
 #include "world/budget_system.hpp" // k_debt_interest_per_quarter, for the briefing's debt line
+#include "world/era_timelapse.hpp" // owner_slice_at / owner_none -- the origin sentence's realm (BL-1099)
 #include "world/logistics.hpp"     // body_tile_grid
+#include "world/polity_identity.hpp" // polity_seat_region -- the origin sentence's seat fallback (BL-1088's rule)
 #include "world/market_clearing.hpp"
 #include "world/sentiment.hpp"
+#include "world/settlement.hpp"    // settlement_state::regions -- the origin region's name (BL-1099)
 
 #include <algorithm>
 #include <array>
@@ -86,6 +90,98 @@ struct firm_goods
     std::array<bool, resource_count> draws{};
     int works = 0;
 };
+
+/// BL-1099 / R22 -- THE ORIGIN SENTENCE (STARTUP.md § The seat; Ben,
+/// 2026-09-24): "Chartered from <city>'s industry, in <region>, under
+/// <nation>, the realm of <X> since <year>". Read from the firm's own
+/// `founded_year` and `origin_region` and from the record's owner slice at
+/// that year (`owner_slice_at`) -- never from the charter report. The region
+/// is the settlement record's; the realm is the polity holding that region at
+/// the founding year on whichever of the cradle's records spans it (the
+/// Industrialisation span first, the two before it if the year falls
+/// earlier), NAMED AS THE BOARD AND THE TICKER NAME IT (BL-1088,
+/// CIVILISATION.md § A realm's name): by the record's coined `polity_name`,
+/// carried by id, and only where the tongue could not coin, by its seat
+/// (`polity_seat_region`) -- the rule `polity_name_of` applies on the round,
+/// so one realm reads as one name on the board, the ticker and this line.
+/// "since" is the year that realm took the region on that record. A firm
+/// with no origin (none the search chartered) gets no sentence; a firm whose
+/// year no record spans, or whose ground no realm held, keeps the sentence
+/// short of the realm clause rather than inventing one.
+std::string seat_origin_sentence(const world& w, const generation_report& rep,
+                                 const corporation_component& cc, const std::string& city,
+                                 const nation_component* nat)
+{
+    const settlement_state* ss = w.gen_settlement.get();
+    if (ss == nullptr || cc.origin_region < 0
+        || static_cast<std::size_t>(cc.origin_region) >= ss->regions.size())
+        return {};
+    const std::string& region = ss->regions[static_cast<std::size_t>(cc.origin_region)].name;
+
+    // The record whose span holds the year: the cradle's, latest first.
+    const era_timelapse* rec = nullptr;
+    for (const generation_report::body_entry& be : rep.bodies)
+    {
+        for (const era_timelapse* t : {&be.industrialisation_timelapse, &be.exploration_timelapse,
+                                       &be.prehistory_timelapse})
+        {
+            if (t->changes.empty()) continue;
+            if (cc.founded_year >= t->start_year && cc.founded_year <= t->start_year + t->years)
+            {
+                rec = t;
+                break;
+            }
+        }
+        if (rec != nullptr) break;
+    }
+
+    // The holder of the origin region at the year -- the record's own slice,
+    // the fold every reader of a record uses -- and the year it took it: the
+    // last change of that region's owner at or before the year. A region held
+    // from before the record opens changes AT its opening, so "since" floors
+    // at the record's start year (NR-939).
+    std::string realm;
+    int32_t     since = 0;
+    if (rec != nullptr)
+    {
+        const std::size_t           origin = static_cast<std::size_t>(cc.origin_region);
+        const std::vector<uint16_t> slice  = owner_slice_at(*rec, cc.founded_year);
+        const uint16_t              owner  = origin < slice.size() ? slice[origin] : owner_none;
+        if (owner != owner_none)
+        {
+            uint16_t prev = owner_none;
+            for (const owner_change& ch : rec->changes)
+            {
+                if (ch.year > cc.founded_year) break; // ascending by year
+                if (ch.region != origin) continue;
+                if (ch.owner != prev) since = ch.year;
+                prev = ch.owner;
+            }
+            if (owner < rec->polity_name.size() && !rec->polity_name[owner].empty())
+                realm = rec->polity_name[owner];
+            else
+            {
+                const std::vector<int32_t> seat = polity_seat_region(*rec, polity_first_region(*rec));
+                if (owner < seat.size() && seat[owner] >= 0
+                    && static_cast<std::size_t>(seat[owner]) < ss->regions.size())
+                    realm = ss->regions[static_cast<std::size_t>(seat[owner])].name;
+            }
+        }
+    }
+
+    std::string s = "Chartered from " + city + "'s industry, in " + region;
+    if (nat != nullptr) s += ", under " + nat->name;
+    // An UNDATED firm (`founded_year` 0: an origin the walk stamped, a year no
+    // finish dated -- a fixture, or a save from before the pairing) keeps the
+    // sentence short of any year: year 0 falls inside the Empires record's
+    // span, and reading a realm off it would name a realm the firm never knew.
+    if (cc.founded_year != 0 && !realm.empty())
+        s += ", the realm of " + realm + " since " + ui::lapse_year_label(since);
+    else if (cc.founded_year != 0)
+        s += ", in " + ui::lapse_year_label(cc.founded_year);
+    s += ".";
+    return s;
+}
 
 firm_goods goods_of(const world& w, const recipe_registry& reg, const corporation_component& cc)
 {
@@ -648,6 +744,11 @@ void app::draw_seat_screen()
                         static_cast<double>(read.access), static_cast<double>(read.trust));
         else
             ImGui::TextUnformatted("You trade under no nation's law.");
+        // BL-1099 / R22: one sentence of origin, from the firm's own fields and
+        // the record's owner slice -- the whole of the history the seat carries.
+        if (const std::string origin = seat_origin_sentence(m_world, m_generation_report, *scc, city, nat);
+            !origin.empty())
+            ImGui::TextUnformatted(origin.c_str());
         if (!sc.shortlisted)
         {
             ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::pinned);

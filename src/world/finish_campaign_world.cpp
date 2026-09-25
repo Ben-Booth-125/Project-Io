@@ -152,6 +152,24 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     out.search    = search_landscape(w, reg, sp);
     apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true,
                               &out.stockpile.budget, out.spend, &out.charter);
+    // BL-1099: THE CHARTERS ARE DATED against the Industrialisation record --
+    // the cradle's own, the one body the span ran for (every other entry is
+    // empty, and an empty record dates every firm at the epoch). Once, on the
+    // winner's report, after its apply: the walk stamps origins, this stamps
+    // years (`date_chartered_firms`). Read-only on the report; nothing here
+    // feeds the search, the settle or a digest.
+    {
+        const std::vector<lapse_event>* events = nullptr;
+        for (const generation_report::body_entry& be : report.bodies)
+            if (!be.industrialisation_timelapse.events.empty())
+            {
+                events = &be.industrialisation_timelapse.events;
+                break;
+            }
+        static const std::vector<lapse_event> none;
+        date_chartered_firms(w, out.charter, events ? *events : none,
+                             static_cast<int32_t>(params.epoch_year));
+    }
     if (out.stockpile.points_total != 0 || out.stockpile.rejected)
     {
         const stockpile_budget& sb = out.stockpile;

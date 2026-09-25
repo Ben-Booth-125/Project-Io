@@ -218,6 +218,24 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                                const struct settlement_state* settle,
                                                charter_spend_report* report = nullptr);
 
+struct lapse_event;
+
+/// BL-1099 — DATE THE CHARTERS AGAINST THE RECORD (CORPORATION_GENERATION.md
+/// § The spawn shortlist; INDUSTRIALISATION.md § Beat 1 "Works chartered").
+/// The walk above stamps each firm's `origin_region` but cannot see the
+/// Industrialisation record; this pass, run once on the winner's report by
+/// `finish_campaign_world`, gives every charter in @p report its year: a
+/// region's k-th charter (in the report's own spend order, richest centre
+/// first) takes the year of the region's k-th `works_chartered` note in
+/// @p events; past the notes, the region's first `furnace_lit` year; never
+/// lit, @p epoch_year. Written onto the firm (`corporation_component::
+/// founded_year`) and onto the report row (`charter_record::founded_year`)
+/// alike. Pure over its inputs and order-independent: the maps it builds are
+/// read by key only. A firm the report names that the world no longer holds
+/// is skipped; a firm with no origin opens at the epoch.
+void date_chartered_firms(world& w, charter_spend_report& report,
+                          const std::vector<lapse_event>& events, int32_t epoch_year);
+
 /// BL-1060 — the refusal a spend's params cannot decide alone: under
 /// `sqrt_capital`, a density ceiling that BINDS on some budgeted body and yet
 /// leaves under one firm per turn good once the yards' places come off it, so

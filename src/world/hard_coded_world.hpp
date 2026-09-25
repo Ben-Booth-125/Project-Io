@@ -742,6 +742,22 @@ struct generation_report
         /// same build).
         era_timelapse industrialisation_timelapse;
 
+        /// THE CULTURE ROUND'S OWN RECORD (BL-1104; Ben, 2026-09-24, R21;
+        /// STARTUP.md § Round 3) -- the migration's replay, folded by
+        /// `build_migration_timelapse` from the settled map BEFORE the Empires
+        /// sim runs, on EVERY run of the cradle: the wizard's stop-after-
+        /// migration build (where it is also what `prehistory_timelapse`
+        /// carries, since no Empires record exists to overwrite it) and the
+        /// full build alike, so the adopted world and its save keep the
+        /// migration past that `prehistory_timelapse` loses to the Empires
+        /// record. Same shape and discipline as the three above: recorded at
+        /// the one site that ran the fold, never re-simulated, read by nothing
+        /// at world setup (a watched and an unwatched build are the same
+        /// build). Empty on any body but the cradle. Serialised straight after
+        /// `industrialisation_timelapse`, before the polity fold's arrays
+        /// below (save_game_version 22).
+        era_timelapse migration_timelapse;
+
         /// BL-1089 — WHAT THE POLITY FOLD DID (NATION_GENERATION.md § Pass 2d),
         /// per nation, parallel to `nation_ids`: the polity id of the realm
         /// each nation IS (its fold representative's, -1 for ownerless

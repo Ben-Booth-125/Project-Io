@@ -597,6 +597,42 @@ struct history_sim_params
     /// is not starved; a quarter is paid into the works.
     int     industry_points_treasury_share_q = 250;
 
+    /// BL-1099 -- WORKS CHARTERED, A RECORD-ONLY NOTE (INDUSTRIALISATION.md sec
+    /// Beat 1 "Works chartered"; Ben, 2026-09-24, R15; STARTUP.md sec Round 6).
+    /// After each round's accrual, a region with centres whose `industry_points`
+    /// have crossed the next multiple of THIS fraction (per mille) of the
+    /// RUNNING charter price -- the world's stock so far over
+    /// `k_stockpile_price_divisor` (`charter_running_price`, the arithmetic the
+    /// close prices by) -- gets a `works_chartered` event, at most
+    /// `works_event_region_cap` per region per span, from a counter local to
+    /// the year loop (never a region field). It fires on the same switches
+    /// that let the span record points at all: `industry_points_enabled` from
+    /// `industry_open_year`, and `record_playback` (as every note). NO POINT IS
+    /// DEBITED and nothing in the sim reads the note back, so a run with this
+    /// at 0 is bit-identical on every other output. Domain 0-1000000 (a
+    /// thousand times the price, so a fraction can be read far past 1 before
+    /// it is pinned); 0 disables; outside the domain the whole run notes
+    /// nothing and says so (`history_sim_state::works_event_params_rejected`)
+    /// -- rejected, never clamped.
+    ///
+    /// PINNED AT 2000 (f = 2), READ OFF THE LIBRARY (industrialisation_sim_harness
+    /// --through 1960 --works-fractions 0,2000,4000,8000,16000,32000,64000, 16
+    /// curated seeds, 2026-09-25). The notes exist to DATE the real charters
+    /// (`date_chartered_firms`: a region's k-th charter takes its k-th note),
+    /// so the reading is notes against charters dated in-span, not notes
+    /// against charters alone: f = 1 noted 8798 works against 1297 charters
+    /// and dated 938 of them (72%; the cap of four per region binds where one
+    /// region charters many firms); f = 2 kept 894 of those (95%) at 3233
+    /// notes; f = 4 brought the notes level with the charters (1087) but dated
+    /// only 554 (43%); f = 8, 332 notes, 220 dated. Two is the largest
+    /// fraction that still dates nearly every charter f = 1 dates, at a third
+    /// of the flashes. The f = 0 control re-run closed EQUAL region for region
+    /// on every seed; the count was monotone in f and bounded on every seed.
+    /// The notes cluster in the span's first century (the running price is
+    /// tiny at the open, so a region crosses its four multiples early) -- a
+    /// consequence of the running-price rule, raised as NR-940.
+    int     works_event_fraction_q = 2000;
+
     /// DEFAULT A (RULED, Ben 2026-09-18, wave 1 form). A region the span FOUNDS
     /// after its open has no survey of its own (the sim has no tiles); with
     /// this on it inherits its parent's `survey_fuel_q` at the same x0.7
@@ -3201,6 +3237,21 @@ inline constexpr int     industry_points_step_years_max  = 1000;
 /// (`history_sim_state::industry_points_params_rejected`), never clamps.
 bool industry_points_params_valid(const history_sim_params& p);
 
+/// BL-1099: the most `works_chartered` notes one region takes in one span.
+/// A CAP, not a rate: the k-th note is what the close pairs a region's k-th
+/// real charter with (CORPORATION_GENERATION.md sec The spawn shortlist), and a
+/// region that charters more firms than it has notes dates the rest by its
+/// furnace year or the epoch. Four: the province cap on charters is 2
+/// (NR-910), so a region's real firms rarely reach it, and a region that has
+/// crossed four prices in a span has told its story.
+inline constexpr int works_event_region_cap = 4;
+
+/// Is `works_event_fraction_q` inside its stated domain (0-1000000)? False
+/// REJECTS every works note of the run
+/// (`history_sim_state::works_event_params_rejected`), never clamps; the
+/// accrual itself is untouched either way.
+bool works_event_params_valid(const history_sim_params& p);
+
 /// The FUEL READING of one region, 0-1000 (500 = the world's mean region):
 /// its span-open survey (`survey_fuel_q`, inherited at a founding under
 /// DEFAULT A) where it has one, else its `energy_q` -- the settlement pass's
@@ -4206,6 +4257,16 @@ struct history_sim_state
     /// (`industry_points_params_valid`): the WHOLE run then credits nothing
     /// and debits no treasury -- rejected, never clamped.
     bool    industry_points_params_rejected = false;
+    /// BL-1099: true when `works_event_fraction_q` left its domain
+    /// (`works_event_params_valid`): the run then notes no works at all.
+    /// Report-only, like the flag above; in no digest.
+    bool    works_event_params_rejected = false;
+    /// BL-1099 / BL-1100: the notes this call wrote -- `works_chartered`
+    /// events, and `rung_crossed` events (a polity reaching the Industrial
+    /// materials rung). REPORT ONLY: read by the harness's per-seed line and
+    /// by nothing in the sim; never serialised, in no digest.
+    int64_t works_chartered_noted = 0;
+    int64_t rung_crossings_noted  = 0;
 
     /// BL-955: stock steps bought this run, by kind — with the allocation a
     /// polity buys at most one per round, so these count CHOICES made.
