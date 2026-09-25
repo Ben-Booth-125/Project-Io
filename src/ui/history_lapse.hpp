@@ -247,11 +247,16 @@ struct lapse_lane_seg
 /// first founding, its parent's most recent region (the `culture_split`
 /// parent) -- to the new one, anchor centre to anchor centre in TILE units,
 /// the pane scale applied at draw time like every other baked layer here.
-/// Dashed where `lapse_corridor_over_water` says the line crosses water: the
-/// crude hop, at region grain. The arrow is honest about its grain -- it says
-/// a people was there and is now here, never which shore they walked; the hop
-/// record that could say so is BL-1093's. Drawn from `year` and fading over
-/// the marker windows after it; a cradle's own first region has no arrow.
+/// Dashed where the straight line between the anchors crosses water -- the
+/// crude hop, at region grain -- as `finish_history_lapse`'s own `crosses_water`
+/// sampler reads it: tile by tile along the line, dashed from
+/// `k_kin_dash_water_tiles` (two) interior water tiles up. NOT
+/// `lapse_corridor_over_water`'s majority rule, which is built for a caravan's
+/// mostly-dry corridor and reads a strait as land; the threshold itself is an
+/// open call (NR-942). The arrow is honest about its grain -- it says a people
+/// was there and is now here, never which shore they walked; the hop record
+/// that could say so is BL-1093's. Drawn from `year` and fading over the
+/// marker windows after it; a cradle's own first region has no arrow.
 struct lapse_kin_seg
 {
     uint16_t region_from = 0;

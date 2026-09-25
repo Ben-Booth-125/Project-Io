@@ -84,11 +84,19 @@ for _, line in ipairs(rows) do
     if string.find(line, "begin at", 1, true) then named = named + 1 end
 end
 verify.expect(#rows > 0, "the ticker has lines at the first year")
--- The cradles take the rarest tier, so they fill the rows before any
--- same-year split can; with fewer cradles than rows the rest may be splits.
-verify.expect(named == math.min(#rows, cradles),
+-- A cradle takes the COMMON tier (history_lapse.cpp ticker_priority, BL-1091),
+-- the same tier as a `culture_split`, and lapse_ticker_rows walks a tier
+-- newest-first -- so a split dated the same first year can displace a cradle
+-- line. The honest bound counts those splits (every split at `first`, folded
+-- or not: the ticker drops the folded ones, so this over-counts and the bound
+-- stays a floor). On the reference world no split lands at 2400 BCE, so the
+-- floor is min(#rows, cradles) and every row is a cradle.
+local KIND_SPLIT = 8
+local same_year_splits = verify.history_event_count(KIND_SPLIT, first)
+verify.expect(named >= math.min(#rows - same_year_splits, cradles),
               "the ticker's first lines are the cradle announcements (" .. named
-              .. " of " .. #rows .. ", " .. cradles .. " cradles)")
+              .. " of " .. #rows .. ", " .. cradles .. " cradles, "
+              .. same_year_splits .. " same-year splits)")
 -- The package follows the seat as a colon-led list ("...: floodplain, coast
 -- and 3 more."); the colon is the tell that the line carries one.
 local with_package = 0
