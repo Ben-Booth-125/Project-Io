@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*40 entries — 19 open, 21 resolved.*
+*41 entries — 20 open, 21 resolved.*
 
 ---
 
@@ -287,6 +287,21 @@ Next on a lapse round launches the next round's worker whether or not the curren
 > **Recommendation:** Fold into BL-1084: with one world moved forward, round N+1 cannot start before round N lands anyway.
 
 *Files: `src/ui/startup_screens.cpp`*
+
+### NR-937 — CALL: does a hard realm's COAST draw heavy too, and is 10% of people (off at 6%) the right pin for a hard border?
+*question · raised 2026-09-25 · from BL-1090 lane I2 (hard borders by people share) and its cold review, 2026-09-25*
+
+The pin was measured over the 16 curated seeds at every recorded Empires step (87,900 polity-steps): top people shares peak 8-17%; 20%+ bolds nothing anywhere, 15% one realm on one world, 10% bolds one to six realms on six of sixteen worlds at 1000 CE (46:1, 28:6, 40:2, 25:1, 38:3, 0:1) and none on the city-state worlds; hysteresis on at 10% / off at 6% (no observed single-step dip deeper than 3.9 points). The doc's "any edge either side of which is hard" is read literally, so a hard realm's coastline draws the 2 px dark + own-colour inner stroke as well as its land frontiers.
+
+**Why it matters.** Both are what the player sees on round 4: how many realms read as great powers (a third of worlds show any; the median world shows none at 1000 CE), and whether a coastal empire's outline is heavy at sea.
+
+- A: keep 10/6 and the heavy coast (built)
+- B: keep 10/6, heavy inter-realm edges only (one-line condition in each frontier pass)
+- C: a rarer pin (15%: one realm on one world) or a commoner one (7%) — the sweep column reports any candidate
+
+> **Recommendation:** B: the coast is not a frontier, and the pin as measured is honest. Take at the live click with the crop.
+
+*Files: `src/ui/history_lapse.hpp`, `src/ui/history_lapse.cpp`, `tools/verify/history_sweep.cpp`*
 
 ---
 
