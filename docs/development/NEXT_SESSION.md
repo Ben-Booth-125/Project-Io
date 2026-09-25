@@ -165,6 +165,11 @@ the decision on BL-1084 (the world built once and moved) -- unstarted, the sprin
 and a done-when clause -- build it now or carry it to sprint 48. Wave 3 (BL-1086, BL-1098,
 BL-1107) is unstarted stretch. Local main is not pushed.
 
+**THE CLOSE FORM (Ben, 2026-09-25):** BL-1084 and wave 3 carried to sprint 48; twelve calls ruled
+(`drafts/sprint-47-rulings.md` § F). Sprint 47 now closes on: the four close-form tasks in
+`REFINED.md` (C1 Culture reroll removed, C2 frontiers only, C3 origin sentence, C4 settle progress
+tap), then Ben's live clicks. BL-1114..BL-1117 are filed, not sprinted. Pushed after this commit.
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936

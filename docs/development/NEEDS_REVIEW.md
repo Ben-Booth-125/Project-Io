@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*47 entries — 26 open, 21 resolved.*
+*47 entries — 13 open, 34 resolved.*
 
 ---
 
@@ -53,36 +53,6 @@ On the form Ben answered Scope with "presentation plus record-only kinds and fie
 **Why it matters.** Fixes the digest and re-bless budget for the whole sprint; if Ben meant the general answer to exclude any of the five, that item comes out before it is built.
 
 > **Recommendation:** Confirm, or name the exception to withdraw.
-
-### NR-920 — CALL: what --epoch 0 means once the recipe band is derived from the history, and whether the ancient-roster sandbox keeps an explicit --band override
-*question · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-Ben ruled the band comes from the history's industry state (BL-1101). The epoch then names the calendar only. Today --epoch 0 also selected the ancient roster through industrial_band_from_year; era_roster.cpp and INDUSTRIALISATION.md § The boundary (the epoch and the band) (ruled 2026-09-24) describe that sandbox.
-
-**Why it matters.** Every harness and the seed library run with an epoch; a derived band can also come out ancient on a seed whose history never crossed the rung, which is a different thing from asking for the ancient roster.
-
-- A: calendar only — same world, same derived band, dated 0 CE
-- B: calendar plus an explicit --band ancient|industrial override kept for the sandbox
-- C: retire epoch 0
-
-> **Recommendation:** B, if the sandbox is still wanted; A otherwise. Either way INDUSTRIALISATION.md § The boundary (the epoch and the band) is rewritten.
-
-*Files: `src/world/era_band.hpp`, `src/core/app.hpp`, `docs/generation/INDUSTRIALISATION.md`*
-
-### NR-921 — CALL: switch sea legs on for the Exploration and Industrialisation spans — today they run with sea_legs_ration_q = 0, so wet campaigns starve and the port bonus is dead code in the spans EXPLORATION.md owns
-*question · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
-
-While reading the sea-lane tier (BL-1097): exploration_sim_params leaves sea_legs_ration_q at 0 and amphibious_weight_crossing false (era_minus_one.cpp:328-375; asserted by industrialisation_sim_harness.cpp:1271-1274, BL-1053's EMPIRES_ONLY), so the only code applying the port/navy crossing bonus (history_sim.cpp:4419-4451) never runs in these spans and EXPLORATION.md:383-395 ("the port is why the skirmish is cheap") describes a force that is off. A lane tier earned by traffic from wet campaigns alone would stamp almost nothing; the tribute-round metropole→subject leg is what carries the record.
-
-**Why it matters.** Turning sea legs on is a sim beat that moves displacement (the phase's one structural reading) and every pin; it is not folded into BL-1097.
-
-- A: leave them off; the tribute-round leg carries the lane record
-- B: turn them on for the later spans as its own item with a re-bless, and re-read displacement
-- C: amend EXPLORATION.md:383-395 to say the port bonus applies only where sea legs run
-
-> **Recommendation:** A now with C's clarification; B as a filed item once BL-1096/1097 have been read on the 16 seeds.
-
-*Files: `src/world/era_minus_one.cpp`, `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
 
 ### NR-922 — NOVEL WORK: seven new record kinds, two series fields and a name table widen the lapse record's scope
 *novel-work · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
@@ -202,36 +172,6 @@ Ben: build the purchase verb this sprint. Taken: buy when the native seat is coa
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
 
-### NR-931 — CALL: what does the Culture round's reroll re-roll, when the migration walk is seed-free by design?
-*question · raised 2026-09-24 · from BL-1083 lane G (span seeds), its harness span_seed_isolation row S0 and the cold review, 2026-09-24*
-
-span_seed[0] is folded into run_settlement's seed as ruled, but the migration record is byte-identical under any value of it (span_seed_isolation: migration digest A00A5876639F4D94 with slot 0 at 0 and at 1) while the Empires, Exploration and Industrialisation records all change. The reason is design, not a defect: the colonisation walk consumes no randomness — where people go is a deterministic consequence of the ground (COLONISATION.md § No actor, and no infrastructure; memory: consequences, not simulation). What the seed reaches is derive_daughter_culture (tongue drift, coined names, aggression_q) and the furnace lag. So a round-3 reroll re-coins the peoples and forks every later age while the ownership map stays identical. STARTUP.md § Each pass round is rerollable now says so and names this call.
-
-**Why it matters.** The item's headline half — "the Culture round can reroll at all" — is not delivered as written, and Ben ruled rerolls are per stage. Either the round's reroll means labels only, or the walk takes dice (against Ben's own principle), or the Culture round carries no reroll and rejecting a migration is the Life round's reroll (the world's).
-
-- A: accept — a Culture reroll re-coins the peoples (names, tongues, temper) and forks later ages; the doc says so (already written)
-- B: give the walk a seeded roll (a design change to COLONISATION.md and a re-bless; contradicts "consequences not simulation")
-- C: remove the Culture round's Reroll; the migration is the world's consequence and the Life round's reroll is how a player rejects it; span_seed[0] stays folded (zero-neutral) or is dropped
-
-> **Recommendation:** C. A reroll button that moves labels and nothing on the map is a button that lies; the honest control is the Life round's. If Ben wants A, the doc already reads that way.
-
-*Files: `src/ui/startup_screens.cpp`, `docs/ui/STARTUP.md`, `docs/generation/COLONISATION.md`, `tools/verify/span_seed_isolation.cpp`*
-
-### NR-932 — OBSERVATION → CALL: one settle tick is pathological — tick 1 runs 44-62 s of a 69-114 s settle on seed 0
-*question · raised 2026-09-24 · from BL-1085 lane C (Begin retired into round six), gen_step_costs --finish 0 28 in Release, 2026-09-24*
-
-Inside the twelve-tick settle that now runs in round 6's worker, tick 1 costs 44-62 s while the other eleven cost ~1.5 s each (seed 0: settle 113,922 ms, slowest tick 1 56,881 ms; seed 28: 68,832 ms). It was hidden inside the old on-thread validation run. The wait's bar holds still through it because a tick has no progress tap; the round-6 wait grew by ~100 s in total with the search and the settle inside it, as Ben accepted, but most of that is one tick.
-
-**Why it matters.** The longest still in the wizard is now this tick (LONGEST STILL 90.91 s on seed 0), which is the "a wait never looks stopped" rule (BL-1072) failing by construction; and a first tick 30-40x the others is a cost shape NR-915 (the tick tail) may already own.
-
-- A: instrument tick 1 (which phase — the first clearing over cold pools? the first dispatch?) and file the finding under NR-915 / BL-1066's economy work
-- B: give the settle a per-tick progress tap so the bar moves and accept the cost
-- C: both
-
-> **Recommendation:** C: the tap is cheap and honest; the cause is economy work for the economy lane, not this sprint.
-
-*Files: `src/world/campaign_settle.cpp`, `src/world/finish_campaign_world.cpp`*
-
 ### NR-933 — DECISION TAKEN: the purchase constants — rate 2000 per mille of the seller's chest, floor as measured — pinned at the first grid point where the purse, not the coast alone, decides
 *decision taken on your behalf · raised 2026-09-24 · from BL-1096 lane W1 (purchase verb), exploration_sweep over the 16 curated seeds at rates 1000 / 2000 / 4000 per mille, 2026-09-24*
 
@@ -247,62 +187,6 @@ Measured bought/taken splits (bought/taken over the library): 1000‰ → 62/48,
 
 *Files: `src/world/history_sim.hpp`, `tools/verify/exploration_sweep.cpp`*
 
-### NR-934 — OBSERVATION → CALL: the ruled band threshold discriminates nothing on the library — every curated seed reaches materials capacity 6 by 1200 CE, so all 16 derive industrial
-*question · raised 2026-09-24 · from BL-1101 lane W2 (band from history), history_sweep over the 16 curated seeds, 2026-09-24*
-
-The band derives per world as ruled (industrial iff a living polity's materials capacity reaches the industrial rung at the 1960 fold). On all 16 seeds the verdict is industrial, and the rung is already reached by 1200 CE on every one. The ancient-band campaign is reachable by the rule but not observed on the library; nothing was reshaped. Side finding: on seeds 0, 12 and 37 one living polity sits at the rung at the fold without a recorded industrial_year (at-rung exceeds ever-crossed by one) — the band is unaffected; the cause was not chased.
-
-**Why it matters.** Ben asked for the reading before any threshold is fixed. A rule that always says industrial is honest but says nothing; whether that is fine, or the rung should be later (the Industry spire ring, or capacity at 1960 rather than "ever"), is his.
-
-- A: fine — the band is the history's and the library is industrial; keep the rung
-- B: name a later rung (e.g. the Industry spire's second ring) so a quiet world can open ancient
-- C: keep the rung and add the per-nation grain through campaign tech (BL-1109) as planned
-
-> **Recommendation:** A now, C as planned; B only if Ben wants ancient openings to exist on the shipped library.
-
-*Files: `src/world/hard_coded_world.cpp`, `tools/verify/history_sweep.cpp`*
-
-### NR-935 — CALL: the tariff bands (300 / 500 / 700) were authored for the retired furnace scalar; under the derived posture the floor cuts the field near its median
-*question · raised 2026-09-24 · from BL-1102 lane W3 (tariff posture derived), industrialisation_sim_harness over the 16 curated seeds, 2026-09-24*
-
-With protection_q derived from scarcity, flows and preference at the close, the per-seed median posture sits 285-376 against law.hpp's tariff_bands 300/500/700: 61% of nations enact a tariff, 80% of the laws are the 5% band, the 20% band is reached on 3 of 16 worlds. The bands were deliberately not moved (the lane was told to measure, not tune). Every curated seed now writes laws, so all 16 --digest-check pins move at the re-bless. The derivation also runs at the Exploration close (gated on exploration_upkeep_enabled), so a world run with the Industrialisation span switched off would enact the 1660 posture — harmless on the shipped path.
-
-**Why it matters.** Whether "most nations tariff, almost all at 5%" is the intended feel of the 1960 map is a design reading, not a constant.
-
-- A: keep the bands; the reading is the map
-- B: re-author the bands against the new posture distribution (e.g. terciles of the library's postures)
-- C: keep the bands, raise the floor so only the protective third tariffs
-
-> **Recommendation:** B, measured from the library's distribution, in the same re-bless.
-
-*Files: `src/world/law.hpp`, `src/world/history_sim.cpp`*
-
-### NR-936 — OBSERVATION: the wizard's Next press does not wait for the running round, so a fast player can have rounds 3-6 building at once
-*observation · raised 2026-09-24 · from BL-1085 lane C and its cold review, 2026-09-24 (the autostart walk was made player-shaped in the fix round; the press itself was not gated)*
-
-Next on a lapse round launches the next round's worker whether or not the current one has landed; four concurrent world builds plus the surface build is the peak memory now, the memory-pressure shape BL-1078 was filed on. Begin never starts a second build, so the adopt path is safe; the concern is the peak. BL-1084 (the world built once and moved) changes what each worker holds and is the natural place to decide whether Next waits.
-
-**Why it matters.** A note for BL-1084's design, not a defect to fix in isolation.
-
-> **Recommendation:** Fold into BL-1084: with one world moved forward, round N+1 cannot start before round N lands anyway.
-
-*Files: `src/ui/startup_screens.cpp`*
-
-### NR-937 — CALL: does a hard realm's COAST draw heavy too, and is 10% of people (off at 6%) the right pin for a hard border?
-*question · raised 2026-09-25 · from BL-1090 lane I2 (hard borders by people share) and its cold review, 2026-09-25*
-
-The pin was measured over the 16 curated seeds at every recorded Empires step (87,900 polity-steps): top people shares peak 8-17%; 20%+ bolds nothing anywhere, 15% one realm on one world, 10% bolds one to six realms on six of sixteen worlds at 1000 CE (46:1, 28:6, 40:2, 25:1, 38:3, 0:1) and none on the city-state worlds; hysteresis on at 10% / off at 6% (no observed single-step dip deeper than 3.9 points). The doc's "any edge either side of which is hard" is read literally, so a hard realm's coastline draws the 2 px dark + own-colour inner stroke as well as its land frontiers.
-
-**Why it matters.** Both are what the player sees on round 4: how many realms read as great powers (a third of worlds show any; the median world shows none at 1000 CE), and whether a coastal empire's outline is heavy at sea.
-
-- A: keep 10/6 and the heavy coast (built)
-- B: keep 10/6, heavy inter-realm edges only (one-line condition in each frontier pass)
-- C: a rarer pin (15%: one realm on one world) or a commoner one (7%) — the sweep column reports any candidate
-
-> **Recommendation:** B: the coast is not a frontier, and the pin as measured is honest. Take at the live click with the crop.
-
-*Files: `src/ui/history_lapse.hpp`, `src/ui/history_lapse.cpp`, `tools/verify/history_sweep.cpp`*
-
 ### NR-938 — DECISION TAKEN: the pinned-slot clash rule is pinned-vs-pinned (the 2026-09-24 ruling said pinned-vs-fresh, a case the walk never produces)
 *decision taken on your behalf · raised 2026-09-25 · from BL-1087 lane I1 fix round and its cold review, 2026-09-25*
 
@@ -316,83 +200,6 @@ The ruling (R7) said a pinned/fresh adjacency clash re-slots the smaller people-
 > **Recommendation:** A.
 
 *Files: `docs/ui/STARTUP.md`, `src/ui/history_lapse.cpp`*
-
-### NR-939 — CALL: the origin sentence's 'since <year>' reads the one record that spans the founding year, so a realm that held the region across the whole span reads 'since 1660 CE'
-*question · raised 2026-09-25 · from BL-1099 lane F3 (the seat briefing's origin sentence, R22) and its review, 2026-09-25*
-
-seat_origin_sentence reads the holder of the firm's origin region at its founding year off the record whose span holds that year (Industrialisation first, then Exploration, then Empires) and takes 'since' as the year of that record's last owner change of the region at or before the founding year. A region held from before the span opens has its first change AT the span's open, so the sentence reads 'the realm of X since 1660 CE' for most firms (the capture: 'Chartered from Guagua's industry, in Gesher Nehua, under Tuarthuage Thuathe, the realm of Gesher Nehua since 1660 CE'). The three records are separate resumes, but a polity id is ONE TABLE across them -- a resumed span inherits its realms by id and restates their seats as `inherited` rather than coining (CIVILISATION.md sec A realm's name; `hard_walk_record` and the slot inheritance rely on the same fact) -- so a walk back into the earlier records is well-defined; it is simply not what the sentence reads today. The realm is named by the record's coined `polity_name`, as the board and the ticker name it.
-
-**Why it matters.** The sentence is 'the whole of the history the seat carries' (STARTUP.md § The seat); 'since 1660 CE' is the record's opening, not the realm's tenure, and a player who watched round 5 may know the realm took that ground earlier.
-
-- A: accept as built -- 'since' is the year the record the sentence reads from first shows the holder (honest about the record, silent about earlier ones)
-- B: walk back into the earlier records while the same polity id holds the region at their close -- well-defined, since ids carry across the spans; two more slices per briefing, and 'since' then reads as tenure rather than as the record's opening
-- C: drop the year when it equals the record's opening: '...the realm of X' with no 'since'
-
-> **Recommendation:** C at low cost, or A: both are honest about the record the sentence reads. B is the one that makes 'since' mean tenure; whether the sentence should claim tenure is the call.
-
-*Files: `src/ui/seat_screen.cpp`*
-
-### NR-940 — CALL: the works-chartered notes cluster in the span's first century because the RUNNING price is tiny at the open -- is that the moment the round should show?
-*question · raised 2026-09-25 · from BL-1099 lane F3, the 16-seed reading that pinned f = 2 (industrialisation_sim_harness --through 1960 --works-fractions ..., 2026-09-25)*
-
-A note fires when a region's industry points cross the next multiple of f x the running price, the world's stock so far over the charter divisor (R15, self-consistent with the close's price per NR-907). At the span's open the world's stock is near zero, so the price is near zero and a region with any points crosses its four multiples in the first decades: on most seeds the notes run 1660 -> ~1760 (seed 28: 1660 -> 1760 at f = 1; the verify world: 27 of 40 charters dated 1660 -> 1716), and the seat briefing's origin year lands early in the span for nearly every firm. At the pinned f = 2 the library notes 3233 works and dates 894 of 1297 charters; the four-per-region cap is what binds thereafter, not the price.
-
-**Why it matters.** The round is meant to show WHEN the capital that charters a firm was built; a close of works flashing in the 1660s reads as the age's dawn rather than its industrial century, and the briefing's 'since 1660 CE' / early founding years follow from it.
-
-- A: accept -- the early crossings are the honest reading of a price that grows with the stock (built)
-- B: floor the running price at a fraction of the CLOSE's price (needs the 1960 stock, which NR-907 ruled out applying backwards) -- not available without a second pass
-- C: read the region's points against ITS OWN running share (the region's k-th multiple of f x the world's mean stock per region so far), which spreads the crossings across the span; a different rule, Ben's to choose
-- D: keep the rule and space the notes: at most one note per region per N years (a rate on top of the cap), so the k-th note lands later without changing what it measures
-
-> **Recommendation:** A for this sprint; D is the smallest change if the dawn-cluster reads wrong at the live click.
-
-*Files: `src/world/history_sim.hpp`, `src/world/history_sim.cpp`, `tools/verify/industrialisation_sim_harness.cpp`*
-
-### NR-941 — CALL: the origin sentence doubles its name once the nation carries its realm's -- 'under Guashe These, the realm of Guashe These since 1660 CE'
-*question · raised 2026-09-25 · from main session, the F3 merge (BL-1099 origin sentence composed with BL-1088/BL-1089 name inheritance), seat_pick.lua seat_02_briefing.png on the verify world*
-
-R22's form is 'under <nation>, the realm of <X> since <year>', where X is the realm the Empires/Exploration/Industrialisation record shows holding the firm's region in its founding year (owner_slice_at). Since BL-1089 every nation with a founding realm carries that realm's coined name verbatim (38 of 38 on seed 0), and a firm is nearly always chartered on ground its own nation's realm held in 1660, so the two names coincide: the capture reads 'under Guashe These, the realm of Guashe These since 1660 CE'. The clause only earns its place when the holder in the founding year is NOT the realm the nation grew from (ground absorbed since; a purchase; a colony's overlord), which is the minority case.
-
-**Why it matters.** The sentence is the one origin line the briefing carries (R22) and Ben's live click on BL-1099 R5 will read it; the doubled form reads as a bug rather than a fact. The information is still right -- the realm the nation is and the realm that held the ground agree -- it is the wording that has no branch for agreement.
-
-- A: collapse on agreement -- when the founding realm's name equals the nation's, write 'under Guashe These, its own realm since 1660 CE'; keep the full form when they differ (one branch in seat_screen.cpp's origin sentence, STARTUP.md's quoted form gains the second reading)
-- B: keep R22's form verbatim -- the repetition is the fact stated twice and the live click decides
-- C: drop the nation clause when the names agree -- 'in Gesher Nehua, the realm of Guashe These since 1660 CE' (shorter, but loses the word 'under' that says whose law you trade beneath, which the line above already states)
-
-> **Recommendation:** A -- the honest sentence in both cases, one branch, no field. Not applied without the call because the form is Ben's ruling (R22, STARTUP.md § The seat).
-
-*Files: `src/ui/seat_screen.cpp`, `docs/ui/STARTUP.md`, `docs/development/drafts/sprint-47-rulings.md`*
-
-### NR-942 — CALL: the kin arrow's dash threshold -- two interior water tiles, any graze, or the corridor majority rule
-*question · raised 2026-09-25 · from lane F1 fix round (BL-1092 routes and splits on the map), cold review [low] on history_lapse.hpp's lapse_kin_seg comment: the header cited lapse_corridor_over_water for the dash while the kin bake (finish_history_lapse's crosses_water lambda) dashes from two interior water tiles by its own per-tile sampler; the constant is now named k_kin_dash_water_tiles*
-
-COLONISATION.md sec The route record says a kin arrow is 'dashed where the line between the two anchors crosses water'. Three readings of 'crosses' were measured on the same tree, 2026-09-25, on library seed 13 (249 arrows) and seed 0: the road bake's majority rule (lapse_corridor_over_water, eight samples, more than half water) dashes 0 of 249; any single sampled water tile dashes 193 of 249; two interior water tiles (the rule shipped, k_kin_dash_water_tiles = 2) dashes 58 of 249. Seed 0 reads 0 dashed under every rule. The shipped rule was picked in-lane because a crude hop is a bounded crossing of up to three tiles (colonisation_max_hop_tiles) while a coast-hugging people's consecutive foundings graze a bay by one tile almost every time, so any-graze drowned the hops and the majority rule found none; it is a constant nobody ruled on.
-
-**Why it matters.** The dash is the one mark the round-3 map makes of a sea hop, and the threshold decides whether the migration's water-crossings read as 58 arrows, 193, or none. The doc's wording is honest about grain under any of the three; which one it MEANS is a design call, and the constant is named so the call is a one-line change.
-
-- A: keep two interior tiles (k_kin_dash_water_tiles = 2) -- 58 of 249 on seed 13; a graze is not a crossing, a strait is
-- B: any interior water tile -- 193 of 249 on seed 13; every wet founding dashed, the hops indistinguishable from the bay-grazes
-- C: the corridor's majority rule (lapse_corridor_over_water) -- 0 of 249 on seed 13; one sampler for roads and kin, and no hop ever dashes at region grain
-- D: tie the threshold to colonisation_max_hop_tiles rather than a bare 2 -- the hop's own bound as the dash's, so the two move together
-
-> **Recommendation:** A, as shipped -- the only reading of the three under which the hops are visible and the grazes are not; D is the principled form of A if the hop bound ever moves. Not applied beyond naming the constant: the threshold is the design's word 'crosses', which is Ben's.
-
-*Files: `src/ui/history_lapse.cpp`, `src/ui/history_lapse.hpp`, `docs/generation/COLONISATION.md`*
-
-### NR-943 — CALL: should the shipped-path validators range-check every civilisation and creed index at the 1200 and 1660 crossings, now that BL-1049 closed the gap?
-*question · raised 2026-09-25 · from lane BL-1049's report and its cold review (2026-09-25): pass_one_output_valid does not range-check the two new tables, and the 1200 path calls make_exploration_output without a `from`, so the prefix check that guards the 1660 crossing never runs at 1200; the fidelity harness is the only check on the 1200 crossing*
-
-The harness gate (industrialisation_sim_harness --fidelity, the BL-1049 section) now fails on any index past the table, any pair recorded twice, or a carried prefix short of the 1200 table, on 16/16 library seeds. The shipped path itself would still accept a regressed resume silently: a region::civilisation or universal_creed index at or past its table resolves to nothing and nothing crashes. Adding the >= size checks to pass_one_output_valid (1200) and exploration_output_valid (1660), as record_handoff_violation, is one loop each -- but exploration_sim_harness builds hand-made exploration_output values whose tables may be empty, so those fixtures would need their tables filled or the check made conditional on a non-empty table.
-
-**Why it matters.** A validator on the shipped path catches the regression on every run of the app; the harness catches it only when someone runs --fidelity. BL-1036 chose harness-only parity at 1660; BL-1049 kept that parity rather than widen.
-
-- A: keep harness-only parity (as shipped)
-- B: add the range checks to both validators, conditional on a non-empty table, and fill the exploration_sim_harness fixtures' tables (one small item)
-- C: add the checks unconditionally and rewrite the fixtures
-
-> **Recommendation:** B, as a small Light item when convenient; not urgent while --fidelity is in the merge gates.
-
-*Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sim_harness.cpp`*
 
 ---
 
@@ -752,4 +559,223 @@ Dispatch and the march share one Logistic Point pool per tick (BL-597). Dispatch
 > **RESOLVED.** RULED (Ben, 2026-09-24): accepted — armies claim Logistic Points first. Written into LOGISTICS.md § Refusal, surface and determinism as a chosen priority.
 
 *Files: `src/core/app.cpp`, `src/main.cpp`, `tools/verify/harness_params.hpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-920 — CALL: what --epoch 0 means once the recipe band is derived from the history, and whether the ancient-roster sandbox keeps an explicit --band override
+*question · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+Ben ruled the band comes from the history's industry state (BL-1101). The epoch then names the calendar only. Today --epoch 0 also selected the ancient roster through industrial_band_from_year; era_roster.cpp and INDUSTRIALISATION.md § The boundary (the epoch and the band) (ruled 2026-09-24) describe that sandbox.
+
+**Why it matters.** Every harness and the seed library run with an epoch; a derived band can also come out ancient on a seed whose history never crossed the rung, which is a different thing from asking for the ancient roster.
+
+- A: calendar only — same world, same derived band, dated 0 CE
+- B: calendar plus an explicit --band ancient|industrial override kept for the sandbox
+- C: retire epoch 0
+
+> **Recommendation:** B, if the sandbox is still wanted; A otherwise. Either way INDUSTRIALISATION.md § The boundary (the epoch and the band) is rewritten.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): C, epoch 0 is retired -- no band override, no ancient-roster sandbox; an ancient opening exists only where a history never crossed the rung. Written into INDUSTRIALISATION.md (the epoch and the band), ERAS.md and the epoch action entry; the work is BL-1114 (epoch 0 retired).
+
+*Files: `src/world/era_band.hpp`, `src/core/app.hpp`, `docs/generation/INDUSTRIALISATION.md`*
+
+### NR-921 — CALL: switch sea legs on for the Exploration and Industrialisation spans — today they run with sea_legs_ration_q = 0, so wet campaigns starve and the port bonus is dead code in the spans EXPLORATION.md owns
+*question · raised 2026-09-24 · from Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md*
+
+While reading the sea-lane tier (BL-1097): exploration_sim_params leaves sea_legs_ration_q at 0 and amphibious_weight_crossing false (era_minus_one.cpp:328-375; asserted by industrialisation_sim_harness.cpp:1271-1274, BL-1053's EMPIRES_ONLY), so the only code applying the port/navy crossing bonus (history_sim.cpp:4419-4451) never runs in these spans and EXPLORATION.md:383-395 ("the port is why the skirmish is cheap") describes a force that is off. A lane tier earned by traffic from wet campaigns alone would stamp almost nothing; the tribute-round metropole→subject leg is what carries the record.
+
+**Why it matters.** Turning sea legs on is a sim beat that moves displacement (the phase's one structural reading) and every pin; it is not folded into BL-1097.
+
+- A: leave them off; the tribute-round leg carries the lane record
+- B: turn them on for the later spans as its own item with a re-bless, and re-read displacement
+- C: amend EXPLORATION.md:383-395 to say the port bonus applies only where sea legs run
+
+> **Recommendation:** A now with C's clarification; B as a filed item once BL-1096/1097 have been read on the 16 seeds.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): B, sea legs switch on for the Exploration and Industrialisation spans as their own item with a re-bless, and displacement is re-read on the 16 seeds. Written into EXPLORATION.md (the port is why the skirmish is cheap); the work is BL-1115 (sea legs in the later spans).
+
+*Files: `src/world/era_minus_one.cpp`, `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
+
+### NR-931 — CALL: what does the Culture round's reroll re-roll, when the migration walk is seed-free by design?
+*question · raised 2026-09-24 · from BL-1083 lane G (span seeds), its harness span_seed_isolation row S0 and the cold review, 2026-09-24*
+
+span_seed[0] is folded into run_settlement's seed as ruled, but the migration record is byte-identical under any value of it (span_seed_isolation: migration digest A00A5876639F4D94 with slot 0 at 0 and at 1) while the Empires, Exploration and Industrialisation records all change. The reason is design, not a defect: the colonisation walk consumes no randomness — where people go is a deterministic consequence of the ground (COLONISATION.md § No actor, and no infrastructure; memory: consequences, not simulation). What the seed reaches is derive_daughter_culture (tongue drift, coined names, aggression_q) and the furnace lag. So a round-3 reroll re-coins the peoples and forks every later age while the ownership map stays identical. STARTUP.md § Each pass round is rerollable now says so and names this call.
+
+**Why it matters.** The item's headline half — "the Culture round can reroll at all" — is not delivered as written, and Ben ruled rerolls are per stage. Either the round's reroll means labels only, or the walk takes dice (against Ben's own principle), or the Culture round carries no reroll and rejecting a migration is the Life round's reroll (the world's).
+
+- A: accept — a Culture reroll re-coins the peoples (names, tongues, temper) and forks later ages; the doc says so (already written)
+- B: give the walk a seeded roll (a design change to COLONISATION.md and a re-bless; contradicts "consequences not simulation")
+- C: remove the Culture round's Reroll; the migration is the world's consequence and the Life round's reroll is how a player rejects it; span_seed[0] stays folded (zero-neutral) or is dropped
+
+> **Recommendation:** C. A reroll button that moves labels and nothing on the map is a button that lies; the honest control is the Life round's. If Ben wants A, the doc already reads that way.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): C, the Culture round carries no Reroll; the migration is the world's consequence and the Life round's reroll rejects it; span_seed[0] stays folded and zero-neutral. Written into STARTUP.md (each pass round is rerollable); the work is a sprint-47 task under BL-1083 (span seeds per round) in REFINED.md, which also re-reads its failed R3.
+
+*Files: `src/ui/startup_screens.cpp`, `docs/ui/STARTUP.md`, `docs/generation/COLONISATION.md`, `tools/verify/span_seed_isolation.cpp`*
+
+### NR-932 — OBSERVATION → CALL: one settle tick is pathological — tick 1 runs 44-62 s of a 69-114 s settle on seed 0
+*question · raised 2026-09-24 · from BL-1085 lane C (Begin retired into round six), gen_step_costs --finish 0 28 in Release, 2026-09-24*
+
+Inside the twelve-tick settle that now runs in round 6's worker, tick 1 costs 44-62 s while the other eleven cost ~1.5 s each (seed 0: settle 113,922 ms, slowest tick 1 56,881 ms; seed 28: 68,832 ms). It was hidden inside the old on-thread validation run. The wait's bar holds still through it because a tick has no progress tap; the round-6 wait grew by ~100 s in total with the search and the settle inside it, as Ben accepted, but most of that is one tick.
+
+**Why it matters.** The longest still in the wizard is now this tick (LONGEST STILL 90.91 s on seed 0), which is the "a wait never looks stopped" rule (BL-1072) failing by construction; and a first tick 30-40x the others is a cost shape NR-915 (the tick tail) may already own.
+
+- A: instrument tick 1 (which phase — the first clearing over cold pools? the first dispatch?) and file the finding under NR-915 / BL-1066's economy work
+- B: give the settle a per-tick progress tap so the bar moves and accept the cost
+- C: both
+
+> **Recommendation:** C: the tap is cheap and honest; the cause is economy work for the economy lane, not this sprint.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): C, both -- a per-tick progress tap on the settle now (a sprint-47 task under BL-1085, Begin retired into round six), and tick 1 instrumented for the economy lane as BL-1117 (settle tick one cost).
+
+*Files: `src/world/campaign_settle.cpp`, `src/world/finish_campaign_world.cpp`*
+
+### NR-934 — OBSERVATION → CALL: the ruled band threshold discriminates nothing on the library — every curated seed reaches materials capacity 6 by 1200 CE, so all 16 derive industrial
+*question · raised 2026-09-24 · from BL-1101 lane W2 (band from history), history_sweep over the 16 curated seeds, 2026-09-24*
+
+The band derives per world as ruled (industrial iff a living polity's materials capacity reaches the industrial rung at the 1960 fold). On all 16 seeds the verdict is industrial, and the rung is already reached by 1200 CE on every one. The ancient-band campaign is reachable by the rule but not observed on the library; nothing was reshaped. Side finding: on seeds 0, 12 and 37 one living polity sits at the rung at the fold without a recorded industrial_year (at-rung exceeds ever-crossed by one) — the band is unaffected; the cause was not chased.
+
+**Why it matters.** Ben asked for the reading before any threshold is fixed. A rule that always says industrial is honest but says nothing; whether that is fine, or the rung should be later (the Industry spire ring, or capacity at 1960 rather than "ever"), is his.
+
+- A: fine — the band is the history's and the library is industrial; keep the rung
+- B: name a later rung (e.g. the Industry spire's second ring) so a quiet world can open ancient
+- C: keep the rung and add the per-nation grain through campaign tech (BL-1109) as planned
+
+> **Recommendation:** A now, C as planned; B only if Ben wants ancient openings to exist on the shipped library.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): A, keep the rung -- the band is the history's and the library is industrial; per-nation grain comes through campaign tech as planned (BL-1109). No doc change: INDUSTRIALISATION.md already reads this way.
+
+*Files: `src/world/hard_coded_world.cpp`, `tools/verify/history_sweep.cpp`*
+
+### NR-935 — CALL: the tariff bands (300 / 500 / 700) were authored for the retired furnace scalar; under the derived posture the floor cuts the field near its median
+*question · raised 2026-09-24 · from BL-1102 lane W3 (tariff posture derived), industrialisation_sim_harness over the 16 curated seeds, 2026-09-24*
+
+With protection_q derived from scarcity, flows and preference at the close, the per-seed median posture sits 285-376 against law.hpp's tariff_bands 300/500/700: 61% of nations enact a tariff, 80% of the laws are the 5% band, the 20% band is reached on 3 of 16 worlds. The bands were deliberately not moved (the lane was told to measure, not tune). Every curated seed now writes laws, so all 16 --digest-check pins move at the re-bless. The derivation also runs at the Exploration close (gated on exploration_upkeep_enabled), so a world run with the Industrialisation span switched off would enact the 1660 posture — harmless on the shipped path.
+
+**Why it matters.** Whether "most nations tariff, almost all at 5%" is the intended feel of the 1960 map is a design reading, not a constant.
+
+- A: keep the bands; the reading is the map
+- B: re-author the bands against the new posture distribution (e.g. terciles of the library's postures)
+- C: keep the bands, raise the floor so only the protective third tariffs
+
+> **Recommendation:** B, measured from the library's distribution, in the same re-bless.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): A, keep the tariff bands 300 / 500 / 700 -- the reading is the map. No change; no second re-bless.
+
+*Files: `src/world/law.hpp`, `src/world/history_sim.cpp`*
+
+### NR-936 — OBSERVATION: the wizard's Next press does not wait for the running round, so a fast player can have rounds 3-6 building at once
+*observation · raised 2026-09-24 · from BL-1085 lane C and its cold review, 2026-09-24 (the autostart walk was made player-shaped in the fix round; the press itself was not gated)*
+
+Next on a lapse round launches the next round's worker whether or not the current one has landed; four concurrent world builds plus the surface build is the peak memory now, the memory-pressure shape BL-1078 was filed on. Begin never starts a second build, so the adopt path is safe; the concern is the peak. BL-1084 (the world built once and moved) changes what each worker holds and is the natural place to decide whether Next waits.
+
+**Why it matters.** A note for BL-1084's design, not a defect to fix in isolation.
+
+> **Recommendation:** Fold into BL-1084: with one world moved forward, round N+1 cannot start before round N lands anyway.
+
+> **RESOLVED.** FOLDED (Ben, 2026-09-25, the sprint-47 close form): BL-1084 (world built once and moved) is carried to sprint 48 and this note rides with it -- with one world moved forward, round N+1 cannot start before round N lands. Recorded in BL-1084's design.
+
+*Files: `src/ui/startup_screens.cpp`*
+
+### NR-937 — CALL: does a hard realm's COAST draw heavy too, and is 10% of people (off at 6%) the right pin for a hard border?
+*question · raised 2026-09-25 · from BL-1090 lane I2 (hard borders by people share) and its cold review, 2026-09-25*
+
+The pin was measured over the 16 curated seeds at every recorded Empires step (87,900 polity-steps): top people shares peak 8-17%; 20%+ bolds nothing anywhere, 15% one realm on one world, 10% bolds one to six realms on six of sixteen worlds at 1000 CE (46:1, 28:6, 40:2, 25:1, 38:3, 0:1) and none on the city-state worlds; hysteresis on at 10% / off at 6% (no observed single-step dip deeper than 3.9 points). The doc's "any edge either side of which is hard" is read literally, so a hard realm's coastline draws the 2 px dark + own-colour inner stroke as well as its land frontiers.
+
+**Why it matters.** Both are what the player sees on round 4: how many realms read as great powers (a third of worlds show any; the median world shows none at 1000 CE), and whether a coastal empire's outline is heavy at sea.
+
+- A: keep 10/6 and the heavy coast (built)
+- B: keep 10/6, heavy inter-realm edges only (one-line condition in each frontier pass)
+- C: a rarer pin (15%: one realm on one world) or a commoner one (7%) — the sweep column reports any candidate
+
+> **Recommendation:** B: the coast is not a frontier, and the pin as measured is honest. Take at the live click with the crop.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): B, keep 10% on / 6% off and draw heavy on edges between two different realms only -- a coast is not a frontier. Written into STARTUP.md (a hard border is people share); the work is a sprint-47 task under BL-1090 (hard borders by people share).
+
+*Files: `src/ui/history_lapse.hpp`, `src/ui/history_lapse.cpp`, `tools/verify/history_sweep.cpp`*
+
+### NR-939 — CALL: the origin sentence's 'since <year>' reads the one record that spans the founding year, so a realm that held the region across the whole span reads 'since 1660 CE'
+*question · raised 2026-09-25 · from BL-1099 lane F3 (the seat briefing's origin sentence, R22) and its review, 2026-09-25*
+
+seat_origin_sentence reads the holder of the firm's origin region at its founding year off the record whose span holds that year (Industrialisation first, then Exploration, then Empires) and takes 'since' as the year of that record's last owner change of the region at or before the founding year. A region held from before the span opens has its first change AT the span's open, so the sentence reads 'the realm of X since 1660 CE' for most firms (the capture: 'Chartered from Guagua's industry, in Gesher Nehua, under Tuarthuage Thuathe, the realm of Gesher Nehua since 1660 CE'). The three records are separate resumes, but a polity id is ONE TABLE across them -- a resumed span inherits its realms by id and restates their seats as `inherited` rather than coining (CIVILISATION.md sec A realm's name; `hard_walk_record` and the slot inheritance rely on the same fact) -- so a walk back into the earlier records is well-defined; it is simply not what the sentence reads today. The realm is named by the record's coined `polity_name`, as the board and the ticker name it.
+
+**Why it matters.** The sentence is 'the whole of the history the seat carries' (STARTUP.md § The seat); 'since 1660 CE' is the record's opening, not the realm's tenure, and a player who watched round 5 may know the realm took that ground earlier.
+
+- A: accept as built -- 'since' is the year the record the sentence reads from first shows the holder (honest about the record, silent about earlier ones)
+- B: walk back into the earlier records while the same polity id holds the region at their close -- well-defined, since ids carry across the spans; two more slices per briefing, and 'since' then reads as tenure rather than as the record's opening
+- C: drop the year when it equals the record's opening: '...the realm of X' with no 'since'
+
+> **Recommendation:** C at low cost, or A: both are honest about the record the sentence reads. B is the one that makes 'since' mean tenure; whether the sentence should claim tenure is the call.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): B, walk back for true tenure -- while the same polity id holds the region at an earlier span's close, the origin sentence reads that record too, so "since" is the realm's tenure. Written into STARTUP.md (the seat); the work is a sprint-47 task under BL-1099 (works chartered events).
+
+*Files: `src/ui/seat_screen.cpp`*
+
+### NR-940 — CALL: the works-chartered notes cluster in the span's first century because the RUNNING price is tiny at the open -- is that the moment the round should show?
+*question · raised 2026-09-25 · from BL-1099 lane F3, the 16-seed reading that pinned f = 2 (industrialisation_sim_harness --through 1960 --works-fractions ..., 2026-09-25)*
+
+A note fires when a region's industry points cross the next multiple of f x the running price, the world's stock so far over the charter divisor (R15, self-consistent with the close's price per NR-907). At the span's open the world's stock is near zero, so the price is near zero and a region with any points crosses its four multiples in the first decades: on most seeds the notes run 1660 -> ~1760 (seed 28: 1660 -> 1760 at f = 1; the verify world: 27 of 40 charters dated 1660 -> 1716), and the seat briefing's origin year lands early in the span for nearly every firm. At the pinned f = 2 the library notes 3233 works and dates 894 of 1297 charters; the four-per-region cap is what binds thereafter, not the price.
+
+**Why it matters.** The round is meant to show WHEN the capital that charters a firm was built; a close of works flashing in the 1660s reads as the age's dawn rather than its industrial century, and the briefing's 'since 1660 CE' / early founding years follow from it.
+
+- A: accept -- the early crossings are the honest reading of a price that grows with the stock (built)
+- B: floor the running price at a fraction of the CLOSE's price (needs the 1960 stock, which NR-907 ruled out applying backwards) -- not available without a second pass
+- C: read the region's points against ITS OWN running share (the region's k-th multiple of f x the world's mean stock per region so far), which spreads the crossings across the span; a different rule, Ben's to choose
+- D: keep the rule and space the notes: at most one note per region per N years (a rate on top of the cap), so the k-th note lands later without changing what it measures
+
+> **Recommendation:** A for this sprint; D is the smallest change if the dawn-cluster reads wrong at the live click.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): A, accept -- the early crossings are the honest reading of a running price that grows with the stock. No change.
+
+*Files: `src/world/history_sim.hpp`, `src/world/history_sim.cpp`, `tools/verify/industrialisation_sim_harness.cpp`*
+
+### NR-941 — CALL: the origin sentence doubles its name once the nation carries its realm's -- 'under Guashe These, the realm of Guashe These since 1660 CE'
+*question · raised 2026-09-25 · from main session, the F3 merge (BL-1099 origin sentence composed with BL-1088/BL-1089 name inheritance), seat_pick.lua seat_02_briefing.png on the verify world*
+
+R22's form is 'under <nation>, the realm of <X> since <year>', where X is the realm the Empires/Exploration/Industrialisation record shows holding the firm's region in its founding year (owner_slice_at). Since BL-1089 every nation with a founding realm carries that realm's coined name verbatim (38 of 38 on seed 0), and a firm is nearly always chartered on ground its own nation's realm held in 1660, so the two names coincide: the capture reads 'under Guashe These, the realm of Guashe These since 1660 CE'. The clause only earns its place when the holder in the founding year is NOT the realm the nation grew from (ground absorbed since; a purchase; a colony's overlord), which is the minority case.
+
+**Why it matters.** The sentence is the one origin line the briefing carries (R22) and Ben's live click on BL-1099 R5 will read it; the doubled form reads as a bug rather than a fact. The information is still right -- the realm the nation is and the realm that held the ground agree -- it is the wording that has no branch for agreement.
+
+- A: collapse on agreement -- when the founding realm's name equals the nation's, write 'under Guashe These, its own realm since 1660 CE'; keep the full form when they differ (one branch in seat_screen.cpp's origin sentence, STARTUP.md's quoted form gains the second reading)
+- B: keep R22's form verbatim -- the repetition is the fact stated twice and the live click decides
+- C: drop the nation clause when the names agree -- 'in Gesher Nehua, the realm of Guashe These since 1660 CE' (shorter, but loses the word 'under' that says whose law you trade beneath, which the line above already states)
+
+> **Recommendation:** A -- the honest sentence in both cases, one branch, no field. Not applied without the call because the form is Ben's ruling (R22, STARTUP.md § The seat).
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): A, collapse on agreement -- "under <nation>, its own realm since <year>" when the holder is the realm the nation grew from; the full form otherwise. Written into STARTUP.md (the seat); the work is a sprint-47 task under BL-1099 (works chartered events), before the live click on its R5.
+
+*Files: `src/ui/seat_screen.cpp`, `docs/ui/STARTUP.md`, `docs/development/drafts/sprint-47-rulings.md`*
+
+### NR-942 — CALL: the kin arrow's dash threshold -- two interior water tiles, any graze, or the corridor majority rule
+*question · raised 2026-09-25 · from lane F1 fix round (BL-1092 routes and splits on the map), cold review [low] on history_lapse.hpp's lapse_kin_seg comment: the header cited lapse_corridor_over_water for the dash while the kin bake (finish_history_lapse's crosses_water lambda) dashes from two interior water tiles by its own per-tile sampler; the constant is now named k_kin_dash_water_tiles*
+
+COLONISATION.md sec The route record says a kin arrow is 'dashed where the line between the two anchors crosses water'. Three readings of 'crosses' were measured on the same tree, 2026-09-25, on library seed 13 (249 arrows) and seed 0: the road bake's majority rule (lapse_corridor_over_water, eight samples, more than half water) dashes 0 of 249; any single sampled water tile dashes 193 of 249; two interior water tiles (the rule shipped, k_kin_dash_water_tiles = 2) dashes 58 of 249. Seed 0 reads 0 dashed under every rule. The shipped rule was picked in-lane because a crude hop is a bounded crossing of up to three tiles (colonisation_max_hop_tiles) while a coast-hugging people's consecutive foundings graze a bay by one tile almost every time, so any-graze drowned the hops and the majority rule found none; it is a constant nobody ruled on.
+
+**Why it matters.** The dash is the one mark the round-3 map makes of a sea hop, and the threshold decides whether the migration's water-crossings read as 58 arrows, 193, or none. The doc's wording is honest about grain under any of the three; which one it MEANS is a design call, and the constant is named so the call is a one-line change.
+
+- A: keep two interior tiles (k_kin_dash_water_tiles = 2) -- 58 of 249 on seed 13; a graze is not a crossing, a strait is
+- B: any interior water tile -- 193 of 249 on seed 13; every wet founding dashed, the hops indistinguishable from the bay-grazes
+- C: the corridor's majority rule (lapse_corridor_over_water) -- 0 of 249 on seed 13; one sampler for roads and kin, and no hop ever dashes at region grain
+- D: tie the threshold to colonisation_max_hop_tiles rather than a bare 2 -- the hop's own bound as the dash's, so the two move together
+
+> **Recommendation:** A, as shipped -- the only reading of the three under which the hops are visible and the grazes are not; D is the principled form of A if the hop bound ever moves. Not applied beyond naming the constant: the threshold is the design's word 'crosses', which is Ben's.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): A, keep two interior water tiles (k_kin_dash_water_tiles = 2) -- a strait is a crossing, a graze is not. Written into COLONISATION.md (the route record). No code change.
+
+*Files: `src/ui/history_lapse.cpp`, `src/ui/history_lapse.hpp`, `docs/generation/COLONISATION.md`*
+
+### NR-943 — CALL: should the shipped-path validators range-check every civilisation and creed index at the 1200 and 1660 crossings, now that BL-1049 closed the gap?
+*question · raised 2026-09-25 · from lane BL-1049's report and its cold review (2026-09-25): pass_one_output_valid does not range-check the two new tables, and the 1200 path calls make_exploration_output without a `from`, so the prefix check that guards the 1660 crossing never runs at 1200; the fidelity harness is the only check on the 1200 crossing*
+
+The harness gate (industrialisation_sim_harness --fidelity, the BL-1049 section) now fails on any index past the table, any pair recorded twice, or a carried prefix short of the 1200 table, on 16/16 library seeds. The shipped path itself would still accept a regressed resume silently: a region::civilisation or universal_creed index at or past its table resolves to nothing and nothing crashes. Adding the >= size checks to pass_one_output_valid (1200) and exploration_output_valid (1660), as record_handoff_violation, is one loop each -- but exploration_sim_harness builds hand-made exploration_output values whose tables may be empty, so those fixtures would need their tables filled or the check made conditional on a non-empty table.
+
+**Why it matters.** A validator on the shipped path catches the regression on every run of the app; the harness catches it only when someone runs --fidelity. BL-1036 chose harness-only parity at 1660; BL-1049 kept that parity rather than widen.
+
+- A: keep harness-only parity (as shipped)
+- B: add the range checks to both validators, conditional on a non-empty table, and fill the exploration_sim_harness fixtures' tables (one small item)
+- C: add the checks unconditionally and rewrite the fixtures
+
+> **Recommendation:** B, as a small Light item when convenient; not urgent while --fidelity is in the merge gates.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): B, range-check the civilisation and creed indices in both validators, conditional on a non-empty table, and fill the exploration_sim_harness fixtures' tables. The work is BL-1116 (handoff validators range-check), Light.
+
+*Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sim_harness.cpp`*
 

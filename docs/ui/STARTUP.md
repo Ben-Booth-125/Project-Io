@@ -349,11 +349,13 @@ lapse) has to be affordable rather than merely tolerable. A history you cannot r
 were assigned. **A reroll is per stage (Ben, 2026-09-24):** rerolling round N re-seeds span N
 and nothing else. Each span carries a seed of its own — `world_params::span_seed[4]`, one
 each for the migration, Empires, Exploration and Industrialisation, folded into that span's
-own seed so that all zeros is the unrerolled world (`era_seed` stays as the legacy term) — so a
-Culture reroll re-coins the peoples — their names, tongues and temper — and forks every age after
-it, while the walk itself is seed-free by design (COLONISATION.md § No actor, and no infrastructure:
-where people go is a consequence of the ground, never a roll), so the ownership map does not move;
-whether that is the Culture round's reroll, or the round carries none, is an open call (NR-931).
+own seed so that all zeros is the unrerolled world (`era_seed` stays as the legacy term). **The
+Culture round carries no Reroll (Ben, 2026-09-25, NR-931).** The walk is seed-free by design
+(COLONISATION.md § No actor, and no infrastructure: where people go is a consequence of the
+ground, never a roll), so a reroll there could re-coin the peoples' names, tongues and temper but
+never move the map — a button that promises a different migration and cannot give one. The
+migration is the world's consequence, and the Life round's reroll is how a player rejects it.
+`span_seed[0]` stays folded and zero-neutral, so the unrerolled world is unchanged by the ruling.
 A later reroll leaves the migration alone. The
 rounds above the rerolled one are untouched; the rounds below it are invalidated; the reroll
 starts from the closing world of the round before it (§ The world cache), which is why nothing
@@ -410,10 +412,13 @@ re-based the start at its own first year would let one steady climb earn a rung 
 
 **A hard border is people share, with hysteresis.** A realm whose share of the world's people
 stands above a fixed threshold draws hard: the two frontier passes lay 2 px of dark and a 1 px
-inner stroke in the realm's colour on any edge either side of which is hard, and the board
-bolds the same rows. Hysteresis keeps a realm sitting on the threshold from flickering across
-it. The threshold is **measured** across the curated seeds before it is fixed (Rule 0b), and
-the flag carries into round 5 by id.
+inner stroke in the realm's colour on any edge **between two different realms** either side of
+which is hard, and the board bolds the same rows. **A coast is not a frontier (Ben, 2026-09-25,
+NR-937):** a hard realm's shoreline draws as any other coast. Hysteresis keeps a realm sitting on
+the threshold from flickering across it. The threshold was **measured** across the curated seeds
+before it was fixed (Rule 0b): **on at 10% of the world's people, off at 6%** (Ben, 2026-09-25,
+NR-937) — one to six realms on six of sixteen worlds at 1000 CE, none on the city-state worlds.
+The flag carries into round 5 by id.
 
 **There is no blanket ring (Ben, 2026-09-16, ruled watching round 4 run), and four kinds earn
 a mark, each its own glyph (Ben, 2026-09-24).** A white ring at every event inside the marker
@@ -685,7 +690,14 @@ corporation am I?*
   and, for a marked firm, why the floor marked it — **and one sentence of origin (Ben,
   2026-09-24):** *"Chartered from <city>'s industry, in <region>, under <nation>, the realm of
   <X> since <year>"*, read from the firm's own founding year and origin region and from the
-  record's owner slice at that year. That sentence is the whole of the history the seat
+  record's owner slice at that year. **When X is the realm the nation grew from, the sentence
+  says so once (Ben, 2026-09-25, NR-941):** *"…under <nation>, its own realm since <year>"*; the
+  full form is kept for ground the nation's realm did not hold (absorbed since, bought, a
+  colony's overlord). **"Since" is the realm's tenure, not the record's opening (Ben,
+  2026-09-25, NR-939):** where the same polity id holds the region at the close of the earlier
+  span, the sentence walks back into that span's record, and on until the holder differs, so a
+  realm that took the ground in 1310 reads *since 1310 CE*, not the year its record opens. A
+  polity id is one table across the three records, so the walk is well-defined. That sentence is the whole of the history the seat
   carries: no opening card, no header change, and no city renamed for it. **Confirm** seats
   the player and opens play; **Back** returns to the list with nothing changed. Choosing is a
   deliberate act, so it takes two presses.

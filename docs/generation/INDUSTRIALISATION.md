@@ -80,11 +80,10 @@ into play), not through a second band. A world on which no polity crosses by 196
 spread and never reshaped until it crosses. Which of the three axes that say "era" in code this
 is: `../economy/ERAS.md` § Three things that say "era" in code.
 
-Epoch 0 is the same generated world, dated so play opens at 0 CE (Ben, 2026-09-24). Since the
-band is the history's and not the calendar's, what epoch 0 buys beyond the date — the 1960 map on
-the band its history earned, or a separate band override that masks the Launchpad and the
-petroleum, propellant and spacecraft chains for an ancient sandbox — is an open call
-(§ Open questions; NEEDS_REVIEW, 2026-09-24).
+**Epoch 0 is retired (Ben, 2026-09-25, NR-920).** The band is the history's and not the
+calendar's, so a 0 CE opening would only have re-dated the 1960 map, and there is no band override
+and no ancient sandbox. Play opens at 1960 on the band the world's history earned; an ancient
+opening exists only where a world's history never crossed the rung.
 
 **SETTLED (Ben, 2026-09-17, NR-888): the span runs on Exploration's 4-year band.** One decision
 round every four years, 75 rounds from 1660 to 1960. Measured on Exploration's forces alone, that
@@ -921,9 +920,6 @@ Measured rather than argued:
 
 Owed from Ben when they bite, not before:
 
-- **What `--epoch 0` means beyond the calendar** — the band is the history's, so an epoch of 0 CE
-  dates the 1960 map and nothing else unless a separate band override exists for the ancient
-  sandbox; whether one does is Ben's call (raised 2026-09-24, NEEDS_REVIEW).
 - **Whether a standing war condition ever becomes a live nation war** — that is a new widening of
   `../ai/AI_OPPONENT.md` § 11, raised when the campaign wants it.
 - **The PROPOSED readings above that the form did not ask about** — computing as electronics,

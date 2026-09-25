@@ -492,7 +492,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "47",
+   "sprint": 48,
    "written": "2026-09-24",
    "requires": [
     "BL-1083"
@@ -518,7 +518,7 @@
     "tools/verify/world_determinism.cpp",
     "tools/verify/harness_params.hpp"
    ],
-   "design": "RULED (Ben, 2026-09-24: \"move the whole half-built world\"; \"we don't want to do the work twice, so seed actual materials at the Life gate and pass tiles through the whole phase\"; docs/development/drafts/sprint-47-rulings.md R1, R2).\n\nWHY. Every lapse round's worker runs make_hard_coded_world from params to its own stop (startup_screens.cpp:375-379): stages 0-7 (Helios, Cinder, the Kepler chain, tiles with deposits, rivers, creeds, settlement) run again on every seam, and round 5 re-runs Empires, round 6 re-runs Empires and Exploration (hard_coded_world.cpp:550-916, :1158, :1313, :1497). Rounds 0-1 build a scratch world for the globe and discard it. Deposits already land at stage 4 (tile_generation.cpp Pass 6, generate_life_deposits_over :2284-2298), downstream of S8 Legacy and S9 Spend (planetology.cpp:1533-1555), so the ruling changes OWNERSHIP, not pass order.\n\nTHE WORK. (1) make_hard_coded_world becomes the composition of resumable stage functions over one generation_cursor carrying what the tail reads as locals today (world, report, naming, rw, deposit_scalar, kepler_tiles/pl/hist/creeds/settlement/np/corridors/grudges/region_polity/polity_treasuries/capital_market_shells, the last span's resume struct): gen_life_gate (bumps 0-5), gen_culture (:826-1138), gen_empires (:1158-1300), gen_exploration (:1313-1470), gen_industrialisation (:1488-1640) then the tail (bumps 9-12). The composition is BYTE-IDENTICAL to the monolith: every harness, fixture, gen_step_costs and the 16 seed-library pins keep one invocation. The stop_after_* flags stop being early returns and become 'run the composition up to stage N'. (2) The wizard: the Life round builds the REAL Life-gate world into slot 0 (the globe rasters pack off it; a planetology move relaunches it and drops every slot below); launch_wizard_history_run(i) takes slot i-1 and runs only stage i into slot i; invalidate_wizard_rounds_below(r) drops every slot below r and stale-marks in-flight ones (a stale landing drops record AND world, the pattern at startup_screens.cpp:439-449); Begin adopts slot 3 exactly as BL-1073 does. (3) The reroll path (delegated reading, NEEDS_REVIEW): the predecessor's closed world is HELD by a faithful copy at landing (BL-1034; world_copy_determinism proves a copy ticks as its original) and a copy is moved into the worker; a reroll re-copies; when the predecessor is not held, REPLAY from the Life gate with the fixed per-span seeds — bit-identical by determinism, ~0.5 s + 1.6 s + 1.5 s in Release (hard_coded_world.cpp:360-398). Measure the copy cost first (Rule 0b); if it exceeds the replay it saves, ship pure replay. Back keeps every record and world. (4) The gate world is Helios + Cinder + Kepler; Selene and Pallas stay in Finishing (an entity-id shift for two bodies no round shows — NEEDS_REVIEW). (5) Round 6 starts playing at the tap's final publish (history_sim.cpp:7899; the record is whole there); landing only swaps the world slot; poll_wizard_history_tap's snapshot path and the landed path must not fight over m_wiz_history[3]. (6) Proof: world_determinism twice; a cursor-vs-monolith check (owner_changes, polities, world digest) at EVERY round boundary on the 16 curated seeds, extending run_autostart_adopt's round-6 proof; begin_adopts_check.js green.\n\nDONE WHEN (live). Press Next on rounds 4 and 5: the wait caption never names an earlier span ('Running the ancient era' never appears on round 5) and the elapsed count is shorter by the predecessor's measured cost; Back then Next on any round recomputes nothing; reroll round 5 and it opens on round 4's exact 1200 frame. Harness: the resumed build equals the monolithic build on the 16 seeds; digests unchanged."
+   "design": "CARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48. NR-936 rides with it: the wizard's Next press does not wait for the running round, so a fast player can have rounds 3-6 building at once; with one world moved forward, round N+1 cannot start before round N lands, so decide here whether Next waits.\n\nRULED (Ben, 2026-09-24: \"move the whole half-built world\"; \"we don't want to do the work twice, so seed actual materials at the Life gate and pass tiles through the whole phase\"; docs/development/drafts/sprint-47-rulings.md R1, R2).\n\nWHY. Every lapse round's worker runs make_hard_coded_world from params to its own stop (startup_screens.cpp:375-379): stages 0-7 (Helios, Cinder, the Kepler chain, tiles with deposits, rivers, creeds, settlement) run again on every seam, and round 5 re-runs Empires, round 6 re-runs Empires and Exploration (hard_coded_world.cpp:550-916, :1158, :1313, :1497). Rounds 0-1 build a scratch world for the globe and discard it. Deposits already land at stage 4 (tile_generation.cpp Pass 6, generate_life_deposits_over :2284-2298), downstream of S8 Legacy and S9 Spend (planetology.cpp:1533-1555), so the ruling changes OWNERSHIP, not pass order.\n\nTHE WORK. (1) make_hard_coded_world becomes the composition of resumable stage functions over one generation_cursor carrying what the tail reads as locals today (world, report, naming, rw, deposit_scalar, kepler_tiles/pl/hist/creeds/settlement/np/corridors/grudges/region_polity/polity_treasuries/capital_market_shells, the last span's resume struct): gen_life_gate (bumps 0-5), gen_culture (:826-1138), gen_empires (:1158-1300), gen_exploration (:1313-1470), gen_industrialisation (:1488-1640) then the tail (bumps 9-12). The composition is BYTE-IDENTICAL to the monolith: every harness, fixture, gen_step_costs and the 16 seed-library pins keep one invocation. The stop_after_* flags stop being early returns and become 'run the composition up to stage N'. (2) The wizard: the Life round builds the REAL Life-gate world into slot 0 (the globe rasters pack off it; a planetology move relaunches it and drops every slot below); launch_wizard_history_run(i) takes slot i-1 and runs only stage i into slot i; invalidate_wizard_rounds_below(r) drops every slot below r and stale-marks in-flight ones (a stale landing drops record AND world, the pattern at startup_screens.cpp:439-449); Begin adopts slot 3 exactly as BL-1073 does. (3) The reroll path (delegated reading, NEEDS_REVIEW): the predecessor's closed world is HELD by a faithful copy at landing (BL-1034; world_copy_determinism proves a copy ticks as its original) and a copy is moved into the worker; a reroll re-copies; when the predecessor is not held, REPLAY from the Life gate with the fixed per-span seeds — bit-identical by determinism, ~0.5 s + 1.6 s + 1.5 s in Release (hard_coded_world.cpp:360-398). Measure the copy cost first (Rule 0b); if it exceeds the replay it saves, ship pure replay. Back keeps every record and world. (4) The gate world is Helios + Cinder + Kepler; Selene and Pallas stay in Finishing (an entity-id shift for two bodies no round shows — NEEDS_REVIEW). (5) Round 6 starts playing at the tap's final publish (history_sim.cpp:7899; the record is whole there); landing only swaps the world slot; poll_wizard_history_tap's snapshot path and the landed path must not fight over m_wiz_history[3]. (6) Proof: world_determinism twice; a cursor-vs-monolith check (owner_changes, polities, world digest) at EVERY round boundary on the 16 curated seeds, extending run_autostart_adopt's round-6 proof; begin_adopts_check.js green.\n\nDONE WHEN (live). Press Next on rounds 4 and 5: the wait caption never names an earlier span ('Running the ancient era' never appears on round 5) and the elapsed count is shorter by the predecessor's measured cost; Back then Next on any round recomputes nothing; reroll round 5 and it opens on round 4's exact 1200 frame. Harness: the resumed build equals the monolithic build on the 16 seeds; digests unchanged."
   },
   {
    "status": "designed",
@@ -555,7 +555,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "47",
+   "sprint": 48,
    "written": "2026-09-24",
    "requires": [
     "BL-1085"
@@ -577,7 +577,7 @@
     "src/core/verify_api.cpp",
     "src/main.cpp"
    ],
-   "design": "FILED (delegated reading, 2026-09-24, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R4). Stretch item in sprint 47: rides the sprint's one re-bless if the relocation (BL-1085) lands with time; otherwise slips.\n\nWHY. Even with Begin's work inside the round-6 worker, stage 11 lays a world-gen roster that the search removes and re-charters (landscape_search.cpp:296-298), and the market carve at stage 12 reads that roster's clusters (hard_coded_world.cpp:2097-2103) — the work is done twice, which is what Ben's brief forbids.\n\nTHE WORK. Fold finish_campaign_world's search into make_hard_coded_world at bump(11) so the carve reads the searched roster; retire the laid-then-removed roster; every pin, golden, --verify and --serve world moves (a design change to what the carve reads, not a move), so it lands in the re-bless with the other world-movers or not at all this sprint.\n\nDONE WHEN. The carve ledger lists the searched roster; no roster is generated and discarded in a Release build log; the re-bless records the movement."
+   "design": "CARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nFILED (delegated reading, 2026-09-24, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R4). Stretch item in sprint 47: rides the sprint's one re-bless if the relocation (BL-1085) lands with time; otherwise slips.\n\nWHY. Even with Begin's work inside the round-6 worker, stage 11 lays a world-gen roster that the search removes and re-charters (landscape_search.cpp:296-298), and the market carve at stage 12 reads that roster's clusters (hard_coded_world.cpp:2097-2103) — the work is done twice, which is what Ben's brief forbids.\n\nTHE WORK. Fold finish_campaign_world's search into make_hard_coded_world at bump(11) so the carve reads the searched roster; retire the laid-then-removed roster; every pin, golden, --verify and --serve world moves (a design change to what the carve reads, not a move), so it lands in the re-bless with the other world-movers or not at all this sprint.\n\nDONE WHEN. The carve ledger lists the searched roster; no roster is generated and discarded in a Release build log; the re-bless records the movement."
   },
   {
    "status": "designed",
@@ -895,7 +895,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "47",
+   "sprint": 48,
    "written": "2026-09-24",
    "requires": [
     "BL-1097"
@@ -920,7 +920,7 @@
     "src/world/hard_coded_world.cpp",
     "tools/verify/world_determinism.cpp"
    ],
-   "design": "RULED (Ben, 2026-09-24: the sea-lane tier this sprint; the stamp is its own item behind the record, BL-1097; docs/development/drafts/sprint-47-rulings.md R14). Stretch in sprint 47: lands in the re-bless if BL-1097 lands with time.\n\nTHE WORK. stamp_sea_lanes(w, body, nodes, legs) beside stamp_history_roads (road_generation.cpp:626): a water-only walker (stamp_edge skips water and the strait rule refuses open ocean — a straight-line raster crosses land on a concave coast, so an A* restricted to water is the honest walker) writing a NEW tile_component::lane_level (world save bump, claimed through next_save_version.js --kind world), read by one multiplier line in tile_traversal_cost (logistics.cpp:96-99: water base × lane multiplier), folded into world_determinism's deep digest beside road_level, stamped at hard_coded_world.cpp:2063-2070 with junction degree extended for the search's seed candidate.\n\nDONE WHEN. Lane tiles on a 1960 world > 0 and counted in the report; A* cost between two lane-joined ports falls below the unlaned cost; reach crosses the lane; the road lens draws no road on water."
+   "design": "CARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nRULED (Ben, 2026-09-24: the sea-lane tier this sprint; the stamp is its own item behind the record, BL-1097; docs/development/drafts/sprint-47-rulings.md R14). Stretch in sprint 47: lands in the re-bless if BL-1097 lands with time.\n\nTHE WORK. stamp_sea_lanes(w, body, nodes, legs) beside stamp_history_roads (road_generation.cpp:626): a water-only walker (stamp_edge skips water and the strait rule refuses open ocean — a straight-line raster crosses land on a concave coast, so an A* restricted to water is the honest walker) writing a NEW tile_component::lane_level (world save bump, claimed through next_save_version.js --kind world), read by one multiplier line in tile_traversal_cost (logistics.cpp:96-99: water base × lane multiplier), folded into world_determinism's deep digest beside road_level, stamped at hard_coded_world.cpp:2063-2070 with junction degree extended for the search's seed candidate.\n\nDONE WHEN. Lane tiles on a 1960 world > 0 and counted in the report; A* cost between two lane-joined ports falls below the unlaned cost; reach crosses the lane; the road lens draws no road on water."
   },
   {
    "status": "designed",
@@ -1134,7 +1134,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "47",
+   "sprint": 48,
    "written": "2026-09-24",
    "requires": [
     "BL-1084"
@@ -1155,7 +1155,7 @@
     "src/world/creeds.hpp",
     "src/world/creeds.cpp"
    ],
-   "design": "FILED (Ben's note, 2026-09-24: \"materials shaped culture, and even primitive cultures can gain a preference towards certain amenities\"; record-only this sprint, no consumer — delegated reading, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R24). Stretch in sprint 47: built if BL-1084's cursor lands early.\n\nTHE WORK. Beside the package at the cradle (settlement.cpp:859-875), a ground profile read off the cradle window's tiles: a survey_endowment-shaped sum over deposits plus an amenity class of cover (forest, coastal grass, marsh-in-valley per TILES.md; a classify function in the shape of classify_farm_class — no amenity field exists today), stored on culture beside origin_farm_class (creeds.hpp:145), inherited through derive_daughter_culture (creeds.cpp:630-641). Its later reader is derive_culture_preference (history_sim.hpp:4637). Digests unmoved while nothing reads it.\n\nDONE WHEN. Every culture on the 16 seeds carries a non-empty profile, daughters inherit their parent's, and the profile is printed per cradle by colonisation_harness."
+   "design": "CARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nFILED (Ben's note, 2026-09-24: \"materials shaped culture, and even primitive cultures can gain a preference towards certain amenities\"; record-only this sprint, no consumer — delegated reading, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R24). Stretch in sprint 47: built if BL-1084's cursor lands early.\n\nTHE WORK. Beside the package at the cradle (settlement.cpp:859-875), a ground profile read off the cradle window's tiles: a survey_endowment-shaped sum over deposits plus an amenity class of cover (forest, coastal grass, marsh-in-valley per TILES.md; a classify function in the shape of classify_farm_class — no amenity field exists today), stored on culture beside origin_farm_class (creeds.hpp:145), inherited through derive_daughter_culture (creeds.cpp:630-641). Its later reader is derive_culture_preference (history_sim.hpp:4637). Digests unmoved while nothing reads it.\n\nDONE WHEN. Every culture on the 16 seeds carries a non-empty profile, daughters inherit their parent's, and the profile is printed per cradle by colonisation_harness."
   },
   {
    "status": "designed",
@@ -1297,6 +1297,100 @@
     "src/world/history_log.hpp"
    ],
    "design": "FILED 2026-09-25. Not in sprint 47.\n\nTHE GAP. world_determinism builds its worlds with make_hard_coded_world alone, on which world::history_log is never seeded (seed_genesis_history runs in finish_campaign_world), and its deep digest folds no record table -- so BL-1049, which drops duplicate civilisation coinings and five lines of the prose history on the reference world, moved none of the harness's four digests. The player_seed_sweep digests (D_land onward) did move. A determinism harness that cannot see a change to the world's own biography is blind to one whole class of generation change.\n\nTHE WORK. Fold into the deep digest (a) the world's history log after seed_genesis_history (run the finish's genesis step on the harness world, or fold the generation_report's per-body dated history directly), and (b) the civilisation and universal-creed tables and the polity-name / civilisation-name / creed-name tables the records carry, in index order. Record the moved digits old -> new with the change (a re-bless of the harness's own row only; the sweep pins do not move). DONE WHEN: a one-line change to a civilisation name on the reference world moves seedA/on; the harness still reads bit-identical run to run."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-09-25, the sprint-47 close form); filed by Claude",
+   "id": "BL-1114",
+   "short_name": "EPOCH_ZERO_RETIRED",
+   "category": "Engine",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Epoch 0 is retired: --epoch 0 is refused and its ancient-roster path removed, so the band is only ever the history's",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "src/world/era_band.hpp",
+    "src/core/app.hpp",
+    "src/world/era_roster.cpp",
+    "tools/verify/world_determinism.cpp",
+    "docs/ai/ACTIONS.json"
+   ],
+   "design": "FILED 2026-09-25 from NR-920 (Ben: C, retire epoch 0). Not in sprint 47.\n\nTHE WORK. Refuse an epoch of 0 at the flag (a clear error, never a silent clamp) and remove the path by which epoch 0 once selected the ancient roster (industrial_band_from_year and any caller that still reads it); the band is derive-only. world_determinism's seedA/on/epoch0 digest row goes or is re-scoped to a non-zero epoch; grep the harnesses, the verify scripts and the seed library for an epoch of 0 and move each to 1960. The epoch action entry already states the ruling.\n\nDONE WHEN. --epoch 0 is refused with a message; no code path maps an epoch to a band; world_determinism twice bit-identical with the epoch row re-scoped; save_roundtrip green."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-09-25, the sprint-47 close form); filed by Claude",
+   "id": "BL-1115",
+   "short_name": "SEA_LEGS_IN_LATER_SPANS",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Sea legs run in the Exploration and Industrialisation spans: wet campaigns carry their ration and the port's crossing discount applies",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/era_minus_one.cpp",
+    "src/world/history_sim.cpp",
+    "tools/verify/industrialisation_sim_harness.cpp",
+    "tools/verify/player_seed_sweep.cpp",
+    "tools/verify/exploration_sim_harness.cpp"
+   ],
+   "design": "FILED 2026-09-25 from NR-921 (Ben: B, its own item with a re-bless). Not in sprint 47.\n\nTHE GAP. exploration_sim_params leaves sea_legs_ration_q at 0 and amphibious_weight_crossing false (era_minus_one.cpp ~328-375; asserted by industrialisation_sim_harness BL-1053's EMPIRES_ONLY row), so the port/navy crossing bonus (history_sim.cpp ~4419-4451) never runs in the spans EXPLORATION.md says it drives.\n\nTHE WORK. Switch both on for the later spans as Empires runs them; re-scope the EMPIRES_ONLY assertion to the ruling. A WORLD-MOVER: read displacement (the phase's one structural reading) and the lane record (BL-1097) on the 16 curated seeds FIRST (Rule 0b), tune nothing to make a seed behave, then take ONE re-bless: the player_seed_sweep pins (both arcs), exploration R3b, seed_library.js --bless.\n\nDONE WHEN. Wet campaigns in the later spans cross with a ration and the port discount; displacement per seed recorded old -> new; one re-bless; --digest-check both arcs green."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-09-25, the sprint-47 close form); filed by Claude",
+   "id": "BL-1116",
+   "short_name": "HANDOFF_VALIDATORS_RANGE_CHECK",
+   "category": "Generation",
+   "priority": "C",
+   "difficulty": 1,
+   "title": "The 1200 and 1660 handoff validators range-check every civilisation and creed index, so a regressed resume fails on every run, not only under --fidelity",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/exploration_sim_harness.cpp"
+   ],
+   "design": "FILED 2026-09-25 from NR-943 (Ben: B). Light. Not in sprint 47.\n\nTHE WORK. Add >= size checks for region::civilisation and universal_creed indices to pass_one_output_valid (1200) and exploration_output_valid (1660), recorded as record_handoff_violation, each conditional on a non-empty table; fill the hand-made exploration_output fixtures' tables in exploration_sim_harness so the check runs there too.\n\nDONE WHEN. Both validators reject an out-of-range index; exploration_sim_harness ALL PASS; industrialisation_sim_harness --fidelity 16/16."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-09-25, the sprint-47 close form); filed by Claude",
+   "id": "BL-1117",
+   "short_name": "SETTLE_TICK_ONE_COST",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Settle tick 1 costs 44-62 s against ~1.5 s for the other eleven: instrument it by phase and hand the cause to the economy lane",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/world/campaign_settle.cpp",
+    "src/world/finish_campaign_world.cpp"
+   ],
+   "design": "FILED 2026-09-25 from NR-932 (Ben: C, both; the progress tap is sprint 47's, this is the other half). Not in sprint 47.\n\nTHE READING. Inside the twelve-tick settle in round 6's worker, tick 1 runs 44-62 s (seed 0: settle 113,922 ms, tick 1 56,881 ms; seed 28: 68,832 ms) while ticks 2-12 cost ~1.5 s each.\n\nTHE WORK. Time tick 1 by phase (the first clearing over cold pools? the first dispatch?) on seeds 0 and 28 in Release, record the split here, and file the fix against the owning economy work -- NR-915 (the tick tail) may already own the cause. Measure, do not reshape.\n\nDONE WHEN. The phase that costs tick 1 is named with its milliseconds on two seeds and the fix is filed where it belongs."
   }
  ]
 }

@@ -37,6 +37,25 @@ claimed by the first lane that needs it (`next_save_version.js --kind envelope|w
 **Owed live clicks carried in:** BL-1068, BL-1072, BL-1073, BL-1076, BL-1080 (round 6, the wait,
 Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
 
+### Close-form tasks (Ben, 2026-09-25) — owed before the live clicks
+
+Ben's close form carried BL-1084 and wave 3 to sprint 48 and ruled the open calls; four rulings
+change built sprint-47 surfaces. Each is small; each is done before its item's live click.
+
+- [ ] C1 BL-1083 (span seeds per round): remove the Culture round's Reroll (NR-931 C, STARTUP.md
+  § Each pass round is rerollable); `span_seed[0]` stays folded, zero-neutral. R3 is re-read as
+  "the Culture round offers no reroll" and `span_seed_isolation` S0 re-scoped to assert the walk is
+  seed-free; R7 closes with it (the per-span rule is written).
+- [ ] C2 BL-1090 (hard borders by people share): the heavy stroke draws on edges between two
+  different realms only, never the coast (NR-937 B); the 10% on / 6% off pin is unchanged. Re-run
+  its capture scripts.
+- [ ] C3 BL-1099 (works chartered events): the origin sentence collapses on agreement — "under
+  <nation>, its own realm since <year>" (NR-941 A) — and "since" walks back through the earlier
+  records while the same polity id holds the region (NR-939 B); `seat_screen.cpp`, with
+  `seat_pick.lua` and `history_lapse_works.lua` re-read. Before R5's live click.
+- [ ] C4 BL-1085 (Begin retired into round six): a per-tick progress tap on the settle so the
+  round-6 bar moves through tick 1 (NR-932 C; the cost itself is BL-1117, settle tick one cost).
+
 ### Wave 0, lane G (generation seams) — BL-1083 (one seed per span). Group `span-seeds-per-round`.
 
 MERGED 2026-09-25 (7bf2bac0, fix round 8889487a): gates green, R3 fails by design (NR-931), R5/R6 owe Ben's click.

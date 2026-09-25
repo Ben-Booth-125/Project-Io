@@ -303,3 +303,24 @@ Stale code comments: `startup_screens.cpp:488-500`, `world_gen_config.hpp:95-101
 `app.hpp:280-283, :643-650, :711-727`, `history_sim.cpp:936-939/:961`, `history_sim.hpp:2683-2687,
 :2718-2731`, `components.hpp:1741`, `hard_coded_world.hpp:730`, `era_roster.cpp:3-4`, the duplicated
 "Pass 2c" labels in `nation_generation.cpp`, `charter_budget.hpp:185-188`.
+
+## F. The close form (Ben, 2026-09-25)
+
+Taken after the one re-bless (`2f877e2c`). Each ruling is written into its owning doc; the NR entry
+carries the resolution.
+
+- **Sprint shape.** BL-1084 (the world built once and moved) and wave 3 (BL-1086, BL-1098, BL-1107)
+  carry to sprint 48; NR-936 (Next does not wait) rides with BL-1084. The done-when drops the
+  seam clause.
+- **NR-941 → A.** The origin sentence collapses when the holder is the nation's own realm.
+- **NR-939 → B.** "Since" is tenure: walk back through the earlier records by polity id.
+- **NR-940 → A.** The works-chartered dawn cluster is accepted.
+- **NR-937 → B.** Hard borders at 10% on / 6% off, inter-realm edges only; a coast is not a frontier.
+- **NR-942 → A.** A kin arrow dashes on two interior water tiles.
+- **NR-931 → C.** The Culture round carries no Reroll.
+- **NR-935 → A.** The tariff bands stay 300 / 500 / 700.
+- **NR-934 → A.** The rung stays; per-nation grain through BL-1109.
+- **NR-921 → B.** Sea legs run in the later spans, as BL-1115 with its own re-bless.
+- **NR-920 → C.** Epoch 0 is retired (BL-1114).
+- **NR-932 → C.** A settle progress tap now; tick 1 instrumented as BL-1117.
+- **NR-943 → B.** Conditional range checks in both validators (BL-1116, Light).

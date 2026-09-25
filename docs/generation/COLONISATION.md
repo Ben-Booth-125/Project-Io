@@ -485,7 +485,10 @@ founding, owned by the people who founded it, and the round draws its **kin arro
 record alone: each founding a line from its people's *previous* region — the region the same
 people most recently founded before it in the record — to the new one, fading over the years
 after the founding, dashed where the line between the two anchors crosses water: the crude hop,
-at region grain. The arrow is honest about its grain. It says a people was there and is now
+at region grain. **"Crosses" means at least two interior samples of the line fall on water (Ben,
+2026-09-25, NR-942):** a strait is a crossing, and a coast-hugging people's one-tile graze of a
+bay is not. Any single wet sample would dash nearly every coastal founding and hide the hops; the
+road bake's majority rule would dash none. The arrow is honest about its grain. It says a people was there and is now
 here; it does not say which stream carried them, which shore they walked or which strait they
 crossed. The exact answer — the source region whose stream reached the founded anchor — is the
 walk's, and the hop record below is what keeps it.

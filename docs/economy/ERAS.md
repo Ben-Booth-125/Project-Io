@@ -57,7 +57,7 @@ band — the calendar only, or an override that buys the ancient roster as a san
 and this document owns only the Era structure, which is the same on both.
 
 **The prehistory is a generator, not a play layer.** Generation runs a pre-epoch history sim that
-produces the world the campaign opens on, at either epoch. It runs three spans on one engine, each
+produces the world the campaign opens on. It runs three spans on one engine, each
 on one band at 4 years a tick: Empires, 400 BCE → 1200 CE; Exploration, to 1660; Industrialisation,
 to 1960 (`src/world/era_minus_one.cpp` derives each; `world_params::prehistory_years` is the scope
 knob that runs them at all). A six-band ladder

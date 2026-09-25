@@ -458,7 +458,10 @@ conflated — otherwise every coastal polity begins with the thing the phase is 
 **The port is why the skirmish is cheap and the home war is not.** A neighbour war is fought where
 treaties bind and no port discount applies. A frontier skirmish is staged from a port the polity
 paid for, against ground whose defender has no fleet. That price gap *is* the displacement of
-conflict, expressed in the only currency the phase has.
+conflict, expressed in the only currency the phase has. **Sea legs run in this span and in
+Industrialisation as they do in Empires (Ben, 2026-09-25, NR-921):** a wet campaign carries its
+ration across the water and the port's crossing discount applies, so a skirmish over the sea is a
+real option and the lane record reads wet campaigns as well as the tribute leg.
 
 **The record keeps the fleet and the harbour, year by year (Ben, 2026-09-24).** Each polity's
 sample on the round's record carries its standing navy and its capital's port stock at every
