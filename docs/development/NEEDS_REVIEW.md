@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*48 entries — 1 open, 47 resolved.*
+*49 entries — 2 open, 47 resolved.*
 
 ---
 
@@ -42,6 +42,21 @@ The ruling removed every border link that ended on a bare village street (seed 4
 - C: read after BL-1130 lands, then choose between A and B on the consolidated worlds
 
 > **Recommendation:** C, leaning B: the ruling was about links that join nothing, and a nation left wholly off the network is the opposite case.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-945 — DECISION TAKEN: only a road that can be laid enters the roads tree and the detour test, so a nation the sea divides builds one tree per landmass
+*decision · raised 2026-09-25 · from BL-1119 (roads tree and detour) cold review, 2026-09-25, finding 1*
+
+The tree and the detour test took every town pair the path flood could reach, and that flood crosses water at the sea-leg cost. Road rasterisation then refuses any open-ocean route. So a tree link across a bay was never laid (stranding a town from its nation's road), and an admitted sea loop sat in the test network refusing real land loops near it. Taken on your behalf: a route that crosses open sea (other than a strait) is not a road candidate at all -- it never enters the Kruskal tree or the detour test, so a nation the sea divides builds one tree per landmass. Also written down: the detour test reads the town graph (cheapest chain of accepted links, each at its own direct cost), not the raster. LOGISTICS.md § 4 states both.
+
+**Why it matters.** It changes which links form a divided nation's tree, so it moves the road digests (inside the sprint's one re-bless). The alternative keeps sea pairs in the tree and accepts stranded towns.
+
+- A: keep the reading (layable links only; one tree per landmass)
+- B: keep sea pairs as candidates but skip them in the detour test only
+- C: something else
+
+> **Recommendation:** A: a road that cannot be built should not decide which roads are built.
 
 *Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
 

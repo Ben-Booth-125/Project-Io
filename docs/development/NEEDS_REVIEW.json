@@ -1054,6 +1054,27 @@
     "docs/economy/LOGISTICS.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-945",
+   "title": "DECISION TAKEN: only a road that can be laid enters the roads tree and the detour test, so a nation the sea divides builds one tree per landmass",
+   "raised": "2026-09-25",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1119 (roads tree and detour) cold review, 2026-09-25, finding 1",
+   "what": "The tree and the detour test took every town pair the path flood could reach, and that flood crosses water at the sea-leg cost. Road rasterisation then refuses any open-ocean route. So a tree link across a bay was never laid (stranding a town from its nation's road), and an admitted sea loop sat in the test network refusing real land loops near it. Taken on your behalf: a route that crosses open sea (other than a strait) is not a road candidate at all -- it never enters the Kruskal tree or the detour test, so a nation the sea divides builds one tree per landmass. Also written down: the detour test reads the town graph (cheapest chain of accepted links, each at its own direct cost), not the raster. LOGISTICS.md § 4 states both.",
+   "why_it_matters": "It changes which links form a divided nation's tree, so it moves the road digests (inside the sprint's one re-bless). The alternative keeps sea pairs in the tree and accepts stranded towns.",
+   "options": [
+    "A: keep the reading (layable links only; one tree per landmass)",
+    "B: keep sea pairs as candidates but skip them in the detour test only",
+    "C: something else"
+   ],
+   "recommendation": "A: a road that cannot be built should not decide which roads are built.",
+   "files": [
+    "src/world/road_generation.cpp",
+    "docs/economy/LOGISTICS.md"
+   ],
+   "resolution": null
   }
  ]
 }

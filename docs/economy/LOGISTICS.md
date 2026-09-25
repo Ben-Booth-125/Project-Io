@@ -167,14 +167,22 @@ between two centres is laid only when the network's own route between them costs
 is never built, and a loop exists only where the tree forces a long way round. This replaces
 the relative-neighbour redundancy edges, which laid the lattice.
 
+The test is read on the **town graph**, not the raster: the network's route is the cheapest chain
+of already-accepted links, each priced at its own direct cost. Candidates are walked
+cheapest-first, and each admitted loop joins the network as it is accepted. **Only a link that
+can be laid is a candidate** (delegated reading, NR-945): a route across open sea is never a road,
+so it never enters the tree or the test, and a nation the sea divides builds one tree per
+landmass.
+
 **Villages join locally, not as lattice members** (BL-620, road generation scales to density):
-**only a village above a size floor lays a spur (Ben, 2026-09-25)**, and the floor is **40,000
-heads** (Ben, 2026-09-25, from the measured ladder: about the 90th percentile of village size on
-the curated seeds). A village's size is its headcount in the population step, the figure that tells
-villages apart when roads are laid. Each such village lays one Track spur to its nearest
-already-roaded same-nation tile — backbone
-raster, another centre's streets, or an earlier spur — chosen from a distance-prefiltered
-candidate set, never all-pairs. A village whose nearest target is beyond the spur cap, or
+**only a village at or above a size floor lays a spur (Ben, 2026-09-25)**, and the floor is
+**40,000 heads** (Ben, 2026-09-25, from the measured ladder: about the 90th percentile of village
+size on the curated seeds). A village's size is its headcount in the population step, the figure
+that tells villages apart when roads are laid. Each such village lays one Track spur to its
+nearest same-nation tile **already joined to the backbone** — backbone raster, a town's streets,
+or an earlier spur that reached the backbone — chosen from a distance-prefiltered candidate set,
+never all-pairs. A spur that only reaches another unjoined village joins nothing, so it does not
+count: a village is on its nation's network only when its road reaches a town. A village whose nearest target is beyond the spur cap, or
 whose every route would cross open sea, keeps only its local street. Low-stratum settlements
 feed the network; they do not define it — which is both the honest historical shape and what
 keeps generation cost linear in village count at demography-derived density (BL-610).
