@@ -248,6 +248,25 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
         h.region_row.push_back(r.row);
         h.region_name.push_back(r.name);
     }
+    // THE RECORD'S OWN REGIONS, NOT THE REPORT'S (BL-1087, the review's fix
+    // round). A round's worker builds its record from a report STOPPED at the
+    // round's close, so its region list is the regions at that close; a
+    // record adopted from a FINISHED report (the --verify rounds, and every
+    // record the Begin/load derivation walks) would otherwise raster over the
+    // regions of 1960 — every region a later span founded — and a strip a
+    // 1700 founding takes between two 1200 neighbours would drop their
+    // adjacency, move a greedy offset, and colour a nation on load differently
+    // from the round the player watched. `region_stride` is the region count
+    // at the record's close, and region ids ascend in founding order, so the
+    // first `region_stride` anchors ARE the round's own list.
+    if (h.lapse.region_stride > 0
+        && static_cast<std::size_t>(h.lapse.region_stride) < h.region_col.size())
+    {
+        const std::size_t n = static_cast<std::size_t>(h.lapse.region_stride);
+        h.region_col.resize(n);
+        h.region_row.resize(n);
+        h.region_name.resize(n);
+    }
 
     if (!(migration && adopted))
     {
@@ -2152,16 +2171,11 @@ std::vector<uint32_t> derive_realm_colours(const generation_report& rep,
         const auto tit = w.tiles.find(grid[k]);
         if (tit != w.tiles.end() && !is_water(tit->second.substrate)) water[k] = 0;
     }
-    std::vector<int32_t> col, row;
-    col.reserve(home.settlement.regions.size());
-    row.reserve(home.settlement.regions.size());
-    for (const region& r : home.settlement.regions) { col.push_back(r.col); row.push_back(r.row); }
-    const std::vector<int32_t> tile_region = nearest_region_raster(water, gw, gh, col, row);
-    const std::vector<std::vector<int32_t>> nbrs = region_adjacency(tile_region, gw, gh, col.size());
 
     polity_pins pins;
     bool has_pins = false;
     int family_count = 0, records = 0;
+    std::size_t regions_last = 0;
     std::vector<int32_t> last_slot, last_rung;
     for (int i = 1; i < round_count; ++i)
     {
@@ -2169,6 +2183,17 @@ std::vector<uint32_t> derive_realm_colours(const generation_report& rep,
         if (h.empty()) continue;
         ++records;
         family_count = h.family_count;
+        // PER RECORD, OVER THE RECORD'S OWN REGIONS (the review's fix round):
+        // `lapse_from_report` cuts the anchor list to the record's
+        // `region_stride`, so this raster and adjacency are the ones the
+        // wizard's round drew by — the regions at that round's close, not the
+        // 1960 set — and a strip founded in a later span cannot move an
+        // earlier round's adjacency here and nowhere else.
+        const std::vector<int32_t> tile_region =
+            nearest_region_raster(water, gw, gh, h.region_col, h.region_row);
+        const std::vector<std::vector<int32_t>> nbrs =
+            region_adjacency(tile_region, gw, gh, h.region_col.size());
+        regions_last = h.region_col.size();
         const std::vector<int32_t> first = polity_first_region(h.lapse);
         const std::vector<int32_t> seat  = polity_seat_region(h.lapse, first);
         std::vector<int32_t> wedge;
@@ -2203,14 +2228,14 @@ std::vector<uint32_t> derive_realm_colours(const generation_report& rep,
             ++coloured;
         }
     std::printf("[identity] realm colours derived from the report: %zu of %zu realms over %d record(s), "
-                "%d families, %d x %d raster, %zu regions\n",
-                coloured, last_slot.size(), records, family_count, gw, gh, col.size());
+                "%d families, %d x %d raster, %zu regions at the last close\n",
+                coloured, last_slot.size(), records, family_count, gw, gh, regions_last);
     return realm;
 }
 
 } // namespace
 
-void app::pin_realm_colours_from_wizard()
+bool app::pin_realm_colours_from_wizard()
 {
     // The last landed polity round holds the colours the player watched:
     // that table, verbatim, at its close. Nothing when the wizard did not run
@@ -2225,8 +2250,9 @@ void app::pin_realm_colours_from_wizard()
             if (h.polity_slot[p] >= 0)
                 realm[p] = ui::lapse_owner_colour(h, static_cast<uint16_t>(p), end);
         ui::palette::set_realm_colour_table(realm);
-        return;
+        return true;
     }
+    return false;
 }
 
 void app::pin_nation_colours_from_report()
@@ -2238,14 +2264,33 @@ void app::pin_nation_colours_from_report()
     if (home == nullptr || home->nation_ids.empty()) return;
 
     // The wizard's own colours where it ran; the report's derivation otherwise
-    // (a load, or a cold Begin). One rule, two sources of the same numbers.
-    pin_realm_colours_from_wizard();
+    // (a load, or a cold Begin). One rule, two sources of the same numbers —
+    // and where both exist they are COMPARED (the review's fix round): the
+    // equality R2 promises between the round the player watched and the
+    // table a load re-derives is a count printed here, not an assertion.
+    // The derivation is three rasters and three assignments, cheap at Begin.
+    const bool wizard_table = pin_realm_colours_from_wizard();
+    const std::vector<uint32_t> derived =
+        derive_realm_colours(m_generation_report, *home, m_world, wizard_lapse_round_count);
+    if (!wizard_table)
+        ui::palette::set_realm_colour_table(derived);
+    else
     {
-        bool found = false;
-        ui::palette::realm_colour(0, &found);
-        if (!found)
-            ui::palette::set_realm_colour_table(
-                derive_realm_colours(m_generation_report, *home, m_world, wizard_lapse_round_count));
+        std::size_t compared = 0, differ = 0, one_sided = 0;
+        for (std::size_t p = 0; p < derived.size(); ++p)
+        {
+            bool found = false;
+            const ImU32 c = ui::palette::realm_colour(static_cast<int>(p), &found);
+            const bool has_derived = derived[p] != 0u;
+            if (!found && !has_derived) continue;
+            if (found != has_derived) { ++one_sided; continue; }
+            ++compared;
+            if (static_cast<uint32_t>(c) != derived[p]) ++differ;
+        }
+        std::printf("[identity] the wizard's realm table against the report's derivation: "
+                    "%zu of %zu realms differ, %zu held by one side only\n",
+                    differ, compared, one_sided);
+        std::fflush(stdout);
     }
 
     std::vector<std::pair<entity_id, ImU32>> table;

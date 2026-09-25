@@ -1291,10 +1291,6 @@ int main(int argc, char** argv)
                 water[t] = is_water(terr.substrate[t]) ? 1 : 0;
             std::vector<int32_t> rcol, rrow;
             for (const region& rg : k->settlement.regions) { rcol.push_back(rg.col); rrow.push_back(rg.row); }
-            const std::vector<int32_t> tile_region =
-                nearest_region_raster(water, home_grid_width, home_grid_height, rcol, rrow);
-            const std::vector<std::vector<int32_t>> nbrs =
-                region_adjacency(tile_region, home_grid_width, home_grid_height, rcol.size());
 
             // The lineage tree, as lapse_from_report rebuilds it (cradles first,
             // daughters after, BL-856; folded daughters take no wedge, BL-1017).
@@ -1319,6 +1315,21 @@ int main(int argc, char** argv)
             {
                 const era_timelapse& rec = *records[ri];
                 if (rec.empty()) continue;
+                // PER RECORD, OVER THE RECORD'S OWN REGIONS (the review's fix
+                // round on BL-1087): the wizard's round rasters over the regions
+                // at ITS close — `region_stride`, ids ascending in founding order
+                // — not the 1960 set, so the clash count is the one the rounds
+                // actually resolve. A raster over the final regions counted a
+                // strip a later founding took as breaking a 1200 adjacency.
+                const std::size_t nreg = rec.region_stride > 0
+                                             ? std::min(rcol.size(), static_cast<std::size_t>(rec.region_stride))
+                                             : rcol.size();
+                const std::vector<int32_t> rcol_at(rcol.begin(), rcol.begin() + static_cast<std::ptrdiff_t>(nreg));
+                const std::vector<int32_t> rrow_at(rrow.begin(), rrow.begin() + static_cast<std::ptrdiff_t>(nreg));
+                const std::vector<int32_t> tile_region =
+                    nearest_region_raster(water, home_grid_width, home_grid_height, rcol_at, rrow_at);
+                const std::vector<std::vector<int32_t>> nbrs =
+                    region_adjacency(tile_region, home_grid_width, home_grid_height, nreg);
                 const std::vector<int32_t> first = polity_first_region(rec);
                 const std::vector<int32_t> seat  = polity_seat_region(rec, first);
                 std::vector<int32_t> wedge;

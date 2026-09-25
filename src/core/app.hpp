@@ -825,7 +825,9 @@ private:
     void pin_nation_colours_from_report();
     /// BL-1089: the realm table alone, from the last landed polity round, so
     /// the loading carve can colour by realm before the nation entities exist.
-    void pin_realm_colours_from_wizard();
+    /// True when a round's table was set; false when the wizard has none to
+    /// give, and the caller derives from the report instead.
+    bool pin_realm_colours_from_wizard();
 
     // --- The seat (BL-630, 2026-08-26) --------------------------------------
     //
