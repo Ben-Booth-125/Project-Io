@@ -10176,6 +10176,13 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
     // carried on the strength of the OTHER end alone... unless that other end
     // is itself held by a survivor, which is exactly the "at least one" test.
     o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
+
+    // BL-1049: the records the carried civilisation and creed indices point
+    // into, copied whole and in index order -- as `make_exploration_output`
+    // does at 1660 -- so the Exploration resume continues the numbering
+    // rather than restarting both tables at 0 under the old indices.
+    o.civilisations    = hs.civilisations;
+    o.universal_creeds = hs.universal_creeds;
     return o;
 }
 

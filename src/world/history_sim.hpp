@@ -1941,11 +1941,11 @@ struct history_sim_params
     // `exploration_output`").
     // -----------------------------------------------------------------------
     //
-    // Three more tables cross beside BL-931's four. Each is null by default,
-    // and the Exploration caller leaves all three null, so every existing run
-    // -- the shipped Exploration span included -- opens exactly as before.
-    // The Industrialisation span (BL-1040, hard_coded_world.cpp) is the caller that
-    // sets all seven, from its `exploration_output`.
+    // Three more tables cross beside BL-931's four. Each is null by default.
+    // The Industrialisation span (BL-1040, hard_coded_world.cpp) sets all
+    // seven from its `exploration_output`; the Exploration span sets the two
+    // record tables from its `pass_one_output` (BL-1049) and leaves the dated
+    // objects null, because the Empires span forms no treaty to carry.
 
     /// Treaty clauses and tribute standing at the prior span's close
     /// (`exploration_output::dated_objects`), copied into this run's table at
@@ -1966,11 +1966,14 @@ struct history_sim_params
     /// reusing 0, and a pair the prior span already settled is found rather
     /// than recorded twice.
     ///
-    /// THE EXPLORATION CALLER LEAVES BOTH NULL, AND THAT IS A KNOWN GAP, NOT
-    /// A CHOICE: its 1200 resume still restarts both tables at 0.
-    /// `pass_one_output` does not carry them, and carrying them there would
-    /// drop a twice-recorded civilisation's line from the world log -- a
-    /// digest mover, so it rides a re-bless rather than this item.
+    /// EVERY RESUMED SPAN SETS BOTH (BL-1049): Exploration from
+    /// `pass_one_output::civilisations` / `::universal_creeds` at 1200, the
+    /// Industrialisation span from `exploration_output`'s at 1660. A resume
+    /// that left them null would reopen both tables at 0 under indices the
+    /// prior span assigned -- an index pointing past the table it sits
+    /// beside, and a settled pair recorded again under a new name --
+    /// which `industrialisation_sim_harness --fidelity` counts and fails on.
+    /// Null is what a fixture that resumes nothing gets.
     const std::vector<civilisation>*    resume_civilisations    = nullptr;
     const std::vector<universal_creed>* resume_universal_creeds = nullptr;
 
@@ -4307,10 +4310,13 @@ struct history_sim_state
     /// few or none".
     std::vector<civilisation> civilisations;
 
-    /// How many civilisation records were ever created (== civilisations.size()
-    /// today, but counted alongside the run's other formation-style counters
-    /// — `foundings`, `polities_industrialised` — for the same reason: a
-    /// harness reads this list, not the vector, when it only wants the count).
+    /// How many civilisation records THIS RUN created (== civilisations.size()
+    /// on a fresh run; on a resumed run the table opens on the carried
+    /// records -- `resume_civilisations`, BL-1049 -- so the count is the
+    /// span's own coinings and the table is longer). Counted alongside the
+    /// run's other formation-style counters — `foundings`,
+    /// `polities_industrialised` — for the same reason: a harness reads this
+    /// list, not the vector, when it only wants the count.
 
     /// BL-897 — EVERY UNIVERSALISING CREED THIS RUN COINED, in the order they
     /// arose. A NAMED RECORD each; `region::universal_creed` and
@@ -5146,6 +5152,23 @@ struct pass_one_output
     /// this produces across `holdings` is the reading the contract is judged
     /// on (§ The network is the estate, and it crosses), never its total.
     std::vector<history_corridor> surviving_corridors;
+
+    /// BL-1049 -- THE CIVILISATION AND UNIVERSAL-CREED RECORDS AT THE CLOSE,
+    /// in index order: the tables `region::civilisation`,
+    /// `region::universal_creed` (in `regions`) and `polity::universal_creed`
+    /// (in `polities`) index into. On exactly the footing of
+    /// `exploration_output::civilisations` (BL-1036): the span resumed from
+    /// this value copies both (`history_sim_params::resume_civilisations` /
+    /// `resume_universal_creeds`), so an index assigned here names the same
+    /// record on the far side of 1200, a record coined there takes the next
+    /// free index rather than reusing 0, and a pair this span already settled
+    /// is found rather than recorded a second time under a name from the next
+    /// span's seed (CIVILISATION.md sec A civilisation is what mixing makes:
+    /// "a record persists, and the fragments inherit it"). DATA carried
+    /// forward, never a seed: coining in the next span still draws on that
+    /// span's own stream (BL-1083).
+    std::vector<civilisation>    civilisations;
+    std::vector<universal_creed> universal_creeds;
 };
 
 /// Fold the live sim state and settlement state into the handoff value.
@@ -5312,10 +5335,11 @@ struct exploration_output
     /// `polity::universal_creed` indices were assigned against during the
     /// span. A resumed span copies both (`history_sim_params::
     /// resume_civilisations` / `resume_universal_creeds`), so its next record
-    /// takes the next free index. NOT RANGE-VALIDATED, and that is the known
-    /// gap `resume_civilisations` names: the Exploration span itself resumes
-    /// at 1200 without the Empires tables, so an index an Empires-era record
-    /// was given can sit on a region here with no row to point at.
+    /// takes the next free index. The Empires span's rows lead the table,
+    /// because the Exploration span opened on them (BL-1049,
+    /// `pass_one_output::civilisations`). Not range-validated here: the
+    /// fidelity harness counts an index at or past its table and a pair
+    /// recorded twice across 1200, and fails on either.
     std::vector<civilisation>    civilisations;
     std::vector<universal_creed> universal_creeds;
 

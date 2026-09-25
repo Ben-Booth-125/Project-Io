@@ -8455,6 +8455,75 @@
      "result_metric": "save_envelope_roundtrip PASS (0 failure(s)) with the migration record in the fixture; next_save_version.js reads v22 claimed by BL-1083 with three share rows (BL-1096/1097; BL-1099/1100/1104) and no second envelope number for sprint 47; save_game_version = 22 unchanged by this lane."
     }
    ]
+  },
+  {
+   "brief": "civilisation-index-reuse-at-1200",
+   "title": "BL-1049 - The civilisation and universal-creed tables cross the 1200 resume",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1049 - sprint 47 re-bless rider (2026-09-25)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "code: history_sim.hpp pass_one_output; history_sim.cpp make_pass_one_output; hard_coded_world.cpp the 1200 resume",
+      "headless: industrialisation_sim_harness --fidelity (the BL-1049 section)"
+     ],
+     "requirement": "pass_one_output carries civilisations and universal_creeds (folded whole, in index order, as exploration_output does at 1660) and generation's 1200 resume sets resume_civilisations / resume_universal_creeds from it, so an Empires-era index names the same record in the Exploration span, a record coined there takes the next free index, and a settled pair is found rather than recorded again. The tables are data carried forward; coining still draws on the span's own seed (BL-1083). (item-spanning gate)",
+     "notes": "",
+     "result_metric": "history_sim.hpp: pass_one_output gains civilisations / universal_creeds (field comment names the footing: exploration_output::civilisations, BL-1036; data carried forward, never a seed, BL-1083); history_sim.cpp make_pass_one_output copies hs.civilisations / hs.universal_creeds whole, in index order; hard_coded_world.cpp sets ep.resume_civilisations / ep.resume_universal_creeds = &kepler_pass_one.* beside the four BL-931 pointers at the 1200 resume (the 1660 call was already setting all seven). The KNOWN GAP comments on history_sim_params::resume_civilisations and exploration_output::civilisations rewritten; history_sim_state::civilisations_formed's comment now says \"this run's coinings\" (the table is longer on a resumed run). industrialisation_sim_harness --fidelity, 16 library seeds, 2026-09-25: the carried prefix equals the whole 1200 table on every seed (e.g. seed 46: 62 rows at 1200 -> 62 at 1660, carried prefix 62 -> 65 at 1960; seed 31: 57 -> 60 (57) -> 60; seed 0: 38 -> 39 (38) -> 39)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: industrialisation_sim_harness --fidelity, before and after the fix; --seeds 0 --through 1960 smoke"
+     ],
+     "requirement": "industrialisation_sim_harness --fidelity prints per seed the regions (civilisation) and regions plus polities (creed) whose index is at or past its table on the 1660 handoff and the 1960 close, and the member pairs recorded twice over the 1200 table followed by what the 1660 table adds beyond its carried prefix; either non-zero fails the seed's gate-1 row. Recorded before the fix (non-zero) and after (0 / 0 on 16 of 16).",
+     "notes": "",
+     "result_metric": "industrialisation_sim_harness.cpp (fidelity namespace): indices_past_table() and pairs_recorded_twice() beside the table_diff helpers; seed_fidelity carries civ_rows_1200/1660/1960, civ_carried_prefix, civ_past_1660/1960, creed_past_1660/1960, civ_pairs_twice; computed per seed off the fixture's pre-Exploration capture, the 1660 handoff and the 1960 close before the continued runs; a non-zero reading is pushed onto open_tables so gate 1 fails; a \"=== BL-1049 ...\" section prints every seed's row. BEFORE the fix (the harness built on the instrumented tree with the 1200 resume still passing neither table; the 16 seeds run as 9 parallel chunks, all FIDELITY FAIL on gate 1, gates 2 and 3 unchanged): seed 0 rows 38 -> 4 (prefix 0) -> 6, past the table 1660 civ 244 creed 1593, 1960 civ 190 creed 1593, pairs recorded twice 3; seed 9: 52 -> 7 -> 8, 343/461, 342/461, 5; seed 10: 28 -> 6 -> 9, 250/984, 246/984, 3; seed 11: 33 -> 8 -> 8, 197/2057, 197/2057, 7; seed 12: 49 -> 3 -> 3, 136/0, 136/0, 1; seed 13: 36 -> 5 -> 6, 221/1260, 220/1260, 5; seed 25: 41 -> 7 -> 8, 155/2271, 154/2271, 4; seed 28: 22 -> 2 -> 2, 88/193, 88/193, 1; seed 31: 57 -> 11 -> 15, 221/3129, 213/3129, 8; seed 32: 33 -> 3 -> 5, 134/1007, 132/1007, 0; seed 37: 33 -> 9 -> 12, 222/1503, 217/1503, 7; seed 38: 34 -> 7 -> 7, 97/417, 97/417, 5; seed 40: 47 -> 10 -> 10, 202/407, 202/407, 5; seed 41: 33 -> 1 -> 1, 183/910, 183/910, 1; seed 43: 26 -> 4 -> 5, 109/903, 107/903, 4; seed 46: 62 -> 11 -> 16, 238/2019, 230/2019, 11. AFTER the fix (same 9 chunks): every seed 0 / 0 / 0 with the carried prefix equal to the 1200 table, gate 1 16/16, gate 2 16/16, gate 3 16/16, FIDELITY PASS on all 9 chunks (worst seed 31 at 343.6 s). Smoke --seeds 0 --through 1960 (readings mode): runs to the end, REPORT ONLY, EXIT 0."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: era_minus_one.hpp; the fixture re-run sites in industrialisation_sim_harness.cpp, exploration_sim_harness.cpp, exploration_sweep.cpp",
+      "headless: exploration_sim_harness; history_sim_harness"
+     ],
+     "requirement": "era_minus_one_fixture captures the 1200 tables (pre_exploration_civilisations / _universal_creeds) and every fixture re-run of the Exploration span passes them, so a harness re-run is still generation's own span. history_sim_harness stays at its baseline (2 pre-existing failures, R3a2/R3a3); exploration_sim_harness R3b's pinned counters are reported if they move, never re-pinned here.",
+     "notes": "",
+     "result_metric": "era_minus_one.hpp: pre_exploration_civilisations / pre_exploration_universal_creeds captured beside the other pre_exploration_* copies (hard_coded_world.cpp, the BL-937 block). Every fixture re-run of the Exploration span passes them: industrialisation_sim_harness continued() and its 1660 control (the --through control), exploration_sim_harness run_exploration (from p1, the fresh fold), run_span and run_surveyed, exploration_sweep's traced re-run and run_to. All 11 resume_corridors setters in src/ and tools/ now carry the pair (the two 1660 sites and the null defaults already did). history_sim_harness: 2 failures, R3a2 / R3a3 (the pre-existing baseline), 105 PASS, EXIT 1. exploration_sim_harness: R3b FAIL exactly as on main: tribute 228427744 against the pin 228427344 (+400); battles 30, conquests 27, foundings 816, subjections 3, freed 0, treaties 354, broken 1, owner changes 2061 all at their pins. NOT this item's move: an untracked bisect copy of the harness re-ran the pinned span with both tables, each alone and neither -- tribute 228427744 in all four; the item's whole footprint on that fixture is civilisations_formed 2 -> 0 and 845 -> 843 prose lines. main already carries the +400 as BL-1096's one purchase, left failing for the sprint's single re-bless (REFINED.md sprint-47 lane W1; NEXT_SESSION.md). Not re-pinned here; every other row PASS (1 failure total)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism x2",
+      "headless: save_envelope_roundtrip",
+      "build: Release ProjectIo"
+     ],
+     "requirement": "world_determinism run twice is bit-identical run to run; the digests that move against main (the deep digest folds the prose history log, and the duplicate civilisation lines drop) are recorded old -> new for the main session's re-bless. save_envelope_roundtrip passes (the time-lapse name tables reach the envelope). The Release build is clean.",
+     "notes": "",
+     "result_metric": "world_determinism (bash builder, Lua-linked) run TWICE on the branch: ALL PASS (0 failures) on both runs, 2026-09-25; the two logs differ in timing lines only. Digests bit-identical run to run and UNMOVED against main: seedA/on 6DBC0094F0B6B0EF -> 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC -> 95EEAD1204FD31AC, seedA/off 4834366D19271E5F -> 4834366D19271E5F (epoch0 6DBC0094F0B6B0EF). Unmoved by construction, not for want of a change: world_determinism builds its worlds with make_hard_coded_world alone, on which world::history_log is never seeded (seed_genesis_history runs in finish_campaign_world), and its BL-1009 folds are sentiment pairs and road tiles -- so neither the Exploration prose lines this item drops nor the record tables reach that digest. The shipped change on its seed A is real: industrialisation_sim_harness --fidelity --seeds 2882400001 (0xABCDEF01) reads BEFORE 37 -> 5 (carried prefix 0) -> 6, 352 civ / 1368 creed indices past the table, 5 pairs recorded twice; AFTER 37 -> 37 (prefix 37) -> 38, 0 / 0 / 0 -- five 'is settled as a shared way of life' lines leave that world's biography, which a digest that folds the world log or the tables (the library sweep's) will see. save_envelope_roundtrip (build_rel, Release): PASS (0 failures) -- the time-lapse name tables (civilisation_name / creed_name, BL-1106) are the tables' reach into the envelope and the format is unchanged. Release ProjectIo built clean twice from bash (an untracked _build_rel_bash.sh mirroring build_lua_harness.sh's MSVC 14.44 environment, cmake -G Ninja Release): BUILD_OK, exe 08:58:44."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "doc: docs/generation/CIVILISATION.md",
+      "doc: docs/generation/EXPLORATION.md"
+     ],
+     "requirement": "CIVILISATION.md § A civilisation is what mixing makes says the record crosses every span boundary whole and in order; EXPLORATION.md § What this phase hands Industrialisation lists the civilisation and universal-creed records (its \"nothing else crosses\" was false for two tables BL-1036 already crossed). State-independent wording.",
+     "notes": "",
+     "result_metric": "CIVILISATION.md § A civilisation is what mixing makes: one bold sentence after \"A record persists, and the fragments inherit it\" -- the record crosses every span boundary whole and in order, owner BL-1049 (civilisation index reuse at 1200). EXPLORATION.md § What this phase hands Industrialisation: a bullet for the civilisation and universal-creed records (the list said \"nothing else crosses\" while BL-1036's struct already carried both). Both state-independent; header_graph not re-run here (no header changed)."
+    }
+   ]
   }
  ]
 }

@@ -712,6 +712,10 @@ and what preference different cultures develop for these goods."*
   span's dead, exactly as the Empire handoff filters its own.
 - **The sea legs it walked**, each with its count of uses — what the lane stamp reads
   (§ The colonial tie is a sea lane), as the surviving network is what the road stamp reads.
+- **The civilisation and universal-creed records**, in index order — the tables every region's
+  and polity's civilisation and creed index points into, opened on at 1200 from the Empire handoff
+  and handed on whole at 1660 (`CIVILISATION.md` § A civilisation is what mixing makes), so the
+  next span continues the numbering rather than coining record 0 twice.
 
 **The list is a struct, and it has readers before Industrialisation exists.** Every item above is one
 field of the handoff value, checked by a validator, on the same footing as the Empire handoff

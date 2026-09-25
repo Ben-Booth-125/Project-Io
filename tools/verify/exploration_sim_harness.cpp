@@ -572,6 +572,8 @@ int main()
             ep.resume_grudges   = &p1.grudges;
             ep.resume_contacts  = &p1.contacts;
             ep.resume_corridors = &p1.surviving_corridors;
+            ep.resume_civilisations    = &p1.civilisations;    // BL-1049: as generation's 1200 resume
+            ep.resume_universal_creeds = &p1.universal_creeds;
             if (tweak != nullptr) tweak(ep);
             history_sim_state st = run_history_sim(ss, &fixture.creeds, fixture.terrain.view(),
                                                    fixture.gw, fixture.gh, ep, seed, nullptr,
@@ -2663,6 +2665,8 @@ int main()
             ep.resume_grudges   = &fixture.pre_exploration_grudges;
             ep.resume_contacts  = &fixture.pre_exploration_contacts;
             ep.resume_corridors = &fixture.pre_exploration_corridors;
+            ep.resume_civilisations    = &fixture.pre_exploration_civilisations;    // BL-1049
+            ep.resume_universal_creeds = &fixture.pre_exploration_universal_creeds;
             ep.industry_tree_enabled = enabled;
             ep.industry_open_year    = open_year;
             settlement_state ss = fixture.pre_exploration_settlement;
@@ -2778,6 +2782,8 @@ int main()
                 ep.resume_grudges   = &fixture.pre_exploration_grudges;
                 ep.resume_contacts  = &fixture.pre_exploration_contacts;
                 ep.resume_corridors = &fixture.pre_exploration_corridors;
+                ep.resume_civilisations    = &fixture.pre_exploration_civilisations;    // BL-1049
+                ep.resume_universal_creeds = &fixture.pre_exploration_universal_creeds;
                 ep.industry_tree_enabled                = true;
                 ep.industry_open_year                   = open;
                 ep.industry_survey_inherits_at_founding = a_on;

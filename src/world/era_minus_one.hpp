@@ -324,6 +324,13 @@ struct era_minus_one_fixture
     std::vector<polity>   pre_exploration_polities;   ///< `pass_one_output::polities` at 1200.
     std::vector<grudge>   pre_exploration_grudges;    ///< `pass_one_output::grudges` at 1200.
     std::vector<history_corridor> pre_exploration_corridors; ///< `pass_one_output::surviving_corridors` at 1200.
+    /// BL-1049: the civilisation and universal-creed tables at 1200
+    /// (`pass_one_output::civilisations` / `::universal_creeds`), which the
+    /// span's resume copies so the carried indices keep their records. A
+    /// re-run that leaves these off `history_sim_params` reopens both tables
+    /// at 0 and is not generation's own span.
+    std::vector<civilisation>    pre_exploration_civilisations;
+    std::vector<universal_creed> pre_exploration_universal_creeds;
 
     // --- BL-956: the Exploration handoff, and what world setup consumed ----
 
