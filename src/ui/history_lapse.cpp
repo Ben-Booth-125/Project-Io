@@ -29,6 +29,10 @@ namespace {
 constexpr ImU32 col_sea      = IM_COL32( 16,  24,  38, 255);
 constexpr ImU32 col_void     = IM_COL32( 10,  11,  15, 255);
 constexpr ImU32 col_frontier = IM_COL32(  8,   9,  12, 200); ///< The line between holders.
+/// BL-1090: the 2 px dark of a HARD border -- opaque where the soft line is
+/// translucent, so the two read as different weights and not as one line
+/// drawn twice.
+constexpr ImU32 col_frontier_hard = IM_COL32(  8,   9,  12, 255);
 constexpr ImU32 col_dim      = IM_COL32(120, 128, 145, 255);
 constexpr ImU32 col_bright   = IM_COL32(225, 230, 240, 255);
 
@@ -651,6 +655,10 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
         h.industry_density_peak = std::max(h.industry_density_peak, d);
     }
 
+    // The hard-border bitmap (BL-1090): the hysteresis walk over the steps,
+    // from the carried state. Empty on the Culture round (no samples).
+    lapse_hard_walk(h);
+
     // The Culture round's record carries a lineage palette (BL-919); its hue
     // families seed the slot walk so kin start near one another on the wheel.
     assign_polity_colours(h, h.culture_family.empty() ? nullptr : &h.culture_family);
@@ -886,13 +894,29 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    frame cheap.) Unclaimed land gets no tint: the bare ground IS the
     //    "nobody here yet" colour. ──
     //
-    // Owner keys: -1 sea (nothing drawn, nothing bordered), -2 wild, else the
-    // polity index. The frontier is drawn between any two DIFFERENT non-sea
-    // keys, on both axes.
+    // Owner keys: -1 sea (nothing drawn), -2 wild, else the polity index. The
+    // frontier is drawn between any two DIFFERENT keys on both axes -- the
+    // `>= -2` tests below admit sea, so a coast is outlined too (which is what
+    // every capture has shown); a hard realm's coast draws heavy like the
+    // rest of its outline (BL-1090), since only the land side can be hard.
     const float carry_fade = lapse_carry_fade(h, year);
     std::vector<int32_t> row(static_cast<std::size_t>(gw));
     std::vector<int32_t> above(static_cast<std::size_t>(gw), -1);
     std::vector<char>    present; // owner -> holds ground in this slice
+
+    // BL-1090: owner -> hard at this frame, read once per owner. The bitmap
+    // lookup is one binary search over the steps; cached because a frontier
+    // asks it per edge and a political map has thousands of edges.
+    std::vector<int8_t> hard_cache; // -1 unread, 0 soft, 1 hard
+    const auto hard_of = [&](int32_t key) -> bool {
+        if (key < 0) return false; // sea and wild ground carry no share
+        const std::size_t o = static_cast<std::size_t>(key);
+        if (hard_cache.size() <= o) hard_cache.resize(o + 1, -1);
+        if (hard_cache[o] < 0)
+            hard_cache[o] = lapse_polity_hard(h, static_cast<uint16_t>(key), year) ? 1 : 0;
+        return hard_cache[o] == 1;
+    };
+
     for (int r = 0; r < gh; ++r)
     {
         for (int c = 0; c < gw; ++c)
@@ -978,11 +1002,39 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 const int32_t west = row[static_cast<std::size_t>(c - 1)];
                 if (west >= -2 && west != key)
                 {
-                    // +0.5: a 1 px line centred ON the pixel column, not
-                    // anti-aliased across two.
-                    dl->AddLine({px(static_cast<float>(c)) + 0.5f, y0},
-                                {px(static_cast<float>(c)) + 0.5f, y1}, col_frontier, 1.0f);
-                    ++prims;
+                    const bool hk = hard_of(key), hw = hard_of(west);
+                    if (hk || hw)
+                    {
+                        // BL-1090: A HARD BORDER. 2 px of dark centred on the
+                        // tile edge (pixel columns c-1 and c), then a 1 px
+                        // stroke one pixel INSIDE each hard realm's ground in
+                        // its own colour -- so the weight reads as the realm's,
+                        // not the edge's, and two hard neighbours each keep
+                        // their own stroke on their own side.
+                        const float x = px(static_cast<float>(c));
+                        dl->AddLine({x, y0}, {x, y1}, col_frontier_hard, 2.0f);
+                        ++prims;
+                        if (hk)
+                        {
+                            dl->AddLine({x + 1.5f, y0}, {x + 1.5f, y1},
+                                        owner_colour(h, static_cast<uint16_t>(key)), 1.0f);
+                            ++prims;
+                        }
+                        if (hw)
+                        {
+                            dl->AddLine({x - 1.5f, y0}, {x - 1.5f, y1},
+                                        owner_colour(h, static_cast<uint16_t>(west)), 1.0f);
+                            ++prims;
+                        }
+                    }
+                    else
+                    {
+                        // +0.5: a 1 px line centred ON the pixel column, not
+                        // anti-aliased across two.
+                        dl->AddLine({px(static_cast<float>(c)) + 0.5f, y0},
+                                    {px(static_cast<float>(c)) + 0.5f, y1}, col_frontier, 1.0f);
+                        ++prims;
+                    }
                 }
             }
             c = e;
@@ -1008,9 +1060,38 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                               && row[static_cast<std::size_t>(e)] == row[static_cast<std::size_t>(s)]
                               && above[static_cast<std::size_t>(e)] == above[static_cast<std::size_t>(s)])
                     ++e;
-                dl->AddLine({px(static_cast<float>(s)), y0 + 0.5f},
-                            {px(static_cast<float>(e)) + 1.0f, y0 + 0.5f}, col_frontier, 1.0f);
-                ++prims;
+                {
+                    // BL-1090: the same hard rule on the north-south edge --
+                    // 2 px of dark on pixel rows r-1 and r, the inner stroke
+                    // one pixel into whichever side is hard.
+                    const int32_t south = row[static_cast<std::size_t>(s)];
+                    const int32_t north = above[static_cast<std::size_t>(s)];
+                    const bool hs = hard_of(south), hn = hard_of(north);
+                    const float x0 = px(static_cast<float>(s));
+                    const float x1 = px(static_cast<float>(e)) + 1.0f;
+                    if (hs || hn)
+                    {
+                        dl->AddLine({x0, y0}, {x1, y0}, col_frontier_hard, 2.0f);
+                        ++prims;
+                        if (hs)
+                        {
+                            dl->AddLine({x0, y0 + 1.5f}, {x1, y0 + 1.5f},
+                                        owner_colour(h, static_cast<uint16_t>(south)), 1.0f);
+                            ++prims;
+                        }
+                        if (hn)
+                        {
+                            dl->AddLine({x0, y0 - 1.5f}, {x1, y0 - 1.5f},
+                                        owner_colour(h, static_cast<uint16_t>(north)), 1.0f);
+                            ++prims;
+                        }
+                    }
+                    else
+                    {
+                        dl->AddLine({x0, y0 + 0.5f}, {x1, y0 + 0.5f}, col_frontier, 1.0f);
+                        ++prims;
+                    }
+                }
                 s = e;
             }
         }
@@ -1495,7 +1576,95 @@ const char* polity_name_of(const history_lapse& h, uint16_t polity)
     return region_name_of(h, static_cast<uint16_t>(h.polity_seat[polity]));
 }
 
+// --- BL-1090: the hard-border walk ------------------------------------------
+
+/// The forward walk with hysteresis over one record's steps, from a carried
+/// state. Shared by the finish (which stores the bitmap on the record) and by
+/// the hand-over (which needs only the closing row of a record that may never
+/// have been finished), so the two cannot compute the flag differently.
+void hard_walk_record(const era_timelapse& t, const std::vector<uint8_t>& carry,
+                      std::vector<uint8_t>& out, int32_t& stride)
+{
+    out.clear();
+    stride = 0;
+    if (t.steps.empty() || t.samples.empty()) return;
+
+    // The bitmap's width: one past the highest polity id a sample or the
+    // carry names. Ids are one table across the spans (the slot inheritance
+    // relies on the same fact), so a carried id addresses the same realm.
+    int32_t n_pol = static_cast<int32_t>(carry.size());
+    for (const polity_sample& s : t.samples)
+        n_pol = std::max<int32_t>(n_pol, static_cast<int32_t>(s.polity) + 1);
+    stride = n_pol;
+    out.assign(t.steps.size() * static_cast<std::size_t>(n_pol), 0);
+
+    std::vector<uint8_t> on(static_cast<std::size_t>(n_pol), 0);
+    for (std::size_t p = 0; p < carry.size(); ++p) on[p] = carry[p] ? 1 : 0;
+    std::vector<uint8_t> living(static_cast<std::size_t>(n_pol), 0);
+    for (std::size_t s = 0; s < t.steps.size(); ++s)
+    {
+        const timelapse_step& st = t.steps[s];
+        int64_t total = 0;
+        for (int i = 0; i < st.sample_count; ++i)
+        {
+            const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
+            if (k < t.samples.size()) total += t.samples[k].population;
+        }
+        std::fill(living.begin(), living.end(), uint8_t{0});
+        for (int i = 0; i < st.sample_count; ++i)
+        {
+            const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
+            if (k >= t.samples.size()) continue;
+            const polity_sample& smp = t.samples[k];
+            // The board's own per-mille arithmetic (`share_q_of` in the sweep).
+            const int q = total > 0 ? static_cast<int>((smp.population * 1000) / total) : 0;
+            uint8_t& flag = on[smp.polity];
+            if (!flag && q >= lapse_hard_on_q)       flag = 1;
+            else if (flag && q < lapse_hard_off_q)   flag = 0;
+            living[smp.polity] = 1;
+        }
+        for (int32_t p = 0; p < n_pol; ++p)
+        {
+            const std::size_t up = static_cast<std::size_t>(p);
+            if (!living[up]) on[up] = 0; // absent -- dead or unborn -- is never hard
+            out[s * static_cast<std::size_t>(n_pol) + up] = on[up];
+        }
+    }
+}
+
 } // namespace
+
+void lapse_hard_walk(history_lapse& h)
+{
+    hard_walk_record(h.lapse, h.hard_carry, h.polity_hard, h.hard_stride);
+}
+
+bool lapse_polity_hard(const history_lapse& h, uint16_t polity, int year)
+{
+    const int step = step_at_or_before(h.lapse, year);
+    if (step < 0 || h.hard_stride <= 0 || polity >= h.hard_stride)
+        return polity < h.hard_carry.size() && h.hard_carry[polity] != 0;
+    const std::size_t k = static_cast<std::size_t>(step) * static_cast<std::size_t>(h.hard_stride)
+                        + static_cast<std::size_t>(polity);
+    return k < h.polity_hard.size() && h.polity_hard[k] != 0;
+}
+
+std::vector<uint8_t> lapse_hard_at_close(const history_lapse& h)
+{
+    std::vector<uint8_t> bits;
+    int32_t stride = 0;
+    if (h.hard_stride > 0 && !h.polity_hard.empty())
+    {
+        bits   = h.polity_hard;
+        stride = h.hard_stride;
+    }
+    else
+    {
+        hard_walk_record(h.lapse, h.hard_carry, bits, stride);
+    }
+    if (stride <= 0 || bits.size() < static_cast<std::size_t>(stride)) return {};
+    return std::vector<uint8_t>(bits.end() - stride, bits.end());
+}
 
 float lapse_industry_heat(const history_lapse& h, uint16_t polity, int year)
 {
@@ -1589,6 +1758,7 @@ void draw_lapse_scoreboard(const history_lapse& h,
     {
         const board_row& b = now[static_cast<std::size_t>(i)];
         ImGui::TableNextRow();
+        const bool hard = lapse_polity_hard(h, b.owner, year); // BL-1090: the row is bold
 
         // Rank, and the movement against the lagged board. A polity CLIMBING INTO
         // the board and DROPPING OUT of it is the whole story of the round, so the
@@ -1641,10 +1811,21 @@ void draw_lapse_scoreboard(const history_lapse& h,
             else if (delta < 0) std::snprintf(cell, sizeof cell, "%s  %d",  nm, delta);
             else                std::snprintf(cell, sizeof cell, "%s", nm);
 
-            if (entered) ImGui::PushStyleColor(ImGuiCol_Text, col_bright);
-            ui::fit_text(text_box::table_cell, "wizard.round4.seat", cell,
-                         std::max(24.0f, name_avail - swatch_w));
-            if (entered) ImGui::PopStyleColor();
+            // BL-1090: A HARD-BORDERED REALM'S ROW IS BOLD -- the same flag the
+            // map draws its heavy border from, so the row and the ground agree.
+            // The UI carries ONE face (fonts.cpp), so bold is the fitted
+            // string drawn a second time one pixel to the right, the faux-bold
+            // every single-face renderer uses: the ledger measures the one
+            // `fit_text` draw, and the overlay is the same fitted text at the
+            // same width, so nothing is drawn that was not measured.
+            const float  name_w  = std::max(24.0f, name_avail - swatch_w);
+            const ImVec2 name_at = ImGui::GetCursorScreenPos();
+            if (entered || hard) ImGui::PushStyleColor(ImGuiCol_Text, col_bright);
+            ui::fit_text(text_box::table_cell, "wizard.round4.seat", cell, name_w);
+            if (entered || hard) ImGui::PopStyleColor();
+            if (hard)
+                ImGui::GetWindowDrawList()->AddText({name_at.x + 1.0f, name_at.y}, col_bright,
+                                                    ui::fitted(cell, name_w).c_str());
         }
 
         // The rank column: this polity's share of everyone held at the step.
@@ -1658,7 +1839,17 @@ void draw_lapse_scoreboard(const history_lapse& h,
         if (smp != nullptr && people_total > 0)
         {
             const int q = static_cast<int>((smp->population * 1000) / people_total);
-            ImGui::Text("%d.%d%%", q / 10, q % 10);
+            char share[16];
+            std::snprintf(share, sizeof share, "%d.%d%%", q / 10, q % 10);
+            // The rank figure is bold on a hard row too (BL-1090), the same way.
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            if (hard) ImGui::PushStyleColor(ImGuiCol_Text, col_bright);
+            ImGui::TextUnformatted(share);
+            if (hard)
+            {
+                ImGui::PopStyleColor();
+                ImGui::GetWindowDrawList()->AddText({at.x + 1.0f, at.y}, col_bright, share);
+            }
         }
         else
         {

@@ -369,6 +369,32 @@ struct history_lapse
     /// Zero on a record with no points (the three earlier rounds): no heat.
     double industry_density_peak = 0.0;
 
+    // --- The hard border (BL-1090; Ben, 2026-09-24, rulings R9) ------------
+    //
+    // A REALM WHOSE SHARE OF THE WORLD'S PEOPLE stands above a fixed threshold
+    // draws HARD: 2 px of dark and a 1 px inner stroke in its own colour on
+    // every edge of its ground, and its board row is bold (STARTUP.md
+    // § Identity across the rounds). The share is the board's own rank
+    // column -- the polity's sampled population over every living polity's at
+    // the recorded step -- so the bold row and the heavy border are one fact.
+    // HYSTERESIS across steps keeps a realm sitting on the line from
+    // flickering: it turns hard at `lapse_hard_on_q` and soft only under
+    // `lapse_hard_off_q`. Derived once per record by `lapse_hard_walk`, a
+    // forward walk over the steps; a per-step bitmap so a frame reads one
+    // byte per owner and re-derives nothing.
+
+    /// [step * hard_stride + polity] != 0 when the polity is hard at that
+    /// recorded step. Empty on a record with no samples (the Culture round).
+    std::vector<uint8_t> polity_hard;
+    int32_t hard_stride = 0; ///< The polity count the bitmap is laid out by.
+
+    /// Polity -> hard at the PREDECESSOR round's close (`lapse_hard_at_close`
+    /// of the round before), set at the hand-over exactly as `polity_slot` is
+    /// inherited. THE FLAG CARRIES BY ID: a realm hard at 1200 on the Empires
+    /// round opens the Exploration round hard, and the walk starts from this
+    /// state rather than from soft. Empty when nothing came before.
+    std::vector<uint8_t> hard_carry;
+
     /// The map prints its primitive count to stderr ONCE per record, so the
     /// draw-index bound is a measured number in every capture log. Mutable
     /// because the draw takes the record by const reference and this is not
@@ -462,6 +488,48 @@ float lapse_carry_fade(const history_lapse& h, int year);
 /// 0 with no sample, no points, or a record that carries none. Public so the
 /// verify API reads the same number the map draws.
 float lapse_industry_heat(const history_lapse& h, uint16_t polity, int year);
+
+/// THE HARD-BORDER THRESHOLD, per-mille of the world's people (BL-1090).
+/// MEASURED, NOT CHOSEN (Rule 0b): `history_sweep`'s BL-1090 block over the
+/// 16 curated seeds, 2026-09-25, every recorded step of the Empires span. The
+/// largest realm's share of people PEAKS at 8-17% across the library and
+/// stands at 6-15% at 1000 CE and at the close; the living-polity share
+/// distribution is 88% under 5%, 11% at 5-10%, under 1% at 10-15%, and 0.1%
+/// at 15-20% (94 of 87,900 polity-steps, all on seed 28). So: a 20% line
+/// bolds NOTHING on any curated world; 15% bolds one realm on one world
+/// (seed 28) and briefly two; 10% bolds on 6 of 16 worlds at 1000 CE (1-6
+/// realms, seed 28's 6 the most), 5 at the close, and none on the peaceable
+/// city-state worlds (seeds 11, 31, 13, 10, 9 -- 52-133 powers, top share
+/// 6-9%). 10% is the line that separates the realms that read as empires
+/// from a field that never reaches it.
+///
+/// HYSTERESIS: at 10% the reading found 35 dip episodes that came back (15
+/// of them one step, i.e. twenty years), the deepest single-step dip 39
+/// per-mille under the line and the deepest of three steps or fewer 54; a
+/// margin of 40 therefore holds every single-step dip observed. On->off
+/// transitions at 10%: 69 raw, 36 at a 30 margin, 22 at 50. A realm turns
+/// hard at `lapse_hard_on_q` and soft only under `lapse_hard_off_q`.
+/// `history_sweep` includes this header and prints what the pinned pair
+/// bolds beside its candidate table, so the number here and the number
+/// measured cannot drift apart unnoticed.
+constexpr int lapse_hard_on_q  = 100;
+constexpr int lapse_hard_off_q = 60;
+
+/// Derive `polity_hard` / `hard_stride` from the record's steps: the forward
+/// walk with hysteresis, seeded from `hard_carry`. Called by
+/// `finish_history_lapse`; public so a caller holding a record that was never
+/// finished (a round landed but not yet drawn) can still read its close.
+/// Pure: a function of the samples and the carry alone.
+void lapse_hard_walk(history_lapse& h);
+
+/// Is @p polity hard at @p year -- the recorded step at or before it, or the
+/// carried state before the first step (so a carried realm draws hard from
+/// the round's first frame). False on a record with no samples.
+bool lapse_polity_hard(const history_lapse& h, uint16_t polity, int year);
+
+/// Polity -> hard at the record's closing step, for the next round's
+/// `hard_carry`. Walks the record itself when @p h was never finished.
+std::vector<uint8_t> lapse_hard_at_close(const history_lapse& h);
 
 /// The colour @p owner is drawn in on @p h — a culture's lineage hue on the
 /// Culture round, a polity's identity slot elsewhere. Public so one round can

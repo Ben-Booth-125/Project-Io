@@ -181,10 +181,13 @@ Begin adopts, select company, industry heat). BL-1078 closes with BL-1085.
 
 ### Wave 1, lane I2 (frontier and marks) — BL-1090 (hard borders) then BL-1094 (marks). Groups `hard-borders-by-people-share`, `marks-that-earn-their-place`.
 
-- [ ] T1 (1090) history_sweep column: the people-share distribution per world on the 16 seeds and the
+- [x] T1 (1090) history_sweep column: the people-share distribution per world on the 16 seeds and the
   count a candidate threshold bolds; the threshold and hysteresis fixed from it and written into the
-  item. (1090 R1)
-- [ ] T2 (1090) the per-owner hard flag with hysteresis; both frontier passes (history_lapse.cpp:~979-985,
+  item. (1090 R1) DONE 2026-09-25: the BL-1090 block (distribution, five candidates, dips, hysteresis
+  margins, and the PINNED pair walked as the map walks it); 16-seed reading in the item's design —
+  20%+ bolds nothing anywhere, 15% one realm on one world, 10% on 6 of 16 worlds and none on the
+  city-state worlds; deepest single-step dip 39‰. Pinned on 100 / off 60 (history_lapse.hpp).
+- [x] T2 (1090) the per-owner hard flag with hysteresis; both frontier passes (history_lapse.cpp:~979-985,
   ~1000-1013) draw 2 px dark + 1 px inner stroke in the realm's colour; the board bolds; the flag
   carries by id into round 5. (1090 R2)
 - [ ] T3 (1094) the four marks with their glyphs, the capital-moved slide (on I1's fold — if I1 has
