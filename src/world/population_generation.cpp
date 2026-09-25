@@ -136,9 +136,10 @@ struct carved_centre
 /// sim's own rule, re-read here because a founding in the sim's last round
 /// cut a neighbour's cell after that neighbour's last urban step — and never
 /// more than its cell can place, so every one of them stands in its own cell.
-/// A region whose cell has no placeable tile at all keeps the one centre it
-/// stands (the rule's floor), and only that centre can spill. Null keeps the
-/// sim's count as it stands (a caller with no grid).
+/// A region whose cell holds no land, or no tile the placement gate passes,
+/// carries no centre at all (Ben, 2026-09-25: it has no ground to stand one
+/// on), so no centre spills. Null keeps the sim's count as it stands (a
+/// caller with no grid).
 std::vector<carved_centre> carve_demography_centres(const settlement_state& settlement,
                                                     int heads_per_centre,
                                                     const std::vector<int>* cell_land = nullptr,
@@ -178,8 +179,10 @@ std::vector<carved_centre> carve_demography_centres(const settlement_state& sett
             int stands = p.centres;
             if (cell_land != nullptr && ri < cell_land->size())
                 stands = region_centres_fit(p.urban_population, stands, (*cell_land)[ri]);
-            if (cell_place != nullptr && ri < cell_place->size() && (*cell_place)[ri] > 0)
+            if (cell_place != nullptr && ri < cell_place->size())
                 stands = std::min(stands, (*cell_place)[ri]);
+            if (stands <= 0)
+                continue; // No ground to stand a centre on: its heads town nobody here.
             urban_total += p.urban_population;
             count       += stands;
             for (int k = 1; k <= stands; ++k)
@@ -597,105 +600,38 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
             return best_idx;
         };
 
-        // Regions ordered by anchor distance from a given region — the spill
-        // order. BL-1130: the carve holds every region to the placeable tiles
-        // of its own cell, so the ONE region that can reach this is one whose
-        // cell holds no placeable tile at all (an anchor on the shore whose
-        // land all lies nearer other anchors) and keeps the single centre the
-        // rule's floor leaves it. Built lazily and cached, since almost no
-        // region spills.
-        std::unordered_map<int, std::vector<int>> spill_order;
-        auto spill_for = [&](int ri) -> const std::vector<int>& {
-            auto it = spill_order.find(ri);
-            if (it != spill_order.end())
-                return it->second;
-            const region& home = settlement->regions[static_cast<std::size_t>(ri)];
-            std::vector<std::pair<int, int>> keyed; // (distance, region index)
-            keyed.reserve(region_count);
-            for (std::size_t j = 0; j < region_count; ++j)
-            {
-                if (static_cast<int>(j) == ri) continue;
-                const region& o = settlement->regions[j];
-                const int dc = std::abs(o.col - home.col);
-                const int d  = std::max(std::min(dc, gw - dc), std::abs(o.row - home.row));
-                keyed.push_back({ d, static_cast<int>(j) });
-            }
-            std::sort(keyed.begin(), keyed.end()); // distance, then region index
-            std::vector<int> order;
-            order.reserve(keyed.size());
-            for (const auto& kv : keyed) order.push_back(kv.second);
-            return spill_order.emplace(ri, std::move(order)).first->second;
-        };
-
         // BL-1042: a carved centre that is never founded is DROPPED and
-        // recorded as such — the whole body was built out, or the carve handed
-        // back more centres than the body has candidate tiles (`centre_count`
-        // never attempts those) — so the industry points its slot would have
-        // held are counted under their own unspent reason rather than silently
-        // spread over its siblings. Recorded in carve order at the end.
-        enum : char { kept = 0, drop_built_out = 1, drop_no_tile = 2 };
-        std::vector<char> fate(demography_centres.size(), kept);
-        for (int d = centre_count; d < static_cast<int>(demography_centres.size()); ++d)
-            fate[static_cast<std::size_t>(d)] = drop_built_out;
-
-        // BL-1130 — TWO PASSES, SO A SPILL NEVER CASCADES. Pass one founds
-        // every carved centre in its OWN cell, in carve order, and defers any
-        // that finds no free tile there. The carve holds each region to its
-        // cell's placeable tiles, so only a region whose cell has none defers.
-        // Pass two then SPILLS the deferred, in carve order, onto the nearest
-        // region with ground left — after every region's own centres already
-        // stand, so a spill can no longer take the one tile a neighbour's cell
-        // had and push that neighbour out in turn (a single-tile cell is the
-        // common case where regions pack densely: measured, the one-pass order
-        // turned 177 placeless regions into 568 spills on seed 0).
+        // recorded as such, so the industry points its slot would have held
+        // are counted under their own unspent reason rather than silently
+        // spread over its siblings.
         //
-        // SPILL, counted by construction rather than hidden: a region whose
-        // cell holds no placeable ground still materialises the one centre it
-        // keeps. The alternative is to drop it, which would silently lose a
-        // settlement history grew. (Before BL-1130 this was most of the carve:
-        // 80.8% of carved centres over the 16 curated seeds, the regions
-        // wanting more centres than their cells held.)
-        std::vector<int> deferred;
-        for (int placed = 0; placed < centre_count; ++placed)
+        // BL-1130 — EVERY CENTRE STANDS IN ITS OWN CELL, AND NOTHING SPILLS
+        // (POPULATION.md "A centre stands in the region that grew it"). The
+        // carve holds each region to the placeable tiles of its own cell and
+        // gives a cell with none no centre at all, and cells are disjoint and
+        // this is the first placement pass, so a region's own cell always has
+        // a free tile for each of its centres. The spill that used to put a
+        // region's surplus on the nearest region with ground left is gone with
+        // the surplus: before BL-1130 it placed 80.8% of carved centres over
+        // the 16 curated seeds, and after the ground hold only the regions
+        // whose cells held no land still reached it. A centre that finds no
+        // tile here (unreachable by the construction above) is dropped and
+        // counted, never moved into a neighbour's cell.
+        for (int placed = 0; placed < static_cast<int>(demography_centres.size()); ++placed)
         {
             const carved_centre& cc = demography_centres[static_cast<std::size_t>(placed)];
-            const int chosen_idx = best_in_region(cc.region);
-            if (chosen_idx < 0) { deferred.push_back(placed); continue; }
-            if (found_centre(chosen_idx, cc.scale, &cc) == null_entity)
-                fate[static_cast<std::size_t>(placed)] = drop_no_tile;
-        }
-        bool built_out = false;
-        for (const int placed : deferred)
-        {
-            const carved_centre& cc = demography_centres[static_cast<std::size_t>(placed)];
-            int chosen_idx = -1;
-            if (!built_out && cc.region >= 0 && cc.region < static_cast<int>(region_count))
-            {
-                for (const int alt : spill_for(cc.region))
-                {
-                    chosen_idx = best_in_region(alt);
-                    if (chosen_idx >= 0) break;
-                }
-            }
+            const int chosen_idx = (placed < centre_count) ? best_in_region(cc.region) : -1;
             if (chosen_idx < 0)
             {
-                // No region has ground left: the whole body is built out, and
-                // every deferred centre after this one is too.
-                built_out = true;
-                fate[static_cast<std::size_t>(placed)] = drop_built_out;
+                w.gen_carve_dropped.push_back(
+                    { cc.region, cc.rank, cc.key,
+                      placed < centre_count ? carve_drop_reason::no_tile
+                                            : carve_drop_reason::body_built_out });
                 continue;
             }
             if (found_centre(chosen_idx, cc.scale, &cc) == null_entity)
-                fate[static_cast<std::size_t>(placed)] = drop_no_tile;
-        }
-        for (std::size_t d = 0; d < demography_centres.size(); ++d)
-        {
-            if (fate[d] == kept) continue;
-            const carved_centre& dc = demography_centres[d];
-            w.gen_carve_dropped.push_back(
-                { dc.region, dc.rank, dc.key,
-                  fate[d] == drop_no_tile ? carve_drop_reason::no_tile
-                                          : carve_drop_reason::body_built_out });
+                w.gen_carve_dropped.push_back(
+                    { cc.region, cc.rank, cc.key, carve_drop_reason::no_tile });
         }
     }
     else

@@ -2038,9 +2038,11 @@ int region_centre_footprint(int64_t urban_heads, int n)
 int region_centres_fit(int64_t urban_heads, int want, int ground)
 {
     // Descending from what the heads want, so a region its ground does not
-    // bind pays one footprint sum and no more; never below one.
-    int m = std::min(want, region_centre_limit);
-    if (ground < 0 || m <= 1) return m;
+    // bind pays one footprint sum and no more. A cell with no land holds none;
+    // a cell with land keeps at least the one centre it stands.
+    int m = clampi(want, 0, region_centre_limit);
+    if (ground < 0) return m;
+    if (ground == 0) return 0;
     while (m > 1 && region_centre_footprint(urban_heads, m) > ground) --m;
     return m;
 }

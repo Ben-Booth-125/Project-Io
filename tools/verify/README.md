@@ -1136,12 +1136,14 @@ bash tools/verify/build_lua_harness.sh market_census
 
 The population-centre census on the world generation hands the landscape search: the shipped
 arc, built by `build_app_base_world` (generation, setup, recipes; no search — the search founds
-no centre). Per curated seed, on the home body: the sim record (regions, the sum of
-`region::centres`, the per-region count histogram); every centre, the land tiles hosting one and
-the land stamped urban; the scale mix by `k_population_for_scale` rung; the fit of the carve
-against each region's cell of the settlement partition (`nearest_region`) — spills out of the
-source cell, regions whose carved footprints outrun the cell's land (the one-centre regions the
-rule's floor keeps split out), regions with no placeable tile, and the sim record's own
+no centre). Per curated seed, on the home body: the history (battles, conquests and foundings
+per span, from the generation report — the Era −1 sim reads `region::centres`); the sim record
+(regions, the sum of `region::centres`, the per-region count histogram); every centre, the land
+tiles hosting one and the land stamped urban; the scale mix by `k_population_for_scale` rung; the
+fit of the carve against each region's cell of the settlement partition (`nearest_region`) —
+spills out of the source cell, regions whose carved footprints outrun the cell's land (the
+one-centre regions the rule's floor keeps split out), regions with no placeable tile, regions
+whose cell holds no land (and whether they still carry a centre), and the sim record's own
 hierarchy against the final cell; where the density is (regions packed one to a land tile, and
 the carved centres standing in such cells); then road tiles (streets on a centre's tile vs the
 network) and markets. `--map DIR` writes one road-field PPM per seed in `gen_step_costs

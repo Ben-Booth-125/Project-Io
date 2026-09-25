@@ -1262,12 +1262,17 @@ int region_centre_footprint(int64_t urban_heads, int n);
 
 /// The most centres, at most @p want, a region's ground holds at
 /// @p urban_heads: the first m descending from @p want whose hierarchy's
-/// footprint (`region_centre_footprint`) fits @p ground land tiles. Never below
-/// 1 when @p want >= 1 — a region keeps the one centre it stands even where
-/// that footprint outruns its ground, as a coastline cuts a footprint short
-/// rather than unbuilding the town. @p ground < 0 is unmeasured and returns
-/// @p want (caps nothing); @p want is clamped to `region_centre_limit`.
-/// The ONE ground rule: growth, the sack and the campaign-era carve all read it.
+/// footprint (`region_centre_footprint`) fits @p ground land tiles.
+///   * @p ground == 0 — a cell that holds NO land — holds no centre at all
+///     (Ben, 2026-09-25): there is no ground to stand one on, so nothing
+///     spills into a neighbour's cell.
+///   * @p ground > 0 never goes below 1 when @p want >= 1 — a region with land
+///     keeps the one centre it stands even where that centre's footprint
+///     outruns its ground, as a coastline cuts a footprint short rather than
+///     unbuilding the town.
+///   * @p ground < 0 is unmeasured and returns @p want (caps nothing).
+/// @p want is clamped to [0, `region_centre_limit`]. The ONE ground rule:
+/// growth, the sack and the campaign-era carve all read it.
 int region_centres_fit(int64_t urban_heads, int want, int ground);
 
 /// THE CELL LAND OF EVERY REGION, maintained incrementally (BL-1130). The

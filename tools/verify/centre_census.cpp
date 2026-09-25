@@ -30,10 +30,20 @@
 //       centre, which the rule's floor keeps whatever its footprint; regions
 //       carrying more carved centres than their cell has placeable tiles;
 //       PLACELESS regions (living, standing centres, a cell with no placeable
-//       tile — the only regions the carve can still spill); and the SIM
-//       RECORD against the final partition: living regions with more than one
-//       centre whose OWN hierarchy's footprint (`region_centre_footprint`, the
-//       quantity `region_centres_fit` judges) outruns their cell's land.
+//       tile — the only regions the carve could ever spill); GROUNDLESS
+//       regions (living, a cell with no land at all — Ben's 2026-09-25 ruling
+//       gives them no centre); and the SIM RECORD against the final
+//       partition: living regions with more than one centre whose OWN
+//       hierarchy's footprint outruns their cell's land (`hierarchy_footprint`
+//       below, a mirror of settlement.cpp's `region_centre_footprint` — the
+//       quantity `region_centres_fit` judges — restated so the census still
+//       builds on a tree without BL-1130, which is where its BEFORE reading is
+//       taken; on such a tree the row reads the old count as if it were a
+//       hierarchy and means nothing).
+//     * THE HISTORY — per span (Empires, Exploration, Industrialisation), the
+//       battles, conquests and foundings the generation report carries, since
+//       the Era -1 sim reads `region::centres` (BL-1130 round 2 attributes the
+//       move the rule makes in them).
 //     * WHERE THE DENSITY IS — living regions whose cell is ONE land tile
 //       (the settle verb founds on the nearest free tile, so settled cores
 //       pack a region to a tile), and how many carved centres stand in such
@@ -124,6 +134,31 @@ std::vector<uint32_t> library_seeds(const char* path)
     return out;
 }
 
+/// MIRROR of settlement.cpp `region_centre_footprint` (BL-1130), restated so the
+/// census builds on a tree that predates it (see the header). Centre k of n
+/// stands U/(k*H_n) heads, banded to the nearest `k_population_for_scale` rung
+/// in log space (the geometric midpoints between the rungs), and paves
+/// `k_urban_footprint_tiles` of that rung.
+int hierarchy_footprint(int64_t urban_heads, int n)
+{
+    constexpr int64_t bands[4] = { 22360, 100000, 447213, 2236067 };
+    if (n <= 0) return 0;
+    n = std::min(n, 32);
+    const int64_t u = std::clamp<int64_t>(urban_heads, 0, int64_t{1} << 40);
+    int64_t h = 0;
+    for (int i = 1; i <= n; ++i) h += 1000000 / i;
+    int tiles = 0;
+    for (int k = 1; k <= n; ++k)
+    {
+        const int64_t share = (u * 1000000) / (static_cast<int64_t>(k) * h);
+        int s = 1;
+        for (int i = 0; i < 4; ++i)
+            if (share >= bands[i]) s = i + 2;
+        tiles += k_urban_footprint_tiles[s - 1];
+    }
+    return tiles;
+}
+
 std::vector<uint32_t> parse_seed_list(const std::string& s)
 {
     std::vector<uint32_t> out;
@@ -169,6 +204,12 @@ struct seed_record
     int placeless_water = 0;        ///< ...whose anchor tile is water (a shore or lake founding)
     int placeless_stacked = 0;      ///< ...whose anchor tile a lower-index region already holds
     int sim_over_cell = 0;          ///< living, centres > 1, own-hierarchy footprint > final cell land
+    int groundless_regions = 0;     ///< living, cell with no land at all
+    int groundless_standing = 0;    ///< ...whose sim record still carries a centre
+
+    // The history, per span: Empires (the report's prehistory), Exploration,
+    // Industrialisation.
+    int64_t battles[3] = {}, conquests[3] = {}, foundings[3] = {};
 
     // Where the density is.
     int single_tile_cells = 0;     ///< living regions whose cell holds exactly one land tile
@@ -271,6 +312,15 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
     const clk::time_point t0 = clk::now();
     build_app_base_world(lua, params, out);
     r.build_s = std::chrono::duration<double>(clk::now() - t0).count();
+    r.battles[0]   = out.report.prehistory_battles;
+    r.conquests[0] = out.report.prehistory_conquests;
+    r.foundings[0] = out.report.prehistory_foundings;
+    r.battles[1]   = out.report.exploration_battles;
+    r.conquests[1] = out.report.exploration_conquests;
+    r.foundings[1] = out.report.exploration_foundings;
+    r.battles[2]   = out.report.industrialisation_battles;
+    r.conquests[2] = out.report.industrialisation_conquests;
+    r.foundings[2] = out.report.industrialisation_foundings;
 
     const world& w = out.w;
     const entity_id body = w.home_body;
@@ -397,8 +447,13 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
         // The rule on the sim record itself: the region's OWN hierarchy (the
         // one `region_centres_fit` judges) against the FINAL partition's land.
         if (p.population > 0 && p.centres > 1
-            && region_centre_footprint(p.urban_population, p.centres) > cell_land[i])
+            && hierarchy_footprint(p.urban_population, p.centres) > cell_land[i])
             ++r.sim_over_cell;
+        if (p.population > 0 && cell_land[i] == 0)
+        {
+            ++r.groundless_regions;
+            if (p.centres > 0) ++r.groundless_standing;
+        }
     }
 
     // --- urban ground, roads, markets -----------------------------------------
@@ -482,6 +537,16 @@ int main(int argc, char** argv)
         std::fflush(stdout);
     }
 
+    std::printf("\n=== C0 the history (generation report, per span) ===\n");
+    std::printf("seed | empires: battles conquests foundings | exploration: battles conquests "
+                "foundings | industrialisation: battles conquests foundings | regions\n");
+    for (const seed_record& r : recs)
+        std::printf("%4u | %16" PRId64 " %9" PRId64 " %9" PRId64 " | %20" PRId64 " %9" PRId64
+                    " %9" PRId64 " | %26" PRId64 " %9" PRId64 " %9" PRId64 " | %7d\n",
+                    r.seed, r.battles[0], r.conquests[0], r.foundings[0], r.battles[1],
+                    r.conquests[1], r.foundings[1], r.battles[2], r.conquests[2], r.foundings[2],
+                    r.regions);
+
     std::printf("\n=== C1 the sim record (living regions) ===\n");
     std::printf("seed  regions  living  standing  sum_centres   urban_heads  max  @limit | "
                 "per-region centres: 0  1  2-4  5-9  10-19  20+\n");
@@ -510,13 +575,16 @@ int main(int argc, char** argv)
 
     std::printf("\n=== C4 fit (carved centres against their source region's cell) ===\n");
     std::printf("seed  spilled  spilled%%  | overfull_regions (one centre)  footprint_excess_tiles | "
-                "regions_over_placeable  placeless(water/stacked/other) | sim_record_over_cell\n");
+                "regions_over_placeable  placeless(water/stacked/other) | groundless (standing) | "
+                "sim_record_over_cell\n");
     for (const seed_record& r : recs)
-        std::printf("%4u  %7d  %7.1f  | %16d (%10d)  %22" PRId64 " | %22d  %9d (%d/%d/%d) | %20d\n",
+        std::printf("%4u  %7d  %7.1f  | %16d (%10d)  %22" PRId64 " | %22d  %9d (%d/%d/%d) | "
+                    "%10d (%8d) | %20d\n",
                     r.seed, r.spilled, pct(r.spilled, r.carved), r.overfull_regions,
                     r.overfull_single, r.overfull_excess, r.overcount_regions, r.placeless_regions,
                     r.placeless_water, r.placeless_stacked,
-                    r.placeless_regions - r.placeless_water - r.placeless_stacked, r.sim_over_cell);
+                    r.placeless_regions - r.placeless_water - r.placeless_stacked,
+                    r.groundless_regions, r.groundless_standing, r.sim_over_cell);
 
     std::printf("\n=== C5 where the density is: regions packed one to a tile ===\n");
     std::printf("seed  living  single_tile_cells  | centres  carved_in_single_tile_cells  "
