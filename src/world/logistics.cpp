@@ -843,10 +843,10 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
     route.body  = body;
     route.tiles = lp.tiles; // copied: the cache entry stays canonical lo->hi
 
-    // THE ORIENTATION RULE (BL-458). intra_body_path canonicalises its stored
-    // sequence to lo->hi to match its canonicalised (lo, hi) cache key, so the
-    // cached order is source->destination only when the source tile is the
-    // lower id. Flip it when it is not. Skipping this puts a convoy's head at
+    // THE ORIENTATION RULE (BL-458). intra_body_path stores its sequence lo->hi
+    // under its ordered (src, dst) key (BL-1126), so the cached order is
+    // source->destination only when the source tile is the lower id. Flip it
+    // when it is not. Skipping this puts a convoy's head at
     // the far end of its own lane about half the time, and the vision beam
     // renders identically either way, so nothing on screen would report it.
     if (st != std::min(st, dt))

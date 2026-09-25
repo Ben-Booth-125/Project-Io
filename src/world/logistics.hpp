@@ -307,10 +307,11 @@ int convoy_travel_ticks(const world& w, entity_id body, const logistics_path& pa
 // and the picture cannot disagree about where a convoy is.
 //
 // THE ORIENTATION RULE LIVES HERE, and that is the point of the move.
-// `intra_body_path` caches on a canonicalised (lo, hi) endpoint key and
-// canonicalises its reconstructed tile sequence to lo->hi to match — so the
-// cached path runs source->destination only when the source tile happens to be
-// the numerically lower id. Every reader therefore owes a conditional reverse.
+// `intra_body_path` caches on the ORDERED (src, dst) key (BL-1126: a path is
+// directed) but stores its reconstructed tile sequence lo->hi whichever way the
+// pair was asked — so the cached path runs source->destination only when the
+// source tile happens to be the numerically lower id. Every reader therefore
+// owes a conditional reverse.
 // A reader that forgets it puts the head at the WRONG END of the lane roughly
 // half the time, and on screen the beam looks fine either way, so nothing
 // catches it. One owner of the rule, asserted in both directions by
