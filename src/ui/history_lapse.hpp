@@ -335,8 +335,9 @@ struct lapse_tie_seg
     int32_t  year_freed = 0x7FFFFFFF;      ///< `subject_freed`, a party's end, or a re-binding.
     bool     freed_by_refusal = false;     ///< Ended by `subject_freed`: eligible for the trade follow-on.
     bool     bought = false;               ///< Bound by purchase rather than taken (drawn the same; the readout tells them apart).
-    int32_t  year_trade     = 0x7FFFFFFF;  ///< The first `treaty_formed` between the pair after the freeing.
-    int32_t  year_trade_end = 0x7FFFFFFF;  ///< That treaty's break, a party's end, or its term's lapse.
+    int32_t  year_trade     = 0x7FFFFFFF;  ///< The first `treaty_formed` between the pair after the freeing -- or, for a line carried across a re-binding, the refusal year it resumes at.
+    int32_t  year_trade_end = 0x7FFFFFFF;  ///< That treaty's break, a party's end, its term's lapse -- or the re-binding that cut it.
+    int32_t  year_trade_due = 0x7FFFFFFF;  ///< The treaty's OWN end (formed + term, or its renewal), kept when a re-binding cuts the line so the refusal that follows can carry it (cold review on the fix round, 2026-09-25).
 };
 
 /// One treaty, as an arc between the parties' capitals.

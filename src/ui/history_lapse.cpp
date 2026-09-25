@@ -2408,15 +2408,21 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
         {
             // polity = the subject (the native); other = the overlord (the
             // arriver, or the buyer). A re-binding closes the standing tie
-            // AND any trade line still standing for the subject: the pair is
-            // bound again, so the line the freeing left is over, and the new
-            // tie draws alone rather than over a green line it would hide.
+            // AND any trade line still standing between THE SAME PAIR: the
+            // pair is bound again, so the line the freeing left is over, and
+            // the new tie draws alone rather than over a green line it would
+            // hide. A line to a DIFFERENT former overlord is not co-linear
+            // with the new tie and its treaty still stands in the sim, so it
+            // is left drawing (cold review, 2026-09-25: cutting it blanked a
+            // standing treaty for the rest of its term).
             if (!pol_ok(e.polity) || !pol_ok(e.other) || e.polity == e.other) break;
             for (lapse_tie_seg& t : h.tie_segs)
             {
                 if (t.subject != e.polity) continue;
                 if (t.year_freed == lapse_never) t.year_freed = e.year;
-                if (t.year_trade != lapse_never && t.year_trade_end > e.year) t.year_trade_end = e.year;
+                if (same_pair(t, e.polity, e.other)
+                 && t.year_trade != lapse_never && t.year_trade_end > e.year)
+                    t.year_trade_end = e.year;
             }
             lapse_tie_seg t;
             t.overlord   = e.other;
@@ -2433,6 +2439,30 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
                 {
                     t.year_freed       = e.year;
                     t.freed_by_refusal = true;
+                    // THE LINE THE RE-BINDING CUT COMES BACK WITH THE REFUSAL
+                    // (cold review, 2026-09-25): the sim binds, treats and
+                    // frees a churned pair inside one round, and a re-binding
+                    // above ends the older tie's trade line at this tie's
+                    // binding year -- but the treaty it drew is still standing
+                    // in the sim. So when THIS tie is refused, the newest
+                    // older tie of the pair whose line was cut exactly at this
+                    // binding hands its treaty forward: the line resumes here
+                    // and runs to the treaty's own end. Nothing is drawn
+                    // twice (the older line ended where this one begins), and
+                    // a treaty that has since lapsed hands nothing on.
+                    for (auto it = h.tie_segs.rbegin(); it != h.tie_segs.rend(); ++it)
+                    {
+                        const lapse_tie_seg& x = *it;
+                        if (&x == &t || !same_pair(x, t.subject, t.overlord)) continue;
+                        if (x.year_trade == lapse_never || x.year_trade_end != t.year_bound) continue;
+                        if (x.year_trade_due > e.year)
+                        {
+                            t.year_trade     = e.year;
+                            t.year_trade_end = x.year_trade_due;
+                            t.year_trade_due = x.year_trade_due;
+                        }
+                        break;
+                    }
                 }
             break;
         case lapse_event_kind::realm_ended:
@@ -2444,6 +2474,7 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
                 if (t.subject != e.polity && t.overlord != e.polity) continue;
                 if (t.year_freed == lapse_never) t.year_freed = e.year;
                 if (t.year_trade != lapse_never && t.year_trade_end > e.year) t.year_trade_end = e.year;
+                if (t.year_trade_due > e.year) t.year_trade_due = e.year; // nothing to carry past a party's end
             }
             for (lapse_treaty_arc& a : h.treaty_arcs)
                 if ((a.a == e.polity || a.b == e.polity) && a.year_end > e.year)
@@ -2481,12 +2512,14 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
                     {
                         t.year_trade     = e.year;
                         t.year_trade_end = year_after(e.year, term);
+                        t.year_trade_due = t.year_trade_end;
                         follow_on = true;
                     }
                 }
                 else if (e.year <= year_after(t.year_trade_end, renewal_slack))
                 {
                     t.year_trade_end = year_after(e.year, term); // the renewal
+                    t.year_trade_due = t.year_trade_end;
                     follow_on = true;
                 }
                 break;
@@ -2524,8 +2557,11 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
                     a.broken   = true;
                 }
             for (lapse_tie_seg& t : h.tie_segs)
-                if (same_pair(t, lo, hi) && t.year_trade != lapse_never && t.year_trade_end > e.year)
-                    t.year_trade_end = e.year;
+                if (same_pair(t, lo, hi) && t.year_trade != lapse_never)
+                {
+                    if (t.year_trade_end > e.year) t.year_trade_end = e.year;
+                    if (t.year_trade_due > e.year) t.year_trade_due = e.year; // a broken treaty is not carried
+                }
             break;
         }
         default:

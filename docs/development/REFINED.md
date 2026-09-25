@@ -311,7 +311,9 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
   `save_envelope_roundtrip`; cold review; Ben's live click. (R5s)
   PART DONE 2026-09-25: life_to_people.lua, routes_and_splits.lua (seed 13 for the hop) and
   culture_overrun.lua (seed 9) green on the lane's Release build; world_determinism twice, digests
-  unmoved; save_envelope_roundtrip PASS. OWED: the cold review and Ben's live click (the R5s).
+  unmoved; save_envelope_roundtrip PASS. COLD REVIEW DONE 2026-09-25 (fix-round: R4's seed re-pinned, the
+  dash threshold named + NR-942, the cradle-line bound made honest; the re-review returned merge,
+  `cddf6c08` merged `23bc50b3`). OWED: Ben's live click (the R5s).
   FOUND ON THE WAY: `verify.new_world` had been a no-op since BL-1085 (setup_world builds only
   into an empty world); restored, and seat_pick.lua's S5 re-reads its pick on the rebuilt world.
   MAIN 2026-09-25: the other script on that binding, recipe_workforce.lua, went red on the real
@@ -344,7 +346,11 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
   clipping) with `history_fleets` / `history_ties` / `history_tie_state` / `history_landing_year` as its
   readout. NOTE: `verify.new_world(N)` cannot pin seed 13 / 41 -- `app::setup_world` builds only when no
   world exists (BL-1085), so the call is a no-op on the harness's built world; seed 0 carries 11 ties, 112
-  arcs, 34 sails and 3 landings, so every glyph is photographed. OWES the cold review and Ben's live click.
+  arcs, 34 sails and 3 landings, so every glyph is photographed. COLD REVIEW DONE 2026-09-25 (fix-round:
+  landings gated to a record that sails, one trade line per pair, the renewal slack read off the sim's
+  band, the hull check at the navy's peak, the 1660 seam gap documented -> BL-1112; `3eea9af0` merged
+  `88a080f1`; the re-review's one medium -- a re-binding cut a standing treaty's line for good -- fixed
+  on main by the main session, `year_trade_due` carried at the refusal). OWES Ben's live click.
 
 ### Wave 2, lane F3 (Industrialisation) — BL-1099 (works chartered) with BL-1100 (rung crossing) and BL-1104 (Culture record saved). Groups `works-chartered-events`, `rung-crossed-narrated`, `culture-record-saved`.
 
@@ -386,8 +392,9 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
 - [ ] T6 harness rows; captures; Release build; `world_determinism` twice; the round trips; cold review;
   Ben's live click. (R5, R2)
   2026-09-25: harness rows, captures, Release build, determinism x2, both round trips DONE; a
-  self-review (7 findings: 4 fixed, NR-939 filed, 2 noted) stands in for the cold review until the
-  main session's; Ben's live click (R5, 1100 R2) OWED.
+  self-review (7 findings: 4 fixed, NR-939 filed, 2 noted); COLD REVIEW DONE 2026-09-25 in two rounds
+  (the branch's fix round, then main's `b596747c` re-pinning the rows and dating a corp-less report
+  row); Ben's live click (R5, 1100 R2) OWED.
 
 ### Wave 1, lane I3 (voice) — BL-1106 (names and voice). Group `names-and-voice`.
 
@@ -403,8 +410,8 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
   draw and `verify.history_board_marks`; 0 marks at 1200 on round 5.
 - [ ] T3 captures; Release build; cold review; Ben's live click. (R3) Lane's halves DONE 2026-09-25:
   scripts/verify/names_and_voice.lua (six captures, all expects green, no clipping), Release build
-  clean, world_determinism ALL PASS. OWED: the cold review (main session) and Ben's live click on the
-  Culture board and a schism line.
+  clean, world_determinism ALL PASS. COLD REVIEW DONE 2026-09-25 (the wave-1 review, fix round
+  `84baaa65`). OWED: Ben's live click on the Culture board and a schism line.
 
 - [x] T1 join every in-flight worker at the top of `~app` (and on the quit path) with a
   "finishing the build before quitting" line on the wait surface. Verification: start a cold Begin

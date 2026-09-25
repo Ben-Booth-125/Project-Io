@@ -1248,6 +1248,32 @@
     "src/core/verify_api.cpp"
    ],
    "design": "FOUND 2026-09-25 by lane I1: on a --verify world the report's tile_inputs grid (180 x 84) does not match the body's tile raster (261 x 121); the lane stopped reading the field. Either the report records the PREVIEW raster (the wizard's scratch surface) rather than the built body's, or the --verify adopted path fills it from a different world. A reader that trusts it (the Generation Ledger, any raster fold) is wrong by construction.\n\nTHE WORK. Find who writes tile_inputs on the verify path and on the app path; make it the built body's grid; a harness assertion that tile_inputs.gw x gh equals the body's tile count on every path.\n\nDONE WHEN. The assertion holds on --verify, --autostart and the wizard's adopted world."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [
+    "BL-1095"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1112",
+   "short_name": "TIES_INHERITED_ACROSS_THE_SEAM",
+   "author": "Claude (2026-09-25, lane F2 fix round, handed to the main session to file)",
+   "category": "UI",
+   "priority": "C",
+   "difficulty": 2,
+   "title": "A tie or treaty standing at the 1660 seam draws on the Industrialisation round: the resumed span restates its standing links at its open",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/era_timelapse.hpp",
+    "src/ui/history_lapse.cpp",
+    "src/ui/history_lapse.hpp"
+   ],
+   "design": "FILED 2026-09-25 (found by lane F2's cold review; documented as a known gap in history_lapse.hpp's fleets-and-ties layer comment). Not in sprint 47.\n\nTHE GAP. The fleets-and-ties bake (BL-1095) opens a tie on subject_bound / province_bought and an arc on treaty_formed, and closes them on subject_freed / treaty_broken / realm_ended, in one forward walk over ONE record. The Industrialisation span copies exploration_upkeep_enabled and so keeps running the subjection and treaty blocks -- but a link bound before 1660 has its opening kind on the Exploration record and only its closing kind on the Industrialisation one, so round 6 finds a close with no open and draws nothing for it; hulls, harbours and sails are whole (they read the span's own samples and kinds). The same shape BL-1088 met for a realm's founding and answered with the `inherited` kind (20).\n\nTHE WORK. At a resumed span's open, the sim emits one record-only restatement per standing subject link and per standing treaty -- either the existing `inherited` kind with `other` naming what is restated, or two kinds of their own (`tie_inherited`, `treaty_inherited`) numbered past 24 -- carrying the overlord/subject pair (or the treaty pair and its remaining term) so the bake can open the segment at the span's first year. Gated exactly as the closing kinds are; the f=0 control byte-identical; in the next envelope bump. The bake's walk then needs no change beyond opening on the new kind(s); fleets_and_ties.lua gains a round-6 assertion that a tie standing at 1660 on the reference world draws at 1660 + one window.\n\nDONE WHEN. On round 6 of the reference world the ties and arcs that stood at the close of round 5 are drawn from the first frame, and every one of them ends where the Industrialisation record ends it."
   }
  ]
 }

@@ -1759,7 +1759,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // BL-1095: the baked ties, one row each, in the order they were bound:
     // overlord, subject, bound (the year), freed (the year, or nil while it
     // stands to the record's end), trade / trade_end (the follow-on treaty's
-    // years, or nil), bought (true for a purchase). What lets a script pick
+    // years, or nil -- `trade` is the refusal year where a line was carried
+    // across a re-binding), bought (true for a purchase). What lets a script pick
     // a tie whose freeing has a whole marker window inside the span and park
     // on its two years.
     v.set_function("history_ties", [this]() {
