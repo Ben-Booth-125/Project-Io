@@ -466,12 +466,14 @@ void draw_generation_preview(const preview_body* bodies, std::size_t count,
         case 0:
             paint_system(dl, p0, sz, bodies, count, params);
             break;
-        case 1:
-            // The surface before its industrial history: drawdown not yet shown.
-            paint_homeworld_round(dl, p0, sz, bodies, count, home, 0.0f, rot, surface);
-            break;
         default:
-            // Round 2 and beyond: the same world, worked.
+            // Round 1 and beyond: the homeworld, WORKED. The Drawdown lean sits
+            // on the Life round under its Legacy fold now (BL-1091; Ben,
+            // 2026-09-24, rulings R12), so the round that takes the lean is the
+            // round whose globe must show what it did -- a lean whose effect is
+            // drawn one round later is a slider nobody can judge. There is no
+            // "before its industrial history" round left in the wizard; the
+            // Spend chart's hollow columns carry the undrawn reference.
             paint_homeworld_round(dl, p0, sz, bodies, count, home,
                                   bodies[home].state->drawdown, rot, surface);
             break;

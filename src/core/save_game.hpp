@@ -231,6 +231,15 @@ inline constexpr uint32_t save_game_magic =
 ///     (BL-1089): five flat arrays after the three time-lapses — nation ids,
 ///     each nation's founding realm, and the absorbed-realm ranges — read by
 ///     the seat card and the per-world nation -> colour table.
+///   - ONE MORE EVENT KIND, `cradle` (BL-1091, a cradle people's opening on
+///     the migration record; 21 and 22 are held for lane F3's kinds), moving
+///     `lapse_event_kind::count` and so the range check; and THE CRADLE
+///     RECORDS AT THE TAIL OF EVERY SETTLEMENT RECORD, written by
+///     `w_settlement` after `urban_map_drawn` and read back in the same place
+///     by `r_settlement`: `settlement_state::cradle_name` (culture id + string
+///     per cradle) and `::cradle_package` (culture id + the package's
+///     `farm_class_count` u16 affinities and u8 breadth per cradle). Record
+///     data the Culture round's ticker reads; nothing at world setup does.
 /// A v21 stream is refused whole on the same strict-equality contract.
 inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened, inherited, realm names, the polity fold's record
 

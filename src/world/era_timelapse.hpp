@@ -202,6 +202,10 @@ enum class lapse_event_kind : uint8_t
     province_bought     = 18, ///< BL-1096: a native was BOUGHT rather than taken (EXPLORATION.md sec Two ways to claim ground across water); `region` = the native seat, `polity` = the native, `other` = the buyer. Noted INSTEAD of `subject_bound` for that binding (save_game_version 22).
     sea_lane_opened     = 19, ///< BL-1097: a sea leg's uses crossed `sea_lane_tier1_uses`; `region`/`other` = its ends (lo, hi), `polity` = the tier (1). The water analogue of `road_promoted` (save_game_version 22).
     inherited           = 20, ///< BL-1088: a RESUMED span restating a living realm it inherited from the span before — `region` = its capital at the resume, `polity` = the realm, dated `start_year`. Ticker-silent: nothing rose (CIVILISATION.md sec A realm's name). Replaces the `founded` re-emit on the resume path only (save_game_version 22).
+    // 21 = works_chartered and 22 = rung_crossed are lane F3's (BL-1099 /
+    // BL-1100), pre-assigned across the sprint-47 lanes so the kinds never
+    // collide on the merge; the numbers below theirs are held for them.
+    cradle              = 23, ///< BL-1091: a cradle people's opening — `region` = the cradle seat (the first region it held), `polity` = the culture, dated the migration's start (2400 BCE); its name and package are the settlement's pure-output records, resolved read-side. Emitted by `build_migration_timelapse` alone; the migration record's second kind beside `culture_split` (save_game_version 22).
     count
 };
 
@@ -242,7 +246,7 @@ struct era_timelapse
 
     /// THE EVENT LAYER (BL-916) — the named moments, ascending by year. Empty
     /// with `record_playback` off and on every body the era never ran for; the
-    /// migration record carries `culture_split` alone.
+    /// migration record carries `cradle` and `culture_split` alone (BL-1091).
     std::vector<lapse_event>     events;
 
     /// THE NAME TABLE (BL-1106) — the names prose needs that no region can

@@ -580,7 +580,9 @@ void draw_tile_inspector(const world& w, ui_state& s,
         ImGui::SameLine();
         nav_button("Life", 1, round);
         ImGui::SameLine();
-        nav_button("Legacy", 2, round);
+        // BL-1091: Legacy is the Life round's closing fold now; the third
+        // group of the chain table holds Spend alone, for this ledger only.
+        nav_button("Spend", 2, round);
 
         const ui::chain_round& cr = ui::chain_round_at(round);
         // Wrapping container (1): the round question clipped mid-word (BL-215).

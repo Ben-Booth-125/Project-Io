@@ -15,8 +15,12 @@
 //
 // Per round the pane shows what the round settles:
 //   round 0 — the system: star colour/size, orbits, body sizes.
-//   round 1 — the homeworld surface: ocean, atmosphere, ice, life tint.
-//   round 2 — the industrial history: the same surface, worked over.
+//   round 1 — the homeworld surface: ocean, atmosphere, ice, life tint, and
+//             the industrial drawdown worked over it (BL-1091: the Drawdown
+//             lean sits on the Life round, so its globe shows the lean's work).
+//   round 2+ — the same worked surface; the wizard no longer walks a third
+//             planetology round, and the Culture round holds this globe through
+//             its wait before dissolving it into the migration map.
 //
 // Deliberately stylised, not a tile map: the wizard resolves preferences, and
 // a painting that moves when a lean moves is the feedback loop wanted here.

@@ -29,13 +29,21 @@ constexpr ImU32 k_body_cols[4] = {
 
 const chain_round& chain_round_at(int r)
 {
+    // LIFE RUNS WATER THROUGH LEGACY (BL-1091; Ben, 2026-09-24, rulings R12;
+    // PLANETOLOGY.md § Preferences, not parameters). The B -> C joint -- the
+    // endowment, the endemics and the civilisation gate -- is the Life round's
+    // CLOSING FOLD rather than the opening of a third round: Inheritance is
+    // retired and not revived. The third group holds Spend ALONE, parked for
+    // the in-game History ledger's Chain view (tile_inspector.cpp reads the
+    // same table); the wizard walks the first two groups only, and the
+    // Drawdown lean that Spend multiplies sits on Life under the Legacy fold.
     static const chain_round rounds[chain_round_count] = {
         { "The System",  "What kind of world is this, and what is it made of?",
           chain_stage::system, chain_stage::engine },
         { "Life",        "What happened on it, and what did that leave in the rocks?",
-          chain_stage::water,  chain_stage::green  },
-        { "Inheritance", "What did the era before you already take?",
-          chain_stage::legacy, chain_stage::spend  },
+          chain_stage::water,  chain_stage::legacy },
+        { "Spend",       "How far had the cheap ore already been worked before you arrived?",
+          chain_stage::spend,  chain_stage::spend  },
     };
     if (r < 0)                 r = 0;
     if (r >= chain_round_count) r = chain_round_count - 1;

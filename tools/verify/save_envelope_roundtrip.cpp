@@ -263,6 +263,21 @@ save_envelope make_envelope()
     be.settlement.median_industrial_year = 1843;
     be.settlement.urban_map_drawn        = true;
 
+    // BL-1091 (save_game_version 22): the cradle records at the settlement's
+    // tail. Two cradles with DIFFERENT ids, names and packages, so a swapped
+    // or dropped field cannot compare equal by accident.
+    be.settlement.cradle_name.emplace_back(0, "Vashet");
+    be.settlement.cradle_name.emplace_back(4, "Orunai");
+    {
+        domestication_package p0;
+        p0.affinity[0] = 820; p0.affinity[8] = 310; p0.breadth = 2;
+        domestication_package p1;
+        p1.affinity[1] = 640; p1.affinity[3] = 505; p1.affinity[6] = 190;
+        p1.affinity[10] = 75; p1.breadth = 4;
+        be.settlement.cradle_package.emplace_back(0, p0);
+        be.settlement.cradle_package.emplace_back(4, p1);
+    }
+
     // THE PLAYBACK RECORD, save_game_version 11 (BL-817). Distinct values in
     // every field of every entry, and DIFFERENT BETWEEN the two entries of each
     // array, for the reason the army-pool check above states: a dropped field
@@ -569,6 +584,36 @@ int main()
                   && le.report.bodies[0].settlement.regions[1].army_stock == 941,
               "S3 the army pool survives BESIDE the manpower pool it is raised "
               "from, unswapped (BL-835, both regions)");
+        // BL-1091, save_game_version 22 -- the cradle records at the
+        // settlement's tail. Pinned to the fixture's literals: two cradles,
+        // distinct ids, names, affinities and breadths, so a transposed
+        // affinity slot or a dropped breadth byte cannot compare equal.
+        {
+            const settlement_state& s = le.report.bodies.empty()
+                                      ? env.report.bodies[0].settlement
+                                      : le.report.bodies[0].settlement;
+            const bool cradle_ok = le.report.bodies.size() == 1
+                && s.cradle_name.size() == 2
+                && s.cradle_name[0].first == 0 && s.cradle_name[0].second == "Vashet"
+                && s.cradle_name[1].first == 4 && s.cradle_name[1].second == "Orunai"
+                && s.cradle_package.size() == 2
+                && s.cradle_package[0].first == 0
+                && s.cradle_package[0].second.affinity[0] == 820
+                && s.cradle_package[0].second.affinity[8] == 310
+                && s.cradle_package[0].second.affinity[1] == 0
+                && s.cradle_package[0].second.breadth == 2
+                && s.cradle_package[1].first == 4
+                && s.cradle_package[1].second.affinity[1] == 640
+                && s.cradle_package[1].second.affinity[3] == 505
+                && s.cradle_package[1].second.affinity[6] == 190
+                && s.cradle_package[1].second.affinity[10] == 75
+                && s.cradle_package[1].second.affinity[0] == 0
+                && s.cradle_package[1].second.breadth == 4;
+            check(cradle_ok,
+                  "S3 the cradle names and packages survive at the settlement's tail "
+                  "(BL-1091, save_game_version 22: two cradles, distinct ids, names, "
+                  "affinities and breadths)");
+        }
         // BL-817, save_game_version 11 -- the playback record. Written as one
         // predicate over every field of every entry, because the failure worth
         // catching here is a transposition inside a fixed-size array (the three

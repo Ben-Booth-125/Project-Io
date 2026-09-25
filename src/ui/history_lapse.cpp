@@ -657,6 +657,104 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
         h.lane_segs.push_back(seg);
     }
 
+    // --- BL-1092: the kin arrows, baked once ---------------------------------
+    //
+    // ONE ARROW PER FOUNDING WITH SOMEWHERE TO COME FROM (Ben, 2026-09-24,
+    // rulings R11; COLONISATION.md sec The route record, region grain). The
+    // change list is walked in order; a region's FIRST change is its founding,
+    // and the arrow runs from the founding people's previous region -- the
+    // one it most recently founded before this -- or, for a people's first
+    // founding, from its PARENT's most recent region, read off the
+    // `culture_split` events (`polity` = daughter, `other` = parent). A later
+    // change on a region already founded is a reculture (the split-year
+    // hue change BL-1092 emits) and draws no arrow: nobody moved. A cradle's
+    // first region has no parent and no previous region, so it draws none.
+    // Dashed where the straight line between the anchors CROSSES water --
+    // not the road bake's majority rule, which is built for a caravan that
+    // walks a mostly-dry corridor and reads a one-tile strait as land. The
+    // line is sampled tile by tile and dashes from TWO interior water tiles
+    // up: a crude hop is a bounded crossing of up to three
+    // (`colonisation_max_hop_tiles`), while a coast-hugging people's
+    // consecutive foundings graze a bay by one tile almost every time --
+    // measured 2026-09-25 on library seed 13, where any-water dashed 193 of
+    // 249 arrows and the hops were lost in them. The doc's words are "dashed
+    // where the line between the two anchors crosses water" (COLONISATION.md
+    // sec The route record), honest about its grain either way; this reads
+    // "crosses" as more than a graze. Nothing on a polity round: its record
+    // carries no `culture_split` and its owners are realms, whose foundings
+    // are seats, not routes.
+    h.kin_segs.clear();
+    if (h.owners_are_cultures)
+    {
+        const auto crosses_water = [&](float c0, float r0, float c1, float r1) {
+            const float dc = c1 - c0, dr = r1 - r0;
+            const int   steps = std::max(2, static_cast<int>(std::ceil(std::max(std::fabs(dc), std::fabs(dr)))));
+            int water = 0;
+            for (int i = 1; i < steps; ++i) // interior samples only: the ends are anchors on land
+            {
+                const float t = static_cast<float>(i) / static_cast<float>(steps);
+                int c = static_cast<int>(std::lround(c0 + dc * t - 0.5f));
+                int r = static_cast<int>(std::lround(r0 + dr * t - 0.5f));
+                if (r < 0 || r >= gh) continue;
+                if (c < 0) c += gw;
+                if (c >= gw) c -= gw;
+                if (band[static_cast<std::size_t>(r * gw + c)] == 0xFFu && ++water >= 2) return true;
+            }
+            return false;
+        };
+        std::vector<int32_t> parent_of;   // culture -> parent, from the splits
+        for (const lapse_event& e : h.lapse.events)
+        {
+            if (e.kind != static_cast<uint8_t>(lapse_event_kind::culture_split)) continue;
+            if (e.polity == lapse_event_none || e.other == lapse_event_none) continue;
+            if (parent_of.size() <= e.polity) parent_of.resize(static_cast<std::size_t>(e.polity) + 1, -1);
+            parent_of[e.polity] = static_cast<int32_t>(e.other);
+        }
+        std::vector<int32_t> last_region; // culture -> the region it most recently founded
+        std::vector<uint8_t> founded(h.region_col.size(), 0u);
+        const auto last_of = [&](uint16_t c) -> int32_t {
+            return (static_cast<std::size_t>(c) < last_region.size()) ? last_region[c] : -1;
+        };
+        for (const owner_change& c : h.lapse.changes)
+        {
+            if (c.owner == owner_none) continue;
+            if (static_cast<std::size_t>(c.region) >= h.region_col.size()) continue;
+            if (last_region.size() <= c.owner)
+                last_region.resize(static_cast<std::size_t>(c.owner) + 1, -1);
+            if (founded[c.region])
+            {
+                // A reculture: the daughter's most recent ground is this
+                // region from here on, but nobody walked anywhere.
+                last_region[c.owner] = static_cast<int32_t>(c.region);
+                continue;
+            }
+            founded[c.region] = 1u;
+            int32_t from = last_of(c.owner);
+            if (from < 0 && static_cast<std::size_t>(c.owner) < parent_of.size())
+            {
+                // The people's first founding: its kin are its parent's, so
+                // the arrow leaves the parent's most recent region. A
+                // grandparent is not walked -- a parent with no region yet
+                // is a fixture case, not a world.
+                const int32_t p = parent_of[c.owner];
+                if (p >= 0) from = last_of(static_cast<uint16_t>(p));
+            }
+            last_region[c.owner] = static_cast<int32_t>(c.region);
+            if (from < 0 || from == static_cast<int32_t>(c.region)) continue;
+            lapse_kin_seg seg;
+            seg.region_from = static_cast<uint16_t>(from);
+            seg.region_to   = c.region;
+            seg.culture     = c.owner;
+            seg.year        = c.year;
+            seg.c0 = static_cast<float>(h.region_col[static_cast<std::size_t>(from)]) + 0.5f;
+            seg.r0 = static_cast<float>(h.region_row[static_cast<std::size_t>(from)]) + 0.5f;
+            seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[c.region]) + 0.5f, gw);
+            seg.r1 = static_cast<float>(h.region_row[c.region]) + 0.5f;
+            seg.over_water = crosses_water(seg.c0, seg.r0, seg.c1, seg.r1);
+            h.kin_segs.push_back(seg);
+        }
+    }
+
     // --- The industry layer (BL-1080), baked once ------------------------------
     //
     // A region's first `furnace_lit` is its crossing; the list is ascending, so
@@ -818,11 +916,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
 
     // Fit the raster into the pane, aspect preserved: a political map stretched
     // to a pane is a map of a different world's shape.
-    const float scale = std::min(avail.x / static_cast<float>(gw),
-                                 avail.y / static_cast<float>(gh));
-    const float mw = scale * static_cast<float>(gw);
-    const float mh = scale * static_cast<float>(gh);
-
+    //
     // NO LETTERBOX (Ben, 2026-09-09: "so that our timelapse doesn't contain
     // black bars"). The pane used to be flooded with `col_void` and the map laid
     // on top of it, so a 261x121 raster in a much taller pane wore a black band
@@ -834,10 +928,14 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // space it was given, because the round's left column ends well before the
     // pane begins. The offset is authored rather than derived — it is a framing
     // judgement about this screen, and deriving it from some other quantity
-    // would only disguise that.
-    constexpr float map_nudge_x = 120.0f;
-    const ImVec2 tl{origin.x + (avail.x - mw) * 0.5f + map_nudge_x,
-                    origin.y + (avail.y - mh) * 0.5f};
+    // would only disguise that. THE RULE LIVES IN `lapse_map_frame` (BL-1091):
+    // the wizard's globe dissolve stamps its year over this same corner, and
+    // one framing shared beats two that agree by luck.
+    float fx = 0.0f, fy = 0.0f, scale = 0.0f;
+    lapse_map_frame(gw, gh, avail.x, avail.y, fx, fy, scale);
+    const float mw = scale * static_cast<float>(gw);
+    const float mh = scale * static_cast<float>(gh);
+    const ImVec2 tl{origin.x + fx, origin.y + fy};
 
     dl->AddRectFilled(tl, {tl.x + mw, tl.y + mh}, col_sea);
 
@@ -1342,6 +1440,68 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             dashed(px(s.c0) + shift, py(s.r0), px(s.c1) + shift, py(s.r1));
         }
     }
+
+    // ── 3c''. THE KIN ARROWS (BL-1092; Ben, 2026-09-24, rulings R11), the
+    //    Culture round's own layer, drawn from each founding's year and FADING
+    //    over a few marker windows after it -- a route is a moment on this
+    //    map, not a standing corridor, and a migration of hundreds of foundings
+    //    drawn as permanent lines would be plaid over the very colours the
+    //    round exists to show. In the founding people's lineage hue, so a
+    //    family's roads read as that family's; DASHED where the line crosses
+    //    water (the crude hop, at region grain), solid over land; a small
+    //    arrowhead at the new region says which way the people went. Seam
+    //    crossers are stroked twice like every corridor above. Empty on the
+    //    polity rounds by construction (finish_history_lapse). ──
+    if (!h.kin_segs.empty())
+    {
+        const int   kin_window = std::max(1, marker_window * 3);
+        const float w    = std::max(1.25f, scale * 0.22f);
+        const float dash = std::max(3.0f, scale * 1.2f);
+        for (const lapse_kin_seg& s : h.kin_segs)
+        {
+            if (year < s.year || year - s.year >= kin_window) continue;
+            const float fade = 1.0f - static_cast<float>(year - s.year)
+                                    / static_cast<float>(kin_window);
+            const int   alpha = static_cast<int>(40.0f + 200.0f * fade);
+            const ImU32 col   = with_alpha(owner_colour(h, s.culture, year), alpha);
+            const ImU32 head  = with_alpha(col_bright, alpha);
+            const auto stroke = [&](float x0, float y0, float x1, float y1) {
+                const float dx = x1 - x0, dy = y1 - y0;
+                const float len = std::sqrt(dx * dx + dy * dy);
+                if (len <= 0.0f) return;
+                const float ux = dx / len, uy = dy / len;
+                if (s.over_water)
+                {
+                    for (float t = 0.0f; t < len; t += dash * 2.0f)
+                    {
+                        const float e = std::min(t + dash, len);
+                        dl->AddLine({x0 + ux * t, y0 + uy * t}, {x0 + ux * e, y0 + uy * e}, col, w);
+                        ++prims;
+                    }
+                }
+                else
+                {
+                    dl->AddLine({x0, y0}, {x1, y1}, col, w);
+                    ++prims;
+                }
+                // The head: a small filled triangle pointing along the line
+                // at the new region, sized to the tile so it survives a
+                // narrow pane without swallowing the seat dot beneath it.
+                const float hl = std::clamp(scale * 0.9f, 3.0f, 6.0f);
+                const ImVec2 tip{x1, y1};
+                const ImVec2 base{x1 - ux * hl, y1 - uy * hl};
+                dl->AddTriangleFilled(tip, {base.x - uy * hl * 0.5f, base.y + ux * hl * 0.5f},
+                                      {base.x + uy * hl * 0.5f, base.y - ux * hl * 0.5f}, head);
+                ++prims;
+            };
+            stroke(px(s.c0), py(s.r0), px(s.c1), py(s.r1));
+            if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw)) // the seam, drawn off the other edge
+            {
+                const float shift = s.c1 < 0.0f ? world_w : -world_w;
+                stroke(px(s.c0) + shift, py(s.r0), px(s.c1) + shift, py(s.r1));
+            }
+        }
+    }
     dl->PopClipRect();
 
     // ── 3d. FLEET AND CARAVAN EXEMPLARS (BL-943, EXPLORATION.md sec Goods move
@@ -1716,9 +1876,13 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     }
 
     // The year, over the map's own corner. It is the one thing a watcher needs
-    // without looking away from the frontier.
+    // without looking away from the frontier. THE BODY'S NAME LEADS IT
+    // (BL-1091; STARTUP.md § Rounds: "every lapse header names the body"):
+    // the round is a history of one world, and the stamp says which.
     {
-        const std::string label = lapse_year_label(year);
+        const std::string label = h.body_name.empty()
+            ? lapse_year_label(year)
+            : h.body_name + "  " + lapse_year_label(year);
         const ImVec2 ts = ImGui::CalcTextSize(label.c_str());
         const ImVec2 at{tl.x + 8.0f, tl.y + 6.0f};
         dl->AddRectFilled({at.x - 5.0f, at.y - 3.0f},
@@ -1756,6 +1920,37 @@ int lapse_marker_window_years(const history_lapse& h)
 {
     // One screen-second of the transport (startup_screens.cpp: span / 30 s).
     return std::max(1, h.lapse.years / 30);
+}
+
+// ---------------------------------------------------------------------------
+// BL-1091 / BL-1092 -- the Life -> people bridge and the migration's roads
+// ---------------------------------------------------------------------------
+
+float lapse_globe_fade(const history_lapse& h, int year)
+{
+    // The carry-fade rule (`lapse_carry_fade`) for the round with nothing
+    // behind it: a tenth of the span, so the dissolve reads the same at every
+    // pace and a scripted capture reaches the fade by parking the playhead.
+    if (h.empty() || h.lapse.years <= 0) return 0.0f;
+    const float over = static_cast<float>(h.lapse.years) * 0.10f;
+    const float gone = static_cast<float>(year - h.lapse.start_year);
+    if (gone <= 0.0f)  return 1.0f;
+    if (gone >= over)  return 0.0f;
+    return 1.0f - gone / over;
+}
+
+int lapse_kin_arrows_at(const history_lapse& h, int year)
+{
+    // The bake is in change-list order, which is ascending by year, so the
+    // count is a prefix; the arrows are few enough that a walk is cheaper
+    // than keeping a second index in step with the bake.
+    int n = 0;
+    for (const lapse_kin_seg& s : h.kin_segs)
+    {
+        if (s.year > year) break;
+        ++n;
+    }
+    return n;
 }
 
 // ---------------------------------------------------------------------------
@@ -2295,6 +2490,25 @@ void draw_lapse_scoreboard(const history_lapse& h,
                     static_cast<int>(now.size()) - shown);
         ImGui::PopStyleColor();
     }
+
+    // BL-1092: THE PEOPLES CENSUS AND THE MIGRATION COUNTER, on the Culture
+    // round alone (Ben, 2026-09-24, rulings R11). The daughters the boundary
+    // fold merges back into an ancestor leave the ticker (lapse_ticker_rows);
+    // this is where they are counted instead, beside how many peoples the
+    // migration coined on the march and how many foundings have moved a
+    // people from one region to another by this year (the kin arrows drawn
+    // so far, `lapse_kin_arrows_at`). The counts are the settlement's own
+    // census, read at the record's construction, never re-derived here.
+    if (h.peoples && (h.peoples_cradles > 0 || h.peoples_coined > 0))
+    {
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+        ImGui::TextWrapped("%d cradles; %d peoples coined on the march, %d of them folded "
+                           "back into an ancestor; %d migrations so far.",
+                           h.peoples_cradles, h.peoples_coined, h.peoples_folded,
+                           lapse_kin_arrows_at(h, year));
+        ImGui::PopStyleColor();
+    }
 }
 
 int lapse_lagged_year(const history_lapse& h, int year)
@@ -2602,11 +2816,54 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         break;
     }
     case lapse_event_kind::culture_split:
-        if (e.region == lapse_event_none)
+    {
+        // BL-1091: NAMED WHERE THE RECORD CAN (`people_name`, read off the
+        // settlement's roster at the record's construction); the unnamed
+        // line stays for a record with no roster behind it.
+        const char* D = (static_cast<std::size_t>(e.polity) < h.people_name.size()
+                         && !h.people_name[e.polity].empty())
+                            ? h.people_name[e.polity].c_str() : nullptr;
+        const char* P = (e.other != lapse_event_none
+                         && static_cast<std::size_t>(e.other) < h.people_name.size()
+                         && !h.people_name[e.other].empty())
+                            ? h.people_name[e.other].c_str() : nullptr;
+        if (D != nullptr && P != nullptr && e.region != lapse_event_none)
+            std::snprintf(buf, sizeof buf, "The %s part from the %s at %s.", D, P, R);
+        else if (D != nullptr && P != nullptr)
+            std::snprintf(buf, sizeof buf, "The %s part from the %s on the march.", D, P);
+        else if (e.region == lapse_event_none)
             std::snprintf(buf, sizeof buf, "A new people parts from its kin on the march.");
         else
             std::snprintf(buf, sizeof buf, "A new people parts from its kin at %s.", R);
         break;
+    }
+    case lapse_event_kind::cradle:
+    {
+        // BL-1091 (Ben, 2026-09-24, rulings R12; COLONISATION.md sec The
+        // domestication package, "the cradle is announced"): one line per
+        // people at the span's start, naming where it began and the package
+        // it raised there. `polity` is the culture; the name and the package
+        // prose are the record's own tables, resolved read-side from the
+        // settlement's pure-output records -- nothing here is re-derived.
+        const char* N = (static_cast<std::size_t>(e.polity) < h.people_name.size()
+                         && !h.people_name[e.polity].empty())
+                            ? h.people_name[e.polity].c_str() : nullptr;
+        const char* K = (static_cast<std::size_t>(e.polity) < h.people_package.size()
+                         && !h.people_package[e.polity].empty())
+                            ? h.people_package[e.polity].c_str() : nullptr;
+        // SHORT, because the ticker's column elides at about sixty characters
+        // (BL-714) and two generated names already spend half of them: the
+        // package follows a colon as a bare list, never a clause.
+        if (N != nullptr && K != nullptr)
+            std::snprintf(buf, sizeof buf, "The %s begin at %s: %s.", N, R, K);
+        else if (N != nullptr)
+            std::snprintf(buf, sizeof buf, "The %s begin at %s.", N, R);
+        else if (K != nullptr)
+            std::snprintf(buf, sizeof buf, "A people begin at %s: %s.", R, K);
+        else
+            std::snprintf(buf, sizeof buf, "A people begin at %s.", R);
+        break;
+    }
     case lapse_event_kind::supply_site_upgraded:
         std::snprintf(buf, sizeof buf, "%s buys a waystation, widening its own reach.", R);
         break;
@@ -2692,6 +2949,12 @@ int ticker_priority(const lapse_event& e)
     // stays silent on it, because nothing rose — a "rises" at 1200 for a
     // realm on round 4's final board told the player it was born that year.
     case lapse_event_kind::inherited:            return -1;
+    // BL-1091: A CRADLE OPENS THE ROUND AND THEN GIVES WAY. It takes the
+    // COMMON tier, not the rarest: at 2400 BCE nothing else has happened, so
+    // the twelve announcements are the ticker's first lines by themselves,
+    // and each living split that follows displaces one, newest first. At the
+    // rarest tier they held the whole ticker until twenty-four later moments
+    // had passed -- most of the round, measured on the reference world.
     case lapse_event_kind::civilisation_formed:
     case lapse_event_kind::creed_preached:
     case lapse_event_kind::schism:
@@ -2738,8 +3001,19 @@ std::vector<int> lapse_ticker_rows(const history_lapse& h, int year, int max_row
     int seen = 0;
     for (int i = last; i >= 0 && seen < window; --i)
     {
-        const int pr = ticker_priority(h.lapse.events[static_cast<std::size_t>(i)]);
+        const lapse_event& e = h.lapse.events[static_cast<std::size_t>(i)];
+        const int pr = ticker_priority(e);
         if (pr < 0) continue;
+        // BL-1092: A FOLDED DAUGHTER LEAVES THE TICKER (Ben, 2026-09-24,
+        // rulings R11). About 85% of the splits the migration coins fold back
+        // into an ancestor at the round's close (BL-1017) and never hold a
+        // name on the map; their lines crowded off the splits that took
+        // ground. The board's census counts them instead. The record still
+        // carries every split -- this is the ticker's filter, not the fold's.
+        if (e.kind == static_cast<uint8_t>(lapse_event_kind::culture_split)
+         && static_cast<std::size_t>(e.polity) < h.culture_folded.size()
+         && h.culture_folded[e.polity] != 0)
+            continue;
         tier[pr].push_back(i);
         ++seen;
     }

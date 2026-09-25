@@ -1163,8 +1163,25 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("new_world", [this](unsigned seed) {
         world_params p = m_active_world_params;
         p.seed = static_cast<uint32_t>(seed);
+        // REBUILT, NOT REUSED (BL-1092's overrun capture found it): since
+        // BL-1085 `setup_world` generates only when no world is held, so on a
+        // verify run -- which always holds one -- this call silently kept the
+        // reference world and re-seated its presentation (seat_pick.lua's two
+        // "different seeds" were one world; state_hash read the same before
+        // and after). The world is released here first, so the seed the
+        // script named is the world it gets. THE WIZARD FOLLOWS IT: the
+        // lapse rounds raster the report's regions over the wizard's own
+        // packed surface, built from the PENDING params (`refresh_wizard_
+        // preview`), so a round adopted after this call was drawing the new
+        // world's peoples over the reference world's coastline -- measured
+        // 2026-09-25 as ~80% of kin arrows "over water" on two library seeds
+        // and 0% on seed 0. The pending descriptor is the new world's now,
+        // and the next wizard frame rebuilds its surface and names from it.
+        m_world = world{};
         setup_world(p);
         load_economy();
+        m_pending_world_params = p;
+        m_wiz_dirty            = true;
     });
 
     v.set_function("show_generation", [this](bool on) {
@@ -1566,6 +1583,80 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return std::make_tuple(m_wiz_history[i].lapse.start_year,
                                m_wiz_history[i].lapse.start_year
                                    + m_wiz_history[i].lapse.years);
+    });
+
+    // BL-1092: THE KIN ARROWS on the CURRENT lapse round -- (arrows drawn at
+    // or before the parked year, of which over water, the year of the first
+    // over-water arrow, the record's whole count). The same bake the map
+    // draws (`history_lapse::kin_segs`), so a script can park on the first
+    // hop's year and capture the dashed line rather than sweep for it. -1s
+    // when the record's derived fields are not built yet (a frame must have
+    // drawn the round), so a vacuous zero cannot pass as a check. The first
+    // hop's year is meaningful only when the water count is above zero: a
+    // year is signed (2374 BCE is -2374), so no year value can be a sentinel.
+    v.set_function("history_kin", [this]() {
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        if (h.empty() || !h.derived()) return std::make_tuple(-1, -1, 0, -1);
+        int water = 0, first_water = 0;
+        bool first_set = false;
+        for (const ui::lapse_kin_seg& s : h.kin_segs)
+        {
+            if (s.year > m_wiz_history_year[i]) break;
+            if (!s.over_water) continue;
+            ++water;
+            if (!first_set) { first_water = s.year; first_set = true; }
+        }
+        return std::make_tuple(ui::lapse_kin_arrows_at(h, m_wiz_history_year[i]), water,
+                               first_water, static_cast<int>(h.kin_segs.size()));
+    });
+
+    // BL-1092: THE SPLITS on the CURRENT lapse round, as rows {year, daughter,
+    // parent, folded} in record order, so a script can assert that a daughter
+    // holds no ground the year BEFORE its split line (the parent-then-daughter
+    // fold) and that a folded daughter's split is off the ticker. Read off
+    // the record's own events and the fold flag the ticker filters by.
+    v.set_function("history_splits", [this]() {
+        sol::state& s   = m_lua.state();
+        sol::table  out = s.create_table();
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        // `shown`: the split is one of the ticker's rows at the parked year,
+        // by the same selection the draw makes -- so a folded daughter on the
+        // ticker is a failure a script can name.
+        const std::vector<int> ticker = h.empty() ? std::vector<int>{}
+                                                  : ui::lapse_ticker_rows(h, m_wiz_history_year[i]);
+        int k = 0;
+        for (std::size_t idx = 0; idx < h.lapse.events.size(); ++idx)
+        {
+            const lapse_event& e = h.lapse.events[idx];
+            if (e.kind != static_cast<uint8_t>(lapse_event_kind::culture_split)) continue;
+            sol::table row = s.create_table();
+            row["year"]     = e.year;
+            row["daughter"] = static_cast<int>(e.polity);
+            row["parent"]   = e.other == lapse_event_none ? -1 : static_cast<int>(e.other);
+            row["folded"]   = static_cast<std::size_t>(e.polity) < h.culture_folded.size()
+                              && h.culture_folded[e.polity] != 0;
+            row["shown"]    = std::find(ticker.begin(), ticker.end(), static_cast<int>(idx))
+                              != ticker.end();
+            out[++k] = row;
+        }
+        return out;
+    });
+
+    // BL-1091 / BL-1092: THE PEOPLES CENSUS the Culture board prints --
+    // (cradles, peoples coined on the march, of which folded, the years the
+    // record runs past the Empires round's opening year: the overrun the
+    // playhead clamp captions, 0 when none). Read off the record, as the
+    // board reads it.
+    v.set_function("history_census", [this]() {
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        const int true_end = h.lapse.start_year + h.lapse.years;
+        const int overrun  = (i == 0 && !h.empty())
+            ? std::max(0, true_end - static_cast<int>(m_pending_world_params.empires_start_year))
+            : 0;
+        return std::make_tuple(h.peoples_cradles, h.peoples_coined, h.peoples_folded, overrun);
     });
 
     // BL-1000: the arc readout's share figures on the CURRENT lapse round, in

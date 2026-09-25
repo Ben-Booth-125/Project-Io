@@ -161,6 +161,37 @@ namespace {
 ///                   report's record is the Empires sim's, so the Culture round
 ///                   folds the migration's own out of the settlement instead —
 ///                   the same fold generation makes, on the same regions.
+/// BL-1091: a cradle's domestication package as a short list -- the kinds of
+/// ground it can farm, best first, two named and the rest counted, so a
+/// broad package reads as "floodplain, coast and 4 more" and a narrow one as
+/// "valley floor alone" (COLONISATION.md § The domestication package: breadth
+/// is the span's asymmetry generator, and the count says it). SHORT because
+/// the ticker's column elides at about sixty characters (BL-714) and the two
+/// generated names ahead of it spend half. Read-side only: the package is the
+/// settlement's pure-output record, and nothing here feeds the walk.
+std::string package_prose(const domestication_package& pk)
+{
+    static constexpr const char* k_ground[farm_class_count] = {
+        "floodplain", "grassland", "woodland", "valley floor", "highland",
+        "mountainside", "steppe", "dry ground", "coast", "volcanic soil",
+        "cold ground", "stony ground",
+    };
+    std::vector<std::pair<int, int>> classes; // (yield, class), best first
+    for (int i = 0; i < farm_class_count; ++i)
+        if (pk.affinity[static_cast<std::size_t>(i)] > 0)
+            classes.emplace_back(pk.affinity[static_cast<std::size_t>(i)], i);
+    if (classes.empty()) return "no ground it could farm";
+    std::stable_sort(classes.begin(), classes.end(),
+                     [](const auto& a, const auto& b) { return a.first > b.first; });
+    std::string out = k_ground[classes[0].second];
+    if (classes.size() == 1) return out + " alone";
+    if (classes.size() == 2) return out + " and " + k_ground[classes[1].second];
+    char buf[48];
+    std::snprintf(buf, sizeof buf, ", %s and %d more", k_ground[classes[1].second],
+                  static_cast<int>(classes.size() - 2));
+    return out + buf;
+}
+
 ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_index,
                                     bool adopted)
 {
@@ -177,6 +208,8 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
     for (const generation_report::body_entry& b : rep.bodies)
         if (b.is_homeworld) { home = &b; break; }
     if (home == nullptr) return h;
+    // BL-1091: the lapse header names the body (seed-pure, BL-257).
+    h.body_name = home->name;
 
     h.lapse  = industrialisation ? home->industrialisation_timelapse
              : exploration       ? home->exploration_timelapse
@@ -193,11 +226,13 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
         const settlement_state& ss = home->settlement;
         if (adopted && !ss.regions.empty())
         {
-            // The plurality on a finished report has drifted a little toward the
-            // conquerors (culture_shares shifts SLOWLY), so this is the migration
-            // as the sim left it rather than as it ended — an approximation the
-            // adopt path already accepts for the sake of not running the pass
-            // twice, and an honest one: every region still carries its people.
+            // The fold reads each region's FOUNDER (`region::founding_culture`,
+            // never moved by the sim) and the isolation record's split steps
+            // (BL-1092), so a finished report's drifted plurality no longer
+            // paints a daughter's hue on ground it never founded; the one
+            // remaining difference from the live path is the region list,
+            // which here carries the later spans' foundings dated past the
+            // span's end -- and the playhead never reaches them.
             h.lapse = build_migration_timelapse(ss, colonisation_start_year,
                                                 ss.migration_end_year);
             // The counters follow the record, not the report: a finished
@@ -237,6 +272,34 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
         // THE LIVING TREE (BL-1017): the settlement record's daughters arrive
         // folded, so the wheel is spent only on names that outlived the round.
         ui::build_lineage_palette(h, parent, &folded);
+
+        // BL-1091 / BL-1092: THE PEOPLES, BY NAME. The cradle names and their
+        // packages are the settlement's pure-output records (settlement.hpp
+        // `cradle_name` / `cradle_package`, written once at the coining); the
+        // daughters carry their own names on the roster. Resolved here, on
+        // the read side, into tables the ticker and the board print from --
+        // nothing at world setup reads any of it. The fold flag is the same
+        // `folded` the palette was just built from.
+        h.people_name.assign(parent.size(), std::string());
+        h.people_package.assign(parent.size(), std::string());
+        h.culture_folded.assign(parent.size(), 0u);
+        for (const auto& [cid, name] : ss.cradle_name)
+            if (cid >= 0 && static_cast<std::size_t>(cid) < h.people_name.size())
+                h.people_name[static_cast<std::size_t>(cid)] = name;
+        for (const auto& [cid, pk] : ss.cradle_package)
+            if (cid >= 0 && static_cast<std::size_t>(cid) < h.people_package.size())
+                h.people_package[static_cast<std::size_t>(cid)] = package_prose(pk);
+        for (std::size_t k = 0; k < ss.spawned_cultures.size(); ++k)
+        {
+            const std::size_t id = static_cast<std::size_t>(cradles) + k;
+            if (id < h.people_name.size()) h.people_name[id] = ss.spawned_cultures[k].name;
+        }
+        for (std::size_t c = 0; c < folded.size() && c < h.culture_folded.size(); ++c)
+            h.culture_folded[c] = folded[c] >= 0 ? 1u : 0u;
+        // The board's census (BL-1092): the settlement's own reading.
+        h.peoples_cradles = ss.census.cradles;
+        h.peoples_coined  = std::max<int32_t>(0, ss.census.cultures - ss.census.cradles);
+        h.peoples_folded  = ss.census.fold_folded;
     }
 
     h.region_col.reserve(home->settlement.regions.size());
@@ -332,6 +395,15 @@ void app::launch_wizard_history_run(int lapse_index)
 
     m_wiz_history[lapse_index]         = ui::history_lapse{};
     m_wiz_history[lapse_index].peoples = (lapse_index == 0); // BL-1106: the live Culture record too.
+    // BL-1091: the header names the body from the first live frame, off the
+    // same seed-pure catalogue the report will carry (`generate_body_names`).
+    for (int b = 0; b < prototype_body_count(); ++b)
+        if (prototype_body(b).is_homeworld
+            && static_cast<std::size_t>(b) < m_wiz_names.bodies.size())
+        {
+            m_wiz_history[lapse_index].body_name = m_wiz_names.bodies[static_cast<std::size_t>(b)];
+            break;
+        }
     m_wiz_history_playing[lapse_index] = false;
     m_wiz_history_paused[lapse_index]  = false;
     m_wiz_history_carry[lapse_index]   = 0.0f;
@@ -1019,27 +1091,32 @@ constexpr const char* kTurbulenceCaption =
     "feed what it took. It leans the forces - it sets no number of "
     "realms, and either setting can surprise you.";
 
-/// Culture (round 2) and Empires (round 3) are PASS rounds, not planetology
-/// rounds, but each still carries exactly one lean row of its own -- Drawdown
-/// (moved here by BL-863) and the historical-turbulence lean (BL-839). The old
-/// `r >= planetology_rounds` guard zeroed both out, under-reserving the layout
-/// by one row and pushing each round's preference block and Next/Back footer
-/// below the visible fold at 1080p (BL-904, found via history_lapse_press.lua
-/// and round4_arc_reach.lua going red).
+/// Empires (round 3) is a PASS round, not a planetology round, but it still
+/// carries exactly one lean row of its own -- the historical-turbulence lean
+/// (BL-839). The old `r >= planetology_rounds` guard zeroed it out,
+/// under-reserving the layout by one row and pushing the round's preference
+/// block and Next/Back footer below the visible fold at 1080p (BL-904, found
+/// via history_lapse_press.lua and round4_arc_reach.lua going red).
+///
+/// THE DRAWDOWN LEAN IS LIFE'S (BL-1091; Ben, 2026-09-24, rulings R12). It sat
+/// on the Culture round since BL-863, which reads nothing from it: it is a
+/// planetology input (S9 Spend multiplies the endowments before a tile is
+/// laid), so it belongs where the world is built, under the Legacy fold that
+/// closes the Life round. Life therefore reserves four rows and Culture none.
 int round_pref_count(int r)
 {
     if (r == 0) return 4;
-    if (r == 1) return 3;
-    if (r == 2 || r == 3) return 1;
+    if (r == 1) return 4;
+    if (r == 3) return 1;
     return 0;
 }
 int round_note_lines(int r)
 {
     if (r == 1) return 3; ///< B carries the iron/coal caption.
     if (r == 0) return 1;
-    // Culture's Drawdown carries no caption. Empires' turbulence caption is
-    // far longer than a fixed line count can safely predict, so its height is
-    // measured directly against kTurbulenceCaption where decide_h is built.
+    // Empires' turbulence caption is far longer than a fixed line count can
+    // safely predict, so its height is measured directly against
+    // kTurbulenceCaption where decide_h is built.
     return 0;
 }
 
@@ -1193,8 +1270,9 @@ void app::draw_generation_screen()
     // AT LEAST ONE COUNTER PER ROUND (BL-863). `roll` keeps THREE rather than
     // shrinking with the round count: it is on the save format
     // (save_envelope_roundtrip asserts 8 leans + roll[3] survive), and shrinking
-    // it would make a UI reorder a save-format change. The spare counter is not
-    // dead -- it is the drawdown lean's, for when round 5 takes it.
+    // it would make a UI reorder a save-format change. The spare counter is
+    // simply spare: the drawdown lean lives on the Life round under its Legacy
+    // fold (BL-1091) and rolls with Life's counter.
     static_assert(sizeof(world_preferences::roll)
                       >= sizeof(uint32_t)
                              * static_cast<std::size_t>(wizard_planetology_round_count),
@@ -1285,9 +1363,23 @@ void app::draw_generation_screen()
                                  m_wiz_terrain.size());
 
         const int first = rec.lapse.start_year;
-        const int last  = first + rec.lapse.years; // BL-914: the YEAR REACHED SO FAR
-                                                    // while live — see poll_wizard_history_tap
-                                                    // — and the true final year once landed.
+        const int true_last = first + rec.lapse.years; // BL-914: the YEAR REACHED SO FAR
+                                                        // while live — see poll_wizard_history_tap
+                                                        // — and the true final year once landed.
+        // BL-1092: THE 400 BCE CLAMP, presentation only (Ben, 2026-09-24,
+        // rulings R11; STARTUP.md § Round 3 — Culture). On 6 of 60 seeds the
+        // migration is still filling when the Empires span opens, and its
+        // record runs on past 400 BCE to its own true end (hard_coded_world.cpp
+        // keeps the later year deliberately, BL-947: a record clamp would hide
+        // a defect in the migration). The PLAYHEAD stops at the Empires
+        // round's opening year regardless, so round 4 opens where round 3
+        // stopped and the calendar never steps back; the overrun caption
+        // below the counters says how far the record ran on. The record is
+        // untouched: the Empires round takes the world as the migration
+        // actually left it, and the hand-over folds the record's true end.
+        const int last = (lapse_index == 0)
+            ? std::min(true_last, static_cast<int>(m_pending_world_params.empires_start_year))
+            : true_last;
         const bool live = m_wiz_history_future[lapse_index].valid();
 
         // FROZEN UNDER --verify, for the reason the globe's rotation is: a capture
@@ -1615,7 +1707,14 @@ void app::draw_generation_screen()
                 // the visible active state, so the same press that started
                 // playing undoes it.
                 const int  first_y = rec.lapse.start_year;
-                const int  last_y  = first_y + rec.lapse.years;
+                // BL-1092: the scrubber ends where the playhead does -- at the
+                // Empires round's opening year on the Culture round (the
+                // presentation clamp above), the record's own end elsewhere.
+                const int  true_last_y = first_y + rec.lapse.years;
+                const int  last_y  = (lapse_index == 0)
+                    ? std::min(true_last_y,
+                               static_cast<int>(m_pending_world_params.empires_start_year))
+                    : true_last_y;
                 const bool playing = m_wiz_history_playing[lapse_index];
                 if (ImGui::Button(playing ? "Pause##wizhisttransport"
                                           : "Play##wizhisttransport",
@@ -1705,6 +1804,18 @@ void app::draw_generation_screen()
                                   static_cast<long long>(rec.conquests),
                                   static_cast<long long>(rec.foundings));
                 dim_text(buf);
+                // BL-1092: THE OVERRUN CAPTION. The playhead stopped at the
+                // Empires round's opening year (the presentation clamp) while
+                // the record ran on; the caption says so rather than letting
+                // the clamp pass for the migration's end.
+                if (lapse_index == 0 && true_last_y > last_y)
+                {
+                    std::snprintf(buf, sizeof buf,
+                                  "The migration ran %d years past %s; the Empires round "
+                                  "opens there, on the ground as the migration left it.",
+                                  true_last_y - last_y, ui::lapse_year_label(last_y).c_str());
+                    dim_text(buf);
+                }
                 ImGui::Separator();
 
                 ui::draw_lapse_scoreboard(rec, hist_slice, hist_lagged,
@@ -1775,9 +1886,15 @@ void app::draw_generation_screen()
                          "iron-rich and coal-lean.");
                 if (lean_row("coal", "Coal basins", pf.coal_basins,
                              "Seasonal", "Mixed", "Everwet"))                        m_wiz_dirty = true;
-                break;
-
-            case 2:
+                // THE DRAWDOWN LEAN, UNDER THE LEGACY FOLD (BL-1091; Ben,
+                // 2026-09-24, rulings R12; PLANETOLOGY.md § Preferences, not
+                // parameters). Legacy is this round's closing fold and Spend
+                // multiplies the endowments Legacy leaves, before any tile is
+                // generated -- so the lean is a planetology input and sits in
+                // the round where the world is built. `m_wiz_dirty` re-runs the
+                // chain and the Life-gate surface, and invalidates every lapse
+                // round below (draw_generation_screen's preview refresh), which
+                // is exactly "changing it re-runs the Life-gate world".
                 if (lean_row("drawdown", "Drawdown", pf.drawdown,
                              "Barely touched", "Worked", "Stripped"))                m_wiz_dirty = true;
                 break;
@@ -1963,6 +2080,60 @@ void app::draw_generation_screen()
         ImGui::SameLine();
         ImGui::BeginChild("##wiz_preview", {0.0f, 0.0f}, false,
                           ImGuiWindowFlags_NoBackground);
+
+        // THE GLOBE, built once for both branches below. The planetology
+        // rounds draw it as their primary view; the Culture round HOLDS it
+        // through its wait and dissolves it into the migration map (BL-1091;
+        // Ben, 2026-09-24, rulings R12; STARTUP.md § The globe: "the globe
+        // does not leave with the Life round"). Kepler turns slowly — one
+        // revolution per minute, wall-clock — so the far hemisphere can be
+        // read too; frozen under --verify (m_golden_dir set), since a golden
+        // capture must never race an animation.
+        std::vector<ui::preview_body> pv;
+        pv.reserve(static_cast<std::size_t>(n_bodies));
+        for (int i = 0; i < n_bodies; ++i)
+        {
+            const body_inputs& bi = prototype_body(i);
+            pv.push_back(ui::preview_body{
+                m_wiz_names.bodies[static_cast<std::size_t>(i)].c_str(), // BL-257
+                bi.orbit_au, bi.mass_earths, bi.parent_orbit_au,
+                bi.is_homeworld, &m_wiz_preview[static_cast<std::size_t>(i)] });
+        }
+        const float rot = m_golden_dir.empty()
+            ? static_cast<float>(std::fmod(ImGui::GetTime() / 60.0, 1.0)) * 6.2831853f
+            : 0.0f;
+        const ui::preview_surface_view surf{
+            home_grid_width, home_grid_height,
+            m_wiz_surface.size() == static_cast<std::size_t>(home_grid_width)
+                                        * static_cast<std::size_t>(home_grid_height)
+                ? m_wiz_surface.data() : nullptr };
+        // The Life round's globe -- the last planetology round's view, which
+        // is the world the Culture round inherits -- at the pane's cursor.
+        const auto draw_life_globe = [&]() {
+            ui::draw_generation_preview(pv.data(), pv.size(), m_wiz_resolved.params,
+                                        wizard_planetology_round_count - 1, rot, surf);
+        };
+        // The lapse header over the map's own corner, in the map's own idiom
+        // (history_lapse.cpp's year stamp): the body's name and the year.
+        // Framed by `lapse_map_frame`, the one rule the drawer uses, so the
+        // stamp the globe wears through the wait sits exactly where the map's
+        // stamp appears as the globe thins -- no jump at the dissolve.
+        const auto draw_lapse_stamp = [&](ImVec2 pane_origin, ImVec2 pane_avail,
+                                          const std::string& body, int year) {
+            float fx = 0.0f, fy = 0.0f, sc = 0.0f;
+            ui::lapse_map_frame(home_grid_width, home_grid_height, pane_avail.x, pane_avail.y,
+                                fx, fy, sc);
+            const std::string label = body.empty() ? ui::lapse_year_label(year)
+                                                   : body + "  " + ui::lapse_year_label(year);
+            const ImVec2 ts = ImGui::CalcTextSize(label.c_str());
+            const ImVec2 at{pane_origin.x + fx + 8.0f, pane_origin.y + fy + 6.0f};
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            dl->AddRectFilled({at.x - 5.0f, at.y - 3.0f},
+                              {at.x + ts.x + 5.0f, at.y + ts.y + 3.0f},
+                              IM_COL32(8, 9, 12, 190));
+            dl->AddText(at, col_bright, label.c_str()); // fit-exempt: a year stamp sized by CalcTextSize
+        };
+
         if (lapse_round)
         {
             // ── The lapse rounds replace the globe with a 2D MAP (Ben, 2026-09-08,
@@ -1977,7 +2148,29 @@ void app::draw_generation_screen()
             // own frontier here is what BL-914 did and what this reverses — the
             // map appears when there is a finished record to play, and plays it
             // from its first year.
-            if (m_wiz_history_future[lapse_index].valid()) { /* the wait draws nothing */ }
+            //
+            // EXCEPT THE CULTURE ROUND, WHICH HOLDS THE GLOBE (BL-1091; Ben,
+            // 2026-09-24, rulings R12). Rounds 4-6 open on the ground their
+            // predecessor left, carried as colour under the map (the hand-over
+            // cross-fade at landing); round 3 has no predecessor lapse, and a
+            // blank pane between the Life round's globe and the migration map
+            // broke the one continuity the wizard is built on. So the wait
+            // keeps the Life round's globe in the pane under a 2400 BCE stamp,
+            // and once the record lands the globe DISSOLVES into the map over
+            // the opening tenth of the span (`lapse_globe_fade`): the first
+            // thing the map shows is the world the globe was showing.
+            if (m_wiz_history_future[lapse_index].valid())
+            {
+                if (lapse_index == 0)
+                {
+                    const ImVec2 pane_origin = ImGui::GetCursorScreenPos();
+                    const ImVec2 pane_avail  = ImGui::GetContentRegionAvail();
+                    draw_life_globe();
+                    draw_lapse_stamp(pane_origin, pane_avail, m_wiz_history[lapse_index].body_name,
+                                     static_cast<int>(colonisation_start_year));
+                }
+                /* the other rounds' wait draws nothing */
+            }
             else if (m_wiz_history[lapse_index].empty())
             {
                 ImGui::Dummy({0.0f, ImGui::GetContentRegionAvail().y * 0.45f});
@@ -2007,33 +2200,49 @@ void app::draw_generation_screen()
             }
             else
             {
-                ui::draw_lapse_map(m_wiz_history[lapse_index], hist_slice,
-                                   m_wiz_history_year[lapse_index]);
+                const ImVec2 pane_origin = ImGui::GetCursorScreenPos();
+                const ImVec2 pane_avail  = ImGui::GetContentRegionAvail();
+                const ui::history_lapse& rec = m_wiz_history[lapse_index];
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+
+                // THE DISSOLVE (BL-1091): a CROSS-FADE, globe to map, as the
+                // playhead leaves the record's first year. Both are drawn
+                // whole and then thinned -- the map's vertices to (1 - fade),
+                // the globe's, painted over it, to fade -- by a post-pass over
+                // the draw list's tail, so neither drawer learns about the
+                // other. At the first year the pane shows exactly what the
+                // wait showed (the globe alone, no map edge peeking out around
+                // it); by a tenth of the span in, the map alone. The stamp is
+                // re-drawn on top, so the header is legible at every point of
+                // the fade: the same corner, the same text, by the same
+                // framing rule.
+                const auto thin = [&](int from, float k) {
+                    for (int v = from; v < dl->VtxBuffer.Size; ++v)
+                    {
+                        ImU32& c = dl->VtxBuffer[v].col;
+                        const ImU32 a  = (c >> IM_COL32_A_SHIFT) & 0xFFu;
+                        const ImU32 a2 = static_cast<ImU32>(static_cast<float>(a) * k);
+                        c = (c & ~IM_COL32_A_MASK) | (a2 << IM_COL32_A_SHIFT);
+                    }
+                };
+                const float fade = (lapse_index == 0)
+                    ? ui::lapse_globe_fade(rec, m_wiz_history_year[lapse_index]) : 0.0f;
+                const int v_map = dl->VtxBuffer.Size;
+                ui::draw_lapse_map(rec, hist_slice, m_wiz_history_year[lapse_index]);
+                if (fade > 0.0f)
+                {
+                    thin(v_map, 1.0f - fade);
+                    const int v_globe = dl->VtxBuffer.Size;
+                    ImGui::SetCursorScreenPos(pane_origin);
+                    draw_life_globe();
+                    thin(v_globe, fade);
+                    draw_lapse_stamp(pane_origin, pane_avail, rec.body_name,
+                                     m_wiz_history_year[lapse_index]);
+                }
             }
         }
         else
         {
-            std::vector<ui::preview_body> pv;
-            pv.reserve(static_cast<std::size_t>(n_bodies));
-            for (int i = 0; i < n_bodies; ++i)
-            {
-                const body_inputs& bi = prototype_body(i);
-                pv.push_back(ui::preview_body{
-                    m_wiz_names.bodies[static_cast<std::size_t>(i)].c_str(), // BL-257
-                    bi.orbit_au, bi.mass_earths, bi.parent_orbit_au,
-                    bi.is_homeworld, &m_wiz_preview[static_cast<std::size_t>(i)] });
-            }
-            // Kepler turns slowly — one revolution per minute, wall-clock — so
-            // the far hemisphere can be read too. Frozen under --verify
-            // (m_golden_dir set): a golden capture must never race an animation.
-            const float rot = m_golden_dir.empty()
-                ? static_cast<float>(std::fmod(ImGui::GetTime() / 60.0, 1.0)) * 6.2831853f
-                : 0.0f;
-            const ui::preview_surface_view surf{
-                home_grid_width, home_grid_height,
-                m_wiz_surface.size() == static_cast<std::size_t>(home_grid_width)
-                                            * static_cast<std::size_t>(home_grid_height)
-                    ? m_wiz_surface.data() : nullptr };
             ui::draw_generation_preview(pv.data(), pv.size(),
                                         m_wiz_resolved.params, m_wiz_round, rot, surf);
 
