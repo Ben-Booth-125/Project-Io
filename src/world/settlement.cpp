@@ -2182,25 +2182,38 @@ void sack_region_urban(region& p, int population_loss_q)
     if (p.centres <= 0 && p.urban_population <= 0)
         return;
 
+    // BL-1130 round 4 (Ben, 2026-09-25: "a razing is counted in people"): the
+    // settlement's size before the walls fall, in the same unit the prize and
+    // the relay read.
+    const int size_before = region_settlement_size(p);
+
     const int64_t loss_q =
         clampi64((static_cast<int64_t>(clampi(population_loss_q, 0, 1000))
                   * urban_sack_multiple_q) / 1000, 0, 1000);
     p.urban_population = clampi64(
         p.urban_population - (p.urban_population * loss_q) / 1000, 0, 1LL << 40);
 
-    // What the survivors can still stand up. The difference is destruction, and
-    // it is RECORDED — a razed city that is later rebuilt still says it was
-    // razed, which is the only way the epoch map can read as historied.
-    // BL-1130: "stand up" is the same hierarchy growth builds, on the same
-    // ground, so a sack and a promotion read one rule in both directions.
+    // What the survivors can still stand up. BL-1130: "stand up" is the same
+    // hierarchy growth builds, on the same ground, so a sack and a promotion
+    // read one rule in both directions.
     const int stands = region_centres_fit(p.urban_population,
                                           region_centres_wanted(p.urban_population),
                                           p.urban_ground);
     if (stands < p.centres)
-    {
-        p.centres_razed += p.centres - stands;
         p.centres = stands;
-    }
+
+    // The destruction is RECORDED — a razed city that is later rebuilt still
+    // says it was razed, which is the only way the epoch map can read as
+    // historied. BL-1130 round 4: it is COUNTED IN PEOPLE, a village's worth of
+    // urban heads per razing, whether or not the centre count steps down, so
+    // the hierarchy's coarse steps (one town standing for 20,000-40,000 heads)
+    // do not hide a sack. The unit is `region_settlement_size`, the size the
+    // prize reads: heads over the village rung, and the last settlement's one
+    // when it falls — so a sack records exactly the centres the one-centre-per-
+    // village rule it replaces would have razed, from the same heads.
+    const int size_after = region_settlement_size(p);
+    if (size_after < size_before)
+        p.centres_razed += size_before - size_after;
 }
 
 void advance_region_demography(region& p, int years, int war_pressure_q)

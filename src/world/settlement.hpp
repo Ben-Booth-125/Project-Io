@@ -627,6 +627,9 @@ struct region
     /// Centres history DESTROYED here — cumulative, never decremented. A
     /// region that was sacked and rebuilt still records that it was sacked,
     /// which is what makes the ruin legible rather than merely absent.
+    /// Counted IN PEOPLE (BL-1130 round 4): a village's worth of urban heads a
+    /// sack destroys is one razing, whether or not the centre count stepped
+    /// down (`sack_region_urban`, `region_settlement_size`).
     int centres_razed = 0;
 
     /// Heads living in this region's centres, a subset of `population`. The
@@ -1265,6 +1268,19 @@ inline int region_centre_equivalents(int64_t urban_heads)
     return static_cast<int>(n < region_centre_limit ? n : region_centre_limit);
 }
 
+/// A SETTLED PLACE IS WORTH AT LEAST A VILLAGE (Ben, 2026-09-25; POPULATION.md
+/// § Generation, BL-1130 round 4). The size the prize and the relay read: the
+/// centre-equivalents of the region's urban heads, and never less than one
+/// while the region stands a settlement (`centres > 0`) — the opening draw
+/// stands a town on ground that farms before its heads reach a village's
+/// worth, and that town is a place. Also the unit a sack's razing is counted
+/// in (`sack_region_urban`): a razing is counted in people.
+inline int region_settlement_size(const region& p)
+{
+    const int eq = region_centre_equivalents(p.urban_population);
+    return (eq < 1 && p.centres > 0) ? 1 : eq;
+}
+
 /// How many centres a region's urban heads stand up as a rank-size hierarchy:
 /// the largest n (<= `region_centre_limit`) whose SMALLEST centre, U/(n*H_n),
 /// is still at least `region_centre_heads`. 0 below one village's heads.
@@ -1377,7 +1393,10 @@ void advance_region_urban(region& p, bool network_ok);
 /// SACK a region's cities. `population_loss_q` is the per-mille the
 /// countryside lost; the city loses a multiple of it, because a sack falls on
 /// the walls and not the fields. Centres fall to what the surviving heads can
-/// stand, and every one lost is recorded in `centres_razed`.
+/// stand, and the destruction is recorded in `centres_razed` COUNTED IN PEOPLE
+/// (Ben, 2026-09-25): the fall in `region_settlement_size` — a village's worth
+/// of urban heads per razing, plus the last settlement's one when it falls —
+/// whether or not the centre count stepped down.
 void sack_region_urban(region& p, int population_loss_q);
 
 /// The manpower ceiling a region's CURRENT population can support — a
