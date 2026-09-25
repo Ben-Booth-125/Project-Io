@@ -63,6 +63,13 @@ PASS — every library seed moved on all four digests (the laws on all 16 from B
 re-pin the 16 sweep rows, R3b's counters, world_determinism's seed B, the seed library, and any
 golden that reads laws or names.
 
+**Attribution of the moved pins (03:55):** the G+C-only tree ALSO reads 0/16 against the sweep's pins — which
+were already stale from sprint 46 (never re-pinned). So the pins cannot say who moved what; row-for-row
+comparison can. Running: the digest check on the pre-sprint tree 1d401e8c (). If
+its rows equal the G+C rows (), BL-1083 and BL-1085 moved nothing and BL-1085 R1
+closes; the full wave-0 rows () are then W1/W3's movement and the re-bless
+re-pins them. If they differ, bisect G (7bf2bac0) against C (2c5c2746) before any re-bless.
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936
