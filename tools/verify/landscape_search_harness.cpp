@@ -15,6 +15,16 @@
 // requires the walk to actually go somewhere before R2's result is read.
 //
 // Build:  bash tools/verify/build_lua_harness.sh landscape_search_harness
+//
+// --curve (BL-1136, fewer search evaluations) — THE CONVERGENCE CURVE, a
+// reading rather than the R-block above. See `curve::run` below.
+//   landscape_search_harness.exe --curve [--seeds 0,28,...] [--rounds 6]
+//                                        [--check-k 3] [--check-threads 1]
+//   Default seeds: docs/generation/seed_library.json, in library order.
+//   --check-threads N scores P1's genuine walk on N threads: P1 is then also
+//   thread invariance on the shipped budget world, and its wall time is what
+//   that thread count saves.
+//   Run from the repo root (it loads scripts/*.lua and the library by path).
 // ---------------------------------------------------------------------------
 
 #include "harness_params.hpp"
@@ -24,11 +34,18 @@
 #include "world/landscape_search.hpp"
 #include "world/market_saturation.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/stockpile_budget.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -102,8 +119,535 @@ void print_path(const landscape_search_result& r)
 
 } // namespace
 
-int main()
+// ---------------------------------------------------------------------------
+// --curve — BL-1136 (fewer search evaluations): THE CONVERGENCE CURVE.
+//
+// GENERATION_STRATEGY.md § Phase 6, "The round count is cut to fit round 6's
+// wait": the count stays fixed and stays one number for every world, but it is
+// chosen from a measured curve — how much score each further round buys on the
+// curated seeds. This is that measurement. A READING, NOT A GATE: nothing here
+// judges a composite; the exit code fails only on the instrument's own honesty
+// rows (P1 below, and V1-V5).
+//
+// THE WORLD is the campaign's: `build_app_base_world` on the shipped arc (the
+// app's generation inputs, its genesis bridge and survey states, its banded
+// registry and first recipe pass), then the search params, charter budget and
+// spend exactly as `finish_campaign_world` builds them. The search is the
+// library's own `search_landscape`; nothing is restated.
+//
+// ONE WALK GIVES THE WHOLE CURVE, and P1 is the proof that it does. A round's
+// proposals are drawn from a stream keyed by (round, axis) off the INCUMBENT,
+// and nothing in a round reads the round count — so a k-round search is
+// exactly the first k rounds of the R-round walk, stopped. The curve is read
+// off the R-round path's prefixes; P1 then runs a GENUINE k-round search
+// (k = --check-k) on every seed and requires it to equal the prefix
+// bit-identically: winner, every scored term, evaluations, and every path step.
+//
+// PER ROUND COUNT k = 0..R, on each seed:
+//   * the winner and its composite, the gain over the seed candidate, and the
+//     SHARE of the R-round gain k rounds capture ((c_k - c_0) / (c_R - c_0));
+//   * the axis whose proposal was taken in round k, if any ("moved by");
+//   * V1-V5, market_census's search-validation rows on the k-round result:
+//       V1 evaluations == 1 + k x live axes;  V2 the path holds every proposal;
+//       V3 the winner never scores below the seed;  V4 every accepted step
+//       strictly beat its incumbent and the winner IS the last one;  V5 the
+//       winner, RE-LAID on a copy of the base with the same budget and spend
+//       and re-scored with the search's own params, is bit-identical on every
+//       scored term. On a prefix V1 and V2 are structural (P1 proves the prefix
+//       is the genuine k-round result); V3-V5 are real on every row.
+//   * whether the k-round winner IS the R-round winner — a seed where it is
+//     not is a WORLD-MOVER at that count.
+//
+// MS PER EVALUATION, MEASURED TWICE (the machine is shared, so a count is the
+// robust figure and a time is indicative): the R-round walk's wall time over
+// its evaluations, and P1's genuine k-round walk's. V5's re-lays are timed too,
+// split into the world copy, the candidate's apply and the score — the three
+// things one evaluation is. All wall time is a printed diagnostic; nothing
+// reads it back.
+// ---------------------------------------------------------------------------
+#ifdef _WIN32
+// Declared rather than <windows.h>, whose macros would reach every name below.
+// FILETIME is two little-endian DWORDs, i.e. one 64-bit count of 100 ns.
+extern "C" __declspec(dllimport) int   __stdcall GetThreadTimes(void*, void*, void*, void*, void*);
+extern "C" __declspec(dllimport) void* __stdcall GetCurrentThread();
+#else
+#include <time.h>
+#endif
+
+namespace curve
 {
+
+using clk = std::chrono::steady_clock;
+
+double ms_since(clk::time_point t0)
+{
+    return std::chrono::duration<double, std::milli>(clk::now() - t0).count();
+}
+
+/// This thread's CPU time (user + kernel), ms. The load-robust twin of the wall
+/// clock: the search runs serially on the calling thread (thread_count 1, the
+/// campaign's), so its CPU time is what one evaluation costs with the machine
+/// to itself, whatever else is running. ~15.6 ms resolution on Windows, against
+/// evaluations of about a second.
+double thread_cpu_ms()
+{
+#ifdef _WIN32
+    std::uint64_t created = 0, exited = 0, kernel = 0, user = 0;
+    GetThreadTimes(GetCurrentThread(), &created, &exited, &kernel, &user);
+    return static_cast<double>(kernel + user) / 10000.0;
+#else
+    timespec ts{};
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+    return static_cast<double>(ts.tv_sec) * 1e3 + static_cast<double>(ts.tv_nsec) / 1e6;
+#endif
+}
+
+/// The library's seeds in library order — market_census's minimal scan, so the
+/// two instruments read one list.
+std::vector<std::uint32_t> library_seeds(const char* path)
+{
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return {};
+    std::stringstream ss;
+    ss << in.rdbuf();
+    const std::string text = ss.str();
+    std::vector<std::uint32_t> out;
+    std::size_t pos = text.find("\"seeds\"");
+    if (pos == std::string::npos) return out;
+    const std::string key = "\"seed\"";
+    while ((pos = text.find(key, pos)) != std::string::npos)
+    {
+        pos += key.size();
+        std::size_t p = pos;
+        while (p < text.size() && (text[p] == ' ' || text[p] == ':' || text[p] == '\t')) ++p;
+        if (p < text.size() && text[p] >= '0' && text[p] <= '9')
+            out.push_back(static_cast<std::uint32_t>(std::strtoul(text.c_str() + p, nullptr, 10)));
+    }
+    return out;
+}
+
+std::vector<std::uint32_t> parse_seed_list(const std::string& s)
+{
+    std::vector<std::uint32_t> out;
+    std::stringstream ss(s);
+    std::string tok;
+    while (std::getline(ss, tok, ','))
+        if (!tok.empty())
+            out.push_back(static_cast<std::uint32_t>(std::strtoul(tok.c_str(), nullptr, 10)));
+    return out;
+}
+
+/// market_census's V5 comparison: every scored term bit-identical, and the
+/// per-market record the same length. Wider than the R-block's `same_score`,
+/// which predates the reach term.
+bool same_full_score(const landscape_score& a, const landscape_score& b)
+{
+    return a.composite           == b.composite
+        && a.realisation         == b.realisation
+        && a.mean_actual         == b.mean_actual
+        && a.mean_completeness   == b.mean_completeness
+        && a.mean_balance        == b.mean_balance
+        && a.mean_reach          == b.mean_reach
+        && a.completeness_spread == b.completeness_spread
+        && a.balance_spread      == b.balance_spread
+        && a.reach_spread        == b.reach_spread
+        && a.spread              == b.spread
+        && a.market_count        == b.market_count
+        && a.markets.size()      == b.markets.size();
+}
+
+bool same_path(const std::vector<landscape_search_step>& a,
+               const std::vector<landscape_search_step>& b)
+{
+    if (a.size() != b.size()) return false;
+    for (std::size_t i = 0; i < a.size(); ++i)
+        if (a[i].round != b[i].round || a[i].axis != b[i].axis
+            || !same_candidate(a[i].proposal, b[i].proposal)
+            || !same_full_score(a[i].score, b[i].score)
+            || a[i].accepted != b[i].accepted)
+            return false;
+    return true;
+}
+
+/// The k-round result, read off the R-round walk: the seed, then every path
+/// step of rounds 0..k-1, the incumbent replaced exactly where the walk
+/// replaced it. P1 checks this against a genuine k-round search.
+landscape_search_result prefix_of(const landscape_search_result& full, int k)
+{
+    landscape_search_result r;
+    r.seed_candidate = full.seed_candidate;
+    r.seed_score     = full.seed_score;
+    r.winner         = full.seed_candidate;
+    r.winner_score   = full.seed_score;
+    r.charter_refused   = full.charter_refused;
+    r.charter_refusal   = full.charter_refusal;
+    r.charter_fell_back = full.charter_fell_back;
+    for (const landscape_search_step& s : full.path)
+    {
+        if (s.round >= k) break;
+        r.path.push_back(s);
+        if (s.accepted)
+        {
+            r.winner       = s.proposal;
+            r.winner_score = s.score;
+            ++r.accepted;
+            ++r.accepted_by_axis[static_cast<int>(s.axis)];
+        }
+    }
+    r.evaluations = 1 + static_cast<int>(r.path.size()); // the walk's own count
+    return r;
+}
+
+struct row
+{
+    int  k = 0;
+    int  evaluations = 0;
+    landscape_candidate winner{};
+    landscape_score     score{};
+    int  moved_axis = -1;   ///< the axis taken IN round k (k >= 1); -1 = held
+    int  accepted = 0;
+    bool v1 = false, v2 = false, v3 = false, v4 = false, v5 = false;
+    bool is_final = false;  ///< the k-round winner IS the R-round winner
+    bool all() const { return v1 && v2 && v3 && v4 && v5; }
+};
+
+struct seed_curve
+{
+    std::uint32_t seed = 0;
+    bool   budget_world = false;
+    bool   refused = false, fell_back = false;
+    int    live_axes = 0;
+    int    markets = 0;
+    std::vector<row> rows;              ///< k = 0..R
+    double ms_eval_walk = 0;            ///< measurement 1: the R-round walk / its evaluations
+    double ms_eval_check = 0;           ///< measurement 2: P1's genuine k-round walk
+    double cpu_eval_walk = 0;           ///< the same two, in this thread's CPU time
+    double cpu_eval_check = 0;
+    int    check_k = -1;
+    int    check_threads = 1;
+    double ms_check_s = 0;              ///< P1's genuine walk, wall seconds
+    double ms_walk_first_k_s = 0;       ///< the serial walk's seed + first k rounds, wall seconds
+    bool   p1 = false;
+    double relay_copy = 0, relay_apply = 0, relay_score = 0; ///< V5's split, mean ms
+    int    relays = 0;
+    double t_gen_s = 0;
+};
+
+const char* short_axis(int a)
+{
+    switch (a)
+    {
+    case 0: return "roster";
+    case 1: return "placement";
+    case 2: return "road_tier";
+    default: return "-";
+    }
+}
+
+double share(double ck, double c0, double cr)
+{
+    return (cr - c0) != 0.0 ? (ck - c0) / (cr - c0) : 1.0;
+}
+
+seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
+                    int check_threads, int& failures)
+{
+    seed_curve sc;
+    sc.seed = seed;
+    std::printf("\n=== seed %u ===========================================================\n", seed);
+    std::fflush(stdout);
+
+    world_params p = arc_params(world_arc::shipped);
+    p.seed = seed;
+    auto out = std::make_unique<app_start_world>();
+    clk::time_point t0 = clk::now();
+    build_app_base_world(lua, p, *out);
+    sc.t_gen_s = ms_since(t0) / 1000.0;
+    const world& base = out->w;
+
+    // finish_campaign_world's step 4, param for param (the harness mirror,
+    // apply_shipped_landscape, builds the same): the campaign's search params,
+    // the world's own stockpile budget at the shipped divisor and its spend.
+    landscape_search_params sp = shipped_search_params(seed, out->cfg.corporation_count);
+    sp.rounds = rounds;
+    const stockpile_budget sb    = build_stockpile_budget(base, k_stockpile_price_divisor);
+    const charter_spend_params spend = stockpile_charter_spend(sb);
+    sp.budget = &sb.budget;
+    sp.spend  = spend;
+
+    t0 = clk::now();
+    double cpu0 = thread_cpu_ms();
+    const landscape_search_result walk = search_landscape(base, out->reg, sp);
+    const double ms_walk  = ms_since(t0);
+    const double cpu_walk = thread_cpu_ms() - cpu0;
+    sc.refused      = walk.charter_refused;
+    sc.fell_back    = walk.charter_fell_back;
+    sc.budget_world = !sb.budget.empty() && !walk.charter_refused && !walk.charter_fell_back;
+    sc.live_axes    = sc.budget_world ? landscape_axis_count - 1 : landscape_axis_count;
+    sc.markets      = walk.seed_score.market_count;
+    sc.ms_eval_walk  = ms_walk / std::max(1, walk.evaluations);
+    sc.cpu_eval_walk = cpu_walk / std::max(1, walk.evaluations);
+
+    // --- P1: a GENUINE k-round search is the prefix, bit for bit ---------
+    if (check_k >= 0 && check_k <= rounds)
+    {
+        landscape_search_params cp = sp;
+        cp.rounds       = check_k;
+        cp.print_rounds = false;
+        // --check-threads N: the genuine run scores each round's proposals on N
+        // threads, so P1 is ALSO thread invariance on this (budget) world —
+        // the serial walk's prefix against a threaded search — and its wall
+        // time is what that thread count would save. Its CPU time is then the
+        // calling thread's join, not the work, and is not reported.
+        cp.thread_count = check_threads;
+        t0 = clk::now();
+        cpu0 = thread_cpu_ms();
+        const landscape_search_result genuine = search_landscape(base, out->reg, cp);
+        const double ms_check  = ms_since(t0);
+        const double cpu_check = thread_cpu_ms() - cpu0;
+        sc.cpu_eval_check = check_threads <= 1 ? cpu_check / std::max(1, genuine.evaluations) : -1.0;
+        const landscape_search_result pre = prefix_of(walk, check_k);
+        sc.check_k       = check_k;
+        sc.check_threads = check_threads;
+        sc.ms_eval_check = ms_check / std::max(1, genuine.evaluations);
+        sc.ms_check_s    = ms_check / 1000.0;
+        for (int i = 0; i <= check_k && i < static_cast<int>(walk.round_ms.size()); ++i)
+            sc.ms_walk_first_k_s += walk.round_ms[static_cast<std::size_t>(i)] / 1000.0;
+        sc.p1 = same_candidate(genuine.winner, pre.winner)
+             && same_full_score(genuine.winner_score, pre.winner_score)
+             && same_full_score(genuine.seed_score, pre.seed_score)
+             && genuine.evaluations == pre.evaluations
+             && genuine.accepted    == pre.accepted
+             && same_path(genuine.path, pre.path);
+        if (!sc.p1) ++failures;
+    }
+
+    // --- the curve: k = 0..R off the walk's prefixes ---------------------
+    // V5 is one re-lay per DISTINCT winner (a held round keeps its incumbent),
+    // cached by the candidate it re-laid.
+    struct relay_memo { landscape_candidate c; bool ok; };
+    std::vector<relay_memo> memo;
+    const auto v5_of = [&](const landscape_candidate& c, const landscape_score& s) {
+        for (const relay_memo& m : memo)
+            if (same_candidate(m.c, c)) return m.ok;
+        clk::time_point a = clk::now();
+        world relay = base;
+        sc.relay_copy += ms_since(a);
+        a = clk::now();
+        apply_landscape_candidate(relay, out->reg, c, /*regenerate_specialists=*/true,
+                                  &sb.budget, spend, /*report=*/nullptr);
+        sc.relay_apply += ms_since(a);
+        a = clk::now();
+        const landscape_score again = score_landscape(relay, out->reg, sp.score);
+        sc.relay_score += ms_since(a);
+        ++sc.relays;
+        const bool ok = same_full_score(again, s);
+        memo.push_back({ c, ok });
+        return ok;
+    };
+
+    for (int k = 0; k <= rounds; ++k)
+    {
+        const landscape_search_result r = prefix_of(walk, k);
+        row w;
+        w.k           = k;
+        w.evaluations = r.evaluations;
+        w.winner      = r.winner;
+        w.score       = r.winner_score;
+        w.accepted    = r.accepted;
+        if (k >= 1)
+            for (const landscape_search_step& s : walk.path)
+                if (s.round == k - 1 && s.accepted)
+                    w.moved_axis = static_cast<int>(s.axis);
+        w.v1 = r.evaluations == 1 + k * sc.live_axes;
+        w.v2 = static_cast<int>(r.path.size()) == k * sc.live_axes;
+        w.v3 = compare_landscape(r.winner_score, r.seed_score) >= 0;
+        landscape_score incumbent = r.seed_score;
+        bool strict = true;
+        int  taken  = 0;
+        for (const landscape_search_step& s : r.path)
+        {
+            if (!s.accepted) continue;
+            ++taken;
+            if (compare_landscape(s.score, incumbent) <= 0) strict = false;
+            incumbent = s.score;
+        }
+        w.v4 = strict && taken == r.accepted && same_full_score(incumbent, r.winner_score);
+        w.v5 = v5_of(r.winner, r.winner_score);
+        w.is_final = same_candidate(r.winner, walk.winner);
+        if (!w.all()) ++failures;
+        sc.rows.push_back(w);
+    }
+    if (sc.relays > 0)
+    {
+        sc.relay_copy  /= sc.relays;
+        sc.relay_apply /= sc.relays;
+        sc.relay_score /= sc.relays;
+    }
+
+    // --- the seed's table ---------------------------------------------------
+    std::printf("  %s, %d live axes, %d markets; generation %.1f s\n",
+                sc.budget_world ? "BUDGET WORLD (roster axis skipped)"
+                : sc.refused    ? "budget REFUSED (the no-budget search)"
+                : sc.fell_back  ? "budget opens no specialist (the no-budget search, NR-910)"
+                                : "no budget (the no-budget search)",
+                sc.live_axes, sc.markets, sc.t_gen_s);
+    const double c0 = sc.rows.front().score.composite;
+    const double cr = sc.rows.back().score.composite;
+    std::printf("   k  evals  winner                                 composite     gain%%    share  moved-by   V1-V5  =R%d\n",
+                rounds);
+    for (const row& w : sc.rows)
+    {
+        std::printf("  %2d  %5d  %-38s %.9f  %+7.3f%%  %6.1f%%  %-9s  %c%c%c%c%c  %s\n",
+                    w.k, w.evaluations, describe(w.winner).c_str(), w.score.composite,
+                    c0 != 0.0 ? 100.0 * (w.score.composite / c0 - 1.0) : 0.0,
+                    100.0 * share(w.score.composite, c0, cr), short_axis(w.moved_axis),
+                    w.v1 ? 'P' : 'F', w.v2 ? 'P' : 'F', w.v3 ? 'P' : 'F', w.v4 ? 'P' : 'F',
+                    w.v5 ? 'P' : 'F', w.is_final ? "yes" : "no");
+    }
+    std::printf("  ms/eval: walk %.0f (%d evals, %.1f s)", sc.ms_eval_walk, walk.evaluations,
+                ms_walk / 1000.0);
+    if (sc.check_k >= 0)
+        std::printf("  |  P1 genuine %d-round walk on %d thread(s) %.0f (%.1f s, the serial walk's "
+                    "first %d rounds %.1f s)  |  P1 %s",
+                    sc.check_k, sc.check_threads, sc.ms_eval_check, sc.ms_check_s, sc.check_k,
+                    sc.ms_walk_first_k_s,
+                    sc.p1 ? "PASS (prefix == genuine, bit for bit)" : "FAIL");
+    std::printf("\n  CPU ms/eval: walk %.0f  |  P1 %.0f", sc.cpu_eval_walk, sc.cpu_eval_check);
+    std::printf("\n  one evaluation, split (V5's %d re-lays, mean): copy %.0f ms, apply %.0f ms, score %.0f ms\n",
+                sc.relays, sc.relay_copy, sc.relay_apply, sc.relay_score);
+    // One machine-readable line per seed, for a sweep to collect.
+    std::printf("CURVE seed=%u live=%d markets=%d ms_eval_walk=%.1f ms_eval_check=%.1f "
+                "cpu_eval_walk=%.1f cpu_eval_check=%.1f check_threads=%d check_s=%.2f "
+                "walk_first_k_s=%.2f p1=%d composite",
+                seed, sc.live_axes, sc.markets, sc.ms_eval_walk, sc.ms_eval_check,
+                sc.cpu_eval_walk, sc.cpu_eval_check, sc.check_threads, sc.ms_check_s,
+                sc.ms_walk_first_k_s, sc.p1 ? 1 : 0);
+    for (const row& w : sc.rows) std::printf(" %.12g", w.score.composite);
+    std::printf(" moved");
+    for (const row& w : sc.rows) std::printf(" %d", w.moved_axis);
+    std::printf(" valid");
+    for (const row& w : sc.rows) std::printf(" %d", w.all() ? 1 : 0);
+    std::printf("\n");
+    std::fflush(stdout);
+    return sc;
+}
+
+int run(int argc, char** argv)
+{
+    std::vector<std::uint32_t> seeds;
+    int rounds  = 6;
+    int check_k = 3;
+    int check_threads = 1;
+    for (int i = 1; i < argc; ++i)
+    {
+        if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc)
+            seeds = parse_seed_list(argv[++i]);
+        else if (std::strcmp(argv[i], "--rounds") == 0 && i + 1 < argc)
+            rounds = std::max(0, std::atoi(argv[++i]));
+        else if (std::strcmp(argv[i], "--check-k") == 0 && i + 1 < argc)
+            check_k = std::atoi(argv[++i]);
+        else if (std::strcmp(argv[i], "--check-threads") == 0 && i + 1 < argc)
+            check_threads = std::max(1, std::atoi(argv[++i]));
+    }
+    if (seeds.empty())
+        seeds = library_seeds("docs/generation/seed_library.json");
+    if (seeds.empty())
+    {
+        std::printf("FATAL: no seeds (run from the repo root, or pass --seeds)\n");
+        return 2;
+    }
+
+    std::printf("landscape_search --curve — BL-1136, the search's score per round count\n"
+                "  %zu seeds, R = %d rounds, P1 genuine check at k = %d on %d thread(s)\n",
+                seeds.size(), rounds, check_k, check_threads);
+
+    lua_state lua;
+    int failures = 0;
+    std::vector<seed_curve> all;
+    for (const std::uint32_t s : seeds)
+        all.push_back(run_seed(lua, s, rounds, check_k, check_threads, failures));
+
+    // --- pooled -----------------------------------------------------------------
+    std::printf("\n=== POOLED over %zu seeds ============================================\n",
+                all.size());
+    int gained = 0;
+    for (const seed_curve& sc : all)
+        if (sc.rows.back().score.composite != sc.rows.front().score.composite) ++gained;
+    std::printf("  %d of %zu seeds gain anything over %d rounds; share = (c_k - c_0) / (c_R - c_0)\n",
+                gained, all.size(), rounds);
+    std::printf("   k  pooled-share  mean-share  min-share  seeds=R%d  valid  taken in round k (roster/placement/road)\n",
+                rounds);
+    for (int k = 0; k <= rounds; ++k)
+    {
+        double num = 0.0, den = 0.0, mean = 0.0, mn = 1.0;
+        int at_final = 0, valid = 0, n_gain = 0;
+        int taken[landscape_axis_count] = { 0, 0, 0 };
+        for (const seed_curve& sc : all)
+        {
+            const double c0 = sc.rows.front().score.composite;
+            const double cr = sc.rows.back().score.composite;
+            const double ck = sc.rows[static_cast<std::size_t>(k)].score.composite;
+            num += ck - c0;
+            den += cr - c0;
+            if (cr != c0)
+            {
+                const double s = share(ck, c0, cr);
+                mean += s;
+                mn = std::min(mn, s);
+                ++n_gain;
+            }
+            if (sc.rows[static_cast<std::size_t>(k)].is_final) ++at_final;
+            if (sc.rows[static_cast<std::size_t>(k)].all()) ++valid;
+            const int m = sc.rows[static_cast<std::size_t>(k)].moved_axis;
+            if (m >= 0) ++taken[m];
+        }
+        std::printf("  %2d  %11.1f%%  %9.1f%%  %8.1f%%  %6d  %5d  %d/%d/%d\n", k,
+                    den != 0.0 ? 100.0 * num / den : 100.0,
+                    n_gain ? 100.0 * mean / n_gain : 100.0, n_gain ? 100.0 * mn : 100.0,
+                    at_final, valid, taken[0], taken[1], taken[2]);
+    }
+
+    // --- what each count costs, per seed ---------------------------------------
+    std::printf("\n  seconds each count SAVES against R = %d, per seed: (R - k) x live axes x ms/eval\n"
+                "  ms/eval = the mean of the two CPU-time measurements (the search is serial on\n"
+                "  one thread, so this is its cost with the machine to itself); the two wall\n"
+                "  measurements are printed beside it and are indicative on a shared machine\n",
+                rounds);
+    std::printf("  seed  cpu ms/eval (walk, P1)  wall (walk, P1)  ");
+    for (int k = 0; k < rounds; ++k) std::printf("   k=%d", k);
+    std::printf("\n");
+    for (const seed_curve& sc : all)
+    {
+        // A threaded P1 has no CPU figure (the calling thread only joins):
+        // the walk's is then the one measurement.
+        const double ms = (sc.check_k >= 0 && sc.cpu_eval_check >= 0.0)
+                              ? 0.5 * (sc.cpu_eval_walk + sc.cpu_eval_check)
+                              : sc.cpu_eval_walk;
+        std::printf("  %4u  %5.0f (%5.0f, %5.0f)    (%5.0f, %5.0f)  ", sc.seed, ms,
+                    sc.cpu_eval_walk, sc.cpu_eval_check, sc.ms_eval_walk, sc.ms_eval_check);
+        for (int k = 0; k < rounds; ++k)
+            std::printf("  %5.1f", (rounds - k) * sc.live_axes * ms / 1000.0);
+        std::printf("\n");
+    }
+
+    int p1_fail = 0;
+    for (const seed_curve& sc : all)
+        if (sc.check_k >= 0 && !sc.p1) ++p1_fail;
+    std::printf("\n  P1 (a genuine k-round search IS the walk's prefix): %s\n",
+                p1_fail == 0 ? "PASS on every seed" : "FAIL on at least one seed");
+    std::printf("\n%s — %d failure(s)\n", failures == 0 ? "PASS" : "FAIL", failures);
+    return failures == 0 ? 0 : 1;
+}
+
+} // namespace curve
+
+int main(int argc, char** argv)
+{
+    for (int i = 1; i < argc; ++i)
+        if (std::strcmp(argv[i], "--curve") == 0)
+            return curve::run(argc, argv);
+
     std::printf("landscape_search — BL-770 slice 3, the phase 6 greedy search\n");
 
     lua_state lua;
