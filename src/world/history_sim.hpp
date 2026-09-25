@@ -1026,9 +1026,12 @@ struct history_sim_params
     // every field below so the two models can be A/B'd on one build.
     bool centre_chain_reach = false;
 
-    /// Per-mille of accrued cost a SINGLE centre refunds. The LP analogy's
-    /// "bigger node, more throughput": the fraction scales with how many
-    /// centres stand in the region, up to `centre_reach_rebate_cap_q`.
+    /// Per-mille of accrued cost one village's worth of settlement refunds. The
+    /// LP analogy's "bigger node, more throughput": the fraction scales with the
+    /// region's settlement size -- its urban heads read as village equivalents,
+    /// at least one while it stands a settlement (`region_settlement_size`;
+    /// POPULATION.md, a place's size is its people, BL-1130) -- up to
+    /// `centre_reach_rebate_cap_q`.
     /// A placeholder magnitude on the same footing as the w_* weights --
     /// the SHAPE is the design, `history_sweep` tunes the number.
     int centre_reach_rebate_q = 150;
