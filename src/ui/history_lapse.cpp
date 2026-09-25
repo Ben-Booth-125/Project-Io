@@ -11,6 +11,7 @@
 
 #include "world/components.hpp"   // is_water, terrain_landform
 #include "world/hex_neighbors.hpp" // the odd-r side offsets the river bits are keyed by
+#include "world/era_minus_one.hpp" // exploration_sim_params: the span's decision band, the renewal slack (BL-1095)
 #include "world/history_sim.hpp"   // history_sim_params::treaty_term_years, the term an arc stands for (BL-1095)
 
 #include <imgui.h>
@@ -2313,11 +2314,28 @@ constexpr ImU32 col_harbour_stone = IM_COL32(226, 224, 212, 240);
 constexpr ImU32 col_harbour_silt  = IM_COL32(176, 138,  92, 240);
 constexpr int32_t lapse_never = 0x7FFFFFFF;
 
-/// A decision round in the Exploration bands is a handful of years, and the
-/// sim re-scores a lapsed treaty on the round AFTER its expiry: a
-/// `treaty_formed` within this of an arc's quiet lapse is that renewal and
-/// extends the arc, rather than opening a second one a few years on.
-constexpr int k_treaty_renewal_slack_years = 20;
+/// THE RENEWAL SLACK IS ONE DECISION BAND, the sim's own. The sim expires a
+/// treaty at the top of a decision round and its formation pass runs in that
+/// same round, so a renewal is a `treaty_formed` at the lapse year itself
+/// (the reference world's 1200 -> 1280 -> 1360 cohorts) or one band after
+/// it; a re-formation any later is rounds the pair spent with no treaty, and
+/// drawing one arc across that gap would show a treaty the sim never had.
+/// Read from `exploration_sim_params` exactly as the term is read from
+/// `history_sim_params{}` above, so the map and the sim cannot drift apart:
+/// the struct DEFAULT's ladder is the Empires round's prehistory clock (100
+/// -> 1), not this span's, and the record cannot give it either -- its steps
+/// run at the record interval (20 years, coarser than the band) and its
+/// treaty years sit ON the band's grid without being adjacent on it (the
+/// reference world's smallest treaty gap is 12). Every span the layer can
+/// bake -- the Empires close, Exploration, Industrialisation -- sets the one
+/// band `era_minus_one.cpp` gives this span (`{stop_year, 4}`), and the
+/// Exploration span is the one the layer is designed for (STARTUP.md
+/// § Round 5), so its params are the read.
+int lapse_renewal_slack_years()
+{
+    const history_sim_params hp = exploration_sim_params(world_params{});
+    return hp.tick_band_count > 0 ? std::max(1, hp.tick_bands[0].step_years) : 1;
+}
 
 int32_t year_after(int32_t year, int years)
 {
@@ -2344,6 +2362,7 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
     h.navy_peak = 0;
     const int gw = h.grid_w, gh = h.grid_h;
     const int term = lapse_treaty_term_years();
+    const int renewal_slack = lapse_renewal_slack_years();
     // "FOLLOWS" MEANS WITHIN ONE MARKER WINDOW OF THE FREEING: the tie's
     // fade-out then overlaps the trade line's fade-in and the line visibly
     // turns from rose to green -- the design's "fading to a trade line". A
@@ -2376,10 +2395,17 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
         case lapse_event_kind::province_bought:
         {
             // polity = the subject (the native); other = the overlord (the
-            // arriver, or the buyer). A re-binding closes the standing tie.
+            // arriver, or the buyer). A re-binding closes the standing tie
+            // AND any trade line still standing for the subject: the pair is
+            // bound again, so the line the freeing left is over, and the new
+            // tie draws alone rather than over a green line it would hide.
             if (!pol_ok(e.polity) || !pol_ok(e.other) || e.polity == e.other) break;
             for (lapse_tie_seg& t : h.tie_segs)
-                if (t.subject == e.polity && t.year_freed == lapse_never) t.year_freed = e.year;
+            {
+                if (t.subject != e.polity) continue;
+                if (t.year_freed == lapse_never) t.year_freed = e.year;
+                if (t.year_trade != lapse_never && t.year_trade_end > e.year) t.year_trade_end = e.year;
+            }
             lapse_tie_seg t;
             t.overlord   = e.other;
             t.subject    = e.polity;
@@ -2421,28 +2447,47 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
             // THE TRADE FOLLOW-ON: a subject freed by refusal whose former
             // overlord then binds a treaty with it keeps the line as trade.
             // The tie stands in for the arc, so no arc is opened for it.
+            // THE LATEST REFUSED TIE OF THE PAIR TAKES IT, AND ONLY IT: the
+            // walk runs newest first and stops at the first refused tie of
+            // the pair, so a pair the span binds and frees round after round
+            // (the reference world's 19 -> 228 at 1200, 1204, 1208) carries
+            // ONE trade line, not one co-linear line per refusal. A tie still
+            // standing is passed over rather than stopping the walk: the sim
+            // binds, treats and frees such a pair inside ONE round, so the
+            // treaty lands between the binding and the refusal and follows
+            // the refusal before it -- the fade the design asks for; the
+            // re-binding above has already ended the older line, so one
+            // stands at a time. A treaty that follows no refusal is an arc.
             bool follow_on = false;
-            for (lapse_tie_seg& t : h.tie_segs)
+            for (auto it = h.tie_segs.rbegin(); it != h.tie_segs.rend(); ++it)
             {
-                if (!same_pair(t, lo, hi) || !t.freed_by_refusal || t.year_freed > e.year) continue;
-                if (t.year_trade == lapse_never && e.year - t.year_freed > follow_on_years) continue;
+                lapse_tie_seg& t = *it;
+                if (!same_pair(t, lo, hi) || !t.freed_by_refusal) continue;
                 if (t.year_trade == lapse_never)
                 {
-                    t.year_trade     = e.year;
-                    t.year_trade_end = year_after(e.year, term);
-                    follow_on = true;
+                    if (e.year - t.year_freed <= follow_on_years)
+                    {
+                        t.year_trade     = e.year;
+                        t.year_trade_end = year_after(e.year, term);
+                        follow_on = true;
+                    }
                 }
-                else if (e.year <= year_after(t.year_trade_end, k_treaty_renewal_slack_years))
+                else if (e.year <= year_after(t.year_trade_end, renewal_slack))
                 {
                     t.year_trade_end = year_after(e.year, term); // the renewal
                     follow_on = true;
                 }
+                break;
             }
             if (follow_on) break;
+            // A RENEWAL EXTENDS THE ARC; A RE-FORMATION OPENS ITS OWN. Within
+            // one band of the quiet lapse it is the sim's renewal (see
+            // `lapse_renewal_slack_years`); later, the gap is rounds the pair
+            // spent treatyless, and a second arc opens at the re-formation.
             bool renewed = false;
             for (lapse_treaty_arc& a : h.treaty_arcs)
                 if (a.a == lo && a.b == hi && !a.broken
-                 && e.year <= year_after(a.year_end, k_treaty_renewal_slack_years))
+                 && e.year <= year_after(a.year_end, renewal_slack))
                 {
                     a.year_end = year_after(e.year, term);
                     renewed = true;
@@ -2495,7 +2540,15 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
 
     // THE LANDINGS: a seat captured across water. The attacker's capital at
     // the capture's year is the fold's; the water test is the corridors' own
-    // sampler over the band the road bake used.
+    // sampler over the band the road bake used. ONLY ON A RECORD THAT SAILS:
+    // `seat_captured` is every span's kind (the Empires span notes thousands
+    // of conquests), and a straight line from a capital to an inland seat
+    // taken by march can cross a bay -- so on a record with no
+    // `sea_leg_campaign` there was no fleet to land, its captures are
+    // conquests, and they draw as the corridor exemplar alone. The sail walk
+    // above runs first so `h.sails` is the gate here; it keeps the Empires
+    // round free of the Exploration idiom, as STARTUP.md's round 4 asks.
+    if (!h.sails.empty())
     for (const lapse_event& e : h.lapse.events)
     {
         if (static_cast<lapse_event_kind>(e.kind) != lapse_event_kind::seat_captured) continue;

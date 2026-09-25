@@ -1829,6 +1829,32 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return year;
     });
 
+    // BL-1095 (fix round 2026-09-25): the year of the recorded step whose
+    // largest sampled navy is the record's peak -- the step the hull's scale
+    // is 1 at -- or the year before the record's start when no sample ever
+    // held a navy. What lets a script assert the hull where a navy STANDS:
+    // a check keyed on the close fails a correct build on any world whose
+    // every navy has decayed to nothing by the span's end. One walk over the
+    // steps' samples; the first step holding the peak wins a tie.
+    v.set_function("history_navy_peak_year", [this]() -> int {
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        int     year = h.lapse.start_year - 1;
+        int64_t best = 0;
+        for (const timelapse_step& st : h.lapse.steps)
+            for (int k = 0; k < st.sample_count; ++k)
+            {
+                const std::size_t s = static_cast<std::size_t>(st.first_sample + k);
+                if (s >= h.lapse.samples.size()) break;
+                if (h.lapse.samples[s].navy_stock > best)
+                {
+                    best = h.lapse.samples[s].navy_stock;
+                    year = st.year;
+                }
+            }
+        return year;
+    });
+
     // BL-1000: the arc readout's share figures on the CURRENT lapse round, in
     // per-mille — (peak share of PEOPLE, closing share of people, peak share of
     // regions). The first is the number the readout prints as "the largest
