@@ -457,6 +457,14 @@ struct charter_record
     /// biggest gap first, or in turn under `sqrt_capital` — picked it); 0xFFFF on
     /// a specialist.
     std::uint16_t good = 0xFFFF;
+
+    /// BL-1099: the calendar year the Industrialisation span dates this charter
+    /// to (`date_chartered_firms`: the region's k-th `works_chartered` note for
+    /// its k-th charter, its furnace year past the notes, the epoch where it
+    /// never lit) — the same value the firm carries as
+    /// `corporation_component::founded_year`, here so the round-6 close can
+    /// flash the report's charters without the world. 0 until dated.
+    std::int32_t founded_year = 0;
 };
 
 /// One body's density rule, fixed before the walk, and what the walk put on it

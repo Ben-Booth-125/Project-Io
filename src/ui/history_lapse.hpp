@@ -428,6 +428,30 @@ struct history_lapse
     struct civ_mark { uint16_t polity; uint16_t region; };
     std::vector<civ_mark> civ_carry;
 
+    /// BL-1099: THE REAL CHARTERS AT THE CLOSE (STARTUP.md § Round 6, "Company
+    /// creation flashes"; Ben, 2026-09-24, R15). One per firm the search
+    /// chartered from the world's stockpile -- `charter_spend_report.charters`
+    /// in its own order, richest centre first -- at the ANCHOR TILE's raster
+    /// position (the report's `anchor_tile`, resolved to grid col/row by the
+    /// caller, which holds the world), carrying the year the pairing dated it
+    /// to (`charter_record::founded_year`) and whether it is the centre's
+    /// specialist. Filled by the wizard at the moment round 6's finish lands
+    /// (the record is whole by then) and NEVER from the world-gen roster, which
+    /// the player never meets. The map flashes them at the record's LAST year
+    /// only, in order, over a short wall-clock stagger (`works_close_t0`); the
+    /// in-span notes flash at their own years from the record and need nothing
+    /// here. Empty on every other round and until the finish lands.
+    struct works_mark { float col; float row; int32_t year; bool specialist; };
+    std::vector<works_mark> works_close;
+    /// Wall-clock second the close flash began (-1 until the last frame is
+    /// first drawn with marks). Mutable because the draw is const and this is
+    /// presentation only -- like `prim_report_done` below.
+    mutable double works_close_t0 = -1.0;
+    /// True under `--verify`: every mark draws at full strength at once, so a
+    /// capture never races the stagger (the rule the globe's rotation and the
+    /// playhead already obey, STARTUP.md § The globe).
+    bool works_close_frozen = false;
+
     /// The map prints its primitive count to stderr ONCE per record, so the
     /// draw-index bound is a measured number in every capture log. Mutable
     /// because the draw takes the record by const reference and this is not

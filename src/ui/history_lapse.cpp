@@ -1447,6 +1447,26 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    to change, `seat_region_of` below. ──
     struct seat_slide { uint16_t polity; float c0, r0, c1, r1, t; };
     std::vector<seat_slide> slides;
+    // THE WORKS (BL-1099): the one glyph here that is a building -- a low
+    // block with a stack rising from its right shoulder, in the furnace tone
+    // over a dark underline, so it reads beside the ember squares as the same
+    // family of fact (industry) and as a different one (a charter, not a
+    // crossing). A specialist's stands a little taller. Shared by the in-span
+    // note in 3f and the close's real charters in 3g, so the two read as one
+    // kind of thing.
+    const auto draw_works = [&](ImVec2 at, int alpha, bool specialist) {
+        const float s   = std::clamp(scale * (specialist ? 0.75f : 0.6f), 2.0f, 4.5f);
+        const float bw  = s * 1.4f, bh = s * 0.8f;          // the block
+        const float sw  = s * 0.45f, sh = s * (specialist ? 2.2f : 1.8f); // the stack
+        const ImU32 under = with_alpha(col_seat_ring, alpha);
+        const ImU32 over  = with_alpha(col_furnace, alpha);
+        // the underline first, one pixel proud all round
+        dl->AddRectFilled({at.x - bw - 1.0f, at.y - bh - 1.0f}, {at.x + bw + 1.0f, at.y + bh + 1.0f}, under);
+        dl->AddRectFilled({at.x + bw - sw - 1.0f, at.y - sh - 1.0f}, {at.x + bw + 1.0f, at.y + 1.0f}, under);
+        dl->AddRectFilled({at.x - bw, at.y - bh}, {at.x + bw, at.y + bh}, over);
+        dl->AddRectFilled({at.x + bw - sw, at.y - sh}, {at.x + bw, at.y}, over);
+        prims += 4;
+    };
     // THE REST SEAT (BL-1094, the review's fix round): where a polity's dot
     // SITS between moves -- the region of its last `capital_moved` at or
     // before the playhead, else `polity_seat`. Read off the record itself,
@@ -1593,9 +1613,52 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 slides.push_back({e.polity, from.x, from.y, to.x, to.y, t});
                 break;
             }
+            case lapse_event_kind::works_chartered:
+            {
+                // BL-1099: a works at the region's anchor, from its note's year,
+                // fading over the window (STARTUP.md § Round 6, "Company
+                // creation flashes"). A ping in the sense the 2026-09-16 ruling
+                // allows: its own glyph for its own kind, never a ring.
+                if (!region_ok(e.region)) continue;
+                const ImVec2 an = anchor(e.region);
+                draw_works({px(an.x), py(an.y)}, a, /*specialist=*/false);
+                break;
+            }
             default:
                 break; // realm_ended, creed_preached and every other kind: nothing
             }
+        }
+        dl->PopClipRect();
+    }
+
+    // ── 3g. THE REAL CHARTERS AT THE CLOSE (BL-1099; Ben, 2026-09-24, R15).
+    //    On the record's LAST frame, and only once the finish has landed
+    //    (`works_close` is filled then), the firms the search actually
+    //    chartered flash in at their anchor tiles, richest centre first,
+    //    over a short wall-clock stagger -- the one place this map animates
+    //    against the clock rather than the year, because the year has
+    //    stopped. Each carries the year the pairing dated it to; nothing is
+    //    read off the world-gen roster. Frozen under --verify. ──
+    if (!h.works_close.empty() && year >= h.lapse.start_year + h.lapse.years)
+    {
+        constexpr double stagger_s = 0.04; // per charter, in report order
+        constexpr double ramp_s    = 0.5;  // to full strength
+        const double now = ImGui::GetTime();
+        if (h.works_close_t0 < 0.0) h.works_close_t0 = now;
+        const double since = now - h.works_close_t0;
+        dl->PushClipRect({tl.x, tl.y}, {tl.x + static_cast<float>(gw) * scale,
+                                        tl.y + static_cast<float>(gh) * scale}, true);
+        for (std::size_t i = 0; i < h.works_close.size(); ++i)
+        {
+            const history_lapse::works_mark& m = h.works_close[i];
+            int a = 255;
+            if (!h.works_close_frozen)
+            {
+                const double t = (since - stagger_s * static_cast<double>(i)) / ramp_s;
+                if (t <= 0.0) break; // in order: none after this one is due yet
+                a = static_cast<int>(255.0 * std::min(1.0, t));
+            }
+            draw_works({px(m.col + 0.5f), py(m.row + 0.5f)}, a, m.specialist);
         }
         dl->PopClipRect();
     }
@@ -1725,10 +1788,12 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // FOUR KINDS EARN A MARK, EACH ITS OWN GLYPH (BL-1094; Ben, 2026-09-24,
     // R10; STARTUP.md § Identity across the rounds) -- pass 3f above:
     // `seat_captured`, `broke_away` / `schism`, `civilisation_formed` and
-    // `capital_moved`; and the Post Road pulse in 3b is a layer transition
-    // marked on the thing. `realm_ended`, `creed_preached` and every other
-    // kind draw nothing. Adding a kind here means asking whether it earns a
-    // glyph of its own, never restoring the blanket.
+    // `capital_moved`; a fifth, `works_chartered` (BL-1099), earns the works
+    // glyph -- a building, not a ring -- and the close's real charters wear
+    // the same glyph in 3g; and the Post Road pulse in 3b is a layer
+    // transition marked on the thing. `realm_ended`, `creed_preached` and
+    // every other kind draw nothing. Adding a kind here means asking whether
+    // it earns a glyph of its own, never restoring the blanket.
 
     ImGui::Dummy(avail);
 }
@@ -2520,6 +2585,20 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "A sea lane opens between %s and %s.",
                       R, region_name_of(h, e.other));
         break;
+    case lapse_event_kind::works_chartered:
+    {
+        // BL-1099: the note, named by region and by the focus a firm chartered
+        // there takes (`other` = industrial_focus: 0 extraction, 1 processing,
+        // 2 trade); a holder, when the ground has one.
+        const char* kind = e.other == 0 ? "An extraction works" : e.other == 1 ? "A processing works"
+                         : e.other == 2 ? "A trading house"     : "A works";
+        if (e.polity == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "%s is chartered at %s.", kind, R);
+        else
+            std::snprintf(buf, sizeof buf, "%s is chartered at %s, in the realm of %s.",
+                          kind, R, polity_name_of(h, e.polity));
+        break;
+    }
     default:
         std::snprintf(buf, sizeof buf, "Something happens at %s.", R);
         break;

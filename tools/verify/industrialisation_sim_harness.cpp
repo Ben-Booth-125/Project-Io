@@ -602,6 +602,29 @@ struct seed_row
     /// "no specialist (fell back)" (NR-910).
     const char* budget_world = "legacy (empty budget)";
 
+    // --- BL-1099: works chartered, the notes against the 1960 firm count ----
+    // The reading f is pinned on: `works_chartered` notes the span wrote at the
+    // shipped fraction, over how many regions, how many of those at the cap
+    // and the first/last note year; then the same span re-run from the fixture
+    // at each fraction in --works-fractions (default "0,2000,4000"), so the
+    // spread is one row per seed. The 0 row is the CONTROL: its close must
+    // equal the shipped close region for region, points included, and its
+    // events must be the shipped events with the works notes removed.
+    int     works_f_q        = 0;      ///< the shipped fraction the span ran at (0 = disabled / rejected)
+    bool    works_rejected   = false;  ///< `works_event_params_rejected`
+    int     works_notes      = 0;      ///< notes at the shipped fraction
+    int     works_regions    = 0;      ///< regions with >= 1 note
+    int     works_capped     = 0;      ///< regions at `works_event_region_cap`
+    int     works_centres    = 0;      ///< regions with centres at the close (the bound's base)
+    int64_t works_first_year = 0;      ///< year of the first note (0: none)
+    int64_t works_last_year  = 0;      ///< year of the last note (0: none)
+    /// Per --works-fractions entry: (fraction, notes), and the control's verdicts.
+    std::vector<std::pair<int, int>> works_at;
+    bool    works_control_ok   = false; ///< f=0 re-run: close equal, other events equal
+    int     works_control_diff = -1;    ///< regions that differ in the control (-1: not run)
+    bool    works_monotone     = true;  ///< notes never rise with the fraction
+    bool    works_bounded      = true;  ///< notes <= cap x regions with centres, every row
+
     // --- Reading 1: density follows cities (campaign world) -----------------
     int    markets        = 0;
     int    markets_urban  = 0;       ///< markets whose catchment holds any urban heads.
@@ -2294,6 +2317,10 @@ int main(int argc, char** argv)
     int  limit = -1;
     int64_t through_year = 1660; // BL-1029
     std::string out_path;        // BL-1029
+    // BL-1099: the fractions (per mille of the running price) the span is
+    // re-run at from the fixture, per seed, for the works-chartered reading;
+    // 0 is the control. `--works-fractions 0,2000,4000`; empty skips the re-runs.
+    std::vector<int> works_fractions{0, 2000, 4000};
     bool fidelity_mode = false;  // BL-1036
     bool resume_tier_mode = false; // BL-1037
     bool continued_mode   = false; // BL-1040: --continued, the 1200-network run
@@ -2304,6 +2331,15 @@ int main(int argc, char** argv)
         if (std::strcmp(argv[a], "--limit") == 0 && a + 1 < argc)
         {
             limit = std::atoi(argv[++a]);
+        }
+        else if (std::strcmp(argv[a], "--works-fractions") == 0 && a + 1 < argc)
+        {
+            // BL-1099: a comma list of per-mille fractions; "none" skips the re-runs.
+            works_fractions.clear();
+            std::stringstream list(argv[++a]);
+            std::string tok;
+            while (std::getline(list, tok, ','))
+                if (!tok.empty() && tok != "none") works_fractions.push_back(std::atoi(tok.c_str()));
         }
         else if (std::strcmp(argv[a], "--integral-stride") == 0 && a + 1 < argc)
         {
@@ -2773,6 +2809,129 @@ int main(int argc, char** argv)
             row.treasury_debited = dst.treasury_spent_on_industry;
             row.points_refused  = dst.industry_points_refused;
             row.ns_points       = fx.ns_industrialisation_industry_points;
+
+            // ---- BL-1099: WORKS CHARTERED -- the reading f is pinned on ----
+            //
+            // The notes the shipped span wrote (at `works_event_fraction_q` as
+            // the app runs it) against the 1960 charter count on the same
+            // seed; then the span re-run from the fixture at each fraction in
+            // --works-fractions, so the count's response to f is one row per
+            // seed and f can be read off the spread rather than guessed. The
+            // 0 row is the CONTROL: the sim with the note switched off must
+            // close on the shipped close region for region, points included,
+            // and its event list must be the shipped list with the works notes
+            // removed -- the "bit-identical on every other output" clause,
+            // checked on the outputs the fixture carries. Bounded: no row may
+            // carry more notes than the cap times the region table; monotone:
+            // a larger fraction never notes more than a smaller one (0, the
+            // switch, stands outside the order).
+            {
+                row.works_f_q      = dpp.works_event_fraction_q;
+                row.works_rejected = dst.works_event_params_rejected;
+                const auto tally = [](const std::vector<lapse_event>& ev, std::size_t n_regions,
+                                      int& notes, int& regions, int& capped, int64_t& first,
+                                      int64_t& last) {
+                    std::vector<int> per(n_regions, 0);
+                    notes = 0; regions = 0; capped = 0; first = 0; last = 0;
+                    for (const lapse_event& e : ev)
+                    {
+                        if (e.kind != static_cast<uint8_t>(lapse_event_kind::works_chartered)) continue;
+                        ++notes;
+                        if (first == 0) first = e.year;
+                        last = e.year;
+                        if (e.region != lapse_event_none && e.region < per.size()) ++per[e.region];
+                    }
+                    for (const int k : per)
+                    {
+                        if (k > 0) ++regions;
+                        if (k >= works_event_region_cap) ++capped;
+                    }
+                };
+                tally(dst.events, close_t.size(), row.works_notes, row.works_regions, row.works_capped,
+                      row.works_first_year, row.works_last_year);
+                for (const region& rg : close_t)
+                    if (rg.centres > 0) ++row.works_centres;
+                const int bound = works_event_region_cap * static_cast<int>(close_t.size());
+                row.works_bounded = row.works_notes <= bound;
+
+                if (!works_fractions.empty() && !open_t.empty())
+                {
+                    const exploration_output& H = fx.exploration_handoff;
+                    fidelity::resume_spec spec;
+                    spec.regions = &open_t;
+                    spec.record  = &H.surviving_corridors;
+                    spec.live    = nullptr;
+                    spec.seed    = fx.industrialisation_seed;
+                    for (const int f : works_fractions)
+                    {
+                        history_sim_params p = dpp;
+                        p.works_event_fraction_q = f;
+                        const fidelity::run_out x = fidelity::resume(fx, H, spec, dpp.stop_year, INT64_MIN, p);
+                        int n = 0, r = 0, c = 0;
+                        int64_t a = 0, b = 0;
+                        tally(x.hs.events, close_t.size(), n, r, c, a, b);
+                        row.works_at.emplace_back(f, n);
+                        if (n > bound) row.works_bounded = false;
+                        if (f == 0)
+                        {
+                            int diff = 0;
+                            const std::vector<region>& R2 = x.ss.regions;
+                            if (R2.size() == close_t.size())
+                            {
+                                for (std::size_t i = 0; i < R2.size(); ++i)
+                                {
+                                    const region& u = close_t[i];
+                                    const region& v = R2[i];
+                                    if (u.nation != v.nation || u.population != v.population
+                                     || u.urban_population != v.urban_population || u.centres != v.centres
+                                     || u.treasury != v.treasury || u.army_stock != v.army_stock
+                                     || u.industry_points != v.industry_points
+                                     || u.industry_points_from_treasury != v.industry_points_from_treasury)
+                                        ++diff;
+                                }
+                            }
+                            else
+                                diff = -1;
+                            // The events, works removed from the shipped list.
+                            std::vector<lapse_event> shipped;
+                            for (const lapse_event& e : dst.events)
+                                if (e.kind != static_cast<uint8_t>(lapse_event_kind::works_chartered))
+                                    shipped.push_back(e);
+                            bool ev_ok = shipped.size() == x.hs.events.size();
+                            for (std::size_t i = 0; ev_ok && i < shipped.size(); ++i)
+                            {
+                                const lapse_event& u = shipped[i];
+                                const lapse_event& v = x.hs.events[i];
+                                ev_ok = u.year == v.year && u.kind == v.kind && u.region == v.region
+                                     && u.polity == v.polity && u.other == v.other;
+                            }
+                            row.works_control_diff = diff;
+                            row.works_control_ok   = diff == 0 && ev_ok;
+                        }
+                    }
+                    std::vector<std::pair<int, int>> pts = row.works_at;
+                    pts.emplace_back(row.works_f_q, row.works_notes);
+                    std::sort(pts.begin(), pts.end());
+                    for (std::size_t k = 1; k < pts.size(); ++k)
+                        if (pts[k - 1].first > 0 && pts[k].first > pts[k - 1].first
+                         && pts[k].second > pts[k - 1].second)
+                            row.works_monotone = false;
+                }
+                std::printf("seed %u WORKS CHARTERED (BL-1099): f_q %d%s, cap %d/region: %d notes over %d regions "
+                            "(%d at the cap) of %zu (%d with centres at the close), %lld -> %lld | vs 1960 charters: "
+                            "%d specialists + %d firms = %d | re-run:",
+                            seed, row.works_f_q, row.works_rejected ? " REJECTED" : "", works_event_region_cap,
+                            row.works_notes, row.works_regions, row.works_capped, close_t.size(), row.works_centres,
+                            static_cast<long long>(row.works_first_year), static_cast<long long>(row.works_last_year),
+                            row.ch_specialists, row.ch_firms, row.ch_specialists + row.ch_firms);
+                if (row.works_at.empty()) std::printf(" (none)");
+                for (const auto& [f, n] : row.works_at) std::printf(" f_q %d -> %d", f, n);
+                std::printf(" | control %s (%d regions differ), monotone %s, bounded %s\n",
+                            row.works_control_diff < 0 && row.works_at.empty() ? "not run"
+                                                           : row.works_control_ok ? "EQUAL" : "DIFFERS",
+                            row.works_control_diff, row.works_monotone ? "yes" : "NO",
+                            row.works_bounded ? "yes" : "NO");
+            }
             const std::size_t open_n = open_t.size();
             int64_t inherited_pts = 0, unheld_pts = 0;
             std::vector<double> reg_pts, rho_p, rho_u, int_p, int_f;
@@ -4142,6 +4301,19 @@ int main(int argc, char** argv)
                                 "\"charter_unspent\": %lld, \"charter_specialists\": %d, \"charter_firms\": %d,\n",
                              r.ch_refused ? "true" : "false", r.ch_fell_back ? "true" : "false",
                              (long long)r.ch_spent, (long long)r.ch_unspent, r.ch_specialists, r.ch_firms);
+                // BL-1099: the works-chartered reading, per seed.
+                std::fprintf(f, "   \"works_f_q\": %d, \"works_rejected\": %s, \"works_notes\": %d, \"works_regions\": %d, "
+                                "\"works_capped\": %d, \"works_centres\": %d, \"works_first_year\": %lld, "
+                                "\"works_last_year\": %lld, \"works_at\": [",
+                             r.works_f_q, r.works_rejected ? "true" : "false", r.works_notes, r.works_regions,
+                             r.works_capped, r.works_centres, (long long)r.works_first_year,
+                             (long long)r.works_last_year);
+                for (std::size_t k = 0; k < r.works_at.size(); ++k)
+                    std::fprintf(f, "%s[%d, %d]", k ? ", " : "", r.works_at[k].first, r.works_at[k].second);
+                std::fprintf(f, "], \"works_control_ok\": %s, \"works_control_diff\": %d, \"works_monotone\": %s, "
+                                "\"works_bounded\": %s,\n",
+                             r.works_control_ok ? "true" : "false", r.works_control_diff,
+                             r.works_monotone ? "true" : "false", r.works_bounded ? "true" : "false");
                 std::fprintf(f, "   \"markets\": %d, \"markets_urban\": %d, \"corps_on_body\": %d, ",
                              r.markets, r.markets_urban, r.corps_on_body);
                 put_rho("rho_firms_urban", r.rho_firms_urban, ", ");

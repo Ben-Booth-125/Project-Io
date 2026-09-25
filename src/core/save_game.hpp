@@ -212,8 +212,11 @@ inline constexpr uint32_t save_game_magic =
 ///     insertion, so a v21 stream misreads everything from `abundance` on.
 ///   - EVENT KINDS appended to `lapse_event_kind` (each moves `count` and so
 ///     the event-kind range check; no field changes width):
-///     `province_bought` (BL-1096, a native bought rather than taken) and
-///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier);
+///     `province_bought` (BL-1096, a native bought rather than taken),
+///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier)
+///     and `works_chartered` (BL-1099, a region's industry points crossing the
+///     next multiple of a fraction of the running charter price; kind 21, the
+///     gap at 20 is lane I1's `inherited`);
 ///     later sprint-47 lanes append theirs under this same number.
 /// A v21 stream is refused whole on the same strict-equality contract.
 inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened

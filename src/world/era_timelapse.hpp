@@ -201,6 +201,9 @@ enum class lapse_event_kind : uint8_t
     furnace_lit         = 17, ///< BL-1080: a region crossed the furnace (`region::industrial_year`); `polity` = its holder. A resumed span notes the crossings it inherits, dated at their own (earlier) year, ahead of its first event (save_game_version 21).
     province_bought     = 18, ///< BL-1096: a native was BOUGHT rather than taken (EXPLORATION.md sec Two ways to claim ground across water); `region` = the native seat, `polity` = the native, `other` = the buyer. Noted INSTEAD of `subject_bound` for that binding (save_game_version 22).
     sea_lane_opened     = 19, ///< BL-1097: a sea leg's uses crossed `sea_lane_tier1_uses`; `region`/`other` = its ends (lo, hi), `polity` = the tier (1). The water analogue of `road_promoted` (save_game_version 22).
+    // 20 is `inherited`, lane I1's (sprint 47): the value is left to that lane so
+    // no two lanes append the same byte; the gap stands until it lands.
+    works_chartered     = 21, ///< BL-1099: a region's `industry_points` crossed the next multiple of `works_event_fraction_q` x the RUNNING charter price (the world's stock so far over `k_stockpile_price_divisor`); `region` = the works' region, `polity` = its holder, `other` = the `industrial_focus` a firm chartered there takes (`focus_from_region`). RECORD-ONLY: no point is debited, at most `works_event_region_cap` per region per span (save_game_version 22).
     count
 };
 

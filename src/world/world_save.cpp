@@ -355,25 +355,31 @@ void w_corp(std::ostream& o, const corporation_component& c)
     w_f32(o, c.science);
     w_bool_array(o, c.produced_ever);
     w_vec(o, c.returns, w_return); // BL-626: world_save_version 16
+    w_i32(o, c.founded_year);      // BL-1099: world_save_version 27
+    w_i32(o, c.origin_region);     // BL-1099: world_save_version 27
 }
 
 bool r_corp(std::istream& i, corporation_component& c)
 {
     // Field order is the declaration order, and BOTH of Sprint 20 wave 1's
     // additions sit in it: `ownership_class` (BL-631) immediately after `focus`,
-    // `returns` (BL-626) last, after `produced_ever`. The write side below must
-    // match this exactly.
+    // `returns` (BL-626) after `produced_ever`; BL-1099's origin pair
+    // (`founded_year`, `origin_region`) last, after `returns`. The write side
+    // above must match this exactly.
     if (!(r_str(i, c.name) && r_id(i, c.home_nation) && r_enum(i, c.focus, max_focus)
           && r_enum(i, c.ownership_class, max_ownership)
           && r_f32(i, c.starting_capital) && r_f32(i, c.balance) && r_bool(i, c.is_player)
           && r_bool(i, c.is_background) && r_ids(i, c.assets) && r_id(i, c.hq_building)
           && r_f32(i, c.influence_range) && r_f32(i, c.science)
-          && r_bool_array(i, c.produced_ever) && r_vec(i, c.returns, r_return)))
+          && r_bool_array(i, c.produced_ever) && r_vec(i, c.returns, r_return)
+          && r_i32(i, c.founded_year) && r_i32(i, c.origin_region)))
         return false;
     // BL-626: retention is bounded by the writer, so a longer run is a corrupt
     // stream, not a longer history. Refused rather than trimmed — trimming would
     // silently pick which quarters to believe.
-    return c.returns.size() <= k_quarterly_return_retention;
+    // BL-1099: an origin is a region index or -1 (no origin); anything below
+    // -1 is not a value the writer produces. Refused, never clamped.
+    return c.returns.size() <= k_quarterly_return_retention && c.origin_region >= -1;
 }
 
 void w_convoy(std::ostream& o, const convoy_component& c)

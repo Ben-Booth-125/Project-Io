@@ -500,6 +500,34 @@ void app::poll_wizard_history()
         if (world_slot && world_slot->ready)
         {
             m_wiz_world = std::move(world_slot);
+            // BL-1099: THE REAL CHARTERS, for the close flash (STARTUP.md
+            // § Round 6). Read off the finish's own report -- the firms the
+            // search chartered from each centre's budget, in the report's
+            // order (richest centre first), each at its anchor tile's raster
+            // position and at the year the pairing dated it to -- and never
+            // off the world-gen roster. Homeworld tiles only: the lapse raster
+            // is the cradle's. Filled here, once, because the record and the
+            // finish land together and neither changes again.
+            {
+                const world&                w   = m_wiz_world->w;
+                const charter_spend_report& rep = m_wiz_world->finish.charter;
+                entity_id home = null_entity;
+                for (const generation_report::body_entry& be : m_wiz_world->report.bodies)
+                    if (be.is_homeworld) { home = be.id; break; }
+                ui::history_lapse& h = m_wiz_history[i];
+                h.works_close.clear();
+                h.works_close.reserve(rep.charters.size());
+                for (const charter_record& r : rep.charters)
+                {
+                    const auto t = w.tiles.find(r.anchor_tile);
+                    if (t == w.tiles.end() || t->second.body != home) continue;
+                    h.works_close.push_back(ui::history_lapse::works_mark{
+                        static_cast<float>(t->second.grid_x), static_cast<float>(t->second.grid_y),
+                        r.founded_year, r.specialist});
+                }
+                h.works_close_t0     = -1.0;
+                h.works_close_frozen = !m_golden_dir.empty();
+            }
             std::printf("[wizard world] cached for Begin (seed %u, era seed %u, "
                         "span seeds %u/%u/%u/%u): searched and settled, %zu corporations\n",
                         m_wiz_world->params.seed, m_wiz_world->params.era_seed,

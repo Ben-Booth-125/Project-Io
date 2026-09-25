@@ -270,7 +270,16 @@ inline constexpr uint32_t world_save_magic =
 /// never on a load, which is the hole this field closes), so there is nothing
 /// a v25 stream could say. Claimed through
 /// `tools/session/next_save_version.js --claim`.
-inline constexpr uint32_t world_save_version = 26;
+/// Bumped to 27 by BL-1099 (the firm's origin): the corp record gains two
+/// int32 at its tail, after `returns` -- `corporation_component::founded_year`
+/// and `::origin_region`, the year the Industrialisation span dates a charter
+/// to and the settlement region of the centre that chartered it, which the
+/// seat briefing's origin sentence reads (STARTUP.md § The seat). A v26 stream
+/// is eight bytes short per corporation, so its next record misreads; refused
+/// whole on the strict-equality contract, no migration (a pre-bump world's
+/// firms had no origin to carry). Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 27;
 
 /// Write @p w as a complete world snapshot.
 ///

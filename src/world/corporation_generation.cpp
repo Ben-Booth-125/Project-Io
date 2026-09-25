@@ -2681,6 +2681,13 @@ struct charter_centre
     /// reconciled region: a charter stays near its centre (INDUSTRIALISATION.md § 1),
     /// and the nation's nearest region can be anywhere in the nation.
     int          anchor_region_idx    = -1;
+    /// ORIGIN (BL-1099, `corporation_component::origin_region`): the settlement
+    /// region whose stock this centre's budget was split from -- the carve
+    /// slot's own (`world::gen_carve_centres`), which is "the region of that
+    /// centre" in the one sense the charter budget knows. A centre the carve
+    /// index does not name (a hand-built fixture) falls to its anchor region,
+    /// then its character region, then -1 (no origin).
+    int          origin_region_idx    = -1;
 
     /// Points left for background firms once the specialist price is taken —
     /// UNROUNDED, so its remainder below one firm price is booked `remainder`.
@@ -3437,6 +3444,15 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             }
             cc.character_region_idx = pi;
         }
+        // THE ORIGIN (BL-1099): the carve slot's region, else the fallbacks
+        // the field documents. Read here, once, so both charter sites below
+        // stamp the same answer on a centre's specialist and its firms.
+        if (const auto slot = w.gen_carve_centres.find(cc.centre);
+            slot != w.gen_carve_centres.end() && slot->second.region >= 0)
+            cc.origin_region_idx = slot->second.region;
+        else
+            cc.origin_region_idx = cc.anchor_region_idx >= 0 ? cc.anchor_region_idx
+                                                             : cc.character_region_idx;
         centres.push_back(std::move(cc));
     }
 
@@ -3614,6 +3630,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 corp.balance          = capital;
                 corp.is_player        = false;
                 corp.is_background    = false;
+                // BL-1099: the origin is the centre's; the year is dated after
+                // the walk against the record (`date_chartered_firms`).
+                corp.origin_region    = cc.origin_region_idx;
+                corp.founded_year     = 0;
 
                 const entity_id home_body = corp_home_body(w, assets);
                 const hq_designation hq   = designate_hq(w, assets, home_body);
@@ -4013,6 +4033,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             corp.balance          = 0.0f;
             corp.is_player        = false;
             corp.is_background    = true;
+            // BL-1099: as the specialist above -- the origin now, the year
+            // after the walk (`date_chartered_firms`).
+            corp.origin_region    = cc.origin_region_idx;
+            corp.founded_year     = 0;
 
             const entity_id home_body = corp_home_body(w, assets);
             const hq_designation hq   = designate_hq(w, assets, home_body);
@@ -4153,4 +4177,56 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     if (report != nullptr)
         *report = std::move(rep);
     return chartered;
+}
+
+// ---------------------------------------------------------------------------
+// BL-1099 — date_chartered_firms
+// ---------------------------------------------------------------------------
+
+void date_chartered_firms(world& w, charter_spend_report& report,
+                          const std::vector<lapse_event>& events, int32_t epoch_year)
+{
+    // Per region: the years of its `works_chartered` notes, in record order
+    // (ascending by year, as every event list is), and its first furnace year.
+    // Ordered maps, read by key only -- nothing here iterates them.
+    std::map<int, std::vector<int32_t>> notes;
+    std::map<int, int32_t>              furnace;
+    for (const lapse_event& e : events)
+    {
+        if (e.region == lapse_event_none)
+            continue;
+        const int region = static_cast<int>(e.region);
+        const auto kind  = static_cast<lapse_event_kind>(e.kind);
+        if (kind == lapse_event_kind::works_chartered)
+            notes[region].push_back(e.year);
+        else if (kind == lapse_event_kind::furnace_lit)
+            furnace.try_emplace(region, e.year); // the FIRST crossing is the region's
+    }
+
+    // THE PAIRING, in the report's own order -- richest centre first, its
+    // specialist then its firms (INDUSTRIALISATION.md sec Beat 1): a region's
+    // k-th charter takes its k-th note; past the notes, its furnace year;
+    // never lit, the epoch. A firm with no origin (none the search chartered)
+    // opens at the epoch and is not counted against any region.
+    std::map<int, std::size_t> taken;
+    for (charter_record& r : report.charters)
+    {
+        const auto cit = w.corporations.find(r.corp);
+        if (cit == w.corporations.end())
+            continue;
+        corporation_component& c = cit->second;
+        int32_t year = epoch_year;
+        if (c.origin_region >= 0)
+        {
+            std::size_t& k = taken[c.origin_region];
+            const auto nit = notes.find(c.origin_region);
+            if (nit != notes.end() && k < nit->second.size())
+                year = nit->second[k];
+            else if (const auto fit = furnace.find(c.origin_region); fit != furnace.end())
+                year = fit->second;
+            ++k;
+        }
+        c.founded_year = year;
+        r.founded_year = year;
+    }
 }

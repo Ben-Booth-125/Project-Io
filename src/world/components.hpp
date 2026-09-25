@@ -1631,6 +1631,23 @@ struct corporation_component
     /// its history intact. The player's own profit chart keeps reading the UI
     /// cache; that surface is unchanged.
     std::vector<quarterly_return> returns;
+
+    /// BL-1099 -- THE FIRM'S ORIGIN (CORPORATION_GENERATION.md sec The spawn
+    /// shortlist; Ben, 2026-09-24, R15/R22). The search charters a firm from
+    /// a population centre's budget, so `origin_region` is the settlement
+    /// region of that centre (an index into `settlement_state::regions`, the
+    /// carve slot's own; -1 for a firm no budget chartered -- the legacy
+    /// roster, a fixture, a save from before the field), and `founded_year`
+    /// is the calendar year the Industrialisation span dates it to: the
+    /// region's k-th `works_chartered` note for its k-th charter, its
+    /// furnace year where the notes ran out, the epoch where it never lit
+    /// (`date_chartered_firms`). Meaningful only with an origin. The seat
+    /// briefing's origin sentence reads these two fields, never the report.
+    ///
+    /// SERIALISED after `returns` (world_save.cpp's corp record) --
+    /// `world_save_version` 27 moved with them.
+    int32_t founded_year  = 0;
+    int32_t origin_region = -1;
 };
 
 /// BL-428: how far down the production graph @p c has actually reached — the
