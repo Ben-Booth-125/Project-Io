@@ -853,7 +853,12 @@ The epoch's handoff, and nothing else:
 - **Tariff posture** — each nation's protection, derived at the span's end from its scarcity
   signals, trade flows and cultural preference (§ The boundary) and enacted as `import_tariff` law;
   the convoy-arrival duty that makes it bite is `../economy/MARKETS.md` § Tariffs — the first flow
-  that pays a nation.
+  that pays a nation. The arithmetic, per living polity over the four goods (farm, ore, energy,
+  port): `protection_q = clamp(Σ_g (short_g + in_g − out_g) / 4, 0, 1000)`, where `short_g` is
+  the capital market's unmet `scarcity_q` for the good weighted by its people's preference
+  (`scarcity × (500 + weight_q / 2) / 1000`), `in_g` the volume of `trade_flows` it buys of the
+  good and `out_g` the volume it sells — what its people run short of, plus what it takes in,
+  less what it sends out, averaged over the four goods.
 - **Road tiers** with the rail rung, stamped from corridors.
 - **Culture shares** per region and per centre, for the lens and for demand.
 - **Standing war conditions** on provinces, with their patrons.
