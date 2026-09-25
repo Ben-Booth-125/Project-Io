@@ -145,6 +145,17 @@ exploration_sim_harness), re-pin with `repin_sweep_table.py`, `seed_library.js -
 `--digest-check` both arcs green, ONE commit. The riders' own digest movement is recorded
 old -> new in their requirement rows.
 
+**RIDERS MERGED (10:10):** BL-1082 `14cd0004` (world_determinism moves: seedA/on 6DBC0094F0B6B0EF ->
+0570E3900D0BD53F, seedB/on 95EEAD1204FD31AC -> D5616442F561DDD3, seedA/off 4834366D19271E5F ->
+B89B87C393B06FC9, by design -- the seat is now in the hash) and BL-1049 `67993f80` (world_determinism
+unmoved: the harness world never seeds its history log -> BL-1113); their review lows on main
+`d6558647` (fidelity gate demands the carried prefixes, 16/16 PASS; R3b re-pinned to 228427744,
+exploration harness ALL PASS; history_sim_harness at its 2-failure baseline; NR-943). The FINAL
+re-bless measurement runs on this tree (`rebless_final.log`: shipped --digest, legacy --digest, the
+library sweep); then `repin_sweep_table.py` both tables, `seed_library.js --bless`, `--digest-check`
+both arcs, one commit -- the earlier (pre-rider) readings in `rebless_measure.log` / `rebless_legacy.log`
+are superseded. Gates on the riders' tree in `gates_riders.log`.
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936
