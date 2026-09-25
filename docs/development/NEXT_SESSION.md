@@ -99,6 +99,20 @@ worktrees pruned (all merged, none ahead); header_graph now reads 329 dangling /
 still running when this was written -- merge in that order after reading the reviews, then the
 single re-bless (F1/F2 are record-only kinds 23/24 and should move no digest; confirm).
 
+**F1 and F2 MERGED (06:50):** `46e244d8` (F1) and `2ccee936` (F2), Release build green. Both cold
+reviews returned fix-round on small findings -- F1: the routes R4 row cites the hashed worst seed
+where the script pins library seed 9; the kin-arrow dash uses a two-interior-tile sampler while
+the hpp names lapse_corridor_over_water (an NR for the threshold: 0 / 58 / 193 of 249 on seed 13);
+life_to_people.lua's ticker assertion assumes the rarest tier; and recipe_workforce.lua was not
+re-run after verify.new_world became a real rebuild. F2: LANDINGS LEAK ONTO ROUND 4 (seat_captured
+has no Exploration gate) -- the one medium; the trade follow-on stacks lines on a churned pair; the
+treaty renewal back-fills a 20-year gap; ties standing at 1660 never draw on round 6 (documented,
+a later item); the hull assertion keys on navy_peak. Fix rounds launched as workflow
+`wf_9839294a-9b4` (two worktrees off `2ccee936`, each re-reviewed cold); gates and the lanes'
+scripts running on the merged tree in `gates_F1F2.log` / `scripts_F1F2.log` (the scratchpad).
+Conflicts on the merge were insertion collisions only (kinds 21-24 in order; verify_api.cpp and
+history_lapse.hpp resolved three-way, F1's block then F2's).
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936
