@@ -209,6 +209,13 @@ LOGISTICS.md §§ 1, 4, 6.
   gates are inert. Water-anchored regions carry no centre: spills 127,226 -> 0. Pooled 16 seeds:
   centres 164,982 -> 69,447, land under centres 70.4% -> 29.6%, road tiles 168,582 -> 86,383,
   markets 4,984 -> 5,329. P and R's reading put to Ben before the merge.
+  ROUNDS 3-4 and MERGED (fa6de123, merged 85fc03a1): Ben ruled P and R read urban heads, a
+  settled place is worth at least a village, and a razing is counted in people. Seed 40 then
+  reproduces main exactly and the synthetic run is 8 battles against 7; the rest is the
+  groundless and freeze classes, both from rulings. Pooled: centres 164,982 -> 66,034, land under
+  centres 70.4% -> 28.2%, spills 127,226 -> 0, road tiles 168,582 -> 82,543, markets 4,984 ->
+  5,180. Still ~4,100 a seed against the ~500 aim: BL-1137, BL-1132 and BL-1133 now running on it.
+  Cold review and main's gates running.
 - [ ] M4 BL-1125 build, after C1 lands: twins fold and gravity fold at the carve (the reach
   calibrated on the consolidated world), conquest consolidates in the history (`history_sim.cpp`,
   the market marking). The markets lane, opened when C1 reports.
