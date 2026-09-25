@@ -805,6 +805,27 @@ target_link_libraries(market_census PRIVATE io_world_obj lua54)
 target_compile_features(market_census PRIVATE cxx_std_20)
 target_compile_options(market_census PRIVATE ${IO_WARNING_FLAGS})
 
+# centre_census (BL-1130; sprint 48) — live-Lua for market_census's reason: it
+# builds the shipped world in app order (harness_params.hpp's
+# build_app_base_world parses world_gen.lua and works.lua and loads
+# recipes/economy), so it names the same four Lua TUs. A research sweep (a full
+# world per curated seed), labelled below.
+add_executable(centre_census
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/centre_census.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(centre_census PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(centre_census PRIVATE io_world_obj lua54)
+target_compile_features(centre_census PRIVATE cxx_std_20)
+target_compile_options(centre_census PRIVATE ${IO_WARNING_FLAGS})
+
 # tier_margin (BL-436, 2026-08-16) — live-Lua for the same reason: it asks
 # whether REFINING PAYS in the shipped economy, so it must read the authored
 # prices, rates and recipes rather than a hand-built mirror of them. It also
@@ -1262,6 +1283,10 @@ set(IO_TEST_SWEEP_HARNESSES
     # year per curated seed. It reports; its only failing rows are its own
     # identification checks and the search's own invariants.
     market_census
+    # CATEGORY (1), added 2026-09-25 (BL-1130): the centre census — a full
+    # shipped world per curated seed, read for centre density, scale and fit.
+    # It reports; its only failing row is its own "could it see a carve" check.
+    centre_census
 
     # Added 2026-09-25 (BL-1084): the generation cursor's proof -- per curated
     # seed, the composition in place, the staged build on faithful copies and
@@ -1429,6 +1454,9 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # ADDED 2026-09-25 (BL-1125 M1). The same four scripts and the seed library
     # by relative path, for the same reason.
     market_census
+    # ADDED 2026-09-25 (BL-1130). The same four scripts and the seed library by
+    # relative path, for the same reason.
+    centre_census
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})

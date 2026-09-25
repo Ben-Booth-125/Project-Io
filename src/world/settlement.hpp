@@ -619,17 +619,38 @@ struct region
     // cities in it.
 
     /// Population centres standing in this region. Promoted as
-    /// `urban_population` crosses `region_centre_heads`, cut by a sack.
+    /// `urban_population` grows the region's hierarchy
+    /// (`region_centres_wanted`), held to what its cell's land holds
+    /// (`region_centres_fit`, BL-1130), cut by a sack.
     int centres = 0;
 
     /// Centres history DESTROYED here — cumulative, never decremented. A
     /// region that was sacked and rebuilt still records that it was sacked,
     /// which is what makes the ruin legible rather than merely absent.
+    /// Counted IN PEOPLE (BL-1130 round 4): a village's worth of urban heads a
+    /// sack destroys is one razing, whether or not the centre count stepped
+    /// down (`sack_region_urban`, `region_settlement_size`).
     int centres_razed = 0;
 
     /// Heads living in this region's centres, a subset of `population`. The
     /// quantity the campaign-era centre count and scale carve reads.
     int64_t urban_population = 0;
+
+    /// BL-1130 (POPULATION.md § Generation, "Growth consolidates") — the LAND
+    /// tiles of this region's own cell of the settlement partition: the tiles
+    /// `nearest_region` gives this region, water excluded. The ground its
+    /// centres' urban footprints must fit inside, so `centres` never exceeds
+    /// what it holds (`region_centres_fit`). -1 is UNMEASURED — the
+    /// opening draw runs before any partition is read, and a synthetic fixture
+    /// with no terrain never measures one — and caps nothing.
+    ///
+    /// Written by `update_urban_ground`, which `run_history_sim` calls once a
+    /// year before the urban step, so a cell a newer neighbour's founding cut
+    /// into is re-read the year it shrank. GENERATION SCRATCH, NOT SAVED, on
+    /// `network_supply_q`'s precedent below: a fact the Era -1 sim maintains
+    /// about ground it is simulating, not one the campaign era reads — the
+    /// carve re-reads the final partition itself.
+    int urban_ground = -1;
 
     /// BL-872 (CIVILISATION.md "Centres are derived by supply and
     /// governance") — 0-1000, how well THIS region's own seat can still
@@ -1213,6 +1234,105 @@ inline constexpr int64_t region_centre_heads = 10000;
 /// should hit a named bound rather than eat that budget silently.
 inline constexpr int region_centre_limit = 32;
 
+// --- Growth consolidates (BL-1130; POPULATION.md § Generation) --------------
+// A region's centres are a HIERARCHY of its own urban heads, not a count of
+// village-sized lumps: centre k of n stands U / (k * H_n) heads (H_n the
+// harmonic number — the rank-size share the body-wide carve already reads,
+// read here inside one region). So growth DEEPENS a place before it widens it:
+// the heads go into the centres standing, their villages merge into a town,
+// and a new centre is founded beside them only once the smallest of the
+// hierarchy would still be a village's worth (`region_centre_heads`). And the
+// hierarchy fits the region's own ground: the urban footprints its centres
+// would stamp (`k_urban_footprint_tiles`, by the rung each share bands to)
+// never add up to more than the land of its cell (`region::urban_ground`). A
+// region whose cell is built out holds the centres it has and the heads go on
+// deepening them, instead of a new centre spilling into a neighbour's cell.
+//
+// PURE INTEGER FUNCTIONS of the region record: no RNG, no floats, no world.
+// No new tuning constant either — the village rung, the rank-size share, the
+// scale bands and the footprint table are all the doc's existing quantities.
+
+/// A PLACE'S SIZE IS ITS PEOPLE (Ben, 2026-09-25; POPULATION.md § Generation,
+/// BL-1130 round 3). The size a history reader values a region by — the
+/// campaign prize, the reach relay — in CENTRE-EQUIVALENTS of its urban heads:
+/// one per `region_centre_heads`, capped at `region_centre_limit`. It is the
+/// pre-consolidation promotion rung read backwards (that rule stood exactly
+/// this many centres on these heads), so a reader calibrated per centre keeps
+/// its constants and gives the same heads the same value it always did,
+/// however the hierarchy now divides them into villages and towns.
+/// Pure: heads in, count out; never reads `region::centres`.
+inline int region_centre_equivalents(int64_t urban_heads)
+{
+    if (urban_heads <= 0) return 0;
+    const int64_t n = urban_heads / region_centre_heads;
+    return static_cast<int>(n < region_centre_limit ? n : region_centre_limit);
+}
+
+/// A SETTLED PLACE IS WORTH AT LEAST A VILLAGE (Ben, 2026-09-25; POPULATION.md
+/// § Generation, BL-1130 round 4). The size the prize and the relay read: the
+/// centre-equivalents of the region's urban heads, and never less than one
+/// while the region stands a settlement (`centres > 0`) — the opening draw
+/// stands a town on ground that farms before its heads reach a village's
+/// worth, and that town is a place. Also the unit a sack's razing is counted
+/// in (`sack_region_urban`): a razing is counted in people.
+inline int region_settlement_size(const region& p)
+{
+    const int eq = region_centre_equivalents(p.urban_population);
+    return (eq < 1 && p.centres > 0) ? 1 : eq;
+}
+
+/// How many centres a region's urban heads stand up as a rank-size hierarchy:
+/// the largest n (<= `region_centre_limit`) whose SMALLEST centre, U/(n*H_n),
+/// is still at least `region_centre_heads`. 0 below one village's heads.
+/// Non-decreasing in @p urban_heads, so growth only ever adds a centre.
+int region_centres_wanted(int64_t urban_heads);
+
+/// The land tiles @p n centres over @p urban_heads would pave: the sum over
+/// k = 1..n of `k_urban_footprint_tiles` at the rung U/(k*H_n) bands to (the
+/// carve's own banding, `scale_for_heads`). 0 for n <= 0.
+int region_centre_footprint(int64_t urban_heads, int n);
+
+/// The most centres, at most @p want, a region's ground holds at
+/// @p urban_heads: the first m descending from @p want whose hierarchy's
+/// footprint (`region_centre_footprint`) fits @p ground land tiles.
+///   * @p ground == 0 — a cell that holds NO land — holds no centre at all
+///     (Ben, 2026-09-25): there is no ground to stand one on, so nothing
+///     spills into a neighbour's cell.
+///   * @p ground > 0 never goes below 1 when @p want >= 1 — a region with land
+///     keeps the one centre it stands even where that centre's footprint
+///     outruns its ground, as a coastline cuts a footprint short rather than
+///     unbuilding the town.
+///   * @p ground < 0 is unmeasured and returns @p want (caps nothing).
+/// @p want is clamped to [0, `region_centre_limit`]. The ONE ground rule:
+/// growth, the sack and the campaign-era carve all read it.
+int region_centres_fit(int64_t urban_heads, int want, int ground);
+
+/// THE CELL LAND OF EVERY REGION, maintained incrementally (BL-1130). The
+/// settlement partition is the Voronoi `nearest_region` reads (Chebyshev,
+/// columns wrapping, ties to the lower region index); regions are only ever
+/// APPENDED, so a new region takes exactly the tiles strictly nearer its
+/// anchor than their current owner's, and every earlier cell can only shrink.
+/// This keeps the owner raster and each tile's distance to it, so a founding
+/// costs one pass over the land rather than a rebuild of the whole partition.
+struct urban_ground_field
+{
+    std::vector<int32_t> land_tiles; ///< Raster indices of the body's land, ascending.
+    std::vector<int32_t> owner;      ///< Per land tile: the region whose cell holds it, -1 none.
+    std::vector<int32_t> owner_dist; ///< Per land tile: Chebyshev distance to that region's anchor.
+    std::vector<int32_t> land;       ///< Per region: land tiles in its cell.
+    std::size_t          raster_size = 0; ///< gw*gh the land list was taken on.
+    std::size_t          measured = 0;    ///< Regions [0, measured) are in the partition.
+};
+
+/// Bring @p f up to date with @p ss (every region appended since the last call
+/// claims its cell) and write each region's `urban_ground`. @p substrate is the
+/// body's substrate in raster order (`is_water` tiles are not ground); its size
+/// must be gw*gh, otherwise nothing is measured and every region stays
+/// unmeasured. The result equals a fresh `nearest_region` pass over the land,
+/// tile for tile. Returns true when any region's `urban_ground` changed.
+bool update_urban_ground(settlement_state& ss, urban_ground_field& f,
+                         const std::vector<terrain_substrate>& substrate, int gw, int gh);
+
 /// The headcount `run_history_sim` seeds an unpopulated region with, and the
 /// figure `draw_urban_map` sizes its seed cities against. ONE derivation, read
 /// by both — the sim's seeding line and the urban draw have to agree or the
@@ -1261,12 +1381,22 @@ void draw_urban_map(settlement_state& s);
 /// keeps its centre and a cut-off one keeps its centres too — POPULATION.md's
 /// asymmetry, now covering both kinds of passive failure. Destruction is
 /// `sack_region_urban` alone, a deliberate act of history.
+///
+/// GROWTH CONSOLIDATES (BL-1130). What the heads stand up is
+/// `region_centres_wanted` — a hierarchy, not one centre per village's worth —
+/// and the count never exceeds `region_centres_fit` for the region's
+/// cell. That ceiling applies whether or not the network holds: it is a MERGE
+/// (a newer neighbour's founding cut the cell, and the centres standing fold
+/// together), not a loss, so `centres_razed` is untouched and the heads stay.
 void advance_region_urban(region& p, bool network_ok);
 
 /// SACK a region's cities. `population_loss_q` is the per-mille the
 /// countryside lost; the city loses a multiple of it, because a sack falls on
 /// the walls and not the fields. Centres fall to what the surviving heads can
-/// stand, and every one lost is recorded in `centres_razed`.
+/// stand, and the destruction is recorded in `centres_razed` COUNTED IN PEOPLE
+/// (Ben, 2026-09-25): the fall in `region_settlement_size` — a village's worth
+/// of urban heads per razing, plus the last settlement's one when it falls —
+/// whether or not the centre count stepped down.
 void sack_region_urban(region& p, int population_loss_q);
 
 /// The manpower ceiling a region's CURRENT population can support — a
