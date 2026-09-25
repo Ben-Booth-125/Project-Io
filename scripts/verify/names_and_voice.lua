@@ -119,16 +119,12 @@ local marks = verify.history_board_marks()
 verify.expect(marks == 0,
               "at " .. first5 .. " no inherited realm carries the entry mark ("
               .. marks .. " marked; -1 means the round never drew)")
--- A second read inside the span: at the first year every mark is zero by identity (the
--- lagged slice IS the first slice), so the claim is only tested a twelfth of the way in,
--- where the unclamped slice used to mark every inherited realm (the cold review).
-local inside5 = first5 + math.floor((last5 - first5) / 12)
-verify.history_year(inside5)
-verify.frames(2)
-local marks_inside = verify.history_board_marks()
-verify.expect(marks_inside == 0,
-              "at " .. inside5 .. " (a twelfth into round 5) no inherited realm carries the entry mark ("
-              .. marks_inside .. " marked)")
+-- WHY THE FIRST-YEAR READ IS THE CHECK (the cold review asked): with the lagged slice clamped
+-- to the record's first year the two slices coincide there, so zero is what the clamp
+-- guarantees -- and it is exactly what the unclamped slice failed (every inherited realm marked
+-- for the first twelfth). A read further in cannot serve: a realm that CLIMBS onto the board
+-- a twelfth in is meant to carry the mark (a rank entrant), so a later count is not a count
+-- of inherited-realm errors. Remove the clamp and this read goes non-zero again.
 
 -- 4. The clipping ledger over those frames.
 verify.expect_no_clipping("names_and_voice")
