@@ -7504,35 +7504,35 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_sim.cpp purchase_price_q; the BL-934 block",
       "headless: exploration_sim_harness (new case: a coastal affordable native is bought, an inland or unaffordable one is taken)"
      ],
      "requirement": "Inside the subjection block, when the native seat carries a port window (port_q > 0) and the arriver's seat treasury covers price = max(subjection_purchase_floor, native seat treasury x subjection_purchase_rate_q / 1000), the province is BOUGHT: the buyer's seat is debited and the native's seat credited (clamped as tribute is), subject_kind = 0, no ground_taken grudge is written, culture shares are untouched, a province_bought event is noted (polity = the native, other = the buyer); otherwise the native is TAKEN as today. subject_kind means the verb taken. (item-spanning gate: exploration_sim_harness's new price-fork case)",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Lane W1 (3d4580de): purchase_price_q beside choose_subjection_native; the fork inside the BL-934 block (BUY when the native seat has a port window and the price is affordable: debit/credit clamped as tribute, subject_kind = 0, no grudge, shares untouched, province_bought noted in place of subject_bound; else TAKE); exploration_sim_harness price-fork case PASS on the lane."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_sim_params validation",
       "headless: exploration_sim_harness control equality"
      ],
      "requirement": "Both params are validated in-domain and rejected (never clamped) on violation; with both at zero a run is byte-identical to a run without the change (the control).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "subjection_purchase_rate_q / subjection_purchase_floor validated in-domain, rejected on violation; zero-disabled control byte-identical at the counter grain (R3d). Reviewer note: with the fork off subject_kind now reads 1 where a coastal seat once read 0 — the field means the verb taken (documented)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: exploration_sweep over the seed library, the reading written into the item"
      ],
      "requirement": "Counters provinces_bought and treasury_spent_on_purchases cross on exploration_output; exploration_sweep reports the bought/taken split per seed; on the 16 curated seeds the split is non-degenerate on at least 4 seeds and the treasury spread is reported (constants MEASURED before they are pinned; never tuned to make one seed buy).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Counters provinces_bought / treasury_spent_on_purchases cross on exploration_output; exploration_sweep bought/taken split over the 16 curated seeds: 1000 per mille 62/48, 4000 per mille 36/74, pinned at 2000 (NR-933); digests moved on seeds 25 and 38; a purchase recoups itself through tribute in ~7 rounds (read, not hidden)."
     },
     {
      "id": "R4",
@@ -7543,18 +7543,18 @@
      ],
      "requirement": "Round 5's ticker distinguishes 'X buys Y's province' from 'falls under the overlordship of' (a caption for province_bought); the new kind is append-only on lapse_event_kind and rides the sprint's envelope bump.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "province_bought = kind 18 (append-only) under the shared envelope v22; round-5 caption written. save_envelope_roundtrip on the merged tree: in the 2026-09-25 wave-0 gate run."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: docs/generation/EXPLORATION.md",
       "code: history_sim.hpp comment"
      ],
      "requirement": "EXPLORATION.md § Two ways to claim ground across water and § A colony is a subject state the built rule (price, fork, label); the sim's header comment at history_sim.hpp (subject_kind) no longer says it is derived from port_q; AI_OPPONENT.md § 11 cites EXPLORATION.md as the owner.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "EXPLORATION.md § Two ways to claim ground across water and § Where subjects come from state the price, the fork and the label; history_sim.hpp's subject_kind comment rewritten; AI_OPPONENT.md § 11 cites EXPLORATION.md."
     },
     {
      "id": "R6",
@@ -7565,7 +7565,7 @@
      ],
      "requirement": "Release build; world_determinism twice on the same params (bit-identical to itself); digests move only against the pre-change pins and are recorded for the sprint's single re-bless.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Release build on the merged tree passes (cc5e51d1); world_determinism x2 in the 2026-09-25 gate run; R3b in exploration_sim_harness moves by +400 tribute and is left for the sprint's single re-bless."
     }
    ]
   },
@@ -7583,14 +7583,14 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_sim.cpp note_sea_leg; the three sites",
       "headless: exploration_sim_harness (leg table non-empty on a seed with subjects; land corridors unchanged)"
      ],
      "requirement": "A sea_leg{a, b, uses} table on history_sim_state, folded (sorted, validated like surviving_corridors) onto exploration_output and industrialisation_output, is appended by note_sea_leg at three sites: the wet campaign launch (beside the existing land note so the land record is unchanged), the purchase crossing (BL-1096), and once per decision round per standing tribute clause (overlord capital -> subject seat). (item-spanning gate)",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Lane W1: sea_leg{a,b,uses} on the sim state and both span outputs (sorted, a<b, in range, uses>0; crosses WHOLE per EXPLORATION.md, no living-holder filter); note_sea_leg at the wet campaign launch, the purchase crossing and once per decision round per standing tribute clause. Main session 2026-09-25: the producer line dp.resume_sea_legs = &kepler_exploration.sea_legs at hard_coded_world.cpp:1526, and the wet-launch note gated on exploration_upkeep_enabled so the Empires span records none."
     },
     {
      "id": "R2",
@@ -7601,7 +7601,7 @@
      ],
      "requirement": "A sea_lane_opened event (region/other = the ends, polity = the tier) is noted when a leg's uses cross sea_lane_tier1_uses (default 4, mirroring road_tier1_uses); the kind is append-only and rides the envelope bump.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "sea_lane_opened = kind 19 at sea_lane_tier1_uses (default 4); save_envelope_roundtrip on the merged tree: in the 2026-09-25 gate run."
     },
     {
      "id": "R3",
@@ -7612,17 +7612,17 @@
      ],
      "requirement": "Round 5 bakes a persistent lane line from the events, drawn as its own water layer distinct from a colonial tie, present from the frame the leg earns the tier to the round's end.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Round 5 bakes a dashed lane line from the events (short AddLine segments over water, its own layer). Ben's live click owed."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: exploration_sweep column"
      ],
      "requirement": "On the 16 curated seeds the leg-table size and the number of legs over the tier are reported per seed; the reading is written into the item (with the note that the later spans run sea legs off, NR-921).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "exploration_sweep column: leg table non-empty on the library (e.g. 237 campaign legs on seed 32 where a target shore was already held); the later spans run sea legs off (NR-921), so the tribute-round leg carries most of the record."
     },
     {
      "id": "R5",
@@ -7633,7 +7633,7 @@
      ],
      "requirement": "EXPLORATION.md § The colonial tie is a sea lane names the three sites and the tier threshold; the industrialisation resume carries the table (fidelity mode compares it).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "EXPLORATION.md § The colonial tie is a sea lane names the three sites and the tier threshold; industrialisation_sim_harness --fidelity gate 3 on the merged tree (with the producer line): in the 2026-09-25 gate run."
     }
    ]
   },
@@ -7719,34 +7719,34 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_sim.cpp end-of-run block",
       "doc: docs/generation/INDUSTRIALISATION.md § What crosses into play"
      ],
      "requirement": "protection_q is derived at the span's end-of-run block from scarcity_q, trade_flows and culture_preference by a STATED formula (named inputs, named arithmetic, in the code comment and in INDUSTRIALISATION.md), independent of boundary_year; the broadcast feeds derive_national_protection unchanged. (item-spanning gate)",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Lane W3 (9a4f909e, f2246014): protection_q derived at the end-of-run block from scarcity_q, trade_flows and culture_preference by a stated formula (code comment + INDUSTRIALISATION.md tariff row), independent of boundary_year; gated on exploration_upkeep_enabled (runs at the 1660 close too — harmless on the shipped path, NR-935 notes it); the broadcast feeds derive_national_protection unchanged."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: a harness or the app log listing the tariff laws on the verify seed"
      ],
      "requirement": "On a 1960 world at least one LAW-IMPORT-TARIFF-* law exists at setup (seed_national_tariffs no longer skips every nation).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "On a 1960 world LAW-IMPORT-TARIFF-* laws exist: 61% of nations tariffed on the library, 80% of the laws at the 5% band, the 20% band reached on 3 of 16 worlds."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: industrialisation_sim_harness or history_sweep column"
      ],
      "requirement": "Across the 16 curated seeds the posture spread is reported and is not all one value; the reading is written into the item.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Per-seed median posture 285-376 across the 16 curated seeds against tariff_bands 300/500/700 (authored for the retired furnace scalar) — the bands were not moved; NR-935 is Ben's call."
     },
     {
      "id": "R4",
@@ -7756,7 +7756,7 @@
      ],
      "requirement": "Digests move only where a law is written; recorded for the sprint's single re-bless; world_determinism twice bit-identical to itself.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Every curated seed now writes laws, so the 16 --digest-check pins move at the re-bless; world_determinism x2 on the merged tree: in the 2026-09-25 gate run."
     }
    ]
   },

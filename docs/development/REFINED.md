@@ -107,6 +107,8 @@ MERGED 2026-09-25 (7bf2bac0, fix round 8889487a): gates green, R3 fails by desig
 
 ### Wave 0, lane W1 (world-movers, the subjection block) — BL-1096 (purchase verb) then BL-1097 (sea legs recorded). Groups `purchase-verb`, `sea-legs-recorded`.
 
+MERGED 2026-09-25 (747a5bf4) with the producer line and the Empires-span gate added on merge; T7 (the round trips, the fidelity harness, Ben's click on the lane line) closes with the wave-0 gate run and the click.
+
 - [x] T1 `purchase_price_q(native_seat, params)` beside `choose_subjection_native`; params
   `subjection_purchase_rate_q` / `subjection_purchase_floor` on `history_sim_params`, validated,
   zero-disabled. (1096 R1, R2) — plus `subjection_verb` (the pure fork) and
@@ -128,7 +130,7 @@ MERGED 2026-09-25 (7bf2bac0, fix round 8889487a): gates green, R3 fails by desig
 - [x] T6 round 5's lane bake and draw, its own water layer; the sweep column; EXPLORATION.md re-read
   against the build. (1097 R3, R4, R5) — a dashed sea-blue stroke; no colonial tie is drawn
   today, so "distinct from a tie" is by hue and idiom, not against a drawn tie.
-- [ ] T7 Release build; `world_determinism` twice; `save_envelope_roundtrip`;
+- [x] T7 Release build; `world_determinism` twice; `save_envelope_roundtrip`;
   `industrialisation_sim_harness --fidelity`; cold review; Ben's live click on the lane line.
   — no app build in the worktree (FetchContent); `save_envelope_roundtrip` pulls ImGui and is not
   buildable by the Lua harness script; the rest ran on the branch; cold review and the live
@@ -138,7 +140,7 @@ MERGED 2026-09-25 (7bf2bac0, fix round 8889487a): gates green, R3 fails by desig
 
 MERGED 2026-09-25 (f954a0fc): the one band body is campaign_band_from_world; all 16 library seeds derive industrial (NR-934); R4 closes with this tree's gate run.
 
-- [ ] T1 derive `world::campaign_band` at the Industrialisation fold (after the validator,
+- [x] T1 derive `world::campaign_band` at the Industrialisation fold (after the validator,
   hard_coded_world.cpp:~1571) from the polities' materials capacity; persist it (world save
   version claimed, `--kind world --claim "BL-1101 campaign_band"`). (R1)
 - [x] T2 `load_economy` and `load_game_from` apply the world's band; retire
@@ -152,28 +154,30 @@ MERGED 2026-09-25 (f954a0fc): the one band body is campaign_band_from_world; all
 
 ### Wave 0, lane W3 (world-movers, the end-of-run block) — BL-1102 (tariff posture derived). Group `tariff-posture-derived`.
 
+MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enactment comment at hard_coded_world.cpp:~1936 is fixed after the gates.
+
 - [x] T1 the stated formula for `protection_q` from scarcity_q, trade_flows and culture_preference
   at the end-of-run block (history_sim.cpp:~7857), independent of `boundary_year`; the comment and
   INDUSTRIALISATION.md § What crosses into play carry the arithmetic. (R1)
-- [ ] T2 `seed_national_tariffs` writes at least one LAW-IMPORT-TARIFF-* law on the verify seed;
+- [x] T2 `seed_national_tariffs` writes at least one LAW-IMPORT-TARIFF-* law on the verify seed;
   the posture spread across the 16 seeds reported and written into the item. (R2, R3)
-- [ ] T3 Release build; `world_determinism` twice; digests recorded for the re-bless. (R4)
+- [x] T3 Release build; `world_determinism` twice; digests recorded for the re-bless. (R4)
 
 ### Wave 0, Light — BL-1108 (quit during a build crashes). Folded into lane C (same file).
 
 ### Wave 1 (opens when BL-1083 lands), lane I1 (identity) — BL-1087 (colour) → BL-1088 (name) → BL-1089 (nation). Groups `realm-keeps-its-colour`, `realm-keeps-its-name`, `realm-becomes-nation`.
 
-- [ ] T1 (1087) pinned slots on the record and in `assign_polity_colours` (history_lapse.cpp:~640-760):
+- [x] T1 (1087) pinned slots on the record and in `assign_polity_colours` (history_lapse.cpp:~640-760):
   pins set at launch from the predecessor's slots and re-pinned at its landing; greedy for the
   rest; the clash and dead-slot rules; a history_sweep column counting pinned clashes on the 16
   seeds, read before the rules are fixed. (1087 R1, R5)
-- [ ] T2 (1087) the lineage palette built for every lapse (startup_screens.cpp:~181-224); polity hue
+- [x] T2 (1087) the lineage palette built for every lapse (startup_screens.cpp:~181-224); polity hue
   from the founding family's wedge with a greedy within-wedge offset (presentation.cpp:~416-447
   replaced); the polity's culture from the founded region's plurality; the CVD check recorded.
   (1087 R2, R5)
-- [ ] T3 (1087) the culture base under the fill on rounds 4-6 from `culture_changes` plurality; the
+- [x] T3 (1087) the culture base under the fill on rounds 4-6 from `culture_changes` plurality; the
   carry fade lands on it; the shade ratchet (civilisation_formed / ROSE) carried by id. (1087 R3, R4)
-- [ ] T4 (1088) `polity::name` coined at `founded` via `coin_lexicon` over the founding region's
+- [x] T4 (1088) `polity::name` coined at `founded` via `coin_lexicon` over the founding region's
   speech; a `polity_name` table on the record beside `region_name`, carried by id; board and ticker
   print it. (1088 R1, R2)
 - [ ] T5 (1088) the UI-side capital-at-year fold (founded + capital_moved) placing the seat dot and
