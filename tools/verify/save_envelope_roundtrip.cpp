@@ -289,6 +289,12 @@ save_envelope make_envelope()
     ps0.industry_points = 0;
     ps1.industry_points = 7340031;
     ps2.industry_points = 9876543210123LL;
+    // BL-1095, save_game_version 22 -- the navy and the capital's port at the
+    // sample's tail. One past 2^32 (a narrowing is visible), one at the port
+    // scale's top, one zero pair (the Empires case: no fleet, no harbour).
+    ps0.navy_stock = 0;             ps0.port_stock_q = 0;
+    ps1.navy_stock = 6100000000LL;  ps1.port_stock_q = 1000;
+    ps2.navy_stock = 4200;          ps2.port_stock_q = 275;
     be.prehistory_timelapse.samples.push_back(ps0);
     be.prehistory_timelapse.samples.push_back(ps1);
     be.prehistory_timelapse.samples.push_back(ps2);
@@ -338,6 +344,7 @@ save_envelope make_envelope()
     {
         polity_sample ip; ip.population = 3100000; ip.polity = 4; ip.regions = 2;
         ip.cap_military = 3; ip.cap_materials = 6; ip.industry_points = 41250000;
+        ip.navy_stock = 90; ip.port_stock_q = 640; // BL-1095
         be.industrialisation_timelapse.samples.push_back(ip);
     }
 
@@ -592,7 +599,9 @@ int main()
                        && t.samples[i].regions == o.samples[i].regions
                        && t.samples[i].cap_military == o.samples[i].cap_military
                        && t.samples[i].cap_materials == o.samples[i].cap_materials
-                       && t.samples[i].industry_points == o.samples[i].industry_points;
+                       && t.samples[i].industry_points == o.samples[i].industry_points
+                       && t.samples[i].navy_stock == o.samples[i].navy_stock       // BL-1095
+                       && t.samples[i].port_stock_q == o.samples[i].port_stock_q;  // BL-1095
             for (std::size_t i = 0; play_ok && i < o.culture_changes.size(); ++i)
             {
                 play_ok = t.culture_changes[i].year == o.culture_changes[i].year
@@ -646,7 +655,8 @@ int main()
                       && t.events[1].region == 0 && t.events[1].polity == 4
                       && t.events[1].other == lapse_event_none
                       && t.samples.size() == 1 && t.samples[0].industry_points == 41250000
-                      && t.samples[0].cap_materials == 6;
+                      && t.samples[0].cap_materials == 6
+                      && t.samples[0].navy_stock == 90 && t.samples[0].port_stock_q == 640; // BL-1095
                 for (std::size_t i = 0; ind_ok && i < o.changes.size(); ++i)
                     ind_ok = t.changes[i].year == o.changes[i].year
                           && t.changes[i].region == o.changes[i].region

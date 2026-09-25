@@ -231,6 +231,16 @@ inline constexpr uint32_t save_game_magic =
 ///     (BL-1089): five flat arrays after the three time-lapses — nation ids,
 ///     each nation's founding realm, and the absorbed-realm ranges — read by
 ///     the seat card and the per-world nation -> colour table.
+///   - TWO FIELDS AT THE TAIL OF EVERY `polity_sample` (BL-1095, fleets and
+///     ties), after `industry_points`: `navy_stock` (i64, the realm's standing
+///     navy) and `port_stock_q` (i16, written as i32, the capital's built port
+///     on 0-1000), written by `w_timelapse` and read back in the same place by
+///     `r_timelapse`, which refuses a negative navy or a port off the scale.
+///     Record-only: read by the time-lapse's hull and harbour marks, never at
+///     world setup. And the kind `sea_leg_campaign` (24) appended to
+///     `lapse_event_kind` — numbered past lane F3's 21/22 and lane F1's 23, so
+///     the range check admits those numbers under this version whether or not
+///     the lane that writes them has landed.
 /// A v21 stream is refused whole on the same strict-equality contract.
 inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened, inherited, realm names, the polity fold's record
 

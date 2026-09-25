@@ -11,6 +11,7 @@
 
 #include "world/components.hpp"   // is_water, terrain_landform
 #include "world/hex_neighbors.hpp" // the odd-r side offsets the river bits are keyed by
+#include "world/history_sim.hpp"   // history_sim_params::treaty_term_years, the term an arc stands for (BL-1095)
 
 #include <imgui.h>
 
@@ -262,6 +263,14 @@ ImU32 owner_colour(const history_lapse& h, uint16_t owner, int year = 0x7FFFFFFF
         return static_cast<ImU32>(h.culture_colour[owner]);
     return polity_colour(h, owner, year);
 }
+
+// --- BL-1095 (fleets and ties): the bake and the pass, defined in the block
+// below the sample-lookup helpers they read; declared here so
+// `finish_history_lapse` and `draw_lapse_map` can call them without a change
+// to their own order. ---
+void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band);
+int  draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice,
+                       ImDrawList* dl, ImVec2 tl, float scale, int year);
 
 } // namespace
 
@@ -688,6 +697,10 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // The identity: pinned slots, family wedges, the ratchet's moments and the
     // capital fold (BL-1087/BL-1088; world/polity_identity.hpp holds the rule).
     assign_polity_colours(h);
+
+    // --- Fleets and ties (BL-1095), baked once, AFTER the capital fold a
+    // landing's attacker end reads. The water test reads `band` above. ---
+    bake_lapse_fleets(h, band);
 }
 
 void assign_polity_colours(history_lapse& h)
@@ -1617,6 +1630,14 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         dl->PopClipRect();
     }
 
+    // ── 3g. FLEETS AND TIES (BL-1095; Ben, 2026-09-24, R13; STARTUP.md
+    //    § Round 5): the colonial ties and treaty arcs between capitals, the
+    //    hull and harbour at each capital, the sail on every wet campaign and
+    //    the landing on every seat taken across water — its own pass, under
+    //    the seats, defined with its bake below the sample helpers. Empty on
+    //    every record that carries none of it. ──
+    prims += draw_lapse_fleets(h, slice, dl, tl, scale, year);
+
     // ── 4. SEATS: one dot per polity HOLDING GROUND in this slice, at the
     //    region it first held. Seats only, not every region — the in-game Ages
     //    view draws a dot per region, and at blob granularity that is a rash;
@@ -1990,6 +2011,599 @@ int32_t creed_of_polity(const history_lapse& h, uint16_t polity)
 }
 
 } // namespace
+
+// ---------------------------------------------------------------------------
+// BL-1095 -- the fleets and ties layer (Ben, 2026-09-24, R13; EXPLORATION.md
+// § Force persists now and § The colonial tie is a sea lane; STARTUP.md
+// § Round 5)
+// ---------------------------------------------------------------------------
+//
+// The bake, the per-frame derivation and the pass, in one block. The bake
+// reads the record once at `finish_history_lapse`; `lapse_fleets_at` derives
+// what one playhead shows, and the verify API reads the same derivation; the
+// pass draws it. Nothing here reads anything but the record and the fold, and
+// nothing here is read by the sim.
+
+int lapse_treaty_term_years()
+{
+    return static_cast<int>(std::max<int64_t>(1, history_sim_params{}.treaty_term_years));
+}
+
+namespace {
+
+/// The tie's hue: ROSE, against the lane's pale-blue dashes, the trade link's
+/// green and the road's ochre, so a dashed line over water still says which
+/// of the two water layers it is. The arc: lilac, thin. The harbour's two
+/// tones: stone for a kept port, sand for one silting.
+constexpr ImU32 col_tie           = IM_COL32(236, 128, 152, 225);
+constexpr ImU32 col_treaty        = IM_COL32(196, 172, 244, 205);
+constexpr ImU32 col_harbour_stone = IM_COL32(226, 224, 212, 240);
+constexpr ImU32 col_harbour_silt  = IM_COL32(176, 138,  92, 240);
+constexpr int32_t lapse_never = 0x7FFFFFFF;
+
+/// A decision round in the Exploration bands is a handful of years, and the
+/// sim re-scores a lapsed treaty on the round AFTER its expiry: a
+/// `treaty_formed` within this of an arc's quiet lapse is that renewal and
+/// extends the arc, rather than opening a second one a few years on.
+constexpr int k_treaty_renewal_slack_years = 20;
+
+int32_t year_after(int32_t year, int years)
+{
+    const int64_t y = static_cast<int64_t>(year) + years;
+    return y >= lapse_never ? lapse_never : static_cast<int32_t>(y);
+}
+
+ImU32 lerp_col(ImU32 a, ImU32 b, float u)
+{
+    const auto ch = [&](int shift) {
+        const int lo = static_cast<int>((a >> shift) & 0xFFu), hi = static_cast<int>((b >> shift) & 0xFFu);
+        return static_cast<ImU32>(std::clamp(lo + static_cast<int>(static_cast<float>(hi - lo) * u), 0, 255));
+    };
+    return (ch(IM_COL32_R_SHIFT) << IM_COL32_R_SHIFT) | (ch(IM_COL32_G_SHIFT) << IM_COL32_G_SHIFT)
+         | (ch(IM_COL32_B_SHIFT) << IM_COL32_B_SHIFT) | (ch(IM_COL32_A_SHIFT) << IM_COL32_A_SHIFT);
+}
+
+void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
+{
+    h.tie_segs.clear();
+    h.treaty_arcs.clear();
+    h.sails.clear();
+    h.landings.clear();
+    h.navy_peak = 0;
+    const int gw = h.grid_w, gh = h.grid_h;
+    const int term = lapse_treaty_term_years();
+    // "FOLLOWS" MEANS WITHIN ONE MARKER WINDOW OF THE FREEING: the tie's
+    // fade-out then overlaps the trade line's fade-in and the line visibly
+    // turns from rose to green -- the design's "fading to a trade line". A
+    // treaty formed generations later is a treaty like any other and draws
+    // as an arc (the reference world forms one 72 years after a freeing, and
+    // a straight green line there read as nothing).
+    const int follow_on_years = lapse_marker_window_years(h);
+    const auto region_ok = [&](uint16_t r) {
+        return r != lapse_event_none && static_cast<std::size_t>(r) < h.region_col.size();
+    };
+    const auto pol_ok   = [](uint16_t p) { return p != lapse_event_none; };
+    const auto anchor_c = [&](int32_t r) {
+        return static_cast<float>(h.region_col[static_cast<std::size_t>(r)]) + 0.5f;
+    };
+    const auto anchor_r = [&](int32_t r) {
+        return static_cast<float>(h.region_row[static_cast<std::size_t>(r)]) + 0.5f;
+    };
+    const auto same_pair = [](const lapse_tie_seg& t, uint16_t lo, uint16_t hi) {
+        return (t.subject == lo && t.overlord == hi) || (t.subject == hi && t.overlord == lo);
+    };
+
+    // THE TIES AND THE ARCS: one forward walk over the events in the order
+    // they happened, closing what each kind closes and opening what it opens.
+    for (const lapse_event& e : h.lapse.events)
+    {
+        const auto kind = static_cast<lapse_event_kind>(e.kind);
+        switch (kind)
+        {
+        case lapse_event_kind::subject_bound:
+        case lapse_event_kind::province_bought:
+        {
+            // polity = the subject (the native); other = the overlord (the
+            // arriver, or the buyer). A re-binding closes the standing tie.
+            if (!pol_ok(e.polity) || !pol_ok(e.other) || e.polity == e.other) break;
+            for (lapse_tie_seg& t : h.tie_segs)
+                if (t.subject == e.polity && t.year_freed == lapse_never) t.year_freed = e.year;
+            lapse_tie_seg t;
+            t.overlord   = e.other;
+            t.subject    = e.polity;
+            t.year_bound = e.year;
+            t.bought     = kind == lapse_event_kind::province_bought;
+            h.tie_segs.push_back(t);
+            break;
+        }
+        case lapse_event_kind::subject_freed:
+            if (!pol_ok(e.polity)) break;
+            for (lapse_tie_seg& t : h.tie_segs)
+                if (t.subject == e.polity && t.year_freed == lapse_never)
+                {
+                    t.year_freed       = e.year;
+                    t.freed_by_refusal = true;
+                }
+            break;
+        case lapse_event_kind::realm_ended:
+            // The link dissolves with either party (the sim: "the overlord is
+            // gone; the link dissolves with it"), and so does a treaty.
+            if (!pol_ok(e.polity)) break;
+            for (lapse_tie_seg& t : h.tie_segs)
+            {
+                if (t.subject != e.polity && t.overlord != e.polity) continue;
+                if (t.year_freed == lapse_never) t.year_freed = e.year;
+                if (t.year_trade != lapse_never && t.year_trade_end > e.year) t.year_trade_end = e.year;
+            }
+            for (lapse_treaty_arc& a : h.treaty_arcs)
+                if ((a.a == e.polity || a.b == e.polity) && a.year_end > e.year)
+                {
+                    a.year_end = e.year;
+                    a.broken   = false;
+                }
+            break;
+        case lapse_event_kind::treaty_formed:
+        {
+            if (!pol_ok(e.polity) || !pol_ok(e.other) || e.polity == e.other) break;
+            const uint16_t lo = std::min(e.polity, e.other), hi = std::max(e.polity, e.other);
+            // THE TRADE FOLLOW-ON: a subject freed by refusal whose former
+            // overlord then binds a treaty with it keeps the line as trade.
+            // The tie stands in for the arc, so no arc is opened for it.
+            bool follow_on = false;
+            for (lapse_tie_seg& t : h.tie_segs)
+            {
+                if (!same_pair(t, lo, hi) || !t.freed_by_refusal || t.year_freed > e.year) continue;
+                if (t.year_trade == lapse_never && e.year - t.year_freed > follow_on_years) continue;
+                if (t.year_trade == lapse_never)
+                {
+                    t.year_trade     = e.year;
+                    t.year_trade_end = year_after(e.year, term);
+                    follow_on = true;
+                }
+                else if (e.year <= year_after(t.year_trade_end, k_treaty_renewal_slack_years))
+                {
+                    t.year_trade_end = year_after(e.year, term); // the renewal
+                    follow_on = true;
+                }
+            }
+            if (follow_on) break;
+            bool renewed = false;
+            for (lapse_treaty_arc& a : h.treaty_arcs)
+                if (a.a == lo && a.b == hi && !a.broken
+                 && e.year <= year_after(a.year_end, k_treaty_renewal_slack_years))
+                {
+                    a.year_end = year_after(e.year, term);
+                    renewed = true;
+                }
+            if (renewed) break;
+            lapse_treaty_arc a;
+            a.a = lo;
+            a.b = hi;
+            a.year_formed = e.year;
+            a.year_end    = year_after(e.year, term);
+            h.treaty_arcs.push_back(a);
+            break;
+        }
+        case lapse_event_kind::treaty_broken:
+        {
+            if (!pol_ok(e.polity) || !pol_ok(e.other)) break;
+            const uint16_t lo = std::min(e.polity, e.other), hi = std::max(e.polity, e.other);
+            for (lapse_treaty_arc& a : h.treaty_arcs)
+                if (a.a == lo && a.b == hi && a.year_end > e.year)
+                {
+                    a.year_end = e.year;
+                    a.broken   = true;
+                }
+            for (lapse_tie_seg& t : h.tie_segs)
+                if (same_pair(t, lo, hi) && t.year_trade != lapse_never && t.year_trade_end > e.year)
+                    t.year_trade_end = e.year;
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    // THE SAILS: one per wet campaign, staging hub -> target.
+    for (const lapse_event& e : h.lapse.events)
+    {
+        if (static_cast<lapse_event_kind>(e.kind) != lapse_event_kind::sea_leg_campaign) continue;
+        if (!region_ok(e.region) || !region_ok(e.other) || e.region == e.other) continue;
+        lapse_sail s;
+        s.polity = e.polity;
+        s.hub    = e.other;
+        s.target = e.region;
+        s.year   = e.year;
+        s.c0 = anchor_c(e.other);
+        s.r0 = anchor_r(e.other);
+        s.c1 = lapse_unwrap_col(s.c0, anchor_c(e.region), gw);
+        s.r1 = anchor_r(e.region);
+        h.sails.push_back(s);
+    }
+
+    // THE LANDINGS: a seat captured across water. The attacker's capital at
+    // the capture's year is the fold's; the water test is the corridors' own
+    // sampler over the band the road bake used.
+    for (const lapse_event& e : h.lapse.events)
+    {
+        if (static_cast<lapse_event_kind>(e.kind) != lapse_event_kind::seat_captured) continue;
+        if (!region_ok(e.region) || !pol_ok(e.polity)) continue;
+        const int32_t from = lapse_polity_capital(h, e.polity, e.year);
+        if (from < 0 || static_cast<std::size_t>(from) >= h.region_col.size()
+         || from == static_cast<int32_t>(e.region)) continue;
+        lapse_landing l;
+        l.polity = e.polity;
+        l.seat   = e.region;
+        l.year   = e.year;
+        l.c0 = anchor_c(from);
+        l.r0 = anchor_r(from);
+        l.c1 = lapse_unwrap_col(l.c0, anchor_c(e.region), gw);
+        l.r1 = anchor_r(e.region);
+        if (!lapse_corridor_over_water(band, gw, gh, l.c0, l.r0, l.c1, l.r1)) continue;
+        h.landings.push_back(l);
+    }
+
+    // THE HULL'S SCALE: the largest navy any sample holds.
+    for (const polity_sample& s : h.lapse.samples)
+        h.navy_peak = std::max(h.navy_peak, s.navy_stock);
+}
+
+/// A dashed stroke: the lane layer's idiom (3c'), restated here so this pass
+/// touches nothing there.
+void fleet_dashed(ImDrawList* dl, float x0, float y0, float x1, float y1,
+                  ImU32 col, float w, float dash, int& prims)
+{
+    const float dx = x1 - x0, dy = y1 - y0;
+    const float len = std::sqrt(dx * dx + dy * dy);
+    if (len <= 0.0f) return;
+    const float ux = dx / len, uy = dy / len;
+    for (float t = 0.0f; t < len; t += dash * 2.0f)
+    {
+        const float e = std::min(t + dash, len);
+        dl->AddLine({x0 + ux * t, y0 + uy * t}, {x0 + ux * e, y0 + uy * e}, col, w);
+        ++prims;
+    }
+}
+
+/// The ship glyph: a sail, apex up, over a short hull line, in the realm's
+/// colour under a dark outline -- the corridor exemplar's sail (3d) grown a
+/// hull, so a crossing reads as a ship and not as a road's fleet mark.
+void fleet_ship(ImDrawList* dl, ImVec2 at, float r, ImU32 fill, int alpha, int& prims)
+{
+    const ImVec2 apex{at.x, at.y - r * 1.3f};
+    const ImVec2 lft{at.x - r * 0.9f, at.y + r * 0.5f};
+    const ImVec2 rgt{at.x + r * 0.9f, at.y + r * 0.5f};
+    dl->AddTriangle(apex, lft, rgt, with_alpha(col_seat_ring, alpha), 2.5f);
+    dl->AddTriangleFilled(apex, lft, rgt, with_alpha(fill, alpha));
+    dl->AddLine({at.x - r * 1.1f, at.y + r * 0.8f}, {at.x + r * 1.1f, at.y + r * 0.8f},
+                with_alpha(col_bright, alpha), std::max(1.0f, r * 0.35f));
+    prims += 3;
+}
+
+int draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice,
+                      ImDrawList* dl, ImVec2 tl, float scale, int year)
+{
+    const lapse_fleet_frame f = lapse_fleets_at(h, slice, year);
+    if (f.ties.empty() && f.arcs.empty() && f.hulls.empty() && f.harbours.empty()
+     && f.sails.empty() && f.landings.empty()) return 0;
+    const int gw = h.grid_w, gh = h.grid_h;
+    const float world_w = static_cast<float>(gw) * scale;
+    const auto px = [&](float c) { return std::floor(tl.x + c * scale); };
+    const auto py = [&](float r) { return std::floor(tl.y + r * scale); };
+    const auto anchor = [&](int32_t region) {
+        return ImVec2{static_cast<float>(h.region_col[static_cast<std::size_t>(region)]) + 0.5f,
+                      static_cast<float>(h.region_row[static_cast<std::size_t>(region)]) + 0.5f};
+    };
+    // Fold a tile column back into the raster where the short way round
+    // crossed the seam.
+    const auto fold_c = [&](float c) {
+        if (c < 0.0f) return c + static_cast<float>(gw);
+        if (c >= static_cast<float>(gw)) return c - static_cast<float>(gw);
+        return c;
+    };
+    const float dot_r = std::clamp(scale * 0.7f, 2.0f, 4.5f); // the seat dot's radius (pass 4)
+    int prims = 0;
+    dl->PushClipRect({tl.x, tl.y}, {tl.x + world_w, tl.y + static_cast<float>(gh) * scale}, true);
+
+    // THE TIES: dashed overlord -> subject, an arrowhead at the subject's end
+    // so the direction reads. The trade line that follows a freeing is the
+    // trade network's own solid green, so it reads as an open border and not
+    // as a bond. Seam-crossing ties are stroked twice, as the corridors are.
+    for (const lapse_fleet_frame::tie& t : f.ties)
+    {
+        const ImVec2 p0 = anchor(t.seat_a);
+        ImVec2 p1 = anchor(t.seat_b);
+        p1.x = lapse_unwrap_col(p0.x, p1.x, gw);
+        const bool  wrapped = p1.x < 0.0f || p1.x > static_cast<float>(gw);
+        const float shift   = p1.x < 0.0f ? world_w : -world_w;
+        const float w    = std::max(1.25f, scale * 0.22f);
+        const float dash = std::max(3.0f, scale * 1.1f);
+        for (int pass = 0; pass < (wrapped ? 2 : 1); ++pass)
+        {
+            const float sx = pass == 0 ? 0.0f : shift;
+            const float x0 = px(p0.x) + sx, y0 = py(p0.y), x1 = px(p1.x) + sx, y1 = py(p1.y);
+            if (t.trade_a > 0.0f)
+            {
+                dl->AddLine({x0, y0}, {x1, y1},
+                            with_alpha(col_trade_link, static_cast<int>(220.0f * t.trade_a)), w);
+                ++prims;
+            }
+            if (t.tie_a > 0.0f)
+            {
+                const ImU32 col = with_alpha(col_tie, static_cast<int>(225.0f * t.tie_a));
+                fleet_dashed(dl, x0, y0, x1, y1, col, w, dash, prims);
+                const float dx = x1 - x0, dy = y1 - y0;
+                const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+                const float ux = dx / len, uy = dy / len;
+                const float ah = std::max(4.0f, w * 3.5f);
+                const ImVec2 tip{x1, y1};
+                const ImVec2 base{x1 - ux * ah, y1 - uy * ah};
+                dl->AddTriangleFilled(tip, {base.x - uy * ah * 0.5f, base.y + ux * ah * 0.5f},
+                                      {base.x + uy * ah * 0.5f, base.y - ux * ah * 0.5f}, col);
+                ++prims;
+            }
+        }
+    }
+
+    // THE TREATY ARCS: a quadratic curve between the two capitals, bowed
+    // toward the map's north so every arc bows the same way and never lies
+    // on its own chord where a tie might run. At `treaty_broken` the arc
+    // SNAPS: its two halves draw back toward their capitals over the window
+    // as they fade -- a mark on the thing, not a ping over it.
+    for (const lapse_fleet_frame::arc& a : f.arcs)
+    {
+        const ImVec2 p0 = anchor(a.seat_a);
+        ImVec2 p1 = anchor(a.seat_b);
+        p1.x = lapse_unwrap_col(p0.x, p1.x, gw);
+        const bool  wrapped = p1.x < 0.0f || p1.x > static_cast<float>(gw);
+        const float shift   = p1.x < 0.0f ? world_w : -world_w;
+        // FAINT BY DESIGN: the colonial world records over a hundred treaties
+        // and dozens stand at once, so an arc at the tie's weight buried the
+        // borders under lilac (the first capture on seed 13). A hairline at a
+        // third of the tie's alpha keeps the arcs a texture the eye can read
+        // through; the snap, which is the moment, keeps its full contrast
+        // against that quiet.
+        const ImU32 col = with_alpha(col_treaty, static_cast<int>(
+            (a.snap > 0.0f ? 190.0f : 80.0f) * (1.0f - a.snap)));
+        const float w   = a.snap > 0.0f ? std::max(1.25f, scale * 0.22f) : 1.0f;
+        constexpr int segs = 14;
+        for (int pass = 0; pass < (wrapped ? 2 : 1); ++pass)
+        {
+            const float sx = pass == 0 ? 0.0f : shift;
+            const ImVec2 q0{px(p0.x) + sx, py(p0.y)}, q2{px(p1.x) + sx, py(p1.y)};
+            const float dx = q2.x - q0.x, dy = q2.y - q0.y;
+            const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+            float nx = -dy / len, ny = dx / len;
+            if (ny > 0.0f) { nx = -nx; ny = -ny; } // bow north
+            const float  bulge = std::clamp(len * 0.18f, 4.0f, 28.0f);
+            const ImVec2 q1{(q0.x + q2.x) * 0.5f + nx * bulge, (q0.y + q2.y) * 0.5f + ny * bulge};
+            const auto at = [&](float u) {
+                const float v = 1.0f - u;
+                return ImVec2{v * v * q0.x + 2.0f * v * u * q1.x + u * u * q2.x,
+                              v * v * q0.y + 2.0f * v * u * q1.y + u * u * q2.y};
+            };
+            // Whole: u over [0, 1]. Snapped: [0, 1/2 - gap] and [1/2 + gap, 1].
+            const float gap = a.snap * 0.5f;
+            for (int half = 0; half < (a.snap > 0.0f ? 2 : 1); ++half)
+            {
+                const float u0 = a.snap > 0.0f && half == 1 ? 0.5f + gap : 0.0f;
+                const float u1 = a.snap > 0.0f && half == 0 ? 0.5f - gap : 1.0f;
+                if (u1 <= u0) continue;
+                ImVec2 prev = at(u0);
+                for (int i = 1; i <= segs; ++i)
+                {
+                    const ImVec2 cur = at(u0 + (u1 - u0) * static_cast<float>(i) / static_cast<float>(segs));
+                    dl->AddLine(prev, cur, col, w);
+                    prev = cur;
+                }
+                prims += segs;
+            }
+        }
+    }
+
+    // THE HARBOURS: a breakwater under the seat -- an arc whose sweep is the
+    // capital's port stock, stone at full stock and sand as it silts, so a
+    // harbour the treasury stops paying for visibly shortens and browns.
+    for (const lapse_fleet_frame::harbour& hb : f.harbours)
+    {
+        const ImVec2 a = anchor(hb.seat);
+        const ImVec2 at{px(a.x), py(a.y)};
+        const float q     = static_cast<float>(hb.port_q) / 1000.0f;
+        const float r     = dot_r + 3.0f;
+        const float sweep = 3.14159265f * (0.15f + 0.8f * q);
+        const float a0 = 1.5707963f - sweep * 0.5f, a1 = 1.5707963f + sweep * 0.5f;
+        dl->PathArcTo(at, r, a0, a1, 12);
+        dl->PathStroke(col_seat_ring, 0, 3.5f);
+        dl->PathArcTo(at, r, a0, a1, 12);
+        dl->PathStroke(lerp_col(col_harbour_silt, col_harbour_stone, q), 0, 2.0f);
+        prims += 2;
+    }
+
+    // THE HULLS: a hull east of the seat dot, its width the navy over the
+    // record's peak (square-rooted, as the industry heat is, so a small fleet
+    // still reads), a mast over it. It grows as the treasury buys steps and
+    // shrinks as the unpaid share decays -- the series drawn, not a ping.
+    for (const lapse_fleet_frame::hull& hl : f.hulls)
+    {
+        const ImVec2 a = anchor(hl.seat);
+        const ImVec2 at{px(a.x), py(a.y)};
+        const float hw = 2.0f + 5.0f * hl.size_q; // half width
+        const float hh = 1.0f + 0.9f * hw;
+        const float cx = at.x + dot_r + 2.0f + hw, cy = at.y + 1.0f;
+        const ImVec2 q0{cx - hw, cy - hh * 0.35f}, q1{cx + hw, cy - hh * 0.35f};
+        const ImVec2 q2{cx + hw * 0.55f, cy + hh * 0.65f}, q3{cx - hw * 0.55f, cy + hh * 0.65f};
+        dl->AddQuad(q0, q1, q2, q3, col_seat_ring, 2.5f);
+        dl->AddQuadFilled(q0, q1, q2, q3, owner_colour(h, hl.polity, year));
+        dl->AddLine({cx, cy - hh * 0.35f}, {cx, cy - hh * 0.35f - hw * 1.1f}, col_bright, 1.0f);
+        prims += 3;
+    }
+
+    // THE SAILS: one ship per wet campaign, hub -> target over the window,
+    // a faint wake behind it. Eased, and folded back into the raster where
+    // the short way round crosses the seam.
+    const auto crossing = [&](uint16_t polity, float c0, float r0, float c1, float r1,
+                              float u, float r, int alpha) {
+        const float ez = u * u * (3.0f - 2.0f * u);
+        const float cu = c0 + (c1 - c0) * ez;
+        const float cy = r0 + (r1 - r0) * ez;
+        const ImVec2 at{px(fold_c(cu)), py(cy)};
+        const float wx0 = px(c0), wy0 = py(r0), wx1 = px(cu), wy1 = py(cy);
+        const ImU32 wake = with_alpha(col_bright, alpha / 3);
+        dl->AddLine({wx0, wy0}, {wx1, wy1}, wake, 1.0f);
+        ++prims;
+        if (c1 < 0.0f || c1 > static_cast<float>(gw))
+        {
+            const float shift = c1 < 0.0f ? world_w : -world_w;
+            dl->AddLine({wx0 + shift, wy0}, {wx1 + shift, wy1}, wake, 1.0f);
+            ++prims;
+        }
+        fleet_ship(dl, at, r, owner_colour(h, polity, year), alpha, prims);
+    };
+    const float ship_r = std::clamp(scale * 0.8f, 2.5f, 4.5f);
+    for (const lapse_fleet_frame::sail& s : f.sails)
+    {
+        const int alpha = static_cast<int>(255.0f * std::min(1.0f, (1.0f - s.t) / 0.3f));
+        crossing(s.polity, s.c0, s.r0, s.c1, s.r1, s.t, ship_r, alpha);
+    }
+
+    // THE LANDINGS: a seat taken across water is drawn as a landing, not a
+    // march -- the winner's ship crosses from its capital over the first half
+    // of the window and a beach-head fans out from the seat over the second,
+    // pointing inland from the sea it came by. (The ring 3f draws for every
+    // seat_captured sits under it; STARTUP.md's "rather than the inland
+    // ring" is one `continue` in 3f against `h.landings`, owed once the
+    // lanes that edited 3f this week have landed.)
+    for (const lapse_fleet_frame::landing& l : f.landings)
+    {
+        const int alpha = static_cast<int>(255.0f * std::min(1.0f, (1.0f - l.t) / 0.3f));
+        crossing(l.polity, l.c0, l.r0, l.c1, l.r1, std::min(1.0f, l.t / 0.5f), ship_r * 1.25f, alpha);
+        if (l.t < 0.5f) continue;
+        const float g = (l.t - 0.5f) / 0.5f;
+        const ImVec2 seat{px(fold_c(l.c1)), py(l.r1)};
+        const float dx = px(l.c1) - px(l.c0), dy = py(l.r1) - py(l.r0);
+        const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+        const float ux = dx / len, uy = dy / len; // inland: on past the seat
+        const float reach = dot_r + 4.0f + 8.0f * g;
+        const ImU32 col   = with_alpha(owner_colour(h, l.polity, year), alpha);
+        const ImU32 under = with_alpha(col_seat_ring, alpha);
+        for (int k = -1; k <= 1; ++k)
+        {
+            const float ang = static_cast<float>(k) * 0.6f;
+            const float ca = std::cos(ang), sa = std::sin(ang);
+            const float rx = ux * ca - uy * sa, ry = ux * sa + uy * ca;
+            const ImVec2 p0{seat.x + rx * dot_r, seat.y + ry * dot_r};
+            const ImVec2 p1{seat.x + rx * reach, seat.y + ry * reach};
+            dl->AddLine(p0, p1, under, 3.0f);
+            dl->AddLine(p0, p1, col, 1.5f);
+            prims += 2;
+        }
+    }
+
+    dl->PopClipRect();
+    return prims;
+}
+
+} // namespace
+
+lapse_fleet_frame lapse_fleets_at(const history_lapse& h, const std::vector<uint16_t>& slice,
+                                  int year)
+{
+    lapse_fleet_frame f;
+    if (!h.derived()) return f;
+    const int window = lapse_marker_window_years(h);
+    const auto seat_ok = [&](int32_t s) {
+        return s >= 0 && static_cast<std::size_t>(s) < h.region_col.size();
+    };
+    // 1 up to and through `at`'s own year, falling to 0 over the window after it.
+    const auto fade_out = [&](int32_t at) -> float {
+        if (at == lapse_never || year < at) return 1.0f;
+        const float t = static_cast<float>(year - at) / static_cast<float>(window);
+        return t >= 1.0f ? 0.0f : 1.0f - t;
+    };
+    // 0 before `at`, rising to 1 over the window from it.
+    const auto fade_in = [&](int32_t at) -> float {
+        if (at == lapse_never || year < at) return 0.0f;
+        const float t = static_cast<float>(year - at + 1) / static_cast<float>(window);
+        return t >= 1.0f ? 1.0f : t;
+    };
+
+    for (const lapse_tie_seg& t : h.tie_segs)
+    {
+        if (year < t.year_bound) continue;
+        const float tie_a   = fade_out(t.year_freed);
+        const float trade_a = (t.year_trade != lapse_never && year >= t.year_trade)
+                            ? std::min(fade_in(t.year_trade), fade_out(t.year_trade_end)) : 0.0f;
+        if (tie_a <= 0.0f && trade_a <= 0.0f) continue;
+        const int32_t sa = lapse_polity_capital(h, t.overlord, year);
+        const int32_t sb = lapse_polity_capital(h, t.subject, year);
+        if (!seat_ok(sa) || !seat_ok(sb) || sa == sb) continue;
+        f.ties.push_back({t.overlord, t.subject, sa, sb, tie_a, trade_a});
+    }
+    for (const lapse_treaty_arc& a : h.treaty_arcs)
+    {
+        if (year < a.year_formed) continue;
+        float snap = 0.0f;
+        if (year >= a.year_end)
+        {
+            if (!a.broken) continue; // lapsed quietly: gone, no mark
+            const int gone = year - a.year_end;
+            if (gone >= window) continue;
+            snap = static_cast<float>(gone + 1) / static_cast<float>(window);
+        }
+        const int32_t sa = lapse_polity_capital(h, a.a, year);
+        const int32_t sb = lapse_polity_capital(h, a.b, year);
+        if (!seat_ok(sa) || !seat_ok(sb) || sa == sb) continue;
+        f.arcs.push_back({a.a, a.b, sa, sb, snap});
+    }
+
+    // THE HULLS AND HARBOURS: every realm holding ground in the slice, off
+    // its sample at the step at or before the playhead -- the board's own
+    // rule, so the hull and the People column read one step.
+    const int step = step_at_or_before(h.lapse, year);
+    if (step >= 0 && static_cast<std::size_t>(step) < h.lapse.steps.size())
+    {
+        std::vector<char> present;
+        for (const uint16_t o : slice)
+        {
+            if (o == owner_none) continue;
+            if (present.size() <= o) present.resize(static_cast<std::size_t>(o) + 1, 0);
+            present[o] = 1;
+        }
+        const timelapse_step& st = h.lapse.steps[static_cast<std::size_t>(step)];
+        for (int i = 0; i < st.sample_count; ++i)
+        {
+            const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
+            if (k >= h.lapse.samples.size()) break;
+            const polity_sample& s = h.lapse.samples[k];
+            if (s.polity >= present.size() || !present[s.polity]) continue;
+            if (s.navy_stock <= 0 && s.port_stock_q <= 0) continue;
+            const int32_t seat = lapse_polity_capital(h, s.polity, year);
+            if (!seat_ok(seat)) continue;
+            if (s.navy_stock > 0 && h.navy_peak > 0)
+            {
+                const double q = std::clamp(static_cast<double>(s.navy_stock)
+                                                / static_cast<double>(h.navy_peak), 0.0, 1.0);
+                f.hulls.push_back({s.polity, seat, static_cast<float>(std::sqrt(q))});
+            }
+            if (s.port_stock_q > 0)
+                f.harbours.push_back({s.polity, seat, std::clamp<int>(s.port_stock_q, 1, 1000)});
+        }
+    }
+
+    for (const lapse_sail& s : h.sails)
+    {
+        if (year < s.year || year - s.year >= window) continue;
+        f.sails.push_back({s.polity, s.c0, s.r0, s.c1, s.r1,
+                           static_cast<float>(year - s.year) / static_cast<float>(window)});
+    }
+    for (const lapse_landing& l : h.landings)
+    {
+        if (year < l.year || year - l.year >= window) continue;
+        f.landings.push_back({l.polity, l.c0, l.r0, l.c1, l.r1,
+                              static_cast<float>(year - l.year) / static_cast<float>(window)});
+    }
+    return f;
+}
 
 void lapse_hard_walk(history_lapse& h)
 {
@@ -2653,6 +3267,12 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "A sea lane opens between %s and %s.",
                       R, region_name_of(h, e.other));
         break;
+    case lapse_event_kind::sea_leg_campaign:
+        // BL-1095: the wet campaign at its launch -- the attacker, the target
+        // (`region`) and the staging hub it was victualled from (`other`).
+        std::snprintf(buf, sizeof buf, "%s sails against %s from %s.",
+                      polity_name_of(h, e.polity), R, region_name_of(h, e.other));
+        break;
     default:
         // Unreachable on a record this build wrote: every kind above `count`
         // has its own line, and a newer writer's kind is refused with the
@@ -2701,7 +3321,10 @@ int ticker_priority(const lapse_event& e)
     case lapse_event_kind::trade_link_closed:
     case lapse_event_kind::treaty_formed:
     case lapse_event_kind::treaty_broken:
-    case lapse_event_kind::sea_lane_opened:      return 2;
+    case lapse_event_kind::sea_lane_opened:
+    // BL-1095: a wet campaign fires as often as the corridors do; the map's
+    // sail is its mark, and the ticker names it only when the arc is quiet.
+    case lapse_event_kind::sea_leg_campaign:     return 2;
     default:                                     return 1;
     }
 }

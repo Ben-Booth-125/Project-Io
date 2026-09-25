@@ -240,6 +240,85 @@ struct lapse_lane_seg
     int32_t year_open = 0;      ///< The year the leg's uses crossed the lane tier.
 };
 
+// ---------------------------------------------------------------------------
+// The fleets and ties layer (BL-1095; Ben, 2026-09-24, R13; EXPLORATION.md
+// § Force persists now and § The colonial tie is a sea lane; STARTUP.md
+// § Round 5)
+// ---------------------------------------------------------------------------
+//
+// EVERYTHING HERE IS READ FROM THE RECORD, and the span is unmoved by any of
+// it. Four lists baked once at record time and two series read at draw time:
+//   - a TIE, dashed overlord -> subject, from `subject_bound` or
+//     `province_bought` (a purchase is a binding too: the sim notes it INSTEAD
+//     of `subject_bound`, and sets the same overlord link) to `subject_freed`,
+//     either party's `realm_ended`, or a re-binding. Where a treaty between
+//     the same pair FOLLOWS a refused renewal — within one marker window of
+//     it, so the tie's fade-out overlaps the line's fade-in — the tie fades
+//     to a TRADE LINE for that treaty's life rather than vanishing (the
+//     design's "fading to a trade line where a trade_access treaty follows";
+//     every formed treaty carries the trade_access clause, so the treaty is
+//     the test). A treaty formed later than that is an arc like any other;
+//   - a TREATY ARC between the parties' capitals from `treaty_formed` for the
+//     treaty's term (a second `treaty_formed` for the pair is the sim's
+//     renewal and extends it), SNAPPED at `treaty_broken`. A treaty that
+//     stands in for a freed subject's tie draws as the trade line, not an arc;
+//   - a SAIL crossing on each `sea_leg_campaign`, staging hub -> target, for
+//     one marker window;
+//   - a LANDING on each `seat_captured` whose attacker-capital -> fallen-seat
+//     line runs over water (`lapse_corridor_over_water`, the same sampler
+//     the corridors use);
+//   - the HULL and the HARBOUR at each capital, off `polity_sample::
+//     navy_stock` and `::port_stock_q` at the step at or before the playhead
+//     (a series, read like the industry heat; nothing baked but the peak).
+// A tie's and an arc's endpoints follow the capital fold (`lapse_polity_capital`)
+// at the playhead, so a moved capital moves its ties; a sail's and a landing's
+// endpoints are the event's own regions, fixed at bake. THE LANE LINE
+// (BL-1097, `lane_segs`) IS ITS OWN LAYER AND STAYS ONE: a lane runs between
+// two shores and stays; a tie runs between two polities and goes when the
+// bond does.
+
+/// One colonial tie. Years are the record's own; 0x7FFFFFFF = never.
+struct lapse_tie_seg
+{
+    uint16_t overlord = 0;
+    uint16_t subject  = 0;
+    int32_t  year_bound = 0;               ///< `subject_bound` or `province_bought`.
+    int32_t  year_freed = 0x7FFFFFFF;      ///< `subject_freed`, a party's end, or a re-binding.
+    bool     freed_by_refusal = false;     ///< Ended by `subject_freed`: eligible for the trade follow-on.
+    bool     bought = false;               ///< Bound by purchase rather than taken (drawn the same; the readout tells them apart).
+    int32_t  year_trade     = 0x7FFFFFFF;  ///< The first `treaty_formed` between the pair after the freeing.
+    int32_t  year_trade_end = 0x7FFFFFFF;  ///< That treaty's break, a party's end, or its term's lapse.
+};
+
+/// One treaty, as an arc between the parties' capitals.
+struct lapse_treaty_arc
+{
+    uint16_t a = 0, b = 0;                 ///< The parties, a < b.
+    int32_t  year_formed = 0;
+    int32_t  year_end    = 0x7FFFFFFF;     ///< `treaty_broken`, a party's end, or formed + term.
+    bool     broken      = false;          ///< Ended by `treaty_broken`: the arc SNAPS rather than lapsing.
+};
+
+/// One wet campaign's crossing (`sea_leg_campaign`), staging hub -> target.
+struct lapse_sail
+{
+    uint16_t polity = 0;                   ///< The attacker.
+    uint16_t hub = 0, target = 0;
+    int32_t  year = 0;
+    float c0 = 0.0f, r0 = 0.0f;            ///< The hub's anchor tile centre.
+    float c1 = 0.0f, r1 = 0.0f;            ///< The target's, unwrapped the short way round.
+};
+
+/// One seat captured across water: the attacker's capital -> the fallen seat.
+struct lapse_landing
+{
+    uint16_t polity = 0;                   ///< The winner.
+    uint16_t seat   = 0;                   ///< The fallen seat.
+    int32_t  year   = 0;
+    float c0 = 0.0f, r0 = 0.0f;            ///< The attacker's capital at the year (the fold).
+    float c1 = 0.0f, r1 = 0.0f;            ///< The fallen seat, unwrapped.
+};
+
 /// The recorded era, plus the derived fields the map and the board need.
 ///
 /// Lifted whole out of `generation_report` on the worker that produced it (see
@@ -417,6 +496,17 @@ struct history_lapse
     /// leg's traffic reached the tier).
     std::vector<lapse_lane_seg> lane_segs;
 
+    // --- The fleets and ties layer (BL-1095), baked once at record time ------
+    // See the four structs above `history_lapse`. Empty on the Culture and
+    // Empires rounds, whose records carry none of the kinds; `navy_peak` is
+    // the largest navy any sample in the record holds (the hull's scale, one
+    // scale across the span) and 0 where no realm ever built one.
+    std::vector<lapse_tie_seg>    tie_segs;
+    std::vector<lapse_treaty_arc> treaty_arcs;
+    std::vector<lapse_sail>       sails;
+    std::vector<lapse_landing>    landings;
+    int64_t navy_peak = 0;
+
     // --- The industry layer (BL-1080), baked once at record time ------------
     //
     // ROUND 6's STORY IS INDUSTRY, and until this layer the round drew only
@@ -541,6 +631,42 @@ std::string lapse_polity_name(const history_lapse& h, uint16_t polity);
 /// `founded` / `inherited` / `capital_moved`, else its first region; -1 for a
 /// polity the record never shows. Public for the verify API.
 int32_t lapse_polity_capital(const history_lapse& h, uint16_t polity, int year);
+
+/// THE FLEETS AND TIES AT ONE PLAYHEAD (BL-1095): what the map's own pass
+/// draws this frame, derived from the baked lists and the samples — every
+/// tie with its fade and its trade line's fade, every arc with its snap, the
+/// hull and harbour of every realm holding ground in @p slice, and the sails
+/// and landings inside the marker window. ONE pure derivation, so the verify
+/// API counts exactly what the pass drew. Empty before the record is derived.
+struct lapse_fleet_frame
+{
+    /// `tie_a` is the dashed tie's strength (1 while bound, falling to 0 over
+    /// the window after it ends); `trade_a` the trade line's (rising over the
+    /// window after the follow-on treaty forms, falling after it ends).
+    struct tie     { uint16_t overlord, subject; int32_t seat_a, seat_b; float tie_a, trade_a; };
+    /// `snap` is 0 while the arc stands, else the break's progress in (0, 1].
+    struct arc     { uint16_t a, b; int32_t seat_a, seat_b; float snap; };
+    /// `size_q` = sqrt(navy / navy_peak), in (0, 1].
+    struct hull    { uint16_t polity; int32_t seat; float size_q; };
+    struct harbour { uint16_t polity; int32_t seat; int port_q; }; ///< 1..1000.
+    /// `t` in [0, 1): the crossing's progress through the marker window.
+    struct sail    { uint16_t polity; float c0, r0, c1, r1, t; };
+    struct landing { uint16_t polity; float c0, r0, c1, r1, t; };
+    std::vector<tie>     ties;
+    std::vector<arc>     arcs;
+    std::vector<hull>    hulls;
+    std::vector<harbour> harbours;
+    std::vector<sail>    sails;
+    std::vector<landing> landings;
+};
+lapse_fleet_frame lapse_fleets_at(const history_lapse& h, const std::vector<uint16_t>& slice,
+                                  int year);
+
+/// The term a treaty arc stands for when nothing breaks it (BL-1095): the
+/// sim's own `history_sim_params::treaty_term_years` default, read from the
+/// struct so the map and the sim cannot drift apart. A renewal — a second
+/// `treaty_formed` for the pair — extends the arc by another term.
+int lapse_treaty_term_years();
 
 /// Derive the lineage palette (BL-919) from the culture tree.
 ///

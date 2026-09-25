@@ -139,6 +139,18 @@ struct polity_sample
     /// READ of the sim like every other field here, never read back by it.
     /// save_game_version 21.
     int64_t  industry_points = 0;
+    // --- BL-1095 (fleets and ties; Ben 2026-09-24, R13), save_game_version 22 ---
+    /// The realm's standing navy at this step (`polity::navy_stock`, in
+    /// hulls) and its CAPITAL's built port at the same step
+    /// (`region::port_stock_q` of `polity::capital`, 0-1000). The two stocks
+    /// the Exploration span maintains and lets decay (EXPLORATION.md § Force
+    /// persists now), sampled so the time-lapse draws a hull that scales and
+    /// a harbour that silts. Zero on the Empires record, whose span builds
+    /// neither (the navy is NEW at 1200 and starts at zero everywhere). A
+    /// READ of the sim like every other field here, never read back by it.
+    int64_t  navy_stock   = 0;
+    int16_t  port_stock_q = 0;
+    // --- end BL-1095 ---
 };
 
 /// One recorded step: a year, and the half-open span of `samples` taken at it.
@@ -202,6 +214,12 @@ enum class lapse_event_kind : uint8_t
     province_bought     = 18, ///< BL-1096: a native was BOUGHT rather than taken (EXPLORATION.md sec Two ways to claim ground across water); `region` = the native seat, `polity` = the native, `other` = the buyer. Noted INSTEAD of `subject_bound` for that binding (save_game_version 22).
     sea_lane_opened     = 19, ///< BL-1097: a sea leg's uses crossed `sea_lane_tier1_uses`; `region`/`other` = its ends (lo, hi), `polity` = the tier (1). The water analogue of `road_promoted` (save_game_version 22).
     inherited           = 20, ///< BL-1088: a RESUMED span restating a living realm it inherited from the span before — `region` = its capital at the resume, `polity` = the realm, dated `start_year`. Ticker-silent: nothing rose (CIVILISATION.md sec A realm's name). Replaces the `founded` re-emit on the resume path only (save_game_version 22).
+    // 21 `works_chartered` and 22 `rung_crossed` are lane F3's (BL-1099 / BL-1100) and
+    // 23 `cradle` is lane F1's (BL-1091): the sprint-47 kinds were numbered ahead so
+    // the lanes merge without renumbering, and a kind absent on this base leaves its
+    // number as a gap rather than taking it. The reader's range check admits the gap
+    // under save_game_version 22 for the same reason.
+    sea_leg_campaign    = 24, ///< BL-1095: a WET campaign launched — `region` = the target, `polity` = the attacker, `other` = the staging hub it was victualled from (EXPLORATION.md sec Force persists now: "a wet campaign is a moment of its own on the record"). Noted beside the leg's `note_sea_leg`, under the same Exploration/Industrialisation gate, so the Empires record carries none (save_game_version 22).
     count
 };
 

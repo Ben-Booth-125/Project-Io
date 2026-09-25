@@ -3021,6 +3021,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
             smp.cap_materials = static_cast<uint8_t>(clampi(
                 out.polities[pi].capacity[static_cast<int>(sim_domain::materials)], 0, 255));
             smp.industry_points = step_industry[pi];
+            // BL-1095 -- THE FLEET AND THE HARBOUR, read as they stand: the
+            // realm's standing navy and its capital's built port (0-1000).
+            // Pure reads of `out.polities` / `ss.regions` into the record; the
+            // sim never reads a sample back, so the digest is untouched. A
+            // capital off the region table (never, on a living realm) reads 0.
+            {
+                const polity& pq = out.polities[pi];
+                smp.navy_stock = std::max<int64_t>(0, pq.navy_stock);
+                if (pq.capital >= 0 && static_cast<std::size_t>(pq.capital) < ss.regions.size())
+                    smp.port_stock_q = static_cast<int16_t>(clampi(
+                        ss.regions[static_cast<std::size_t>(pq.capital)].port_stock_q, 0, 1000));
+            }
             out.samples.push_back(smp);
         }
 
@@ -5940,6 +5952,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     note_sea_leg(src, static_cast<int>(ti));
                     ++out.sea_legs_noted_campaign;
+                    // BL-1095 -- THE WET CAMPAIGN IS A MOMENT OF ITS OWN on the
+                    // record (EXPLORATION.md § Force persists now): its target,
+                    // its attacker and the staging hub it was victualled from,
+                    // so the map draws the crossing as a sail. Same gate as
+                    // the leg, so the Empires record carries none; a pure
+                    // record write, read by nothing below.
+                    note_event(lapse_event_kind::sea_leg_campaign,
+                               static_cast<int>(ti), q.id, src);
                 }
 
                 // The stall, counted where it actually happens (BL-312). The
