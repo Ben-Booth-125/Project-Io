@@ -10,7 +10,11 @@
 -- renewal and breaks from'; a treaty arc between party capitals that snaps at
 -- 'breaks its treaty with'; a hull at each capital scaled by the navy; a
 -- harbour that silts; a sail crossing on every 'sails against'; a landing on
--- a seat taken across water.
+-- a seat taken across water. And round 4 draws NONE of it: the Empires
+-- record notes thousands of seat_captured and no sea_leg_campaign, so the
+-- landing walk must bake nothing there (the fix round of 2026-09-25 -- a
+-- landing had leaked onto round 4 against BL-1097's ruling that round 4
+-- draws no water layer).
 --
 -- THE HARNESS'S OWN WORLD (seed 0, the library's reference world), which
 -- carries eleven ties, over a hundred treaties, thirty-odd wet campaigns and
@@ -27,6 +31,9 @@
 -- screen-second under playback, and that a hull shrinks as the ticker says
 -- the fleet lapses, is Ben's live click (R4). Playback is frozen under
 -- --verify, so `history_year` alone moves it.
+--
+-- The rounds run in order, 4 then 5, because the successor's pins come from
+-- the predecessor's landed record (realm_identity.lua's rule).
 --
 -- 1920x1080, the design-review resolution.
 
@@ -47,6 +54,21 @@ end
 local treaty_formed    = 12
 local sea_leg_campaign = 24
 
+-- ROUND 4 FIRST, FOR THE GATE: the Empires record carries no sail, so the
+-- landing walk bakes nothing -- its captures are conquests, drawn by the
+-- corridor exemplar alone (history_lapse.hpp's layer comment).
+verify.history_run(1)
+verify.frames(4)
+local r4_first, r4_last = verify.history_span()
+local r4 = verify.history_fleets()
+print(string.format("fleets_and_ties: round 4 (%d -> %d) recorded %d ties, %d arcs, %d sails, %d landings; navy peak %.0f",
+      r4_first, r4_last, r4.ties_recorded or -1, r4.arcs_recorded or -1, r4.sails_recorded or -1,
+      r4.landings_recorded or -1, r4.navy_peak or -1))
+verify.expect((r4.landings_recorded or -1) == 0,
+              "round 4 (Empires) bakes no landing: a record with no sail had no fleet to land ("
+              .. tostring(r4.landings_recorded) .. " recorded)")
+verify.capture("fleets_and_ties_round4_no_water_layer")
+
 verify.history_run(2) -- round 5, Exploration, on the harness's own world
 verify.frames(4)
 verify.capture("fleets_and_ties_warmup")
@@ -62,6 +84,27 @@ print(string.format("fleets_and_ties: recorded %d ties, %d arcs, %d sails, %d la
       fl.landings_recorded or -1, fl.navy_peak or -1))
 verify.expect((fl.ties_recorded or 0) > 0, "the record carries at least one colonial tie")
 
+-- THE TREATY CADENCE, as a reading, not a claim: the distinct treaty_formed
+-- years on the record and their smallest gap. The bake's arc renewal slack
+-- is the sim's own decision band (history_lapse.cpp's
+-- lapse_renewal_slack_years reads exploration_sim_params: 4 years), which
+-- these years sit on without being adjacent on it -- the reference world's
+-- smallest gap is 12 -- so the record could not have given the band. Walked
+-- off history_event_year, which answers the last treaty at or before a year.
+do
+    local prev, gap, count, y = nil, 0, 0, first
+    while y <= last do
+        local t = verify.history_event_year(treaty_formed, -1, y)
+        if t >= first and t ~= prev then
+            if prev and t - prev > 0 and (gap == 0 or t - prev < gap) then gap = t - prev end
+            prev  = t
+            count = count + 1
+        end
+        y = y + 1
+    end
+    print(string.format("fleets_and_ties: %d distinct treaty_formed year(s) on this record, smallest gap %d", count, gap))
+end
+
 -- THE TIE: the last tie whose freeing leaves a whole marker window inside
 -- the span (the wizard clamps the playhead to the record, so a freeing at
 -- the close could never be photographed faded); else the last binding.
@@ -75,9 +118,9 @@ local function pick_tie()
     local ties = verify.history_ties()
     local later_pick, same_pick, bound_pick = nil, nil, nil
     for _, t in ipairs(ties) do
-        print(string.format("fleets_and_ties:   tie %d -> %d bound %d freed %s%s trade %s bought %s",
+        print(string.format("fleets_and_ties:   tie %d -> %d bound %d freed %s%s trade %s..%s bought %s",
               t.overlord, t.subject, t.bound, tostring(t.freed), t.refused and " (refused)" or "",
-              tostring(t.trade), tostring(t.bought)))
+              tostring(t.trade), tostring(t.trade_end), tostring(t.bought)))
         if t.freed and t.freed + window <= last then
             if t.freed > t.bound then later_pick = t else same_pick = t end
         end
@@ -108,14 +151,54 @@ if pick then
     end
 end
 
--- THE HULLS AND HARBOURS: at the close, a realm with a navy wears a hull.
-verify.history_year(last)
-local close = verify.history_fleets()
-if (close.navy_peak or 0) > 0 then
-    verify.expect(close.hulls > 0, "at the close a realm with a navy wears a hull at its capital")
+-- THE TRADE-LINE RULE (fix round 2026-09-25): the follow-on treaty belongs to
+-- the pair's LATEST tie only, and a re-binding ends a standing line, so no
+-- pair carries more than one STANDING trade line at any year of the span --
+-- a churned pair (19 -> 228 bound and freed at 1200, 1204, 1208) had stacked
+-- three co-linear green lines under one rose tie. Counted off history_ties
+-- at every year: a line stands at y when trade <= y and trade_end is unset
+-- or after y (a line still FADING past its end is a fade, not a standing
+-- line, and is not counted). The pair is unordered, as the bake's own test.
+do
+    local ties = verify.history_ties()
+    local worst, worst_year, worst_pair, lines = 0, nil, nil, 0
+    for _, t in ipairs(ties) do if t.trade then lines = lines + 1 end end
+    for y = first, last do
+        local per = {}
+        for _, t in ipairs(ties) do
+            if t.trade and t.trade <= y and (t.trade_end == nil or t.trade_end > y) then
+                local key = math.min(t.overlord, t.subject) .. "/" .. math.max(t.overlord, t.subject)
+                per[key] = (per[key] or 0) + 1
+                if per[key] > worst then worst, worst_year, worst_pair = per[key], y, key end
+            end
+        end
+    end
+    verify.expect(worst <= 1,
+                  "no pair carries more than one standing trade line at any year of the span ("
+                  .. lines .. " trade lines recorded; worst " .. worst
+                  .. (worst_pair and (" for pair " .. worst_pair .. " at " .. worst_year) or "") .. ")")
+end
+
+-- THE HULLS AND HARBOURS: where the record's largest sampled navy stands,
+-- its realm wears a hull. Keyed on the peak STEP, not the close (fix round
+-- 2026-09-25): a world whose every navy has decayed to nothing by the span's
+-- end is a correct build with no hull at the close, so the close's count is
+-- a reading here, not a claim.
+local peak_year = verify.history_navy_peak_year()
+if peak_year >= first then
+    verify.history_year(peak_year)
+    local at_peak = verify.history_fleets()
+    verify.expect(at_peak.hulls > 0,
+                  "at the navy's peak step (" .. peak_year .. ") a realm wears a hull at its capital ("
+                  .. at_peak.hulls .. " hulls)")
+    shot("fleets_and_ties_hull_peak")
 else
     print("fleets_and_ties: no realm ever held a navy on this record; hulls skipped")
 end
+verify.history_year(last)
+local close = verify.history_fleets()
+print(string.format("fleets_and_ties: at the close %d hulls, %d harbours (navy peak %.0f)",
+      close.hulls, close.harbours, close.navy_peak or -1))
 if close.harbours == 0 then print("fleets_and_ties: no built port at the close; harbours skipped") end
 shot("fleets_and_ties_close")
 

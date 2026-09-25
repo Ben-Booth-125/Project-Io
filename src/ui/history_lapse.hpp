@@ -285,16 +285,27 @@ struct lapse_kin_seg
 //     to a TRADE LINE for that treaty's life rather than vanishing (the
 //     design's "fading to a trade line where a trade_access treaty follows";
 //     every formed treaty carries the trade_access clause, so the treaty is
-//     the test). A treaty formed later than that is an arc like any other;
+//     the test). The follow-on belongs to the pair's LATEST REFUSED tie
+//     only, so a pair bound and freed round after round draws one trade
+//     line, not a stack; a re-binding ends any trade line still standing
+//     for the subject. A treaty formed later than that is an arc like any
+//     other;
 //   - a TREATY ARC between the parties' capitals from `treaty_formed` for the
-//     treaty's term (a second `treaty_formed` for the pair is the sim's
-//     renewal and extends it), SNAPPED at `treaty_broken`. A treaty that
+//     treaty's term, SNAPPED at `treaty_broken`. A second `treaty_formed`
+//     for the pair within one DECISION BAND of the arc's quiet lapse is the
+//     sim's renewal and extends it; any later re-formation opens its own
+//     arc, since the gap is rounds the pair spent with no treaty (the band
+//     is the sim's own, `exploration_sim_params`, read as the term is). A treaty that
 //     stands in for a freed subject's tie draws as the trade line, not an arc;
 //   - a SAIL crossing on each `sea_leg_campaign`, staging hub -> target, for
 //     one marker window;
 //   - a LANDING on each `seat_captured` whose attacker-capital -> fallen-seat
 //     line runs over water (`lapse_corridor_over_water`, the same sampler
-//     the corridors use);
+//     the corridors use) — ON A RECORD THAT CARRIES A SAIL. `seat_captured`
+//     is every span's kind and the Empires span notes thousands of
+//     conquests, none by sea; a record with no `sea_leg_campaign` had no
+//     fleet to land, so its captures draw no landing and round 4 keeps no
+//     water layer;
 //   - the HULL and the HARBOUR at each capital, off `polity_sample::
 //     navy_stock` and `::port_stock_q` at the step at or before the playhead
 //     (a series, read like the industry heat; nothing baked but the peak).
@@ -304,6 +315,16 @@ struct lapse_kin_seg
 // (BL-1097, `lane_segs`) IS ITS OWN LAYER AND STAYS ONE: a lane runs between
 // two shores and stays; a tie runs between two polities and goes when the
 // bond does.
+//
+// THE 1660 SEAM IS A KNOWN GAP FOR TIES AND ARCS. A tie or a treaty standing
+// when the Exploration span closes does not draw on the Industrialisation
+// round: that span's record carries only the `subject_freed` /
+// `treaty_broken` that closes a link whose binding sits on the previous
+// record, and a close with no open is nothing for the walk above to draw.
+// Hulls, harbours and sails read their own span's samples and events and are
+// whole. The remedy is an `inherited`-style restatement of the standing links
+// at a resumed span's open, as `furnace_lit` has — a later item, not this
+// layer's.
 
 /// One colonial tie. Years are the record's own; 0x7FFFFFFF = never.
 struct lapse_tie_seg
@@ -563,8 +584,10 @@ struct history_lapse
 
     // --- The fleets and ties layer (BL-1095), baked once at record time ------
     // See the four structs above `history_lapse`. Empty on the Culture and
-    // Empires rounds, whose records carry none of the kinds; `navy_peak` is
-    // the largest navy any sample in the record holds (the hull's scale, one
+    // Empires rounds: their records carry no tie, treaty or sail kind, and
+    // the landing walk is gated on a sail in the record (the Empires span
+    // notes thousands of `seat_captured`, none by sea). `navy_peak` is the
+    // largest navy any sample in the record holds (the hull's scale, one
     // scale across the span) and 0 where no realm ever built one.
     std::vector<lapse_tie_seg>    tie_segs;
     std::vector<lapse_treaty_arc> treaty_arcs;
@@ -754,7 +777,8 @@ lapse_fleet_frame lapse_fleets_at(const history_lapse& h, const std::vector<uint
 /// The term a treaty arc stands for when nothing breaks it (BL-1095): the
 /// sim's own `history_sim_params::treaty_term_years` default, read from the
 /// struct so the map and the sim cannot drift apart. A renewal — a second
-/// `treaty_formed` for the pair — extends the arc by another term.
+/// `treaty_formed` for the pair within one decision band of the lapse —
+/// extends the arc by another term; a later re-formation is its own arc.
 int lapse_treaty_term_years();
 
 /// Derive the lineage palette (BL-919) from the culture tree.
