@@ -7777,9 +7777,9 @@
      "status": "complete",
      "verification": [
       "code: history_lapse.cpp assign_polity_colours pins",
-      "visual: scripts/verify/<name>.lua capture at 1200 on rounds 4 and 5 with identical swatches (name it)"
+      "visual: scripts/verify/realm_identity.lua captures realm_identity_1_round4_close / _2_round5_open at 1200 (and _4 / _5 at 1660) with identical swatches"
      ],
-     "requirement": "Pinned slots live on the record and enter assign_polity_colours: a realm alive at the predecessor's close keeps its slot in the successor record (set at launch from the predecessor's slots, re-pinned at its landing); greedy colouring fills the rest; no two adjacent realms share a swatch; a pinned/fresh adjacency clash re-slots the smaller people-share realm at the round's opening step; a dead realm's slot is retired only for a newcomer seated inside its last-held ground. (item-spanning gate: history_lapse_press.lua or a new verify script asserting slot equality across the 1200 and 1660 seams on a library seed)",
+     "requirement": "Pinned slots live on the record and enter assign_polity_colours: a realm alive at the predecessor's close keeps its slot in the successor record (set at launch from the predecessor's slots, re-pinned at its landing); greedy colouring fills the rest; no two adjacent realms share a swatch; a clash between two pinned realms the new record makes neighbours on one slot re-slots the smaller people-share realm at the round's opening step (a fresh realm is coloured around the pins and cannot clash); a dead realm's slot is retired only for a newcomer seated inside its last-held ground. (item-spanning gate: history_lapse_press.lua or a new verify script asserting slot equality across the 1200 and 1660 seams on a library seed)",
      "notes": "",
      "result_metric": "world/polity_identity.* assign_polity_identity: every pin kept, a pinned/pinned clash (two pinned realms the new record makes neighbours on one slot) re-slots the smaller opening people share, a dead realm's slot reserved for a newcomer seated on its last-held ground; pins set at launch and again at landing (startup_screens.cpp, lapse_pins_for_successor). Gate: scripts/verify/realm_identity.lua (NEW) PASS on the verify world -- 1200 seam: 64 realms alive on both sides, 62 kept their slot and the 2 that moved are exactly the clash rule's re-slots (history_identity().reslotted == 2); 1660 seam: 53 shared, 51 kept, 2 re-slotted; 0 spills on either round. Captures realm_identity_1_round4_close / _2_round5_open and _4_round5_close / _5_round6_open agree swatch for swatch and row for row (eyeballed)."
     },
@@ -7936,7 +7936,7 @@
      "status": "complete",
      "verification": [
       "code: nation_generation.cpp Pass 5",
-      "headless: a harness row or verify script (name it)"
+      "headless: tools/verify/realm_names_check.cpp (every nation with a founding realm carries that realm's name verbatim; absorbed realms listed once)"
      ],
      "requirement": "polity_names on nation_params indexed by polity id; Pass 5 follows the fold representative through the Pass 2c merge and the nation inherits its founding realm's coined name verbatim, coining only for ownerless ground; merge rule A: the absorber keeps its name. (item-spanning gate: a headless check that every nation with a founding realm carries that realm's name)",
      "notes": "",
