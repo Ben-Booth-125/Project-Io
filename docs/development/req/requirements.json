@@ -7612,7 +7612,7 @@
       "visual: Ben's live click - a lane appears and persists on a seed with subjects"
      ],
      "requirement": "Round 5 bakes a persistent lane line from the events, drawn as its own water layer distinct from a colonial tie, present from the frame the leg earns the tier to the round's end.",
-     "notes": "2026-09-25: NOT SEEN at Ben's live click (Release build_rel 15:06 on 50e5e822, seed 4219783578). The library sweep opens lanes on 14 of 16 seeds (0 on 12 and 37; 1-16 elsewhere; seed 0 has 7), so the record carries them; whether his seed earned any, or the line is lost among the round's layers, is unread. Stays pending.",
+     "notes": "2026-09-25: NOT SEEN at Ben's live click (Release build_rel 15:06 on 50e5e822, seed 4219783578). The library sweep opens lanes on 14 of 16 seeds (0 on 12 and 37; 1-16 elsewhere; seed 0 has 7), so the record carries them; whether his seed earned any, or the line is lost among the round's layers, is unread. Stays pending. 2026-09-25 (sea_lanes.lua, seed 32, 16 lanes, round 5 close): the lanes ARE drawn, but almost all sit UNDER a colonial tie on the same capital-to-capital line -- the tie's pink dashes with the lane's sea-blue in the gaps -- because the tribute leg writes most lane uses (seed 46: 619 of 663). So the lane does not read as its own layer, which is this row's claim; how it should read is Ben's call.",
      "result_metric": "Round 5 bakes a dashed lane line from the events (short AddLine segments over water, its own layer). Ben's live click owed."
     },
     {

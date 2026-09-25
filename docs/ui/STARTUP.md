@@ -244,6 +244,18 @@ risers turn out to have been founding empty ground. The arc readout under the bo
 **and it is the only summary a round gets (Ben, 2026-09-24):** no round closes on a card, no
 close-of-round event kind exists, and accepting simply moves on.
 
+**The Empires map draws less than the rounds after it (Ben, 2026-09-25, after walking the
+round: "the Empires round shows too much").** It draws the ground, the realm fill over the
+culture base, the frontiers and hard borders, the rivers, the promoted roads, the cross-border
+trade links, the seat dots, the schism crack and the civilisation diamond. It does **not** draw
+the caravan glyphs, the seat-captured ring, the capital slide (a moved capital's dot simply sits
+at the new seat) or the fleets, harbours and treaty arcs. Those belong to the rounds whose
+subject they are.
+
+**Every lapse round carries a legend (Ben, 2026-09-25):** a key naming each layer its map draws,
+so what is on the map never has to be guessed. **The sea is a deep blue on every lapse round
+(Ben, 2026-09-25)**, so water reads as water and what sails on it reads as being at sea.
+
 **Round 5 — Exploration (BL-946, Ben 2026-09-13).** The span **1200 → 1660 CE**, four
 hundred and sixty years, on the same shared engine as round 4 — its authority is
 [`EXPLORATION.md`](../generation/EXPLORATION.md). Where Empires asks who holds this
@@ -330,7 +342,9 @@ part of its wall time, so the two are split: the record is published whole at th
 year, and **the lapse starts playing there while the same worker builds the tail behind it**
 into § The world cache. Landing swaps only the world slot; a caption beside the playing map
 names the one step under way ("Drawing borders", "Searching the landscape", "Proving the
-field") and nothing else. Its record
+field") and nothing else. **The tail lands within 35 s of the round's arrival (Ben,
+2026-09-25, after a round 6 that took "just over one minute")**; the road pass is where the
+time goes, and the road rule (LOGISTICS.md § 4, the detour test) is how it gets there. Its record
 (`generation_report::body_entry::industrialisation_timelapse`, with its own
 battle/conquest/founding counters) is recorded once, at the call site that runs the span, and
 plays on the same map as rounds 3–5. The span runs only when Exploration ran and

@@ -1391,6 +1391,98 @@
     "src/world/finish_campaign_world.cpp"
    ],
    "design": "FILED 2026-09-25 from NR-932 (Ben: C, both; the progress tap is sprint 47's, this is the other half). Not in sprint 47.\n\nTHE READING. Inside the twelve-tick settle in round 6's worker, tick 1 runs 44-62 s (seed 0: settle 113,922 ms, tick 1 56,881 ms; seed 28: 68,832 ms) while ticks 2-12 cost ~1.5 s each.\n\nFIRST READING (2026-09-25, gen_step_costs --finish 0, Release, the lap timing now printed by finish_campaign_world): settle 55,962 ms; slowest tick 1 at 38,487 ms, of which run_economy_step 38,453 ms (lap 1: the economy step and dispatch), clear_markets 24, apply_budget+nation_step 9, the other three 0. So the cost is inside run_economy_step on econ step 1 -- the corp AI cadence (half the slots per step) is the first suspect, not a cold pool. Seed 28 not yet read.\n\nTHE WORK. Time tick 1 by phase (the first clearing over cold pools? the first dispatch?) on seeds 0 and 28 in Release, record the split here, and file the fix against the owning economy work -- NR-915 (the tick tail) may already own the cause. Measure, do not reshape.\n\nDONE WHEN. The phase that costs tick 1 is named with its milliseconds on two seeds and the fix is filed where it belongs."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-09-25, the round-feedback form after the sprint-47 live clicks); filed by Claude",
+   "id": "BL-1118",
+   "short_name": "ROUND_LEGENDS",
+   "sprint": 48,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "Every lapse round carries a legend naming each layer its map draws",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/history_lapse.cpp",
+    "src/ui/startup_screens.cpp",
+    "docs/ui/question_log.json"
+   ],
+   "design": "FILED 2026-09-25 (Ben: \"we also probably need a legend for each round, just in case it isn't clear what is shown on the map\"; timing: sprint 48, AFTER the Empires cut). STARTUP.md § Round 4 states the ruling.\n\nTHE WORK. A key per lapse round (Culture, Empires, Exploration, Industrialisation) listing exactly the layers that round draws -- read from the same predicates the painter uses, so a layer cut from a round (the Empires cut, 2026-09-25) drops from its legend by construction and a legend can never name a layer the round does not draw. Glyphs drawn by the painter's own calls, not re-drawn icons. The question log gains the surface.\n\nDONE WHEN. Each round's legend lists its layers and only those; a capture per round; Ben's live click. BL-1097's lane line was not found at the 2026-09-25 click -- the legend is where a player finds it."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-09-25, the round-feedback form after the sprint-47 live clicks); filed by Claude",
+   "id": "BL-1119",
+   "short_name": "ROADS_TREE_AND_DETOUR",
+   "sprint": 48,
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 3,
+   "title": "Roads are a tree plus a detour test, and only villages above a size spur: no lattice, and round 6's tail inside 35 s",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/road_generation.cpp",
+    "tools/verify/road_generation_harness.cpp",
+    "tools/verify/gen_step_costs.cpp",
+    "tools/verify/player_seed_sweep.cpp"
+   ],
+   "design": "FILED 2026-09-25 (Ben, walking round 6: \"we also need many fewer roads... it should be heavily discouraged to build a lattice of roads\"; he chose the tree plus a detour test over \"no second path\", and spurs only for villages above a size). LOGISTICS.md § 4 carries the rule; STARTUP.md § Round 6 carries the 35 s target.\n\nTHE WORK. (1) Replace the relative-neighbour redundancy edges with the DETOUR TEST: after the Kruskal MST, a candidate link between two centres is laid only when the network's route between them costs more than 2x the direct A* route (one constant, named). The percentile rationing of loops applies to the loops the test admits (a delegated reading that keeps BL-618/BL-621 intact; Ben may overturn). (2) A village lays a spur only above a size floor, MEASURED on the 16 curated seeds first (Rule 0b: road tiles, spur count and pass time per floor candidate). (3) The border link rule is unchanged.\n\nA WORLD-MOVER: every road digest and the sweep pins move -- read road tile counts, pass time (gen_step_costs --finish) and the haulage baseline (memory: goldens cannot see trade) on the 16 seeds before and after, then ONE re-bless.\n\nDONE WHEN. No lattice on a capture of the densest seed; road pass time and tile count recorded old -> new per seed; round 6's tail lands within 35 s of arrival on seeds 0 and 28 in Release (gen_step_costs); one re-bless; road_generation_harness green (connectivity held)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-09-25, the round-feedback form after the sprint-47 live clicks); filed by Claude",
+   "id": "BL-1120",
+   "short_name": "OCEAN_CURRENTS",
+   "sprint": null,
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 4,
+   "title": "Ocean currents: generated from the planet, they cheapen sea legs that run with them, and the Exploration round charts them",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/planetology.cpp",
+    "src/world/history_sim.cpp",
+    "src/ui/history_lapse.cpp"
+   ],
+   "design": "CONTINUITY PASS (Ben, 2026-09-25): filed from the round-feedback form -- \"chart ocean currents as part of the exploration stage\"; Ben chose a FORCE over a drawing (\"currents shape sea legs\"). EXPLORATION.md § Currents are a force, not a picture.\n\nOPEN DESIGN (a design pass before build): what generates a current (latitude bands and the body's rotation, the continents' shape -- PLANETOLOGY.md / CONTINENTS.md own the inputs), its grain (per ocean region), and its weight on a sea leg's cost with and against. A sim beat: it moves sea legs, lanes, displacement and every pin -- read on the 16 seeds first, one re-bless. Pairs with BL-1115 (sea legs in the later spans), which should land first so currents act on legs that run."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-09-25, the round-feedback form after the sprint-47 live clicks); filed by Claude",
+   "id": "BL-1121",
+   "short_name": "COLONIAL_TRIBUTE_SHOWN",
+   "sprint": null,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "Measure the tribute subjects pay their overlords on the 16 seeds, then show it running home along the ties on the Exploration round",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "tools/verify/exploration_sweep.cpp",
+    "src/ui/history_lapse.cpp"
+   ],
+   "design": "FILED 2026-09-25 (Ben: \"what we don't see, but really should, is the colonial conquest of smaller nations, exploiting them to bring wealth back to larger polities\"; he chose A -- measure, then show what the sim has, before any new mechanism). EXPLORATION.md § the tribute table: tribute is already a remittance from subject to overlord.\n\nTHE WORK. (1) READ FIRST (Rule 0b): on the 16 curated seeds, how many subjects stand overseas vs home, how much tribute flows per round and to whom, and how often a large polity subjects a small one across water -- a column in exploration_sweep. (2) If the flow is there, draw it: tribute running subject -> overlord along the tie, weighted by the amount, on round 5. (3) If it is not there, that is the finding: report it and the colonial-drive mechanism becomes its own call for Ben (the B he did not pick yet).\n\nDONE WHEN. The reading recorded per seed; the flow drawn where it exists; Ben's live click."
   }
  ]
 }

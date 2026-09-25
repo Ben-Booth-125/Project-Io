@@ -28,7 +28,10 @@ namespace {
 // The map's non-identity ground. These are BACKDROP, not identity: sea, and land
 // nobody has reached yet. Identity colours are ui::palette's and are not
 // duplicated here (presentation.hpp owns them).
-constexpr ImU32 col_sea      = IM_COL32( 16,  24,  38, 255);
+/// The sea is a DEEP BLUE on every round (Ben, 2026-09-25), not the near-black
+/// it was: water reads as water at a glance, so the lanes, sails and ties on it
+/// read as being at sea.
+constexpr ImU32 col_sea      = IM_COL32( 16,  40,  88, 255);
 constexpr ImU32 col_void     = IM_COL32( 10,  11,  15, 255);
 constexpr ImU32 col_frontier = IM_COL32(  8,   9,  12, 200); ///< The line between holders.
 /// BL-1090: the 2 px dark of a HARD border -- opaque where the soft line is
@@ -1022,6 +1025,15 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // a hard realm's edge against sea or wild ground is the ordinary line.
     const float carry_fade = lapse_carry_fade(h, year);
 
+    // THE EMPIRES ROUND DRAWS LESS (Ben, 2026-09-25, walking round 4: "the
+    // Empires round shows too much"; STARTUP.md § Round 4). Cut from this
+    // round only: the caravan glyphs, the seat-captured ring, the capital
+    // slide (the dot sits at the current capital, it does not travel), and
+    // the fleets, harbours and treaty arcs. The polity record that closes at
+    // 1200 CE is the Empires record; the Culture record's owners are peoples.
+    const bool empires_round = !h.owners_are_cultures
+                            && h.lapse.start_year + h.lapse.years <= lapse_exploration_epoch_year;
+
     // THE CULTURE BASE (BL-1087 R3; Ben, 2026-09-24, R7 "both"): on the
     // polity rounds a dull lineage-hue tint of each region's plurality people
     // goes down under everything political — the carry lands on it as it
@@ -1547,7 +1559,9 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    reading those two event kinds inside the marker window is the whole
     //    filter; nothing here re-derives a number. One exemplar per crossing,
     //    fading exactly like the event ring below, never a mark per cargo unit
-    //    and never a continuous animation. ──
+    //    and never a continuous animation. Not on the Empires round (Ben,
+    //    2026-09-25). ──
+    if (!empires_round)
     {
         const int window = lapse_marker_window_years(h);
         for (const lapse_event& e : h.lapse.events)
@@ -1764,7 +1778,9 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             {
                 // A ring in the winner's colour at the fallen seat, widening a
                 // little as it fades -- the one glyph here that is a ring, so
-                // "a seat fell" reads as itself.
+                // "a seat fell" reads as itself. Not on the Empires round
+                // (Ben, 2026-09-25): the border moving is the story there.
+                if (empires_round) continue;
                 if (!region_ok(e.region) || e.polity == lapse_event_none) continue;
                 const ImVec2 an = anchor(e.region);
                 const ImVec2 at{px(an.x), py(an.y)};
@@ -1821,6 +1837,9 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             {
                 // The seat dot slides from the OLD capital (`other`) to the new
                 // (`region`) over the window; the seats pass reads this table.
+                // Not on the Empires round (Ben, 2026-09-25): the dot sits at
+                // the current capital, read off `rest_seat`, without travelling.
+                if (empires_round) continue;
                 if (!region_ok(e.region) || !region_ok(e.other) || e.polity == lapse_event_none) continue;
                 const ImVec2 from = anchor(e.other);
                 ImVec2 to = anchor(e.region);
@@ -1885,7 +1904,8 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    the landing on every seat taken across water — its own pass, under
     //    the seats, defined with its bake below the sample helpers. Empty on
     //    every record that carries none of it. ──
-    prims += draw_lapse_fleets(h, slice, dl, tl, scale, year);
+    if (!empires_round) // Ben, 2026-09-25: cut from the Empires round
+        prims += draw_lapse_fleets(h, slice, dl, tl, scale, year);
 
     // ── 4. SEATS: one dot per polity HOLDING GROUND in this slice, at the
     //    region it first held. Seats only, not every region — the in-game Ages

@@ -463,6 +463,11 @@ Industrialisation as they do in Empires (Ben, 2026-09-25, NR-921):** a wet campa
 ration across the water and the port's crossing discount applies, so a skirmish over the sea is a
 real option and the lane record reads wet campaigns as well as the tribute leg.
 
+**Currents are a force, not a picture (Ben, 2026-09-25).** The sea carries currents generated
+from the planet, and a leg that runs with one costs less than a leg run against it, so routes,
+lanes and staging follow them; the Exploration round charts them. How they are generated and
+how much they weigh is BL-1120's (ocean currents).
+
 **The record keeps the fleet and the harbour, year by year (Ben, 2026-09-24).** Each polity's
 sample on the round's record carries its standing navy and its capital's port stock at every
 sampled year, so the time-lapse draws a fleet that is *there* — a hull at the capital that scales

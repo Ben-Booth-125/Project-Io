@@ -153,12 +153,20 @@ shortfall rule; this section owns only the transmission.
 Generated per nation after population, deterministically from the campaign seed (BL-146 /
 BL-172, road generation). Local streets first: every centre's own tile gets at least a Track.
 Then the **backbone**, over towns-and-up only (scale ≥ 2): a weighted graph over the town
-pairs, a **Kruskal MST** plus relative-neighbour redundancy edges for realistic loops, a
-three-tier assignment, and rasterisation along each edge's A\* path taking the **max**
-`road_level` on overlap.
+pairs, a **Kruskal MST**, loops admitted only by the **detour test**, a three-tier assignment,
+and rasterisation along each edge's A\* path taking the **max** `road_level` on overlap.
+
+**A road is not built where a road already serves (Ben, 2026-09-25, walking round 6: "it should
+be heavily discouraged to build a lattice of roads").** The tree comes first. A further link
+between two centres is laid only when the network's own route between them costs more than
+**twice** the direct route — the detour test, one number. A second road beside a serviceable one
+is never built, and a loop exists only where the tree forces a long way round. This replaces
+the relative-neighbour redundancy edges, which laid the lattice.
 
 **Villages join locally, not as lattice members** (BL-620, road generation scales to density):
-each village lays one Track spur to its nearest already-roaded same-nation tile — backbone
+**only a village above a size floor lays a spur (Ben, 2026-09-25)**; the floor is measured on
+the curated seeds before it is fixed. Each such village lays one Track spur to its nearest
+already-roaded same-nation tile — backbone
 raster, another centre's streets, or an earlier spur — chosen from a distance-prefiltered
 candidate set, never all-pairs. A village whose nearest target is beyond the spur cap, or
 whose every route would cross open sea, keeps only its local street. Low-stratum settlements
@@ -178,9 +186,9 @@ The gates are **era-relative** (Ben, 2026-08-25, ruling on NR-641; BL-621, era-r
 gates): they read the nation's qualification **percentile among the world's nations** — mid-rank
 on ties — never the absolute fraction. Tier promotion: a Highway needs its two major endpoints
 *and* percentile ≥ 0.80; a Road needs its Town+ endpoint *and* percentile ≥ 0.40; a gated-out
-edge demotes one rung, never disappears. Redundancy loops are **rationed** cheapest-first — the
-kept fraction is the percentile itself, so the median nation keeps half its loops and the MST
-always survives whole. An all-tied world (the antiquity epoch, every nation at the seeding
+edge demotes one rung, never disappears. The loops the detour test admits are **rationed**
+cheapest-first — the kept fraction is the percentile itself, so the median nation keeps half its
+loops and the MST always survives whole. An all-tied world (the antiquity epoch, every nation at the seeding
 floor) grades everyone at 0.5: Roads on every Town+ backbone, Highways nowhere — the
 Roman-roads-analogue backbone — while a spread industrial world promotes its leaders to
 Highways and demotes its laggards to Track. Only a nation *behind its own world* lays an
