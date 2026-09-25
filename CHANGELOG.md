@@ -12,6 +12,61 @@ release.
 
 ## [Unreleased]
 
+## [0.1.26] — 2026-09-25
+
+*One history, told through the rounds. The six wizard rounds now read as one past unfolding
+rather than six screens: a realm keeps its colour, its name and its borders from the round it
+rose in to the seat card, where the nation it became still carries them, and the corporation the
+player picks names the realm whose ground chartered it. Each round got the one thing it lacked —
+the Life globe hands a named world to the migration, the migration draws its routes, Exploration
+its fleets and colonial ties, Industrialisation the works chartered across the span. Sprint 47
+closed on Ben's acceptance after two live walk-throughs; its seam item, the world built once and
+moved forward, carried to sprint 48.*
+
+### Added
+
+- **One seed per span** (BL-1083): each history round rerolls its own span and nothing above it.
+  The Culture round carries no Reroll — the migration follows the ground, and the Life round's
+  reroll is how a player rejects it.
+- **Round 6 does Begin's work** (BL-1085): the landscape search and the twelve-tick settle run
+  inside the round, so Begin only seats the player. Quitting during a build no longer crashes
+  (BL-1108). The settle's bar counts laps, not ticks.
+- **Realms keep their identity** (BL-1087, BL-1088, BL-1089): a colour and a name coined in the
+  founding tongue carried by id through every round, a nation inheriting its realm's name and
+  colour, and **hard borders** on realms holding ≥ 10% of the world's people (off at 6%), drawn
+  between realms only (BL-1090). Marks that earn their place (BL-1094); names and a voice on the
+  boards and ticker (BL-1106).
+- **Each round's flair**: the Life round names the world and its cradles (BL-1091); kin arrows,
+  routes and splits on the Culture map (BL-1092); fleets, harbours, colonial ties and treaty arcs on
+  Exploration (BL-1095); works chartered through the Industrialisation span, the first realm to
+  cross the industrial rung narrated (BL-1099, BL-1100); the Culture record saved (BL-1104).
+- **The seat briefing's origin sentence**: "Chartered from <city>'s industry, in <region>, under
+  <nation>, its own realm since <year>" — the realm's real tenure, named once when it is the
+  nation's own.
+- **The purchase verb** (BL-1096): an overseas power buys a coastal native seat it can afford and
+  takes it otherwise; **sea legs recorded** (BL-1097). The recipe band derived from the history
+  (BL-1101), the tariff posture derived by the span (BL-1102).
+
+### Changed
+
+- **The sea is deep blue** on every round; **the Empires map draws less** — no caravan glyphs,
+  seat-captured rings, capital slide or fleets there (Ben, at the live app).
+- **Life to Culture is a sharp jump**: the map replaces the globe the moment the record lands.
+- **The state hash folds the seat** (BL-1082), and the civilisation and creed tables cross the
+  1200 resume (BL-1049).
+- **The one re-bless of the sprint**, taken once after its riders: both `player_seed_sweep`
+  tables re-pinned (16/16 on both arcs), library seeds 25 and 38 blessed.
+
+### Known — recorded, not fixed
+
+- **The sea lanes are drawn but hard to find** — most run under a colonial tie (BL-1124, sprint 48).
+- **The settle's bar still holds ~38 s** inside tick 1's economy step; the cost is BL-1117's.
+- **Round 6 takes about a minute**; roads are most of it. The road rule is now a tree plus a
+  detour test, with round 6 inside 35 s (BL-1119, sprint 48).
+- **The CTest tier is still not a working gate** (BL-1065). This release was gated on the Release
+  build, `world_determinism` twice, both save round trips, and the scripts named in each commit.
+- Save files from v0.1.25 are refused (`world_save_version` 27, envelope 22).
+
 ## [0.1.25] — 2026-09-24
 
 *The generation reaches the game. Sprint 45 built the last span of the pre-campaign history — the
@@ -1208,7 +1263,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.25...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.26...HEAD
+[0.1.26]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.25...v0.1.26
 [0.1.25]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.24...v0.1.25
 [0.1.24]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.23...v0.1.24
 [0.1.23]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.22...v0.1.23

@@ -308,8 +308,8 @@ over empire flare, and on some worlds one becomes general).
   close settles on, so an early charter and a late one are priced by one rule — capped per
   region per round and gated exactly as a furnace crossing is. **Each is a real charter (Ben,
   2026-09-25, NR-925):** the firm is founded at that crossing and its points are debited, so a
-  flash in 1720 is a firm that exists from 1720 (INDUSTRIALISATION.md § Firms are chartered in
-  the span; BL-1122). The fraction is measured against the 1960 firm
+  flash in 1720 is a firm that exists from 1720 (INDUSTRIALISATION.md § Beat 1 — Industry: cities
+  make industry points; BL-1122). The fraction is measured against the 1960 firm
   count before it is fixed. **At the close the
   flashes are the real charters** — the firms the search chartered from each city's budget,
   richest centre first, each at its anchor tile, each dated by pairing a region's k-th real

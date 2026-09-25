@@ -10,6 +10,41 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-25 (afternoon) — Sprint 47 closed: the re-bless applied, every call ruled, two live walks, v0.1.26 — version 0.1.26
+
+**Runtime:** ~6 h wall clock (12:15–18:00), one main session, no agents; modes Delivery (the
+re-bless, the four close-form tasks, the round feedback builds), Design (three forms), Review (two
+live walks). Picked up after the overnight session ran out of budget mid-re-bless.
+
+### What landed
+- **The re-bless, taken once** (`2f877e2c`). The overnight session's final measurement (exe built
+  10:22 on `d6558647`, the riders merged) was complete but unapplied; the tree held an uncommitted
+  re-pin from the superseded PRE-rider reading. It was backed up and discarded, both tables were
+  re-pinned from the final reading, library seeds 25 and 38 were blessed, and `--digest-check` read 16/16
+  on both arcs.
+- **The close form** (`0953311a`): BL-1084 and the wave-3 stretch carried to sprint 48; twelve
+  calls ruled into their docs; BL-1114..BL-1117 filed.
+- **The four close-form tasks** (`6a654046`, `fd051430`, `14b8f645`, `20553048`): the Culture round
+  carries no Reroll (a verify binding, `wizard_span_seed`, lets a script tell a reroll from a no-op);
+  hard borders between realms only; the origin sentence names the realm once and reads its tenure
+  ("its own realm since 400 BCE"); the settle's bar counts laps.
+- **Two live walks** on the Release build: 20 of 21 checks passed the first time (`ed7b4877`), and
+  the Empires cut and deep-blue sea passed the second.
+- **The round feedback** (`ad0838c9`, `803d6323`, `c2235517`): deep-blue sea, the Empires map cut,
+  the lane as a soft band, Life→Culture a sharp jump; roads ruled a tree plus a detour test with
+  round 6 inside 35 s; legends, currents, colonial tribute, in-span chartering and a per-nation band
+  filed (BL-1118..BL-1124). The review queue closed EMPTY; "no sim beats" was overruled (NR-919).
+
+### What the measurement said
+- **Tick 1 of the settle is all `run_economy_step`**: 38,453 of 38,487 ms on seed 0 (Release); the
+  finish now prints the slowest tick's laps. The lap tap took the longest still from 90.9 s to 38.4 s;
+  Ben accepted the rest as BL-1117's cost.
+- **The lanes draw but hide**: `sea_lanes.lua` (seed 32, 16 lanes) shows them on the colonial ties'
+  own line, because the tribute leg writes most lane uses (seed 46: 619 of 663). Moved to BL-1124.
+
+### Open
+- Sprint 48 is proposed, not cut: `NEXT_SESSION.md`.
+
 ## 2026-09-24 (evening) — Sprint 47 cut: one history, told through the rounds
 
 **Runtime:** ~6 h so far (the design pass, the cut, wave 0 launched; the lanes run on). Design → Full

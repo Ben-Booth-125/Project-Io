@@ -2,6 +2,10 @@
 
 ## Sprint 47 — one history, told through the rounds (opened 2026-09-24)
 
+**CLOSED 2026-09-25 (Ben: "I'll accept this as sprint 47 complete"; v0.1.26).** Every task below
+is terminal; the groups and delivered rows are archived. BL-1084 (the world built once and moved)
+and the wave-3 stretch carried to sprint 48 (`NEXT_SESSION.md`).
+
 **Goal.** The wizard reads as one history: the world is built once at the Life gate and moves
 forward through every round with nothing recomputed; rerolls are per stage; round 6 absorbs
 Begin's work and closes on the map the campaign opens on; a realm keeps its colour, shade and name

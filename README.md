@@ -111,7 +111,9 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.22, v0.1.23, v0.1.24 and v0.1.25
+## Latest releases — v0.1.23, v0.1.24, v0.1.25 and v0.1.26
+
+**v0.1.26 — one history, told through the rounds.** The six wizard rounds now read as one past unfolding. A realm keeps its colour, its name and its borders from the round it rose in to the seat card, and the nation it became still carries them; the corporation the player picks names the realm whose ground chartered it, and since when. Each round gained what it lacked — the Life globe hands a named world to the migration, the migration draws its routes, Exploration its fleets and colonial ties, Industrialisation the works chartered across the span — and round 6 now does all of Begin's work, so Begin only seats the player. The world built once and moved forward through the rounds carries to sprint 48, with fewer roads and a faster round 6.
 
 **v0.1.25 — the generation reaches the game.** The last span of the pre-campaign history now runs, Industrialisation, 1660 → 1960, and the wizard plays the whole arc as one paced time-lapse — round 6 shows industry spreading as a heat across the map. Begin keeps the world the wizard built rather than building a second one, and the player chooses the corporation they become from a ranked list beside the map. The epoch flipped to 1960 without moving the world: generation no longer reads it. **But the release's subject is the economy the new world exposed.** A player could not finish a military base, and following that one stall down found that goods could not move between markets on one body at all — every same-body haul had returned to the pool it left. Pools now live per market, sellers weigh every market before they sell (3,712 units a year sold at their destinations, 82.5% of it past the nearest market), and the live tick got 5–9× faster once its tail turned out to be one AI loop repeating work. The base still does not reliably finish, and that is recorded rather than quietly fixed.
 
