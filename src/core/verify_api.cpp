@@ -1452,6 +1452,35 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return year;
     });
 
+    // BL-1106: the ticker's lines at the playhead, oldest first -- the same
+    // rows `draw_lapse_ticker` shows, as the prose it prints -- so a script can
+    // assert what a moment is CALLED (a schism naming both parties and the
+    // creed; a civilisation under its coined name) rather than only that a
+    // frame rendered. Read-only, off the round's own record.
+    v.set_function("history_ticker", [this]() {
+        sol::state& s   = m_lua.state();
+        sol::table  out = s.create_table();
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        int idx = 0;
+        if (!h.empty())
+            for (const int row : ui::lapse_ticker_rows(h, m_wiz_history_year[i]))
+                out[++idx] = ui::lapse_event_prose(h, h.lapse.events[static_cast<std::size_t>(row)]);
+        return out;
+    });
+
+    // BL-1106: how many rows of the board carry the entry mark ('*') at the
+    // playhead, against the lagged slice the app draws by (`lapse_lagged_year`).
+    // 0 at a resumed span's first year, where every realm is inherited and none
+    // is new; -1 when the record's derived fields are not built yet (a frame
+    // must have drawn the round), so a vacuous zero cannot pass as a check.
+    v.set_function("history_board_marks", [this]() -> int {
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        if (h.empty() || h.tile_region.empty()) return -1;
+        return ui::lapse_board_entered_count(h, m_wiz_history_year[i]);
+    });
+
     // The current lapse round's own span, so a script walks the years the run
     // actually produced rather than the years a doc says it should have.
     v.set_function("history_span", [this]() {
