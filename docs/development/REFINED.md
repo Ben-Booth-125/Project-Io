@@ -180,19 +180,70 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
 - [x] T4 (1088) `polity::name` coined at `founded` via `coin_lexicon` over the founding region's
   speech; a `polity_name` table on the record beside `region_name`, carried by id; board and ticker
   print it. (1088 R1, R2)
-- [ ] T5 (1088) the UI-side capital-at-year fold (founded + capital_moved) placing the seat dot and
+- [x] T5 (1088) the UI-side capital-at-year fold (founded + capital_moved) placing the seat dot and
   the 1200 burst; the resume re-emit → a ticker-silent `inherited` kind (append-only; the envelope
-  bump); 'A people settle at X' for an ownerless founding. (1088 R3, R4, R5)
-- [ ] T6 (1089) `polity_names` on `nation_params`; Pass 5 follows the fold representative through
+  bump); 'A people settle at X' for an ownerless founding. (1088 R3, R4, R5) DONE 2026-09-25: the
+  fold is `polity_capital_moves` / `polity_capital_at` (world/polity_identity.*) baked at record
+  time and BL-1094's `rest_seat` widened to `founded` + `inherited`; the seat dot, the 1200 burst
+  and the marks read it. Kind 20 `inherited` (era_timelapse.hpp, save_game.hpp's v22 list) replaces
+  the `founded` re-emit on the resume path only, the ticker filters it, and
+  `industrialisation_sim_harness`'s resumed-open check counts both kinds. Prose: "X rises at Y" /
+  "A people settle at X". Headless: `realm_names_check` N3 — seed 0's exploration open states 46
+  realms inherited and the industrialisation open 45, 0 founded at either open.
+- [x] T6 (1089) `polity_names` on `nation_params`; Pass 5 follows the fold representative through
   the Pass 2c merge and inherits the realm's name; merge rule A; ownerless ground coined; the
-  headless check that every nation with a founding realm carries its name. (1089 R1)
-- [ ] T7 (1089) the per-world nation → slot table set at Begin/load from the saved report and read in
+  headless check that every nation with a founding realm carries its name. (1089 R1) DONE
+  2026-09-25: `nation_params::polity_names` filled by `polity_names_at_close` span by span;
+  `merge_undersized_nations` records `absorbed_into` and the compaction; Pass 5 coins for every
+  nation as before (name_rng untouched) then copies the surviving seed's realm name over it; the
+  fold record (`nation_fold_record`) rides the report. The headless check is NEW
+  `tools/verify/realm_names_check.cpp` (built with build_lua_harness): on seed 0 ALL PASS — 227
+  polities named on each of the three records, 454 shared ids and 0 renamed, 38 nations all of a
+  realm carrying its coined name verbatim, 7 absorbed realms listed, 0 ownerless.
+- [x] T7 (1089) the per-world nation → slot table set at Begin/load from the saved report and read in
   `nation_colour` (hash as fallback): the border band, the seat map, the carve and the Ages view
   agree; the seat card lists absorbed realms and cites the city's region; the nation-count line.
-  (1089 R2, R3)
+  (1089 R2, R3) DONE 2026-09-25: `app::pin_nation_colours_from_report` (startup_screens.cpp) at
+  Begin (adopt and cold) and on load sets `ui::palette`'s nation table from the wizard's last
+  landed round, else re-derived from the report over `polity_identity`'s own walk; `nation_colour`
+  reads it first; the carve colours by realm off the tap's `nation_polity`; the Ages view reads
+  `realm_colour`; the seat card's nation line names the realm / lists what it absorbed, the HQ line
+  cites the region, the header counts realms / absorbed / ownerless. The resumed session found the
+  UI half had never compiled (a missing `ui/presentation.hpp` include and `wizard_lapse_round_count`
+  reached from a free function) — fixed, Release build green.
 - [ ] T8 Release build; `world_determinism` twice; `save_envelope_roundtrip`; `begin_adopts_check.js`;
   the verify captures named in the groups; cold review; Ben's live click across the 1200/1660 seams
-  and into the seat. (all R6/R5)
+  and into the seat. (all R6/R5) 2026-09-25, the headless half DONE: Release build green in the
+  worktree (two compile faults fixed, see T7); `world_determinism` twice ALL PASS and identical run to
+  run — seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F; the A/B
+  with the inheritance line off returns main's own 5BA2EE1EE993C201 / 4F7BBD76AEEF3431 /
+  4834366D19271E5F, so BL-1089's name inheritance is the only mover (recorded for the sprint's
+  re-bless); `save_envelope_roundtrip` PASS with the two v22 blocks pinned to literals;
+  `begin_adopts_check` 12/12, adopted == cold; `realm_identity.lua` (new) and `seat_pick.lua` PASS
+  with the captures eyeballed (both seams, 800 CE, the ratchet pair, the re-seat, the seat canvas
+  with the realm line and the header count); `realm_names_check` (new) ALL PASS;
+  `industrialisation_sim_harness --seeds 0 --through 1960` exit 0. OWES the cold review (no reviewer
+  agent is reachable from this lane) and Ben's live click across the 1200/1660 seams and into the
+  seat (1087 R6, 1088 R6, 1089 R5).
+  COLD REVIEW DONE and its FIX ROUND landed 2026-09-25 (main merged at 1889f642 first; both name
+  tables sit at the record's tail, BL-1106's three then BL-1088's `polity_name`, in `w_timelapse`
+  and `r_timelapse` alike; `inherited` is silent under the tiered ticker). Six findings, six fixes,
+  one commit each: (high) a landed round is derived on demand at the hand-over
+  (`derive_lapse_for_handover`) and an already-open successor is re-pinned when its predecessor
+  lands, so Next-during-the-wait keeps the seam; (medium) every record rasters over its own
+  regions (`lapse_from_report` cuts the anchors to `region_stride`) in the wizard, the Begin/load
+  derivation and the sweep, and the adopt path prints how many realms the wizard's table and the
+  derivation disagree on; (medium) a load checks the wizard's record against the loaded report
+  before trusting its table, and a cold build after a wizard run wears none; (low) STARTUP.md and
+  the item say pinned/pinned as the code does; (low) ROSE reads the founding size carried by id
+  (`rose_start` / `rose_fired`), once per life; (low) the requirement rows name their scripts.
+  GATES on the fixed tree: Release build green; `save_envelope_roundtrip` and `save_roundtrip`
+  PASS; `world_determinism` twice ALL PASS, digests unmoved (6DBC0094F0B6B0EF / 95EEAD1204FD31AC /
+  4834366D19271E5F); `begin_adopts_check` 12/12, adopt == cold BB0457AAD5205D34;
+  `realm_identity.lua` 24/24 (1200 seam 64 shared / 63 kept / 1 re-slot; 1660 seam 53 / 52 / 1),
+  `seat_pick.lua` and `names_and_voice.lua` green, captures re-eyeballed; `realm_names_check`
+  ALL PASS. Still OWED: Ben's live click (1087 R6, 1088 R6, 1089 R5); a re-read of the sweep's
+  pinned-clash column on the library (its 101 / 18 was over the 1960 raster).
 
 ### Wave 1, lane I2 (frontier and marks) — BL-1090 (hard borders) then BL-1094 (marks). Groups `hard-borders-by-people-share`, `marks-that-earn-their-place`.
 

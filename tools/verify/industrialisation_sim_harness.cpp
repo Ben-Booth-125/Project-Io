@@ -1490,13 +1490,22 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             if (owner_mismatch > 0)
                 row.open_tables.push_back("owner map vs region::nation: " + std::to_string(owner_mismatch));
 
-            // The event layer: a resumed open notes the LIVING as founded,
-            // each once, and never a polity the prior span already ended.
+            // The event layer: a resumed open notes the LIVING as inherited
+            // (BL-1088: the ticker-silent kind that replaced the `founded`
+            // re-emit -- a founding at a resume told the player a realm they
+            // had watched for centuries was born that year), each once, and
+            // never a polity the prior span already ended. A `founded` at the
+            // open is counted too, so a regression to the re-emit still fails
+            // the "each once" half below rather than vanishing from the count.
+            const auto noted_at_open = [](const lapse_event& e) {
+                return e.kind == static_cast<uint8_t>(lapse_event_kind::inherited)
+                    || e.kind == static_cast<uint8_t>(lapse_event_kind::founded);
+            };
             int living = 0, founded_living = 0, founded_dead = 0;
             for (const polity& q : H.polities) if (q.alive) ++living;
             for (const lapse_event& e : r_one.hs.events)
             {
-                if (e.year != open || e.kind != static_cast<uint8_t>(lapse_event_kind::founded)) continue;
+                if (e.year != open || !noted_at_open(e)) continue;
                 if (e.polity < H.polities.size() && H.polities[e.polity].alive) ++founded_living;
                 else ++founded_dead;
             }
@@ -1511,7 +1520,7 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             for (const polity& q : fx.pre_exploration_polities) if (!q.alive) ++row.expl_ghosts;
             for (const lapse_event& e : c_one.hs.events)
             {
-                if (e.year != expl_open || e.kind != static_cast<uint8_t>(lapse_event_kind::founded)) continue;
+                if (e.year != expl_open || !noted_at_open(e)) continue;
                 if (e.polity < fx.pre_exploration_polities.size() && !fx.pre_exploration_polities[e.polity].alive)
                     ++row.expl_founded_dead;
             }

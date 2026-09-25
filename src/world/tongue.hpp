@@ -123,5 +123,20 @@ struct mt_picker
 /// a stream or carry the words between them.
 tongue_lexicon coin_lexicon(const tongue& t);
 
+/// Coin a REALM's name in @p t (BL-1088; CIVILISATION.md sec A realm's name;
+/// the register in NATION_GENERATION.md sec Pass 5). The same three structural
+/// forms `make_nation_name` builds — bare name, coined epithet + name, name +
+/// coined realm word — over `coin_lexicon(t)`'s own morphemes, so a realm and
+/// the nation it becomes read as one sound system.
+///
+/// A PURE FUNCTION of the tongue and @p salt, on the same footing as
+/// `coin_lexicon`: the stream is seeded from the tongue's own signature
+/// crossed with the salt, never from the sim's RNG, so coining a name inside
+/// `run_history_sim` draws nothing from the decision loop and moves no digest.
+/// @p salt tells two realms of one culture apart — the caller passes the realm's
+/// own id and founding seat; the same realm coins the same name on replay.
+/// Empty when the tongue cannot coin (the caller falls back to its seat's name).
+std::string coin_realm_name(const tongue& t, uint64_t salt);
+
 /// Lower-case @p w, for use as a suffix morpheme inside a longer name.
 std::string tongue_lower(const std::string& w);

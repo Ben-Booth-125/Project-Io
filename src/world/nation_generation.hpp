@@ -141,6 +141,36 @@ struct nation_params
     /// the history never held, or a body with no settlement pass): the same
     /// zero NATIONS.md names for a treasury nothing has credited.
     float treasury_floor = 0.0f;
+
+    /// BL-1089 — THE REALMS' NAMES CROSS THE FOLD (NATION_GENERATION.md § Pass
+    /// 5; Ben, 2026-09-24). Indexed by POLITY ID, the same ids `seed_polities`
+    /// carries: `polity::name` as the last span's close left it, coined once
+    /// at the realm's founding and never re-coined. Pass 5 gives a nation the
+    /// name of its fold representative's polity VERBATIM, following that
+    /// representative through the size-floor merge (the absorber keeps its
+    /// name — merge rule A), and coins only for ownerless ground. An empty
+    /// entry (a tongue that could not coin) falls back to coining, as every
+    /// nation did before this item. Empty (the default) keeps the pre-BL-1089
+    /// naming bit-for-bit.
+    std::vector<std::string> polity_names;
+};
+
+/// BL-1089 — WHAT THE FOLD DID, per nation, in the order `generate_nations`
+/// returns the nation ids. Written for the caller to put on the generation
+/// report, so the seat card and the per-world colour table can read which
+/// realm a nation is and which it absorbed, without re-running the carve.
+struct nation_fold_record
+{
+    /// Per nation: the polity id of its founding realm (its fold
+    /// representative's polity), or -1 for a nation of ownerless ground.
+    std::vector<int32_t> polity;
+    /// Per nation: the polity ids of the realms the size floor folded INTO it
+    /// (merge rule A: it kept its own name; these are listed on its card), in
+    /// absorption order. Flattened: `[absorbed_first[n], absorbed_first[n] +
+    /// absorbed_count[n])` indexes `absorbed`.
+    std::vector<int32_t> absorbed_first;
+    std::vector<int32_t> absorbed_count;
+    std::vector<int32_t> absorbed;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.
@@ -169,6 +199,9 @@ struct nation_params
 ///                 changes no branch — passing null (the default, and every
 ///                 headless caller) produces a byte-identical political map.
 ///                 Defined in world/hard_coded_world.hpp.
+/// @param fold_out Optional (BL-1089): receives what the fold did per nation,
+///                 in the returned order. A pure READ of the passes — filling
+///                 it consumes no randomness and changes no branch.
 /// @return         Nation entity IDs in seed-placement order (one per nation created).
 std::vector<entity_id> generate_nations(
     world& w,
@@ -177,7 +210,8 @@ std::vector<entity_id> generate_nations(
     int gw, int gh,
     const nation_params& params,
     uint32_t seed,
-    struct generation_progress* progress = nullptr);
+    struct generation_progress* progress = nullptr,
+    nation_fold_record* fold_out = nullptr);
 
 // ---------------------------------------------------------------------------
 // BL-571 — nation garrisons (docs/military/MILITARY.md § Nation garrisons)

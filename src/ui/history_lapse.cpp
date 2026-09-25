@@ -91,11 +91,17 @@ constexpr int tint_alpha = 170;
 /// (`assign_polity_colours`), not from the id, so two neighbours never share it.
 /// A polity the colouring never saw (a record still deriving) falls back to its
 /// own index, which is at least stable.
-ImU32 polity_colour(const history_lapse& h, uint16_t owner)
+///
+/// BL-1087: the slot is a wedge and an offset (world/polity_identity.hpp), so
+/// the colour comes from `polity_slot_colour` with the record's wedge count,
+/// and @p year applies the shade ratchet as it stood then (R8). A record with
+/// no culture tree (`family_count == 0`) still reads the fallback table.
+ImU32 polity_colour(const history_lapse& h, uint16_t owner, int year)
 {
     const int32_t slot = (owner < h.polity_slot.size()) ? h.polity_slot[owner]
                                                         : static_cast<int32_t>(owner);
-    return palette::lapse_polity_colour(slot);
+    const int rung = polity_rung_at(h.identity, owner, year);
+    return palette::polity_slot_colour(slot, h.family_count, rung);
 }
 
 ImU32 with_alpha(ImU32 c, int a)
@@ -247,11 +253,14 @@ void draw_lapse_exemplar(ImDrawList* dl, ImVec2 at, float scale, bool over_water
 /// lineage palette (BL-919); on the Empires round it is a polity and the palette
 /// is empty, so the identity slot applies. One function for the map row and the
 /// board swatch, so a row and its ground cannot disagree on either round.
-ImU32 owner_colour(const history_lapse& h, uint16_t owner)
+/// BL-1087: the lineage palette is built on every round now (the polity
+/// rounds read it for the wedge and the base), so the ROUND's flag, not the
+/// palette's emptiness, says which id space `owner` is in.
+ImU32 owner_colour(const history_lapse& h, uint16_t owner, int year = 0x7FFFFFFF)
 {
-    if (owner < h.culture_colour.size())
+    if (h.owners_are_cultures && owner < h.culture_colour.size())
         return static_cast<ImU32>(h.culture_colour[owner]);
-    return polity_colour(h, owner);
+    return polity_colour(h, owner, year);
 }
 
 } // namespace
@@ -279,9 +288,13 @@ void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent,
         return (f >= 0 && static_cast<std::size_t>(f) < i) ? f : -1;
     };
 
-    int roots = 0;
-    for (std::size_t i = 0; i < n; ++i)
-        if (folded_to(i) < 0 && (parent[i] < 0 || static_cast<std::size_t>(parent[i]) >= i)) ++roots;
+    // BL-1087: the wedge walk is the pure `lineage_wedges_of` — the same
+    // function the sweep and the load path call — so a family's wedge here
+    // and the wedge its realms' slots encode are one number.
+    const lineage_wedges lw = lineage_wedges_of(parent, folded_into);
+    h.culture_wedge = lw.wedge;
+    h.family_count  = lw.count;
+    const int   roots = lw.count;
     const float wedge = 1.0f / static_cast<float>(roots > 0 ? roots : 1);
     // The fixed step a daughter takes off its parent, and the furthest any
     // member may drift from the root: inside the wedge with a margin, so the
@@ -295,7 +308,6 @@ void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent,
     // Sibling rank: how many earlier daughters this parent already has.
     std::vector<int32_t> children(n, 0);
 
-    int root_rank = 0;
     for (std::size_t i = 0; i < n; ++i)
     {
         if (const int32_t f = folded_to(i); f >= 0)
@@ -315,7 +327,7 @@ void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent,
         if (p < 0 || static_cast<std::size_t>(p) >= i)
         {
             h.culture_family[i] = static_cast<int32_t>(i);
-            h.culture_hue[i]    = wedge * static_cast<float>(root_rank++);
+            h.culture_hue[i]    = wedge * static_cast<float>(lw.wedge[i] < 0 ? 0 : lw.wedge[i]);
             h.culture_depth[i]  = 0;
             deviation[i]        = 0.0f;
         }
@@ -370,40 +382,18 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // LAND only. Every tile ends on the region whose anchor is nearest by walking
     // distance rather than by straight line — which is the honest measure here,
     // because a region across a strait is not next door however close it looks.
-    std::deque<int> frontier;
-    for (std::size_t r = 0; r < h.region_col.size(); ++r)
+    // BL-1087: the walk itself is `nearest_region_raster` (world/
+    // polity_identity.hpp) — the same function the Begin/load colour table
+    // and the sweep's clash column call — so the raster the slots were
+    // assigned over is the raster they are re-derived over. Columns WRAP as
+    // the equator does; rows do not (hard_coded_world.hpp § the homeworld
+    // grid); two anchors on one tile resolve to the lower index.
     {
-        const int c = h.region_col[r], w = h.region_row[r];
-        if (c < 0 || c >= gw || w < 0 || w >= gh) continue;
-        const int idx = w * gw + c;
-        if (is_water(preview_substrate(packed[static_cast<std::size_t>(idx)]))) continue;
-        if (h.tile_region[static_cast<std::size_t>(idx)] >= 0) continue; // two anchors, one tile
-        h.tile_region[static_cast<std::size_t>(idx)] = static_cast<int32_t>(r);
-        frontier.push_back(idx);
-    }
-
-    while (!frontier.empty())
-    {
-        const int idx = frontier.front();
-        frontier.pop_front();
-        const int32_t owner = h.tile_region[static_cast<std::size_t>(idx)];
-        const int col = idx % gw, row = idx / gw;
-
-        // Columns WRAP as the equator does; rows do not. The same rule the
-        // world's own grid keeps (hard_coded_world.hpp § the homeworld grid).
-        const int steps[4][2] = { {1, 0}, {-1, 0}, {0, 1}, {0, -1} };
-        for (const auto& s : steps)
-        {
-            int nc = col + s[0], nr = row + s[1];
-            if (nr < 0 || nr >= gh) continue;
-            if (nc < 0)   nc += gw;
-            if (nc >= gw) nc -= gw;
-            const std::size_t ni = static_cast<std::size_t>(nr * gw + nc);
-            if (h.tile_region[ni] >= 0) continue;
-            if (is_water(preview_substrate(packed[ni]))) continue;
-            h.tile_region[ni] = owner;
-            frontier.push_back(static_cast<int>(ni));
-        }
+        std::vector<uint8_t> water(n, 0);
+        for (std::size_t i = 0; i < n; ++i)
+            water[i] = is_water(preview_substrate(packed[i])) ? 1 : 0;
+        h.tile_region = nearest_region_raster(water, gw, gh, h.region_col, h.region_row);
+        if (h.tile_region.size() != n) h.tile_region.assign(n, -1);
     }
 
     for (std::size_t i = 0; i < n; ++i)
@@ -695,137 +685,100 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // from the carried state. Empty on the Culture round (no samples).
     lapse_hard_walk(h);
 
-    // The Culture round's record carries a lineage palette (BL-919); its hue
-    // families seed the slot walk so kin start near one another on the wheel.
-    assign_polity_colours(h, h.culture_family.empty() ? nullptr : &h.culture_family);
+    // The identity: pinned slots, family wedges, the ratchet's moments and the
+    // capital fold (BL-1087/BL-1088; world/polity_identity.hpp holds the rule).
+    assign_polity_colours(h);
 }
 
-void assign_polity_colours(history_lapse& h, const std::vector<int32_t>* hue_family)
+void assign_polity_colours(history_lapse& h)
 {
     h.polity_slot.clear();
+    h.identity = polity_identity{};
+    h.polity_wedge.clear();
+    h.capital_moves.clear();
     if (h.tile_region.empty()) return;
 
-    const int gw = h.grid_w, gh = h.grid_h;
-    const std::size_t nreg = h.region_col.size();
-
-    // 1. REGION adjacency, off the nearest-region raster: two regions touch if
-    //    any two of their tiles do, under the same four-neighbour, column-wrapping
-    //    rule the raster itself was walked with. A sorted, deduplicated edge list
-    //    rather than an n^2 matrix — a few hundred regions, a few hundred edges.
-    std::vector<std::pair<int32_t, int32_t>> region_edges;
-    for (int r = 0; r < gh; ++r)
-        for (int c = 0; c < gw; ++c)
-        {
-            const int32_t a = h.tile_region[static_cast<std::size_t>(r * gw + c)];
-            if (a < 0) continue;
-            const int steps[2][2] = { {1, 0}, {0, 1} }; // east and south: each pair once
-            for (const auto& s : steps)
-            {
-                int nc = c + s[0], nr = r + s[1];
-                if (nr >= gh) continue;
-                if (nc >= gw) nc -= gw;
-                const int32_t b = h.tile_region[static_cast<std::size_t>(nr * gw + nc)];
-                if (b < 0 || b == a) continue;
-                region_edges.emplace_back(std::min(a, b), std::max(a, b));
-            }
-        }
-    std::sort(region_edges.begin(), region_edges.end());
-    region_edges.erase(std::unique(region_edges.begin(), region_edges.end()), region_edges.end());
-
-    std::vector<std::vector<int32_t>> region_nbrs(nreg);
-    for (const auto& e : region_edges)
-    {
-        region_nbrs[static_cast<std::size_t>(e.first)].push_back(e.second);
-        region_nbrs[static_cast<std::size_t>(e.second)].push_back(e.first);
-    }
-
-    // 2. POLITY adjacency, across the WHOLE record rather than one slice. Two
+    // 1. REGION adjacency off the nearest-region raster, and the polity
+    //    adjacency the module folds from it across the WHOLE record (two
     //    polities are adjacent if they ever held neighbouring regions at the
-    //    same time — and a neighbouring pair can only come into being when one
-    //    side changes hands, so folding the change list and looking around each
-    //    changed region sees every pair that ever existed. Linear in changes
-    //    times region degree.
-    std::size_t npol = h.polity_seat.size();
-    std::vector<uint16_t> owner(nreg, owner_none);
-    std::vector<std::pair<int32_t, int32_t>> polity_edges;
-    for (const owner_change& ch : h.lapse.changes)
-    {
-        if (ch.region >= nreg) continue;
-        owner[ch.region] = ch.owner;
-        if (ch.owner == owner_none) continue;
-        if (ch.owner >= npol) npol = static_cast<std::size_t>(ch.owner) + 1;
-        for (const int32_t nb : region_nbrs[ch.region])
-        {
-            const uint16_t o = owner[static_cast<std::size_t>(nb)];
-            if (o == owner_none || o == ch.owner) continue;
-            polity_edges.emplace_back(std::min<int32_t>(ch.owner, o),
-                                      std::max<int32_t>(ch.owner, o));
-        }
-    }
-    std::sort(polity_edges.begin(), polity_edges.end());
-    polity_edges.erase(std::unique(polity_edges.begin(), polity_edges.end()), polity_edges.end());
+    //    same time) -- the same graph BL-915's greedy walk always coloured.
+    const std::vector<std::vector<int32_t>> region_nbrs =
+        region_adjacency(h.tile_region, h.grid_w, h.grid_h, h.region_col.size());
 
-    std::vector<std::vector<int32_t>> polity_nbrs(npol);
-    for (const auto& e : polity_edges)
+    // 2. THE FOUNDING FAMILY per polity, read UI-side (BL-1087 R2): the
+    //    plurality people of the realm's seat at its first recorded year,
+    //    through the lineage tree's wedges. Empty when the record carries no
+    //    culture tree (a bare harness record): every realm then reads the
+    //    fallback table, as before this item.
+    const std::vector<int32_t> first_region = polity_first_region(h.lapse);
+    const std::vector<int32_t> seat_region  = polity_seat_region(h.lapse, first_region);
+    if (h.family_count > 0)
     {
-        polity_nbrs[static_cast<std::size_t>(e.first)].push_back(e.second);
-        polity_nbrs[static_cast<std::size_t>(e.second)].push_back(e.first);
+        const std::vector<int32_t> culture = polity_founding_culture(h.lapse, seat_region, first_region);
+        h.polity_wedge.assign(culture.size(), -1);
+        for (std::size_t p = 0; p < culture.size(); ++p)
+            if (culture[p] >= 0 && static_cast<std::size_t>(culture[p]) < h.culture_wedge.size())
+                h.polity_wedge[p] = h.culture_wedge[static_cast<std::size_t>(culture[p])];
     }
 
-    // 3. GREEDY, in a fixed order: highest degree first, then index, which is
-    //    the standard heuristic and deterministic. Each polity takes the lowest
-    //    slot no already-coloured neighbour holds. With a HUE FAMILY supplied,
-    //    the search starts at the family's band of the palette and wraps, so
-    //    kin share a neighbourhood of hues where the constraint allows it. If
-    //    every slot is taken by a neighbour (a degree above the palette, which
-    //    the greedy order makes unlikely), the least-used slot among the
-    //    neighbours is taken and that one shared edge is left to the frontier
-    //    line — a bound met honestly rather than a palette silently widened.
-    std::vector<int32_t> order(npol);
-    for (std::size_t i = 0; i < npol; ++i) order[i] = static_cast<int32_t>(i);
-    std::sort(order.begin(), order.end(), [&](int32_t a, int32_t b) {
-        const std::size_t da = polity_nbrs[static_cast<std::size_t>(a)].size();
-        const std::size_t db = polity_nbrs[static_cast<std::size_t>(b)].size();
-        if (da != db) return da > db;
-        return a < b;
-    });
+    // 3. THE ASSIGNMENT: pins kept, the clash rule, the dead-ground rule, then
+    //    the greedy walk in founding order (world/polity_identity.hpp).
+    polity_identity_input in;
+    in.rec          = &h.lapse;
+    in.region_nbrs  = &region_nbrs;
+    in.family       = h.family_count > 0 ? &h.polity_wedge : nullptr;
+    in.family_count = h.family_count;
+    in.pins         = h.has_pins ? &h.pins : nullptr;
+    h.identity    = assign_polity_identity(in);
+    h.polity_slot = h.identity.slot;
 
-    constexpr int k_slots = palette::lapse_polity_slot_count;
-    h.polity_slot.assign(npol, -1);
-    for (const int32_t p : order)
-    {
-        int used[k_slots] = {};
-        for (const int32_t nb : polity_nbrs[static_cast<std::size_t>(p)])
-        {
-            const int32_t s = h.polity_slot[static_cast<std::size_t>(nb)];
-            if (s >= 0) ++used[s % k_slots];
-        }
-        const bool has_family = hue_family != nullptr
-                             && static_cast<std::size_t>(p) < hue_family->size()
-                             && (*hue_family)[static_cast<std::size_t>(p)] >= 0;
-        const int start = has_family
-                              ? ((*hue_family)[static_cast<std::size_t>(p)] * 7) % k_slots
-                              : 0;
-        int chosen = -1;
-        for (int k = 0; k < k_slots && chosen < 0; ++k)
-            if (used[(start + k) % k_slots] == 0) chosen = (start + k) % k_slots;
-        if (chosen < 0)
-        {
-            chosen = 0;
-            for (int k = 1; k < k_slots; ++k)
-                if (used[k] < used[chosen]) chosen = k;
-        }
-        h.polity_slot[static_cast<std::size_t>(p)] = chosen;
-    }
+    // 4. THE CAPITAL FOLD (BL-1088): baked once; `lapse_polity_capital` reads it.
+    h.capital_moves = polity_capital_moves(h.lapse);
+    // The instrument (what the pins had to do at this round's opening) stays
+    // on `h.identity` for the verify API's `history_identity()`; the sweep's
+    // column is the reading across the library. Not printed here: the live
+    // tap re-derives every 0.2 s while a round runs.
+}
+
+polity_pins lapse_pins_for_successor(const history_lapse& prev)
+{
+    if (prev.owners_are_cultures || prev.polity_slot.empty()) return polity_pins{};
+    return pins_from(prev.identity, prev.lapse, prev.has_pins ? &prev.pins : nullptr);
+}
+
+int lapse_polity_rung(const history_lapse& h, uint16_t polity, int year)
+{
+    return polity_rung_at(h.identity, polity, year);
+}
+
+std::string lapse_polity_name(const history_lapse& h, uint16_t polity)
+{
+    if (polity == lapse_event_none) return "an unnamed realm";
+    if (static_cast<std::size_t>(polity) < h.lapse.polity_name.size()
+        && !h.lapse.polity_name[polity].empty())
+        return h.lapse.polity_name[polity];
+    if (static_cast<std::size_t>(polity) < h.polity_seat.size() && h.polity_seat[polity] >= 0
+        && static_cast<std::size_t>(h.polity_seat[polity]) < h.region_name.size()
+        && !h.region_name[static_cast<std::size_t>(h.polity_seat[polity])].empty())
+        return h.region_name[static_cast<std::size_t>(h.polity_seat[polity])];
+    return "an unnamed realm";
+}
+
+int32_t lapse_polity_capital(const history_lapse& h, uint16_t polity, int year)
+{
+    const int32_t first = (static_cast<std::size_t>(polity) < h.polity_seat.size())
+                              ? h.polity_seat[polity] : -1;
+    return polity_capital_at(h.capital_moves, polity, year, first);
 }
 
 // ---------------------------------------------------------------------------
 // The map
 // ---------------------------------------------------------------------------
 
-uint32_t lapse_owner_colour(const history_lapse& h, uint16_t owner)
+
+uint32_t lapse_owner_colour(const history_lapse& h, uint16_t owner, int year)
 {
-    return static_cast<uint32_t>(owner_colour(h, owner));
+    return static_cast<uint32_t>(owner_colour(h, owner, year));
 }
 
 float lapse_carry_fade(const history_lapse& h, int year)
@@ -936,6 +889,31 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // every capture has shown); a hard realm's coast draws heavy like the
     // rest of its outline (BL-1090), since only the land side can be hard.
     const float carry_fade = lapse_carry_fade(h, year);
+
+    // THE CULTURE BASE (BL-1087 R3; Ben, 2026-09-24, R7 "both"): on the
+    // polity rounds a dull lineage-hue tint of each region's plurality people
+    // goes down under everything political — the carry lands on it as it
+    // fades, the realm fill sits over it — so unorganised peopled ground reads
+    // as somebody's ground at 800 CE and the base is still there at 1900. One
+    // fold of the record's culture changes per frame (the cost the ownership
+    // slice already pays), then a colour per region. Nothing on the Culture
+    // round, whose fill IS the culture, and nothing without a lineage tree.
+    std::vector<uint32_t> base_colour;
+    if (!h.owners_are_cultures && h.family_count > 0 && !h.lapse.culture_changes.empty())
+    {
+        const std::vector<int32_t> plural = culture_plurality_at(h.lapse, year);
+        base_colour.assign(plural.size(), 0u);
+        for (std::size_t r = 0; r < plural.size(); ++r)
+        {
+            const int32_t c = plural[r];
+            if (c < 0 || static_cast<std::size_t>(c) >= h.culture_hue.size()) continue;
+            base_colour[r] = static_cast<uint32_t>(
+                palette::culture_base_colour(h.culture_hue[static_cast<std::size_t>(c)],
+                                             h.culture_depth[static_cast<std::size_t>(c)]));
+        }
+    }
+    constexpr int base_alpha = 110;
+
     std::vector<int32_t> row(static_cast<std::size_t>(gw));
     std::vector<int32_t> above(static_cast<std::size_t>(gw), -1);
     std::vector<char>    present; // owner -> holds ground in this slice
@@ -979,6 +957,35 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         // just made the map dim. So the carried frame goes down first across the
         // whole row and this round's own fill goes over it — two translucent
         // tints over the same ground, one leaving as the other arrives.
+        // THE BASE, run-merged by colour along the row exactly as the carry
+        // is below: peopled ground in its people's dull lineage hue.
+        if (!base_colour.empty())
+        {
+            int k = 0;
+            while (k < gw)
+            {
+                const int32_t reg = h.tile_region[static_cast<std::size_t>(r * gw + k)];
+                const uint32_t col = (reg >= 0 && static_cast<std::size_t>(reg) < base_colour.size())
+                                         ? base_colour[static_cast<std::size_t>(reg)] : 0u;
+                int k2 = k + 1;
+                while (k2 < gw)
+                {
+                    const int32_t r2 = h.tile_region[static_cast<std::size_t>(r * gw + k2)];
+                    const uint32_t c2 = (r2 >= 0 && static_cast<std::size_t>(r2) < base_colour.size())
+                                            ? base_colour[static_cast<std::size_t>(r2)] : 0u;
+                    if (c2 != col) break;
+                    ++k2;
+                }
+                if (col != 0u)
+                {
+                    dl->AddRectFilled({px(static_cast<float>(k)), y0},
+                                      {px(static_cast<float>(k2)), y1},
+                                      with_alpha(static_cast<ImU32>(col), base_alpha));
+                    ++prims;
+                }
+                k = k2;
+            }
+        }
         if (carry_fade > 0.0f)
         {
             int k = 0;
@@ -1028,7 +1035,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 // first frame, so it draws at full strength as it always did.
                 dl->AddRectFilled({px(static_cast<float>(c)), y0},
                                   {px(static_cast<float>(e)), y1},
-                                  with_alpha(owner_colour(h, o),
+                                  with_alpha(owner_colour(h, o, year), // BL-1087: the ratchet at this year
                                              static_cast<int>(tint_alpha * (1.0f - carry_fade))));
                 ++prims;
             }
@@ -1463,13 +1470,23 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                           static_cast<float>(h.region_row[r]) + 0.5f};
         };
         rest_seat.assign(h.polity_seat.size(), -1);
+        // BL-1088: THE CAPITAL FOLD. A `founded` states the seat a realm rose
+        // at and an `inherited` (a resumed span's restatement) where it sat at
+        // the resume -- which on a resumed record is its CAPITAL, not the
+        // lowest-indexed region the change list happens to show first -- and a
+        // `capital_moved` moves it. The last at or before the playhead wins.
+        // This is the one fold the seat dot, the 1200 burst and every mark on
+        // a seat read; the NAME never follows it (CIVILISATION.md sec A
+        // realm's name).
         for (const lapse_event& e : h.lapse.events)
         {
             if (e.year > year) break; // ascending by year
-            if (static_cast<lapse_event_kind>(e.kind) != lapse_event_kind::capital_moved) continue;
+            const lapse_event_kind k = static_cast<lapse_event_kind>(e.kind);
+            if (k != lapse_event_kind::capital_moved && k != lapse_event_kind::founded
+             && k != lapse_event_kind::inherited) continue;
             if (e.polity == lapse_event_none || static_cast<std::size_t>(e.polity) >= rest_seat.size()) continue;
             if (!region_ok(e.region)) continue;
-            rest_seat[e.polity] = e.region; // the last move at or before the playhead wins
+            rest_seat[e.polity] = e.region; // the last statement at or before the playhead wins
         }
         // A polity's seat region on this record at the playhead (see the note above).
         const auto seat_region_of = [&](uint16_t polity) -> int32_t {
@@ -1633,7 +1650,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 at = {px(cx), py(cy)};
                 break;
             }
-            dl->AddCircleFilled(at, rad, owner_colour(h, static_cast<uint16_t>(o)), 10);
+            dl->AddCircleFilled(at, rad, owner_colour(h, static_cast<uint16_t>(o), year), 10);
             dl->AddCircle(at, rad, col_seat_ring, 10, 1.0f);
             prims += 2;
         }
@@ -1666,7 +1683,9 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             for (std::size_t o = 0; o < present.size() && o < h.polity_seat.size(); ++o)
             {
                 if (!present[o]) continue;
-                const int32_t seat = h.polity_seat[o];
+                // BL-1088: the burst is at the CAPITAL the fold gives, as the dot is.
+                const int32_t seat = (o < rest_seat.size() && rest_seat[o] >= 0) ? rest_seat[o]
+                                                                                : h.polity_seat[o];
                 if (seat < 0 || static_cast<std::size_t>(seat) >= h.region_col.size()) continue;
                 const ImVec2 at{px(static_cast<float>(h.region_col[static_cast<std::size_t>(seat)]) + 0.5f),
                                 py(static_cast<float>(h.region_row[static_cast<std::size_t>(seat)]) + 0.5f)};
@@ -1871,9 +1890,15 @@ const char* region_name_of(const history_lapse& h, uint16_t region)
     return h.region_name[region].c_str();
 }
 
-/// A polity's name is its seat's name — the same rule the board uses.
+/// A polity's name (BL-1088): the record's coined name — coined once at its
+/// founding in its founding culture's tongue, carried by id — and only where
+/// the tongue could not coin, its seat's name (the pre-BL-1088 rule). The same
+/// rule the board uses, through `lapse_polity_name`.
 const char* polity_name_of(const history_lapse& h, uint16_t polity)
 {
+    if (polity != lapse_event_none && static_cast<std::size_t>(polity) < h.lapse.polity_name.size()
+     && !h.lapse.polity_name[polity].empty())
+        return h.lapse.polity_name[polity].c_str();
     if (polity == lapse_event_none || static_cast<std::size_t>(polity) >= h.polity_seat.size()
      || h.polity_seat[polity] < 0)
         return "an unnamed realm";
@@ -2138,16 +2163,23 @@ void draw_lapse_scoreboard(const history_lapse& h,
             const ImVec2 p = ImGui::GetCursorScreenPos();
             const float  s = ImGui::GetTextLineHeight();
             ImGui::GetWindowDrawList()->AddRectFilled(
-                {p.x, p.y + 2.0f}, {p.x + s * 0.55f, p.y + s - 1.0f}, owner_colour(h, b.owner));
+                {p.x, p.y + 2.0f}, {p.x + s * 0.55f, p.y + s - 1.0f}, owner_colour(h, b.owner, year));
             swatch_w = s * 0.55f + 5.0f + ImGui::GetStyle().ItemSpacing.x;
             ImGui::Dummy({s * 0.55f + 5.0f, s});
             ImGui::SameLine();
         }
         {
+            // BL-1088: the realm's coined name, never its seat's (the seat's
+            // name is the fallback for a tongue that could not coin). On the
+            // Culture round the owner is a culture and its row keeps the
+            // region-name read it always had.
             const int32_t seat = (b.owner < h.polity_seat.size())
                                      ? h.polity_seat[b.owner] : -1;
-            const char* nm = (seat >= 0 && static_cast<std::size_t>(seat) < h.region_name.size()
-                              && !h.region_name[static_cast<std::size_t>(seat)].empty())
+            const char* nm = (!h.owners_are_cultures && b.owner < h.lapse.polity_name.size()
+                              && !h.lapse.polity_name[b.owner].empty())
+                                 ? h.lapse.polity_name[b.owner].c_str()
+                             : (seat >= 0 && static_cast<std::size_t>(seat) < h.region_name.size()
+                                && !h.region_name[static_cast<std::size_t>(seat)].empty())
                                  ? h.region_name[static_cast<std::size_t>(seat)].c_str()
                                  : "unnamed seat";
             // A generated seat name in a third-width column is exactly the shape
@@ -2504,7 +2536,20 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
     switch (static_cast<lapse_event_kind>(e.kind))
     {
     case lapse_event_kind::founded:
-        std::snprintf(buf, sizeof buf, "A realm rises at %s.", R);
+        // BL-1088: a realm rises under its own name; ground that organises with
+        // no polity to own it is a people settling, not a realm rising
+        // (CIVILISATION.md sec A realm's name).
+        if (e.polity == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "A people settle at %s.", R);
+        else
+            std::snprintf(buf, sizeof buf, "%s rises at %s.", polity_name_of(h, e.polity), R);
+        break;
+    case lapse_event_kind::inherited:
+        // Ticker-silent by design: a resumed span restating a living realm's
+        // seat is a fact for the capital fold, not a moment. Never narrated
+        // (the ticker filters the kind); this line is only what a caller
+        // reading the prose directly would see.
+        std::snprintf(buf, sizeof buf, "%s holds %s.", polity_name_of(h, e.polity), R);
         break;
     case lapse_event_kind::seat_captured:
         std::snprintf(buf, sizeof buf, "%s, seat of %s, falls to %s.",
@@ -2642,6 +2687,11 @@ int ticker_priority(const lapse_event& e)
     // realm). They still pulse on the map; the ticker is for the moments of
     // the ARC, which is what the round exists to show.
     case lapse_event_kind::road_promoted:        return -1;
+    // BL-1088: AN INHERITED SEAT IS NOT A MOMENT. A resumed span restates
+    // where every living realm sits (the capital fold reads it); the ticker
+    // stays silent on it, because nothing rose — a "rises" at 1200 for a
+    // realm on round 4's final board told the player it was born that year.
+    case lapse_event_kind::inherited:            return -1;
     case lapse_event_kind::civilisation_formed:
     case lapse_event_kind::creed_preached:
     case lapse_event_kind::schism:

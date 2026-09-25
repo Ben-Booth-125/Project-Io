@@ -7774,58 +7774,58 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp assign_polity_colours pins",
-      "visual: scripts/verify/<name>.lua capture at 1200 on rounds 4 and 5 with identical swatches (name it)"
+      "visual: scripts/verify/realm_identity.lua captures realm_identity_1_round4_close / _2_round5_open at 1200 (and _4 / _5 at 1660) with identical swatches"
      ],
-     "requirement": "Pinned slots live on the record and enter assign_polity_colours: a realm alive at the predecessor's close keeps its slot in the successor record (set at launch from the predecessor's slots, re-pinned at its landing); greedy colouring fills the rest; no two adjacent realms share a swatch; a pinned/fresh adjacency clash re-slots the smaller people-share realm at the round's opening step; a dead realm's slot is retired only for a newcomer seated inside its last-held ground. (item-spanning gate: history_lapse_press.lua or a new verify script asserting slot equality across the 1200 and 1660 seams on a library seed)",
+     "requirement": "Pinned slots live on the record and enter assign_polity_colours: a realm alive at the predecessor's close keeps its slot in the successor record (set at launch from the predecessor's slots, re-pinned at its landing); greedy colouring fills the rest; no two adjacent realms share a swatch; a clash between two pinned realms the new record makes neighbours on one slot re-slots the smaller people-share realm at the round's opening step (a fresh realm is coloured around the pins and cannot clash); a dead realm's slot is retired only for a newcomer seated inside its last-held ground. (item-spanning gate: history_lapse_press.lua or a new verify script asserting slot equality across the 1200 and 1660 seams on a library seed)",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "world/polity_identity.* assign_polity_identity: every pin kept, a pinned/pinned clash (two pinned realms the new record makes neighbours on one slot) re-slots the smaller opening people share, a dead realm's slot reserved for a newcomer seated on its last-held ground; pins set at launch and again at landing (startup_screens.cpp, lapse_pins_for_successor). Gate: scripts/verify/realm_identity.lua (NEW) PASS on the verify world -- 1200 seam: 64 realms alive on both sides, 62 kept their slot and the 2 that moved are exactly the clash rule's re-slots (history_identity().reslotted == 2); 1660 seam: 53 shared, 51 kept, 2 re-slotted; 0 spills on either round. Captures realm_identity_1_round4_close / _2_round5_open and _4_round5_close / _5_round6_open agree swatch for swatch and row for row (eyeballed). FIX ROUND (2026-09-25, the cold review): the pins a landed round hands its successor are derived ON DEMAND at the hand-over (derive_lapse_for_handover, startup_screens.cpp -- the draw path's finish_history_lapse against the wizard's surface), and a successor already open when its predecessor lands is re-pinned from the landed record, so an ordinary press order (Next during round 4's wait) keeps the seam; and every record rasters over ITS OWN regions (lapse_from_report cuts the anchors to region_stride), so the --verify rounds now run the per-round geometry the real wizard does. realm_identity.lua on the fixed tree: 24 expects PASS, 0 clipping; 1200 seam 64 shared / 63 kept / 1 re-slotted by the rule (polity 89, slot 61 -> 70); 1660 seam 53 / 52 / 1 (polity 380, 42 -> 50); 0 spills; captures re-eyeballed (the seam pairs agree row for row)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: presentation.cpp palette; startup_screens.cpp palette build per lapse",
       "visual: capture"
      ],
      "requirement": "Polity hue is drawn from the founding culture family's wedge with a within-wedge offset chosen greedily (a palette function replacing the 20-slot table's kin-on-opposite-hues ordering); the polity's culture is derived UI-side from the founded region's plurality; the lineage palette is built for every lapse, not only lapse 0; two city states from one cradle share a hue family.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "palette::polity_slot_colour (presentation.cpp): slot = wedge x 6 + offset, the wedge from lineage_wedges_of -- the walk the lineage palette and the sweep also use; the founding culture read UI-side from the seat's plurality at the first recorded year (polity_founding_culture); the lineage tree built for every lapse (lapse_from_report) and copied to the live phase at launch. Verify world: 12 families; the captures show kin rows in one hue family (the two Thuastos realms, rows 4-5, both magenta)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp base layer",
       "visual: capture at 800 CE and 1900"
      ],
      "requirement": "A dull lineage-hue culture base is drawn under the polity fill on rounds 4-6 from each region's plurality in culture_changes; unorganised peopled ground at 800 CE carries its culture tint; the base is still present at 1900; the carry fade lands on the base.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "palette::culture_base_colour (dull: s 0.32, v 0.62 - 0.05 per depth) drawn under the carry and the fill on rounds 4-6 from culture_plurality_at at base_alpha 110 (draw_lapse_map). Captures realm_identity_0_round4_800ce (unorganised peopled ground tinted at 800 CE) and _6_round6_close (the base still under the fills at 1960)."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp ratchet",
       "visual: capture before/after a civilisation_formed line"
      ],
      "requirement": "The shade ratchet: a realm's fill darkens one rung the frame civilisation_formed fires for it or it crosses the sweep's ROSE rule (peak >= 2x start and +3 regions), stays darker, and carries into the next round by id.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "polity_identity::ratchet_year (civilisation_formed for the realm; the sweep's ROSE rule against its FOUNDING size) read by polity_rung_at; palette::shade_rung steps the value 0.78x per rung; the rung carries by id as polity_pins::rung. realm_identity.lua: a civilisation_formed at 1156 ratchets 1 realm one rung with its slot unmoved (captures _0_round4_ratchet_before / _after); 34 realms carry a rung by 1200. FIX ROUND (2026-09-25, the cold review): ROSE is read against the realm's founding size carried by id (polity_pins::rose_start) and fires once in its life (polity_pins::rose_fired), never re-based at a later span's opening sample; STARTUP.md § Identity across the rounds states the start. realm_identity.lua's ratchet checks unchanged on the fixed tree (1 stepped at 1156, 0 slots moved, 34 rungs by 1200)."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: history_sweep column",
       "manual: the CVD check recorded in the item"
      ],
      "requirement": "Pinned clashes are counted across the 16 curated seeds by a history_sweep column and the reading written into the item; the new palette's colour-deficiency safety is checked against the twelve-slot nation table's reasoning (presentation.cpp:371-377) and the check recorded.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "history_sweep's BL-1087 block on the 16 curated seeds (first session): 12 families on every world; pinned clashes 101 pooled at the 1200 seam (0-20 per seed), 18 at 1660, 14 of 16 worlds with at least one; 119 re-slotted, 594 dead-slot inheritances, 0 spills. CVD: tools/session/cvd_palette_check.js (Machado 2009 severity 1.0, CIE76) -- wedge centres 13.6-17 dE deutan / 8.7-36 protan for 4-8 families, the first three kin offsets 10-17 dE up to 6 families, against the nation table's own worst pairs 7.1 / 9.0 / 10.8. Written into the item's design. FIX ROUND (2026-09-25, the cold review): the sweep's column now rasters each record over its own regions (the first region_stride anchors), as the rounds do; the 101 / 18 reading above was taken over the 1960 raster and is to be re-read the next time history_sweep runs on the library (not re-run in the fix round: the sweep is a Lua-basket harness, minutes per seed)."
     },
     {
      "id": "R6",
@@ -7835,7 +7835,7 @@
       "headless: world_determinism x2"
      ],
      "requirement": "LIVE: on a library seed a realm alive at 1200 has the same swatch on round 4's board at 1200 and round 5's at 1200, likewise at 1660; no two adjacent realms share a swatch; kin city states share a family; the base is under the fill; a ratchet is visible. Watched and unwatched runs byte-identical; digests unchanged.",
-     "notes": "",
+     "notes": "OWES Ben's live click (2026-09-25). Headless half done: world_determinism twice ALL PASS, bit-identical to itself (seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F on both runs); seedA/off equals main; seedA/on and seedB/on moved by BL-1089's name inheritance alone -- with kepler_np.polity_names left empty (one line), seedA/on 5BA2EE1EE993C201, seedB/on 4F7BBD76AEEF3431, seedA/off 4834366D19271E5F -- main's own values, ALL PASS. The world to click: the verify world (seed 0), round 4's close and round 5's open at 1200 agree except the clash rule's re-slot (polity 89, slot 61 -> 70, after the fix round's per-record raster). FIX ROUND (2026-09-25, on the merged tree with main at 1889f642): world_determinism twice ALL PASS, digests identical run to run and to the readings above (seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F); realm_identity.lua 24 expects PASS, 0 clipping; names_and_voice.lua (lane I3's, the ticker merge) 12 expects PASS. Still OWES the live click.",
      "result_metric": ""
     }
    ]
@@ -7854,58 +7854,58 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_sim.cpp founding; era_timelapse.hpp table",
       "headless: world_determinism x2; save_envelope_roundtrip"
      ],
      "requirement": "polity::name is coined at founded via coin_lexicon over the founding region's culture speech; a polity_name table sits on the record beside region_name and is carried by id across the resume; the name never follows the capital; digests unchanged (the tongue's own stream). (item-spanning gate)",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "polity::name coined at the six sites that push a polity onto the table by coin_realm_name (tongue.cpp: the tongue's signature crossed with (id, seat), no draw from the sim's stream); the polity_name table on era_timelapse (as_timelapse, the tap publishes it, save_game_version 22). tools/verify/realm_names_check.cpp (NEW, seed 0): 227 polities named on each of the three records, 454 shared ids, 0 renamed. save_envelope_roundtrip PASS (the table pinned to literals, an empty entry in place). Digests: world_determinism twice ALL PASS, bit-identical to itself (seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F on both runs); with BL-1089's inheritance switched off (one line) with kepler_np.polity_names left empty (one line), seedA/on 5BA2EE1EE993C201, seedB/on 4F7BBD76AEEF3431, seedA/off 4834366D19271E5F -- main's own values, ALL PASS -- the name itself moves nothing."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp board/ticker",
       "visual: capture across the 1200 seam"
      ],
      "requirement": "The board and the ticker print the coined name; a realm's board name is identical on round 4's last frame and round 5's first.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "lapse_polity_name / polity_name_of / the board's name cell read polity_name first, the seat's name only as the no-tongue fallback (history_lapse.cpp). realm_identity.lua: 64 of 64 names identical across the 1200 seam, 53 of 53 across 1660; captures _1 / _2 and _4 / _5."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp capital fold",
       "visual: capture at a capital_moved line"
      ],
      "requirement": "A UI-side capital-at-year fold from founded + capital_moved places the seat dot and the 1200 burst at the capital; after 'X re-seats itself at Y' the dot is at Y and the name is unchanged.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "polity_capital_moves / polity_capital_at baked at record time; rest_seat widened to founded + inherited; the seat dot, the 1200 burst and the marks read it. realm_identity.lua: a capital_moved at 1496 moves 1 seat and renames 0; capture _3_round5_reseat (the ticker's \"Tairairuth Marai re-seats itself at Maluam Tutu Reach\", the board name unchanged)."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_sim.cpp resume; era_timelapse.hpp",
       "visual: capture of round 5's opening ticker"
      ],
      "requirement": "The resume re-emit becomes a ticker-silent inherited kind (region = q.capital, dated start_year, append-only on the enum, in the envelope bump); round 5's ticker at 1200 shows no 'A realm rises' for a realm on round 4's final board; the capital is still stated by the record.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "lapse_event_kind::inherited (20) noted at the resume in place of founded (history_sim.cpp), ticker-silent (draw_lapse_ticker's narrated filter), in save_game.hpp's v22 list. realm_identity.lua: round 5's open 0 founded / 68 inherited; realm_names_check N3: 46 / 45 inherited at the two resumed opens, none rising twice; capture _2_round5_open's ticker shows re-seats and falls and no rises."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp prose",
       "doc: docs/generation/CIVILISATION.md"
      ],
      "requirement": "An ownerless founding reads 'A people settle at X'; CIVILISATION.md § A realm's name matches the built rule.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "lapse_event_prose: a founded with no polity reads \"A people settle at X.\", else \"<name> rises at X.\"; CIVILISATION.md sec A realm's name matches the built rule (its fold sentence now names the resume's inherited restatement beside founded and capital_moved)."
     },
     {
      "id": "R6",
@@ -7914,7 +7914,7 @@
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click across the 1200 and 1660 seams.",
-     "notes": "",
+     "notes": "OWES Ben's live click across the 1200 and 1660 seams (2026-09-25); the verify world's board names to look for: Theimai, Kakaira Kaikai, Rate.",
      "result_metric": ""
     }
    ]
@@ -7933,46 +7933,46 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: nation_generation.cpp Pass 5",
-      "headless: a harness row or verify script (name it)"
+      "headless: tools/verify/realm_names_check.cpp (every nation with a founding realm carries that realm's name verbatim; absorbed realms listed once)"
      ],
      "requirement": "polity_names on nation_params indexed by polity id; Pass 5 follows the fold representative through the Pass 2c merge and the nation inherits its founding realm's coined name verbatim, coining only for ownerless ground; merge rule A: the absorber keeps its name. (item-spanning gate: a headless check that every nation with a founding realm carries that realm's name)",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "nation_params::polity_names (by polity id, polity_names_at_close span by span); merge_undersized_nations records absorbed_into and the compaction; Pass 5 coins for every nation as before (name_rng untouched) then copies the surviving seed's realm name over it (merge rule A). Gate: tools/verify/realm_names_check.cpp (NEW, build_lua_harness) seed 0 ALL PASS -- 38 nations, all of a realm, every one carrying its realm's coined name verbatim; 7 absorbed realms listed, none both own and absorbed, none twice; 0 ownerless."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: presentation.cpp nation_colour; app.cpp Begin/load",
       "visual: capture of the seat map and the first in-game frame"
      ],
      "requirement": "A per-world nation -> colour-slot table is set at Begin and on load from the saved report and read inside nation_colour (hash as fallback), so the national border band, the seat map, the loading-screen carve and the Ages view share the wizard's colours; the first in-game frame's band colour equals the seat map's.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "palette::set_nation_colour_table / realm_colour (presentation.cpp); app::pin_nation_colours_from_report at Begin (adopt and cold) and on load -- the realm table from the wizard's last landed round, else derived from the report over polity_identity's walk on the home_grid raster (the report's tiles.gw/gh read 180 x 84 against a 261 x 121 body and pinned nothing: fixed this session); the carve reads the tap's nation_polity; the Ages view reads realm_colour. Cold verify world: \"43 of 43 nations\" pinned, 679 realms over 3 records. Capture seat_00_canvas_row1 (seat_pick.lua): the seat map's territories carry the wizard's colours -- the same families in the same places as realm_identity_6_round6_close. No verify script reaches the first in-game frame: its band is owed with the live click (R5). FIX ROUND (2026-09-25, the cold review): (a) derive_realm_colours rasters and folds EACH record over its own regions (lapse_from_report cuts the anchors to region_stride), so a load colours a nation as the round that watched it did -- the derivation reads \"679 of 679 realms over 3 record(s), 12 families, 261 x 121 raster, 2623 regions at the last close\", 43 of 43 nations pinned, seat_pick.lua PASS and the capture re-eyeballed; (b) a load never trusts a realm table the wizard left behind from another world: pin_realm_colours_from_wizard(report) checks the last landed round's record against the report's own time-lapse (start year, span, region count, list sizes, the realm name table) and derives on a mismatch; Begin sets the carve's realm colours only on the wait-on-round-6 and adopt paths, never a cold build after a wizard run; (c) where the wizard's table and the derivation both exist, the adopt path counts the realms whose colours differ and prints \"[identity] the wizard's realm table against the report's derivation: N of M realms differ\" -- R2's equality measured, not asserted (0 expected on a full round 4 -> 5 -> 6 session; --autostart-adopt runs round 6 alone, so its round-6 table is unpinned and the count there is informative, not a failure)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: seat_screen.cpp",
       "visual: capture of a card with an absorbed realm"
      ],
      "requirement": "The seat card lists the realms a nation absorbed under its name, cites the region for its city, and the nation-count line explains merges.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "seat_screen.cpp: the nation line names the realm and lists what it absorbed (\"Nation: Rethma Meruta ... Absorbed under the floor: Tairairuth Marai.\" on capture seat_00_canvas_row1) or says the ground had no realm; the HQ line cites the region (\"Taima (in Maluam Tutu Reach Reach)\" -- the doubled quarter word is the settlement's own name for that span-founded region, not the card's); the header reads \"43 nations: 43 realms of the close, 10 realms absorbed under the floor, 0 of ground no realm held.\""
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism x2; begin_adopts_check.js"
      ],
      "requirement": "Digests: the nation name change moves any digest that folds names — recorded for the sprint's re-bless; world_determinism twice bit-identical to itself; state hash adopt == cold.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "world_determinism twice ALL PASS, bit-identical to itself (seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F on both runs); against main (5BA2EE1EE993C201 / 4F7BBD76AEEF3431 / 4834366D19271E5F) the two ON digests moved and OFF did not; A/B with the inheritance line off: with kepler_np.polity_names left empty (one line), seedA/on 5BA2EE1EE993C201, seedB/on 4F7BBD76AEEF3431, seedA/off 4834366D19271E5F -- main's own values, ALL PASS -- the name inheritance is the only mover, recorded for the sprint's re-bless. begin_adopts_check.js: 12 of 12 PASS, adopted == cold state hash (BB0457AAD5205D34). FIX ROUND (2026-09-25, on the merged tree with main at 1889f642): world_determinism twice ALL PASS, bit-identical run to run and unmoved by the fix round (seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F -- the re-bless reading stands); begin_adopts_check.js 12 of 12 PASS, adopted == cold BB0457AAD5205D34 (143 s / 147 s); save_envelope_roundtrip and save_roundtrip PASS with both name tables at the record's tail (BL-1106's three, then BL-1088's polity_name); realm_names_check seed 0 ALL PASS (38 of 38 nations named by their realm, 7 absorbed listed)."
     },
     {
      "id": "R5",
@@ -7981,7 +7981,7 @@
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: pick the realm ranked #1 on round 6's final board — on the seat map its territory carries the same colour and the nation line its name; the band on the first in-game frame has not flipped.",
-     "notes": "",
+     "notes": "OWES Ben's live click (2026-09-25): the realm ranked #1 on round 6's final board (Theimai on the verify world) on the seat map, and the first frame's band.",
      "result_metric": ""
     }
    ]

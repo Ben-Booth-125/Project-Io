@@ -212,18 +212,27 @@ inline constexpr uint32_t save_game_magic =
 ///     insertion, so a v21 stream misreads everything from `abundance` on.
 ///   - EVENT KINDS appended to `lapse_event_kind` (each moves `count` and so
 ///     the event-kind range check; no field changes width):
-///     `province_bought` (BL-1096, a native bought rather than taken) and
-///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier);
-///     later sprint-47 lanes append theirs under this same number.
-///   - THE NAME TABLE AT THE TAIL OF EVERY TIME-LAPSE RECORD (BL-1106, the
-///     ticker names civilisations and creeds): `era_timelapse::civilisation_name`
-///     and `::creed_name` (two string lists, index order) and `::polity_creed`
-///     (i32 per polity id, -1 = none; any value under -1 is corrupt), written
-///     by `w_timelapse` after the event list in all three records and read
-///     back in the same place by `r_timelapse`. Record-only: read by the
-///     ticker, by nothing at world setup.
+///     `province_bought` (BL-1096, a native bought rather than taken),
+///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier) and
+///     `inherited` (BL-1088, a resumed span restating a living realm at its
+///     capital, ticker-silent; replaces the `founded` re-emit on the resume
+///     path only); later sprint-47 lanes append theirs under this same number.
+///   - THE NAME TABLES AT THE TAIL OF EVERY TIME-LAPSE RECORD, in this order,
+///     written by `w_timelapse` after the event list in all three records and
+///     read back in the same place by `r_timelapse`:
+///       1. `era_timelapse::civilisation_name` and `::creed_name` (two string
+///          lists, index order) and `::polity_creed` (i32 per polity id, -1 =
+///          none; any value under -1 is corrupt) — BL-1106, the ticker names
+///          civilisations and creeds. Record-only: read by the ticker, by
+///          nothing at world setup.
+///       2. `era_timelapse::polity_name` (BL-1088, the realm name table): one
+///          string per polity id.
+///   - THE POLITY FOLD'S RECORD on every `generation_report::body_entry`
+///     (BL-1089): five flat arrays after the three time-lapses — nation ids,
+///     each nation's founding realm, and the absorbed-realm ranges — read by
+///     the seat card and the per-world nation -> colour table.
 /// A v21 stream is refused whole on the same strict-equality contract.
-inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened
+inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened, inherited, realm names, the polity fold's record
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

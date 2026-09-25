@@ -2,6 +2,7 @@
 
 #include "world/components.hpp"    // terrain_landform, for the packed terrain raster (BL-915)
 #include "world/era_timelapse.hpp"
+#include "world/polity_identity.hpp" // the identity a realm carries by id (BL-1087/1088)
 
 #include <cstddef>
 #include <cstdint>
@@ -350,6 +351,48 @@ struct history_lapse
     /// it, so a row and its territory cannot disagree.
     std::vector<int32_t> polity_slot;
 
+    // --- Identity across the rounds (BL-1087/BL-1088; Ben, 2026-09-24) ------
+    //
+    // STARTUP.md § Identity across the rounds: a realm is one thing from the
+    // round that founds it to the nation Begin makes of it, and the map says
+    // so by carrying colour, shade, seat and name BY ID rather than
+    // re-deriving any of them per round. The pure half lives in
+    // world/polity_identity.hpp; these are its inputs and outputs on this
+    // record.
+
+    /// True on the Culture round, whose `owner` is a CULTURE index and whose
+    /// fill is the lineage palette. The lineage palette is built for every
+    /// lapse now (the polity rounds read it for the wedge and the base), so
+    /// this flag, not `culture_colour.empty()`, says which id space an owner
+    /// is in.
+    bool owners_are_cultures = false;
+
+    /// Culture -> its family's compact WEDGE index (`lineage_wedges_of`), and
+    /// the wedge count. The polity palette keys off the wedge; -1 unknown.
+    std::vector<int32_t> culture_wedge;
+    int family_count = 0;
+
+    /// Polity -> its founding family's wedge, derived UI-side at record time:
+    /// the plurality people of its seat at its first recorded year, through
+    /// `culture_wedge`. -1 where the record says nothing (fallback wedge 0).
+    std::vector<int32_t> polity_wedge;
+
+    /// THE PINS the round before this one handed over (`lapse_pins_for_successor`):
+    /// set at launch, set again at landing, read by `assign_polity_colours`.
+    /// `has_pins` false on a round with nothing behind it.
+    polity_pins pins;
+    bool        has_pins = false;
+
+    /// The assignment's other outputs: the shade ratchet's named moments, the
+    /// carried rungs, the seats, and the instrument counts. `polity_slot`
+    /// above IS `identity.slot`, kept as the field every reader already names.
+    polity_identity identity;
+
+    /// THE CAPITAL FOLD (BL-1088): every founding, inherited seat and
+    /// re-seating as a move, baked at record time; `lapse_polity_capital`
+    /// reads the seat at a year off it. The NAME never follows it.
+    std::vector<polity_capital_move> capital_moves;
+
     // --- The baked terrain base (BL-915) -------------------------------------
     // Run-merged ONCE, in tile units, when the record lands. Per frame the map
     // only scales and emits these; nothing under the fill is re-merged.
@@ -467,15 +510,37 @@ struct history_lapse
 void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t packed_len,
                           const uint16_t* terrain = nullptr, std::size_t terrain_len = 0);
 
-/// Greedy-colour the polities over their adjacency graph so no two neighbours
-/// share a palette slot (BL-915). Called by `finish_history_lapse`; exposed so a
-/// sibling item can re-run it with a HUE FAMILY per polity.
-///
-/// @param hue_family Optional, one entry per polity: polities in the same family
-///                   are assigned slots from the same band of the palette where
-///                   the adjacency constraint allows. nullptr = no families; the
-///                   walk hands out the lowest free slot.
-void assign_polity_colours(history_lapse& h, const std::vector<int32_t>* hue_family = nullptr);
+/// Assign every polity its identity slot (BL-915; pinned and family-wedged by
+/// BL-1087): the pins the predecessor handed over are kept, a clash between
+/// two pinned realms this record makes neighbours re-slots the smaller people
+/// share, and the rest are coloured greedily from their founding family's
+/// wedge so no two neighbours share a swatch. Also bakes the shade ratchet's
+/// moments, the founding families and the capital fold. Called by
+/// `finish_history_lapse`; `world/polity_identity.hpp` holds the rule.
+void assign_polity_colours(history_lapse& h);
+
+/// The pins @p prev hands the round after it (BL-1087): every slot it assigned
+/// (dead realms' too, so their colours stay retired), the rung each realm
+/// reached at its close, and the ground its dead last held. Empty pins when
+/// @p prev's owners are cultures — nothing is inherited across that boundary —
+/// and empty when @p prev is not derived, since the slots are the derivation's:
+/// the app derives a landed record on demand before asking
+/// (`derive_lapse_for_handover`, startup_screens.cpp), so a round the player
+/// never drew still hands its successor the identity off its record.
+polity_pins lapse_pins_for_successor(const history_lapse& prev);
+
+/// Shade rungs @p polity carries at @p year on @p h (BL-1087 R8).
+int lapse_polity_rung(const history_lapse& h, uint16_t polity, int year);
+
+/// A realm's NAME as this surface prints it (BL-1088): the record's coined
+/// name, else its founding seat's region name (the pre-BL-1088 rule, kept as
+/// the fallback for a tongue that could not coin). Public for the verify API.
+std::string lapse_polity_name(const history_lapse& h, uint16_t polity);
+
+/// Where @p polity's seat stands at @p year (BL-1088): the capital fold over
+/// `founded` / `inherited` / `capital_moved`, else its first region; -1 for a
+/// polity the record never shows. Public for the verify API.
+int32_t lapse_polity_capital(const history_lapse& h, uint16_t polity, int year);
 
 /// Derive the lineage palette (BL-919) from the culture tree.
 ///
@@ -581,8 +646,9 @@ std::vector<history_lapse::civ_mark> lapse_civ_marks_at_close(const history_laps
 /// Culture round, a polity's identity slot elsewhere. Public so one round can
 /// hand its final frame to the next as colours rather than as indices into a
 /// palette that round does not have (the carry above). ImU32 layout, kept as
-/// uint32_t so this header stays off imgui.
-uint32_t lapse_owner_colour(const history_lapse& h, uint16_t owner);
+/// uint32_t so this header stays off imgui. @p year applies the shade ratchet
+/// as it stood then (BL-1087 R8); the default is the record's final state.
+uint32_t lapse_owner_colour(const history_lapse& h, uint16_t owner, int year = 0x7FFFFFFF);
 
 /// The ordered, capped top-16 board.
 ///
