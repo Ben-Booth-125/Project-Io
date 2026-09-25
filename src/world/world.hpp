@@ -72,6 +72,24 @@ struct logistics_flood_field
     std::vector<char>  crossed;           ///< Best path anchor -> cell touches ocean?
 };
 
+/// A body's NEAREST-ANCHOR FIELD (BL-1117, settle tick one): for every cell, the
+/// Logistic Point anchor nearest it and that anchor's cost, from ONE multi-source
+/// Dijkstra seeded at every anchor in `anchors`. It answers `nearest_lp_anchor`
+/// for every tile of the body at once; the per-pair loop it replaces flooded the
+/// whole body once per anchor (9,038 floods, ~90 s, on seed 0's first convoy).
+///
+/// A PURE FUNCTION of the body's tiles and of `anchors`: the edges are the flood
+/// field's own (relaxed outward from the anchor, the direction `intra_body_path`
+/// floods on a double miss), so `cost[i]` is exactly the smallest of the anchors'
+/// own flood distances to cell i, and `nearest[i]` the lowest anchor tile id at
+/// that cost (see logistics.cpp § build_lp_anchor_field for the one float case).
+struct lp_anchor_field
+{
+    std::vector<entity_id> anchors; ///< The anchor tile set it was built over, ascending.
+    std::vector<entity_id> nearest; ///< Per raster cell: the nearest anchor tile; null_entity unreached.
+    std::vector<float>     cost;    ///< Per raster cell: that anchor's cost; 1e30f unreached.
+};
+
 // ---------------------------------------------------------------------------
 // World history log (BL-208) — the append-only, serialised world log
 // ---------------------------------------------------------------------------
@@ -563,6 +581,15 @@ struct world
     /// asks this question for every tile under the cursor, and the armed-build tint asks it
     /// for the whole visible grid at once, so a per-query search would be the wrong shape.
     faithful_unordered_map<entity_id, std::vector<float>> body_reach_cost;
+
+    /// Per-body NEAREST LOGISTIC POINT ANCHOR (BL-1117) — see lp_anchor_field. A
+    /// derived cache on the same footing as the three above: built lazily by
+    /// `nearest_lp_anchor`, cleared by invalidate_logistics_caches and by
+    /// clear_derived_state, never serialised. Rebuilt in place when a caller's
+    /// anchor pool names a different anchor set than the one it was built over,
+    /// so no answer ever depends on what was cached. std::map: ordered, so a copy
+    /// or a load cannot reorder it (and it is never iterated by the sim).
+    std::map<entity_id, lp_anchor_field> lp_anchor_fields;
 
     /// Techs each corporation has EARNED, by tech id (BL-344). Per-corp, never
     /// global: two corporations research independently, and a gate that read a

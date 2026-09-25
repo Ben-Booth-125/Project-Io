@@ -13,6 +13,7 @@
 #include "world.hpp"
 
 #include <array>
+#include <chrono> // economy_step_phase_clock (BL-1117)
 #include <map>
 #include <unordered_map>
 #include <utility>
@@ -363,6 +364,34 @@ struct economy_report
 economy_report run_economy_step(world& w, const recipe_registry& reg,
                                 bool spectating = false,
                                 lp_pool_map* shared_lp_pools = nullptr);
+
+/// THE ECONOMY STEP'S PHASE CLOCK (BL-1117, settle tick one) -- REPORTED ONLY.
+/// One settle tick of the twelve cost 30-40x the others, and the lap clock
+/// (campaign_settle.hpp) put all of it inside lap 1. These stamps split
+/// `run_economy_step` by its own phases, in call order, so the settle's
+/// `[finish_campaign_world]` lines name the phase and the milliseconds.
+///
+/// DETERMINISM. The sink is the calling thread's (`thread_local`), null except
+/// while `finish_campaign_world` runs its settle; `run_economy_step` WRITES
+/// steady-clock stamps into it and nothing in `world/*` reads one back, on the
+/// BL-754 footing the lap clock already stands on. Unarmed, a phase costs one
+/// null check.
+inline constexpr int k_economy_step_phase_count = 13;
+inline constexpr const char* k_economy_step_phase_names[k_economy_step_phase_count] = {
+    "construction", "credits+contracts", "labour", "stacks+solve", "production",
+    "growth", "migration", "reflex_agency", "corp_strategic", "battles", "march",
+    "unit_upkeep", "building_upkeep" };
+
+struct economy_step_phase_clock
+{
+    /// stamps[0] at entry, stamps[i+1] after phase i: phase i is
+    /// stamps[i+1] - stamps[i].
+    std::array<std::chrono::steady_clock::time_point, k_economy_step_phase_count + 1> stamps{};
+};
+
+/// The calling thread's sink (defined beside its writer in economy_system.cpp).
+/// Armed and disarmed by `finish_campaign_world` around its settle only.
+economy_step_phase_clock*& economy_step_phase_clock_sink();
 
 // ---------------------------------------------------------------------------
 // BL-617 — the population migration pass

@@ -772,6 +772,7 @@ void clear_derived_state(world& w)
     w.astar_cost_cache.clear();
     w.logistics_flood_fields.clear();
     w.body_reach_cost.clear();
+    w.lp_anchor_fields.clear(); // BL-1117: the nearest-anchor field, same footing
 
     // The market index carries its own staleness stamps; zeroing them is what
     // makes the next `market_for_tile` rebuild rather than trust an empty index.
