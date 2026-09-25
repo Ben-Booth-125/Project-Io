@@ -1,5 +1,7 @@
 #include "hard_coded_world.hpp"
 
+#include "generation_cursor.hpp" // BL-1084: make_hard_coded_world is its stages, over one cursor
+
 #include "province.hpp"
 
 #include "body_names.hpp"
@@ -423,8 +425,8 @@ std::vector<int64_t> polity_treasuries_at_close(const std::vector<region>& regio
 }
 
 // BL-1053 -- A SPAN'S PARAMS AS THE FIXTURE KEEPS THEM. The resume pointers
-// point into the handoff struct of the span before, which is a local of
-// `make_hard_coded_world` and is freed before the fixture reaches its caller,
+// point into the handoff struct of the span before, which is a member of the
+// generation cursor (BL-1084) and is freed with it, before the fixture reaches its caller,
 // so a kept pointer is a dangling one. Every harness that re-runs a span from
 // the fixture sets its own pointers onto the fixture's own copies; the
 // captured params keep the forces, the span and the clock, and no address.
@@ -463,6 +465,20 @@ int generation_stage_count(const world_gen_config& cfg)
     if (cfg.stop_after_ancient_era || cfg.stop_after_exploration || cfg.stop_after_industrialisation)
         return 8;
     return 12;                                     // + bump 9-12: borders to finishing
+}
+
+generation_stage generation_stop_stage(const world_gen_config& cfg)
+{
+    // THE EARLIER STOP WINS, as it always did (BL-1084 keeps the order the
+    // single call's early returns had): the migration's return sat inside the
+    // settlement block, ahead of every other; the Empires stop gated the
+    // Exploration span off; the Exploration stop gated the Industrialisation
+    // span off; and the remaining returns ran in that order.
+    if (cfg.stop_after_migration)         return generation_stage::culture;
+    if (cfg.stop_after_ancient_era)       return generation_stage::empires;
+    if (cfg.stop_after_exploration)       return generation_stage::exploration;
+    if (cfg.stop_after_industrialisation) return generation_stage::industrialisation;
+    return generation_stage::tail;
 }
 
 int64_t generation_step_cost_ms(int label_index, const world_params& params)
@@ -555,58 +571,73 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
     return tiles;
 }
 
-world make_hard_coded_world(world_params params, generation_report* report,
-                            const world_gen_config& gen_cfg,
-                            generation_progress* progress,
-                            const works_registry* works,
-                            era_minus_one_fixture* fixture)
+// ===========================================================================
+// THE STAGES (BL-1084) -- make_hard_coded_world as a composition
+// ===========================================================================
+//
+// What was one 2,470-line function is six stage functions over one
+// `generation_cursor` (world/generation_cursor.hpp owns what it holds, and why
+// a copy of it resumes as its original). EVERY STAGE BODY BELOW IS THE SINGLE
+// CALL'S OWN CODE, IN ITS ORDER: each stage binds the cursor members it reads
+// to the names the code always used, so the passes, their seeds and their
+// order are untouched and the composition is byte-identical to the function it
+// replaced. What moved, and why none of it can move a byte:
+//
+//   * the lambdas the function defined (the step clock, `plan`,
+//     `record_tile_inputs`, the handoff-violation recorder) are functions of the
+//     cursor, because two stages call each of them;
+//   * the Empires span's report and fixture counters are written at the end of
+//     its own stage rather than after the two later spans -- fields neither
+//     later span writes, so no reader can see the order;
+//   * the history's close (the capital shells through the city names) is the
+//     tail's first act -- generation_cursor.hpp says why no span boundary can
+//     carry it;
+//   * the `stop_after_*` flags no longer gate a span from inside it: they
+//     choose the stage the composition runs to (`generation_stop_stage`), and
+//     `close_stopped_generation` is the ending their early returns gave.
+
+namespace {
+
+using gen_clock = generation_cursor::clock_state::clock;
+
+// --- The generation budget (BL-754) -------------------------------------
+//
+// Per-pass wall clock, REPORTED and never asserted. What a pass costs is
+// not a number any check can own: it varies with the machine, the
+// build type and what else is running. So it is measured, handed to the
+// fixture (which has no save-seam presence — see era_minus_one.hpp) and
+// printed once; nothing reads it back.
+//
+// THESE CLOCKS TOUCH NO CONTROL FLOW AND NO DIGEST. A `steady_clock` read
+// inside `world/*` is only safe while it is write-only with respect to the
+// world, and every use below is: the values land in the fixture and in one
+// fprintf, and never in a branch, a seed, a hash or a stored field. The
+// standing determinism rule forbids timing that can VARY OUTPUT, not
+// measuring how long the output took.
+int64_t ms_between(gen_clock::time_point a, gen_clock::time_point b)
 {
-    world w;
-    // BL-910 capital markets, recorded as they are placed so the pricing pass
-    // after the carve can price them (Ben, 2026-09-23 — see that pass).
-    std::vector<entity_id> capital_market_shells;
+    return std::chrono::duration_cast<std::chrono::milliseconds>(b - a).count();
+}
 
-    // --- The generation budget (BL-754) -------------------------------------
-    //
-    // Per-pass wall clock, REPORTED and never asserted. What a pass costs is
-    // not a number any check can own: it varies with the machine, the
-    // build type and what else is running. So it is measured, handed to the
-    // fixture (which has no save-seam presence — see era_minus_one.hpp) and
-    // printed once; nothing reads it back.
-    //
-    // THESE CLOCKS TOUCH NO CONTROL FLOW AND NO DIGEST. A `steady_clock` read
-    // inside `world/*` is only safe while it is write-only with respect to the
-    // world, and every use below is: the values land in the fixture and in one
-    // fprintf, and never in a branch, a seed, a hash or a stored field. The
-    // standing determinism rule forbids timing that can VARY OUTPUT, not
-    // measuring how long the output took.
-    using gen_clock = std::chrono::steady_clock;
-    const auto ms_between = [](gen_clock::time_point a, gen_clock::time_point b) {
-        return std::chrono::duration_cast<std::chrono::milliseconds>(b - a).count();
-    };
-    const gen_clock::time_point t_world_begin = gen_clock::now();
-    gen_clock::time_point t_settlement_begin = t_world_begin;
-    gen_clock::time_point t_settlement_end   = t_world_begin;
-    gen_clock::time_point t_era_end          = t_world_begin;
-
-    // Coarse progress for a caller drawing a loading screen on another thread.
-    // `bump` is the only writer and it only ever moves forward, so a reader
-    // never sees the fraction go backwards.
-    int gen_stage = 0;
+// Coarse progress for a caller drawing a loading screen on another thread.
+// `bump` is the only writer and it only ever moves forward, so a reader
+// never sees the fraction go backwards.
+//
+// --- The step plan and its clocks (BL-1072) -----------------------------
+//
+// Which captioned steps THIS run will enter, each weighted by its measured
+// Release cost, so the outer bar moves by what a step costs rather than by
+// counting steps as equals. The plan is read off the same flags the gates
+// below read; a planned span that turns out not to run just hands its
+// weight to the next step (a jump forward, never back). The per-step
+// clock beside it is REPORTED ONLY, on the BL-754 footing above.
+void publish_generation_plan(generation_cursor& c)
+{
+    generation_progress* const progress = c.progress;
+    const world_gen_config&    gen_cfg  = c.gen_cfg;
+    const world_params&        params   = c.params;
     if (progress != nullptr)
         progress->stage_count.store(generation_stage_count(gen_cfg), std::memory_order_relaxed);
-
-    // --- The step plan and its clocks (BL-1072) -----------------------------
-    //
-    // Which captioned steps THIS run will enter, each weighted by its measured
-    // Release cost, so the outer bar moves by what a step costs rather than by
-    // counting steps as equals. The plan is read off the same flags the gates
-    // below read; a planned span that turns out not to run just hands its
-    // weight to the next step (a jump forward, never back). The per-step
-    // clock beside it is REPORTED ONLY, on the BL-754 footing above.
-    std::array<int64_t, generation_stage_label_count> step_ms{};
-    int                   step_label = -1;
-    gen_clock::time_point step_begin = t_world_begin;
     if (progress != nullptr)
     {
         const bool plan_history    = !gen_cfg.stop_after_migration;
@@ -635,53 +666,207 @@ world make_hard_coded_world(world_params params, generation_report* report,
         progress->weight_now.store(0, std::memory_order_relaxed);
         progress->weight_total.store(total, std::memory_order_relaxed);
     }
-    // Enter a captioned step: close the clock on the one being left, fold its
-    // weight into the finished sum, then publish the new step's weight and
-    // caption. The inner bar is cleared FIRST, so a reader that sees the new
-    // sum never also sees the old step's full inner bar on top of it.
-    const auto enter_step = [&](int label_index) {
-        const gen_clock::time_point now = gen_clock::now(); // reported only
-        if (step_label >= 0)
-        {
-            step_ms[static_cast<std::size_t>(step_label)] += ms_between(step_begin, now);
-            if (progress != nullptr)
-                progress->ms_step[static_cast<std::size_t>(step_label)].store(
-                    static_cast<int32_t>(step_ms[static_cast<std::size_t>(step_label)]),
-                    std::memory_order_relaxed);
-        }
-        step_label = label_index;
-        step_begin = now;
-        if (progress == nullptr) return;
-        progress->sub_total.store(0, std::memory_order_relaxed);
-        progress->sub_progress.store(0, std::memory_order_relaxed);
-        progress->weight_done.store(progress->weight_done.load(std::memory_order_relaxed)
-                                        + progress->weight_now.load(std::memory_order_relaxed),
-                                    std::memory_order_relaxed);
-        progress->weight_now.store(generation_step_cost_ms(label_index, params),
-                                   std::memory_order_relaxed);
-        progress->label.store(label_index, std::memory_order_relaxed);
-    };
-    // Progress WITHIN a step is reported by the pass itself, through
-    // `generation_progress::report_sub` (generate_nations, generate_roads,
-    // stamp_history_roads; the spans through the year counter).
+}
 
-    const auto bump = [&](int label_index) {
-        enter_step(label_index);
-        if (progress == nullptr) return;
-        progress->stage.store(++gen_stage, std::memory_order_relaxed);
-    };
-    bump(0);
+// Enter a captioned step: close the clock on the one being left, fold its
+// weight into the finished sum, then publish the new step's weight and
+// caption. The inner bar is cleared FIRST, so a reader that sees the new
+// sum never also sees the old step's full inner bar on top of it.
+void enter_step(generation_cursor& c, int label_index)
+{
+    generation_cursor::clock_state& k        = c.clocks;
+    generation_progress* const      progress = c.progress;
+    const world_params&             params   = c.params;
+    const gen_clock::time_point now = gen_clock::now(); // reported only
+    if (k.step_label >= 0)
+    {
+        k.step_ms[static_cast<std::size_t>(k.step_label)] += ms_between(k.step_begin, now);
+        if (progress != nullptr)
+            progress->ms_step[static_cast<std::size_t>(k.step_label)].store(
+                static_cast<int32_t>(k.step_ms[static_cast<std::size_t>(k.step_label)]),
+                std::memory_order_relaxed);
+    }
+    k.step_label = label_index;
+    k.step_begin = now;
+    if (progress == nullptr) return;
+    progress->sub_total.store(0, std::memory_order_relaxed);
+    progress->sub_progress.store(0, std::memory_order_relaxed);
+    progress->weight_done.store(progress->weight_done.load(std::memory_order_relaxed)
+                                    + progress->weight_now.load(std::memory_order_relaxed),
+                                std::memory_order_relaxed);
+    progress->weight_now.store(generation_step_cost_ms(label_index, params),
+                               std::memory_order_relaxed);
+    progress->label.store(label_index, std::memory_order_relaxed);
+}
+
+// Progress WITHIN a step is reported by the pass itself, through
+// `generation_progress::report_sub` (generate_nations, generate_roads,
+// stamp_history_roads; the spans through the year counter).
+void bump(generation_cursor& c, int label_index)
+{
+    enter_step(c, label_index);
+    if (c.progress == nullptr) return;
+    c.progress->stage.store(++c.clocks.gen_stage, std::memory_order_relaxed);
+}
+
+// Index into the shared prototype body set (planetology.hpp). The wizard's
+// live preview walks the same list with the same seeds and the same derived
+// orbit, so the charts a player decided against describe exactly this world.
+// Continents/Drift (BL-210 first slice): a sibling pass reading Engine's
+// already-computed mobile_lid/theta, run BEFORE the tile pipeline. Its
+// history merges into the body's biography (chain_stage::engine lines);
+// its height bias feeds Pass 1 in place of pure noise. `plan` therefore
+// needs the body's grid dims and an out-param for the bias.
+// `convergent_out` is optional: only Kepler's Pass 5 currently reads it, and
+// the other bodies have no mountain-bearing terrain worth steering.
+// `body_id` is the world entity this plan describes. It is threaded in so the
+// report entry carries an IDENTITY (BL-257) rather than leaving consumers to
+// match a report entry to a world body by its display name.
+planetology_state plan_body(generation_cursor& c, int proto_index, entity_id body_id,
+                            int gw, int gh, std::vector<float>& bias_out,
+                            std::vector<uint8_t>* convergent_out = nullptr,
+                            continent_state* cs_out = nullptr)
+{
+    const world_params&      params = c.params;
+    generation_report* const report = c.report;
+    const body_naming&       naming = c.naming;
+    const resolved_world&    rw     = c.rw;
+    body_inputs in = prototype_body(proto_index);
+    // The generated name, not the prototype's placeholder literal — the
+    // chain's biography lines quote it (BL-257). `naming` outlives `in`.
+    in.name = naming.bodies[static_cast<std::size_t>(proto_index)].c_str();
+    if (in.is_homeworld)
+        in.orbit_au = rw.home_orbit_au;
+    // A moon travels with its planet. The homeworld's orbit is DERIVED from
+    // the star, so a moon left at its authored 1.00 AU would sit somewhere
+    // else in the system entirely — computing its instellation, and now its
+    // eclipse geometry, against a star it is not actually that far from.
+    // The prototype set's only moon (Selene) orbits the homeworld.
+    else if (in.parent_mass_earths > 0.0f)
+        in.orbit_au = rw.home_orbit_au;
+    const uint32_t body_seed = params.seed ^ prototype_body_seed(proto_index);
+    planetology_state st = run_planetology(in, rw.params, body_seed);
+
+    continent_state cs = run_continents(st, gw, gh, body_seed ^ 0xC0117E57u);
+    st.history.insert(st.history.end(),
+                      std::make_move_iterator(cs.history.begin()),
+                      std::make_move_iterator(cs.history.end()));
+    cs.history.clear(); // moved-from; the biography owns these lines now.
+    std::stable_sort(st.history.begin(), st.history.end(),
+        [](const history_event& a, const history_event& b)
+        { return a.years_before_epoch > b.years_before_epoch; });
+    bias_out = cs.height_bias;
+    if (convergent_out) *convergent_out = cs.convergent;
+    // BL-765: Pass 6's Life phase asks the PLATE SET where a tile sat when
+    // its fossils formed, so the whole continents result has to reach
+    // generate_body_tiles, not just the two per-tile masks derived from it.
+    // Copied rather than referenced because `cs` is moved into the report
+    // below when one is being written.
+    if (cs_out) *cs_out = cs;
+
+    if (report)
+    {
+        // The pre-drawdown twin, for the History ledger's formed-against-left
+        // chart. Drawdown is the chain's last act and consumes no randomness,
+        // so re-running with the dial at zero yields the same world minus its
+        // industrial history rather than a different roll. Continents are not
+        // re-run — the twin is read for its endowment only.
+        planetology_params undrawn = rw.params;
+        undrawn.drawdown = 0.0f;
+        report->bodies.push_back(generation_report::body_entry{
+            in.name, body_id, in.is_homeworld, st,
+            run_planetology(in, undrawn, body_seed), std::move(cs) });
+    }
+    return st;
+}
+
+// Stamp the tile pass's own arguments onto the body's report entry (BL-303).
+// Deliberately recorded at the CALL SITE rather than derived later: the
+// homeworld's seed is chosen by the acceptance gate, and the convergent mask is
+// passed for the homeworld alone, so any attempt to reconstruct these from
+// world_params would be a second implementation waiting to disagree with this
+// one. The Generation Ledger replays the pass from exactly these.
+void record_tile_inputs(generation_cursor& c, entity_id body_id, uint32_t tile_seed,
+                        int gw, int gh, bool used_convergent)
+{
+    generation_report* const report         = c.report;
+    const float              deposit_scalar = c.deposit_scalar;
+    if (!report)
+        return;
+    for (generation_report::body_entry& be : report->bodies)
+        if (be.id == body_id)
+        {
+            be.tiles = generation_report::body_entry::tile_inputs{
+                true, tile_seed, deposit_scalar, gw, gh, used_convergent };
+            break;
+        }
+}
+
+// BL-969: THE VALIDATOR RUNS HERE, NOT ONLY IN A HARNESS. Until
+// this line both validators were thorough and called from two
+// harnesses only, so the shipped path folded the struct and
+// trusted it -- GENERATION_STRATEGY.md § What crosses each handoff
+// says "a validator checks them rather than a reader trusting the
+// sentence", and a check that runs off the shipped path is the
+// sentence. Against `kepler_creeds`, the live table the fold read,
+// so the copy in the struct and the table consumers still read
+// are proven to agree at the fold.
+//
+// A violation is RECORDED, never repaired: onto the report so a
+// harness can assert it stays false; one line to stderr so a
+// release build is not silent; an assert so a debug build stops
+// on it. Generation continues on the value as folded -- there is
+// no "fixed" value to substitute, and inventing one here would be
+// exactly the clamp this layer refuses.
+void record_handoff_violation(generation_cursor& c, const char* which, const std::string& why)
+{
+    generation_report* const report = c.report;
+    const std::string msg = std::string(which) + ": " + why;
+    if (report != nullptr)
+    {
+        report->handoff_invalid = true;
+        if (!report->handoff_violation.empty()) report->handoff_violation += "; ";
+        report->handoff_violation += msg;
+    }
+    std::fprintf(stderr, "make_hard_coded_world: handoff validator failed -- %s\n",
+                 msg.c_str());
+    assert(false && "a handoff validator failed on the shipped path (BL-969)");
+}
+
+// ---------------------------------------------------------------------------
+// STAGE 1 -- THE LIFE GATE (bumps 0-5): the star, the system, the homeworld's
+// tiles with their deposits, its rivers. Created here, in this order: the
+// player entity, Helios, Cinder (and its tiles), Kepler (and its tiles).
+// Selene and Pallas are the tail's.
+// ---------------------------------------------------------------------------
+void run_life_gate(generation_cursor& c)
+{
+    world&                   w       = c.w;
+    const world_params&      params  = c.params;
+    generation_report* const report  = c.report;
+    const world_gen_config&  gen_cfg = c.gen_cfg;
+
+    // The clocks (BL-754, BL-1072): reported only.
+    c.clocks.world_begin      = gen_clock::now();
+    c.clocks.settlement_begin = c.clocks.world_begin;
+    c.clocks.settlement_end   = c.clocks.world_begin;
+    c.clocks.era_end          = c.clocks.world_begin;
+    c.clocks.step_begin       = c.clocks.world_begin;
+    publish_generation_plan(c);
+    bump(c, 0);
 
     // The resource-abundance multiplier every body's deposit pass is scaled by.
     // At the default `standard` tier this is 1.0f, so a default-params world is
     // bit-identical to the pre-BL-114 generation.
-    const float deposit_scalar = deposit_scalar_for(params.abundance, gen_cfg);
+    c.deposit_scalar = deposit_scalar_for(params.abundance, gen_cfg);
+    const float deposit_scalar = c.deposit_scalar;
 
     // The system's catalogue (BL-257). Coined from one tongue, before anything
     // else runs — the planetology chain writes body names into the biography
     // prose it emits, so a name decided later would leave that prose stale.
     // See body_names.hpp for the register rule.
-    const body_naming naming = generate_body_names(params.seed);
+    c.naming = generate_body_names(params.seed);
+    const body_naming& naming = c.naming;
 
     // ---------------------------------------------------------------------
     // Planetology (BL-167). A body-level sibling pass that runs BEFORE the
@@ -695,7 +880,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // This is where reject-and-reroll happens: the draw repeats, with the attempt
     // index folded in, until the homeworld clears the strict Earth-like floor. It
     // stays a pure function of (preferences, seed).
-    const resolved_world rw = resolve_preferences(params.preferences, params.seed);
+    c.rw = resolve_preferences(params.preferences, params.seed);
+    const resolved_world& rw = c.rw;
 
     if (report)
     {
@@ -706,90 +892,6 @@ world make_hard_coded_world(world_params params, generation_report* report,
         report->bodies.clear();
         report->stage_lines.clear();
     }
-    // Index into the shared prototype body set (planetology.hpp). The wizard's
-    // live preview walks the same list with the same seeds and the same derived
-    // orbit, so the charts a player decided against describe exactly this world.
-    // Continents/Drift (BL-210 first slice): a sibling pass reading Engine's
-    // already-computed mobile_lid/theta, run BEFORE the tile pipeline. Its
-    // history merges into the body's biography (chain_stage::engine lines);
-    // its height bias feeds Pass 1 in place of pure noise. `plan` therefore
-    // needs the body's grid dims and an out-param for the bias.
-    // `convergent_out` is optional: only Kepler's Pass 5 currently reads it, and
-    // the other bodies have no mountain-bearing terrain worth steering.
-    // `body_id` is the world entity this plan describes. It is threaded in so the
-    // report entry carries an IDENTITY (BL-257) rather than leaving consumers to
-    // match a report entry to a world body by its display name.
-    auto plan = [&](int proto_index, entity_id body_id, int gw, int gh,
-                    std::vector<float>& bias_out,
-                    std::vector<uint8_t>* convergent_out = nullptr,
-                    continent_state* cs_out = nullptr) {
-        body_inputs in = prototype_body(proto_index);
-        // The generated name, not the prototype's placeholder literal — the
-        // chain's biography lines quote it (BL-257). `naming` outlives `in`.
-        in.name = naming.bodies[static_cast<std::size_t>(proto_index)].c_str();
-        if (in.is_homeworld)
-            in.orbit_au = rw.home_orbit_au;
-        // A moon travels with its planet. The homeworld's orbit is DERIVED from
-        // the star, so a moon left at its authored 1.00 AU would sit somewhere
-        // else in the system entirely — computing its instellation, and now its
-        // eclipse geometry, against a star it is not actually that far from.
-        // The prototype set's only moon (Selene) orbits the homeworld.
-        else if (in.parent_mass_earths > 0.0f)
-            in.orbit_au = rw.home_orbit_au;
-        const uint32_t body_seed = params.seed ^ prototype_body_seed(proto_index);
-        planetology_state st = run_planetology(in, rw.params, body_seed);
-
-        continent_state cs = run_continents(st, gw, gh, body_seed ^ 0xC0117E57u);
-        st.history.insert(st.history.end(),
-                          std::make_move_iterator(cs.history.begin()),
-                          std::make_move_iterator(cs.history.end()));
-        cs.history.clear(); // moved-from; the biography owns these lines now.
-        std::stable_sort(st.history.begin(), st.history.end(),
-            [](const history_event& a, const history_event& b)
-            { return a.years_before_epoch > b.years_before_epoch; });
-        bias_out = cs.height_bias;
-        if (convergent_out) *convergent_out = cs.convergent;
-        // BL-765: Pass 6's Life phase asks the PLATE SET where a tile sat when
-        // its fossils formed, so the whole continents result has to reach
-        // generate_body_tiles, not just the two per-tile masks derived from it.
-        // Copied rather than referenced because `cs` is moved into the report
-        // below when one is being written.
-        if (cs_out) *cs_out = cs;
-
-        if (report)
-        {
-            // The pre-drawdown twin, for the History ledger's formed-against-left
-            // chart. Drawdown is the chain's last act and consumes no randomness,
-            // so re-running with the dial at zero yields the same world minus its
-            // industrial history rather than a different roll. Continents are not
-            // re-run — the twin is read for its endowment only.
-            planetology_params undrawn = rw.params;
-            undrawn.drawdown = 0.0f;
-            report->bodies.push_back(generation_report::body_entry{
-                in.name, body_id, in.is_homeworld, st,
-                run_planetology(in, undrawn, body_seed), std::move(cs) });
-        }
-        return st;
-    };
-
-    // Stamp the tile pass's own arguments onto the body's report entry (BL-303).
-    // Deliberately recorded at the CALL SITE rather than derived later: the
-    // homeworld's seed is chosen by the acceptance gate, and the convergent mask is
-    // passed for the homeworld alone, so any attempt to reconstruct these from
-    // world_params would be a second implementation waiting to disagree with this
-    // one. The Generation Ledger replays the pass from exactly these.
-    auto record_tile_inputs = [&](entity_id body_id, uint32_t tile_seed,
-                                  int gw, int gh, bool used_convergent) {
-        if (!report)
-            return;
-        for (generation_report::body_entry& be : report->bodies)
-            if (be.id == body_id)
-            {
-                be.tiles = generation_report::body_entry::tile_inputs{
-                    true, tile_seed, deposit_scalar, gw, gh, used_convergent };
-                break;
-            }
-    };
 
     // Nation seeding is no longer parameterised here: generate_nations derives its own
     // seed budget from the body's habitable land area and merges on a minimum-viable
@@ -839,12 +941,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Mercury-analogue physical facts; everything else is derived by the chain.
     std::vector<float> cinder_bias;
     continent_state cinder_cs;
-    bump(1);
-    const planetology_state cinder_pl = plan(0, cinder, 180, 84, cinder_bias, nullptr, &cinder_cs);
+    bump(c, 1);
+    const planetology_state cinder_pl = plan_body(c, 0, cinder, 180, 84, cinder_bias, nullptr, &cinder_cs);
     const uint32_t cinder_tile_seed = params.seed ^ 0xC1D0001u;
     generate_body_tiles(w, cinder, 180, 84, cinder_pl.profile,
         cinder_tile_seed, deposit_scalar, &cinder_pl, nullptr, &cinder_bias, nullptr, &cinder_cs);
-    record_tile_inputs(cinder, cinder_tile_seed, 180, 84, /*used_convergent=*/false);
+    record_tile_inputs(c, cinder, cinder_tile_seed, 180, 84, /*used_convergent=*/false);
 
     // -----------------------------------------------------------------------
     // Kepler — temperate home planet (Earth analogue, ~1.0 AU)
@@ -854,7 +956,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // belts. Two installations and a market authored after tile generation.
     // -----------------------------------------------------------------------
 
-    const entity_id kepler = w.create_entity();
+    c.kepler = w.create_entity();
+    const entity_id kepler = c.kepler;
     w.bodies[kepler] = body_component{
         .name                                 = naming.bodies[1],
         .type                                 = body_type::planet,
@@ -886,10 +989,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // records its margin, and still writes its line.
     std::vector<float> kepler_bias;
     std::vector<uint8_t> kepler_convergent; // Pass 5 seeds mountain ranges along these
-    bump(2);
+    bump(c, 2);
     continent_state kepler_cs;
-    const planetology_state kepler_pl = plan(1, kepler, home_grid_width, home_grid_height,
-                                             kepler_bias, &kepler_convergent, &kepler_cs);
+    c.kepler_pl = plan_body(c, 1, kepler, home_grid_width, home_grid_height,
+                            kepler_bias, &kepler_convergent, &kepler_cs);
+    const planetology_state& kepler_pl = c.kepler_pl;
     // A non-null generation_record is requested here so the river pass below can read the
     // Pass-1 heightmap it captures; this is a pure capture (TILE_GENERATION.md § Generation
     // history hook) and does not perturb the deterministic tile surface itself.
@@ -909,19 +1013,41 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // make_hard_coded_world Kepler, tile for tile", which is precisely the
     // "the preview silently stops being the world" failure the preview's own
     // header comment warns about.
-    bump(4);
-    auto kepler_tiles = generate_body_tiles(w, kepler, home_grid_width, home_grid_height,
+    bump(c, 4);
+    c.kepler_tiles = generate_body_tiles(w, kepler, home_grid_width, home_grid_height,
         kepler_pl.profile,
         kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent,
         &kepler_cs);
-    record_tile_inputs(kepler, kepler_tile_seed, 180, 84, /*used_convergent=*/true);
+    const std::vector<entity_id>& kepler_tiles = c.kepler_tiles;
+    record_tile_inputs(c, kepler, kepler_tile_seed, 180, 84, /*used_convergent=*/true);
 
     // Rivers (BL-170) — sibling pass (BL-051 convention) over the same heightmap Pass 2
     // already thresholded; needs Kepler's ocean placement done, so it runs after
     // generate_body_tiles returns rather than being spliced into the six-pass core.
-    bump(5);
+    bump(c, 5);
     generate_rivers(w, kepler_tiles, home_grid_width, home_grid_height,
                     kepler_record.height, /*seed=*/params.seed ^ 0x52490001u);
+}
+
+// ---------------------------------------------------------------------------
+// STAGE 2 -- CULTURE (bumps 6-7): the history ladder, the creeds, the
+// migration. The Culture round's world. Its stop ending (the round's one tap
+// publish and its record) is `publish_migration_round`, which only a build
+// stopped here runs.
+// ---------------------------------------------------------------------------
+void run_culture(generation_cursor& c)
+{
+    world&                        w                 = c.w;
+    const world_params&           params            = c.params;
+    generation_report* const      report            = c.report;
+    const world_gen_config&       gen_cfg           = c.gen_cfg;
+    const entity_id               kepler            = c.kepler;
+    const planetology_state&      kepler_pl         = c.kepler_pl;
+    const std::vector<entity_id>& kepler_tiles      = c.kepler_tiles;
+    history_ladder_state&         kepler_hist       = c.kepler_hist;
+    creed_state&                  kepler_creeds     = c.kepler_creeds;
+    settlement_state&             kepler_settlement = c.kepler_settlement;
+    nation_params&                kepler_np         = c.kepler_np;
 
     // Kepler is the only body with a political layer in the prototype; its nation
     // count is derived, not authored. Selene/Cinder/Pallas stay unclaimed.
@@ -946,7 +1072,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // against exit, and nation_params_from_ladder turns that into the seed
     // budget the Voronoi pass grows from. The ladder does not narrate a map it
     // was handed — it is upstream of the map (Ben, 2026-07-30).
-    history_ladder_state kepler_hist =
+    kepler_hist =
         run_history_ladder(kepler_pl, w, kepler_tiles, home_grid_width, home_grid_height,
                            /*seed=*/params.seed ^ 0x5A11EDu);
 
@@ -957,8 +1083,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // (BL-852) — the tribal marches retired; `record_cultural_contact` reads
     // the settled map's own culture shares once settlement has run, further
     // down this function.
-    bump(6);
-    creed_state kepler_creeds =
+    bump(c, 6);
+    kepler_creeds =
         run_creeds(kepler_pl, kepler_hist, w, kepler_tiles, home_grid_width, home_grid_height,
                    /*seed=*/params.seed ^ 0xC4EED5u);
 
@@ -968,52 +1094,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // random draw — "seeding changes, expansion does not". Each region
     // inherits its nearest cradle's culture, so the pantheons the creeds pass
     // raised are now mapped onto specific ground and specific ancient deposits.
-    settlement_state kepler_settlement;
-
-    // BL-768 — THE ANCIENT ROAD RECORD, hoisted to this scope because the two
-    // passes that consume it (the road stamp, and the market carve's trade-
-    // concentration term) both run long after the block below has closed. The
-    // sim's own `history_sim_state` stays local to that block: what crosses out
-    // of it is the record, not the run.
-    std::vector<history_corridor> kepler_corridors;
-
-    // BL-898 — THE GRUDGE RECORD, hoisted for the same reason and on the same
-    // terms as the corridors above: its consumer (`seed_grudge_sentiment`) runs
-    // after the political map exists, which is long after the block below has
-    // closed. The sim's `history_sim_state` still stays local to that block —
-    // what crosses out is the record, not the run.
     //
-    // WHY IT NEEDED HOISTING AT ALL. Before this item the record crossed the
-    // pass 1 -> pass 2 handoff and died there: `grudge_between` had exactly one
-    // caller in the tree (the handoff harness) and this file never read
-    // `pass_one_output::grudges`. Carried is not consequential.
-    std::vector<grudge> kepler_grudges;
-    /// The sim's own `grudge_cap`, carried beside the record so the conversion
-    /// is a fraction of the scale that actually produced these scores rather
-    /// than of a struct default that might have moved.
-    int32_t kepler_grudge_cap = grudge_sentiment_params{}.score_full;
+    // `kepler_settlement` and the records the later stages hand forward --
+    // the ancient road record, the grudges and their cap, the region polity,
+    // the chests and the realm names -- are the cursor's; each is documented
+    // at its member in world/generation_cursor.hpp.
 
-    /// Indexed by region: which POLITY held it at the epoch. Snapshotted before
-    /// `derive_national_character` overwrites `region::nation` with the nation
-    /// index — the same field, read at the one moment it still names a polity.
-    std::vector<int> kepler_region_polity;
-
-    /// BL-975: indexed by POLITY id, the treasury each polity held at the LAST
-    /// span's close — `region::treasury` summed over the regions flying its
-    /// flag (`polity_treasuries_at_close`): Exploration's 1660 close, or the
-    /// Industrialisation span's 1960 one when that span ran (BL-1053). Empty when
-    /// neither ran, so a world without them credits nothing and every nation
-    /// starts on the floor. The corridor and grudge records above follow the
-    /// same rule: each is the last close's, replaced span by span.
-    std::vector<int64_t> kepler_polity_treasuries;
-
-    /// BL-1089: indexed by POLITY id, the realm names as the LAST span's close
-    /// left them (`polity_names_at_close`), replaced span by span on the same
-    /// rule as the chests above, so Pass 5 inherits the name the wizard's last
-    /// board printed. Empty when no span ran.
-    std::vector<std::string> kepler_polity_names;
-
-    nation_params kepler_np =
+    kepler_np =
         nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 });
     {
         // Aim the region budget at the political pass's own seed budget, so
@@ -1027,8 +1114,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
         }
         const int budget = std::max(1, kepler_land / std::max(1, kepler_np.land_tiles_per_seed));
 
-        bump(7);
-        t_settlement_begin = gen_clock::now(); // BL-754
+        bump(c, 7);
+        c.clocks.settlement_begin = gen_clock::now(); // BL-754
         // THE SIM'S OWN START YEAR, so settlement knows which foundings to hand
         // forward rather than place (BL-846). Derived from the same helper the
         // era invocation uses a hundred lines below — there is no second
@@ -1039,9 +1126,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // founded at all. `prehistory_years == 0` is exactly how the harnesses
         // that do not test the era avoid paying for it, so this path is taken
         // often and must leave the map complete.
-        const int64_t sim_start = era_minus_one_enabled(params)
-                                      ? era_minus_one_sim_params(params).start_year
-                                      : INT64_MAX;
+        c.sim_start = era_minus_one_enabled(params)
+                          ? era_minus_one_sim_params(params).start_year
+                          : INT64_MAX;
+        const int64_t sim_start = c.sim_start;
 
         // THE MIGRATION'S OWN SEED SLOT (world_params::span_seed, slot 0): the
         // Culture round's reroll bumps `span_seed[0]` and this is the only
@@ -1059,7 +1147,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                            // the campaign epoch.
                                            /*stop_year=*/world_params::settlement_stop_year,
                                            /*sim_start_year=*/sim_start);
-        t_settlement_end = gen_clock::now(); // BL-754
+        c.clocks.settlement_end = gen_clock::now(); // BL-754
 
         // THE SETTLED CELLS BECOME A HARD INPUT TO THE PROVINCE PARTITION
         // (BL-849; docs/generation/PROVINCES.md § The settled cells are a
@@ -1213,10 +1301,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // `prehistory_years == 0` caller gets) — a caller with no
         // Empires round has no coast target to hold the map still until,
         // and keeps seeing the migration's own raw end exactly as before.
-        const int64_t culture_round_end_year =
+        c.culture_round_end_year =
             sim_start != INT64_MAX
                 ? std::max(kepler_settlement.migration_end_year, sim_start)
                 : kepler_settlement.migration_end_year;
+        const int64_t culture_round_end_year = c.culture_round_end_year;
 
         // THE FOLD RUNS ON EVERY BUILD (BL-1104; Ben, 2026-09-24, R21). It sat
         // inside the stop branch below, so a full build never folded the
@@ -1232,12 +1321,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // Folded only where something will hold it: a caller with no report
         // and no stop (a harness building a bare world) would pay the fold for
         // a record nobody keeps. The world is the same either way.
-        const era_timelapse migration_lapse =
+        c.migration_lapse =
             (report != nullptr || gen_cfg.stop_after_migration)
                 ? build_migration_timelapse(kepler_settlement, kepler_creeds,
                                             colonisation_start_year,
                                             culture_round_end_year)
                 : era_timelapse{};
+        const era_timelapse& migration_lapse = c.migration_lapse;
         if (report != nullptr)
             for (generation_report::body_entry& be : report->bodies)
                 if (be.id == kepler)
@@ -1245,801 +1335,882 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     be.migration_timelapse = migration_lapse;
                     break;
                 }
+    }
+}
 
-        if (gen_cfg.stop_after_migration)
+// The Culture round's own ending (BL-871, BL-914): what a build stopped after
+// the migration hands its caller. Nothing else runs it -- a whole build never
+// publishes the migration to the tap, and its report reads the later spans.
+void publish_migration_round(generation_cursor& c)
+{
+    generation_progress* const progress               = c.progress;
+    generation_report* const   report                 = c.report;
+    const entity_id            kepler                 = c.kepler;
+    const settlement_state&    kepler_settlement      = c.kepler_settlement;
+    const int64_t              culture_round_end_year = c.culture_round_end_year;
+    const era_timelapse&       migration_lapse        = c.migration_lapse;
+
+    // BL-914: round 3 gets the same tap round 4 does. `run_settlement`
+    // itself is not instrumented (out of this item's files), so this is
+    // ONE publish of the finished migration record rather than a
+    // growing one — but it still lands here, on the worker thread,
+    // before `make_hard_coded_world` returns and long before the
+    // std::async future resolves on the app side. So the renderer's
+    // playhead can start moving as soon as this publish happens rather
+    // than waiting for the future AND the report-to-lapse conversion
+    // both to finish, which is the whole gap this item closes.
+    if (progress != nullptr && progress->lapse_tap != nullptr)
+    {
+        // Geometry alongside ownership, same reasoning as round 4's
+        // per-founding publish (history_sim.cpp): the renderer cannot
+        // draw a single tile without a region position.
+        std::vector<int32_t>     tap_region_col;
+        std::vector<int32_t>     tap_region_row;
+        std::vector<std::string> tap_region_name;
+        tap_region_col.reserve(kepler_settlement.regions.size());
+        tap_region_row.reserve(kepler_settlement.regions.size());
+        tap_region_name.reserve(kepler_settlement.regions.size());
+        for (const region& r : kepler_settlement.regions)
         {
-            // BL-914: round 3 gets the same tap round 4 does. `run_settlement`
-            // itself is not instrumented (out of this item's files), so this is
-            // ONE publish of the finished migration record rather than a
-            // growing one — but it still lands here, on the worker thread,
-            // before `make_hard_coded_world` returns and long before the
-            // std::async future resolves on the app side. So the renderer's
-            // playhead can start moving as soon as this publish happens rather
-            // than waiting for the future AND the report-to-lapse conversion
-            // both to finish, which is the whole gap this item closes.
-            if (progress != nullptr && progress->lapse_tap != nullptr)
-            {
-                // Geometry alongside ownership, same reasoning as round 4's
-                // per-founding publish (history_sim.cpp): the renderer cannot
-                // draw a single tile without a region position.
-                std::vector<int32_t>     tap_region_col;
-                std::vector<int32_t>     tap_region_row;
-                std::vector<std::string> tap_region_name;
-                tap_region_col.reserve(kepler_settlement.regions.size());
-                tap_region_row.reserve(kepler_settlement.regions.size());
-                tap_region_name.reserve(kepler_settlement.regions.size());
-                for (const region& r : kepler_settlement.regions)
-                {
-                    tap_region_col.push_back(r.col);
-                    tap_region_row.push_back(r.row);
-                    tap_region_name.push_back(r.name);
-                }
-                progress->lapse_tap->publish_regions(tap_region_col, tap_region_row,
-                                                     tap_region_name);
-                progress->lapse_tap->publish(
-                    migration_lapse.changes, migration_lapse.culture_changes,
-                    migration_lapse.events,
-                    static_cast<int32_t>(culture_round_end_year));
-            }
-
-            if (report)
-            {
-                report->prehistory_years     = culture_round_end_year
-                                              - colonisation_start_year;
-                report->prehistory_battles   = 0;   // The migration is a diffusion, not a
-                report->prehistory_conquests = 0;   // contest — COLONISATION.md owns why
-                report->prehistory_foundings = static_cast<int64_t>(kepler_settlement.regions.size());
-                for (generation_report::body_entry& be : report->bodies)
-                    if (be.id == kepler)
-                    {
-                        be.settlement           = kepler_settlement;
-                        be.prehistory_timelapse = migration_lapse;
-                        break;
-                    }
-            }
-            return w;
+            tap_region_col.push_back(r.col);
+            tap_region_row.push_back(r.row);
+            tap_region_name.push_back(r.name);
         }
-
-        // ------------------------------------------------------------------
-        // The year-tick sim, wired into generation (Ben, 2026-08-12).
-        //
-        // run_settlement founds regions and stops. Below the industrial era
-        // it deliberately leaves the rest to "the year-tick sim", and that sim
-        // HAS EXISTED SINCE BL-271 WITHOUT EVER BEING CALLED HERE — its only
-        // caller was the tile inspector. So the campaign opened onto a world
-        // that had been settled and then stood perfectly still: no wars, no
-        // borders that had ever moved, nothing to inherit.
-        //
-        // Ben's ask, and the acceptance test for this block: "there is turmoil
-        // at the beginning of the campaign... some losing / winning bodies, and
-        // the game FEELS alive right from the first tick."
-        //
-        // 400 years at 4 years a tick — his figure. 100 decision rounds, ~110 ms
-        // measured, against a generation budget of one minute that the whole
-        // chain currently spends 2.4 s of.
-        bump(8);
-        // THE GATE AND THE PARAMS ARE DERIVED, NOT AUTHORED HERE (BL-462).
-        //
-        // Every line of this invocation used to be written out at this one site,
-        // where no other caller could read it — so every Era -1 harness took
-        // `history_sim_params`'s struct default instead (4000 BCE -> 0 CE on six
-        // bands, 136 rounds, against generation's 400 years on one 4-year band,
-        // 100 rounds) and no check in the project measured the run that actually
-        // generates a world. The derivations now live in era_minus_one.hpp and
-        // the harnesses call the same ones. This block's BEHAVIOUR is unchanged:
-        // the helpers reproduce it line for line.
-        //
-        // The settlement clause stays here because it is not a question about
-        // params — `era_minus_one_fixture::ran` is the answer that includes it.
-        if (era_minus_one_enabled(params) && !kepler_settlement.regions.empty())
-        {
-            const sim_terrain_arrays terr =
-                build_sim_terrain(w, kepler, home_grid_width, home_grid_height);
-
-            const history_sim_params hp    = era_minus_one_sim_params(params);
-            const uint32_t           hseed = era_minus_one_sim_seed(params);
-
-            // THE CAPTURE (BL-462). Everything a re-run needs that cannot be
-            // re-derived from the report: the settlement BEFORE the sim mutates
-            // it in place, the creeds the polity aggressions are read off, the
-            // terrain, and the works pointer. Taken here, at the one call site,
-            // so a harness constructs nothing of its own and has nothing left to
-            // drift on. Costs nothing when no fixture was asked for.
-            if (fixture != nullptr)
-            {
-                fixture->ran        = true;
-                fixture->body       = kepler;
-                fixture->gw         = home_grid_width;
-                fixture->gh         = home_grid_height;
-                fixture->settlement = kepler_settlement;
-                fixture->creeds     = kepler_creeds;
-                fixture->terrain    = terr;
-                fixture->params     = hp;
-                fixture->seed       = hseed;
-                fixture->works      = works;
-            }
-
-            // The one pass long enough to earn the loading screen's inner bar
-            // (~23 s of the ~25 s total): announce the year span, hand the sim
-            // the year counter, and clear the announcement when the pass ends.
-            if (progress != nullptr)
-            {
-                progress->sub_progress.store(0, std::memory_order_relaxed);
-                progress->sub_total.store(
-                    static_cast<int>(hp.stop_year - hp.start_year),
-                    std::memory_order_relaxed);
-            }
-
-            const history_sim_state hs =
-                run_history_sim(kepler_settlement, &kepler_creeds, terr.view(),
-                                home_grid_width, home_grid_height, hp,
-                                hseed,
-                                progress != nullptr ? &progress->sub_progress
-                                                    : nullptr,
-                                works, // BL-321: the Era -1 works table, or null.
-                                progress != nullptr ? progress->lapse_tap
-                                                    : nullptr); // BL-914: null off the wizard's path.
-
-            if (progress != nullptr)
-                progress->sub_total.store(0, std::memory_order_relaxed);
-
-            // BL-911: fold into the pass 1 -> pass 2 handoff HERE, while `hs`
-            // and the now-final `kepler_settlement` ownership are both still
-            // live, so the stamp pass below reads the crossed record rather
-            // than reaching back into live sim state. `kepler_settlement` is
-            // the ownership read `make_pass_one_output` wants — `run_history_sim`
-            // took it by reference and wrote every ownership change into it in
-            // place, so by this line it already holds the map at the epoch.
-            const pass_one_output kepler_pass_one = make_pass_one_output(
-                kepler_settlement, hs, &kepler_creeds);
-
-            // BL-969: THE VALIDATOR RUNS HERE, NOT ONLY IN A HARNESS. Until
-            // this line both validators were thorough and called from two
-            // harnesses only, so the shipped path folded the struct and
-            // trusted it -- GENERATION_STRATEGY.md § What crosses each handoff
-            // says "a validator checks them rather than a reader trusting the
-            // sentence", and a check that runs off the shipped path is the
-            // sentence. Against `kepler_creeds`, the live table the fold read,
-            // so the copy in the struct and the table consumers still read
-            // are proven to agree at the fold.
-            //
-            // A violation is RECORDED, never repaired: onto the report so a
-            // harness can assert it stays false; one line to stderr so a
-            // release build is not silent; an assert so a debug build stops
-            // on it. Generation continues on the value as folded -- there is
-            // no "fixed" value to substitute, and inventing one here would be
-            // exactly the clamp this layer refuses.
-            const auto record_handoff_violation = [&](const char* which, const std::string& why) {
-                const std::string msg = std::string(which) + ": " + why;
-                if (report != nullptr)
-                {
-                    report->handoff_invalid = true;
-                    if (!report->handoff_violation.empty()) report->handoff_violation += "; ";
-                    report->handoff_violation += msg;
-                }
-                std::fprintf(stderr, "make_hard_coded_world: handoff validator failed -- %s\n",
-                             msg.c_str());
-                assert(false && "a handoff validator failed on the shipped path (BL-969)");
-            };
-            {
-                std::string why;
-                if (!pass_one_output_valid(kepler_pass_one, &why, &kepler_creeds))
-                    record_handoff_violation("pass_one_output", why);
-            }
-
-            // BL-768/BL-911: the corridors the history walked, filtered to the
-            // ones a surviving polity still holds an end of (§ The network is
-            // the estate, and it crosses) — never the raw `hs.supply_corridors`
-            // record, which carries corridors held by realms that fell too.
-            kepler_corridors = kepler_pass_one.surviving_corridors;
-
-            // BL-898: the directed grudge table, out of the block with the
-            // corridors. READ FROM THE STRUCT (BL-969), not `hs.grudges`: the
-            // struct is the whole of what crosses, and a consumer that reached
-            // past it into the live sim state was the drift the validator
-            // above exists to catch. Sparse, so the copy is a few dozen rows.
-            kepler_grudges    = kepler_pass_one.grudges;
-            kepler_grudge_cap = static_cast<int32_t>(hp.grudge_cap);
-            kepler_polity_names = polity_names_at_close(kepler_pass_one.polities); // BL-1089
-
-            // The sim narrates through the same history_event shape the other
-            // generation passes use, so its wars join the world log without a
-            // new case anywhere.
-            //
-            // A DELIBERATE `hs.` READ PAST THE FOLD (BL-969): the narrative
-            // log is not on the doc's list of what crosses the handoff -- it
-            // is the biography the ledgers print, joined to the settlement
-            // record here for presentation, and nothing downstream computes
-            // from it. Carrying it in the struct would widen the contract to
-            // a table no consumer reads as data.
-            kepler_settlement.history.insert(kepler_settlement.history.end(),
-                                             hs.history.begin(), hs.history.end());
-
-            // ------------------------------------------------------------
-            // BL-931/BL-946 — THE EXPLORATION SPAN, 1200 -> exploration_stop_year,
-            // on the SAME engine, immediately after the Empires round
-            // closes above. Gated on `exploration_sim_enabled(params)`
-            // (default TRUE since BL-946) so a caller can still opt out, and
-            // additionally skipped whenever this call is the wizard's OWN
-            // Empires-round launch (`gen_cfg.stop_after_ancient_era`) — that
-            // round wants only the Empires history and must not pay for a
-            // span it discards a few lines below.
-            //
-            // BL-956: WHEN THE SPAN RUNS, IT HANDS FORWARD ITS OWN VALUE.
-            // The span is folded into `exploration_output` right after it
-            // closes, and `kepler_corridors` / `kepler_grudges` above are
-            // REPLACED by that value's 1660 grudges and surviving network
-            // (filtered over THIS span's dead) — EXPLORATION.md § What this
-            // phase hands Industrialisation: "A campaign that opens on the 1660
-            // political map must not open on 1200's resentments and 1200's
-            // roads." When the span does not run, the Empires values stand.
-            if (exploration_sim_enabled(params) && !kepler_pass_one.polities.empty()
-                && !gen_cfg.stop_after_ancient_era)
-            {
-                history_sim_params ep = exploration_sim_params(params);
-                ep.resume_polities  = &kepler_pass_one.polities;
-                ep.resume_grudges   = &kepler_pass_one.grudges;
-                ep.resume_contacts  = &kepler_pass_one.contacts;
-                ep.resume_corridors = &kepler_pass_one.surviving_corridors;
-                // BL-1049: the civilisation and creed records the carried
-                // indices point into cross here exactly as they cross at 1660
-                // (the Industrialisation call below), so the span continues
-                // the numbering instead of reopening both tables at 0 under
-                // the Empires span's indices. Data, not a seed: what this span
-                // coins still draws on its own stream (BL-1083).
-                ep.resume_civilisations    = &kepler_pass_one.civilisations;
-                ep.resume_universal_creeds = &kepler_pass_one.universal_creeds;
-
-                // BL-937: the PRE-sim capture, taken before this call mutates
-                // `kepler_settlement`/`kepler_creeds` in place — see the field
-                // comments on `era_minus_one_fixture::pre_exploration_*` for
-                // why a harness needs these rather than the post-sim state.
-                if (fixture != nullptr)
-                {
-                    fixture->pre_exploration_settlement = kepler_settlement;
-                    fixture->pre_exploration_creeds     = kepler_creeds;
-                    fixture->pre_exploration_polities   = kepler_pass_one.polities;
-                    fixture->pre_exploration_grudges    = kepler_pass_one.grudges;
-                    fixture->pre_exploration_corridors  = kepler_pass_one.surviving_corridors;
-                    fixture->pre_exploration_civilisations    = kepler_pass_one.civilisations;    // BL-1049
-                    fixture->pre_exploration_universal_creeds = kepler_pass_one.universal_creeds; // BL-1049
-                }
-
-                // BL-946: the loading screen's sub-bar AND the live lapse tap,
-                // same `progress` pointer the Empires call above already
-                // reads — so the wizard's new Exploration round gets the same
-                // "wait is the round" live map the Empires round has, rather
-                // than a silent hang followed by a populated map on landing.
-                //
-                // AND IT SAYS WHICH SPAN IT IS RUNNING (Ben, 2026-09-16). The
-                // label was last set to "Running the ancient era" at stage 8
-                // and never moved, so this pass counted ITS OWN 460 years
-                // under the previous pass's name — "year 397 of 460" while the
-                // line above said the ancient era, which is 1,600 years long.
-                // A counter and a caption that describe different spans are
-                // worse than either alone.
-                enter_step(13); // the exploration age (BL-1072: its own weight)
-                if (progress != nullptr)
-                {
-                    progress->sub_progress.store(0, std::memory_order_relaxed);
-                    progress->sub_total.store(
-                        static_cast<int>(ep.stop_year - ep.start_year),
-                        std::memory_order_relaxed);
-                }
-
-                const history_sim_state kepler_exploration_hs = run_history_sim(
-                    kepler_settlement, &kepler_creeds, terr.view(),
-                    home_grid_width, home_grid_height, ep,
-                    exploration_sim_seed(params),
-                    progress != nullptr ? &progress->sub_progress : nullptr,
-                    works,
-                    progress != nullptr ? progress->lapse_tap : nullptr); // BL-946: wired.
-
-                if (progress != nullptr)
-                    progress->sub_total.store(0, std::memory_order_relaxed);
-
-                kepler_settlement.history.insert(kepler_settlement.history.end(),
-                                                 kepler_exploration_hs.history.begin(),
-                                                 kepler_exploration_hs.history.end());
-
-                // BL-956: fold the 1660 handoff while `kepler_exploration_hs`
-                // and the now-final `kepler_settlement` ownership are both
-                // live, then let world setup read ITS grudges and corridors.
-                const exploration_output kepler_exploration = make_exploration_output(
-                    kepler_settlement, kepler_exploration_hs, &kepler_creeds);
-
-                // BL-969: validated on the shipped path, against the live
-                // table, same discipline as the Empires fold above. The span
-                // wrote `kepler_creeds` in place, so the struct's copy is the
-                // 1660 table and this is the check that it is.
-                {
-                    std::string why;
-                    if (!exploration_output_valid(kepler_exploration, &why, &kepler_creeds))
-                        record_handoff_violation("exploration_output", why);
-                }
-
-                kepler_corridors  = kepler_exploration.surviving_corridors;
-                kepler_grudges    = kepler_exploration.grudges;
-                kepler_grudge_cap = static_cast<int32_t>(ep.grudge_cap);
-
-                // BL-975: THE TREASURIES CROSS TOO. Read off the handoff
-                // struct's own region table, not the live sim state, because
-                // this is on EXPLORATION.md's list of what the span hands
-                // forward (BL-956 named it first). Summed per polity over the
-                // regions it holds at 1660 — the chest is a fact about the
-                // ground and the flag over the ground owns it (settlement.hpp,
-                // `region::treasury`) — in ascending region order, as
-                // integers, so the sum is exact. `generate_nations` Pass 7
-                // converts it once (NATION_GENERATION.md § Pass 7). One rule
-                // for every close world setup reads (BL-1053):
-                // `polity_treasuries_at_close`.
-                kepler_polity_treasuries = polity_treasuries_at_close(kepler_exploration.regions);
-                kepler_polity_names      = polity_names_at_close(kepler_exploration.polities); // BL-1089
-
-                if (fixture != nullptr)
-                    fixture->exploration_handoff = kepler_exploration;
-
-                // BL-937: hand the sweep harness the span's real input and
-                // output, on the same capture-not-re-derive footing as the
-                // Empires block above. Costs nothing when no fixture was
-                // asked for.
-                //
-                // DELIBERATE `kepler_exploration_hs` READS PAST THE FOLD
-                // (BL-969): the fixture IS a capture of the live sim state --
-                // that is what a harness re-running the span against
-                // generation's own outcome needs -- so it takes the sim's
-                // state by design, beside the handoff value it also holds.
-                if (fixture != nullptr)
-                {
-                    fixture->exploration_ran    = true;
-                    // BL-1053: no pointer into `kepler_pass_one`, which dies
-                    // with this block.
-                    fixture->exploration_params = without_resume_pointers(ep);
-                    fixture->exploration_seed   = exploration_sim_seed(params);
-                    fixture->pre_exploration_contacts = kepler_pass_one.contacts;
-                    fixture->exploration_state        = kepler_exploration_hs;
-                }
-
-                // BL-946: THE RECORDED RECORD, same discipline as `hs` a few
-                // lines below -- recorded once, here, at the one call site
-                // that ran it, rather than re-derived by a consumer.
-                //
-                // DELIBERATE `kepler_exploration_hs` READS PAST THE FOLD
-                // (BL-969): the four counters and the time-lapse are the
-                // RECORD OF THE RUN for the generation screen and the Ages
-                // view, not items on EXPLORATION.md's list of what the span
-                // hands forward, and no world-setup consumer computes from
-                // them. `exploration_output` carries no time-lapse for that
-                // reason; widening it to carry one would put a presentation
-                // artefact inside the contract.
-                if (report != nullptr)
-                {
-                    report->exploration_years     = kepler_exploration_hs.years;
-                    report->exploration_battles   = kepler_exploration_hs.battles;
-                    report->exploration_conquests = kepler_exploration_hs.conquests;
-                    report->exploration_foundings = kepler_exploration_hs.foundings;
-                    for (generation_report::body_entry& be : report->bodies)
-                        if (be.id == kepler)
-                            be.exploration_timelapse = as_timelapse(kepler_exploration_hs);
-                }
-
-                // --------------------------------------------------------
-                // BL-1040 — THE INDUSTRIALISATION SPAN, exploration_stop_year ->
-                // industrialisation_stop_year (1660 -> 1960), as its OWN call to
-                // the same engine, resumed from `kepler_exploration` above.
-                //
-                // THE RUN PREDICATE IS THIS BLOCK'S NESTING. It sits inside
-                // the block that ran Exploration, so it runs if and only if
-                // Exploration ran (Ben, 2026-09-18) -- never on an epoch test
-                // of its own. Its own gates are the switch
-                // (on by default since BL-1044) and `stop_after_exploration`,
-                // which must stop BEFORE this span: that knob's own return
-                // sits below population centres, past this call, so it is
-                // read here -- the Exploration round's launch, exploration_
-                // sweep and the seed-library fingerprints never pay for it.
-                //
-                // AFTER THE EXPLORATION FOLD AND VALIDATOR, BEFORE POPULATION
-                // CENTRES: centres materialise from the 1960 demography, and
-                // everything downstream that reads `kepler_settlement` (the
-                // 1200-close market stand, nations, `gen_settlement`) reads
-                // the 1960 map.
-                //
-                // BL-1053: A SPAN THAT CANNOT PLAY IS REFUSED BEFORE IT RUNS.
-                // A stop year at or before Exploration's close is a span of no
-                // years (or negative ones); run, its close would fail its own
-                // validator ("closes on the year it opens") after the settlement
-                // had been handed to the sim. Refused here instead, loudly, and
-                // world setup reads the 1660 close as if the switch were off.
-                const bool span_years_ordered =
-                    params.industrialisation_stop_year > params.exploration_stop_year;
-                if (params.industrialisation_span_enabled && !span_years_ordered)
-                    std::fprintf(stderr,
-                                 "make_hard_coded_world: Industrialisation span refused -- industrialisation_stop_year "
-                                 "%lld is not after exploration_stop_year %lld\n",
-                                 static_cast<long long>(params.industrialisation_stop_year),
-                                 static_cast<long long>(params.exploration_stop_year));
-                if (params.industrialisation_span_enabled && span_years_ordered
-                    && !gen_cfg.stop_after_exploration)
-                {
-                    // PARAMS FROM EXPLORATION'S DERIVATION, never the Empires
-                    // round's (era_minus_one.cpp says why), with every table
-                    // of the 1660 struct as the resume -- BL-1036's lossless
-                    // set: polities, grudges, contacts, the surviving corridor
-                    // record, the standing treaties and tribute, and the
-                    // civilisation and creed records so the numbering
-                    // continues. Trade flows rebuild from the treaties in the
-                    // span's first round (the resume pointer's comment).
-                    history_sim_params dp = industrialisation_sim_params(params);
-                    dp.resume_polities         = &kepler_exploration.polities;
-                    dp.resume_grudges          = &kepler_exploration.grudges;
-                    dp.resume_contacts         = &kepler_exploration.contacts;
-                    dp.resume_corridors        = &kepler_exploration.surviving_corridors;
-                    // BL-1097: the sea legs Exploration walked seed the span's own record, so a
-                    // lane earned by 1660 is still a lane at 1960 (the review's integration line).
-                    dp.resume_sea_legs         = &kepler_exploration.sea_legs;
-                    dp.resume_dated_objects    = &kepler_exploration.dated_objects;
-                    dp.resume_civilisations    = &kepler_exploration.civilisations;
-                    dp.resume_universal_creeds = &kepler_exploration.universal_creeds;
-                    const uint32_t dseed = industrialisation_sim_seed(params);
-
-                    // THE SPAN OPENS ON THE STRUCT. The region table the
-                    // resume reads is the handoff's own (equal to the live one
-                    // at this line -- the fold copied it -- so this moves
-                    // nothing today, and it keeps the struct the source if a
-                    // later fold ever differs from the live settlement). The
-                    // creeds stay the LIVE table: the span coins and folds
-                    // cultures in place, the naming passes below read it, and
-                    // the Exploration validator above has just proved it
-                    // equals `kepler_exploration.cultures` row for row.
-                    kepler_settlement.regions = kepler_exploration.regions;
-
-                    // BL-1051 -- THE SPAN-OPEN SURVEY (INDUSTRY_TREE.md sec The
-                    // scorer, "Forest is surveyed"). Every region the span
-                    // opens on is surveyed ONCE, from its own tiles, for fuel
-                    // and forest -- here because this is the one place both
-                    // the tiles and the 1660 region table are live (the sim has
-                    // neither `world&` nor tile ids by design). It writes four
-                    // NEW fields and nothing else -- two scores and the two
-                    // unclamped shares they are taken from (BL-1059, NR-900):
-                    // `energy_q`, the treasury endowment and every gate mean
-                    // stay as Exploration left them. INSIDE THE SWITCH, so with the span off none of
-                    // the four is ever written and no digest can see them.
-                    //
-                    // AFTER the struct copy above, so the 1660 handoff value
-                    // itself stays exactly the close Exploration folded (its
-                    // validator and the seed library read it); the survey is
-                    // what the span opens ON, not part of what Exploration hands.
-                    survey_regions_at_span_open(w, kepler_tiles, home_grid_width, home_grid_height,
-                                                kepler_settlement.regions);
-                    if (fixture != nullptr)
-                        fixture->industrialisation_open_regions = kepler_settlement.regions;
-
-                    enter_step(14); // the Industrialisation span (BL-1072: its own weight)
-                    if (progress != nullptr)
-                    {
-                        progress->sub_progress.store(0, std::memory_order_relaxed);
-                        progress->sub_total.store(
-                            static_cast<int>(dp.stop_year - dp.start_year),
-                            std::memory_order_relaxed);
-                    }
-
-                    const gen_clock::time_point t_span_begin = gen_clock::now(); // reported only
-                    const history_sim_state kepler_industrialisation_hs = run_history_sim(
-                        kepler_settlement, &kepler_creeds, terr.view(),
-                        home_grid_width, home_grid_height, dp, dseed,
-                        progress != nullptr ? &progress->sub_progress : nullptr,
-                        works,
-                        progress != nullptr ? progress->lapse_tap : nullptr);
-                    const int64_t span_ms = ms_between(t_span_begin, gen_clock::now());
-
-                    if (progress != nullptr)
-                        progress->sub_total.store(0, std::memory_order_relaxed);
-
-                    // The span's wars join the world log, as Exploration's do.
-                    kepler_settlement.history.insert(kepler_settlement.history.end(),
-                                                     kepler_industrialisation_hs.history.begin(),
-                                                     kepler_industrialisation_hs.history.end());
-
-                    // THE 1960 CLOSE, folded while the run and the now-final
-                    // settlement are both live, and validated on the shipped
-                    // path against the live creeds AND against the 1660 value
-                    // it resumed from (BL-969's discipline, one span later) --
-                    // and against the stop year it was asked to reach (BL-1053).
-                    const industrialisation_output kepler_industrialisation = make_industrialisation_output(
-                        kepler_settlement, kepler_industrialisation_hs, &kepler_creeds);
-                    {
-                        std::string why;
-                        if (!industrialisation_output_valid(kepler_industrialisation, &why, &kepler_creeds,
-                                                       &kepler_exploration,
-                                                       params.industrialisation_stop_year))
-                            record_handoff_violation("industrialisation_output", why);
-                    }
-
-                    // BL-1101 -- THE RECIPE BAND, DERIVED FROM THE HISTORY'S
-                    // INDUSTRY STATE (Ben, 2026-09-24; PRODUCTION.md § The era
-                    // band). Read off the polities the span actually closed
-                    // on: `industrial` iff any living polity's materials
-                    // capacity sits at the Industrial rung at 1960, `ancient`
-                    // otherwise. The epoch reaches nothing here -- a 0 CE and
-                    // a 1960 start build the same world and earn the same
-                    // band. A seed on which nobody crossed opens on the
-                    // ancient roster; that is the world the history made, and
-                    // it is reported (history_sweep, industrialisation_sim_
-                    // harness), never reshaped. Written once, here, and read
-                    // from `w.campaign_band` by the app on a new game AND on a
-                    // load (world_save v26), and by every harness through
-                    // `band_registry_from_world`.
-                    w.campaign_band = derive_campaign_band(kepler_industrialisation_hs.polities).band;
-
-                    // BL-1053 -- WORLD SETUP READS THE 1960 CLOSE, NOT THE 1660
-                    // ONE. The live settlement the span left (ownership,
-                    // population, treasury, culture) is already read in place
-                    // by population centres, naming, the market stand, nations
-                    // and `gen_settlement`. The hoisted records are what still
-                    // held Exploration's values, set a few lines above, and
-                    // they are replaced here off the span's own fold, on the
-                    // pattern of Exploration's block replacing the Empires
-                    // values. With the span off none of these lines runs, and
-                    // setup reads the 1660 close exactly as it did.
-                    //   - GRUDGES: wars fought after 1660 leave theirs, and a
-                    //     grudge that decayed by 1960 seeds at its 1960 score;
-                    //     the cap is the span's own, the scale those scores
-                    //     were raised on.
-                    //   - THE SURVIVING NETWORK: roads walked after 1660 are
-                    //     stamped, and the corridors of realms dead by 1960
-                    //     are not (the fold filters over the span's dead).
-                    //     Junction markets count off this same record.
-                    //   - TREASURIES: summed under the flag over the ground at
-                    //     1960, so a polity founded after 1660 is credited its
-                    //     chest and one conquered after 1660 is credited none.
-                    kepler_corridors         = kepler_industrialisation.surviving_corridors;
-                    kepler_grudges           = kepler_industrialisation.grudges;
-                    kepler_grudge_cap        = static_cast<int32_t>(dp.grudge_cap);
-                    kepler_polity_treasuries = polity_treasuries_at_close(kepler_industrialisation.regions);
-                    kepler_polity_names      = polity_names_at_close(kepler_industrialisation.polities); // BL-1089
-
-                    // BL-1068: THE RECORDED RECORD, on Exploration's footing
-                    // above -- the four counters and the time-lapse are the
-                    // record of the run for the wizard's Industrialisation
-                    // round, recorded here, at the one call site that ran the
-                    // span. Write-only: nothing at world setup reads them, so
-                    // recording cannot steer the world (save_game_version 18).
-                    if (report != nullptr)
-                    {
-                        report->industrialisation_years     = kepler_industrialisation_hs.years;
-                        report->industrialisation_battles   = kepler_industrialisation_hs.battles;
-                        report->industrialisation_conquests = kepler_industrialisation_hs.conquests;
-                        report->industrialisation_foundings = kepler_industrialisation_hs.foundings;
-                        for (generation_report::body_entry& be : report->bodies)
-                            if (be.id == kepler)
-                                be.industrialisation_timelapse = as_timelapse(kepler_industrialisation_hs);
-                    }
-
-                    if (fixture != nullptr)
-                    {
-                        fixture->industrialisation_ran     = true;
-                        // BL-1053: no pointer into `kepler_exploration`, which
-                        // dies with the Exploration block.
-                        fixture->industrialisation_params  = without_resume_pointers(dp);
-                        fixture->industrialisation_seed    = dseed;
-                        fixture->industrialisation_handoff = kepler_industrialisation;
-                        fixture->industrialisation_state   = kepler_industrialisation_hs;
-                        // The profile is a process-wide accumulator the NEXT
-                        // run resets; nothing between the call and this line
-                        // runs the sim, and it is read only for a harness.
-                        fixture->industrialisation_rounds  = history_sim_last_profile().decision_rounds;
-                        fixture->ms_industrialisation      = span_ms;
-                        // BL-1041: the points' own accrual cost, same footing.
-                        fixture->ns_industrialisation_industry_points =
-                            history_sim_last_profile().ns_industry_points;
-                    }
-                }
-            }
-
-            // Report what the era actually produced, into the generation record
-            // rather than to stdout. The acceptance test for this block is
-            // behavioural ("turmoil... losing / winning bodies"), and a block
-            // that silently produced a peaceful world would otherwise look
-            // identical to one that was never called — which is exactly how
-            // this sim went unwired for so long.
-            //
-            // DELIBERATE `hs.` READS PAST THE FOLD (BL-969): the four counters
-            // are the record of the run, not items on the doc's list of what
-            // crosses, and nothing at world setup computes from them. The
-            // time-lapse, by contrast, IS on the struct (`pass_one_output::
-            // timelapse`, folded from this same `hs`), so it is read there.
-            if (report != nullptr)
-            {
-                report->prehistory_battles   = hs.battles;
-                report->prehistory_conquests = hs.conquests;
-                report->prehistory_foundings = hs.foundings;
-                report->prehistory_years     = hs.years;
-                // NR-733: the ownership history itself, so the Ages view can
-                // REPLAY the era rather than re-running it. Recorded at the one
-                // call site that ran it, which is what makes it generation's own
-                // era and not a second construction of one.
-                //
-                // Onto the CRADLE'S OWN ENTRY, because that is the body the era
-                // was fought over — every other entry keeps an empty record, and
-                // the view reads empty as "never settled".
-                for (generation_report::body_entry& be : report->bodies)
-                    if (be.id == kepler)
-                        be.prehistory_timelapse = kepler_pass_one.timelapse;
-            }
-
-            // The same four counts into the fixture, so a harness holding one
-            // can bind its re-run against them without also needing a report.
-            // (`hs.` reads by design, as the exploration fixture block above:
-            // a fixture captures the live sim state, BL-969.)
-            if (fixture != nullptr)
-            {
-                fixture->battles   = hs.battles;
-                fixture->conquests = hs.conquests;
-                fixture->foundings = hs.foundings;
-                fixture->years     = hs.years;
-            }
-
-            // --- BL-910: capitals and markets stand at the 1200 CE close ---
-            //
-            // `run_history_sim` marked `region::has_market` on every living
-            // polity's capital (CIVILISATION.md sec Capitals exist at the
-            // close) -- a PLACE AND A VISIBLE CONDITION, not an order book:
-            // the market spawned here is default-constructed (no supply, no
-            // demand, no price, no inventory) except for its anchor. It is a
-            // SEPARATE mechanism from the BL-768 resource/junction carve
-            // below, which prices and populates the campaign's own market
-            // set once population centres exist; that carve is unchanged and
-            // this block does not fold into it, only stands ahead of it.
-            {
-                const std::vector<entity_id>& grid = body_tile_grid(w, kepler);
-                if (static_cast<int>(grid.size()) >= home_grid_width * home_grid_height)
-                {
-                    for (const region& rg : kepler_settlement.regions)
-                    {
-                        if (!rg.has_market) continue;
-                        if (rg.row < 0 || rg.row >= home_grid_height
-                         || rg.col < 0 || rg.col >= home_grid_width)
-                            continue;
-                        const entity_id anchor_tile =
-                            grid[static_cast<std::size_t>(rg.row) * home_grid_width
-                                 + static_cast<std::size_t>(rg.col)];
-                        if (anchor_tile == null_entity) continue;
-                        market_component mc;
-                        mc.body        = kepler;
-                        mc.centre_tile = anchor_tile;
-                        const entity_id shell_id = w.create_entity();
-                        w.markets[shell_id] = mc;
-                        capital_market_shells.push_back(shell_id);
-                    }
-                }
-            }
-        }
-        // OUTSIDE the gate, deliberately: a skipped era must read as zero
-        // elapsed rather than folding the whole remainder of generation into
-        // the era's bucket (BL-754).
-        t_era_end = gen_clock::now();
-
-        // Population centres (BL-610, centres from demography): placed HERE,
-        // after the Era -1 sim has grown, warred and plagued the regions'
-        // populations, so the centre count and scale distribution are the
-        // history's consequence rather than a land-area divisor and an
-        // authored weighted draw. Same seed derivation as the pre-BL-610 call
-        // site; only the position in the chain and the settlement argument
-        // changed.
-        generate_population_centres(w, kepler, /*seed=*/params.seed ^ 0x70701001u,
-                                    &kepler_settlement);
-
-        kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
-
-        // BL-769 — THE HISTORY'S POLITICAL MAP CROSSES THE HANDOFF. Read here,
-        // BEFORE `derive_national_character` overwrites `region::nation` with
-        // the nation index: until that call the field holds the POLITY id the
-        // sim wrote as it ran. Phase 5 folds a polity's regions into one nation
-        // instead of growing an independent realm out of each anchor.
-        kepler_np.seed_polities = settlement_seed_polities(kepler_settlement);
-
-        // BL-975 — THE HISTORY'S CHESTS CROSS WITH ITS MAP. Indexed by the
-        // same polity ids `seed_polities` just read, so Pass 2d can land each
-        // polity's treasury on the seed it folds to -- the chest at the same
-        // close as the map (1660, or 1960 when the Industrialisation span ran:
-        // BL-1053), so a polity's ids and its chest are never two dates.
-        // Empty when the Exploration span did not run (opted out, or the
-        // wizard's Empires-round launch), which credits nothing. The fixture
-        // records exactly what this site handed nation generation.
-        kepler_np.polity_treasuries = kepler_polity_treasuries;
-        if (fixture != nullptr) fixture->setup_polity_treasuries = kepler_polity_treasuries;
-
-        // BL-1089 — THE NAMES CROSS WITH THE MAP AND THE CHESTS, by the same
-        // polity ids, so Pass 5 copies a realm's coined name across instead of
-        // coining a second one (NATION_GENERATION.md § Pass 5).
-        kepler_np.polity_names = kepler_polity_names;
-
-        // BL-898 — THE SAME READ, KEPT FOR THE SAME WINDOW. `seed_polities`
-        // above is filtered to anchored regions because `generate_nations`
-        // reads it as a parallel array; the grudge seeding needs the polity of
-        // EVERY region, including the unanchored ones, to work out which nation
-        // a polity's ground ended up inside. One line, taken at the one moment
-        // `region::nation` still holds a polity id.
-        kepler_region_polity.reserve(kepler_settlement.regions.size());
-        for (const region& p : kepler_settlement.regions)
-            kepler_region_polity.push_back(p.nation);
-
-        // Each anchor carries its region's tongue across into Pass 5, so a
-        // nation is named in the speech of the people who settled its core
-        // rather than out of a bank of its own (BL-290).
-        kepler_np.seed_tongues.reserve(kepler_settlement.regions.size());
-        for (const region& p : kepler_settlement.regions)
-        {
-            if (p.anchor < 0) continue;
-            // BL-826 — PLURALITY. A nation is named in ONE tongue, so the
-            // distribution has to collapse to a single answer here, and the
-            // largest people on the core is it. The same rule city_names.cpp
-            // applies to a town, applied to the realm grown from that ground.
-            const int pc = p.culture.plurality();
-            kepler_np.seed_tongues.push_back(
-                pc >= 0 && pc < static_cast<int>(kepler_creeds.cultures.size())
-                    ? kepler_creeds.cultures[static_cast<std::size_t>(pc)].speech
-                    : tongue{});
-        }
-
-        // Same act for the cities: the placeholder names generate_population_
-        // centres coined before there was any culture are replaced with names
-        // in the nearest region's tongue.
-        name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
-                                /*seed=*/params.seed ^ 0xC17910E6u);
+        progress->lapse_tap->publish_regions(tap_region_col, tap_region_row,
+                                             tap_region_name);
+        progress->lapse_tap->publish(
+            migration_lapse.changes, migration_lapse.culture_changes,
+            migration_lapse.events,
+            static_cast<int32_t>(culture_round_end_year));
     }
 
-    // THE ANCIENT ERA HAS RUN. A caller that only wanted the history — the
-    // wizard's history round — stops here rather than paying for borders, roads
-    // and companies it will discard (about 95% of the wall clock; see
-    // world_gen_config::stop_after_ancient_era). The world left behind is
-    // deliberately half-built and must not be played.
+    if (report)
+    {
+        report->prehistory_years     = culture_round_end_year
+                                      - colonisation_start_year;
+        report->prehistory_battles   = 0;   // The migration is a diffusion, not a
+        report->prehistory_conquests = 0;   // contest — COLONISATION.md owns why
+        report->prehistory_foundings = static_cast<int64_t>(kepler_settlement.regions.size());
+        for (generation_report::body_entry& be : report->bodies)
+            if (be.id == kepler)
+            {
+                be.settlement           = kepler_settlement;
+                be.prehistory_timelapse = migration_lapse;
+                break;
+            }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// STAGE 3 -- THE EMPIRES SPAN (bump 8), 400 BCE -> 1200. Folds the 1200 handoff
+// (`c.pass_one`) the Exploration span resumes from, and records the span's own
+// report and fixture counters.
+// ---------------------------------------------------------------------------
+void run_empires(generation_cursor& c)
+{
+    const world&                   w                   = c.w;
+    const world_params&            params              = c.params;
+    generation_report* const       report              = c.report;
+    generation_progress* const     progress            = c.progress;
+    const works_registry* const    works               = c.works;
+    era_minus_one_fixture* const   fixture             = c.fixture;
+    const entity_id                kepler              = c.kepler;
+    creed_state&                   kepler_creeds       = c.kepler_creeds;
+    settlement_state&              kepler_settlement   = c.kepler_settlement;
+    std::vector<history_corridor>& kepler_corridors    = c.kepler_corridors;
+    std::vector<grudge>&           kepler_grudges      = c.kepler_grudges;
+    int32_t&                       kepler_grudge_cap   = c.kepler_grudge_cap;
+    std::vector<std::string>&      kepler_polity_names = c.kepler_polity_names;
+
+    // ------------------------------------------------------------------
+    // The year-tick sim, wired into generation (Ben, 2026-08-12).
     //
-    // THE REPORT IS FINISHED FIRST, AND THAT ORDERING IS THE WHOLE OF THIS
-    // BLOCK. The first cut returned immediately and shipped a report carrying
-    // the era's TIME-LAPSE but not its SETTLEMENT — `be.settlement` is assigned
-    // a hundred lines below, past the return — so the wizard's round got an
-    // ownership record with no region coordinates to draw it against and
-    // rendered an empty map for four thousand years while its own header
-    // reported 611 foundings.
+    // run_settlement founds regions and stops. Below the industrial era
+    // it deliberately leaves the rest to "the year-tick sim", and that sim
+    // HAS EXISTED SINCE BL-271 WITHOUT EVER BEING CALLED HERE — its only
+    // caller was the tile inspector. So the campaign opened onto a world
+    // that had been settled and then stood perfectly still: no wars, no
+    // borders that had ever moved, nothing to inherit.
     //
-    // It survived the scripted check because that check cannot see this path:
-    // under `--verify` the round ADOPTS the harness's own fully-built world
-    // rather than running a stopped one, so five green assertions said nothing
-    // about the branch. Caught by driving the built app, which is what the
-    // live-click rule is for.
-    if (gen_cfg.stop_after_ancient_era)
+    // Ben's ask, and the acceptance test for this block: "there is turmoil
+    // at the beginning of the campaign... some losing / winning bodies, and
+    // the game FEELS alive right from the first tick."
+    //
+    // 400 years at 4 years a tick — his figure. 100 decision rounds, ~110 ms
+    // measured, against a generation budget of one minute that the whole
+    // chain currently spends 2.4 s of.
+    bump(c, 8);
+    // THE GATE AND THE PARAMS ARE DERIVED, NOT AUTHORED HERE (BL-462).
+    //
+    // Every line of this invocation used to be written out at this one site,
+    // where no other caller could read it — so every Era -1 harness took
+    // `history_sim_params`'s struct default instead (4000 BCE -> 0 CE on six
+    // bands, 136 rounds, against generation's 400 years on one 4-year band,
+    // 100 rounds) and no check in the project measured the run that actually
+    // generates a world. The derivations now live in era_minus_one.hpp and
+    // the harnesses call the same ones. This block's BEHAVIOUR is unchanged:
+    // the helpers reproduce it line for line.
+    //
+    // The settlement clause stays here because it is not a question about
+    // params — `era_minus_one_fixture::ran` is the answer that includes it.
+    if (era_minus_one_enabled(params) && !kepler_settlement.regions.empty())
     {
-        if (report)
+        c.era_ran = true;
+        c.terrain = build_sim_terrain(w, kepler, home_grid_width, home_grid_height);
+        const sim_terrain_arrays& terr = c.terrain;
+
+        const history_sim_params hp    = era_minus_one_sim_params(params);
+        const uint32_t           hseed = era_minus_one_sim_seed(params);
+
+        // THE CAPTURE (BL-462). Everything a re-run needs that cannot be
+        // re-derived from the report: the settlement BEFORE the sim mutates
+        // it in place, the creeds the polity aggressions are read off, the
+        // terrain, and the works pointer. Taken here, at the one call site,
+        // so a harness constructs nothing of its own and has nothing left to
+        // drift on. Costs nothing when no fixture was asked for.
+        if (fixture != nullptr)
+        {
+            fixture->ran        = true;
+            fixture->body       = kepler;
+            fixture->gw         = home_grid_width;
+            fixture->gh         = home_grid_height;
+            fixture->settlement = kepler_settlement;
+            fixture->creeds     = kepler_creeds;
+            fixture->terrain    = terr;
+            fixture->params     = hp;
+            fixture->seed       = hseed;
+            fixture->works      = works;
+        }
+
+        // The one pass long enough to earn the loading screen's inner bar
+        // (~23 s of the ~25 s total): announce the year span, hand the sim
+        // the year counter, and clear the announcement when the pass ends.
+        if (progress != nullptr)
+        {
+            progress->sub_progress.store(0, std::memory_order_relaxed);
+            progress->sub_total.store(
+                static_cast<int>(hp.stop_year - hp.start_year),
+                std::memory_order_relaxed);
+        }
+
+        const history_sim_state hs =
+            run_history_sim(kepler_settlement, &kepler_creeds, terr.view(),
+                            home_grid_width, home_grid_height, hp,
+                            hseed,
+                            progress != nullptr ? &progress->sub_progress
+                                                : nullptr,
+                            works, // BL-321: the Era -1 works table, or null.
+                            progress != nullptr ? progress->lapse_tap
+                                                : nullptr); // BL-914: null off the wizard's path.
+
+        if (progress != nullptr)
+            progress->sub_total.store(0, std::memory_order_relaxed);
+
+        // BL-911: fold into the pass 1 -> pass 2 handoff HERE, while `hs`
+        // and the now-final `kepler_settlement` ownership are both still
+        // live, so the stamp pass below reads the crossed record rather
+        // than reaching back into live sim state. `kepler_settlement` is
+        // the ownership read `make_pass_one_output` wants — `run_history_sim`
+        // took it by reference and wrote every ownership change into it in
+        // place, so by this line it already holds the map at the epoch.
+        c.pass_one = make_pass_one_output(
+            kepler_settlement, hs, &kepler_creeds);
+        const pass_one_output& kepler_pass_one = c.pass_one;
+
+        // BL-969: THE VALIDATOR RUNS HERE, NOT ONLY IN A HARNESS -- see
+        // `record_handoff_violation` for what a violation does and does not do.
+        {
+            std::string why;
+            if (!pass_one_output_valid(kepler_pass_one, &why, &kepler_creeds))
+                record_handoff_violation(c, "pass_one_output", why);
+        }
+
+        // BL-768/BL-911: the corridors the history walked, filtered to the
+        // ones a surviving polity still holds an end of (§ The network is
+        // the estate, and it crosses) — never the raw `hs.supply_corridors`
+        // record, which carries corridors held by realms that fell too.
+        kepler_corridors = kepler_pass_one.surviving_corridors;
+
+        // BL-898: the directed grudge table, out of the block with the
+        // corridors. READ FROM THE STRUCT (BL-969), not `hs.grudges`: the
+        // struct is the whole of what crosses, and a consumer that reached
+        // past it into the live sim state was the drift the validator
+        // above exists to catch. Sparse, so the copy is a few dozen rows.
+        kepler_grudges    = kepler_pass_one.grudges;
+        kepler_grudge_cap = static_cast<int32_t>(hp.grudge_cap);
+        kepler_polity_names = polity_names_at_close(kepler_pass_one.polities); // BL-1089
+
+        // The sim narrates through the same history_event shape the other
+        // generation passes use, so its wars join the world log without a
+        // new case anywhere.
+        //
+        // A DELIBERATE `hs.` READ PAST THE FOLD (BL-969): the narrative
+        // log is not on the doc's list of what crosses the handoff -- it
+        // is the biography the ledgers print, joined to the settlement
+        // record here for presentation, and nothing downstream computes
+        // from it. Carrying it in the struct would widen the contract to
+        // a table no consumer reads as data.
+        kepler_settlement.history.insert(kepler_settlement.history.end(),
+                                         hs.history.begin(), hs.history.end());
+
+        // THE EMPIRES SPAN'S OWN COUNTERS, at the end of its own stage (BL-1084).
+        // They sat after the two later spans in the single call; neither span
+        // writes these fields, so the move is invisible to every reader.
+        //
+        // Report what the era actually produced, into the generation record
+        // rather than to stdout. The acceptance test for this block is
+        // behavioural ("turmoil... losing / winning bodies"), and a block
+        // that silently produced a peaceful world would otherwise look
+        // identical to one that was never called — which is exactly how
+        // this sim went unwired for so long.
+        //
+        // DELIBERATE `hs.` READS PAST THE FOLD (BL-969): the four counters
+        // are the record of the run, not items on the doc's list of what
+        // crosses, and nothing at world setup computes from them. The
+        // time-lapse, by contrast, IS on the struct (`pass_one_output::
+        // timelapse`, folded from this same `hs`), so it is read there.
+        if (report != nullptr)
+        {
+            report->prehistory_battles   = hs.battles;
+            report->prehistory_conquests = hs.conquests;
+            report->prehistory_foundings = hs.foundings;
+            report->prehistory_years     = hs.years;
+            // NR-733: the ownership history itself, so the Ages view can
+            // REPLAY the era rather than re-running it. Recorded at the one
+            // call site that ran it, which is what makes it generation's own
+            // era and not a second construction of one.
+            //
+            // Onto the CRADLE'S OWN ENTRY, because that is the body the era
+            // was fought over — every other entry keeps an empty record, and
+            // the view reads empty as "never settled".
             for (generation_report::body_entry& be : report->bodies)
-                if (be.id == kepler) { be.settlement = kepler_settlement; break; }
-        return w;
+                if (be.id == kepler)
+                    be.prehistory_timelapse = kepler_pass_one.timelapse;
+        }
+
+        // The same four counts into the fixture, so a harness holding one
+        // can bind its re-run against them without also needing a report.
+        // (`hs.` reads by design, as the Exploration stage's fixture block:
+        // a fixture captures the live sim state, BL-969.)
+        if (fixture != nullptr)
+        {
+            fixture->battles   = hs.battles;
+            fixture->conquests = hs.conquests;
+            fixture->foundings = hs.foundings;
+            fixture->years     = hs.years;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// STAGE 4 -- THE EXPLORATION SPAN, 1200 -> 1660 (re-captions bump 8). Nested in
+// the era: it runs only where the Empires span ran. Folds the 1660 handoff
+// (`c.exploration`) the Industrialisation span resumes from.
+// ---------------------------------------------------------------------------
+void run_exploration(generation_cursor& c)
+{
+    if (c.history_closed)
+    {
+        std::fprintf(stderr, "make_hard_coded_world: the Exploration span refused -- the "
+                             "history was closed at an earlier stop (close_stopped_generation)\n");
+        return;
+    }
+    const world_params&            params                   = c.params;
+    generation_report* const       report                   = c.report;
+    generation_progress* const     progress                 = c.progress;
+    const works_registry* const    works                    = c.works;
+    era_minus_one_fixture* const   fixture                  = c.fixture;
+    const entity_id                kepler                   = c.kepler;
+    creed_state&                   kepler_creeds            = c.kepler_creeds;
+    settlement_state&              kepler_settlement        = c.kepler_settlement;
+    std::vector<history_corridor>& kepler_corridors         = c.kepler_corridors;
+    std::vector<grudge>&           kepler_grudges           = c.kepler_grudges;
+    int32_t&                       kepler_grudge_cap        = c.kepler_grudge_cap;
+    std::vector<int64_t>&          kepler_polity_treasuries = c.kepler_polity_treasuries;
+    std::vector<std::string>&      kepler_polity_names      = c.kepler_polity_names;
+    const sim_terrain_arrays&      terr                     = c.terrain;
+    const pass_one_output&         kepler_pass_one          = c.pass_one;
+
+    // ------------------------------------------------------------
+    // BL-931/BL-946 — THE EXPLORATION SPAN, 1200 -> exploration_stop_year,
+    // on the SAME engine, immediately after the Empires round
+    // closes above. Gated on `exploration_sim_enabled(params)`
+    // (default TRUE since BL-946) so a caller can still opt out, and
+    // never reached by a build stopped at the Empires stage -- the wizard's
+    // OWN Empires-round launch (`gen_cfg.stop_after_ancient_era`) — that
+    // round wants only the Empires history and must not pay for a
+    // span it discards (BL-1084: the stop chooses the stage, not a gate).
+    //
+    // BL-956: WHEN THE SPAN RUNS, IT HANDS FORWARD ITS OWN VALUE.
+    // The span is folded into `exploration_output` right after it
+    // closes, and `kepler_corridors` / `kepler_grudges` above are
+    // REPLACED by that value's 1660 grudges and surviving network
+    // (filtered over THIS span's dead) — EXPLORATION.md § What this
+    // phase hands Industrialisation: "A campaign that opens on the 1660
+    // political map must not open on 1200's resentments and 1200's
+    // roads." When the span does not run, the Empires values stand.
+    if (c.era_ran && exploration_sim_enabled(params) && !kepler_pass_one.polities.empty())
+    {
+        c.exploration_ran = true;
+        history_sim_params ep = exploration_sim_params(params);
+        ep.resume_polities  = &kepler_pass_one.polities;
+        ep.resume_grudges   = &kepler_pass_one.grudges;
+        ep.resume_contacts  = &kepler_pass_one.contacts;
+        ep.resume_corridors = &kepler_pass_one.surviving_corridors;
+        // BL-1049: the civilisation and creed records the carried
+        // indices point into cross here exactly as they cross at 1660
+        // (the Industrialisation call below), so the span continues
+        // the numbering instead of reopening both tables at 0 under
+        // the Empires span's indices. Data, not a seed: what this span
+        // coins still draws on its own stream (BL-1083).
+        ep.resume_civilisations    = &kepler_pass_one.civilisations;
+        ep.resume_universal_creeds = &kepler_pass_one.universal_creeds;
+
+        // BL-937: the PRE-sim capture, taken before this call mutates
+        // `kepler_settlement`/`kepler_creeds` in place — see the field
+        // comments on `era_minus_one_fixture::pre_exploration_*` for
+        // why a harness needs these rather than the post-sim state.
+        if (fixture != nullptr)
+        {
+            fixture->pre_exploration_settlement = kepler_settlement;
+            fixture->pre_exploration_creeds     = kepler_creeds;
+            fixture->pre_exploration_polities   = kepler_pass_one.polities;
+            fixture->pre_exploration_grudges    = kepler_pass_one.grudges;
+            fixture->pre_exploration_corridors  = kepler_pass_one.surviving_corridors;
+            fixture->pre_exploration_civilisations    = kepler_pass_one.civilisations;    // BL-1049
+            fixture->pre_exploration_universal_creeds = kepler_pass_one.universal_creeds; // BL-1049
+        }
+
+        // BL-946: the loading screen's sub-bar AND the live lapse tap,
+        // same `progress` pointer the Empires call above already
+        // reads — so the wizard's new Exploration round gets the same
+        // "wait is the round" live map the Empires round has, rather
+        // than a silent hang followed by a populated map on landing.
+        //
+        // AND IT SAYS WHICH SPAN IT IS RUNNING (Ben, 2026-09-16). The
+        // label was last set to "Running the ancient era" at stage 8
+        // and never moved, so this pass counted ITS OWN 460 years
+        // under the previous pass's name — "year 397 of 460" while the
+        // line above said the ancient era, which is 1,600 years long.
+        // A counter and a caption that describe different spans are
+        // worse than either alone.
+        enter_step(c, 13); // the exploration age (BL-1072: its own weight)
+        if (progress != nullptr)
+        {
+            progress->sub_progress.store(0, std::memory_order_relaxed);
+            progress->sub_total.store(
+                static_cast<int>(ep.stop_year - ep.start_year),
+                std::memory_order_relaxed);
+        }
+
+        const history_sim_state kepler_exploration_hs = run_history_sim(
+            kepler_settlement, &kepler_creeds, terr.view(),
+            home_grid_width, home_grid_height, ep,
+            exploration_sim_seed(params),
+            progress != nullptr ? &progress->sub_progress : nullptr,
+            works,
+            progress != nullptr ? progress->lapse_tap : nullptr); // BL-946: wired.
+
+        if (progress != nullptr)
+            progress->sub_total.store(0, std::memory_order_relaxed);
+
+        kepler_settlement.history.insert(kepler_settlement.history.end(),
+                                         kepler_exploration_hs.history.begin(),
+                                         kepler_exploration_hs.history.end());
+
+        // BL-956: fold the 1660 handoff while `kepler_exploration_hs`
+        // and the now-final `kepler_settlement` ownership are both
+        // live, then let world setup read ITS grudges and corridors.
+        c.exploration = make_exploration_output(
+            kepler_settlement, kepler_exploration_hs, &kepler_creeds);
+        const exploration_output& kepler_exploration = c.exploration;
+
+        // BL-969: validated on the shipped path, against the live
+        // table, same discipline as the Empires fold above. The span
+        // wrote `kepler_creeds` in place, so the struct's copy is the
+        // 1660 table and this is the check that it is.
+        {
+            std::string why;
+            if (!exploration_output_valid(kepler_exploration, &why, &kepler_creeds))
+                record_handoff_violation(c, "exploration_output", why);
+        }
+
+        kepler_corridors  = kepler_exploration.surviving_corridors;
+        kepler_grudges    = kepler_exploration.grudges;
+        kepler_grudge_cap = static_cast<int32_t>(ep.grudge_cap);
+
+        // BL-975: THE TREASURIES CROSS TOO. Read off the handoff
+        // struct's own region table, not the live sim state, because
+        // this is on EXPLORATION.md's list of what the span hands
+        // forward (BL-956 named it first). Summed per polity over the
+        // regions it holds at 1660 — the chest is a fact about the
+        // ground and the flag over the ground owns it (settlement.hpp,
+        // `region::treasury`) — in ascending region order, as
+        // integers, so the sum is exact. `generate_nations` Pass 7
+        // converts it once (NATION_GENERATION.md § Pass 7). One rule
+        // for every close world setup reads (BL-1053):
+        // `polity_treasuries_at_close`.
+        kepler_polity_treasuries = polity_treasuries_at_close(kepler_exploration.regions);
+        kepler_polity_names      = polity_names_at_close(kepler_exploration.polities); // BL-1089
+
+        if (fixture != nullptr)
+            fixture->exploration_handoff = kepler_exploration;
+
+        // BL-937: hand the sweep harness the span's real input and
+        // output, on the same capture-not-re-derive footing as the
+        // Empires block above. Costs nothing when no fixture was
+        // asked for.
+        //
+        // DELIBERATE `kepler_exploration_hs` READS PAST THE FOLD
+        // (BL-969): the fixture IS a capture of the live sim state --
+        // that is what a harness re-running the span against
+        // generation's own outcome needs -- so it takes the sim's
+        // state by design, beside the handoff value it also holds.
+        if (fixture != nullptr)
+        {
+            fixture->exploration_ran    = true;
+            // BL-1053: no pointer into `kepler_pass_one`, which
+            // lives on the cursor and dies with it (BL-1084).
+            fixture->exploration_params = without_resume_pointers(ep);
+            fixture->exploration_seed   = exploration_sim_seed(params);
+            fixture->pre_exploration_contacts = kepler_pass_one.contacts;
+            fixture->exploration_state        = kepler_exploration_hs;
+        }
+
+        // BL-946: THE RECORDED RECORD, same discipline as `hs` a few
+        // lines below -- recorded once, here, at the one call site
+        // that ran it, rather than re-derived by a consumer.
+        //
+        // DELIBERATE `kepler_exploration_hs` READS PAST THE FOLD
+        // (BL-969): the four counters and the time-lapse are the
+        // RECORD OF THE RUN for the generation screen and the Ages
+        // view, not items on EXPLORATION.md's list of what the span
+        // hands forward, and no world-setup consumer computes from
+        // them. `exploration_output` carries no time-lapse for that
+        // reason; widening it to carry one would put a presentation
+        // artefact inside the contract.
+        if (report != nullptr)
+        {
+            report->exploration_years     = kepler_exploration_hs.years;
+            report->exploration_battles   = kepler_exploration_hs.battles;
+            report->exploration_conquests = kepler_exploration_hs.conquests;
+            report->exploration_foundings = kepler_exploration_hs.foundings;
+            for (generation_report::body_entry& be : report->bodies)
+                if (be.id == kepler)
+                    be.exploration_timelapse = as_timelapse(kepler_exploration_hs);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// STAGE 5 -- THE INDUSTRIALISATION SPAN, 1660 -> 1960 (re-captions bump 8).
+// Nested in Exploration: it runs only where that span ran.
+// ---------------------------------------------------------------------------
+void run_industrialisation(generation_cursor& c)
+{
+    if (!c.exploration_ran) return; // THE RUN PREDICATE IS THE NESTING (below)
+    if (c.history_closed)
+    {
+        std::fprintf(stderr, "make_hard_coded_world: the Industrialisation span refused -- the "
+                             "history was closed at an earlier stop (close_stopped_generation)\n");
+        return;
+    }
+    world&                         w                        = c.w;
+    const world_params&            params                   = c.params;
+    generation_report* const       report                   = c.report;
+    generation_progress* const     progress                 = c.progress;
+    const works_registry* const    works                    = c.works;
+    era_minus_one_fixture* const   fixture                  = c.fixture;
+    const entity_id                kepler                   = c.kepler;
+    const std::vector<entity_id>&  kepler_tiles             = c.kepler_tiles;
+    creed_state&                   kepler_creeds            = c.kepler_creeds;
+    settlement_state&              kepler_settlement        = c.kepler_settlement;
+    std::vector<history_corridor>& kepler_corridors         = c.kepler_corridors;
+    std::vector<grudge>&           kepler_grudges           = c.kepler_grudges;
+    int32_t&                       kepler_grudge_cap        = c.kepler_grudge_cap;
+    std::vector<int64_t>&          kepler_polity_treasuries = c.kepler_polity_treasuries;
+    std::vector<std::string>&      kepler_polity_names      = c.kepler_polity_names;
+    const sim_terrain_arrays&      terr                     = c.terrain;
+    const exploration_output&      kepler_exploration       = c.exploration;
+
+    // --------------------------------------------------------
+    // BL-1040 — THE INDUSTRIALISATION SPAN, exploration_stop_year ->
+    // industrialisation_stop_year (1660 -> 1960), as its OWN call to
+    // the same engine, resumed from `kepler_exploration` above.
+    //
+    // THE RUN PREDICATE IS THIS BLOCK'S NESTING. It sits inside
+    // the block that ran Exploration, so it runs if and only if
+    // Exploration ran (Ben, 2026-09-18) -- never on an epoch test
+    // of its own. Its own gate is the switch (on by default since
+    // BL-1044); `stop_after_exploration` stops the composition
+    // BEFORE this stage (BL-1084), so the Exploration round's
+    // launch, exploration_sweep and the seed-library fingerprints
+    // never pay for it.
+    //
+    // AFTER THE EXPLORATION FOLD AND VALIDATOR, BEFORE POPULATION
+    // CENTRES: centres materialise from the 1960 demography, and
+    // everything downstream that reads `kepler_settlement` (the
+    // 1200-close market stand, nations, `gen_settlement`) reads
+    // the 1960 map.
+    //
+    // BL-1053: A SPAN THAT CANNOT PLAY IS REFUSED BEFORE IT RUNS.
+    // A stop year at or before Exploration's close is a span of no
+    // years (or negative ones); run, its close would fail its own
+    // validator ("closes on the year it opens") after the settlement
+    // had been handed to the sim. Refused here instead, loudly, and
+    // world setup reads the 1660 close as if the switch were off.
+    const bool span_years_ordered =
+        params.industrialisation_stop_year > params.exploration_stop_year;
+    if (params.industrialisation_span_enabled && !span_years_ordered)
+        std::fprintf(stderr,
+                     "make_hard_coded_world: Industrialisation span refused -- industrialisation_stop_year "
+                     "%lld is not after exploration_stop_year %lld\n",
+                     static_cast<long long>(params.industrialisation_stop_year),
+                     static_cast<long long>(params.exploration_stop_year));
+    if (params.industrialisation_span_enabled && span_years_ordered)
+    {
+        // PARAMS FROM EXPLORATION'S DERIVATION, never the Empires
+        // round's (era_minus_one.cpp says why), with every table
+        // of the 1660 struct as the resume -- BL-1036's lossless
+        // set: polities, grudges, contacts, the surviving corridor
+        // record, the standing treaties and tribute, and the
+        // civilisation and creed records so the numbering
+        // continues. Trade flows rebuild from the treaties in the
+        // span's first round (the resume pointer's comment).
+        history_sim_params dp = industrialisation_sim_params(params);
+        dp.resume_polities         = &kepler_exploration.polities;
+        dp.resume_grudges          = &kepler_exploration.grudges;
+        dp.resume_contacts         = &kepler_exploration.contacts;
+        dp.resume_corridors        = &kepler_exploration.surviving_corridors;
+        // BL-1097: the sea legs Exploration walked seed the span's own record, so a
+        // lane earned by 1660 is still a lane at 1960 (the review's integration line).
+        dp.resume_sea_legs         = &kepler_exploration.sea_legs;
+        dp.resume_dated_objects    = &kepler_exploration.dated_objects;
+        dp.resume_civilisations    = &kepler_exploration.civilisations;
+        dp.resume_universal_creeds = &kepler_exploration.universal_creeds;
+        const uint32_t dseed = industrialisation_sim_seed(params);
+
+        // THE SPAN OPENS ON THE STRUCT. The region table the
+        // resume reads is the handoff's own (equal to the live one
+        // at this line -- the fold copied it -- so this moves
+        // nothing today, and it keeps the struct the source if a
+        // later fold ever differs from the live settlement). The
+        // creeds stay the LIVE table: the span coins and folds
+        // cultures in place, the naming passes below read it, and
+        // the Exploration validator above has just proved it
+        // equals `kepler_exploration.cultures` row for row.
+        kepler_settlement.regions = kepler_exploration.regions;
+
+        // BL-1051 -- THE SPAN-OPEN SURVEY (INDUSTRY_TREE.md sec The
+        // scorer, "Forest is surveyed"). Every region the span
+        // opens on is surveyed ONCE, from its own tiles, for fuel
+        // and forest -- here because this is the one place both
+        // the tiles and the 1660 region table are live (the sim has
+        // neither `world&` nor tile ids by design). It writes four
+        // NEW fields and nothing else -- two scores and the two
+        // unclamped shares they are taken from (BL-1059, NR-900):
+        // `energy_q`, the treasury endowment and every gate mean
+        // stay as Exploration left them. INSIDE THE SWITCH, so with the span off none of
+        // the four is ever written and no digest can see them.
+        //
+        // AFTER the struct copy above, so the 1660 handoff value
+        // itself stays exactly the close Exploration folded (its
+        // validator and the seed library read it); the survey is
+        // what the span opens ON, not part of what Exploration hands.
+        survey_regions_at_span_open(w, kepler_tiles, home_grid_width, home_grid_height,
+                                    kepler_settlement.regions);
+        if (fixture != nullptr)
+            fixture->industrialisation_open_regions = kepler_settlement.regions;
+
+        enter_step(c, 14); // the Industrialisation span (BL-1072: its own weight)
+        if (progress != nullptr)
+        {
+            progress->sub_progress.store(0, std::memory_order_relaxed);
+            progress->sub_total.store(
+                static_cast<int>(dp.stop_year - dp.start_year),
+                std::memory_order_relaxed);
+        }
+
+        const gen_clock::time_point t_span_begin = gen_clock::now(); // reported only
+        const history_sim_state kepler_industrialisation_hs = run_history_sim(
+            kepler_settlement, &kepler_creeds, terr.view(),
+            home_grid_width, home_grid_height, dp, dseed,
+            progress != nullptr ? &progress->sub_progress : nullptr,
+            works,
+            progress != nullptr ? progress->lapse_tap : nullptr);
+        const int64_t span_ms = ms_between(t_span_begin, gen_clock::now());
+
+        if (progress != nullptr)
+            progress->sub_total.store(0, std::memory_order_relaxed);
+
+        // The span's wars join the world log, as Exploration's do.
+        kepler_settlement.history.insert(kepler_settlement.history.end(),
+                                         kepler_industrialisation_hs.history.begin(),
+                                         kepler_industrialisation_hs.history.end());
+
+        // THE 1960 CLOSE, folded while the run and the now-final
+        // settlement are both live, and validated on the shipped
+        // path against the live creeds AND against the 1660 value
+        // it resumed from (BL-969's discipline, one span later) --
+        // and against the stop year it was asked to reach (BL-1053).
+        const industrialisation_output kepler_industrialisation = make_industrialisation_output(
+            kepler_settlement, kepler_industrialisation_hs, &kepler_creeds);
+        {
+            std::string why;
+            if (!industrialisation_output_valid(kepler_industrialisation, &why, &kepler_creeds,
+                                           &kepler_exploration,
+                                           params.industrialisation_stop_year))
+                record_handoff_violation(c, "industrialisation_output", why);
+        }
+
+        // BL-1101 -- THE RECIPE BAND, DERIVED FROM THE HISTORY'S
+        // INDUSTRY STATE (Ben, 2026-09-24; PRODUCTION.md § The era
+        // band). Read off the polities the span actually closed
+        // on: `industrial` iff any living polity's materials
+        // capacity sits at the Industrial rung at 1960, `ancient`
+        // otherwise. The epoch reaches nothing here -- a 0 CE and
+        // a 1960 start build the same world and earn the same
+        // band. A seed on which nobody crossed opens on the
+        // ancient roster; that is the world the history made, and
+        // it is reported (history_sweep, industrialisation_sim_
+        // harness), never reshaped. Written once, here, and read
+        // from `w.campaign_band` by the app on a new game AND on a
+        // load (world_save v26), and by every harness through
+        // `band_registry_from_world`.
+        w.campaign_band = derive_campaign_band(kepler_industrialisation_hs.polities).band;
+
+        // BL-1053 -- WORLD SETUP READS THE 1960 CLOSE, NOT THE 1660
+        // ONE. The live settlement the span left (ownership,
+        // population, treasury, culture) is already read in place
+        // by population centres, naming, the market stand, nations
+        // and `gen_settlement`. The hoisted records are what still
+        // held Exploration's values, set a few lines above, and
+        // they are replaced here off the span's own fold, on the
+        // pattern of Exploration's block replacing the Empires
+        // values. With the span off none of these lines runs, and
+        // setup reads the 1660 close exactly as it did.
+        //   - GRUDGES: wars fought after 1660 leave theirs, and a
+        //     grudge that decayed by 1960 seeds at its 1960 score;
+        //     the cap is the span's own, the scale those scores
+        //     were raised on.
+        //   - THE SURVIVING NETWORK: roads walked after 1660 are
+        //     stamped, and the corridors of realms dead by 1960
+        //     are not (the fold filters over the span's dead).
+        //     Junction markets count off this same record.
+        //   - TREASURIES: summed under the flag over the ground at
+        //     1960, so a polity founded after 1660 is credited its
+        //     chest and one conquered after 1660 is credited none.
+        kepler_corridors         = kepler_industrialisation.surviving_corridors;
+        kepler_grudges           = kepler_industrialisation.grudges;
+        kepler_grudge_cap        = static_cast<int32_t>(dp.grudge_cap);
+        kepler_polity_treasuries = polity_treasuries_at_close(kepler_industrialisation.regions);
+        kepler_polity_names      = polity_names_at_close(kepler_industrialisation.polities); // BL-1089
+
+        // BL-1068: THE RECORDED RECORD, on Exploration's footing
+        // above -- the four counters and the time-lapse are the
+        // record of the run for the wizard's Industrialisation
+        // round, recorded here, at the one call site that ran the
+        // span. Write-only: nothing at world setup reads them, so
+        // recording cannot steer the world (save_game_version 18).
+        if (report != nullptr)
+        {
+            report->industrialisation_years     = kepler_industrialisation_hs.years;
+            report->industrialisation_battles   = kepler_industrialisation_hs.battles;
+            report->industrialisation_conquests = kepler_industrialisation_hs.conquests;
+            report->industrialisation_foundings = kepler_industrialisation_hs.foundings;
+            for (generation_report::body_entry& be : report->bodies)
+                if (be.id == kepler)
+                    be.industrialisation_timelapse = as_timelapse(kepler_industrialisation_hs);
+        }
+
+        if (fixture != nullptr)
+        {
+            fixture->industrialisation_ran     = true;
+            // BL-1053: no pointer into `kepler_exploration`, which
+            // lives on the cursor and dies with it (BL-1084).
+            fixture->industrialisation_params  = without_resume_pointers(dp);
+            fixture->industrialisation_seed    = dseed;
+            fixture->industrialisation_handoff = kepler_industrialisation;
+            fixture->industrialisation_state   = kepler_industrialisation_hs;
+            // The profile is a process-wide accumulator the NEXT
+            // run resets; nothing between the call and this line
+            // runs the sim, and it is read only for a harness.
+            fixture->industrialisation_rounds  = history_sim_last_profile().decision_rounds;
+            fixture->ms_industrialisation      = span_ms;
+            // BL-1041: the points' own accrual cost, same footing.
+            fixture->ns_industrialisation_industry_points =
+                history_sim_last_profile().ns_industry_points;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// THE HISTORY'S CLOSE, after whichever span ran last: the capital market
+// shells, population centres, the nation seeding and the city names. The
+// tail's first act, and a stopped span build's ending. Runs once.
+// ---------------------------------------------------------------------------
+void close_history(generation_cursor& c)
+{
+    if (c.history_closed) return;
+    c.history_closed = true;
+
+    world&                          w                        = c.w;
+    const world_params&             params                   = c.params;
+    era_minus_one_fixture* const    fixture                  = c.fixture;
+    const entity_id                 kepler                   = c.kepler;
+    const creed_state&              kepler_creeds            = c.kepler_creeds;
+    settlement_state&               kepler_settlement        = c.kepler_settlement;
+    nation_params&                  kepler_np                = c.kepler_np;
+    const std::vector<int64_t>&     kepler_polity_treasuries = c.kepler_polity_treasuries;
+    const std::vector<std::string>& kepler_polity_names      = c.kepler_polity_names;
+    std::vector<int>&               kepler_region_polity     = c.kepler_region_polity;
+    std::vector<entity_id>&         capital_market_shells    = c.capital_market_shells;
+
+    // The shells stand only where the era ran: they sat inside its gate.
+    if (c.era_ran)
+    {
+        // --- BL-910: capitals and markets stand at the 1200 CE close ---
+        //
+        // `run_history_sim` marked `region::has_market` on every living
+        // polity's capital (CIVILISATION.md sec Capitals exist at the
+        // close) -- a PLACE AND A VISIBLE CONDITION, not an order book:
+        // the market spawned here is default-constructed (no supply, no
+        // demand, no price, no inventory) except for its anchor. It is a
+        // SEPARATE mechanism from the BL-768 resource/junction carve
+        // below, which prices and populates the campaign's own market
+        // set once population centres exist; that carve is unchanged and
+        // this block does not fold into it, only stands ahead of it.
+        {
+            const std::vector<entity_id>& grid = body_tile_grid(w, kepler);
+            if (static_cast<int>(grid.size()) >= home_grid_width * home_grid_height)
+            {
+                for (const region& rg : kepler_settlement.regions)
+                {
+                    if (!rg.has_market) continue;
+                    if (rg.row < 0 || rg.row >= home_grid_height
+                     || rg.col < 0 || rg.col >= home_grid_width)
+                        continue;
+                    const entity_id anchor_tile =
+                        grid[static_cast<std::size_t>(rg.row) * home_grid_width
+                             + static_cast<std::size_t>(rg.col)];
+                    if (anchor_tile == null_entity) continue;
+                    market_component mc;
+                    mc.body        = kepler;
+                    mc.centre_tile = anchor_tile;
+                    const entity_id shell_id = w.create_entity();
+                    w.markets[shell_id] = mc;
+                    capital_market_shells.push_back(shell_id);
+                }
+            }
+        }
+    }
+    // OUTSIDE the gate, deliberately: a skipped era must read as zero
+    // elapsed rather than folding the whole remainder of generation into
+    // the era's bucket (BL-754).
+    c.clocks.era_end = gen_clock::now();
+
+    // Population centres (BL-610, centres from demography): placed HERE,
+    // after the Era -1 sim has grown, warred and plagued the regions'
+    // populations, so the centre count and scale distribution are the
+    // history's consequence rather than a land-area divisor and an
+    // authored weighted draw. Same seed derivation as the pre-BL-610 call
+    // site; only the position in the chain and the settlement argument
+    // changed.
+    generate_population_centres(w, kepler, /*seed=*/params.seed ^ 0x70701001u,
+                                &kepler_settlement);
+
+    kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
+
+    // BL-769 — THE HISTORY'S POLITICAL MAP CROSSES THE HANDOFF. Read here,
+    // BEFORE `derive_national_character` overwrites `region::nation` with
+    // the nation index: until that call the field holds the POLITY id the
+    // sim wrote as it ran. Phase 5 folds a polity's regions into one nation
+    // instead of growing an independent realm out of each anchor.
+    kepler_np.seed_polities = settlement_seed_polities(kepler_settlement);
+
+    // BL-975 — THE HISTORY'S CHESTS CROSS WITH ITS MAP. Indexed by the
+    // same polity ids `seed_polities` just read, so Pass 2d can land each
+    // polity's treasury on the seed it folds to -- the chest at the same
+    // close as the map (1660, or 1960 when the Industrialisation span ran:
+    // BL-1053), so a polity's ids and its chest are never two dates.
+    // Empty when the Exploration span did not run (opted out, or the
+    // wizard's Empires-round launch), which credits nothing. The fixture
+    // records exactly what this site handed nation generation.
+    kepler_np.polity_treasuries = kepler_polity_treasuries;
+    if (fixture != nullptr) fixture->setup_polity_treasuries = kepler_polity_treasuries;
+
+    // BL-1089 — THE NAMES CROSS WITH THE MAP AND THE CHESTS, by the same
+    // polity ids, so Pass 5 copies a realm's coined name across instead of
+    // coining a second one (NATION_GENERATION.md § Pass 5).
+    kepler_np.polity_names = kepler_polity_names;
+
+    // BL-898 — THE SAME READ, KEPT FOR THE SAME WINDOW. `seed_polities`
+    // above is filtered to anchored regions because `generate_nations`
+    // reads it as a parallel array; the grudge seeding needs the polity of
+    // EVERY region, including the unanchored ones, to work out which nation
+    // a polity's ground ended up inside. One line, taken at the one moment
+    // `region::nation` still holds a polity id.
+    kepler_region_polity.reserve(kepler_settlement.regions.size());
+    for (const region& p : kepler_settlement.regions)
+        kepler_region_polity.push_back(p.nation);
+
+    // Each anchor carries its region's tongue across into Pass 5, so a
+    // nation is named in the speech of the people who settled its core
+    // rather than out of a bank of its own (BL-290).
+    kepler_np.seed_tongues.reserve(kepler_settlement.regions.size());
+    for (const region& p : kepler_settlement.regions)
+    {
+        if (p.anchor < 0) continue;
+        // BL-826 — PLURALITY. A nation is named in ONE tongue, so the
+        // distribution has to collapse to a single answer here, and the
+        // largest people on the core is it. The same rule city_names.cpp
+        // applies to a town, applied to the realm grown from that ground.
+        const int pc = p.culture.plurality();
+        kepler_np.seed_tongues.push_back(
+            pc >= 0 && pc < static_cast<int>(kepler_creeds.cultures.size())
+                ? kepler_creeds.cultures[static_cast<std::size_t>(pc)].speech
+                : tongue{});
     }
 
-    // BL-946: the wizard's new Exploration round's own stop point, one round
-    // later than the Empires round's above -- same contract, same reason.
-    // (It stopped the Industrialisation span too, at the span's own gate: the span
-    // runs ahead of this line, so this return alone could not.)
-    if (gen_cfg.stop_after_exploration)
-    {
-        if (report)
-            for (generation_report::body_entry& be : report->bodies)
-                if (be.id == kepler) { be.settlement = kepler_settlement; break; }
-        return w;
-    }
+    // Same act for the cities: the placeholder names generate_population_
+    // centres coined before there was any culture are replaced with names
+    // in the nearest region's tongue.
+    name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
+                            /*seed=*/params.seed ^ 0xC17910E6u);
+}
 
-    // BL-1040: one span later -- the Industrialisation span has run (when it was
-    // enabled and Exploration ran), and nothing of world setup has. Same
-    // contract as the two stops above.
-    if (gen_cfg.stop_after_industrialisation)
-    {
-        if (report)
-            for (generation_report::body_entry& be : report->bodies)
-                if (be.id == kepler) { be.settlement = kepler_settlement; break; }
-        return w;
-    }
+// ---------------------------------------------------------------------------
+// STAGE 6 -- THE TAIL (bumps 9-12): the history's close, then borders, roads,
+// companies, the markets, Selene and Pallas, laws, provinces and garrisons.
+// ---------------------------------------------------------------------------
+void run_tail(generation_cursor& c)
+{
+    close_history(c);
 
-    bump(9);
+    world&                               w                     = c.w;
+    const world_params&                  params                = c.params;
+    generation_report* const             report                = c.report;
+    generation_progress* const           progress              = c.progress;
+    era_minus_one_fixture* const         fixture               = c.fixture;
+    const world_gen_config&              gen_cfg               = c.gen_cfg;
+    const float                          deposit_scalar        = c.deposit_scalar;
+    const body_naming&                   naming                = c.naming;
+    const resolved_world&                rw                    = c.rw;
+    const entity_id                      kepler                = c.kepler;
+    const planetology_state&             kepler_pl             = c.kepler_pl;
+    const std::vector<entity_id>&        kepler_tiles          = c.kepler_tiles;
+    history_ladder_state&                kepler_hist           = c.kepler_hist;
+    creed_state&                         kepler_creeds         = c.kepler_creeds;
+    settlement_state&                    kepler_settlement     = c.kepler_settlement;
+    const nation_params&                 kepler_np             = c.kepler_np;
+    const std::vector<history_corridor>& kepler_corridors      = c.kepler_corridors;
+    const std::vector<grudge>&           kepler_grudges        = c.kepler_grudges;
+    const int32_t                        kepler_grudge_cap     = c.kepler_grudge_cap;
+    const std::vector<int>&              kepler_region_polity  = c.kepler_region_polity;
+    const std::vector<entity_id>&        capital_market_shells = c.capital_market_shells;
+    generation_cursor::clock_state&      clk                   = c.clocks;
+
+    bump(c, 9);
     // BL-1089: the fold's own record — which realm each nation is and which
     // it absorbed — read off the passes and put on the report, so Begin, a
     // load and the seat card all read one derivation (a pure read: filling it
@@ -2255,7 +2426,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // (BL-623), so they take local streets and spurs like any village and the
     // off-lattice centre class ends here. Deterministic; no seed of its own —
     // a pure function of the generated tiles/nations/centres.
-    bump(10);
+    bump(c, 10);
     generate_roads(w, kepler, progress); // BL-1072: reports its village walk
 
     // ANCIENT ROADS, STAMPED FROM THE HISTORY (BL-768; Ben, the eight-phase
@@ -2281,7 +2452,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
         road_nodes.reserve(kepler_settlement.regions.size());
         for (const region& p : kepler_settlement.regions)
             road_nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
-        enter_step(15); // BL-1072: a step of its own, 4-7 s in Release
+        enter_step(c, 15); // BL-1072: a step of its own, 4-7 s in Release
         stamp_history_roads(w, kepler, road_nodes, kepler_corridors, progress);
     }
 
@@ -2318,7 +2489,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // above are in w.buildings for corporate asset placement to collision-avoid.
     // Corporations: 6-10 actors registered in the generated nations, including
     // the player's (which sets w.player_entity). See CORPORATION_GENERATION.md.
-    bump(11);
+    bump(c, 11);
     generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count,
                                                  .seed_starting_force = gen_cfg.seed_starting_force },
         /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement, progress);
@@ -2326,7 +2497,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // BL-1072: "Finishing" is entered HERE, so its caption covers what is
     // actually left -- the markets, the other bodies, laws, provinces and
     // garrisons -- rather than being published after the last of it ran.
-    bump(12);
+    bump(c, 12);
 
     // Kepler markets — population-anchored but RESOURCE-CARVED (BL-096). Markets
     // still anchor to population-centre tiles (catchment routing via market_for_tile
@@ -2761,11 +2932,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // drives the tidal term.
     std::vector<float> selene_bias;
     continent_state selene_cs;
-    const planetology_state selene_pl = plan(2, selene, 90, 42, selene_bias, nullptr, &selene_cs);
+    const planetology_state selene_pl = plan_body(c, 2, selene, 90, 42, selene_bias, nullptr, &selene_cs);
     const uint32_t selene_tile_seed = params.seed ^ 0x5E1E001u;
     generate_body_tiles(w, selene, 90, 42, selene_pl.profile,
         selene_tile_seed, deposit_scalar, &selene_pl, nullptr, &selene_bias, nullptr, &selene_cs);
-    record_tile_inputs(selene, selene_tile_seed, 90, 42, /*used_convergent=*/false);
+    record_tile_inputs(c, selene, selene_tile_seed, 90, 42, /*used_convergent=*/false);
 
     // -----------------------------------------------------------------------
     // Asteroid belt — a band beyond Kepler. The belt itself is not a body; it
@@ -2805,11 +2976,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // exits the chain at accretion and the whole object becomes the deposit.
         std::vector<float> ast_bias;
         continent_state ast_cs;
-        const planetology_state ast_pl = plan(a.proto_index, id, 30, 14, ast_bias, nullptr, &ast_cs);
+        const planetology_state ast_pl = plan_body(c, a.proto_index, id, 30, 14, ast_bias, nullptr, &ast_cs);
         const uint32_t ast_tile_seed = params.seed ^ a.seed;
         generate_body_tiles(w, id, 30, 14, ast_pl.profile,
             ast_tile_seed, deposit_scalar, &ast_pl, nullptr, &ast_bias, nullptr, &ast_cs);
-        record_tile_inputs(id, ast_tile_seed, 30, 14, /*used_convergent=*/false);
+        record_tile_inputs(c, id, ast_tile_seed, 30, 14, /*used_convergent=*/false);
     }
 
     // Freeze each body's authored phase as its epoch angle, so the econ tick can
@@ -2927,7 +3098,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     seed_nation_garrisons(w);
 
     // BL-1053: the count published at the first line is the count reported.
-    assert((progress == nullptr || gen_stage == generation_stage_count(gen_cfg))
+    assert((progress == nullptr || clk.gen_stage == generation_stage_count(gen_cfg))
            && "generation_stage_count disagrees with the bumps this run made");
 
     // --- The generation budget, reported (BL-754) ---------------------------
@@ -2944,12 +3115,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
         // BL-1072: close the last step's clock (reported only, like the rest),
         // and fill the weighted bar: the build is whole.
-        if (step_label >= 0)
+        if (clk.step_label >= 0)
         {
-            step_ms[static_cast<std::size_t>(step_label)] += ms_between(step_begin, t_world_end);
+            clk.step_ms[static_cast<std::size_t>(clk.step_label)] += ms_between(clk.step_begin, t_world_end);
             if (progress != nullptr)
-                progress->ms_step[static_cast<std::size_t>(step_label)].store(
-                    static_cast<int32_t>(step_ms[static_cast<std::size_t>(step_label)]),
+                progress->ms_step[static_cast<std::size_t>(clk.step_label)].store(
+                    static_cast<int32_t>(clk.step_ms[static_cast<std::size_t>(clk.step_label)]),
                     std::memory_order_relaxed);
         }
         if (progress != nullptr)
@@ -2963,11 +3134,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                         std::memory_order_relaxed);
         }
 
-        const int64_t ms_total      = ms_between(t_world_begin, t_world_end);
-        const int64_t ms_before     = ms_between(t_world_begin, t_settlement_begin);
-        const int64_t ms_settlement = ms_between(t_settlement_begin, t_settlement_end);
-        const int64_t ms_era        = ms_between(t_settlement_end, t_era_end);
-        const int64_t ms_after      = ms_between(t_era_end, t_world_end);
+        const int64_t ms_total      = ms_between(clk.world_begin, t_world_end);
+        const int64_t ms_before     = ms_between(clk.world_begin, clk.settlement_begin);
+        const int64_t ms_settlement = ms_between(clk.settlement_begin, clk.settlement_end);
+        const int64_t ms_era        = ms_between(clk.settlement_end, clk.era_end);
+        const int64_t ms_after      = ms_between(clk.era_end, t_world_end);
 
         // Write-only tap. `budget_ready` is released last, so a renderer that
         // acquire-loads it sees all five values or none of them.
@@ -3002,9 +3173,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
             // BL-1072: the per-step split the loading bar's weights are read from.
             std::fprintf(stderr, "[gen steps]");
             for (int l = 0; l < generation_stage_label_count; ++l)
-                if (step_ms[static_cast<std::size_t>(l)] > 0)
+                if (clk.step_ms[static_cast<std::size_t>(l)] > 0)
                     std::fprintf(stderr, " %d:%lld", l,
-                                 static_cast<long long>(step_ms[static_cast<std::size_t>(l)]));
+                                 static_cast<long long>(clk.step_ms[static_cast<std::size_t>(l)]));
             std::fprintf(stderr, "\n");
         }
     }
@@ -3022,6 +3193,124 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // to. Move each into the corp's home market pool (PRODUCTION.md § Stockpile
     // and output flow).
     rehome_opening_pools(w);
+}
 
-    return w;
+} // namespace
+
+// ===========================================================================
+// The public composition (world/generation_cursor.hpp)
+// ===========================================================================
+
+generation_cursor begin_generation(const world_params& params, generation_report* report,
+                                   const world_gen_config& gen_cfg,
+                                   generation_progress* progress,
+                                   const works_registry* works,
+                                   era_minus_one_fixture* fixture)
+{
+    generation_cursor c;
+    c.params   = params;
+    c.gen_cfg  = gen_cfg;
+    c.report   = report;
+    c.progress = progress;
+    c.works    = works;
+    c.fixture  = fixture;
+    return c;
+}
+
+void run_generation_to(generation_cursor& c, generation_stage target)
+{
+    // One stage at a time, in order, each exactly once: the cursor records the
+    // last stage run, and a stage whose span does not run still advances it.
+    while (c.reached < target)
+    {
+        switch (c.reached)
+        {
+            case generation_stage::none:              run_life_gate(c);         break;
+            case generation_stage::life_gate:         run_culture(c);           break;
+            case generation_stage::culture:           run_empires(c);           break;
+            case generation_stage::empires:           run_exploration(c);       break;
+            case generation_stage::exploration:       run_industrialisation(c); break;
+            case generation_stage::industrialisation: run_tail(c);              break;
+            case generation_stage::tail:              return;
+        }
+        c.reached = static_cast<generation_stage>(static_cast<uint8_t>(c.reached) + 1);
+    }
+}
+
+void gen_life_gate(generation_cursor& c)         { run_generation_to(c, generation_stage::life_gate); }
+void gen_culture(generation_cursor& c)           { run_generation_to(c, generation_stage::culture); }
+void gen_empires(generation_cursor& c)           { run_generation_to(c, generation_stage::empires); }
+void gen_exploration(generation_cursor& c)       { run_generation_to(c, generation_stage::exploration); }
+void gen_industrialisation(generation_cursor& c) { run_generation_to(c, generation_stage::industrialisation); }
+void gen_tail(generation_cursor& c)              { run_generation_to(c, generation_stage::tail); }
+
+void close_stopped_generation(generation_cursor& c)
+{
+    generation_report* const report = c.report;
+    const entity_id          kepler = c.kepler;
+    switch (c.reached)
+    {
+        case generation_stage::culture:
+            // THE MIGRATION HAS RUN (BL-871): the Culture round's own ending.
+            publish_migration_round(c);
+            break;
+
+        case generation_stage::empires:
+        case generation_stage::exploration:
+        case generation_stage::industrialisation:
+        {
+            close_history(c);
+            const settlement_state& kepler_settlement = c.kepler_settlement;
+            //
+            // THE ANCIENT ERA HAS RUN. A caller that only wanted the history — the
+            // wizard's history round — stops here rather than paying for borders, roads
+            // and companies it will discard (about 95% of the wall clock; see
+            // world_gen_config::stop_after_ancient_era). The world left behind is
+            // deliberately half-built and must not be played.
+            //
+            // THE REPORT IS FINISHED FIRST, AND THAT ORDERING IS THE WHOLE OF THIS
+            // BLOCK. The first cut returned immediately and shipped a report carrying
+            // the era's TIME-LAPSE but not its SETTLEMENT — `be.settlement` is assigned
+            // a hundred lines below, past the return — so the wizard's round got an
+            // ownership record with no region coordinates to draw it against and
+            // rendered an empty map for four thousand years while its own header
+            // reported 611 foundings.
+            //
+            // It survived the scripted check because that check cannot see this path:
+            // under `--verify` the round ADOPTS the harness's own fully-built world
+            // rather than running a stopped one, so five green assertions said nothing
+            // about the branch. Caught by driving the built app, which is what the
+            // live-click rule is for.
+            //
+            // BL-946: the wizard's Exploration round stops one round later than
+            // the Empires round, on the same contract for the same reason; and
+            // BL-1040 one span later again, with the Industrialisation span run
+            // (when it was enabled and Exploration ran) and nothing of world
+            // setup. One ending for all three (BL-1084).
+            if (report)
+                for (generation_report::body_entry& be : report->bodies)
+                    if (be.id == kepler) { be.settlement = kepler_settlement; break; }
+            break;
+        }
+
+        case generation_stage::none:
+        case generation_stage::life_gate:
+        case generation_stage::tail:
+            break;
+    }
+}
+
+world make_hard_coded_world(world_params params, generation_report* report,
+                            const world_gen_config& gen_cfg,
+                            generation_progress* progress,
+                            const works_registry* works,
+                            era_minus_one_fixture* fixture)
+{
+    // THE COMPOSITION (BL-1084): every stage up to the one the stop flags name
+    // (the tail when none is set), then the ending a stopped build had. One
+    // path, stopped where the caller asked -- never a second construction.
+    generation_cursor c = begin_generation(params, report, gen_cfg, progress, works, fixture);
+    run_generation_to(c, generation_stop_stage(gen_cfg));
+    close_stopped_generation(c); // a whole build (reached == tail) does nothing here
+    return std::move(c.w);
 }
