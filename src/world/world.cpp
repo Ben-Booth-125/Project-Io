@@ -42,6 +42,19 @@ uint64_t world::state_hash(int tick) const
     fnv1a_i32(h, tick);
 
     // Corporations: balance is the tick-mutating field the money loop drives.
+    //
+    // THE SEAT IS FOLDED HERE TOO (BL-1082, ruled by Ben 2026-09-24): each
+    // corp's `is_player` inside the sorted walk, and `player_entity` once after
+    // it. The seat is the one folded field a tick never moves — the generator's
+    // draw or `corp_verb::take_seat` writes it, pre-play — and it is folded
+    // because a pick IS a different campaign: without it two different picks on
+    // one world hashed alike, and `seat_pick_check` had to read the player id
+    // beside the hash to tell them apart (found by BL-1076). Both halves are
+    // folded, not one: `player_entity` names the seat, the flags say exactly one
+    // corp carries it, and a world where the two disagree is a broken invariant
+    // the hash should see. Integer-only and cheap. It moves every pinned hash
+    // once, structurally (new state, not new behaviour), at the re-bless it
+    // rides.
     {
         std::vector<entity_id> ids;
         ids.reserve(corporations.size());
@@ -52,7 +65,9 @@ uint64_t world::state_hash(int tick) const
             const corporation_component& cc = corporations.at(id);
             fnv1a_u32(h, id);
             fnv1a_f32(h, cc.balance);
+            fnv1a_i32(h, cc.is_player ? 1 : 0);
         }
+        fnv1a_u32(h, player_entity);
     }
 
     // Buildings: every field the AI / economy tick may mutate.

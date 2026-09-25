@@ -13,7 +13,10 @@
 //                                is the drawn seat, nothing else moves;
 //   3. --autostart --seat Y      a different ranked firm, twice: both runs open on
 //                                the same hash (reproducible from (seed, pick)),
-//                                both seated on Y;
+//                                both seated on Y -- and that hash is NOT the
+//                                draw's: world::state_hash folds the seat
+//                                (BL-1082), so a different pick is a different
+//                                hash, asserted from the hash alone;
 //   4. --autostart --seat 1      an id that names no ranked specialist: the run
 //                                FAILS and seats nobody (never a silent fall-back
 //                                to the draw).
@@ -85,9 +88,11 @@ const checks = [
   ['a different pick seats that firm (run 1)', !!y1 && y1.rc === 0 && y1.picked === other],
   ['a different pick seats that firm (run 2)', !!y2 && y2.rc === 0 && y2.picked === other],
   ['(seed, pick) reproduces the seat: run 1 hash == run 2 hash', !!y1 && !!y2 && !!y1.hash && y1.hash === y2.hash],
-  // NOT "a different hash": world::state_hash folds balances and building
-  // state but not is_player / player_entity, so the seat is read beside it.
-  ['a different pick is a different seat', !!y1 && y1.picked !== draw.drawn],
+  // BL-1082: world::state_hash folds is_player / player_entity, so a different
+  // pick IS a different hash. Asserted from the hash alone; the `[seat] picked`
+  // id printed beside it above is a diagnostic, not the assertion.
+  ['a different pick is a different seat (from the state hash alone)',
+   !!y1 && !!y1.hash && !!draw.hash && y1.hash !== draw.hash],
   ['a pick naming no ranked firm FAILS the run', bad.rc !== 0 && /--seat 1 REJECTED/.test(bad.out)],
   ['a refused pick seats nobody', !/\[seat\] (drawn|picked)/.test(bad.out)],
 ];

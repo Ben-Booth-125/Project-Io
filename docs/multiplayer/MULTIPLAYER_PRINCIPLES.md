@@ -142,8 +142,9 @@ reader can see the whole shape.
 
 ## The deterministic state hash
 
-**`world::state_hash(int tick)`** (`src/world/world.{hpp,cpp}`) folds the fields a tick may mutate
-into one `uint64_t`; it is sampled by `tools/verify/ai_skill_harness.cpp`, `determinism_harness.cpp`
+**`world::state_hash(int tick)`** (`src/world/world.{hpp,cpp}`) folds the fields a tick may mutate,
+plus the seat (`is_player` / `player_entity`, so two picks on one world hash apart), into one
+`uint64_t`; it is sampled by `tools/verify/ai_skill_harness.cpp`, `determinism_harness.cpp`
 and `save_roundtrip.cpp` among others. It has value in *both* worlds, which is why it is worth
 recording here. As a single-player tool it is a save/regression aid: two runs of the same seed hash
 identically. In a lockstep context it is exactly the **desync-detection** primitive — clients
