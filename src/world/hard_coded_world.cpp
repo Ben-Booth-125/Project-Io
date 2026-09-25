@@ -1975,13 +1975,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // ordinary `import_tariff` authored by that nation, which is what finally
     // gives NATIONS.md's "vocabulary ahead of its consumer" its instance.
     //
-    // A world whose polities never industrialised enacts NOTHING here, and that
-    // is a legitimate outcome rather than a gap — see `polity::protection_q`.
-    // THIS IS THE ENACTMENT SEAM, NOT THE DERIVATION (BL-976): the Era -1 sim
-    // no longer writes `protection_q` (its derivation went with the two-span
-    // arc, BL-1075), and Industrialisation owns the derivation
-    // (INDUSTRIALISATION.md § The boundary). The call stays so that whatever
-    // writes the field is read by one path.
+    // THIS IS THE ENACTMENT SEAM, NOT THE DERIVATION (BL-976): the span's
+    // end-of-run block writes `polity::protection_q` from the scarcity signals,
+    // the trade flows and the cultural preference (BL-1102, the stated formula
+    // in history_sim.cpp; INDUSTRIALISATION.md § The boundary owns it), and
+    // this is the one path that reads it. A nation whose derived protection
+    // sits below the lowest tariff band enacts nothing, which is a legitimate
+    // outcome rather than a gap (NATIONS.md § The import tariff's floor).
     seed_national_tariffs(w, kepler_nations,
                           derive_national_protection(
                               kepler_settlement, static_cast<int>(kepler_nations.size())));

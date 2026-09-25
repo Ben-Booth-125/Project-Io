@@ -7536,14 +7536,14 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: era_timelapse.hpp; history_lapse.cpp caption",
       "headless: save_envelope_roundtrip"
      ],
      "requirement": "Round 5's ticker distinguishes 'X buys Y's province' from 'falls under the overlordship of' (a caption for province_bought); the new kind is append-only on lapse_event_kind and rides the sprint's envelope bump.",
      "notes": "",
-     "result_metric": "province_bought = kind 18 (append-only) under the shared envelope v22; round-5 caption written. save_envelope_roundtrip on the merged tree: in the 2026-09-25 wave-0 gate run."
+     "result_metric": "province_bought = kind 18 under the shared envelope v22 (save_game.hpp LAYOUT 22 lists the seeds and both kinds); save_envelope_roundtrip PASS (0 failures) on the full wave-0 tree, 2026-09-25 01:12."
     },
     {
      "id": "R5",
@@ -7558,14 +7558,14 @@
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "build",
       "headless: world_determinism x2"
      ],
      "requirement": "Release build; world_determinism twice on the same params (bit-identical to itself); digests move only against the pre-change pins and are recorded for the sprint's single re-bless.",
      "notes": "",
-     "result_metric": "Release build on the merged tree passes (cc5e51d1); world_determinism x2 in the 2026-09-25 gate run; R3b in exploration_sim_harness moves by +400 tribute and is left for the sprint's single re-bless."
+     "result_metric": "Release build cc5e51d1 green; world_determinism x2 on the full wave-0 tree ALL PASS, digests unchanged (seedA/on 5BA2EE1EE993C201 — the harness world runs the ancient arc only, so purchases do not reach it); exploration_sim_harness fails exactly its R3b regression pin (+400 tribute), left for the sprint's single re-bless; the 16 library pins move at the re-bless."
     }
    ]
   },
@@ -7594,14 +7594,14 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: era_timelapse.hpp; history_sim.cpp",
       "headless: save_envelope_roundtrip"
      ],
      "requirement": "A sea_lane_opened event (region/other = the ends, polity = the tier) is noted when a leg's uses cross sea_lane_tier1_uses (default 4, mirroring road_tier1_uses); the kind is append-only and rides the envelope bump.",
      "notes": "",
-     "result_metric": "sea_lane_opened = kind 19 at sea_lane_tier1_uses (default 4); save_envelope_roundtrip on the merged tree: in the 2026-09-25 gate run."
+     "result_metric": "sea_lane_opened = kind 19 at sea_lane_tier1_uses 4; save_envelope_roundtrip PASS on the full wave-0 tree, 2026-09-25."
     },
     {
      "id": "R3",
@@ -7626,14 +7626,14 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: docs/generation/EXPLORATION.md",
       "headless: industrialisation_sim_harness --fidelity"
      ],
      "requirement": "EXPLORATION.md § The colonial tie is a sea lane names the three sites and the tier threshold; the industrialisation resume carries the table (fidelity mode compares it).",
      "notes": "",
-     "result_metric": "EXPLORATION.md § The colonial tie is a sea lane names the three sites and the tier threshold; industrialisation_sim_harness --fidelity gate 3 on the merged tree (with the producer line): in the 2026-09-25 gate run."
+     "result_metric": "EXPLORATION.md § The colonial tie is a sea lane names the three sites and the tier; industrialisation_sim_harness --fidelity on the merged tree with the producer line: gate 1 16/16, gate 2 16/16, gate 3 (shipped span == the resume) 16/16 — FIDELITY PASS, 2026-09-25 01:36."
     }
    ]
   },
@@ -7750,13 +7750,13 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism x2"
      ],
      "requirement": "Digests move only where a law is written; recorded for the sprint's single re-bless; world_determinism twice bit-identical to itself.",
      "notes": "",
-     "result_metric": "Every curated seed now writes laws, so the 16 --digest-check pins move at the re-bless; world_determinism x2 on the merged tree: in the 2026-09-25 gate run."
+     "result_metric": "world_determinism x2 on the full wave-0 tree ALL PASS, pinned digits unchanged (the harness world stops at 1200; the laws land at the 1960 close); industrialisation_sim_harness BL-1056 SELF-CHECK PASS; the 16 library pins move at the re-bless."
     }
    ]
   },
