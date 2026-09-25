@@ -6978,24 +6978,24 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: lp_anchor_field_check L1, seeds 0 and 28"
      ],
      "requirement": "A save and load after settle tick 1 continues identically to the unsaved run on every tick 2-11, WITHOUT the --cold-original control.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "a2b3e948 (merged f6c87707): lp_anchor_field_check L1 MATCHES on every settle tick 2-11 on seeds 0 and 28 with NO --cold-original control (before: diverged at tick 2 / tick 3). intra_body_path(O, D) always reads D's flood field under the ordered key; flood_edge_cost prices each hop toward the anchor so the field holds O -> D (LOGISTICS.md section 1)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: gen_step_costs --finish 0 28",
       "headless: player_seed_sweep --digest-check"
      ],
      "requirement": "Flood count and settle time old -> new are recorded; the digest movement is named as a cause in the sprint's re-bless.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Indicative, loaded: floods alive in the settle and a play year unchanged (217 / 119); generation floods 2,927 -> 4,401 (seed 0), 1,709 -> 2,086 (seed 28), all road generation's own queries (step 15 doubled on seed 0, 10 -> ~22 s; BL-1119 round 4 restructures them). Settle and play year no slower. Digests move on every row (world_determinism seedA/on D356F1A2E9148EDE -> C4494BD786F8197F; player_seed_sweep D_search/D_land/D_settle/D_seat on seeds 0 and 28): a named re-bless cause -- path costs read one way only, O -> D, the river discount taken in travel direction."
     },
     {
      "id": "R3",

@@ -162,10 +162,16 @@ upstream this sprint (BL-1130); the spur floor 40,000 and border links on the ne
 the path-cost cache dependence fixed this sprint (BL-1126). Docs: MARKETS.md, POPULATION.md,
 LOGISTICS.md §§ 1, 4, 6.
 
-- [ ] P1 BL-1126 (path cost reads the cache): `intra_body_path` pure in the ordered pair, the
+- [x] P1 BL-1126 (path cost reads the cache): `intra_body_path` pure in the ordered pair, the
   destination's field only; L1 matches without the control; plus BL-1117's S2 review fix round
   (tie contract restated, F1 non-vacuous, stale comments). Files: `logistics.*`,
   `lp_anchor_field_check.cpp`. The settle lane.
+  DONE 2026-09-25 (a2b3e948, merged f6c87707): L1 MATCHES on ticks 2-11, seeds 0 and 28, no
+  control. Each hop is priced toward the anchor, so a destination's field holds O -> D. F2
+  reports 2 exact-tie cells on seed 28 (costs identical; within the restated contract).
+  Generation floods +50% on seed 0, step 15 doubled -> D6. Cold review running.
+- [ ] D6 BL-1119 round 4: road generation asks its directed path queries so each destination's
+  flood is reused (one deterministic direction per unordered town pair, stated). The roads lane.
 - [x] D4 BL-1119 round 2: the floor constant; border links only on towns and spurring villages;
   `invalidate_logistics_caches` in road generation; the loading-bar weights measured (applied by
   the main session after K4); the highway-tier row's cause. Files: `road_generation.*`, its
