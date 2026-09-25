@@ -115,6 +115,7 @@ uint64_t digest(const era_timelapse& t)
     {
         f.v(s.population); f.v(s.polity); f.v(s.regions);
         f.v(s.cap_military); f.v(s.cap_materials); f.v(s.industry_points);
+        f.v(s.navy_stock); f.v(s.port_stock_q); // BL-1095: the two fleet fields are history too
     }
     f.v(static_cast<uint64_t>(t.culture_changes.size()));
     for (const culture_change& c : t.culture_changes)

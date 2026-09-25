@@ -139,6 +139,18 @@ struct polity_sample
     /// READ of the sim like every other field here, never read back by it.
     /// save_game_version 21.
     int64_t  industry_points = 0;
+    // --- BL-1095 (fleets and ties; Ben 2026-09-24, R13), save_game_version 22 ---
+    /// The realm's standing navy at this step (`polity::navy_stock`, in
+    /// hulls) and its CAPITAL's built port at the same step
+    /// (`region::port_stock_q` of `polity::capital`, 0-1000). The two stocks
+    /// the Exploration span maintains and lets decay (EXPLORATION.md § Force
+    /// persists now), sampled so the time-lapse draws a hull that scales and
+    /// a harbour that silts. Zero on the Empires record, whose span builds
+    /// neither (the navy is NEW at 1200 and starts at zero everywhere). A
+    /// READ of the sim like every other field here, never read back by it.
+    int64_t  navy_stock   = 0;
+    int16_t  port_stock_q = 0;
+    // --- end BL-1095 ---
 };
 
 /// One recorded step: a year, and the half-open span of `samples` taken at it.
@@ -205,7 +217,8 @@ enum class lapse_event_kind : uint8_t
     works_chartered     = 21, ///< BL-1099: a region's `industry_points` crossed the next multiple of `works_event_fraction_q` x the RUNNING charter price (the world's stock so far over `k_stockpile_price_divisor`); `region` = the works' region, `polity` = its holder, `other` = the `industrial_focus` a firm chartered there takes (`focus_from_region`). RECORD-ONLY: no point is debited, at most `works_event_region_cap` per region per span (save_game_version 22).
     rung_crossed        = 22, ///< BL-1100: a POLITY's materials capacity reached the Industrial rung (`polity::industrial_year`, INDUSTRIALISATION.md sec Beat 1 "The span's industrial moment is the polity's crossing"); `region` = its capital that year, `polity` = the polity, `other` = none. ITS OWN KIND, not a reuse of `furnace_lit` (Ben's either/or, 2026-09-24, R16): a region furnace is Stage 4's ground-by-ground lag and never lights on a generated world, while this is the realm's crossing the sim computes -- one kind per fact, so the ember layer can mark the capital without claiming the region's furnace lit. RECORD-ONLY, noted once per polity (save_game_version 22).
     cradle              = 23, ///< BL-1091: a cradle people's opening — `region` = the cradle seat (the first region it held), `polity` = the culture, dated the migration's start (2400 BCE); its name and package are the settlement's pure-output records, resolved read-side. Emitted by `build_migration_timelapse` alone; the migration record's second kind beside `culture_split` (save_game_version 22).    count
-};
+    sea_leg_campaign    = 24, ///< BL-1095: a WET campaign launched — `region` = the target, `polity` = the attacker, `other` = the staging hub it was victualled from (EXPLORATION.md sec Force persists now: "a wet campaign is a moment of its own on the record"). Noted beside the leg's `note_sea_leg`, under the same Exploration/Industrialisation gate, so the Empires record carries none (save_game_version 22).
+    count};
 
 /// No party in this slot — a founding has no killer, a cradle culture no parent.
 inline constexpr uint16_t lapse_event_none = 0xFFFFu;

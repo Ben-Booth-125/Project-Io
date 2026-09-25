@@ -316,12 +316,30 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
 
 ### Wave 2, lane F2 (Exploration) — BL-1095 (fleets and ties). Group `fleets-and-ties`.
 
-- [ ] T1 `navy_stock` and the capital's `port_stock_q` sampled onto `polity_sample`; `sea_leg_campaign`
-  at the wet launch (history_sim.cpp:~5695-5708; append-only; the envelope bump). (R1)
-- [ ] T2 ties and treaty arcs baked from events with endpoints from the capital fold (BL-1088, else the
+- [x] T1 `navy_stock` and the capital's `port_stock_q` sampled onto `polity_sample`; `sea_leg_campaign`
+  at the wet launch (history_sim.cpp:~5695-5708; append-only; the envelope bump). (R1) DONE 2026-09-25:
+  kind 24 (21/22 lane F3, 23 lane F1 left as a numbered gap); the two fields at the tail of the sample's
+  wire form under LAYOUT 22, no bump; world_determinism twice bit-identical and unmoved against main
+  (6DBC0094F0B6B0EF / 95EEAD1204FD31AC / 4834366D19271E5F); save_envelope_roundtrip and save_roundtrip
+  green; span_seed_isolation's hasher folds the pair.
+- [x] T2 ties and treaty arcs baked from events with endpoints from the capital fold (BL-1088, else the
   seat region); the hull glyph, the harbour mark, the sail crossing, the landing for an over-water
-  `seat_captured`; the lane line (BL-1097) kept as its own layer. (R2, R3)
+  `seat_captured`; the lane line (BL-1097) kept as its own layer. (R2, R3) DONE 2026-09-25:
+  `bake_lapse_fleets` at the tail of `finish_history_lapse` (after the fold), `lapse_fleets_at` (one
+  derivation the pass and the verify API share) and pass 3g in `draw_lapse_map` -- its own block, 3f and
+  3c' untouched. Ties open on `subject_bound` OR `province_bought` (the sim notes the purchase instead of
+  the binding and sets the same overlord link); "a treaty follows" is bounded to one marker window; arcs
+  stand for the sim's term (read from `history_sim_params`) and were thinned to a hairline after the
+  first capture buried the borders under 90 of them. The 3f ring still draws under a landing: one
+  `continue` owed in 3f once the lanes that edited it have merged.
 - [ ] T3 captures; Release build; `world_determinism` twice; cold review; Ben's live click. (R4)
+  2026-09-25: Release build green (bash wrapper at build_gen/rel_build.sh in the worktree);
+  `world_determinism` twice bit-identical and unmoved; `save_envelope_roundtrip` and `save_roundtrip`
+  green; `scripts/verify/fleets_and_ties.lua` PASS on the reference world (0 golden failures, no
+  clipping) with `history_fleets` / `history_ties` / `history_tie_state` / `history_landing_year` as its
+  readout. NOTE: `verify.new_world(N)` cannot pin seed 13 / 41 -- `app::setup_world` builds only when no
+  world exists (BL-1085), so the call is a no-op on the harness's built world; seed 0 carries 11 ties, 112
+  arcs, 34 sails and 3 landings, so every glyph is photographed. OWES the cold review and Ben's live click.
 
 ### Wave 2, lane F3 (Industrialisation) — BL-1099 (works chartered) with BL-1100 (rung crossing) and BL-1104 (Culture record saved). Groups `works-chartered-events`, `rung-crossed-narrated`, `culture-record-saved`.
 

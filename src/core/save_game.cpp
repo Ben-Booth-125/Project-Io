@@ -501,6 +501,12 @@ void w_timelapse(std::ostream& o, const era_timelapse& t)
         w_u8(s, v.cap_military);
         w_u8(s, v.cap_materials);
         w_i64(s, v.industry_points); // save_game_version 21 (BL-1080)
+        // --- save_game_version 22 (BL-1095, fleets and ties) -- keep r_timelapse
+        // in step: the navy and the capital's port at the sample's tail. The
+        // i16 goes out as i32, as the culture change's do.
+        w_i64(s, v.navy_stock);
+        w_i32(s, v.port_stock_q);
+        // --- end BL-1095 ---
     });
     w_vec(o, t.culture_changes, [](std::ostream& s, const culture_change& v) {
         w_i32(s, v.year);
@@ -562,6 +568,16 @@ bool r_timelapse(std::istream& i, era_timelapse& t)
             if (v.industry_points < 0) return false;
             v.cap_military  = cm;
             v.cap_materials = cx;
+            // --- save_game_version 22 (BL-1095, fleets and ties) -- keep
+            // w_timelapse in step. WIDE ON THE WIRE, NARROW IN THE STRUCT: the
+            // port is range-checked on the i32 that was written before it
+            // narrows to the i16 field; a negative navy cannot have been
+            // written (history_sim.cpp clamps the stock at 0).
+            int32_t port = 0;
+            if (!(r_i64(s, v.navy_stock) && r_i32(s, port))) return false;
+            if (v.navy_stock < 0 || port < 0 || port > 1000) return false;
+            v.port_stock_q = static_cast<int16_t>(port);
+            // --- end BL-1095 ---
             return true;
         }))
         return false;

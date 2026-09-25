@@ -1713,6 +1713,122 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return std::make_tuple(h.peoples_cradles, h.peoples_coined, h.peoples_folded, overrun);
     });
 
+    // --- BL-1095: THE FLEETS AND TIES on the CURRENT lapse round -------------
+    //
+    // What the map's own pass draws at the playhead, counted off the SAME
+    // derivation it draws from (`ui::lapse_fleets_at`), so a script can claim
+    // a tie or a sail IS on the frame rather than hoping a capture shows one:
+    // ties (dashed, strength > 0), trade_lines (a freed subject's tie carried
+    // on as trade), arcs, hulls, harbours, sails and landings in the window;
+    // and the record's totals (ties_recorded, arcs_recorded, sails_recorded,
+    // landings_recorded, navy_peak) so a script can say "none on this world"
+    // honestly. -1 counts when the record's derived fields are not built yet
+    // (a frame must have drawn the round).
+    v.set_function("history_fleets", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        if (h.empty() || !h.derived())
+        {
+            out["ties"] = -1;
+            return out;
+        }
+        const std::vector<uint16_t> slice = owner_slice_at(h.lapse, m_wiz_history_year[i]);
+        const ui::lapse_fleet_frame f = ui::lapse_fleets_at(h, slice, m_wiz_history_year[i]);
+        int ties = 0, trade = 0;
+        for (const auto& t : f.ties)
+        {
+            if (t.tie_a > 0.0f)   ++ties;
+            if (t.trade_a > 0.0f) ++trade;
+        }
+        out["ties"]              = ties;
+        out["trade_lines"]       = trade;
+        out["arcs"]              = static_cast<int>(f.arcs.size());
+        out["hulls"]             = static_cast<int>(f.hulls.size());
+        out["harbours"]          = static_cast<int>(f.harbours.size());
+        out["sails"]             = static_cast<int>(f.sails.size());
+        out["landings"]          = static_cast<int>(f.landings.size());
+        out["ties_recorded"]     = static_cast<int>(h.tie_segs.size());
+        out["arcs_recorded"]     = static_cast<int>(h.treaty_arcs.size());
+        out["sails_recorded"]    = static_cast<int>(h.sails.size());
+        out["landings_recorded"] = static_cast<int>(h.landings.size());
+        out["navy_peak"]         = static_cast<double>(h.navy_peak);
+        return out;
+    });
+
+    // BL-1095: the baked ties, one row each, in the order they were bound:
+    // overlord, subject, bound (the year), freed (the year, or nil while it
+    // stands to the record's end), trade / trade_end (the follow-on treaty's
+    // years, or nil), bought (true for a purchase). What lets a script pick
+    // a tie whose freeing has a whole marker window inside the span and park
+    // on its two years.
+    v.set_function("history_ties", [this]() {
+        sol::state& s   = m_lua.state();
+        sol::table  out = s.create_table();
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        constexpr int32_t never = 0x7FFFFFFF;
+        int idx = 0;
+        for (const ui::lapse_tie_seg& t : h.tie_segs)
+        {
+            sol::table row = s.create_table();
+            row["overlord"] = static_cast<int>(t.overlord);
+            row["subject"]  = static_cast<int>(t.subject);
+            row["bound"]    = t.year_bound;
+            if (t.year_freed != never)     row["freed"]     = t.year_freed;
+            if (t.year_trade != never)     row["trade"]     = t.year_trade;
+            if (t.year_trade_end != never) row["trade_end"] = t.year_trade_end;
+            row["refused"]  = t.freed_by_refusal;
+            row["bought"]   = t.bought;
+            out[++idx] = row;
+        }
+        return out;
+    });
+
+    // BL-1095: one subject's tie as the frame draws it at the playhead --
+    // "tie" (drawn at full strength), "fading" (inside the window after its
+    // end), "trade" (carried on as a trade line, the tie itself gone) or
+    // "none". Off the same derivation as history_fleets. THE STRONGEST STATE
+    // ACROSS THE SUBJECT'S TIES: a pair the span binds and frees round after
+    // round (the reference world's 19 -> 228 at 1200, 1204, 1208) has the
+    // earlier binding mid-fade on the frame the later one is drawn at full,
+    // and the question a script asks is whether a tie is drawn, not which.
+    v.set_function("history_tie_state", [this](int subject) -> std::string {
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        if (h.empty() || !h.derived()) return "none";
+        const std::vector<uint16_t> slice = owner_slice_at(h.lapse, m_wiz_history_year[i]);
+        const ui::lapse_fleet_frame f = ui::lapse_fleets_at(h, slice, m_wiz_history_year[i]);
+        float tie_a = 0.0f, trade_a = 0.0f;
+        for (const auto& t : f.ties)
+        {
+            if (t.subject != static_cast<uint16_t>(subject)) continue;
+            tie_a   = std::max(tie_a, t.tie_a);
+            trade_a = std::max(trade_a, t.trade_a);
+        }
+        if (tie_a >= 1.0f)   return "tie";
+        if (tie_a > 0.0f)    return "fading";
+        if (trade_a > 0.0f)  return "trade";
+        return "none";
+    });
+
+    // BL-1095: the last over-water seat capture's year at or before
+    // @p at_or_before (the record's end when omitted), or the year before the
+    // record's start when none -- so a script can park on a landing with a
+    // whole window still inside the span, as history_event_year lets it for
+    // a kind.
+    v.set_function("history_landing_year", [this](sol::optional<int> at_or_before) -> int {
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        int year = h.lapse.start_year - 1;
+        for (const ui::lapse_landing& l : h.landings)
+        {
+            if (at_or_before && l.year > *at_or_before) break; // ascending by year
+            year = l.year;
+        }
+        return year;
+    });
+
     // BL-1000: the arc readout's share figures on the CURRENT lapse round, in
     // per-mille — (peak share of PEOPLE, closing share of people, peak share of
     // regions). The first is the number the readout prints as "the largest

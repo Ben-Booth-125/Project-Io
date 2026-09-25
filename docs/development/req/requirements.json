@@ -8274,36 +8274,36 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_sim.cpp sampling and note; era_timelapse.hpp",
       "headless: world_determinism x2; save_envelope_roundtrip"
      ],
      "requirement": "navy_stock and the capital's port_stock_q are series fields on polity_sample (record-only writes; digests unmoved) and one sea_leg_campaign event (region = target, polity = attacker, other = staging hub; append-only; the envelope bump) is noted at the wet campaign launch. (item-spanning gate)",
-     "notes": "",
-     "result_metric": ""
+     "notes": "Lane F2, 2026-09-25, on a branch fast-forwarded to main f81d0d05 (lane I1's name inheritance in). The kind is 24 with 21/22 (lane F3) and 23 (lane F1) left as a numbered gap per the wave brief; the reader's range check admits the gap under version 22. The two fields ride the tail of polity_sample's wire form (i64 + i32, port range-checked 0-1000 before it narrows to the i16) under the existing LAYOUT 22 bullet list -- no bump. span_seed_isolation's field hasher folds the two fields too (one line), so its per-span digest keeps reading the whole record. The live tap publishes no samples, so hulls and harbours appear at landing, as the board's People column does.",
+     "result_metric": "history_sim.cpp record_step: smp.navy_stock = polity::navy_stock, smp.port_stock_q = ss.regions[capital].port_stock_q clamped 0-1000 (0 when the capital is off the table); the wet launch's `if (!exec_dry && params.exploration_upkeep_enabled)` block notes sea_leg_campaign(region = ti, polity = q.id, other = src) beside note_sea_leg. era_timelapse.hpp: polity_sample gains navy_stock (i64) and port_stock_q (i16); lapse_event_kind::sea_leg_campaign = 24. save_game.cpp w/r_timelapse write and read the pair after industry_points, refusing a negative navy or a port off 0-1000. world_determinism (Lua-linked, bash builder) run TWICE on the branch: ALL PASS both, digests bit-identical run to run -- seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F, epoch0 6DBC0094F0B6B0EF -- and the same three digits REFINED.md records for main after lane I1 (unmoved). save_envelope_roundtrip PASS (0 failures; S3 compares navy_stock / port_stock_q on the prehistory fixture -- 0/0, 6100000000/1000, 4200/275 -- and the Industrialisation sample 90/640); save_roundtrip SAVE ROUND TRIP OK. The reference world's Exploration record carries 34 sea_leg_campaign events and a navy peak of 34000 (fleets_and_ties.lua's reading)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp ties and arcs",
       "visual: capture at a subject_bound line"
      ],
      "requirement": "Round 5 bakes dashed overlord -> subject ties from subject_bound / subject_freed / realm_ended (fading to a trade line where a trade_access treaty follows) and treaty arcs between party capitals that snap at treaty_broken, endpoints from the capital-at-year fold (BL-1088; the seat region until it lands).",
-     "notes": "",
-     "result_metric": ""
+     "notes": "Lane F2, 2026-09-25. TWO READINGS FOR THE MERGE SESSION. (1) province_bought is noted INSTEAD of subject_bound for a purchase and sets the same overlord link (history_sim.cpp's subjection block), so a tie opens on either kind -- the item's list names three kinds; the built rule reads four. (2) 'A treaty follows' is bounded to one marker window after the freeing (the tie's fade-out overlapping the line's fade-in); the first cut took any later treaty and the reference world drew a lone straight green line for one formed 72 years on. Arcs are drawn for the sim's term (history_sim_params::treaty_term_years, read from the struct, not duplicated), extended by a re-formation within 20 years of the lapse (the sim re-scores on the round after expiry). SEEN ON THE RECORD: the span's open binds and frees the same pair three rounds running (19 -> 228 and 61 -> 79 at 1200, 1204, 1208, each refused the round it was bound) -- the sim's own doing, worth a look. The arcs were THINNED after the first capture (a hairline at alpha 80, brightening to 190 at a break): 85-95 arcs stand at once on the reference world and at the tie's weight they buried the borders.",
+     "result_metric": "finish_history_lapse tail -> bake_lapse_fleets (history_lapse.cpp, its own block after the sample helpers): one forward walk over the events opens a tie on subject_bound / province_bought (polity = subject, other = overlord; a re-binding closes the standing tie), closes it on subject_freed (flagged refused), on either party's realm_ended, and opens / renews / breaks a treaty arc on treaty_formed / treaty_broken; lapse_fleets_at derives the frame (tie_a 1 while bound then fading over the marker window; trade_a rising from the follow-on treaty and falling after it; an arc's snap in (0, 1] over the window after a break) with endpoints from lapse_polity_capital at the playhead; pass 3g draws ties dashed rose with an arrowhead at the subject, trade lines solid in col_trade_link, arcs as north-bowed quadratics whose halves recoil from the midpoint on a break. verify: history_fleets / history_ties / history_tie_state read the same derivation. scripts/verify/fleets_and_ties.lua on the reference world (seed 0; new_world cannot pin a library seed -- see the item's report): 11 ties, 112 arcs recorded; tie 19 -> 228 reads 'tie' at its binding (1208), 'tie' at its freeing year and 'none' one window on (1223), captures tie_a_bound / tie_b_freed / tie_c_after; at a treaty's forming 87 arcs stand (capture arc); 0 golden failures, expect_no_clipping 0 failures over 38 records."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp glyphs",
       "visual: captures"
      ],
      "requirement": "A hull glyph at each capital scaled by navy_stock; a harbour mark that grows and silts with port_stock_q; a sail crossing the water on each sea_leg_campaign; an over-water seat_captured drawn as a landing (water sampler); the lane line (BL-1097) stays its own layer.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "Lane F2, 2026-09-25. The hull's scale is sqrt(navy / navy_peak) over the record's largest sampled navy (the industry heat's own root, so a small fleet still reads); the harbour is an arc under the seat whose sweep is the port stock and whose colour lerps sand -> stone. Both read the sample at the step at or before the playhead (the board's rule) for every realm holding ground in the slice; the tap publishes no samples, so both appear at landing. The landing's water test is lapse_corridor_over_water over the same band the road bake used, from the attacker's capital at the capture's year (the fold) to the fallen seat. RESIDUAL: 3f's winner-colour ring still draws under a landing; STARTUP.md's 'rather than the inland ring' is one `continue` in 3f against h.landings, left for the merge session since three lanes edited 3f this week. Pass 3c' (the lane) is untouched.",
+     "result_metric": "Pass 3g (history_lapse.cpp draw_lapse_fleets): a hull -- a dark-outlined trapezoid in the realm's colour with a mast, half-width 2 + 5 * size_q px, east of the seat dot; a harbour -- a breakwater arc of radius dot + 3 px under the seat sweeping pi * (0.15 + 0.8 * port_q / 1000), 2 px stone-to-sand over a 3.5 px dark underline; a sail -- fleet_ship (a sail apex-up over a hull line, realm colour under a dark outline) eased hub -> target over the marker window with a faint wake, folded across the seam; a landing -- the same ship from the attacker's capital to the seat over the first half of the window, then three chevrons fanning inland from the seat over the second, both fading in the window's last third. The lane layer 3c' is not edited. fleets_and_ties.lua on the reference world: navy peak 34000; at the close 13 hulls and 8 harbours (capture close); 34 sails recorded, 2 in flight a third of a window after the last launch with a window to spare (capture sail); 3 landings recorded, 1 drawn three quarters of a window after the last (capture landing, at 1227 CE: the cyan winner's ship at the seat with its fan beside a red rival's 3f ring); crops at 2-3x eyeballed for all four glyphs; 0 golden failures, no clipping."
     },
     {
      "id": "R4",
@@ -8312,7 +8312,7 @@
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click — a tie appears at 'falls under the overlordship of' and vanishes or fades at 'breaks from'; a hull shrinks when the fleet lapses; a sail crosses; a landing shows.",
-     "notes": "",
+     "notes": "OWES Ben's live click (lane F2, 2026-09-25): scrub round 5 to a 'falls under the overlordship of' (or 'buys the province of') line for the dashed rose tie, to its 'refuses renewal and breaks from' line for the fade, watch a hull shrink as the fleet lapses, a sail cross on a 'sails against' line, and a landing on an over-water capture. On the reference world the tie churn sits at the span's open (1200-1223 CE); the arcs are deliberately faint (a hairline at a third of the tie's alpha, brightening only at a break). Also for the click: the 3f ring still draws under a landing -- STARTUP.md's 'rather than the inland ring' is one `continue` in 3f against h.landings, left for the merge session because three lanes edited 3f this week.",
      "result_metric": ""
     }
    ]
