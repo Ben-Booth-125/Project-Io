@@ -62,15 +62,17 @@ struct logistics_path
 /// many-to-one layer beneath the per-pair path cache (2026-08-25 warm-start
 /// stall): dispatch prices hundreds of origins against the same few destination
 /// centres, so one flood per centre answers every pair that touches it at
-/// path-reconstruction cost instead of a fresh grid search. Byte-identical to
-/// the per-pair search's answers — same relaxation order, same tie-breaks, and
-/// a settled node's parent is final whether or not the search stopped early.
+/// path-reconstruction cost instead of a fresh grid search. A DESTINATION'S
+/// field (BL-1126, path cost reads the cache): every edge is priced as the hop
+/// TOWARD the anchor, so it answers `intra_body_path(cell, anchor)` for every
+/// cell and nothing else — never the reverse route, which a river prices
+/// differently. A settled node's parent is final.
 struct logistics_flood_field
 {
     int                anchor_idx = -1;   ///< Raster index of the anchor tile.
-    std::vector<float> dist;              ///< Weighted cost anchor -> cell; 1e30f unreached.
-    std::vector<int>   came_from;         ///< Parent raster index on the best path, -1 at anchor/unreached.
-    std::vector<char>  crossed;           ///< Best path anchor -> cell touches ocean?
+    std::vector<float> dist;              ///< Weighted travel cost cell -> anchor; 1e30f unreached.
+    std::vector<int>   came_from;         ///< The cell's next hop toward the anchor, -1 at anchor/unreached.
+    std::vector<char>  crossed;           ///< Best path cell -> anchor touches ocean?
 };
 
 /// A body's NEAREST-ANCHOR FIELD (BL-1117, settle tick one): for every cell, the

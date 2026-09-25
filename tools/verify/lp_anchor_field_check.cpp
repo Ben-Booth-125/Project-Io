@@ -7,7 +7,7 @@
 // whole-body flood per anchor. This harness holds it to its contract on real,
 // settled worlds, per seed:
 //
-//   L1  (REPORTED, not counted) THE LOAD CONTINUATION. After --copy-after K
+//   L1  (A CHECK, BL-1126) THE LOAD CONTINUATION. After --copy-after K
 //       settle ticks the world is saved and loaded (a flat-binary snapshot, the
 //       load contract world_copy_determinism's `--copy-by snapshot` uses), and
 //       both worlds settle the remaining ticks in lockstep with the BL-1031
@@ -44,8 +44,10 @@
 //   F3  NO PER-ANCHOR FLOODS: building the field and answering the sample, from
 //       cold, leaves `logistics_flood_fields` and the pair cache empty.
 //
-// A seed PASSES on F1-F3. L1 is gated on nothing here; its verdict line says
-// MATCH or DIFFER (BL-1126's done-when: MATCH on every tick, no control).
+// A seed PASSES on L1 and F1-F3; any FAIL sets a non-zero exit. L1 is BL-1126's
+// done-when (MATCH on every tick, no control). F1 counts every anchored body
+// whose warm field the ticks built — warm reads are taken for all bodies before
+// the first body's invalidation.
 //
 // USAGE (repo root):
 //   ./build_gen/verify/lp_anchor_field_check.exe [--seeds 0,28] [--copy-after 2] [--no-brute]
@@ -142,7 +144,32 @@ bool cached_over_pool(const world& w, entity_id body, const std::unordered_map<e
     return keys == it->second.anchors;
 }
 
-body_rows check_body(world& w, entity_id body, std::uint32_t seed, bool brute)
+/// One body's warm read, taken for EVERY body before the first check_body runs:
+/// check_body calls invalidate_logistics_caches, which clears every body's
+/// field, so a later body read after it would be a fresh build (the review of
+/// this row, 2026-09-25) and F1 would silently count only the first body.
+struct warm_read
+{
+    bool            anchored  = false; ///< the body has a non-empty anchor pool
+    bool            was_built = false; ///< a field was cached for it at all
+    bool            reused    = false; ///< cached over exactly the pool's anchor set
+    lp_anchor_field field;             ///< the warm field (the cached one when reused)
+};
+
+warm_read take_warm_read(world& w, entity_id body)
+{
+    warm_read r;
+    const std::unordered_map<entity_id, float> pool = active_lp_anchor_pools(w, body, 1.0f);
+    if (pool.empty())
+        return r;
+    r.anchored  = true;
+    r.was_built = w.lp_anchor_fields.count(body) != 0;
+    r.reused    = cached_over_pool(w, body, pool); // compared BEFORE the call
+    r.field     = body_lp_anchor_field(w, body, pool); // a copy
+    return r;
+}
+
+body_rows check_body(world& w, entity_id body, std::uint32_t seed, bool brute, const warm_read& wr)
 {
     body_rows out;
     // The tick's pool: `active_lp_anchor_pools` is what lp_pool_for_body builds
@@ -153,12 +180,13 @@ body_rows check_body(world& w, entity_id body, std::uint32_t seed, bool brute)
     const std::vector<entity_id>& grid = body_tile_grid(w, body);
     const std::size_t cells = grid.size();
 
-    // --- F1: warm, then cold ---
-    // Compared BEFORE the call: a field built here would make F1 compare two
-    // fresh builds of the same thing, which proves nothing (the S2 review).
-    const bool was_built = w.lp_anchor_fields.count(body) != 0;
-    const bool reused    = cached_over_pool(w, body, pool);
-    const lp_anchor_field warm = body_lp_anchor_field(w, body, pool); // a copy
+    // --- F1: warm (taken for every body up front, see warm_read), then cold ---
+    // A field built at the warm read would make F1 compare two fresh builds of
+    // the same thing, which proves nothing (the S2 review), so only a REUSED
+    // field is counted.
+    const bool was_built = wr.was_built;
+    const bool reused    = wr.reused;
+    const lp_anchor_field& warm = wr.field;
     const std::size_t floods_warm = w.logistics_flood_fields.size();
     const std::size_t pairs_warm  = w.astar_cost_cache.size();
     invalidate_logistics_caches(w);
@@ -387,6 +415,11 @@ int main(int argc, char** argv)
         else
             std::printf("  L1 MATCH: the loaded world ticks as the unsaved one on every tick %d-%d\n",
                         copy_after, ticks - 1);
+        // A CHECK, not a report (BL-1126's review): a loaded world that parts
+        // from the unsaved one fails the harness and its exit code.
+        check(first_diff < 0,
+              "L1 a save and load mid-settle continues as the unsaved world, every tick (BL-1126)",
+              seed);
         loaded.reset();
 
         // --- P1: floods over the settle, then a play year ---
@@ -409,10 +442,17 @@ int main(int argc, char** argv)
 
         // --- F1-F3 per body, on the settled (warm) world ---
         body_rows all;
-        int f1_bodies = 0;
-        for (const entity_id body : sorted_body_ids(a.w))
+        int f1_bodies = 0, anchored_bodies = 0;
+        const std::vector<entity_id> bodies = sorted_body_ids(a.w);
+        std::vector<warm_read> warm_reads;
+        warm_reads.reserve(bodies.size());
+        for (const entity_id body : bodies)
+            warm_reads.push_back(take_warm_read(a.w, body)); // before ANY invalidation
+        for (std::size_t bi = 0; bi < bodies.size(); ++bi)
         {
-            const body_rows r = check_body(a.w, body, seed, brute);
+            const entity_id body = bodies[bi];
+            if (warm_reads[bi].anchored) ++anchored_bodies;
+            const body_rows r = check_body(a.w, body, seed, brute, warm_reads[bi]);
             if (r.f1_counted)
             {
                 ++f1_bodies;
@@ -422,7 +462,8 @@ int main(int argc, char** argv)
             all.f3 = all.f3 && r.f3;
             all.tie_cells += r.tie_cells;
         }
-        std::printf("  F1 counted on %d body(ies) whose warm field the ticks built\n", f1_bodies);
+        std::printf("  F1 counted on %d of %d anchored body(ies) (a warm field the ticks built and "
+                    "the read reused)\n", f1_bodies, anchored_bodies);
         check(all.f1 && f1_bodies > 0,
               "F1 the ticks' own nearest-anchor field is identical after invalidate_logistics_caches",
               seed);
