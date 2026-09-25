@@ -268,6 +268,10 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                     road_generation_trace* trace)
 {
     road_generation_stats st{}; // BL-1119 D1: filled as the pass goes, copied out at the end
+    // BL-1119 round 4: floods built so far — the per-site deltas in the stats (write-only).
+    const auto floods_now = [&w]() {
+        return static_cast<long long>(w.logistics_flood_fields.size());
+    };
     // BL-1119 round 3: a laid route, whole, into the caller's trace (write-only). The
     // path is the one stamp_edge just laid — the pair cache answers it again unchanged.
     const auto record = [&](road_generation_trace::kind k, entity_id from, entity_id to,
@@ -478,8 +482,18 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
         {
             // Pairwise terrain-weighted A* costs; collect the reachable pairs as
             // candidate edges (a,b index into `towns`).
+            //
+            // DIRECTION (BL-1119 round 4; a path is directed and answered from its
+            // destination's flood, BL-1126): a town pair is priced FROM THE LOWER TILE ID
+            // TO THE HIGHER — `towns` is in tile order and a < b — and the link the tree or
+            // the detour test chooses is laid in that same direction, so laying it reads
+            // the cached answer. The nation's n towns cost n - 1 floods (every town but the
+            // lowest is a destination), the fewest any direction can: every pair needs one
+            // of its two ends flooded. The detour test's direct costs are these same
+            // answers; it asks nothing of its own.
             struct edge { float cost; int a; int b; };
             std::vector<edge> edges;
+            const long long floods_pairs_from = floods_now();
             for (int a = 0; a < n; ++a)
                 for (int b = a + 1; b < n; ++b)
                 {
@@ -501,6 +515,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                     }
                     report_units(++units_done); // BL-1072
                 }
+            st.floods_town_pairs += floods_now() - floods_pairs_from;
 
             // Deterministic edge order: cost, then lo-tile-id, then hi-tile-id.
             auto lo_tile = [&](const edge& e) { return std::min(nodes[towns[e.a]].tile, nodes[towns[e.b]].tile); };
@@ -580,6 +595,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
             // Rasterise: tier by the two towns' scales gated by qualification (BL-618),
             // and feed this nation's stamped tiles into the spur target set.
             std::vector<entity_id> stamped;
+            const long long floods_lay_from = floods_now();
             for (std::size_t ci = 0; ci < chosen.size(); ++ci)
             {
                 const auto [a, b] = chosen[ci];
@@ -605,6 +621,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                     if (nation_of(w, t) == nation)
                         add_target(t);
             }
+            st.floods_backbone_lay += floods_now() - floods_lay_from;
         }
 
         // --- Village spurs (BL-620) -----------------------------------------------
@@ -613,11 +630,18 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
         // tiles join the target set — they are joined, since the spur ends on a joined
         // tile — so later villages branch off earlier feeders rather than each running its
         // own long track; the incremental order is deterministic because the walk is.
+        //
+        // DIRECTION (BL-1119 round 4): a spur is priced from the village TO its target —
+        // origin to destination, as LOGISTICS.md § 2 reads a path — so the flood is the
+        // target's, and a target that is a town reuses the flood its backbone already
+        // built. Measured 2026-09-25: pricing toward the village instead would build one
+        // flood per spurring village (791 on seed 0 against this direction's 569).
         if (gw > 0)
         {
             constexpr long long kMaxSpurD2 =
                 static_cast<long long>(kMaxSpurGridDist) * kMaxSpurGridDist;
             std::vector<entity_id> stamped;
+            const long long floods_spurs_from = floods_now();
             for (const int m : members)
             {
                 if (nodes[m].scale >= kMidScale)
@@ -660,6 +684,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                 ++(laid ? st.spurs_laid : st.spurs_failed);
                 if (laid) on_network[static_cast<std::size_t>(m)] = 1;
             }
+            st.floods_spurs += floods_now() - floods_spurs_from;
         }
     }
 
@@ -777,21 +802,40 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
         if (static_cast<int>(probe.size()) > kBorderProbePairs)
             probe.resize(kBorderProbePairs);
 
-        float best = kUnreachable;
-        entity_id best_a = null_entity, best_b = null_entity;
+        // WHICH WAY THE PROBES ARE PRICED (BL-1119 round 4; a path is directed, BL-1126,
+        // and answered from its destination's flood). Every probe of one nation pair is
+        // priced the SAME way, so their costs compare like for like, and that way is
+        // toward the side offering FEWER distinct probe endpoints — the fewer floods. A
+        // tie keeps A -> B (the lower-id nation toward the higher), the direction the pass
+        // always used. The chosen link is laid in the direction it was priced. A pure
+        // function of the probe set, never of what a cache holds.
+        std::set<entity_id> probe_a, probe_b;
         for (const border_pair& bp : probe)
         {
-            const logistics_path& p = intra_body_path(w, body, bp.ta, bp.tb);
+            probe_a.insert(bp.ta);
+            probe_b.insert(bp.tb);
+        }
+        const bool toward_a = probe_a.size() < probe_b.size();
+
+        float best = kUnreachable;
+        entity_id best_from = null_entity, best_to = null_entity;
+        for (const border_pair& bp : probe)
+        {
+            const entity_id from = toward_a ? bp.tb : bp.ta;
+            const entity_id to   = toward_a ? bp.ta : bp.tb;
+            const logistics_path& p = intra_body_path(w, body, from, to);
             if (p.reachable && p.cost < best)
             {
                 best = p.cost;
-                best_a = bp.ta;
-                best_b = bp.tb;
+                best_from = from;
+                best_to   = to;
             }
         }
-        if (best_a != null_entity && stamp_edge(w, body, best_a, best_b, kTrack))
+        const entity_id best_a = toward_a ? best_to : best_from; // nation A's endpoint
+        const entity_id best_b = toward_a ? best_from : best_to; // nation B's endpoint
+        if (best_from != null_entity && stamp_edge(w, body, best_from, best_to, kTrack))
         {
-            record(road_generation_trace::kind::border, best_a, best_b, na);
+            record(road_generation_trace::kind::border, best_from, best_to, na);
             ++st.border_links;
             if (street_only.count(best_a) != 0 || street_only.count(best_b) != 0)
                 ++st.border_links_street_only;
@@ -799,6 +843,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     }
 
     report_units(units_total); // BL-1072: whole, whatever the border walk found
+    st.floods_border = floods_now() - st.flood_fields_before_border;
     st.flood_fields = static_cast<long long>(w.logistics_flood_fields.size());
     if (trace != nullptr)
         for (std::size_t i = 0; i < nodes.size(); ++i)
@@ -826,8 +871,10 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
 void stamp_history_roads(world& w, entity_id body,
                          const std::vector<history_road_node>& nodes,
                          const std::vector<history_corridor>&  corridors,
-                         generation_progress* progress)
+                         generation_progress* progress, history_road_stats* stats)
 {
+    history_road_stats hs{};
+    const long long floods_at_entry = static_cast<long long>(w.logistics_flood_fields.size());
     if (corridors.empty() || nodes.empty())
         return; // A world with no Era -1 pass. The whole call is a no-op.
 
@@ -850,12 +897,36 @@ void stamp_history_roads(world& w, entity_id body,
         return grid[static_cast<std::size_t>(n.row) * gw + n.col];
     };
 
+    // WHICH WAY A CORRIDOR IS PRICED (BL-1119 round 4, after BL-1126 made a path
+    // directed: `intra_body_path(O, D)` is O -> D, answered from D's flood field). A
+    // corridor is an unordered pair (`a < b` by region index), so its direction is a
+    // choice, and the choice is the pass's cost: every distinct destination is one
+    // whole-body flood. The history's corridors radiate from hubs — a parent region
+    // and its foundings, a staging holding and its objectives — so each corridor is
+    // priced TOWARD ITS BUSIER END: the endpoint tile more corridors touch, counted
+    // over this call's own corridor set; a tie keeps the higher-index region `b`, the
+    // direction the pass always used. One flood at a hub then answers every line into
+    // it. A pure function of the corridor set — never of what a cache happens to hold.
+    std::map<entity_id, int> corridor_degree;
+    for (const history_corridor& c : corridors)
+    {
+        if (c.a >= nodes.size() || c.b >= nodes.size())
+            continue;
+        const entity_id ta = tile_of(nodes[c.a]);
+        const entity_id tb = tile_of(nodes[c.b]);
+        if (ta == null_entity || tb == null_entity || ta == tb)
+            continue;
+        ++corridor_degree[ta];
+        ++corridor_degree[tb];
+    }
+
     // `corridors` arrives sorted by (a, b) and stamping takes the max per tile,
     // so this walk is order-independent: a tile shared by two corridors ends at
     // the higher of the two tiers whichever is stamped first.
     // BL-1072: one unit per corridor on the loading bar. Write-only.
     const int corridor_total = static_cast<int>(std::min<std::size_t>(corridors.size(), 1000000));
     int       corridor_done  = 0;
+    std::set<entity_id> destinations; // BL-1119 round 4 stats: the tiles priced toward
     for (const history_corridor& c : corridors)
     {
         if (progress != nullptr && corridor_done < corridor_total)
@@ -869,6 +940,10 @@ void stamp_history_roads(world& w, entity_id body,
         const entity_id tb = tile_of(nb);
         if (ta == null_entity || tb == null_entity || ta == tb)
             continue;
+        // Toward the busier end; the tie keeps a -> b.
+        const bool toward_a = corridor_degree[ta] > corridor_degree[tb];
+        const entity_id from = toward_a ? tb : ta;
+        const entity_id to   = toward_a ? ta : tb;
 
         // A region anchored on coastal water is legitimate (BL-777, the water
         // ownership ruling), and it simply carries no road: stamp_edge skips
@@ -881,8 +956,15 @@ void stamp_history_roads(world& w, entity_id body,
         // off the carried rung, never off `uses`: a purchase adds one walk.
         std::uint8_t tier = ancient_tier(c.uses, na.reach_mod, nb.reach_mod);
         if (c.tier >= 3) tier = kHighway;
-        stamp_edge(w, body, ta, tb, tier);
+        ++hs.corridors;
+        destinations.insert(to);
+        if (stamp_edge(w, body, from, to, tier))
+            ++hs.laid;
     }
+    hs.destinations = static_cast<int>(destinations.size());
+    hs.floods = static_cast<long long>(w.logistics_flood_fields.size()) - floods_at_entry;
+    if (stats != nullptr)
+        *stats = hs; // BL-1119 round 4: write-only
 
     // Same contract as generate_roads' tail: road_level moved, so every cache
     // keyed on traversal cost is stale — the whole set, through its one owner.

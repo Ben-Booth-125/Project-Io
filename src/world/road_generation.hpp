@@ -148,6 +148,22 @@ struct road_generation_stats
     /// construction once only layable links are candidates; kept as the check.
     int tree_links_refused   = 0;
     int loops_refused        = 0;
+    /// Whole-body flood fields BUILT, per call site (BL-1119 round 4: a path is directed
+    /// and answered from its destination's field, so which pairs share a destination
+    /// is the pass's cost). Deltas of `world::logistics_flood_fields` around each site.
+    long long floods_town_pairs   = 0; ///< the backbone's town-pair costs (MST + detour test)
+    long long floods_backbone_lay = 0; ///< stamping the chosen tree links and loops
+    long long floods_spurs        = 0; ///< the village spurs (every candidate tried)
+    long long floods_border       = 0; ///< the border probes and links
+};
+
+/// What one `stamp_history_roads` call did (BL-1119 round 4). WRITE-ONLY.
+struct history_road_stats
+{
+    int       corridors   = 0; ///< corridors with both ends on the body
+    int       laid        = 0; ///< of them, stamped (reachable, no open-sea crossing)
+    int       destinations = 0; ///< distinct tiles the corridors were priced TOWARD
+    long long floods      = 0; ///< whole-body flood fields built by the call
 };
 
 /// BL-1119 round 3: every route one `generate_roads` call LAID, whole, for a harness to
@@ -237,4 +253,5 @@ void generate_roads(world& w, entity_id body, generation_progress* progress = nu
 void stamp_history_roads(world& w, entity_id body,
                          const std::vector<history_road_node>& nodes,
                          const std::vector<history_corridor>&  corridors,
-                         generation_progress* progress = nullptr); // BL-1072: per corridor
+                         generation_progress* progress = nullptr, // BL-1072: per corridor
+                         history_road_stats* stats = nullptr);    // BL-1119 round 4, write-only

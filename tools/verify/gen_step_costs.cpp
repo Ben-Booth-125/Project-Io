@@ -311,7 +311,15 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
             std::vector<history_road_node> nodes;
             for (const region& p : be->settlement.regions)
                 nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
-            stamp_history_roads(w, body, nodes, fx.setup_corridors);
+            // BL-1119 round 4: the old-road stamp's own cost — the in-generation step 15 —
+            // read as floods (load-independent) and wall time (indicative).
+            history_road_stats hs{};
+            const clk::time_point h0 = clk::now();
+            stamp_history_roads(w, body, nodes, fx.setup_corridors, nullptr, &hs);
+            std::printf("  ROADS seed %u HISTORY: %d corridors, %d laid, priced toward %d distinct"
+                        " tiles | floods %lld | %.2f s\n",
+                        seed, hs.corridors, hs.laid, hs.destinations, hs.floods,
+                        secs_between(h0, clk::now()));
         }
         const std::map<entity_id, std::uint8_t> replay = road_field(w, body);
         std::size_t diff = 0;
@@ -370,6 +378,12 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
                     st.border_pairs, st.border_pairs_no_endpoint, border_s, s,
                     s > 0.0 ? 100.0 * border_s / s : 0.0,
                     st.flood_fields - st.flood_fields_before_border, st.flood_fields, fit_k);
+        // BL-1119 round 4: floods built per call site (a path is answered from its
+        // destination's field, so a site's cost is how many destinations it asks).
+        std::printf("  ROADS seed %u FLOODS floor %lld: town pairs %lld | backbone lay %lld | spurs %lld"
+                    " | border %lld | total %lld\n",
+                    seed, f, st.floods_town_pairs, st.floods_backbone_lay, st.floods_spurs,
+                    st.floods_border, st.flood_fields);
         // BL-1119 round 3: the two cold-review holes, read per row.
         std::printf("  ROADS seed %u LINKS floor %lld: sea-route candidates %d | refused by the stamp:"
                     " tree %d, loop %d | villages on the network %d, of them NOT joined to a town %d |"
