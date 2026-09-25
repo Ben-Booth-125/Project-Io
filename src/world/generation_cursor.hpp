@@ -110,8 +110,12 @@ struct generation_cursor
     int64_t              sim_start              = INT64_MAX;
     /// The Culture round's displayed close (BL-947).
     int64_t              culture_round_end_year = 0;
-    /// The migration's own record (BL-1104), folded where something holds it.
+    /// The migration's own record (BL-1104), folded where a report holds it.
     era_timelapse        migration_lapse;
+    /// The Culture stage folded `migration_lapse` (a report was bound). A
+    /// build stopped there with no report folds it on demand at its ending,
+    /// from the same settlement and creeds -- so no stage reads a stop flag.
+    bool                 migration_folded = false;
 
     // empires / exploration / industrialisation: the records the tail reads,
     // each the LAST span's close, replaced span by span (BL-956, BL-1053).
@@ -186,8 +190,14 @@ struct generation_cursor
         std::array<int64_t, generation_stage_label_count> step_ms{};
         int               step_label = -1;
         clock::time_point step_begin{};
-        /// Bumps made so far -- what `generation_progress::stage` holds.
+        /// Bumps made so far, counted whether or not a sink is bound -- the
+        /// running count `generation_progress::stage` is published from.
         int               gen_stage = 0;
+        /// The sink the last plan was published to (`plan_generation_progress`).
+        /// `run_generation_to` plans for a bound sink that differs from it --
+        /// a fresh sink, or one rebound on a resumed copy -- and leaves a sink
+        /// already planned for alone. Compared, never dereferenced.
+        const generation_progress* plan_sink = nullptr;
     } clocks;
 };
 
@@ -227,5 +237,24 @@ void gen_tail(generation_cursor& c);
 /// stop that is exactly the single call's sequence. It is the stop flags'
 /// legacy contract ("the world is not usable"), kept byte for byte; a caller
 /// that means to resume (the wizard's slots) publishes its round's record
-/// without it.
+/// without it: `stopped_report`.
 void close_stopped_generation(generation_cursor& c);
+
+/// THE REPORT A BUILD STOPPED AT `c.reached` WOULD HAND BACK, as a copy, with
+/// the cursor, its world and its sinks untouched (BL-1084). The same report
+/// writes `close_stopped_generation` makes (one function stamps both), so the
+/// wizard reads each round's record off exactly the report the stop flags
+/// always produced -- and the cursor stays resumable. The close is not needed
+/// for the report: it reads the settlement and never writes it.
+generation_report stopped_report(const generation_cursor& c);
+
+/// Publish to `c.progress` the plan for the stages after `c.reached` up to and
+/// including @p target: the weighted total (plus the sink's `weight_after`),
+/// the running stage count at the end, and the caption of the first step, with
+/// nothing done yet (BL-1084). `run_generation_to` calls it itself for a sink
+/// it has not planned for, so each run -- the single call's whole build, one
+/// wizard round's stage -- plans exactly the stages it runs, off the params
+/// and what has run, never off a stop flag. Call it first only to plan WIDER
+/// than one call (round 6's span, tail and finish). A null sink publishes
+/// nothing. Reported only: nothing in generation reads it back.
+void plan_generation_progress(generation_cursor& c, generation_stage target);
