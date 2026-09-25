@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*54 entries — 3 open, 51 resolved.*
+*55 entries — 4 open, 51 resolved.*
 
 ---
 
@@ -74,6 +74,21 @@ Ben ruled roads pull toward market centres and bridge across markets (BL-1138). 
 > **Recommendation:** A.
 
 *Files: `docs/economy/LOGISTICS.md`, `src/world/road_generation.cpp`*
+
+### NR-951 — DECISION TAKEN: a centre's urban footprint stops at its region's cell edge, and "no land" means no ground a centre can stand on
+*decision · raised 2026-09-26 · from BL-1130 (centres consolidate) cold review, 2026-09-26*
+
+Two readings taken on your behalf to make your rulings hold as written. (1) The sim sizes a region's centres by its own hierarchy, but the carve gives them body-wide rank-size scales and paves their footprints from those, so a large region could pave its neighbours' cells. Reading: a footprint is cut short at its own region's cell edge, exactly as it already is at a coast; scales unchanged. (2) A region whose cell has land but no tile a centre can stand on kept centres in the sim and earned industry points the carve could never spend. Reading: your water ruling ("a cell that holds no land carries no centre") counts ground a centre can stand on, so such a region carries none and earns nothing. POPULATION.md states both.
+
+**Why it matters.** (1) keeps "footprints fit inside the region's own cell" true by construction; (2) stops industry points vanishing into regions with nowhere to stand a centre.
+
+- A: keep both readings
+- B: for (1), size the carve's centres by each region's own hierarchy instead (overturns the body-wide rank-size)
+- C: other
+
+> **Recommendation:** A: both are the smallest change that makes the ruled rules true.
+
+*Files: `docs/economy/POPULATION.md`, `src/world/population_generation.cpp`, `src/world/settlement.cpp`*
 
 ---
 

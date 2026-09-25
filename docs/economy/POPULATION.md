@@ -71,7 +71,9 @@ RNG anywhere on the path:
   **The merge is a size hierarchy inside the region (Ben, 2026-09-25):** its centres are a
   rank-size share of its own urban heads, as many as keep the smallest a village's worth. **A
   region whose cell holds no land carries no centre** (Ben, 2026-09-25): it has no ground to stand
-  one on, so nothing spills.
+  one on, so nothing spills. "Land" here is ground a centre can stand on — the carve's own
+  placement gate — so a cell of land no centre can stand on counts as none (delegated reading,
+  NR-951).
   **A place's size is its people, never how many centres they are split into (Ben,
   2026-09-25).** A history reader that asks how big or how valuable a region is — the campaign
   prize, the reach relay — reads its urban heads, so the same people make the same prize however
@@ -153,7 +155,8 @@ RNG anywhere on the path:
   A centre arrives with an urban land-use footprint scaled by its tier, so city ground is
   scarce and contested from turn one rather than notionally open (§ Land use). The footprint
   is the centre's own tile plus its most-livable land neighbours — 1/1/2/4/7 tiles by scale
-  (`k_urban_footprint_tiles`); a footprint the coast cuts short stays short, and a tile two
+  (`k_urban_footprint_tiles`); a footprint the coast cuts short stays short, and so does one its
+  own region's cell edge cuts short (delegated reading, NR-951), and a tile two
   cities share is stamped once. Extraction already standing is grandfathered
   (`docs/economy/TILES.md` § Urban transform).
 
