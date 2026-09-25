@@ -333,6 +333,7 @@ struct generation_progress
         weight_now.store(0, std::memory_order_relaxed);
         weight_after.store(0, std::memory_order_relaxed);
         for (auto& m : ms_step) m.store(0, std::memory_order_relaxed);
+        nation_polity_count.store(0, std::memory_order_relaxed); // BL-1089
         wait_began = std::chrono::steady_clock::now();
         wait_shown = 0.0f;
     }
@@ -468,6 +469,21 @@ struct generation_progress
     /// a different order rather than a wrong-looking map.
     std::atomic<uint32_t> nation_id_base{0};
 
+    /// BL-1089 — WHICH REALM EACH CARVED NATION IS, by nation index: the
+    /// polity id its fold representative carried, or -1 for ownerless ground,
+    /// published once the size floor has settled the survivors (the same
+    /// moment `nation_count` becomes the final one). It is what lets the
+    /// loading screen colour the carve in the realm's own colour — the slot
+    /// the wizard's rounds pinned — rather than by a hash of an id that does
+    /// not exist yet. Slots past `max_carve_nations` are DROPPED, not wrapped,
+    /// and read as -1 (the hash fallback): a wrong colour on the carve would
+    /// be a map lying, a plain one is a map not yet told. `nation_polity_count`
+    /// is release-stored AFTER the entries, the reader's guarantee that
+    /// `[0, count)` are filled.
+    static constexpr int max_carve_nations = 2048;
+    std::array<std::atomic<int32_t>, max_carve_nations> nation_polity{};
+    std::atomic<int> nation_polity_count{0};
+
     /// Bumped on every publish. The renderer keeps its own copy of the map and
     /// re-reads only when this moves, so a still frame costs nothing.
     std::atomic<uint32_t> carve_epoch{0};
@@ -529,6 +545,19 @@ struct generation_progress
     /// the renderer redraws at most once a frame anyway, and an epoch bump per
     /// tile would be 45,000 needless release fences.
     void publish_carve() { carve_epoch.fetch_add(1, std::memory_order_release); }
+
+    /// BL-1089: the carved nations' realms, once the floor has settled them.
+    /// Entries first, then the count with release, then the epoch.
+    void publish_nation_polities(const std::vector<int32_t>& polity_by_nation)
+    {
+        const int n = static_cast<int>(std::min<std::size_t>(polity_by_nation.size(),
+                                                              static_cast<std::size_t>(max_carve_nations)));
+        for (int i = 0; i < n; ++i)
+            nation_polity[static_cast<std::size_t>(i)].store(polity_by_nation[static_cast<std::size_t>(i)],
+                                                             std::memory_order_relaxed);
+        nation_polity_count.store(n, std::memory_order_release);
+        carve_epoch.fetch_add(1, std::memory_order_release);
+    }
 
     void mark_asset(int col, int row, int corp_slot)
     {
@@ -724,9 +753,28 @@ struct generation_report
         /// record. Same shape and discipline as the three above: recorded at
         /// the one site that ran the fold, never re-simulated, read by nothing
         /// at world setup (a watched and an unwatched build are the same
-        /// build). Empty on any body but the cradle. Serialised after
-        /// `industrialisation_timelapse` (save_game_version 22).
+        /// build). Empty on any body but the cradle. Serialised straight after
+        /// `industrialisation_timelapse`, before the polity fold's arrays
+        /// below (save_game_version 22).
         era_timelapse migration_timelapse;
+
+        /// BL-1089 — WHAT THE POLITY FOLD DID (NATION_GENERATION.md § Pass 2d),
+        /// per nation, parallel to `nation_ids`: the polity id of the realm
+        /// each nation IS (its fold representative's, -1 for ownerless
+        /// ground) and the realms the size floor folded into it (merge rule
+        /// A: the absorber kept its name; these are listed on its seat card),
+        /// flattened as `[absorbed_first[n], absorbed_first[n] +
+        /// absorbed_count[n])` into `nation_absorbed`. A RECORD of the passes,
+        /// read by the seat card and by the per-world nation -> colour table
+        /// at Begin and on load (`ui::palette::nation_colour`), never by the
+        /// world. Empty on every body but the cradle, and on a body with no
+        /// settlement pass (every seed its own nation, no realm to name).
+        /// save_game_version 22.
+        std::vector<entity_id> nation_ids;
+        std::vector<int32_t>   nation_polity;
+        std::vector<int32_t>   nation_absorbed_first;
+        std::vector<int32_t>   nation_absorbed_count;
+        std::vector<int32_t>   nation_absorbed;
 
         /// Exactly what `generate_body_tiles` was called with for this body — the
         /// arguments that are NOT recoverable from anything else the report or the

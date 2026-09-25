@@ -1369,12 +1369,90 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return static_cast<int>(seen.size());
     });
 
+    // BL-1087/BL-1088 -- THE IDENTITY A REALM CARRIES, read off the CURRENT
+    // lapse round at the parked year, so a script can assert that a realm
+    // alive at 1200 has the same slot and the same name on round 4's board at
+    // 1200 and on round 5's, and that after "X re-seats itself at Y" the seat
+    // is Y and the name is unchanged. Reads of the record's own tables, the
+    // same the map and the board draw from; nothing here is a second derivation.
+    //   history_holders()          -> ascending list of polity ids holding ground now
+    //   history_polity_slot(p)     -> the colour slot (-1 unassigned)
+    //   history_polity_name(p)     -> the name the board prints
+    //   history_polity_capital(p)  -> the seat region at the parked year (-1 none)
+    //   history_polity_rung(p)     -> shade rungs at the parked year
+    //   history_identity()         -> {clashes, reslotted, dead_slot, spills, families, pinned}
+    v.set_function("history_holders", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const int i = wizard_lapse_index();
+        if (m_wiz_history[i].empty()) return out;
+        const std::vector<uint16_t> slice =
+            owner_slice_at(m_wiz_history[i].lapse, m_wiz_history_year[i]);
+        std::vector<uint16_t> seen;
+        for (uint16_t o : slice)
+            if (o != owner_none && std::find(seen.begin(), seen.end(), o) == seen.end())
+                seen.push_back(o);
+        std::sort(seen.begin(), seen.end());
+        int k = 1;
+        for (uint16_t o : seen) out[k++] = static_cast<int>(o);
+        return out;
+    });
+    v.set_function("history_polity_slot", [this](int polity) -> int {
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        if (polity < 0 || static_cast<std::size_t>(polity) >= h.polity_slot.size()) return -1;
+        return h.polity_slot[static_cast<std::size_t>(polity)];
+    });
+    v.set_function("history_polity_name", [this](int polity) -> std::string {
+        const int i = wizard_lapse_index();
+        if (polity < 0 || polity >= static_cast<int>(lapse_event_none)) return std::string{};
+        return ui::lapse_polity_name(m_wiz_history[i], static_cast<uint16_t>(polity));
+    });
+    v.set_function("history_polity_capital", [this](int polity) -> int {
+        const int i = wizard_lapse_index();
+        if (polity < 0 || polity >= static_cast<int>(lapse_event_none)) return -1;
+        return ui::lapse_polity_capital(m_wiz_history[i], static_cast<uint16_t>(polity),
+                                        m_wiz_history_year[i]);
+    });
+    v.set_function("history_polity_rung", [this](int polity) -> int {
+        const int i = wizard_lapse_index();
+        if (polity < 0 || polity >= static_cast<int>(lapse_event_none)) return 0;
+        return ui::lapse_polity_rung(m_wiz_history[i], static_cast<uint16_t>(polity),
+                                     m_wiz_history_year[i]);
+    });
+    v.set_function("history_identity", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        out["clashes"]   = h.identity.pinned_clashes;
+        out["reslotted"] = h.identity.reslotted;
+        out["dead_slot"] = h.identity.inherited_dead_slot;
+        out["spills"]    = h.identity.spills;
+        out["families"]  = h.family_count;
+        out["pinned"]    = h.has_pins;
+        return out;
+    });
+
     // BL-916: how many recorded events sit at or before the playhead on the
     // CURRENT lapse round, and how many of them are realms ending — the two
     // numbers the ticker and the arc readout draw from. What it lets a script
     // claim is that the ticker it captured had lines to show and that the
     // "destroyed" count came off the record rather than off an absence. Counts
     // only; the prose is the surface's and a capture is how it is judged.
+    // BL-1088: how many events of one KIND sit at or before @p at_or_before on
+    // the CURRENT lapse round (the whole record when omitted). What lets a
+    // script assert that a resumed span's open carries `inherited` (20) and
+    // no `founded` (0) — the ticker-silent kind against the re-emit it replaced.
+    v.set_function("history_event_count", [this](int kind, sol::optional<int> at_or_before) -> int {
+        const int i = wizard_lapse_index();
+        int n = 0;
+        for (const lapse_event& e : m_wiz_history[i].lapse.events)
+        {
+            if (at_or_before && e.year > *at_or_before) break; // ascending by year
+            if (e.kind == static_cast<uint8_t>(kind)) ++n;
+        }
+        return n;
+    });
+
     v.set_function("history_events", [this]() {
         const int i = wizard_lapse_index();
         int total = 0, ended = 0, broke = 0;

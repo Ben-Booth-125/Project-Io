@@ -290,6 +290,19 @@ uint32_t choose_home_tile_seed(const planetology_state& pl,
     return chosen;
 }
 
+// BL-1089 -- THE REALMS' NAMES AT A SPAN'S CLOSE, the same one-rule footing as
+// the chests below. Indexed by POLITY id, dead realms included (an absorbed
+// or ended realm can still be named on a card): `polity::name`, coined once
+// at founding and carried by id, so whichever span closed last hands nation
+// generation the same table the wizard's board printed.
+std::vector<std::string> polity_names_at_close(const std::vector<polity>& polities)
+{
+    std::vector<std::string> names;
+    names.reserve(polities.size());
+    for (const polity& q : polities) names.push_back(q.name);
+    return names;
+}
+
 // BL-975/BL-1053 -- THE CHESTS AT A SPAN'S CLOSE, one rule for every close
 // world setup reads. Indexed by POLITY id: `region::treasury` summed over the
 // regions flying that polity's flag at the close -- the chest is a fact about
@@ -896,6 +909,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     /// same rule: each is the last close's, replaced span by span.
     std::vector<int64_t> kepler_polity_treasuries;
 
+    /// BL-1089: indexed by POLITY id, the realm names as the LAST span's close
+    /// left them (`polity_names_at_close`), replaced span by span on the same
+    /// rule as the chests above, so Pass 5 inherits the name the wizard's last
+    /// board printed. Empty when no span ran.
+    std::vector<std::string> kepler_polity_names;
+
     nation_params kepler_np =
         nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 });
     {
@@ -1323,6 +1342,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
             // above exists to catch. Sparse, so the copy is a few dozen rows.
             kepler_grudges    = kepler_pass_one.grudges;
             kepler_grudge_cap = static_cast<int32_t>(hp.grudge_cap);
+            kepler_polity_names = polity_names_at_close(kepler_pass_one.polities); // BL-1089
 
             // The sim narrates through the same history_event shape the other
             // generation passes use, so its wars join the world log without a
@@ -1446,6 +1466,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // for every close world setup reads (BL-1053):
                 // `polity_treasuries_at_close`.
                 kepler_polity_treasuries = polity_treasuries_at_close(kepler_exploration.regions);
+                kepler_polity_names      = polity_names_at_close(kepler_exploration.polities); // BL-1089
 
                 if (fixture != nullptr)
                     fixture->exploration_handoff = kepler_exploration;
@@ -1667,6 +1688,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     kepler_grudges           = kepler_industrialisation.grudges;
                     kepler_grudge_cap        = static_cast<int32_t>(dp.grudge_cap);
                     kepler_polity_treasuries = polity_treasuries_at_close(kepler_industrialisation.regions);
+                    kepler_polity_names      = polity_names_at_close(kepler_industrialisation.polities); // BL-1089
 
                     // BL-1068: THE RECORDED RECORD, on Exploration's footing
                     // above -- the four counters and the time-lapse are the
@@ -1819,6 +1841,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
         kepler_np.polity_treasuries = kepler_polity_treasuries;
         if (fixture != nullptr) fixture->setup_polity_treasuries = kepler_polity_treasuries;
 
+        // BL-1089 — THE NAMES CROSS WITH THE MAP AND THE CHESTS, by the same
+        // polity ids, so Pass 5 copies a realm's coined name across instead of
+        // coining a second one (NATION_GENERATION.md § Pass 5).
+        kepler_np.polity_names = kepler_polity_names;
+
         // BL-898 — THE SAME READ, KEPT FOR THE SAME WINDOW. `seed_polities`
         // above is filtered to anchored regions because `generate_nations`
         // reads it as a parallel array; the grudge seeding needs the polity of
@@ -1905,9 +1932,25 @@ world make_hard_coded_world(world_params params, generation_report* report,
     }
 
     bump(9);
+    // BL-1089: the fold's own record — which realm each nation is and which
+    // it absorbed — read off the passes and put on the report, so Begin, a
+    // load and the seat card all read one derivation (a pure read: filling it
+    // draws nothing and changes no branch).
+    nation_fold_record kepler_fold;
     const std::vector<entity_id> kepler_nations =
         generate_nations(w, kepler, kepler_tiles, home_grid_width, home_grid_height, kepler_np,
-                         /*seed=*/params.seed ^ 0x4A71012u, progress);
+                         /*seed=*/params.seed ^ 0x4A71012u, progress, &kepler_fold);
+    if (report != nullptr)
+        for (generation_report::body_entry& be : report->bodies)
+            if (be.id == kepler)
+            {
+                be.nation_ids.assign(kepler_nations.begin(), kepler_nations.end());
+                be.nation_polity         = kepler_fold.polity;
+                be.nation_absorbed_first = kepler_fold.absorbed_first;
+                be.nation_absorbed_count = kepler_fold.absorbed_count;
+                be.nation_absorbed       = kepler_fold.absorbed;
+                break;
+            }
 
     // The political axes are OUTPUTS now (BL-218): expansionism from the
     // border-contest integral, economic_focus from the resource class of the

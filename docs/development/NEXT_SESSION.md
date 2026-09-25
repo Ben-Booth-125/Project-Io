@@ -55,6 +55,32 @@ civilisation diamond carried across the seam); its two capture scripts and the 1
 scratchpad: `digest_check_wave0.log`). NR-937 asks Ben whether a hard realm's coast draws heavy
 and whether 10% of people (off at 6%) is the pin.
 
+**The re-bless reading (02:56):** `player_seed_sweep --digest-check` on the full wave-0 tree: 0/16 rows
+PASS — every library seed moved on all four digests (the laws on all 16 from BL-1102; purchases on 25 and
+38 from BL-1096); world_determinism's seed B also reads 4F7BBD76AEEF3431 on main now (was
+5ECE9A097D14DACE at v0.1.25); exploration R3b +400 tribute. THE RE-BLESS IS TAKEN ONCE, after lane I1
+(realm becomes nation, which renames nations and may move any digest that folds names) is merged:
+re-pin the 16 sweep rows, R3b's counters, world_determinism's seed B, the seed library, and any
+golden that reads laws or names.
+
+**Attribution of the moved pins (03:55):** the G+C-only tree ALSO reads 0/16 against the sweep's pins — which
+were already stale from sprint 46 (never re-pinned). So the pins cannot say who moved what; row-for-row
+comparison can. Running: the digest check on the pre-sprint tree 1d401e8c (the session
+scratchpad's `digest_check_pre47.log`). If its rows equal the G+C rows (`digest_check_GC.log`),
+BL-1083 and BL-1085 moved nothing and BL-1085 R1 closes; the full wave-0 rows
+(`digest_check_wave0.log`) are then W1/W3's movement and the re-bless re-pins them. RESULT (04:43): pre-sprint and G+C rows are IDENTICAL on all 16 seeds — BL-1083 and BL-1085 moved nothing; BL-1085 R1 closed. Against the full wave-0 tree: D_land/D_settle/D_seat move on every seed (BL-1102's laws) and D_search on 13, 25, 31, 32, 46 (BL-1096/1097). Those, plus BL-1089's name inheritance, are the re-bless.
+
+**Wave 1 complete on main (04:40):** I1 (BL-1087 colour, BL-1088 name, BL-1089 nation) merged
+`66bdbc0f` after a fix round on its branch (pins derived on demand at the hand-over; the Begin/load
+derivation rasters each record over its own regions; a load never trusts another world's realm
+table; the ROSE start carried by id) and the second review's four low notes taken on main
+`f81d0d05`. BL-1089 is the sprint's ONE intended digest mover (nation names fold into the deep
+digest): world_determinism on the lane read seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC —
+confirm on main in `gates_I1.log`. NR-938 records the clash-rule wording the lane changed. Lane I3
+(BL-1106) merged `4a8848a7` + `84baaa65`. Wave 2: F3 (BL-1099/1100/1104) resumed on its worktree
+after the session limit; F1 (BL-1091/1092) and F2 (BL-1095) launched from `f81d0d05` with kinds 23
+and 24 pre-assigned (20 inherited, 21 works_chartered, 22 rung_crossed are I1's and F3's).
+
 Calls raised by the lanes, for Ben: NR-931 (the Culture reroll re-coins peoples, never the walk —
 accept, dice, or no reroll), NR-932 (settle tick 1 runs 44-62 s), NR-933 (purchase rate 2000‰),
 NR-934 (every library seed derives industrial), NR-935 (tariff bands vs the new posture), NR-936

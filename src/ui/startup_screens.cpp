@@ -14,8 +14,11 @@
 #include "ui/generation_wait.hpp"      // BL-1072: the one wait surface
 #include "ui/generation_preview.hpp"
 #include "ui/history_lapse.hpp"      // BL-829/BL-830: round 4's map and its board
+#include "ui/presentation.hpp"       // ui::palette — the per-world nation/realm colour tables (BL-1089)
 #include "world/colonisation.hpp"   // colonisation_start_year -- the Culture round's own first year (BL-919)
 #include "world/era_timelapse.hpp"   // owner_slice_at — the whole replay substrate
+#include "world/logistics.hpp"       // body_tile_grid — the load path's water mask (BL-1089)
+#include "world/polity_identity.hpp" // the pure identity walk the load path re-derives with (BL-1089)
 
 #include <algorithm>
 #include <chrono>
@@ -181,6 +184,10 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
     h.grid_w = home_grid_width;
     h.grid_h = home_grid_height;
 
+    // BL-1087: THE ROUND'S FLAG, not the palette's emptiness, says which id
+    // space `owner` is in — the lineage palette is built for every lapse now.
+    h.owners_are_cultures = migration;
+
     if (migration)
     {
         const settlement_state& ss = home->settlement;
@@ -201,12 +208,19 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
             h.foundings = static_cast<int64_t>(ss.regions.size());
         }
 
-        // THE CULTURE TREE, rebuilt from what the report carries. The cradle
-        // cultures themselves are not in the report — `creed_state` never
-        // crosses it — but every cradle is listed in `cradle_coined_year`, and
-        // the daughters are `spawned_cultures` whole, each naming its parent.
-        // Daughter ids run one past the last cradle culture (BL-856), so the
-        // flat index is cradles first, daughters after, in that order.
+    }
+
+    // THE CULTURE TREE, rebuilt from what the report carries — FOR EVERY LAPSE
+    // ROUND (BL-1087): the Culture round paints by it, and the polity rounds
+    // read it for each realm's founding-family wedge and for the dull culture
+    // base under the fill. The cradle cultures themselves are not in the
+    // report — `creed_state` never crosses it — but every cradle is listed in
+    // `cradle_coined_year`, and the daughters are `spawned_cultures` whole,
+    // each naming its parent. Daughter ids run one past the last cradle
+    // culture (BL-856), so the flat index is cradles first, daughters after,
+    // in that order.
+    {
+        const settlement_state& ss = home->settlement;
         int32_t cradles = 0;
         for (const auto& [cid, year] : ss.cradle_coined_year)
             if (cid >= cradles) cradles = cid + 1;
@@ -234,6 +248,25 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
         h.region_row.push_back(r.row);
         h.region_name.push_back(r.name);
     }
+    // THE RECORD'S OWN REGIONS, NOT THE REPORT'S (BL-1087, the review's fix
+    // round). A round's worker builds its record from a report STOPPED at the
+    // round's close, so its region list is the regions at that close; a
+    // record adopted from a FINISHED report (the --verify rounds, and every
+    // record the Begin/load derivation walks) would otherwise raster over the
+    // regions of 1960 — every region a later span founded — and a strip a
+    // 1700 founding takes between two 1200 neighbours would drop their
+    // adjacency, move a greedy offset, and colour a nation on load differently
+    // from the round the player watched. `region_stride` is the region count
+    // at the record's close, and region ids ascend in founding order, so the
+    // first `region_stride` anchors ARE the round's own list.
+    if (h.lapse.region_stride > 0
+        && static_cast<std::size_t>(h.lapse.region_stride) < h.region_col.size())
+    {
+        const std::size_t n = static_cast<std::size_t>(h.lapse.region_stride);
+        h.region_col.resize(n);
+        h.region_row.resize(n);
+        h.region_name.resize(n);
+    }
 
     if (!(migration && adopted))
     {
@@ -249,6 +282,43 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
                     : exploration       ? rep.exploration_foundings : rep.prehistory_foundings;
     }
     return h;
+}
+
+/// BL-1087 (the cold review's fix round): A LANDED ROUND'S IDENTITY IS DERIVED
+/// ON DEMAND AT THE HAND-OVER, whether or not the round was ever drawn. The
+/// pins a round hands its successor (`lapse_pins_for_successor`) are read off
+/// `polity_slot`, which only `finish_history_lapse` fills — and until this
+/// helper that ran solely from the draw path of the round ON SCREEN. A player
+/// who pressed Next while round 4 was still running, and never went back,
+/// therefore had round 4 land unseen, un-derived, and hand round 5 EMPTY pins
+/// at its landing: round 5 coloured itself from scratch, and the identity the
+/// item exists for broke on an ordinary press order (the hard flag never
+/// broke this way, because `lapse_hard_at_close` walks an unfinished record).
+/// This is the same call the draw path makes, against the wizard's own packed
+/// surface, so a record derived here and one derived by a frame are one
+/// derivation. A no-op on a record already derived, and honest about a
+/// surface not built yet: the pins are then empty and it says so, rather than
+/// letting the successor colour from scratch in silence.
+/// @param display_round The round as the wizard numbers it for the player
+///                      (the lapse index plus the planetology rounds), for the log.
+void derive_lapse_for_handover(ui::history_lapse& rec, int display_round,
+                               const std::vector<uint8_t>& surface,
+                               const std::vector<uint16_t>& terrain)
+{
+    if (rec.empty() || rec.derived()) return;
+    ui::finish_history_lapse(rec,
+                             surface.empty() ? nullptr : surface.data(), surface.size(),
+                             terrain.empty() ? nullptr : terrain.data(), terrain.size());
+    if (rec.derived())
+        std::printf("[identity] round %d derived at the hand-over (landed, never drawn): "
+                    "%zu realms slotted\n",
+                    display_round, rec.polity_slot.size());
+    else
+        std::printf("[identity] round %d could not be derived at the hand-over: the wizard's "
+                    "surface is not built (%zu of %d x %d tiles); its successor opens unpinned "
+                    "until it is drawn\n",
+                    display_round, surface.size(), rec.grid_w, rec.grid_h);
+    std::fflush(stdout);
 }
 
 } // namespace
@@ -271,17 +341,46 @@ void app::launch_wizard_history_run(int lapse_index)
     m_wiz_history_paused[lapse_index]  = false;
     m_wiz_history_carry[lapse_index]   = 0.0f;
 
-    // BL-1090: THE HARD BORDER CARRIES BY ID from the round before, from the
-    // FIRST live frame. The landing sets it again (`poll_wizard_history`), but
-    // the tap plays the record's opening years long before the future lands,
-    // and the `--verify` adopted path below never lands at all. Polity rounds
-    // only: the migration's owners are cultures.
+    // THE IDENTITY CARRIES BY ID from the round before, from the FIRST live
+    // frame: the colour-slot PINS, the shade rungs and the dead ground
+    // (BL-1087, `lapse_pins_for_successor`), the hard-border flag (BL-1090)
+    // and the civilisation diamonds (BL-1094). The landing sets them all again
+    // (`poll_wizard_history`), but the tap plays the record's opening years
+    // long before the future lands, and the `--verify` adopted path below
+    // never lands at all. Polity rounds only: the migration's owners are
+    // cultures, and nothing is inherited across that boundary. The lineage
+    // tree comes with them so the live phase can read a wedge before the
+    // report lands (the landing rebuilds it from the report).
     const auto inherit_hard = [this, lapse_index]() {
         if (lapse_index <= 0) return;
+        // A LANDED predecessor is derived on demand before its pins are read
+        // (`derive_lapse_for_handover`): the player may never have drawn it.
+        // A predecessor still RUNNING is left to the draw path — its record is
+        // partial, and the landing below re-pins this round from the whole.
+        if (!m_wiz_history_future[lapse_index - 1].valid())
+            derive_lapse_for_handover(m_wiz_history[lapse_index - 1],
+                                      lapse_index - 1 + wizard_planetology_round_count + 1,
+                                      m_wiz_surface, m_wiz_terrain);
         const ui::history_lapse& prev = m_wiz_history[lapse_index - 1];
-        if (prev.empty() || !prev.culture_colour.empty()) return;
-        m_wiz_history[lapse_index].hard_carry = ui::lapse_hard_at_close(prev);
-        m_wiz_history[lapse_index].civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094
+        if (prev.empty()) return;
+        ui::history_lapse& cur = m_wiz_history[lapse_index];
+        // The tree crosses EVERY boundary, the Culture -> Empires one included:
+        // without it the Empires round's live phase would colour by the
+        // fallback table and recolour every realm the moment the record landed.
+        if (cur.culture_wedge.empty() && !prev.culture_wedge.empty())
+        {
+            cur.culture_family = prev.culture_family;
+            cur.culture_hue    = prev.culture_hue;
+            cur.culture_depth  = prev.culture_depth;
+            cur.culture_colour = prev.culture_colour;
+            cur.culture_wedge  = prev.culture_wedge;
+            cur.family_count   = prev.family_count;
+        }
+        if (prev.owners_are_cultures) return; // no pins, no flags across the culture boundary
+        cur.pins     = ui::lapse_pins_for_successor(prev);
+        cur.has_pins = !cur.pins.slot.empty();
+        cur.hard_carry = ui::lapse_hard_at_close(prev);
+        cur.civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094
     };
     inherit_hard();
     // Sentinel, not 0: a signed calendar year of 0 is a real year (0 CE), so
@@ -576,6 +675,14 @@ void app::poll_wizard_history()
         // deltas, so a record with a span is enough.
         if (i > 0 && m_wiz_history[i - 1].lapse.years > 0)
         {
+            // The predecessor's identity, derived on demand if no frame ever
+            // drew it (`derive_lapse_for_handover`): the carried colours below
+            // and the pins read `polity_slot`, which is empty on an undrawn
+            // record. Only a LANDED predecessor — a running one is partial.
+            if (!m_wiz_history_future[i - 1].valid())
+                derive_lapse_for_handover(m_wiz_history[i - 1],
+                                          i - 1 + wizard_planetology_round_count + 1,
+                                          m_wiz_surface, m_wiz_terrain);
             const ui::history_lapse& prev = m_wiz_history[i - 1];
             const int prev_end = prev.lapse.start_year + prev.lapse.years;
             const std::vector<uint16_t> last = owner_slice_at(prev.lapse, prev_end);
@@ -584,48 +691,70 @@ void app::poll_wizard_history()
             for (std::size_t r = 0; r < last.size(); ++r)
                 if (last[r] != owner_none)
                 {
-                    cols[r] = static_cast<uint32_t>(ui::lapse_owner_colour(prev, last[r]));
+                    // BL-1087: the colour as it stood at the predecessor's
+                    // close, the shade ratchet included.
+                    cols[r] = static_cast<uint32_t>(ui::lapse_owner_colour(prev, last[r], prev_end));
                     ++held;
                 }
             if (held > 0) m_wiz_history[i].carry_colour = std::move(cols);
 
-            // AND THE REALMS KEEP THEIR COLOURS ACROSS THE HAND-OVER (Ben,
+            // AND THE REALMS KEEP THEIR IDENTITY ACROSS THE HAND-OVER (Ben,
             // 2026-09-16: the Exploration round "looks like it actually carried
-            // over from culture"). It had not: the carry was right and the
-            // PALETTE was not.  is a greedy graph colouring over
-            // one record's own adjacency, so the Empires record and the
-            // Exploration record — different spans, different neighbour sets —
-            // gave the same realm different slots, and a realm that changed
-            // colour at the round boundary read as a different world. The
-            // polity ids are the same table (one generation, one seed, the
-            // spans continue), so a shared id keeps the slot it already had
-            // and only realms the predecessor never saw take a fresh one.
+            // over from culture"; ruled whole 2026-09-24, STARTUP.md § Identity
+            // across the rounds). The first cut copied the predecessor's slots
+            // over the landed record's — DEAD CODE, since `lapse_from_report`
+            // never colours and `polity_slot` was empty here (BL-1087's finding).
+            // Now the predecessor hands over PINS (`lapse_pins_for_successor`:
+            // every slot it assigned, the rung each realm reached, the ground
+            // its dead last held), the hard-border flag (BL-1090) and the
+            // civilisation diamonds (BL-1094), all by id; the landed record is
+            // re-derived so its own colouring keeps every pin, colours only the
+            // rest, and its hysteresis walk starts where the last round left it.
             //
             // Polity rounds only: the migration's owners are CULTURES in their
             // own id space and its lineage palette is a different thing
             // entirely, so nothing is inherited across that boundary.
-            if (prev.culture_colour.empty() && !prev.polity_slot.empty())
+            if (!prev.owners_are_cultures)
             {
-                std::vector<int32_t>& slot = m_wiz_history[i].polity_slot;
-                const std::size_t n = std::min(slot.size(), prev.polity_slot.size());
-                for (std::size_t p = 0; p < n; ++p)
-                    if (prev.polity_slot[p] >= 0) slot[p] = prev.polity_slot[p];
+                ui::history_lapse& cur = m_wiz_history[i];
+                cur.pins       = ui::lapse_pins_for_successor(prev);
+                cur.has_pins   = !cur.pins.slot.empty();
+                cur.hard_carry = ui::lapse_hard_at_close(prev);
+                cur.civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094: the diamonds stay
+                cur.tile_region.clear();
             }
+        }
 
-            // AND THE HARD BORDER CARRIES BY ID (BL-1090; STARTUP.md § Identity
-            // across the rounds): a realm hard at the predecessor's close opens
-            // this round hard, so the hysteresis walk starts where the last
-            // round left it rather than from soft -- a realm sitting inside the
-            // band at 1200 keeps its weight across the hand-over. Read off the
-            // predecessor's record itself (`lapse_hard_at_close` walks it if it
-            // was never finished), and the landed record is re-derived so its
-            // own walk reads the carry. Polity rounds only, as the slots above.
-            if (prev.culture_colour.empty())
-            {
-                m_wiz_history[i].hard_carry = ui::lapse_hard_at_close(prev);
-                m_wiz_history[i].civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094: the diamonds stay
-                m_wiz_history[i].tile_region.clear();
-            }
+        // AND THE ROUND AFTER THIS ONE IS RE-PINNED, IF IT IS ALREADY OPEN
+        // (BL-1087, the review's fix round). A player who pressed Next while
+        // this round was still running has its successor live — or even
+        // landed — on pins taken from a partial record, or from no record at
+        // all. The landing is the first moment the whole record exists, so
+        // the hand-over is made again here, from the landed record, exactly
+        // as it is made for a successor that launches later; the successor
+        // re-derives on its next frame. A running successor keeps its own
+        // record (only its pins move); a landed one is re-coloured whole.
+        // The chain stops at one: the successor's own successor is re-pinned
+        // when the successor lands, from a record that is whole by then.
+        // The successor is re-pinned whether or not its tap has published yet
+        // (the second cold review): a rapid double-Next has the successor
+        // launched but empty when this lands, and it must not wait for its own
+        // landing to learn its pins.
+        if (i + 1 < wizard_lapse_round_count
+            && !m_wiz_history[i].owners_are_cultures)
+        {
+            derive_lapse_for_handover(m_wiz_history[i], i + wizard_planetology_round_count + 1,
+                                      m_wiz_surface, m_wiz_terrain);
+            const ui::history_lapse& prev = m_wiz_history[i];
+            ui::history_lapse&       nxt  = m_wiz_history[i + 1];
+            nxt.pins       = ui::lapse_pins_for_successor(prev);
+            nxt.has_pins   = !nxt.pins.slot.empty();
+            nxt.hard_carry = ui::lapse_hard_at_close(prev);
+            nxt.civ_carry  = ui::lapse_civ_marks_at_close(prev);
+            nxt.tile_region.clear();
+            std::printf("[identity] round %d re-pinned from round %d's landing (it was already open)\n",
+                        i + 1 + wizard_planetology_round_count + 1, i + wizard_planetology_round_count + 1);
+            std::fflush(stdout);
         }
 
         // BL-914: LANDING NO LONGER RE-PARKS THE PLAYHEAD AT THE START. Under
@@ -691,6 +820,7 @@ void app::poll_wizard_history_tap(int lapse_index)
     m_wiz_history_tap_seen[lapse_index] = tap.snapshot(
         rec.lapse.changes, rec.lapse.culture_changes, rec.lapse.events,
         rec.region_col, rec.region_row, rec.region_name,
+        rec.lapse.polity_name, // BL-1088: the name table as it grows
         start_year, year_reached);
     // BL-1106: the name table, so a live ticker names a civilisation or a
     // creed in the year it is coined rather than only once the future lands.
@@ -2040,4 +2170,307 @@ void app::draw_generation_screen()
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// BL-1089 — the per-world nation -> colour table, from the saved report
+// ---------------------------------------------------------------------------
+//
+// A NATION'S COLOUR IS ITS REALM'S (Ben, 2026-09-24, R6; NATION_GENERATION.md
+// § Pass 5; LENSES.md § The Country lens has retired). The wizard's rounds
+// pinned every realm's slot by id; at Begin the last landed polity round holds
+// exactly the colours the player watched, and a LOAD re-derives them from the
+// saved report over the same pure functions (world/polity_identity.hpp) and
+// the same raster walk, so a loaded game colours every nation as the wizard
+// did. `ui::palette::nation_colour` reads the table first and hashes only an
+// id the table does not hold — a nation of ownerless ground, or a world with
+// no history.
+
+namespace {
+
+/// The realm colours (by polity id) re-derived from the report alone: the
+/// three polity records in sequence, each assigned with the pins the one
+/// before handed over, coloured at the last record's close. The water mask
+/// is the world's own tiles, which is the surface the wizard's raster was
+/// packed from. Empty when the body carries no record.
+/// @param round_count The wizard's lapse round count (`app::wizard_lapse_round_count`),
+///                    passed in because this is a free function and the count is the app's.
+std::vector<uint32_t> derive_realm_colours(const generation_report& rep,
+                                           const generation_report::body_entry& home,
+                                           world& w, int round_count)
+{
+    std::vector<uint32_t> realm;
+    // The homeworld grid is the CONSTANT the lapse rounds raster over
+    // (`lapse_from_report` sets `grid_w`/`grid_h` from it) and the grid the
+    // world's own tiles sit on. NOT the report's `tiles.gw/gh`: that is the
+    // generator's call record and reads 180 x 84 on a --verify world while the
+    // body carries 261 x 121 tiles — measured 2026-09-25, when reading it here
+    // left every nation on the hash.
+    const int gw = home_grid_width, gh = home_grid_height;
+    if (gw <= 0 || gh <= 0) return realm;
+    const std::vector<entity_id>& grid = body_tile_grid(w, home.id);
+    if (grid.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+    {
+        // Said aloud rather than silently hashed: a grid that does not match
+        // the report's raster is a wiring fault, not a world with no history.
+        std::printf("[identity] realm colours NOT derived: body %llu grid %zu tiles vs %d x %d\n",
+                    static_cast<unsigned long long>(home.id), grid.size(), gw, gh);
+        return realm;
+    }
+
+    std::vector<uint8_t> water(grid.size(), 1);
+    for (std::size_t k = 0; k < grid.size(); ++k)
+    {
+        const auto tit = w.tiles.find(grid[k]);
+        if (tit != w.tiles.end() && !is_water(tit->second.substrate)) water[k] = 0;
+    }
+
+    polity_pins pins;
+    bool has_pins = false;
+    int family_count = 0, records = 0;
+    std::size_t regions_last = 0;
+    std::vector<int32_t> last_slot, last_rung;
+    for (int i = 1; i < round_count; ++i)
+    {
+        ui::history_lapse h = lapse_from_report(rep, i, /*adopted=*/true);
+        if (h.empty()) continue;
+        ++records;
+        family_count = h.family_count;
+        // PER RECORD, OVER THE RECORD'S OWN REGIONS (the review's fix round):
+        // `lapse_from_report` cuts the anchor list to the record's
+        // `region_stride`, so this raster and adjacency are the ones the
+        // wizard's round drew by — the regions at that round's close, not the
+        // 1960 set — and a strip founded in a later span cannot move an
+        // earlier round's adjacency here and nowhere else.
+        const std::vector<int32_t> tile_region =
+            nearest_region_raster(water, gw, gh, h.region_col, h.region_row);
+        const std::vector<std::vector<int32_t>> nbrs =
+            region_adjacency(tile_region, gw, gh, h.region_col.size());
+        regions_last = h.region_col.size();
+        const std::vector<int32_t> first = polity_first_region(h.lapse);
+        const std::vector<int32_t> seat  = polity_seat_region(h.lapse, first);
+        std::vector<int32_t> wedge;
+        if (h.family_count > 0)
+        {
+            const std::vector<int32_t> culture = polity_founding_culture(h.lapse, seat, first);
+            wedge.assign(culture.size(), -1);
+            for (std::size_t p = 0; p < culture.size(); ++p)
+                if (culture[p] >= 0 && static_cast<std::size_t>(culture[p]) < h.culture_wedge.size())
+                    wedge[p] = h.culture_wedge[static_cast<std::size_t>(culture[p])];
+        }
+        polity_identity_input in;
+        in.rec          = &h.lapse;
+        in.region_nbrs  = &nbrs;
+        in.family       = h.family_count > 0 ? &wedge : nullptr;
+        in.family_count = h.family_count;
+        in.pins         = has_pins ? &pins : nullptr;
+        const polity_identity id = assign_polity_identity(in);
+        const polity_pins next   = pins_from(id, h.lapse, has_pins ? &pins : nullptr);
+        pins      = next;
+        has_pins  = true;
+        last_slot = pins.slot;
+        last_rung = pins.rung;
+    }
+    realm.assign(last_slot.size(), 0u);
+    std::size_t coloured = 0;
+    for (std::size_t p = 0; p < last_slot.size(); ++p)
+        if (last_slot[p] >= 0)
+        {
+            realm[p] = static_cast<uint32_t>(ui::palette::polity_slot_colour(
+                last_slot[p], family_count, p < last_rung.size() ? last_rung[p] : 0));
+            ++coloured;
+        }
+    std::printf("[identity] realm colours derived from the report: %zu of %zu realms over %d record(s), "
+                "%d families, %d x %d raster, %zu regions at the last close\n",
+                coloured, last_slot.size(), records, family_count, gw, gh, regions_last);
+    return realm;
+}
+
+/// Is the wizard round @p h holds THIS report's own record? A round's record
+/// is a copy of the homeworld's time-lapse for that round, so the descriptor
+/// (start year, span, region count), the list sizes and the realm name table
+/// all agree when it is, and a record of another world fails on the first of
+/// them that differs. Cheap: sizes and one string-vector compare.
+bool lapse_is_reports_own(const ui::history_lapse& h, int lapse_index, const generation_report& rep)
+{
+    const generation_report::body_entry* home = nullptr;
+    for (const generation_report::body_entry& b : rep.bodies)
+        if (b.is_homeworld) { home = &b; break; }
+    if (home == nullptr) return false;
+    const era_timelapse& t = lapse_index == 3 ? home->industrialisation_timelapse
+                           : lapse_index == 2 ? home->exploration_timelapse
+                                              : home->prehistory_timelapse;
+    const era_timelapse& r = h.lapse;
+    return r.start_year == t.start_year && r.years == t.years
+        && r.region_stride == t.region_stride
+        && r.changes.size() == t.changes.size() && r.events.size() == t.events.size()
+        && r.samples.size() == t.samples.size() && r.steps.size() == t.steps.size()
+        && r.polity_name == t.polity_name;
+}
+
+} // namespace
+
+bool app::pin_realm_colours_from_wizard(const generation_report* rep)
+{
+    // The last landed polity round holds the colours the player watched:
+    // that table, verbatim, at its close. Nothing when the wizard did not run
+    // (a cold Begin, `--autostart`), and the report path below fills in.
+    for (int i = wizard_lapse_round_count - 1; i >= 1; --i)
+    {
+        // A ROUND STILL RUNNING holds a partial record (the tap's), and a
+        // partial realm table is not the one the player watched: on the
+        // vouched Begin path the carve would otherwise wear round 6's
+        // half-built table instead of round 5's whole one (the second cold
+        // review). Only a LANDED round is read here.
+        if (m_wiz_history_future[i].valid()) continue;
+        // A landed round the player never drew is derived here as at the
+        // hand-over: its slots are the derivation's.
+        derive_lapse_for_handover(m_wiz_history[i], i + wizard_planetology_round_count + 1,
+                                  m_wiz_surface, m_wiz_terrain);
+        const ui::history_lapse& h = m_wiz_history[i];
+        if (h.empty() || !h.derived() || h.owners_are_cultures || h.polity_slot.empty()) continue;
+        // THE RECORD MUST BE THIS WORLD'S (the cold review's finding on
+        // BL-1089). The wizard's records survive a Begin, a load and a trip
+        // through the menu, and nothing else clears them; a save of another
+        // world loaded after a wizard run would otherwise index that world's
+        // nations into this one's slots, and the console would still say
+        // "pinned from the realms". The round's record is a copy of the
+        // report's own time-lapse, so equality on its descriptor and its
+        // tables is the test; a mismatch on the last landed round means the
+        // rounds below it are the same session's, so nothing is trusted.
+        if (rep != nullptr && !lapse_is_reports_own(h, i, *rep))
+        {
+            std::printf("[identity] the wizard's round %d record is not this world's "
+                        "(start %d, %d years, %d regions, %zu realms named): its realm table "
+                        "is not used; the report's own derivation stands\n",
+                        i + wizard_planetology_round_count + 1, h.lapse.start_year, h.lapse.years,
+                        h.lapse.region_stride, h.lapse.polity_name.size());
+            std::fflush(stdout);
+            return false;
+        }
+        const int end = h.lapse.start_year + h.lapse.years;
+        std::vector<uint32_t> realm(h.polity_slot.size(), 0u);
+        for (std::size_t p = 0; p < h.polity_slot.size(); ++p)
+            if (h.polity_slot[p] >= 0)
+                realm[p] = ui::lapse_owner_colour(h, static_cast<uint16_t>(p), end);
+        ui::palette::set_realm_colour_table(realm);
+        return true;
+    }
+    return false;
+}
+
+void app::pin_nation_colours_from_report()
+{
+    ui::palette::clear_nation_colour_table();
+    const generation_report::body_entry* home = nullptr;
+    for (const generation_report::body_entry& b : m_generation_report.bodies)
+        if (b.is_homeworld) { home = &b; break; }
+    if (home == nullptr || home->nation_ids.empty()) return;
+
+    // The wizard's own colours where it ran; the report's derivation otherwise
+    // (a load, or a cold Begin). One rule, two sources of the same numbers —
+    // and where both exist they are COMPARED (the review's fix round): the
+    // equality R2 promises between the round the player watched and the
+    // table a load re-derives is a count printed here, not an assertion.
+    // The derivation is three rasters and three assignments, cheap at Begin.
+    const bool wizard_table = pin_realm_colours_from_wizard(&m_generation_report);
+    const std::vector<uint32_t> derived =
+        derive_realm_colours(m_generation_report, *home, m_world, wizard_lapse_round_count);
+    if (!wizard_table)
+        ui::palette::set_realm_colour_table(derived);
+    else
+    {
+        std::size_t compared = 0, differ = 0, one_sided = 0;
+        for (std::size_t p = 0; p < derived.size(); ++p)
+        {
+            bool found = false;
+            const ImU32 c = ui::palette::realm_colour(static_cast<int>(p), &found);
+            const bool has_derived = derived[p] != 0u;
+            if (!found && !has_derived) continue;
+            if (found != has_derived) { ++one_sided; continue; }
+            ++compared;
+            if (static_cast<uint32_t>(c) != derived[p]) ++differ;
+        }
+        std::printf("[identity] the wizard's realm table against the report's derivation: "
+                    "%zu of %zu realms differ, %zu held by one side only\n",
+                    differ, compared, one_sided);
+        std::fflush(stdout);
+    }
+
+    std::vector<std::pair<entity_id, ImU32>> table;
+    table.reserve(home->nation_ids.size());
+    int pinned = 0, ownerless = 0;
+    std::vector<std::size_t> ownerless_idx;
+    for (std::size_t n = 0; n < home->nation_ids.size() && n < home->nation_polity.size(); ++n)
+    {
+        const int32_t pol = home->nation_polity[n];
+        if (pol < 0) { ++ownerless; ownerless_idx.push_back(n); continue; }
+        bool found = false;
+        const ImU32 c = ui::palette::realm_colour(pol, &found);
+        if (!found) continue;
+        table.emplace_back(home->nation_ids[n], c);
+        ++pinned;
+    }
+
+    // OWNERLESS GROUND TAKES A SLOT THE SAME RULE HANDS IT AGAINST ITS
+    // NEIGHBOURS (NATION_GENERATION.md § Pass 5): a nation no realm founded
+    // has no wedge to draw from, so it takes the lowest fallback-table slot
+    // whose colour no nation adjacent to it on the carve already wears —
+    // the greedy walk the realms had, over the world's own tile ownership.
+    // In ascending nation-index order, so the walk is deterministic.
+    if (!ownerless_idx.empty())
+    {
+        const int gw = home_grid_width, gh = home_grid_height; // the world's grid, as above
+        const std::vector<entity_id>& grid = body_tile_grid(m_world, home->id);
+        std::vector<int32_t> tile_nation; // raster -> nation index, -1 none
+        std::vector<std::vector<int32_t>> nbrs(home->nation_ids.size());
+        if (gw > 0 && gh > 0 && grid.size() == static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        {
+            std::vector<std::pair<entity_id, int32_t>> by_id;
+            by_id.reserve(home->nation_ids.size());
+            for (std::size_t n = 0; n < home->nation_ids.size(); ++n)
+                by_id.emplace_back(home->nation_ids[n], static_cast<int32_t>(n));
+            std::sort(by_id.begin(), by_id.end());
+            const auto index_of = [&](entity_id id) -> int32_t {
+                const auto it = std::lower_bound(by_id.begin(), by_id.end(), std::make_pair(id, int32_t{0}),
+                                                 [](const auto& a, const auto& b) { return a.first < b.first; });
+                return (it != by_id.end() && it->first == id) ? it->second : -1;
+            };
+            tile_nation.assign(grid.size(), -1);
+            for (std::size_t k = 0; k < grid.size(); ++k)
+            {
+                const auto nit = m_world.tile_to_nation.find(grid[k]);
+                if (nit != m_world.tile_to_nation.end()) tile_nation[k] = index_of(nit->second);
+            }
+            nbrs = region_adjacency(tile_nation, gw, gh, home->nation_ids.size());
+        }
+        // Colour by nation index, for the adjacency test (realms already pinned).
+        std::vector<ImU32> colour_of(home->nation_ids.size(), 0u);
+        for (const auto& [id, c] : table)
+        {
+            for (std::size_t n = 0; n < home->nation_ids.size(); ++n)
+                if (home->nation_ids[n] == id) { colour_of[n] = c; break; }
+        }
+        for (const std::size_t n : ownerless_idx)
+        {
+            ImU32 chosen = 0u;
+            for (int slot = 0; slot < polity_fallback_slot_count && chosen == 0u; ++slot)
+            {
+                const ImU32 c = ui::palette::lapse_polity_colour(slot);
+                bool used = false;
+                if (n < nbrs.size())
+                    for (const int32_t nb : nbrs[n])
+                        if (nb >= 0 && static_cast<std::size_t>(nb) < colour_of.size() && colour_of[static_cast<std::size_t>(nb)] == c)
+                        { used = true; break; }
+                if (!used) chosen = c;
+            }
+            if (chosen == 0u) chosen = ui::palette::lapse_polity_colour(static_cast<int>(n)); // every slot taken: the index's
+            colour_of[n] = chosen;
+            table.emplace_back(home->nation_ids[n], chosen);
+        }
+    }
+    ui::palette::set_nation_colour_table(table);
+    std::printf("[identity] nation colours pinned from the realms: %d of %zu nations, %d of ownerless ground\n",
+                pinned, home->nation_ids.size(), ownerless);
+    std::fflush(stdout);
 }

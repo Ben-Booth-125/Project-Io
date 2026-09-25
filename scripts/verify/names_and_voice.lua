@@ -93,7 +93,10 @@ for _, k in ipairs(kinds) do
             verify.expect(string.find(line, "unnamed", 1, true) == nil,
                           "the " .. label .. " line names its parties off the record: " .. line)
             if label == "schism" then
-                verify.expect(string.find(line, "creed", 1, true) ~= nil,
+                -- The phrase, not the word: "an unnamed creed" carries "creed" too, so the
+                -- fallback branch would pass the check it exists to fail (the cold review).
+                verify.expect(string.find(line, "and its creed, ", 1, true) ~= nil
+                              and string.find(line, "unnamed creed", 1, true) == nil,
                               "the schism line names the creed as well as both parties: " .. line)
             end
         end
@@ -116,6 +119,12 @@ local marks = verify.history_board_marks()
 verify.expect(marks == 0,
               "at " .. first5 .. " no inherited realm carries the entry mark ("
               .. marks .. " marked; -1 means the round never drew)")
+-- WHY THE FIRST-YEAR READ IS THE CHECK (the cold review asked): with the lagged slice clamped
+-- to the record's first year the two slices coincide there, so zero is what the clamp
+-- guarantees -- and it is exactly what the unclamped slice failed (every inherited realm marked
+-- for the first twelfth). A read further in cannot serve: a realm that CLIMBS onto the board
+-- a twelfth in is meant to carry the mark (a rank entrant), so a later count is not a count
+-- of inherited-realm errors. Remove the clamp and this read goes non-zero again.
 
 -- 4. The clipping ledger over those frames.
 verify.expect_no_clipping("names_and_voice")

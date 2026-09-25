@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*43 entries — 22 open, 21 resolved.*
+*44 entries — 23 open, 21 resolved.*
 
 ---
 
@@ -303,7 +303,21 @@ The pin was measured over the 16 curated seeds at every recorded Empires step (8
 
 *Files: `src/ui/history_lapse.hpp`, `src/ui/history_lapse.cpp`, `tools/verify/history_sweep.cpp`*
 
-### NR-938 — CALL: the origin sentence's 'since <year>' reads the one record that spans the founding year, so a realm that held the region across the whole span reads 'since 1660 CE'
+### NR-938 — DECISION TAKEN: the pinned-slot clash rule is pinned-vs-pinned (the 2026-09-24 ruling said pinned-vs-fresh, a case the walk never produces)
+*decision taken on your behalf · raised 2026-09-25 · from BL-1087 lane I1 fix round and its cold review, 2026-09-25*
+
+The ruling (R7) said a pinned/fresh adjacency clash re-slots the smaller people-share realm. In the built walk a FRESH realm is coloured greedily AROUND the pins, so it cannot clash with one; the only clash the seam makes is two PINNED realms that never touched before and now neighbour — that is the case the code resolves (the smaller people share re-slots at the round's opening step; on the verify world 1 re-slot at each of the 1200 and 1660 seams). STARTUP.md § Identity across the rounds was reworded to say so with a dated note; the sentence is qualified: a fresh realm cannot clash except on a spill (the palette exhausted), where it shares a neighbour's slot and no re-slot happens.
+
+**Why it matters.** An authority-doc sentence was changed by a lane on its own reading; Ben should know the rule he ruled is not the rule the walk needs, and confirm the pinned/pinned form.
+
+- A: confirm pinned/pinned (as built and now written)
+- B: keep the ruling's wording and add a fresh-realm re-slot the walk does not need
+
+> **Recommendation:** A.
+
+*Files: `docs/ui/STARTUP.md`, `src/ui/history_lapse.cpp`*
+
+### NR-939 — CALL: the origin sentence's 'since <year>' reads the one record that spans the founding year, so a realm that held the region across the whole span reads 'since 1660 CE'
 *question · raised 2026-09-25 · from BL-1099 lane F3 (the seat briefing's origin sentence, R22) and its review, 2026-09-25*
 
 seat_origin_sentence reads the holder of the firm's origin region at its founding year off the record whose span holds that year (Industrialisation first, then Exploration, then Empires) and takes 'since' as the year of that record's last owner change of the region at or before the founding year. A region held from before the span opens has its first change AT the span's open, so the sentence reads 'the realm of X since 1660 CE' for most firms (the capture: 'Chartered from Guagua's industry, in Gesher Nehua, under Tuarthuage Thuathe, the realm of Gesher Nehua since 1660 CE'). The three records are separate resumes; whether a polity id means the same realm across them is what a walk back into the earlier records would have to rely on, and it is not asserted anywhere.
@@ -318,7 +332,7 @@ seat_origin_sentence reads the holder of the firm's origin region at its foundin
 
 *Files: `src/ui/seat_screen.cpp`*
 
-### NR-939 — CALL: the works-chartered notes cluster in the span's first century because the RUNNING price is tiny at the open -- is that the moment the round should show?
+### NR-940 — CALL: the works-chartered notes cluster in the span's first century because the RUNNING price is tiny at the open -- is that the moment the round should show?
 *question · raised 2026-09-25 · from BL-1099 lane F3, the 16-seed reading that pinned f = 2 (industrialisation_sim_harness --through 1960 --works-fractions ..., 2026-09-25)*
 
 A note fires when a region's industry points cross the next multiple of f x the running price, the world's stock so far over the charter divisor (R15, self-consistent with the close's price per NR-907). At the span's open the world's stock is near zero, so the price is near zero and a region with any points crosses its four multiples in the first decades: on most seeds the notes run 1660 -> ~1760 (seed 28: 1660 -> 1760 at f = 1; the verify world: 27 of 40 charters dated 1660 -> 1716), and the seat briefing's origin year lands early in the span for nearly every firm. At the pinned f = 2 the library notes 3233 works and dates 894 of 1297 charters; the four-per-region cap is what binds thereafter, not the price.

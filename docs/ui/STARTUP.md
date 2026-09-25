@@ -385,8 +385,14 @@ with an offset inside the wedge chosen greedily, so kin realms read as kin; and 
 polity fill on rounds 4–6 sits a dull culture base in the lineage hue of each region's
 plurality people, read from the record's culture changes. **Slots are pinned:** a realm's
 colour slot lives on the record from the round that seats it, the greedy table fills only the
-slots no pin holds, and a clash between a pinned realm and a fresh neighbour re-slots the
-smaller people-share realm at the round's opening step. A dead realm's slot is retired only
+slots no pin holds, and a **clash** — two *pinned* realms the new record makes neighbours while
+they share a slot — re-slots the one with the smaller people share at the round's opening step.
+A fresh realm cannot clash except on a spill — the palette exhausted around it, where it shares a
+neighbour's slot and no re-slot happens: it is coloured around the pins it touches, so the only pair the walk
+can find sharing a slot is two pins that were never neighbours in the record that slotted them
+(the 2026-09-24 ruling's "pinned/fresh" wording named a case the walk never produces; the
+pinned/pinned reading is the one the rule was built and measured on — 2026-09-25, on the cold
+review). A dead realm's slot is retired only
 for a newcomer seated inside its last-held ground. The same slot is what the nation's colour
 is pinned to at Begin and on load, so the national border band (LENSES.md § The Country lens
 has retired — national borders are chrome), the seat map and the wizard show one colour for one
@@ -396,7 +402,11 @@ realm.
 under it, or when it crosses the *rose* threshold the arc readout already reads by (a peak at
 least double its start and three regions more) — and holds that rung everywhere else, so the
 shade carries by id and a viewer reads "this one has grown" from the fill alone. There is no
-continuous tint.
+continuous tint. **The start is the realm's founding size** — the first sample the record that
+founded it holds — carried by id across the seams exactly as the rung is, so a realm crosses
+*rose* once in its life and never again by re-basing at a later span's opening; a span that
+re-based the start at its own first year would let one steady climb earn a rung per round
+(2026-09-25, on the cold review).
 
 **A hard border is people share, with hysteresis.** A realm whose share of the world's people
 stands above a fixed threshold draws hard: the two frontier passes lay 2 px of dark and a 1 px

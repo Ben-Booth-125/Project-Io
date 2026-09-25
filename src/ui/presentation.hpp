@@ -6,6 +6,8 @@
 #include <imgui.h>
 
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace ui {
 
@@ -257,7 +259,62 @@ inline constexpr int lapse_polity_slot_count = 20;
 ///
 /// @param slot Palette slot from the colouring.
 /// @return     That slot's identity colour.
+///
+/// THE FALLBACK TABLE since BL-1087: a record with a culture tree paints its
+/// realms by `polity_slot_colour` below, from the founding family's wedge;
+/// this twenty-slot table is what a record with NO tree (no lineage to read a
+/// wedge from) still colours by.
 ImU32 lapse_polity_colour(int slot);
+
+/// A REALM'S COLOUR FROM ITS FAMILY'S WEDGE (BL-1087; Ben, 2026-09-24, R7):
+/// the slot encodes a hue-family wedge and an offset inside it
+/// (`polity_slot_offsets`, world/polity_identity.hpp). The wedge is the founding
+/// culture's root cradle's — the same wedge the lineage palette gives that
+/// family, so kin realms and the culture base under them read as one hue —
+/// and the offset nudges the hue inside the wedge and steps the lightness, so
+/// two adjacent kin never share a swatch. Wedges alternate a base lightness
+/// by parity, the CVD-safe axis, so two wedges whose hues collapse under a
+/// deficiency still separate (the twelve-slot nation table's reasoning:
+/// widen by lightness within safe hues, not by new hues). `rung` darkens the
+/// colour one step per shade rung (R8's ratchet). With `family_count <= 0`
+/// the slot indexes the fallback table above instead.
+///
+/// @param slot         The realm's slot from `assign_polity_identity`.
+/// @param family_count The record's wedge count (`lineage_wedges::count`).
+/// @param rung         Shade rungs earned (0 = none), clamped to two.
+ImU32 polity_slot_colour(int slot, int family_count, int rung);
+
+/// ONE RUNG DARKER (BL-1087, R8): the same colour with its value stepped down,
+/// as the ratchet draws it. 0 returns @p c unchanged; clamped to two rungs.
+ImU32 shade_rung(ImU32 c, int rung);
+
+/// THE CULTURE BASE under the polity fill on the Empires, Exploration and
+/// Industrialisation rounds (BL-1087, R7): the lineage hue of a region's
+/// plurality people, DULL — low saturation, mid value — so the realm tint
+/// over it stays the political read and the base is context. Same hue and
+/// depth arguments as `lineage_colour`, so a family's base and its fill agree.
+ImU32 culture_base_colour(float hue, int depth);
+
+/// THE PER-WORLD NATION -> COLOUR TABLE (BL-1089; Ben, 2026-09-24, R6). A
+/// nation's colour is its founding realm's — the slot the wizard's rounds
+/// pinned by id — and this table, set at Begin and again on load from the
+/// saved report, is what `nation_colour` reads first; the hash below is only
+/// the fallback for an id the table does not hold (a nation of ownerless
+/// ground, a hand-built harness world, a world with no history). One table,
+/// so the national border band, the seat map, the loading carve and the Ages
+/// view cannot disagree. Cleared with the world.
+void set_nation_colour_table(const std::vector<std::pair<entity_id, ImU32>>& table);
+void clear_nation_colour_table();
+/// True when @p id is in the table (the colour is the realm's, not the hash).
+bool nation_colour_pinned(entity_id id);
+
+/// THE REALM -> COLOUR TABLE by polity id (BL-1089), set beside the nation
+/// table from the same derivation, for the surfaces that hold a POLITY id
+/// rather than a nation entity: the loading carve (before the entities
+/// exist) and the Ages view's replay. @p found reports a miss; the colour
+/// returned on a miss is the fallback table's slot for the id.
+void set_realm_colour_table(const std::vector<uint32_t>& colour_by_polity);
+ImU32 realm_colour(int polity, bool* found = nullptr);
 
 /// Identity colour for a building **kind** — the colour a segment of the stacked-tile
 /// ring is drawn in (`ui::icons::stack_ring`, PLANETARY.md § Building markers).

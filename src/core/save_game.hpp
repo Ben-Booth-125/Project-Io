@@ -213,27 +213,36 @@ inline constexpr uint32_t save_game_magic =
 ///   - EVENT KINDS appended to `lapse_event_kind` (each moves `count` and so
 ///     the event-kind range check; no field changes width):
 ///     `province_bought` (BL-1096, a native bought rather than taken),
-///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier)
-///     `works_chartered` (BL-1099, a region's industry points crossing the
-///     next multiple of a fraction of the running charter price; kind 21, the
-///     gap at 20 is lane I1's `inherited`) and `rung_crossed` (BL-1100, a
-///     polity's materials capacity reaching the Industrial rung, at its
-///     capital; kind 22);
-///     later sprint-47 lanes append theirs under this same number.
-///   - THE CULTURE ROUND'S OWN RECORD AT THE TAIL OF EVERY BODY ENTRY (BL-1104):
-///     `generation_report::body_entry::migration_timelapse`, one more
-///     `w_timelapse` record after `industrialisation_timelapse`, folded on every
-///     full build so the adopted world keeps its migration past (empty on any
-///     body but the cradle). Record-only: read by nothing at world setup.
-///   - THE NAME TABLE AT THE TAIL OF EVERY TIME-LAPSE RECORD (BL-1106, the
-///     ticker names civilisations and creeds): `era_timelapse::civilisation_name`
-///     and `::creed_name` (two string lists, index order) and `::polity_creed`
-///     (i32 per polity id, -1 = none; any value under -1 is corrupt), written
-///     by `w_timelapse` after the event list in all three records and read
-///     back in the same place by `r_timelapse`. Record-only: read by the
-///     ticker, by nothing at world setup.
+///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier),
+///     `inherited` (BL-1088, a resumed span restating a living realm at its
+///     capital, ticker-silent; replaces the `founded` re-emit on the resume
+///     path only; kind 20), `works_chartered` (BL-1099, a region's industry
+///     points crossing the next multiple of a fraction of the running charter
+///     price; kind 21) and `rung_crossed` (BL-1100, a polity's materials
+///     capacity reaching the Industrial rung, at its capital; kind 22); later
+///     sprint-47 lanes append theirs under this same number.
+///   - THE CULTURE ROUND'S OWN RECORD ON EVERY BODY ENTRY (BL-1104):
+///     `generation_report::body_entry::migration_timelapse`, a fourth
+///     `w_timelapse` record straight after `industrialisation_timelapse` and
+///     BEFORE the polity fold's arrays below, folded on every full build so the
+///     adopted world keeps its migration past (empty on any body but the
+///     cradle). Record-only: read by nothing at world setup.
+///   - THE NAME TABLES AT THE TAIL OF EVERY TIME-LAPSE RECORD, in this order,
+///     written by `w_timelapse` after the event list in all three records and
+///     read back in the same place by `r_timelapse`:
+///       1. `era_timelapse::civilisation_name` and `::creed_name` (two string
+///          lists, index order) and `::polity_creed` (i32 per polity id, -1 =
+///          none; any value under -1 is corrupt) — BL-1106, the ticker names
+///          civilisations and creeds. Record-only: read by the ticker, by
+///          nothing at world setup.
+///       2. `era_timelapse::polity_name` (BL-1088, the realm name table): one
+///          string per polity id.
+///   - THE POLITY FOLD'S RECORD on every `generation_report::body_entry`
+///     (BL-1089): five flat arrays after the four time-lapses — nation ids,
+///     each nation's founding realm, and the absorbed-realm ranges — read by
+///     the seat card and the per-world nation -> colour table.
 /// A v21 stream is refused whole on the same strict-equality contract.
-inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened
+inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened, inherited, realm names, the polity fold's record
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

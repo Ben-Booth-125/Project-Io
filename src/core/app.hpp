@@ -825,6 +825,24 @@ private:
     /// whatever its tap has published so far into `m_wiz_history[lapse_index]`
     /// and re-derive the drawable map from it, throttled — see the .cpp.
     void poll_wizard_history_tap(int lapse_index);
+    /// BL-1089: set `ui::palette`'s per-world nation -> colour table (and the
+    /// realm table by polity id) from `m_generation_report` — at Begin and on
+    /// load — so the border band, the seat map, the carve and the Ages view
+    /// share the wizard's colours. Defined in startup_screens.cpp.
+    void pin_nation_colours_from_report();
+    /// BL-1089: the realm table alone, from the last landed polity round, so
+    /// the loading carve can colour by realm before the nation entities exist.
+    /// True when a round's table was set; false when the wizard has none to
+    /// give, and the caller derives from the report instead.
+    /// @param rep The report the table must belong to: the round's record has
+    ///            to be that report's own time-lapse (start year, span, region
+    ///            count, the change / event / sample / step counts and the realm
+    ///            name table all equal), else nothing is set and false comes
+    ///            back — a load must never wear a realm table the wizard left
+    ///            behind from a different world (the cold review's finding).
+    ///            nullptr means the caller vouches for the world: Begin waiting
+    ///            on round 6's own build, whose report does not exist yet.
+    bool pin_realm_colours_from_wizard(const generation_report* rep);
 
     // --- The seat (BL-630, 2026-08-26) --------------------------------------
     //

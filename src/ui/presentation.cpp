@@ -1,12 +1,34 @@
 #include "presentation.hpp"
 
+#include "world/polity_identity.hpp" // polity_slot_offsets, polity_slot_family (BL-1087)
+
+#include <algorithm>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include <cstddef>
 
 namespace ui {
 
 namespace {
+
+// BL-1089 — THE PER-WORLD TABLES. Presentation state, not world state: set
+// from the saved report at Begin and on load, cleared with the world, read by
+// `nation_colour` / `realm_colour`. Sorted by id so the lookup is a binary
+// search, and never hashed on an id.
+std::vector<std::pair<entity_id, ImU32>> g_nation_colours;
+std::vector<uint32_t>                    g_realm_colours; ///< By polity id; 0 = no entry.
+
+const ImU32* pinned_nation_colour(entity_id id)
+{
+    const auto it = std::lower_bound(g_nation_colours.begin(), g_nation_colours.end(), id,
+                                     [](const std::pair<entity_id, ImU32>& e, entity_id v) {
+                                         return e.first < v;
+                                     });
+    if (it == g_nation_colours.end() || it->first != id) return nullptr;
+    return &it->second;
+}
 
 // Indexed by static_cast<std::size_t>(resource_type); order matches the enum in
 // components.hpp. Identity colours are chosen to read distinctly against the
@@ -389,10 +411,48 @@ ImU32 nation_colour(entity_id id)
         IM_COL32(150, 180, 220, 255), // blue, tinted
         IM_COL32(150,  80, 110, 255), // reddish purple, shaded
     };
+    // BL-1089: the per-world table first — a nation's colour is its realm's,
+    // pinned at Begin/load from the saved report. The hash is the fallback.
+    if (const ImU32* pinned = pinned_nation_colour(id)) return *pinned;
     // Knuth multiplicative hash so consecutive nation ids (the common case) land
     // on well-separated palette slots rather than adjacent hues.
     const uint32_t h = static_cast<uint32_t>(id) * 2654435761u;
     return nation_table[h % nation_slot_count];
+}
+
+void set_nation_colour_table(const std::vector<std::pair<entity_id, ImU32>>& table)
+{
+    g_nation_colours = table;
+    std::sort(g_nation_colours.begin(), g_nation_colours.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+}
+
+void clear_nation_colour_table()
+{
+    g_nation_colours.clear();
+    g_realm_colours.clear();
+}
+
+bool nation_colour_pinned(entity_id id)
+{
+    return pinned_nation_colour(id) != nullptr;
+}
+
+void set_realm_colour_table(const std::vector<uint32_t>& colour_by_polity)
+{
+    g_realm_colours = colour_by_polity;
+}
+
+ImU32 realm_colour(int polity, bool* found)
+{
+    if (polity >= 0 && static_cast<std::size_t>(polity) < g_realm_colours.size()
+        && g_realm_colours[static_cast<std::size_t>(polity)] != 0u)
+    {
+        if (found) *found = true;
+        return static_cast<ImU32>(g_realm_colours[static_cast<std::size_t>(polity)]);
+    }
+    if (found) *found = false;
+    return lapse_polity_colour(polity < 0 ? 0 : polity);
 }
 
 ImU32 lineage_colour(float hue, int depth)
@@ -445,6 +505,92 @@ ImU32 lapse_polity_colour(int slot)
     };
     if (slot < 0) slot = -slot;
     return table[slot % lapse_polity_slot_count];
+}
+
+ImU32 shade_rung(ImU32 c, int rung)
+{
+    if (rung <= 0) return c;
+    if (rung > 2) rung = 2;
+    // One rung is a value step of 0.78, the size the lineage palette's own
+    // depth steps take (0.90 -> 0.80 -> 0.70 reads as three rungs there), so a
+    // ratchet reads as "grown" on the same scale a daughter culture reads as
+    // "younger". Alpha untouched: the fill's opacity is the map's, not the
+    // colour's.
+    const float k = rung == 1 ? 0.78f : 0.60f;
+    const int r = static_cast<int>(static_cast<float>((c >> IM_COL32_R_SHIFT) & 0xFF) * k + 0.5f);
+    const int g = static_cast<int>(static_cast<float>((c >> IM_COL32_G_SHIFT) & 0xFF) * k + 0.5f);
+    const int b = static_cast<int>(static_cast<float>((c >> IM_COL32_B_SHIFT) & 0xFF) * k + 0.5f);
+    const int a = static_cast<int>((c >> IM_COL32_A_SHIFT) & 0xFF);
+    return IM_COL32(r, g, b, a);
+}
+
+ImU32 polity_slot_colour(int slot, int family_count, int rung)
+{
+    if (slot < 0) slot = 0;
+    if (family_count <= 0)
+        return shade_rung(lapse_polity_colour(slot), rung);
+
+    const int wedge  = polity_slot_family(slot) % family_count;
+    const int offset = polity_slot_offset(slot);
+
+    // THE WEDGE IS THE LINEAGE PALETTE'S: the k-th root cradle owns hue k / F
+    // (`build_lineage_palette`, history_lapse.cpp), so a realm and the culture
+    // base under it share a hue by construction rather than by lookup.
+    const float wedge_w = 1.0f / static_cast<float>(family_count);
+    const float centre  = wedge_w * static_cast<float>(wedge);
+
+    // SIX OFFSETS, greedy-lowest-first, SEPARATED ON THE VALUE AXIS: a hue
+    // nudge inside the wedge (in wedge half-widths, small so kin still read
+    // as one family) paired with six distinct values. Value is the axis a
+    // colour deficiency keeps, so the first three offsets — the ones adjacent
+    // kin actually receive — sit at 1.00 / 0.60 / 0.82 (gaps of 0.18 and
+    // more); the last three fill the levels between, and the sixth is a rare
+    // spill. MEASURED (tools/session/cvd_palette_check.js, BL-1087 R5): the
+    // first cut paired offsets 0 and 3 at one value and they collapsed to
+    // under 2 dE under protan and deutan; this set holds the first three at
+    // 10+ dE under every deficiency and the whole six at ~5 (the structural
+    // floor of six levels in [0.52, 1.0]).
+    static constexpr float nudge[polity_slot_offsets] = { 0.0f, +0.35f, -0.35f, +0.2f, -0.2f, 0.0f };
+    static constexpr float value[polity_slot_offsets] = { 1.00f, 0.60f, 0.82f, 0.70f, 0.92f, 0.52f };
+    float hue = centre + nudge[offset] * (wedge_w * 0.5f);
+    hue -= static_cast<float>(static_cast<int>(hue));
+    if (hue < 0.0f) hue += 1.0f;
+
+    // WEDGE PARITY alternates the base lightness (0.98 / 0.76) AND the
+    // saturation (0.80 / 0.55): the two axes a colour deficiency keeps, so two
+    // wedges whose hues fall together under deutan or protan simulation still
+    // read apart — the twelve-slot nation table's own reasoning (widen by
+    // lightness within safe hues, never by new hues), taken to a wheel of
+    // wedges. Measured: wedge centres hold at 15+ dE under deutan and protan
+    // up to six families, and at 9 dE at eight — the nation table's own
+    // worst pair under protan.
+    const float base_v = (wedge % 2 == 0) ? 0.98f : 0.76f;
+    const float s      = (wedge % 2 == 0) ? 0.80f : 0.55f;
+    const float v      = base_v * value[offset];
+    float r = 0.0f, g = 0.0f, b = 0.0f;
+    ImGui::ColorConvertHSVtoRGB(hue, s, v, r, g, b);
+    const ImU32 c = IM_COL32(static_cast<int>(r * 255.0f + 0.5f),
+                             static_cast<int>(g * 255.0f + 0.5f),
+                             static_cast<int>(b * 255.0f + 0.5f), 255);
+    return shade_rung(c, rung);
+}
+
+ImU32 culture_base_colour(float hue, int depth)
+{
+    // Dull on purpose: saturation a third of the lineage palette's, value in
+    // the middle, so over the relief base it reads as tinted ground and the
+    // polity tint laid over it stays the political read. Depth steps down as
+    // `lineage_colour` does, so a family's members keep their order.
+    hue -= static_cast<float>(static_cast<int>(hue));
+    if (hue < 0.0f) hue += 1.0f;
+    const int   d = depth < 0 ? 0 : (depth > lineage_depth_cap ? lineage_depth_cap : depth);
+    const float s = 0.32f;
+    const float v = 0.62f - 0.05f * static_cast<float>(d);
+    float r = 0.0f, g = 0.0f, b = 0.0f;
+    ImGui::ColorConvertHSVtoRGB(hue, s, v, r, g, b);
+    return IM_COL32(static_cast<int>(r * 255.0f + 0.5f),
+                    static_cast<int>(g * 255.0f + 0.5f),
+                    static_cast<int>(b * 255.0f + 0.5f), 255);
 }
 
 ImU32 building_kind_colour(building_type type)

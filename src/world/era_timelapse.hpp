@@ -201,8 +201,7 @@ enum class lapse_event_kind : uint8_t
     furnace_lit         = 17, ///< BL-1080: a region crossed the furnace (`region::industrial_year`); `polity` = its holder. A resumed span notes the crossings it inherits, dated at their own (earlier) year, ahead of its first event (save_game_version 21).
     province_bought     = 18, ///< BL-1096: a native was BOUGHT rather than taken (EXPLORATION.md sec Two ways to claim ground across water); `region` = the native seat, `polity` = the native, `other` = the buyer. Noted INSTEAD of `subject_bound` for that binding (save_game_version 22).
     sea_lane_opened     = 19, ///< BL-1097: a sea leg's uses crossed `sea_lane_tier1_uses`; `region`/`other` = its ends (lo, hi), `polity` = the tier (1). The water analogue of `road_promoted` (save_game_version 22).
-    // 20 is `inherited`, lane I1's (sprint 47): the value is left to that lane so
-    // no two lanes append the same byte; the gap stands until it lands.
+    inherited           = 20, ///< BL-1088: a RESUMED span restating a living realm it inherited from the span before — `region` = its capital at the resume, `polity` = the realm, dated `start_year`. Ticker-silent: nothing rose (CIVILISATION.md sec A realm's name). Replaces the `founded` re-emit on the resume path only (save_game_version 22).
     works_chartered     = 21, ///< BL-1099: a region's `industry_points` crossed the next multiple of `works_event_fraction_q` x the RUNNING charter price (the world's stock so far over `k_stockpile_price_divisor`); `region` = the works' region, `polity` = its holder, `other` = the `industrial_focus` a firm chartered there takes (`focus_from_region`). RECORD-ONLY: no point is debited, at most `works_event_region_cap` per region per span (save_game_version 22).
     rung_crossed        = 22, ///< BL-1100: a POLITY's materials capacity reached the Industrial rung (`polity::industrial_year`, INDUSTRIALISATION.md sec Beat 1 "The span's industrial moment is the polity's crossing"); `region` = its capital that year, `polity` = the polity, `other` = none. ITS OWN KIND, not a reuse of `furnace_lit` (Ben's either/or, 2026-09-24, R16): a region furnace is Stage 4's ground-by-ground lag and never lights on a generated world, while this is the realm's crossing the sim computes -- one kind per fact, so the ember layer can mark the capital without claiming the region's furnace lit. RECORD-ONLY, noted once per polity (save_game_version 22).
     count
@@ -254,15 +253,36 @@ struct era_timelapse
     /// `creed_name`, and `polity_creed` is polity id -> the creed that realm
     /// adopted (-1 = none), so a `schism` line can name the creed the seceding
     /// people walked out on — the parent's, which no event carries. Filled by
-    /// `as_timelapse` from the sim's own lists, IN INDEX ORDER, so a resumed
-    /// span's numbering continues (history_sim.hpp's civilisation/creed copy);
-    /// read by the ticker and by nothing in world/*. Every name is coined by
-    /// the sim from a generated tongue — never an Earth name. Empty on the
-    /// migration record and on every body the era never ran for
-    /// (save_game_version 22).
+    /// `as_timelapse` from the sim's own lists, IN INDEX ORDER. THE TABLES ARE
+    /// THIS RECORD'S OWN: a resumed span that restarts the civilisation and
+    /// creed lists at zero (the Exploration resume does, BL-1049) numbers its
+    /// events against its own tables, so an index is meaningful only within
+    /// the record that carries it, and a `polity_creed` row on a later round
+    /// names that round's creed list, never round 4's. The prose degrades
+    /// honestly where a table is empty ("an unnamed creed"). Read by the ticker
+    /// and by nothing in world/*. Every name is coined by the sim from a
+    /// generated tongue — never an Earth name. Empty on the migration record
+    /// and on every body the era never ran for (save_game_version 22).
     std::vector<std::string> civilisation_name;
     std::vector<std::string> creed_name;
     std::vector<int32_t>     polity_creed;
+
+    /// THE REALM NAME TABLE (BL-1088) — one coined name per polity id,
+    /// parallel to the polity table the record's owners index, as
+    /// `region_name` on the tap and the settlement is parallel to the regions.
+    /// It is here rather than resolved read-side from the seat because a
+    /// realm's name is not its seat's: it is coined ONCE at founding in the
+    /// founding culture's tongue (`coin_realm_name`, a pure function of the
+    /// tongue and the realm) and never follows the capital or a span boundary
+    /// (CIVILISATION.md sec A realm's name). UNLIKE the tables above, a
+    /// resumed span carries every earlier realm's entry by id, dead ones
+    /// included, so an index that names them stays valid across records.
+    /// Empty on the migration record (its owners are cultures) and on a body
+    /// the era never ran for; filled from the polity table whether or not the
+    /// playback was recorded, since the names live on the polities. Never read
+    /// by the sim: record data, not world state. Written after the three
+    /// tables above (save_game_version 22).
+    std::vector<std::string>     polity_name;
 
     /// Ownership alone. The playback record can be present with no ownership
     /// change ever recorded, and a caller replaying colour wants to know about
@@ -356,6 +376,11 @@ struct era_lapse_tap
     std::vector<int32_t>     region_row;
     std::vector<std::string> region_name;
 
+    /// BL-1088: the polity name table as it grows — `polity::name`, indexed by
+    /// polity id, the same append-only tail-copy contract as the region
+    /// geometry above (a polity table only ever grows for the life of a run).
+    std::vector<std::string> polity_name;
+
     int32_t start_year   = 0;  ///< Year of the first publish this run.
     int32_t year_reached = 0;  ///< The highest year folded into the three lists above.
     bool    started      = false;
@@ -411,6 +436,19 @@ struct era_lapse_tap
         epoch.fetch_add(1, std::memory_order_release);
     }
 
+    /// Worker side, the name table (BL-1088). @p all_names is the caller's own
+    /// append-only mirror of `polity::name` by id; only the new tail is copied
+    /// in, same contract as `publish_regions`. Called beside `publish`, since a
+    /// realm rises far less often than a year advances and a name never
+    /// changes once coined.
+    void publish_polity_names(const std::vector<std::string>& all_names)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        for (std::size_t i = polity_name.size(); i < all_names.size(); ++i)
+            polity_name.push_back(all_names[i]);
+        epoch.fetch_add(1, std::memory_order_release);
+    }
+
     /// Renderer side. Lock-free peek: has anything published since `last_seen`
     /// (a value this same function returned before)? Callers skip `snapshot`
     /// entirely when this comes back equal.
@@ -428,6 +466,7 @@ struct era_lapse_tap
                        std::vector<int32_t>&        out_region_col,
                        std::vector<int32_t>&        out_region_row,
                        std::vector<std::string>&    out_region_name,
+                       std::vector<std::string>&    out_polity_name,
                        int32_t& out_start_year, int32_t& out_year_reached) const
     {
         std::lock_guard<std::mutex> lock(mutex);
@@ -437,6 +476,7 @@ struct era_lapse_tap
         out_region_col      = region_col;
         out_region_row      = region_row;
         out_region_name     = region_name;
+        out_polity_name     = polity_name;
         out_start_year      = start_year;
         out_year_reached    = year_reached;
         return epoch.load(std::memory_order_relaxed);
@@ -495,6 +535,7 @@ struct era_lapse_tap
         region_col.clear();
         region_row.clear();
         region_name.clear();
+        polity_name.clear();
         civilisation_name.clear();
         creed_name.clear();
         polity_creed.clear();

@@ -526,8 +526,14 @@ void draw_tile_inspector(const world& w, ui_state& s,
             const region& p = settled.regions[i];
             const ImVec2 at(origin.x + (static_cast<float>(p.col) + 0.5f) * scale,
                             origin.y + (static_cast<float>(p.row) + 0.5f) * scale);
-            dl->AddCircleFilled(at, r,
-                                palette::nation_colour(static_cast<entity_id>(slice[i] + 1)));
+            // BL-1089: the REALM's colour — the slot the wizard's rounds pinned
+            // by id, from the per-world table set at Begin/load — so the Ages
+            // view and the border band show one colour for one realm. The
+            // fallback (no table: a world with no history behind it) is the
+            // lapse polity palette by index, never `nation_colour` of a polity
+            // index dressed as a nation id, which was the third mapping this
+            // item retired.
+            dl->AddCircleFilled(at, r, palette::realm_colour(static_cast<int>(slice[i])));
         }
         ImGui::Dummy(ImVec2(avail, mh));
 

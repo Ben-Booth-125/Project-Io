@@ -627,6 +627,14 @@ void app::begin_new_game()
 
     m_worldgen_params = m_pending_world_params;
     m_generation_report = generation_report{};
+    // BL-1089: the realms' colours from the wizard's last landed round, so
+    // the loading carve colours each nation by its realm before the nation
+    // entities exist (the polity per nation index comes off the carve tap).
+    // Cleared here; SET only on the two paths that build the wizard's own
+    // world (the wait on round 6 below, and the adopt) — a cold build after a
+    // wizard run is another world, and its carve must not wear the wizard's
+    // slots (the cold review's finding on BL-1089).
+    ui::palette::clear_nation_colour_table();
 
     // --- BL-1085: BEGIN WAITS FOR ROUND 6, THEN ADOPTS ----------------------
     //
@@ -650,6 +658,10 @@ void app::begin_new_game()
         // build's figures would otherwise show under a different world's wait
         // (the review's fix round on BL-1085). Cleared here, never a stale split.
         m_worldgen_progress.budget_ready.store(false, std::memory_order_relaxed);
+        // The world being built is the wizard's own (a stale run is dropped
+        // at its landing, and the final pin re-checks against the report), so
+        // the carve wears the wizard's realm colours: vouched, no report yet.
+        pin_realm_colours_from_wizard(nullptr);
         m_screen = app_screen::building;
         return;
     }
@@ -672,6 +684,10 @@ bool app::try_adopt_wizard_world()
         drop_wizard_world("its params no longer match the wizard's");
     if (!(m_wiz_world && m_wiz_world->ready))
         return false;
+
+    // BL-1089: the realm colours for the carve, checked against the cached
+    // world's own report — the record the wizard shows must be this report's.
+    pin_realm_colours_from_wizard(&m_wiz_world->report);
 
     m_worldgen_slot = std::move(m_wiz_world);
     m_wiz_world.reset(); // one world at most: the cache is spent
@@ -872,6 +888,7 @@ void app::poll_worldgen()
     m_registry               = std::move(built->registry);
     m_landscape_winner_score = built->finish.search.winner_score;
     built.reset();
+    pin_nation_colours_from_report(); // BL-1089: the realms' colours, before the first frame
     start_new_game_prelude();
     // BL-568: the cadence key continues from the settle's twelve steps, which
     // the worker stamped 0..11 (`run_settle`); the first live quarter is 12.
@@ -1067,16 +1084,34 @@ void app::draw_building_carve()
 
             if (run_val > 0) // 0 == unclaimed; the sink stores index + 1
             {
-                // The SAME palette the in-game Country lens uses, so the map the
-                // player watches being carved is the map they meet again under
-                // the lens (ui/presentation.hpp).
+                // THE REALM'S OWN COLOUR (BL-1089): once the floor has settled
+                // the survivors the tap says which realm each nation index
+                // is, and the realm table (pinned from the wizard's last round
+                // before the build started) gives its colour — the same slot
+                // the player watched it in. Before that publish, or for
+                // ownerless ground, the same palette the border band falls
+                // back to, keyed by the id the nation will get
+                // (ui/presentation.hpp), so the carve never lies about a
+                // colour it does not yet know.
+                const int  nidx     = run_val - 1;
+                const int  npol_n   = m_worldgen_progress.nation_polity_count.load(std::memory_order_acquire);
+                bool       by_realm = false;
+                ImU32      colour   = 0;
+                if (nidx < npol_n)
+                {
+                    const int32_t pol = m_worldgen_progress.nation_polity[static_cast<std::size_t>(nidx)]
+                                            .load(std::memory_order_relaxed);
+                    if (pol >= 0) colour = ui::palette::realm_colour(pol, &by_realm);
+                }
+                if (!by_realm)
+                    colour = ui::palette::nation_colour(
+                        static_cast<entity_id>(id_base + static_cast<uint32_t>(nidx)));
                 dl->AddRectFilled(
                     {tl.x + static_cast<float>(run_start) * cell,
                      tl.y + static_cast<float>(row) * cell},
                     {tl.x + static_cast<float>(col) * cell,
                      tl.y + static_cast<float>(row + 1) * cell},
-                    ui::palette::nation_colour(
-                        static_cast<entity_id>(id_base + static_cast<uint32_t>(run_val - 1))));
+                    colour);
             }
             run_start = col;
             run_val   = v;
@@ -1688,6 +1723,7 @@ void app::setup_world(world_params params)
     // presentation-only and never otherwise reaches `world` — this is that bridge,
     // and it must run exactly once per generation (not idempotent).
     seed_genesis_history(m_world, m_generation_report);
+    pin_nation_colours_from_report(); // BL-1089: a cold build derives the realms' colours from the report
 
     setup_presentation(params);
 
@@ -2028,6 +2064,7 @@ bool app::load_game_from(const std::string& path)
     m_world               = std::move(w);
     m_generation_report   = std::move(env.report);
     m_active_world_params = env.params;
+    pin_nation_colours_from_report(); // BL-1089: a load colours every nation as the wizard did
     // BL-705: a save carries the epoch its world was generated at, so the
     // calendar follows the loaded world rather than the process's --epoch flag.
     ui::fmt::set_campaign_epoch_year(static_cast<int>(env.params.epoch_year));

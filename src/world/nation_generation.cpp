@@ -576,11 +576,21 @@ void assign_orphan_islands(std::vector<int>& owner_map,
 /// would stop being one, which is the failure the exemption exists to prevent.
 /// An empty mask is exactly the pre-BL-769 pass.
 ///
+/// BL-1089 — WHAT WAS ABSORBED INTO WHAT. @p absorbed_into, when given, is
+/// sized to `seed_count` and receives per seed index the index it was folded
+/// into (the absorber at that step; an absorber absorbed later is followed by
+/// the caller), or -1 for a survivor. @p remap_out receives the compaction:
+/// seed index -> nation index, -1 for an absorbed seed. Both are pure READS of
+/// the walk — writing them changes no branch.
+///
 /// @return the final nation count (distinct nations after compaction).
 int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
                              int min_tiles, int gw, int gh,
-                             const std::vector<bool>& exempt)
+                             const std::vector<bool>& exempt,
+                             std::vector<int>* absorbed_into = nullptr,
+                             std::vector<int>* remap_out = nullptr)
 {
+    if (absorbed_into) absorbed_into->assign(static_cast<std::size_t>(seed_count), -1);
     const auto is_exempt = [&](int ni) {
         return ni >= 0 && ni < static_cast<int>(exempt.size())
             && exempt[static_cast<std::size_t>(ni)];
@@ -662,6 +672,7 @@ int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
         count[static_cast<std::size_t>(best)]  += count[static_cast<std::size_t>(small)];
         count[static_cast<std::size_t>(small)]  = 0;
         active[static_cast<std::size_t>(small)] = false;
+        if (absorbed_into) (*absorbed_into)[static_cast<std::size_t>(small)] = best; // BL-1089
         --distinct;
     }
 
@@ -677,6 +688,7 @@ int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
         if (ni >= 0)
             owner_map[static_cast<std::size_t>(idx)] = remap[static_cast<std::size_t>(ni)];
     }
+    if (remap_out) *remap_out = remap; // BL-1089
     return next;
 }
 
@@ -865,7 +877,8 @@ std::vector<entity_id> generate_nations(
     int gw, int gh,
     const nation_params& params,
     uint32_t seed,
-    generation_progress* progress)
+    generation_progress* progress,
+    nation_fold_record* fold_out)
 {
     const int total = gw * gh;
 
@@ -1016,10 +1029,13 @@ std::vector<entity_id> generate_nations(
     // --- Pass 2b: orphan-island assignment (claim sea-disconnected ground) ---
     assign_orphan_islands(owner_map, unclaimable, gw, gh);
 
-    // --- Pass 2c: water takes its owner from the shore (NR-792) -------------
-    // Must run AFTER the land carve and orphan islands (its sources are owned
-    // land tiles) and BEFORE the polity fold, so a water tile is remapped by
-    // the fold exactly as the shore it was derived from is.
+    // --- Water takes its owner from the shore (NR-792; between 2b and 2d) --
+    // Not a numbered pass of NATION_GENERATION.md (the "Pass 2c" this label
+    // once wore is the size floor below, and one name for two passes was the
+    // stale-comment fix sprint 47's rulings named). Must run AFTER the land
+    // carve and orphan islands (its sources are owned land tiles) and BEFORE
+    // the polity fold, so a water tile is remapped by the fold exactly as the
+    // shore it was derived from is.
     derive_water_ownership(owner_map, sub, gw, gh);
 
     // --- Pass 2d: THE POLITY FOLD (BL-769) ---------------------------------
@@ -1109,10 +1125,17 @@ std::vector<entity_id> generate_nations(
             ? mark_city_states(w, tile_ids, owner_map, fold, seed_polity, seed_count, total)
             : std::vector<bool>{};
 
+    // BL-1089: the merge's own record of who folded into whom, and the
+    // compaction, so Pass 5 can follow a nation back to the SURVIVING seed —
+    // the fold representative that kept its identity through the floor.
+    std::vector<int> absorbed_into(static_cast<std::size_t>(seed_count), -1);
+    std::vector<int> seed_to_nation(static_cast<std::size_t>(seed_count));
+    for (int si = 0; si < seed_count; ++si) seed_to_nation[static_cast<std::size_t>(si)] = si;
+
     int nation_count = seed_count;
     if (params.min_nation_tiles > 0)
         nation_count = merge_undersized_nations(owner_map, seed_count, params.min_nation_tiles,
-                                                gw, gh, city_states);
+                                                gw, gh, city_states, &absorbed_into, &seed_to_nation);
 
     // BL-305: 2b and 2c both rewrite owner indices wholesale (the merge also
     // COMPACTS them), so this is the one place the published map has to be
@@ -1125,6 +1148,31 @@ std::vector<entity_id> generate_nations(
             progress->claim_tile(idx, owner_map[static_cast<std::size_t>(idx)]);
         progress->nation_count.store(nation_count, std::memory_order_relaxed);
         progress->publish_carve();
+    }
+
+    // BL-1089 — EACH NATION'S REPRESENTATIVE SEED: the SURVIVING seed of its
+    // index. After the fold that seed is a polity's founding core (or
+    // ownerless ground); after the size floor it is the ABSORBER's core,
+    // never an absorbed seed's, whatever index the absorbed one carried
+    // (merge rule A). One read, three consumers: the carve's colours below,
+    // Pass 5's name, and the fold record.
+    std::vector<int> nation_rep_seed(static_cast<std::size_t>(nation_count), -1);
+    for (int si = 0; si < seed_count; ++si)
+    {
+        const int ni = seed_to_nation[static_cast<std::size_t>(si)];
+        if (ni < 0 || ni >= nation_count) continue;
+        if (nation_rep_seed[static_cast<std::size_t>(ni)] < 0) nation_rep_seed[static_cast<std::size_t>(ni)] = si;
+    }
+    const auto seed_polity_of = [&](int si) -> int {
+        return (si >= 0 && static_cast<std::size_t>(si) < seed_polity.size())
+                   ? seed_polity[static_cast<std::size_t>(si)] : -1;
+    };
+    if (progress)
+    {
+        std::vector<int32_t> by_nation(static_cast<std::size_t>(nation_count), -1);
+        for (int ni = 0; ni < nation_count; ++ni)
+            by_nation[static_cast<std::size_t>(ni)] = seed_polity_of(nation_rep_seed[static_cast<std::size_t>(ni)]);
+        progress->publish_nation_polities(by_nation);
     }
 
     // --- Allocate nation_component stubs (populated in Passes 3–5) ---
@@ -1221,8 +1269,62 @@ std::vector<entity_id> generate_nations(
         const tongue& t = nation_speech[static_cast<std::size_t>(ni)].usable()
                               ? nation_speech[static_cast<std::size_t>(ni)]
                               : fallback;
+        // Coined for EVERY nation, inherited or not, so `name_rng` is drawn
+        // exactly as before BL-1089 and a nation of ownerless ground — the one
+        // kind Pass 5 still names — keeps the name it always had. The draw is
+        // discarded below for a nation with a founding realm.
         nation_data[static_cast<std::size_t>(ni)].name =
             make_nation_name(name_rng, t, coin_lexicon(t));
+    }
+
+    // BL-1089 — A NATION INHERITS ITS FOUNDING REALM'S NAME, VERBATIM
+    // (NATION_GENERATION.md § Pass 5; Ben, 2026-09-24). The nation's
+    // representative is the SURVIVING seed of its index — after the fold that
+    // seed is a polity's founding core (or ownerless ground), and after the
+    // size floor it is the ABSORBER's core, never an absorbed seed's, whatever
+    // index the absorbed one carried (merge rule A). So the polity it names is
+    // read off that one seed, and the realm's coined name is copied across.
+    // The fold record (`fold_out`) is filled from the same reads
+    // (`nation_rep_seed` / `seed_polity_of`, computed after the floor above).
+    for (int ni = 0; ni < nation_count; ++ni)
+    {
+        const int rep = nation_rep_seed[static_cast<std::size_t>(ni)];
+        const int pol = seed_polity_of(rep);
+        if (pol < 0 || static_cast<std::size_t>(pol) >= params.polity_names.size()) continue;
+        const std::string& realm = params.polity_names[static_cast<std::size_t>(pol)];
+        if (!realm.empty()) nation_data[static_cast<std::size_t>(ni)].name = realm;
+    }
+    if (fold_out != nullptr)
+    {
+        fold_out->polity.assign(static_cast<std::size_t>(nation_count), -1);
+        fold_out->absorbed_first.assign(static_cast<std::size_t>(nation_count), 0);
+        fold_out->absorbed_count.assign(static_cast<std::size_t>(nation_count), 0);
+        fold_out->absorbed.clear();
+        for (int ni = 0; ni < nation_count; ++ni)
+            fold_out->polity[static_cast<std::size_t>(ni)] = seed_polity_of(nation_rep_seed[static_cast<std::size_t>(ni)]);
+        // Per absorbed REALM (a fold representative that the floor folded
+        // away), the nation it ended up in: follow the absorber chain to the
+        // survivor. Ascending seed order, which is absorption order for the
+        // floor's own smallest-first walk only approximately — the order the
+        // card lists them in is a presentation fact, and ascending index is a
+        // deterministic one.
+        for (int ni = 0; ni < nation_count; ++ni)
+        {
+            fold_out->absorbed_first[static_cast<std::size_t>(ni)] = static_cast<int32_t>(fold_out->absorbed.size());
+            for (int si = 0; si < seed_count; ++si)
+            {
+                if (absorbed_into[static_cast<std::size_t>(si)] < 0) continue;   // a survivor
+                if (fold[static_cast<std::size_t>(si)] != si) continue;           // not a representative
+                const int pol = seed_polity_of(si);
+                if (pol < 0) continue;                                            // ownerless ground names nothing
+                int at = si;
+                for (int guard = 0; guard < seed_count && absorbed_into[static_cast<std::size_t>(at)] >= 0; ++guard)
+                    at = absorbed_into[static_cast<std::size_t>(at)];
+                if (seed_to_nation[static_cast<std::size_t>(at)] != ni) continue;
+                fold_out->absorbed.push_back(pol);
+                ++fold_out->absorbed_count[static_cast<std::size_t>(ni)];
+            }
+        }
     }
 
     // --- Register nations in the world and write ownership maps ---

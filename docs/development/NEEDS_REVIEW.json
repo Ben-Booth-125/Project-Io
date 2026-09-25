@@ -907,6 +907,26 @@
   },
   {
    "id": "NR-938",
+   "title": "DECISION TAKEN: the pinned-slot clash rule is pinned-vs-pinned (the 2026-09-24 ruling said pinned-vs-fresh, a case the walk never produces)",
+   "raised": "2026-09-25",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1087 lane I1 fix round and its cold review, 2026-09-25",
+   "what": "The ruling (R7) said a pinned/fresh adjacency clash re-slots the smaller people-share realm. In the built walk a FRESH realm is coloured greedily AROUND the pins, so it cannot clash with one; the only clash the seam makes is two PINNED realms that never touched before and now neighbour — that is the case the code resolves (the smaller people share re-slots at the round's opening step; on the verify world 1 re-slot at each of the 1200 and 1660 seams). STARTUP.md § Identity across the rounds was reworded to say so with a dated note; the sentence is qualified: a fresh realm cannot clash except on a spill (the palette exhausted), where it shares a neighbour's slot and no re-slot happens.",
+   "why_it_matters": "An authority-doc sentence was changed by a lane on its own reading; Ben should know the rule he ruled is not the rule the walk needs, and confirm the pinned/pinned form.",
+   "options": [
+    "A: confirm pinned/pinned (as built and now written)",
+    "B: keep the ruling's wording and add a fresh-realm re-slot the walk does not need"
+   ],
+   "recommendation": "A.",
+   "files": [
+    "docs/ui/STARTUP.md",
+    "src/ui/history_lapse.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-939",
    "title": "CALL: the origin sentence's 'since <year>' reads the one record that spans the founding year, so a realm that held the region across the whole span reads 'since 1660 CE'",
    "raised": "2026-09-25",
    "kind": "question",
@@ -926,7 +946,7 @@
    "resolution": null
   },
   {
-   "id": "NR-939",
+   "id": "NR-940",
    "title": "CALL: the works-chartered notes cluster in the span's first century because the RUNNING price is tiny at the open -- is that the moment the round should show?",
    "raised": "2026-09-25",
    "kind": "question",
