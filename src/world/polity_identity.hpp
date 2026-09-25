@@ -110,6 +110,15 @@ struct polity_pins
 {
     std::vector<int32_t> slot;              ///< Per polity: its slot, or -1 for none.
     std::vector<int32_t> rung;              ///< Per polity: shade rungs earned so far.
+    /// Per polity: the region count at the realm's FOUNDING — its first sample
+    /// in the record that founded it — or -1 for a realm never sampled. THE
+    /// ROSE RULE IS READ AGAINST THIS for the realm's whole life (the cold
+    /// review's finding): a successor that re-based the start at its own
+    /// opening sample let one steady climb earn a rung per round.
+    std::vector<int32_t> rose_start;
+    /// Per polity: non-zero once the realm has crossed ROSE, so the moment
+    /// fires once and never again in a later record.
+    std::vector<uint8_t> rose_fired;
     /// Per REGION: the dead pinned realm that last held it, or -1. This is
     /// what "a newcomer seated inside its last-held ground" is read against.
     std::vector<int32_t> region_dead_owner;
@@ -134,9 +143,16 @@ struct polity_identity
     std::vector<int32_t> rung_carry;   ///< Per polity: rungs carried in from the predecessor.
     /// Two per polity (`2 * p`, `2 * p + 1`): the years its named moments fire
     /// — `civilisation_formed` for it, and crossing the sweep's ROSE rule (a
-    /// peak at least double its start and three regions more) — ascending,
-    /// `INT32_MAX` where a moment never fires. Each fires at most once.
+    /// peak at least double its FOUNDING size and three regions more) —
+    /// ascending, `INT32_MAX` where a moment never fires. Each fires at most
+    /// once in the realm's life: ROSE is read against `rose_start` and
+    /// silenced by `rose_fired`, both carried in from the predecessor.
     std::vector<int32_t> ratchet_year;
+    /// Per polity: the founding size ROSE was read against (the carried one,
+    /// else this record's first sample), and whether ROSE has fired by this
+    /// record's end — what `pins_from` hands on.
+    std::vector<int32_t> rose_start;
+    std::vector<uint8_t> rose_fired;
     std::vector<int32_t> first_region; ///< `polity_first_region`.
     std::vector<int32_t> seat_region;  ///< `polity_seat_region`.
 

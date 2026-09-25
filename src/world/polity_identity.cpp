@@ -497,8 +497,13 @@ polity_identity assign_polity_identity(const polity_identity_input& in)
 
     // --- 4. The ratchet's named moments (BL-1087 R4). ----------------------
     // `civilisation_formed` for the realm, and the first step at which it
-    // crosses the sweep's ROSE rule against its own first sample in this
-    // record. Each at most once; ascending per polity.
+    // crosses the sweep's ROSE rule AGAINST ITS FOUNDING SIZE: the start is
+    // carried in from the predecessor by id (`polity_pins::rose_start`) and
+    // is this record's first sample only for a realm no earlier record
+    // sampled; a realm that has already crossed (`rose_fired`) never crosses
+    // again. Read per record instead, the start re-based at every span's
+    // opening and one steady climb earned a rung per round (the cold
+    // review's finding). Each moment at most once; ascending per polity.
     {
         std::vector<int32_t> civ(npol, INT32_MAX);
         for (const lapse_event& e : rec.events)
@@ -509,6 +514,14 @@ polity_identity assign_polity_identity(const polity_identity_input& in)
             if (e.year < y) y = e.year;
         }
         std::vector<int32_t> start(npol, -1), rose(npol, INT32_MAX);
+        std::vector<uint8_t> fired(npol, 0);
+        if (in.pins != nullptr)
+        {
+            for (std::size_t p = 0; p < npol && p < in.pins->rose_start.size(); ++p)
+                start[p] = in.pins->rose_start[p];
+            for (std::size_t p = 0; p < npol && p < in.pins->rose_fired.size(); ++p)
+                fired[p] = in.pins->rose_fired[p];
+        }
         for (const timelapse_step& st : rec.steps)
         {
             for (int32_t i = st.first_sample; i < st.first_sample + st.sample_count
@@ -516,14 +529,20 @@ polity_identity assign_polity_identity(const polity_identity_input& in)
             {
                 const polity_sample& s = rec.samples[static_cast<std::size_t>(i)];
                 if (static_cast<std::size_t>(s.polity) >= npol) continue;
+                // The founding sample: the start, with nothing to cross yet.
+                // A carried start falls through, since this record's first
+                // sample is then mid-life and may itself be the crossing.
                 if (start[s.polity] < 0) { start[s.polity] = s.regions; continue; }
-                if (rose[s.polity] != INT32_MAX) continue;
+                if (fired[s.polity] != 0 || rose[s.polity] != INT32_MAX) continue;
                 if (s.regions >= 2 * start[s.polity] && s.regions >= start[s.polity] + 3)
                     rose[s.polity] = st.year;
             }
         }
+        id.rose_start = start;
+        id.rose_fired = fired;
         for (std::size_t p = 0; p < npol; ++p)
         {
+            if (rose[p] != INT32_MAX) id.rose_fired[p] = 1;
             int32_t a = civ[p], b = rose[p];
             if (b < a) std::swap(a, b);
             id.ratchet_year[2 * p]     = a;
@@ -554,6 +573,12 @@ polity_pins pins_from(const polity_identity& id, const era_timelapse& rec,
     const int end_year = rec.start_year + rec.years;
     for (std::size_t p = 0; p < id.slot.size(); ++p)
         pins.rung[p] = polity_rung_at(id, p, end_year);
+    // The founding size and the ROSE flag, as this record read and left them
+    // (the carry is already folded into `id` by the assignment).
+    pins.rose_start = id.rose_start;
+    pins.rose_fired = id.rose_fired;
+    pins.rose_start.resize(pins.slot.size(), -1);
+    pins.rose_fired.resize(pins.slot.size(), 0);
     // Keep the predecessor's slots for ids this record never saw (they stay
     // retired), so a realm dead two rounds ago does not free its colour.
     if (predecessor != nullptr)
@@ -564,6 +589,14 @@ polity_pins pins_from(const polity_identity& id, const era_timelapse& rec,
             if (pins.slot[p] < 0) pins.slot[p] = predecessor->slot[p];
         for (std::size_t p = 0; p < predecessor->rung.size(); ++p)
             if (pins.rung[p] == 0) pins.rung[p] = predecessor->rung[p];
+        if (pins.rose_start.size() < predecessor->rose_start.size())
+            pins.rose_start.resize(predecessor->rose_start.size(), -1);
+        if (pins.rose_fired.size() < predecessor->rose_fired.size())
+            pins.rose_fired.resize(predecessor->rose_fired.size(), 0);
+        for (std::size_t p = 0; p < predecessor->rose_start.size(); ++p)
+            if (pins.rose_start[p] < 0) pins.rose_start[p] = predecessor->rose_start[p];
+        for (std::size_t p = 0; p < predecessor->rose_fired.size(); ++p)
+            if (pins.rose_fired[p] == 0) pins.rose_fired[p] = predecessor->rose_fired[p];
         pins.region_dead_owner = predecessor->region_dead_owner;
     }
     pins.region_dead_owner.resize(static_cast<std::size_t>(std::max<int32_t>(0, rec.region_stride)), -1);
