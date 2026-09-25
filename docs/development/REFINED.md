@@ -274,13 +274,20 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
 
 ### Wave 1, lane I3 (voice) — BL-1106 (names and voice). Group `names-and-voice`.
 
-- [ ] T1 the Culture board 'peoples / Homeland', no battle cells; the civilisation/creed name table on
+- [x] T1 the Culture board 'peoples / Homeland', no battle cells; the civilisation/creed name table on
   the report (record-only, the envelope bump); schism prose naming both parties and the creed;
-  'Something happens' gone. (R1)
-- [ ] T2 in-world footers (startup_screens.cpp:~1510-1518); ticker priority by kind
+  'Something happens' gone. (R1) DONE 2026-09-25: `era_timelapse::civilisation_name` / `creed_name` /
+  `polity_creed` (the schism's creed is the parent's, on no event), filled by `as_timelapse` and the
+  live tap; save_envelope_roundtrip PASS; names_and_voice.lua green on seed 0.
+- [x] T2 in-world footers (startup_screens.cpp:~1510-1518); ticker priority by kind
   (history_lapse.cpp:~2028-2035); the lagged-slice clamp (startup_screens.cpp:~1151-1153); the
-  quiet-age sentence. (R2)
-- [ ] T3 captures; Release build; cold review; Ben's live click. (R3)
+  quiet-age sentence. (R2) DONE 2026-09-25: three tiers (rarest / arc / churn) in a 4 x rows window —
+  two tiers lost the 1156 civilisation to six same-year break-aways; `lapse_lagged_year` shared by the
+  draw and `verify.history_board_marks`; 0 marks at 1200 on round 5.
+- [ ] T3 captures; Release build; cold review; Ben's live click. (R3) Lane's halves DONE 2026-09-25:
+  scripts/verify/names_and_voice.lua (six captures, all expects green, no clipping), Release build
+  clean, world_determinism ALL PASS. OWED: the cold review (main session) and Ben's live click on the
+  Culture board and a schism line.
 
 - [x] T1 join every in-flight worker at the top of `~app` (and on the quit path) with a
   "finishing the build before quitting" line on the wait surface. Verification: start a cold Begin

@@ -218,6 +218,13 @@ inline constexpr uint32_t save_game_magic =
 ///     next multiple of a fraction of the running charter price; kind 21, the
 ///     gap at 20 is lane I1's `inherited`);
 ///     later sprint-47 lanes append theirs under this same number.
+///   - THE NAME TABLE AT THE TAIL OF EVERY TIME-LAPSE RECORD (BL-1106, the
+///     ticker names civilisations and creeds): `era_timelapse::civilisation_name`
+///     and `::creed_name` (two string lists, index order) and `::polity_creed`
+///     (i32 per polity id, -1 = none; any value under -1 is corrupt), written
+///     by `w_timelapse` after the event list in all three records and read
+///     back in the same place by `r_timelapse`. Record-only: read by the
+///     ticker, by nothing at world setup.
 /// A v21 stream is refused whole on the same strict-equality contract.
 inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened
 

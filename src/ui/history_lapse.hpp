@@ -265,6 +265,14 @@ struct history_lapse
     int64_t conquests = 0;
     int64_t foundings = 0;
 
+    /// BL-1106: the record's owners are PEOPLES, not realms — the Culture
+    /// round's migration record, whose owner index is a culture. The board
+    /// then reads "peoples / Homeland" and prints no battle cells, and the arc
+    /// readout's nouns follow (STARTUP.md § Round 3 — Culture: "Its board is
+    /// peoples and Homeland"). Set by the app at the record's two construction
+    /// sites; the record itself does not say what its owners are.
+    bool peoples = false;
+
     // --- Derived on the draw thread by `finish_history_lapse` --------------
 
     /// Tile -> nearest region index over LAND, or -1 for water and for land no
@@ -633,11 +641,35 @@ void draw_lapse_scoreboard(const history_lapse& h,
 /// the year. Never an Earth name: every noun here comes off the region table.
 std::string lapse_event_prose(const history_lapse& h, const lapse_event& e);
 
-/// BL-916 -- the ticker: the last `max_rows` narrated events at or before
-/// @p year, oldest first, the newest bright. Road promotions are ringed on the
-/// map but not narrated (see the .cpp for the measurement). Six rows, so the
-/// arc readout under it stays above the column's fold at 1080p.
+/// BL-1106 -- the rows the ticker shows at @p year: indices into
+/// `h.lapse.events`, ascending. Priority by KIND inside a recent window, so a
+/// rare moment is never crowded off by common ones: the window is the last
+/// `4 * max_rows` narrated events at or before @p year, and inside it the
+/// rarest kinds (a civilisation settled, a creed preached, a schism, a furnace
+/// lit) are taken first, then the arc's common kinds (foundings, seats
+/// falling, realms ending), then trade and treaty churn — each newest first,
+/// until the rows are full. Road promotions are never narrated (see the .cpp
+/// for the measurement). Public so the verify API reads the same rows the
+/// draw shows.
+std::vector<int> lapse_ticker_rows(const history_lapse& h, int year, int max_rows = 6);
+
+/// BL-916 -- the ticker: `lapse_ticker_rows` as prose, oldest first, the
+/// newest bright. Six rows, so the arc readout under it stays above the
+/// column's fold at 1080p.
 void draw_lapse_ticker(const history_lapse& h, int year, int max_rows = 6);
+
+/// BL-1106 -- the year the board's LAGGED slice is taken at, for the entry
+/// marks: a twelfth of the span back from @p year, never before the record's
+/// own first year. The clamp is what keeps a resumed span (round 5 at 1200,
+/// round 6 at 1660) from marking every inherited realm as a newcomer — an
+/// unclamped lag reads a year the record does not hold, sees nobody, and marks
+/// everybody. The one rule, shared by the app's draw and the verify read.
+int lapse_lagged_year(const history_lapse& h, int year);
+
+/// BL-1106 -- how many of the board's shown rows carry the entry mark ('*')
+/// at @p year, against the lagged slice `lapse_lagged_year` names. The verify
+/// API's read of the same predicate `draw_lapse_scoreboard` marks by.
+int lapse_board_entered_count(const history_lapse& h, int year);
 
 /// BL-916 -- how many years an event stays marked on the map after it happens:
 /// about one screen-second of playback, derived from the span exactly as the

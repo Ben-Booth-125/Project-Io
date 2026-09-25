@@ -3100,8 +3100,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // be mid-append, so a renderer reading it can never run ahead of what
         // is actually settled. Write-only: nothing below ever reads `tap` back.
         if (tap != nullptr)
+        {
             tap->publish(out.owner_changes, out.culture_changes, out.events,
                         static_cast<int32_t>(y - 1));
+            // BL-1106: the name table rides the same publish, so a live ticker
+            // names a civilisation or creed in the year it is coined. A pure
+            // read of `out`; the tap copies only the tail.
+            std::vector<std::string> tap_civ, tap_creed;
+            std::vector<int32_t>     tap_polity_creed;
+            fill_lapse_name_table(out, tap_civ, tap_creed, tap_polity_creed);
+            tap->publish_names(tap_civ, tap_creed, tap_polity_creed);
+        }
 
         const std::size_t century =
             static_cast<std::size_t>((y - params.start_year) / 100);
@@ -8303,8 +8312,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // year, so the last year simulated is never folded in inside the loop —
     // this is the one place that year's record reaches the tap.
     if (tap != nullptr)
+    {
         tap->publish(out.owner_changes, out.culture_changes, out.events,
                     static_cast<int32_t>(params.stop_year - 1));
+        // BL-1106: the closing name table, same as the per-year publish.
+        std::vector<std::string> tap_civ, tap_creed;
+        std::vector<int32_t>     tap_polity_creed;
+        fill_lapse_name_table(out, tap_civ, tap_creed, tap_polity_creed);
+        tap->publish_names(tap_civ, tap_creed, tap_polity_creed);
+    }
 
     return out;
 }

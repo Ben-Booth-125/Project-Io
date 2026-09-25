@@ -166,6 +166,7 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
     const bool industrialisation = lapse_index == 3;
 
     ui::history_lapse h;
+    h.peoples = migration; // BL-1106: the Culture board reads peoples / Homeland.
 
     // The homeworld by its authored flag, not by name or position: names are
     // generated and display-only (BL-257), and the body list can be reordered.
@@ -260,6 +261,7 @@ void app::launch_wizard_history_run(int lapse_index)
     if (m_wiz_history_future[lapse_index].valid()) return; // already running on this round
 
     m_wiz_history[lapse_index]         = ui::history_lapse{};
+    m_wiz_history[lapse_index].peoples = (lapse_index == 0); // BL-1106: the live Culture record too.
     m_wiz_history_playing[lapse_index] = false;
     m_wiz_history_paused[lapse_index]  = false;
     m_wiz_history_carry[lapse_index]   = 0.0f;
@@ -669,6 +671,10 @@ void app::poll_wizard_history_tap(int lapse_index)
         rec.lapse.changes, rec.lapse.culture_changes, rec.lapse.events,
         rec.region_col, rec.region_row, rec.region_name,
         start_year, year_reached);
+    // BL-1106: the name table, so a live ticker names a civilisation or a
+    // creed in the year it is coined rather than only once the future lands.
+    tap.snapshot_names(rec.lapse.civilisation_name, rec.lapse.creed_name,
+                       rec.lapse.polity_creed);
 
     if (rec.region_col.empty())
         return; // Geometry has not been published yet — nothing drawable this poll.
@@ -1241,11 +1247,11 @@ void app::draw_generation_screen()
         if (year > last)  year = last;
 
         hist_slice = owner_slice_at(rec.lapse, year);
-        // The lagged board, for the entry/exit marks. A twelfth of the span back:
-        // far enough that a rank move means something, near enough that the marks
-        // are not permanently lit.
-        const int lag = std::max(1, (last - first) / 12);
-        hist_lagged_year = year - lag;
+        // The lagged board, for the entry/exit marks: a twelfth of the span
+        // back, CLAMPED to the record's first year (BL-1106) — the one rule,
+        // in history_lapse.cpp, that the verify read shares. Unclamped, a
+        // resumed span's first twelfth marked every inherited realm '*'.
+        hist_lagged_year = ui::lapse_lagged_year(rec, year);
         hist_lagged = owner_slice_at(rec.lapse, hist_lagged_year);
     }
 
@@ -1575,12 +1581,27 @@ void app::draw_generation_screen()
                 }
                 ImGui::Spacing();
 
-                std::snprintf(buf, sizeof buf, "%s  -  %lld battles, %lld conquests, "
-                                               "%lld foundings in the full run",
-                              ui::lapse_year_label(m_wiz_history_year[lapse_index]).c_str(),
-                              static_cast<long long>(rec.battles),
-                              static_cast<long long>(rec.conquests),
-                              static_cast<long long>(rec.foundings));
+                if (rec.peoples)
+                {
+                    // BL-1106: NO BATTLE CELLS ON THE CULTURE ROUND — a
+                    // migration is a diffusion with nothing fighting in it
+                    // (STARTUP.md § Round 3). The line counts what the record
+                    // holds instead: every people the record ever shows
+                    // holding ground, over the regions it settled.
+                    int peoples = 0;
+                    for (const int32_t seat : rec.polity_seat) if (seat >= 0) ++peoples;
+                    std::snprintf(buf, sizeof buf, "%s  -  %d peoples across %d regions "
+                                                   "in the full run",
+                                  ui::lapse_year_label(m_wiz_history_year[lapse_index]).c_str(),
+                                  peoples, static_cast<int>(rec.lapse.region_stride));
+                }
+                else
+                    std::snprintf(buf, sizeof buf, "%s  -  %lld battles, %lld conquests, "
+                                                   "%lld foundings in the full run",
+                                  ui::lapse_year_label(m_wiz_history_year[lapse_index]).c_str(),
+                                  static_cast<long long>(rec.battles),
+                                  static_cast<long long>(rec.conquests),
+                                  static_cast<long long>(rec.foundings));
                 dim_text(buf);
                 ImGui::Separator();
 
@@ -1603,15 +1624,20 @@ void app::draw_generation_screen()
                 // the gap this note used to name: the Empires round now runs
                 // its full 400 BCE -> 1200 CE span, decoupled from the epoch
                 // (`CIVILISATION.md` § The span is 400 BCE to 1200 CE).
+                // IN-WORLD FOOTERS (BL-1106). A footer names the age the
+                // round plays, in the history's own words; it cites no
+                // repository path, because the player is not reading the
+                // repository. Each names its own span, and the spans meet
+                // end to end (STARTUP.md § Rounds).
                 if (lapse_index == 1)
-                    dim_text("This round's own span, separate from round 3's migration — "
-                             "the full 400 BCE to 1200 CE the design asks for.");
+                    dim_text("400 BCE to 1200 CE: the realms that rose on the ground the "
+                             "migration left, and what became of them.");
                 else if (lapse_index == 2)
-                    dim_text("This round's own span, 1200 to 1660 CE — where conflict "
-                             "moves off the home coast (docs/generation/EXPLORATION.md).");
+                    dim_text("1200 to 1660 CE: the age of exploration, when conflict moved "
+                             "off the home coast and across the water.");
                 else if (lapse_index == 3)
-                    dim_text("This round's own span, 1660 to 1960 CE — the last before "
-                             "the campaign opens (docs/generation/INDUSTRIALISATION.md).");
+                    dim_text("1660 to 1960 CE: the age of industry, the last before the "
+                             "campaign opens.");
             }
         }
 
