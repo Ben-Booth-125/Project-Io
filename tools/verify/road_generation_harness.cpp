@@ -13,7 +13,15 @@
 //   Q  differential — the same world regenerated at floor vs high qualification
 //                   produces measurably different lattices (BL-618's contract):
 //                   promoted tiers appear only on the qualified run, and the
-//                   qualified lattice is at least as large (redundancy loops).
+//                   qualified lattice is at least as large (rationed loops).
+//   R5 tree + floor — BL-1119 (roads tree and detour; LOGISTICS.md § 4), read off
+//                   the pass's own write-only stats on a fresh world regenerated
+//                   at spur floor 0 and at the shipped floor: every village is
+//                   accounted for (below the floor, spurred, or failed); floor 0
+//                   is the unfloored pass; the shipped floor leaves some villages
+//                   on their street alone; the detour test refuses candidates and
+//                   the ration never keeps more than it admitted; and the floor
+//                   never touches the backbone (tree and loops identical at both).
 //   R3 connectivity — EVERY population centre sits on, or orthogonally adjacent
 //                   to, a roaded tile — anchor foundings included (BL-623,
 //                   provinces before roads: anchors exist when the lattice is
@@ -82,6 +90,21 @@ static void regen_roads_with_spread(world& w, entity_id body)
     w.astar_cost_cache.clear();
     w.body_reach_cost.clear();
     generate_roads(w, body);
+}
+
+/// BL-1119: re-run road generation on @p w's body at spur floor @p floor_heads from a
+/// road-free body and cold caches, returning the pass's own stats.
+static road_generation_stats regen_roads_at_floor(world& w, entity_id body, long long floor_heads)
+{
+    for (auto& [tid, tc] : w.tiles)
+        if (tc.body == body)
+            tc.road_level = 0;
+    w.astar_cost_cache.clear();
+    w.logistics_flood_fields.clear();
+    w.body_reach_cost.clear();
+    road_generation_stats st{};
+    generate_roads(w, body, nullptr, floor_heads, &st);
+    return st;
 }
 
 /// Tier census of @p body's road_level field: counts[1..3], plus total in counts[0].
@@ -181,8 +204,9 @@ int main()
     // class — with its anchor exemption and the R3b companion row — is retired.
     // What legitimately remains is the SPUR-CAP / OPEN-SEA survivor: a village
     // whose spur found no reachable target inside kMaxSpurGridDist, or whose
-    // every route crossed open sea. Such a centre keeps only its own street —
-    // which still satisfies this row — and is counted and reported below
+    // every route crossed open sea — and, since BL-1119, every village below the
+    // spur floor, which lays no spur by rule. Such a centre keeps only its own
+    // street — which still satisfies this row — and is counted and reported below
     // (street-only: own tile roaded, no roaded 4-neighbour).
     auto road_at = [&](int r, int c) -> bool {
         if (r < 0 || r >= gh) return false;
@@ -217,7 +241,7 @@ int main()
         }
     }
     std::printf("      (connectivity: %d/%d centres touch a road; %d/%d anchors;"
-                " %d street-only — spur-cap/open-sea survivors)\n",
+                " %d street-only — below the spur floor (BL-1119), or spur-cap/open-sea survivors)\n",
                 connected, total, anchors_connected, anchors, street_only);
     check(total > 0 && connected == total,
           "R3 every population centre touches the road lattice (anchors included, BL-623)");
@@ -231,6 +255,45 @@ int main()
         if (it == w2.tiles.end() || it->second.road_level != tc.road_level) ++mismatches;
     }
     check(mismatches == 0, "R4 road_level field identical across two generations");
+
+    // R5 — the tree and the floor (BL-1119). A fresh world, so Q below keeps its own.
+    {
+        world w5 = make_hard_coded_world(no_prehistory());
+        const road_generation_stats s0 = regen_roads_at_floor(w5, w5.home_body, 0);
+        int t0[4];
+        tier_census(w5, w5.home_body, t0);
+        const road_generation_stats sf =
+            regen_roads_at_floor(w5, w5.home_body, kVillageSpurFloorHeads);
+        int tf[4];
+        tier_census(w5, w5.home_body, tf);
+        auto line = [](const char* what, const road_generation_stats& s, const int t[4]) {
+            std::printf("      (%s: road tiles %d | towns %d tree %d candidates %d admitted %d kept %d |"
+                        " villages %d below %d spurs %d failed %d | border %d, %d on a below-floor"
+                        " street | floods %lld)\n",
+                        what, t[0], s.towns, s.mst_links, s.loop_candidates, s.loops_admitted,
+                        s.loops_kept, s.villages, s.villages_below_floor, s.spurs_laid,
+                        s.spurs_failed, s.border_links, s.border_links_street_only, s.flood_fields);
+        };
+        line("floor 0", s0, t0);
+        std::printf("      (shipped floor %lld heads, detour ratio %.2f)\n",
+                    kVillageSpurFloorHeads, kDetourRatio);
+        line("shipped floor", sf, tf);
+        auto accounted = [](const road_generation_stats& s) {
+            return s.villages == s.villages_below_floor + s.spurs_laid + s.spurs_failed;
+        };
+        check(s0.villages > 0 && accounted(s0) && accounted(sf),
+              "R5a every village is below the floor, spurred, or failed (both floors)");
+        check(s0.villages_below_floor == 0, "R5b floor 0 is the unfloored pass (no village below it)");
+        check(kVillageSpurFloorHeads <= 0 || sf.villages_below_floor > 0,
+              "R5c the shipped floor leaves some villages on their street alone");
+        check(s0.loop_candidates > 0 && s0.loops_admitted < s0.loop_candidates
+                  && s0.loops_kept <= s0.loops_admitted,
+              "R5d the detour test refuses candidates; the ration keeps no more than it admitted");
+        check(s0.towns == sf.towns && s0.mst_links == sf.mst_links
+                  && s0.loop_candidates == sf.loop_candidates
+                  && s0.loops_admitted == sf.loops_admitted && s0.loops_kept == sf.loops_kept,
+              "R5e the floor never touches the backbone (tree and loops identical at both floors)");
+    }
 
     // Q — the BL-621 era-relative contract (Ben, 2026-08-25, ruling on NR-641): gates
     // read percentile standing, not absolute qualification. (Mutates w and w2; keep last.)

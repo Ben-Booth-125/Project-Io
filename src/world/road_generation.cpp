@@ -11,6 +11,7 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <queue>
 #include <set>
 #include <utility>
 #include <vector>
@@ -84,6 +85,9 @@ constexpr int kBorderProbePairs = 24;
 //   - Redundancy loops are RATIONED cheapest-first: floor(count * percentile) kept, so
 //     the median nation keeps half its loops and the MST is never rationed.
 // Spurs, local streets and border links are Tracks already and are not modulated.
+// BL-1119: the loops rationed are the ones the DETOUR TEST admits (kDetourRatio,
+// road_generation.hpp) — the relative-neighbour redundancy edges that laid the lattice
+// are gone. A delegated reading that keeps BL-618/BL-621 intact; Ben may overturn it.
 constexpr float kRoadPercentile    = 0.40f;
 constexpr float kHighwayPercentile = 0.80f;
 
@@ -204,10 +208,65 @@ std::uint8_t ancient_tier(int uses, int reach_a, int reach_b)
     return t;
 }
 
+/// The network's route cost between towns @p from and @p to over @p adj (the tree plus
+/// the loops admitted so far; each link weighted by its DIRECT A* cost), or a value
+/// above @p bound when that route costs more than @p bound or does not exist. A
+/// bounded Dijkstra over the town graph — n is a nation's towns, so this is cheap
+/// integer-indexed work, never a tile search.
+///
+/// Deterministic: adjacency lists are appended in the fixed edge order, the queue
+/// orders on (cost, node index), and a node's settled cost is final.
+double network_route_cost(const std::vector<std::vector<std::pair<int, double>>>& adj,
+                          int from, int to, double bound)
+{
+    const double over = bound * 2.0 + 1.0;
+    if (from == to)
+        return 0.0;
+    std::vector<double> dist(adj.size(), std::numeric_limits<double>::infinity());
+    std::vector<char>   done(adj.size(), 0);
+    using item = std::pair<double, int>;
+    std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
+    dist[static_cast<std::size_t>(from)] = 0.0;
+    pq.push({ 0.0, from });
+    while (!pq.empty())
+    {
+        const auto [dc, u] = pq.top();
+        pq.pop();
+        if (done[static_cast<std::size_t>(u)])
+            continue;
+        done[static_cast<std::size_t>(u)] = 1;
+        if (dc > bound)
+            return over; // every remaining route is longer still
+        if (u == to)
+            return dc;
+        for (const auto& [v, c] : adj[static_cast<std::size_t>(u)])
+        {
+            const double nd = dc + c;
+            if (nd < dist[static_cast<std::size_t>(v)])
+            {
+                dist[static_cast<std::size_t>(v)] = nd;
+                pq.push({ nd, v });
+            }
+        }
+    }
+    return over; // no route at all: a different component of the tree
+}
+
 } // namespace
 
-void generate_roads(world& w, entity_id body, generation_progress* progress)
+long long village_spur_size(const world& w, entity_id centre)
 {
+    if (const auto sit = w.gen_carve_centres.find(centre); sit != w.gen_carve_centres.end())
+        return static_cast<long long>(sit->second.key);
+    if (const auto pit = w.population_centres.find(centre); pit != w.population_centres.end())
+        return static_cast<long long>(pit->second.population) * 1000;
+    return 0;
+}
+
+void generate_roads(world& w, entity_id body, generation_progress* progress,
+                    long long spur_floor_heads, road_generation_stats* stats)
+{
+    road_generation_stats st{}; // BL-1119 D1: filled as the pass goes, copied out at the end
     // Grid geometry (BL-620: the spur and border prefilters measure wrapped grid
     // distance, so they need the body's dimensions up front).
     const auto bit = w.bodies.find(body);
@@ -240,7 +299,10 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
     std::sort(nodes.begin(), nodes.end(),
               [](const road_node& a, const road_node& b) { return a.tile < b.tile; });
     if (nodes.empty())
+    {
+        if (stats != nullptr) *stats = st;
         return;
+    }
 
     // 1b. Every centre's own tile carries at least a Track (Sprint B2 cut 1). Previously a
     //     nation with a single centre on this body fell straight through the backbone pass
@@ -300,6 +362,21 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
     // of A* per nation, 1.1 s against 5,873 villages' 27.5 s on seed 28).
     // Counted from the same `by_nation` the loops read, so it ends exactly on
     // its total. WRITE-ONLY: nothing below reads it back.
+    //
+    // BL-1119: the floor is decided here, once per village, and the count reads
+    // it — a village below the floor lays no spur, so it is no unit of work.
+    std::vector<char> spurs(nodes.size(), 0); // 1 = a village at/above the spur floor
+    for (std::size_t i = 0; i < nodes.size(); ++i)
+    {
+        if (nodes[i].scale >= kMidScale)
+            continue;
+        ++st.villages;
+        if (village_spur_size(w, nodes[i].centre) >= spur_floor_heads)
+            spurs[i] = 1;
+        else
+            ++st.villages_below_floor;
+    }
+
     constexpr long long kBorderUnitsPerNation = 12;
     long long units_done = 0, units_total = 0;
     {
@@ -307,7 +384,10 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
         {
             long long t = 0, v = 0;
             for (const int m : members)
-                (nodes[m].scale >= kMidScale ? t : v) += 1;
+            {
+                if (nodes[m].scale >= kMidScale) ++t;
+                else if (spurs[static_cast<std::size_t>(m)]) ++v;
+            }
             if (t >= 2) units_total += t * (t - 1) / 2;
             if (gw > 0) units_total += v;
         }
@@ -323,9 +403,9 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
     };
     report_units(0);
 
-    // 2+3. Per nation: a BACKBONE over towns-and-up (MST + relative-neighbour redundancy,
-    //      the pre-BL-620 shape, now over the town set only), then each village joins the
-    //      lattice locally with a Track spur.
+    // 2+3. Per nation: a BACKBONE over towns-and-up (the Kruskal tree, then the loops the
+    //      detour test admits — BL-1119), then each village at or above the spur floor
+    //      joins the network locally with a Track spur.
     for (const auto& [nation, members] : by_nation)
     {
         // BL-618/BL-621: the nation's qualification PERCENTILE gates tier promotion
@@ -339,6 +419,11 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
         // street (stamped in 1b) plus, below, the backbone raster and earlier spurs. The
         // std::set only dedupes; candidate order never depends on it (the nearest-target
         // scan is over the vector with a strict (distance^2, tile-id) comparison).
+        //
+        // BL-1119: a village BELOW the spur floor is not a target. Its street never joins
+        // the network, so a spur ending on it would join two villages to each other and
+        // to nothing else. At floor 0 every village spurs and the set is exactly the
+        // pre-BL-1119 one.
         struct spur_target { entity_id tile; int gx; int gy; };
         std::vector<spur_target> targets;
         std::set<entity_id>      target_seen;
@@ -351,7 +436,8 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
             targets.push_back({ t, it->second.grid_x, it->second.grid_y });
         };
         for (const int m : members)
-            add_target(nodes[m].tile);
+            if (nodes[m].scale >= kMidScale || spurs[static_cast<std::size_t>(m)])
+                add_target(nodes[m].tile);
 
         // --- Backbone: towns-and-up only (BL-620) ---------------------------------
         std::vector<int> towns;
@@ -359,22 +445,20 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
             if (nodes[m].scale >= kMidScale)
                 towns.push_back(m);
         const int n = static_cast<int>(towns.size());
+        st.towns += n;
         if (n >= 2)
         {
-            // Pairwise terrain-weighted A* costs (symmetric matrix); collect the
-            // reachable pairs as candidate edges (a,b index into `towns`).
+            // Pairwise terrain-weighted A* costs; collect the reachable pairs as
+            // candidate edges (a,b index into `towns`).
             struct edge { float cost; int a; int b; };
             std::vector<edge> edges;
-            std::vector<std::vector<float>> d(n, std::vector<float>(n, kUnreachable));
             for (int a = 0; a < n; ++a)
                 for (int b = a + 1; b < n; ++b)
                 {
                     const logistics_path& p =
                         intra_body_path(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile);
-                    const float c = p.reachable ? p.cost : kUnreachable;
-                    d[a][b] = d[b][a] = c;
                     if (p.reachable)
-                        edges.push_back({ c, a, b });
+                        edges.push_back({ p.cost, a, b });
                     report_units(++units_done); // BL-1072
                 }
 
@@ -396,6 +480,9 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
             };
             std::vector<std::pair<int, int>> chosen;
             std::vector<std::vector<bool>> in_mst(n, std::vector<bool>(n, false));
+            // The network as the detour test sees it: towns joined by the links laid so
+            // far, each weighted by its DIRECT A* cost (BL-1119). Appended in edge order.
+            std::vector<std::vector<std::pair<int, double>>> net(static_cast<std::size_t>(n));
             for (const edge& e : edges)
             {
                 const int ra = find(e.a), rb = find(e.b);
@@ -404,39 +491,48 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
                     parent[ra] = rb;
                     chosen.emplace_back(e.a, e.b);
                     in_mst[e.a][e.b] = in_mst[e.b][e.a] = true;
+                    net[static_cast<std::size_t>(e.a)].push_back({ e.b, static_cast<double>(e.cost) });
+                    net[static_cast<std::size_t>(e.b)].push_back({ e.a, static_cast<double>(e.cost) });
+                    ++st.mst_links;
                 }
             }
 
-            // Relative-neighbour redundancy: keep a non-MST edge (a,b) only if no third
-            // town c is closer to BOTH endpoints than they are to each other — i.e.
-            // max(d[a][c], d[b][c]) < d[a][b] for some c disqualifies it. Adds the short
-            // loops a bare MST misses without cluttering the lattice.
+            // THE DETOUR TEST (BL-1119; LOGISTICS.md § 4). The tree comes first, whole;
+            // then every other reachable town pair, cheapest-first in the same (cost, lo,
+            // hi) order, is laid only when the network's route between its two towns costs
+            // more than kDetourRatio x its direct route. An admitted loop joins the network
+            // at once, so a later candidate running beside it finds a serviceable route and
+            // is refused — a second road beside a serviceable one is never built, and a loop
+            // exists only where the tree forces a long way round. This replaces the
+            // relative-neighbour redundancy edges, which laid the lattice.
             std::vector<std::pair<int, int>> loops;
             for (const edge& e : edges)
             {
                 if (in_mst[e.a][e.b])
                     continue;
-                bool keep = true;
-                for (int c = 0; c < n; ++c)
+                ++st.loop_candidates;
+                const double direct = static_cast<double>(e.cost);
+                const double bound  = kDetourRatio * direct;
+                if (network_route_cost(net, e.a, e.b, bound) > bound)
                 {
-                    if (c == e.a || c == e.b)
-                        continue;
-                    if (std::max(d[e.a][c], d[e.b][c]) < d[e.a][e.b])
-                    {
-                        keep = false;
-                        break;
-                    }
-                }
-                if (keep)
                     loops.emplace_back(e.a, e.b);
+                    net[static_cast<std::size_t>(e.a)].push_back({ e.b, direct });
+                    net[static_cast<std::size_t>(e.b)].push_back({ e.a, direct });
+                }
             }
+            st.loops_admitted += static_cast<int>(loops.size());
             // BL-618/BL-621: ration the loops by qualification PERCENTILE, cheapest-first
             // (`loops` inherits the deterministic (cost, lo, hi) edge order). The MST is
             // never rationed — a nation's towns connect regardless; loops are the
             // qualified-labour luxury, and the median nation keeps half of them.
+            //
+            // BL-1119: the loops rationed are the ones the detour test admitted. Keeping a
+            // cheapest-first PREFIX is consistent with the admission walk: every kept loop
+            // was tested against a network holding only cheaper loops, all of them kept.
             const float loop_frac = std::clamp(qualification, 0.0f, 1.0f);
             const int loops_kept =
                 static_cast<int>(static_cast<float>(loops.size()) * loop_frac);
+            st.loops_kept += loops_kept;
             for (int i = 0; i < loops_kept; ++i)
                 chosen.push_back(loops[static_cast<std::size_t>(i)]);
 
@@ -469,6 +565,8 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
             {
                 if (nodes[m].scale >= kMidScale)
                     continue; // towns are backbone members, not spur clients
+                if (!spurs[static_cast<std::size_t>(m)])
+                    continue; // BL-1119: below the spur floor, the street alone
                 report_units(++units_done); // BL-1072: one village, before its A*
                 // The kSpurCandidates nearest targets by (distance^2, tile id), capped.
                 struct cand { long long d2; entity_id tile; };
@@ -487,6 +585,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
                             || (c.d2 == best[s].d2 && c.tile < best[s].tile))
                             std::swap(c, best[s]);
                 }
+                bool laid = false;
                 for (int s = 0; s < kSpurCandidates; ++s)
                 {
                     if (best[s].tile == null_entity)
@@ -497,8 +596,10 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
                     for (const entity_id t : stamped)
                         if (nation_of(w, t) == nation)
                             add_target(t);
+                    laid = true;
                     break;
                 }
+                ++(laid ? st.spurs_laid : st.spurs_failed);
             }
         }
     }
@@ -506,7 +607,10 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
     // 5. Border links: one local road between the nearest centre pair of each
     //    territorially-adjacent nation pair, connecting the per-nation lattices.
     if (bit == w.bodies.end())
+    {
+        if (stats != nullptr) *stats = st;
         return;
+    }
     const std::vector<entity_id>& grid = body_tile_grid(w, body); // grid_y*gw + grid_x
 
     // Territorial adjacency (sorted nation pair → adjacent), from a 4-cardinal
@@ -553,6 +657,15 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
         scan_line([&](int c) { return grid[static_cast<std::size_t>(r) * gw + c]; }, gw, true);
     for (int cc = 0; cc < gw; ++cc)
         scan_line([&](int r) { return grid[static_cast<std::size_t>(r) * gw + cc]; }, gh, false);
+
+    // BL-1119: the rule is unchanged — the nearest centre pair, below-floor villages
+    // included — so the stats count the links that end on a street the floor left off
+    // the network (write-only; nothing below reads it).
+    std::set<entity_id> street_only;
+    for (std::size_t i = 0; i < nodes.size(); ++i)
+        if (nodes[i].scale < kMidScale && !spurs[i])
+            street_only.insert(nodes[i].tile);
+    st.flood_fields_before_border = static_cast<long long>(w.logistics_flood_fields.size());
 
     // BL-1072: the border links carry the last units, spread over however
     // many adjacent pairs this map has.
@@ -601,11 +714,18 @@ void generate_roads(world& w, entity_id body, generation_progress* progress)
                 best_b = bp.tb;
             }
         }
-        if (best_a != null_entity)
-            stamp_edge(w, body, best_a, best_b, kTrack);
+        if (best_a != null_entity && stamp_edge(w, body, best_a, best_b, kTrack))
+        {
+            ++st.border_links;
+            if (street_only.count(best_a) != 0 || street_only.count(best_b) != 0)
+                ++st.border_links_street_only;
+        }
     }
 
     report_units(units_total); // BL-1072: whole, whatever the border walk found
+    st.flood_fields = static_cast<long long>(w.logistics_flood_fields.size());
+    if (stats != nullptr)
+        *stats = st; // BL-1119 D1: write-only, read by nothing in this pass
 
     // The A* cost cache (world.astar_cost_cache) was populated road-free while this
     // pass measured centre-pair costs to lay the network out — correct for the MST
