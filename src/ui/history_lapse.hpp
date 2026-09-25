@@ -522,7 +522,11 @@ void assign_polity_colours(history_lapse& h);
 /// The pins @p prev hands the round after it (BL-1087): every slot it assigned
 /// (dead realms' too, so their colours stay retired), the rung each realm
 /// reached at its close, and the ground its dead last held. Empty pins when
-/// @p prev's owners are cultures — nothing is inherited across that boundary.
+/// @p prev's owners are cultures — nothing is inherited across that boundary —
+/// and empty when @p prev is not derived, since the slots are the derivation's:
+/// the app derives a landed record on demand before asking
+/// (`derive_lapse_for_handover`, startup_screens.cpp), so a round the player
+/// never drew still hands its successor the identity off its record.
 polity_pins lapse_pins_for_successor(const history_lapse& prev);
 
 /// Shade rungs @p polity carries at @p year on @p h (BL-1087 R8).

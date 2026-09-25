@@ -265,6 +265,43 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
     return h;
 }
 
+/// BL-1087 (the cold review's fix round): A LANDED ROUND'S IDENTITY IS DERIVED
+/// ON DEMAND AT THE HAND-OVER, whether or not the round was ever drawn. The
+/// pins a round hands its successor (`lapse_pins_for_successor`) are read off
+/// `polity_slot`, which only `finish_history_lapse` fills — and until this
+/// helper that ran solely from the draw path of the round ON SCREEN. A player
+/// who pressed Next while round 4 was still running, and never went back,
+/// therefore had round 4 land unseen, un-derived, and hand round 5 EMPTY pins
+/// at its landing: round 5 coloured itself from scratch, and the identity the
+/// item exists for broke on an ordinary press order (the hard flag never
+/// broke this way, because `lapse_hard_at_close` walks an unfinished record).
+/// This is the same call the draw path makes, against the wizard's own packed
+/// surface, so a record derived here and one derived by a frame are one
+/// derivation. A no-op on a record already derived, and honest about a
+/// surface not built yet: the pins are then empty and it says so, rather than
+/// letting the successor colour from scratch in silence.
+/// @param display_round The round as the wizard numbers it for the player
+///                      (the lapse index plus the planetology rounds), for the log.
+void derive_lapse_for_handover(ui::history_lapse& rec, int display_round,
+                               const std::vector<uint8_t>& surface,
+                               const std::vector<uint16_t>& terrain)
+{
+    if (rec.empty() || rec.derived()) return;
+    ui::finish_history_lapse(rec,
+                             surface.empty() ? nullptr : surface.data(), surface.size(),
+                             terrain.empty() ? nullptr : terrain.data(), terrain.size());
+    if (rec.derived())
+        std::printf("[identity] round %d derived at the hand-over (landed, never drawn): "
+                    "%zu realms slotted\n",
+                    display_round, rec.polity_slot.size());
+    else
+        std::printf("[identity] round %d could not be derived at the hand-over: the wizard's "
+                    "surface is not built (%zu of %d x %d tiles); its successor opens unpinned "
+                    "until it is drawn\n",
+                    display_round, surface.size(), rec.grid_w, rec.grid_h);
+    std::fflush(stdout);
+}
+
 } // namespace
 
 void app::launch_wizard_history_run(int lapse_index)
@@ -292,6 +329,14 @@ void app::launch_wizard_history_run(int lapse_index)
     // report lands (the landing rebuilds it from the report).
     const auto inherit_hard = [this, lapse_index]() {
         if (lapse_index <= 0) return;
+        // A LANDED predecessor is derived on demand before its pins are read
+        // (`derive_lapse_for_handover`): the player may never have drawn it.
+        // A predecessor still RUNNING is left to the draw path — its record is
+        // partial, and the landing below re-pins this round from the whole.
+        if (!m_wiz_history_future[lapse_index - 1].valid())
+            derive_lapse_for_handover(m_wiz_history[lapse_index - 1],
+                                      lapse_index - 1 + wizard_planetology_round_count + 1,
+                                      m_wiz_surface, m_wiz_terrain);
         const ui::history_lapse& prev = m_wiz_history[lapse_index - 1];
         if (prev.empty()) return;
         ui::history_lapse& cur = m_wiz_history[lapse_index];
@@ -562,6 +607,14 @@ void app::poll_wizard_history()
         // deltas, so a record with a span is enough.
         if (i > 0 && m_wiz_history[i - 1].lapse.years > 0)
         {
+            // The predecessor's identity, derived on demand if no frame ever
+            // drew it (`derive_lapse_for_handover`): the carried colours below
+            // and the pins read `polity_slot`, which is empty on an undrawn
+            // record. Only a LANDED predecessor — a running one is partial.
+            if (!m_wiz_history_future[i - 1].valid())
+                derive_lapse_for_handover(m_wiz_history[i - 1],
+                                          i - 1 + wizard_planetology_round_count + 1,
+                                          m_wiz_surface, m_wiz_terrain);
             const ui::history_lapse& prev = m_wiz_history[i - 1];
             const int prev_end = prev.lapse.start_year + prev.lapse.years;
             const std::vector<uint16_t> last = owner_slice_at(prev.lapse, prev_end);
@@ -602,6 +655,34 @@ void app::poll_wizard_history()
                 cur.civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094: the diamonds stay
                 cur.tile_region.clear();
             }
+        }
+
+        // AND THE ROUND AFTER THIS ONE IS RE-PINNED, IF IT IS ALREADY OPEN
+        // (BL-1087, the review's fix round). A player who pressed Next while
+        // this round was still running has its successor live — or even
+        // landed — on pins taken from a partial record, or from no record at
+        // all. The landing is the first moment the whole record exists, so
+        // the hand-over is made again here, from the landed record, exactly
+        // as it is made for a successor that launches later; the successor
+        // re-derives on its next frame. A running successor keeps its own
+        // record (only its pins move); a landed one is re-coloured whole.
+        // The chain stops at one: the successor's own successor is re-pinned
+        // when the successor lands, from a record that is whole by then.
+        if (i + 1 < wizard_lapse_round_count && !m_wiz_history[i + 1].empty()
+            && !m_wiz_history[i].owners_are_cultures)
+        {
+            derive_lapse_for_handover(m_wiz_history[i], i + wizard_planetology_round_count + 1,
+                                      m_wiz_surface, m_wiz_terrain);
+            const ui::history_lapse& prev = m_wiz_history[i];
+            ui::history_lapse&       nxt  = m_wiz_history[i + 1];
+            nxt.pins       = ui::lapse_pins_for_successor(prev);
+            nxt.has_pins   = !nxt.pins.slot.empty();
+            nxt.hard_carry = ui::lapse_hard_at_close(prev);
+            nxt.civ_carry  = ui::lapse_civ_marks_at_close(prev);
+            nxt.tile_region.clear();
+            std::printf("[identity] round %d re-pinned from round %d's landing (it was already open)\n",
+                        i + 1 + wizard_planetology_round_count + 1, i + wizard_planetology_round_count + 1);
+            std::fflush(stdout);
         }
 
         // BL-914: LANDING NO LONGER RE-PARKS THE PLAYHEAD AT THE START. Under
