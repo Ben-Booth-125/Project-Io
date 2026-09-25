@@ -75,15 +75,19 @@ RNG anywhere on the path:
   **A place's size is its people, never how many centres they are split into (Ben,
   2026-09-25).** A history reader that asks how big or how valuable a region is — the campaign
   prize, the reach relay — reads its urban heads, so the same people make the same prize however
-  the hierarchy divides them into villages and towns.
+  the hierarchy divides them into villages and towns. **A settled place is worth at least a
+  village (Ben, 2026-09-25):** a region that stands a settlement counts as one however few its
+  heads, and its heads count above that.
   **A 1960 world aims at roughly 500 centres (Ben, 2026-09-25)** — about a dozen for each
   market, most land open country between them. It is the aim the forces are calibrated against
   (settle spacing, consolidation, industrial urbanisation, abandonment), measured on the curated
   seeds, never a count any rule enforces.
 - **The sack destroys.** A conquest costs the taken region's cities a multiple of what it
   costs its countryside, because a sack falls on the walls and not the fields. Centres fall to
-  what the surviving heads can stand up, and every one lost is recorded in `centres_razed` —
-  so a razed city that is later rebuilt still says it was razed. Razing stays **rare**, as
+  what the surviving heads can stand up, and **a razing is counted in people (Ben, 2026-09-25)**:
+  a sack that costs the region a village's worth of urban heads records a razing, whether or not
+  the centre count steps down — so a razed city that is later rebuilt still says it was razed,
+  and the size hierarchy's coarse steps do not hide a sack. Razing stays **rare**, as
   § Growth, decline and razing requires: an occupier almost always prefers to occupy.
 
 - **A centre stands in the region that grew it.** Each carved centre is **bound to its source
