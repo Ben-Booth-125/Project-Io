@@ -1181,6 +1181,51 @@
     "src/world/corporation_generation.cpp"
    ],
    "design": "FILED 2026-09-24 from the sprint-46 draft row CAMPAIGN_TECH_STATE (Ben, 2026-09-18, NR-898 (7): per CORPORATION through the existing earned_techs gates, not per nation). Not in sprint 47: the IN-node → campaign-tech mapping needs a design session with Ben first (no per-nation consumer and no IN-* → E*-* mapping exists). It is also the per-nation grain of the recipe band (BL-1101).\n\nTHE WORK (after the design session). Polity → nation by the representative-polity tally used for grudges (hard_coded_world.cpp:1761-1790); seed each corporation from its home nation's mask AFTER the search winner is applied (the regeneration wipes earned_techs, corporation_generation.cpp:2084), through a helper that also appends the tech's modifiers; check whether state_hash folds earned_techs.\n\nDONE WHEN. On a 1960 world corporations of a nation holding the mapped IN node have the mapped tech and its modifiers; corporations of one without it do not."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1110",
+   "short_name": "REGION_NAME_DOUBLES_QUARTER_WORD",
+   "author": "Claude (lane I1, BL-1089, 2026-09-25); found on the seat card",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 1,
+   "title": "A daughter region founded in a span is named with its quarter word twice (\"Maluam Tutu Reach Reach\") beside its parent \"Maluam Tutu Reach\"",
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "FOUND 2026-09-25 by lane I1 while building the seat card's origin line: a region founded during a span (settle verb) takes its name from the parent region's full name plus the quarter word, so the quarter word doubles. NATION_GENERATION.md § Pass 5 — Naming rules a region is <People> <Region> with both halves native and the region word positional; a span founding must coin from the people half and its own position, never from the parent's finished string.\n\nTHE WORK. Find the span-founding name path (history_sim.cpp settle → the region name coin) and give it the people half + the region's own positional word, as settlement.cpp coins a migration founding; a harness row asserting no region name repeats its final word.\n\nDONE WHEN. On the 16 curated seeds no region name ends in a doubled word; the seat card's HQ line reads one quarter word."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1111",
+   "short_name": "TILE_INPUTS_GRID_MISMATCH",
+   "author": "Claude (lane I1, BL-1089, 2026-09-25)",
+   "category": "Engine",
+   "priority": "C",
+   "difficulty": 1,
+   "title": "generation_report::body_entry::tile_inputs.gw/gh read 180 x 84 for a homeworld carrying 261 x 121 tiles on a --verify world",
+   "authority_doc": "docs/generation/GENERATION_LEDGER.md",
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "src/world/hard_coded_world.hpp",
+    "src/core/verify_api.cpp"
+   ],
+   "design": "FOUND 2026-09-25 by lane I1: on a --verify world the report's tile_inputs grid (180 x 84) does not match the body's tile raster (261 x 121); the lane stopped reading the field. Either the report records the PREVIEW raster (the wizard's scratch surface) rather than the built body's, or the --verify adopted path fills it from a different world. A reader that trusts it (the Generation Ledger, any raster fold) is wrong by construction.\n\nTHE WORK. Find who writes tile_inputs on the verify path and on the app path; make it the built body's grid; a harness assertion that tile_inputs.gw x gh equals the body's tile count on every path.\n\nDONE WHEN. The assertion holds on --verify, --autostart and the wizard's adopted world."
   }
  ]
 }
