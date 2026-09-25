@@ -1481,6 +1481,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 ep.resume_grudges   = &kepler_pass_one.grudges;
                 ep.resume_contacts  = &kepler_pass_one.contacts;
                 ep.resume_corridors = &kepler_pass_one.surviving_corridors;
+                // BL-1049: the civilisation and creed records the carried
+                // indices point into cross here exactly as they cross at 1660
+                // (the Industrialisation call below), so the span continues
+                // the numbering instead of reopening both tables at 0 under
+                // the Empires span's indices. Data, not a seed: what this span
+                // coins still draws on its own stream (BL-1083).
+                ep.resume_civilisations    = &kepler_pass_one.civilisations;
+                ep.resume_universal_creeds = &kepler_pass_one.universal_creeds;
 
                 // BL-937: the PRE-sim capture, taken before this call mutates
                 // `kepler_settlement`/`kepler_creeds` in place — see the field
@@ -1493,6 +1501,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     fixture->pre_exploration_polities   = kepler_pass_one.polities;
                     fixture->pre_exploration_grudges    = kepler_pass_one.grudges;
                     fixture->pre_exploration_corridors  = kepler_pass_one.surviving_corridors;
+                    fixture->pre_exploration_civilisations    = kepler_pass_one.civilisations;    // BL-1049
+                    fixture->pre_exploration_universal_creeds = kepler_pass_one.universal_creeds; // BL-1049
                 }
 
                 // BL-946: the loading screen's sub-bar AND the live lapse tap,

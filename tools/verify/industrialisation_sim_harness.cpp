@@ -783,6 +783,12 @@ std::vector<uint32_t> library_seeds(const char* path)
 //   This is what makes the span "the real consumer of the resume" a checked
 //   claim: the resume gates 1 and 2 prove lossless is the resume the shipped
 //   world runs, and no settlement or creed state outside the struct reaches it.
+// GATE 1 ALSO CARRIES BL-1049: the civilisation and creed tables cross the
+//   1200 resume too. On the 1660 handoff and the 1960 close, no region's
+//   civilisation index and no region's or polity's universal_creed index sits
+//   at or past its table; and no member pair is recorded twice over the 1200
+//   table followed by what the 1660 table adds beyond the prefix it carried.
+//   Either non-zero fails the seed's gate-1 row.
 // REPORT: the one-round footprint of the real resume, the entry state the
 //   handoff differs from the continued run in, and the 1960 divergence
 //   against the continued run, attributed by source by adding them back one
@@ -955,6 +961,61 @@ std::string table_diff(const std::vector<T>& a, const std::vector<T>& b, Eq eq)
     return {};
 }
 
+// ---------------------------------------------------------------------------
+// BL-1049 -- THE CIVILISATION AND CREED TABLES CROSS THE 1200 RESUME.
+//
+// A region's `civilisation` and a region's or polity's `universal_creed` are
+// indices into the tables the handoff carries. A resume that restarted either
+// table at 0 leaves an Empires-era index pointing past the end of the table
+// it now sits beside (or at whatever the next span coined first), and records
+// a pair the Empires span already settled a second time under a name from the
+// next span's seed. Two readings, both 0 on a world whose tables crossed.
+// ---------------------------------------------------------------------------
+
+/// Indices at or past their table: regions whose `civilisation` is >= the
+/// civilisation table's size, and regions plus polities whose
+/// `universal_creed` is >= the creed table's size. -1 (none) never counts.
+struct index_truth
+{
+    int civ_past   = 0;
+    int creed_past = 0;
+};
+index_truth indices_past_table(const std::vector<region>& rs, const std::vector<polity>& ps,
+                               std::size_t civ_rows, std::size_t creed_rows)
+{
+    index_truth t;
+    for (const region& r : rs)
+    {
+        if (r.civilisation >= 0 && static_cast<std::size_t>(r.civilisation) >= civ_rows) ++t.civ_past;
+        if (r.universal_creed >= 0 && static_cast<std::size_t>(r.universal_creed) >= creed_rows) ++t.creed_past;
+    }
+    for (const polity& q : ps)
+        if (q.universal_creed >= 0 && static_cast<std::size_t>(q.universal_creed) >= creed_rows) ++t.creed_past;
+    return t;
+}
+
+/// Member pairs recorded twice across the 1200 boundary. The world's record
+/// is the Empires close's table (@p at_1200) followed by whatever the 1660
+/// table (@p at_1660) adds beyond the prefix it carried from it (matched row
+/// for row by `civ_eq`, reported through @p prefix_out). A resume that
+/// restarted the table carries no prefix, so every pair both spans settled
+/// counts once here; a resume that carried it adds only pairs the Empires
+/// span never recorded, so the count is 0.
+int pairs_recorded_twice(const std::vector<civilisation>& at_1200,
+                         const std::vector<civilisation>& at_1660, int* prefix_out)
+{
+    std::size_t prefix = 0;
+    while (prefix < at_1200.size() && prefix < at_1660.size() && civ_eq(at_1200[prefix], at_1660[prefix]))
+        ++prefix;
+    if (prefix_out != nullptr) *prefix_out = static_cast<int>(prefix);
+    std::map<std::vector<int>, int> seen;
+    for (const civilisation& c : at_1200) ++seen[c.members];
+    for (std::size_t i = prefix; i < at_1660.size(); ++i) ++seen[at_1660[i].members];
+    int twice = 0;
+    for (const auto& kv : seen) if (kv.second > 1) ++twice;
+    return twice;
+}
+
 std::string census_text(const field_census& c)
 {
     std::string s;
@@ -1038,6 +1099,8 @@ run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture
     hp.resume_grudges   = &fx.pre_exploration_grudges;
     hp.resume_contacts  = &fx.pre_exploration_contacts;
     hp.resume_corridors = &fx.pre_exploration_corridors;
+    hp.resume_civilisations    = &fx.pre_exploration_civilisations;    // BL-1049: generation's own 1200 resume
+    hp.resume_universal_creeds = &fx.pre_exploration_universal_creeds; // carries both tables; C must too
     hp.capture_year     = capture;
     // BL-1037: unset keeps the captured Exploration params' own switch — the
     // run generation made (on by default since BL-1044); --resume-tier sets it.
@@ -1234,6 +1297,13 @@ struct seed_fidelity
     int  open_founded_dead = 0; ///< founded events at the open for a dead polity (must be 0)
     int  expl_ghosts       = 0; ///< polities dead at 1200 that Exploration's own open carries
     int  expl_founded_dead = 0; ///< ... and notes founded (must be 0)
+    // BL-1049 -- the civilisation and creed tables across the 1200 resume.
+    // Both readings fold into gate 1 (a non-zero one is noted in open_tables).
+    int  civ_rows_1200 = 0, civ_rows_1660 = 0, civ_rows_1960 = 0; ///< table sizes (reported)
+    int  civ_carried_prefix = 0;   ///< rows of the 1660 table that are the 1200 table's, in order
+    int  civ_past_1660 = 0, creed_past_1660 = 0; ///< indices at or past the table on the 1660 handoff
+    int  civ_past_1960 = 0, creed_past_1960 = 0; ///< ... on the 1960 close
+    int  civ_pairs_twice = 0;      ///< member pairs recorded twice across 1200 (must be 0)
     bool gate1 = false;
 
     // The entry state the handoff differs from the continued run in.
@@ -1494,6 +1564,34 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
         const int64_t one  = open + dp.tick_bands[0].step_years; // one round: 1664
         const int64_t stop = dp.stop_year;     // 1960
         const uint32_t own_seed = fx.industrialisation_seed; // BL-1040: the span's own fold
+
+        // ---- BL-1049: the civilisation and creed tables across the 1200 resume --
+        // Read off the shipped values alone: the 1200 handoff's tables (the
+        // fixture's pre-Exploration capture), the 1660 handoff, the 1960 close.
+        {
+            const industrialisation_output& S = fx.industrialisation_handoff;
+            row.civ_rows_1200 = static_cast<int>(fx.pre_exploration_civilisations.size());
+            row.civ_rows_1660 = static_cast<int>(H.civilisations.size());
+            row.civ_rows_1960 = static_cast<int>(S.civilisations.size());
+            const index_truth t1660 = indices_past_table(H.regions, H.polities,
+                                                         H.civilisations.size(), H.universal_creeds.size());
+            const index_truth t1960 = indices_past_table(S.regions, S.polities,
+                                                         S.civilisations.size(), S.universal_creeds.size());
+            row.civ_past_1660   = t1660.civ_past;
+            row.creed_past_1660 = t1660.creed_past;
+            row.civ_past_1960   = t1960.civ_past;
+            row.creed_past_1960 = t1960.creed_past;
+            row.civ_pairs_twice = pairs_recorded_twice(fx.pre_exploration_civilisations, H.civilisations,
+                                                       &row.civ_carried_prefix);
+            if (row.civ_past_1660 + row.creed_past_1660 + row.civ_past_1960 + row.creed_past_1960
+                + row.civ_pairs_twice != 0)
+                row.open_tables.push_back(
+                    "civilisation/creed tables (BL-1049): indices past the table 1660 civ "
+                    + std::to_string(row.civ_past_1660) + " creed " + std::to_string(row.creed_past_1660)
+                    + ", 1960 civ " + std::to_string(row.civ_past_1960) + " creed "
+                    + std::to_string(row.creed_past_1960) + "; pairs recorded twice across 1200 "
+                    + std::to_string(row.civ_pairs_twice));
+        }
 
         // ---- C: the continued run, carrying the span's forces from 1660 -------
         std::fprintf(stderr, "[fidelity] seed %u continued runs\n", seed);
@@ -1868,6 +1966,21 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                     r.open_living, r.open_dead, r.expl_ghosts);
         for (const std::string& t : r.open_tables) std::printf(" | %s", t.c_str());
         std::printf("\n");
+    }
+
+    std::printf("\n=== BL-1049: the civilisation and creed tables across the 1200 resume (folded into gate 1) ===\n");
+    std::printf("  (past = regions whose civilisation index, or regions and polities whose universal_creed index, is at\n"
+                "   or past the table it sits beside; twice = member pairs recorded twice over the 1200 table followed by\n"
+                "   what the 1660 table adds beyond the prefix it carried from it; both must be 0)\n");
+    for (const seed_fidelity& r : rows)
+    {
+        if (!r.ran) continue;
+        std::printf("  %5u  rows 1200 %3d -> 1660 %3d (carried prefix %3d) -> 1960 %3d | past the table: 1660 civ %d creed %d, "
+                    "1960 civ %d creed %d | pairs recorded twice %d  %s\n",
+                    r.seed, r.civ_rows_1200, r.civ_rows_1660, r.civ_carried_prefix, r.civ_rows_1960,
+                    r.civ_past_1660, r.creed_past_1660, r.civ_past_1960, r.creed_past_1960, r.civ_pairs_twice,
+                    (r.civ_past_1660 + r.creed_past_1660 + r.civ_past_1960 + r.creed_past_1960
+                     + r.civ_pairs_twice) == 0 ? "PASS" : "FAIL");
     }
 
     std::printf("\n=== ENTRY: where the handoff differs from the continued run at the top of 1660 (reported) ===\n");
@@ -3377,6 +3490,8 @@ int main(int argc, char** argv)
             hp.resume_grudges   = &fx.pre_exploration_grudges;
             hp.resume_contacts  = &fx.pre_exploration_contacts;
             hp.resume_corridors = &fx.pre_exploration_corridors;
+            hp.resume_civilisations    = &fx.pre_exploration_civilisations;    // BL-1049
+            hp.resume_universal_creeds = &fx.pre_exploration_universal_creeds;
             settlement_state ss_control = fx.pre_exploration_settlement;
             creed_state      cs_control = fx.pre_exploration_creeds;
             const history_sim_state control = run_history_sim(

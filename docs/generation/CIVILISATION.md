@@ -383,7 +383,12 @@ lens on the existing shares. It is a thing with a name, and it can be pointed at
 **A record is what lets a civilisation OUTLIVE the polities that formed it**, which is the
 property the other two candidates cannot supply. A lens dies the moment the shares beneath it
 move, so a civilisation would evaporate at exactly the moment the design most wants it — after the
-empire that raised it has fragmented. A record persists, and the fragments inherit it.
+empire that raised it has fragmented. A record persists, and the fragments inherit it. **The record
+crosses every span boundary whole and in order** (`BL-1049 (civilisation index reuse at 1200)`): the
+civilisation table and the universal-creed table are part of what each handoff carries, a span
+resumed from a handoff opens on them, so a region's index names the same record on either side of
+1200 or 1660, a record coined in the later span takes the next free index, and a pair an earlier span
+already settled is found rather than recorded a second time under a name from the later span's seed.
 
 **Its name is coined from the tongues that mixed, never from a bank of its own.** The naming
 substrate exists (`../lore/CREEDS.md`, `world/tongue.hpp`) and the standing rule holds without

@@ -447,6 +447,46 @@ the re-bless after the merge.
 - [x] T4 `world_determinism` twice, bit-identical; the moved digests recorded old -> new. (R4)
   DONE 2026-09-25: world_determinism run 1 and run 2 (build_gen/verify/world_determinism.exe, Release /O2 /MD): both ALL PASS (0 failures); both print "digest seedA/on  = 0570E3900D0BD53F and 0570E3900D0BD53F", "digest seedB/on  = D5616442F561DDD3", "digest seedA/off = B89B87C393B06FC9", "digest seedA/on/epoch0 = 0570E3900D0BD53F" -- bit-identical run to run. OLD (main, 6855a3cf): seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F. NEW: seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9 (all three moved).
 - [ ] T5 main session: merge, the one re-bless (player_seed_sweep pins), cold review. (R4)
+### Re-bless riders
+
+#### BL-1049 (civilisation index reuse at 1200) — a digest mover by design. Group `civilisation-index-reuse-at-1200`.
+
+- [x] T1 `pass_one_output` carries `civilisations` / `universal_creeds` (folded by
+  `make_pass_one_output`, as `make_exploration_output` folds them at 1660); the 1200 resume in
+  hard_coded_world.cpp sets `resume_civilisations` / `resume_universal_creeds` from it; the KNOWN
+  GAP comments rewritten. (R1) DONE 2026-09-25: two lines beside the four BL-931 pointers; the
+  fold copies both tables whole; the three comments (the resume pointer, `exploration_output`'s
+  field, `civilisations_formed`) now say every resumed span sets both.
+- [x] T2 `era_minus_one_fixture::pre_exploration_civilisations` / `_universal_creeds` captured at the
+  1200 resume, and every fixture re-run of the Exploration span passes them (industrialisation
+  fidelity's C and its 1660 control, exploration_sim_harness's three sites, exploration_sweep's
+  two), so a re-run is still generation's own span. (R3) DONE 2026-09-25: all 11 `resume_corridors`
+  setters in src/ and tools/ carry the pair.
+- [x] T3 `industrialisation_sim_harness --fidelity`: per seed, indices at or past the table on the
+  1660 handoff and the 1960 close (civilisation; region and polity creed), and member pairs recorded
+  twice over the 1200 table followed by what the 1660 table adds beyond its carried prefix; printed,
+  folded into gate 1. BEFORE the fix recorded, AFTER 0 / 0 on 16/16. (R2) DONE 2026-09-25: BEFORE
+  (harness built before the fix, one 16-seed run, 1018.6 s) gate 1 0 of 16 -- e.g. seed 46: the
+  62-row 1200 table restarts as 11 rows, 238 regions past the civilisation table, 2019 creed indices
+  past theirs, 11 pairs recorded twice; seed 31: 57 -> 11, 221 / 3129 / 8; seed 0: 38 -> 4,
+  244 / 1593 / 3. AFTER: carried prefix = the whole 1200 table on every seed, 0 / 0 / 0, gates
+  1-3 16/16, FIDELITY PASS. Smoke `--seeds 0 --through 1960` runs clean (report only).
+- [x] T4 history_sim_harness at baseline (2 pre-existing failures), exploration_sim_harness (R3b's
+  counters reported if moved, not re-pinned), world_determinism twice (bit-identical; old -> new
+  digests recorded), save_envelope_roundtrip (the lapse name tables reach the envelope), Release
+  build. (R4) DONE 2026-09-25: history_sim_harness 2 failures (R3a2/R3a3, the baseline);
+  exploration_sim_harness 1 failure, R3b, exactly main's own +400 tribute (228427744 vs the pin
+  228427344; a bisect with both tables, each alone and neither reads the same tribute -- the item
+  moves none of the nine counters; its footprint there is 2 duplicate coinings gone); world_determinism
+  ALL PASS twice, digests bit-identical and UNMOVED against main -- seedA/on 6DBC0094F0B6B0EF,
+  seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F -- because that harness never seeds
+  `world::history_log` (make_hard_coded_world alone) and folds no record table; the shipped seed A
+  does drop five duplicate coinings (fidelity on 2882400001: 5 pairs recorded twice -> 0), so the
+  library sweep's digests are the ones to watch at the re-bless; save_envelope_roundtrip PASS (0
+  failures); Release build clean.
+- [x] T5 CIVILISATION.md § A civilisation is what mixing makes: the record crosses every span
+  boundary whole; EXPLORATION.md § What this phase hands Industrialisation: the records are on the
+  list ("nothing else crosses" was false for two tables BL-1036 crosses). (R5) DONE 2026-09-25.
 
 ## Drained 2026-09-16
 

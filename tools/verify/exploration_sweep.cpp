@@ -953,6 +953,8 @@ int main(int argc, char** argv)
         ep2.resume_grudges   = &fx.pre_exploration_grudges;
         ep2.resume_contacts  = &fx.pre_exploration_contacts;
         ep2.resume_corridors = &fx.pre_exploration_corridors;
+        ep2.resume_civilisations    = &fx.pre_exploration_civilisations;    // BL-1049: generation's own resume
+        ep2.resume_universal_creeds = &fx.pre_exploration_universal_creeds;
         if (want_override && want_override_q >= 0) ep2.w_want_q = want_override_q;
         apply_sets(ep2);
         if (industry_open > 0)
@@ -1736,6 +1738,8 @@ int main(int argc, char** argv)
                 hp.resume_grudges   = &fx.pre_exploration_grudges;
                 hp.resume_contacts  = &fx.pre_exploration_contacts;
                 hp.resume_corridors = &fx.pre_exploration_corridors;
+                hp.resume_civilisations    = &fx.pre_exploration_civilisations;    // BL-1049
+                hp.resume_universal_creeds = &fx.pre_exploration_universal_creeds;
                 settlement_state ss = fx.pre_exploration_settlement;
                 creed_state      cs = fx.pre_exploration_creeds;
                 const auto t0 = std::chrono::steady_clock::now();
