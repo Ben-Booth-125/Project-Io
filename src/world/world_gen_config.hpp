@@ -67,27 +67,30 @@ struct world_gen_config
     /// Default false: every existing caller builds a whole world, exactly as
     /// before. Authored nowhere in Lua — this is a call-site scope knob, not a
     /// balance value, and it is the one field here that is not.
+    ///
+    /// BL-1084: ALL FOUR STOP FLAGS NAME A STAGE. `make_hard_coded_world` is a
+    /// composition of stage functions over one `generation_cursor`
+    /// (world/generation_cursor.hpp), and a flag says which stage it runs up to
+    /// (`generation_stop_stage`: the earliest flag set wins) before the stopped
+    /// ending (`close_stopped_generation`). No flag gates a pass from inside it.
     bool stop_after_ancient_era = false;
 
     /// STOP GENERATION ONCE THE EXPLORATION SPAN HAS RUN, before borders,
     /// roads and companies are built (BL-946) -- the Exploration round's own
     /// sibling to `stop_after_ancient_era` above, same contract, one round
-    /// later. Also gates the Exploration span ITSELF off whenever
-    /// `stop_after_ancient_era` is set, so the Empires round's own launch
-    /// (which stops right after the ancient era) never pays for a span it
-    /// will discard.
+    /// later. When both are set the earlier stop wins, so the Empires round's
+    /// own launch (which stops right after the ancient era) never pays for a
+    /// span it will discard.
     ///
     /// THE WORLD IS NOT USABLE WHEN THIS IS SET, for the same reason
     /// `stop_after_ancient_era` is not.
     ///
     /// Default false: every existing caller is unaffected.
     ///
-    /// BL-1040: IT ALSO STOPS BEFORE THE INDUSTRIALISATION SPAN. The span sits
-    /// between the Exploration fold and population centres, which is ahead of
-    /// this knob's own return, so the call site gates the span on this knob
-    /// directly -- the Exploration round's launch, `exploration_sweep` and the
-    /// seed-library fingerprints never pay for a span they would discard, and
-    /// never read a world it moved.
+    /// BL-1040: IT ALSO STOPS BEFORE THE INDUSTRIALISATION SPAN, which is the
+    /// next stage (BL-1084) -- the Exploration round's launch,
+    /// `exploration_sweep` and the seed-library fingerprints never pay for a
+    /// span they would discard, and never read a world it moved.
     bool stop_after_exploration = false;
 
     /// STOP GENERATION ONCE THE INDUSTRIALISATION SPAN HAS RUN (BL-1040), before
@@ -117,7 +120,7 @@ struct world_gen_config
     /// be fused into the same run. Mutually exclusive with
     /// `stop_after_ancient_era` in practice: a caller wants one stop point or
     /// the other, never both, though nothing here enforces that (the earlier
-    /// check wins if both are set).
+    /// stop wins if both are set, `generation_stop_stage`).
     ///
     /// THE WORLD IS NOT USABLE WHEN THIS IS SET, for the same reason
     /// `stop_after_ancient_era` is not: `run_history_sim` has not run at all,

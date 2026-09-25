@@ -934,6 +934,29 @@ world make_hard_coded_world(world_params params = {}, generation_report* report 
                             const works_registry* works = nullptr,
                             era_minus_one_fixture* fixture = nullptr);
 
+/// BL-1084 — THE STAGES `make_hard_coded_world` IS COMPOSED OF, one per wizard
+/// round boundary, in order. The call above is `begin_generation` then
+/// `run_generation_to(tail)` over one `generation_cursor`; a caller that wants
+/// to stop, hold and resume a build uses those directly. The cursor, the stage
+/// functions and what each stage holds are in world/generation_cursor.hpp,
+/// which this header does not include (it carries history_sim.hpp, and this
+/// header's includers should not pay for it).
+enum class generation_stage : uint8_t
+{
+    none = 0,          ///< Nothing has run.
+    life_gate,         ///< The star, the system, the homeworld's tiles and deposits, its rivers.
+    culture,           ///< The ladder, the creeds, the migration.
+    empires,           ///< The Empires span, 400 BCE -> 1200.
+    exploration,       ///< The exploration age, 1200 -> 1660.
+    industrialisation, ///< The Industrialisation span, 1660 -> 1960.
+    tail,              ///< The history's close, borders, roads, companies, finishing.
+};
+
+/// The stage a `make_hard_coded_world` call on @p cfg runs up to: the earliest
+/// `stop_after_*` flag set (the earlier stop wins, as it always did), or
+/// `tail` when none is.
+generation_stage generation_stop_stage(const world_gen_config& cfg);
+
 /// The homeworld's tile grid dimensions — one authority the build and the
 /// wizard preview both read.
 ///
