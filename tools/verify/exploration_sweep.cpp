@@ -410,6 +410,22 @@ struct exploration_row
     int64_t subjections_formed   = 0;
     int64_t subjections_freed    = 0;
     int64_t tribute_remitted     = 0;
+    /// BL-1096: the bought/taken split and the treasury that moved for the
+    /// purchases, off the traced re-run; and the 1660 capital-treasury spread
+    /// (min / median / max over living polities) the price sits inside.
+    int64_t provinces_bought            = 0;
+    int64_t treasury_spent_on_purchases = 0;
+    bool    purchase_params_rejected    = false;
+    int64_t treasury_1660_min = 0, treasury_1660_med = 0, treasury_1660_max = 0;
+    /// BL-1097: the sea-leg record's size at 1660, the legs at or over the
+    /// lane tier, and the three sites' counts (NR-921: the later spans run
+    /// sea legs off, so the tribute-round leg carries most of this).
+    int64_t sea_legs_rows       = 0;
+    int64_t sea_legs_over_tier  = 0;
+    int64_t sea_legs_campaign   = 0;
+    int64_t sea_legs_purchase   = 0;
+    int64_t sea_legs_tribute    = 0;
+    int64_t sea_lanes_opened    = 0;
 
     // --- Reading 6: subject friction (operationalized -- see the printed
     // note beside readings 1-2's own operationalization disclosure). A
@@ -792,6 +808,11 @@ int main(int argc, char** argv)
             else if (kv.first == "standing_army_upkeep_per_1000_heads_year_q") hp.standing_army_upkeep_per_1000_heads_year_q = kv.second;
             else if (kv.first == "navy_upkeep_per_1000_units_year_q")          hp.navy_upkeep_per_1000_units_year_q = kv.second;
             else if (kv.first == "standing_army_levy_per_mille_q")             hp.standing_army_levy_per_mille_q = static_cast<int>(kv.second);
+            // BL-1096: the purchase fork's two constants, measured here before they were pinned.
+            else if (kv.first == "subjection_purchase_rate_q") hp.subjection_purchase_rate_q = static_cast<int>(kv.second);
+            else if (kv.first == "subjection_purchase_floor")  hp.subjection_purchase_floor  = kv.second;
+            // BL-1097: the lane tier, for a tuning run.
+            else if (kv.first == "sea_lane_tier1_uses")        hp.sea_lane_tier1_uses = static_cast<int>(kv.second);
             else { std::printf("unknown --set %s\n", kv.first.c_str()); std::exit(2); }
         }
     };
@@ -1254,6 +1275,33 @@ int main(int argc, char** argv)
         row.treasury_spent_on_navies          = traced.treasury_spent_on_navies;
         row.treasury_spent_on_ports           = traced.treasury_spent_on_ports;
         row.treasury_spent_on_standing_armies = traced.treasury_spent_on_standing_armies;
+
+        // BL-1096 / BL-1097 -- the purchase split, the treasury spread it
+        // sits inside, and the sea-leg record, all off the traced re-run.
+        row.provinces_bought            = traced.provinces_bought;
+        row.treasury_spent_on_purchases = traced.treasury_spent_on_purchases;
+        row.purchase_params_rejected    = traced.subjection_purchase_params_rejected;
+        {
+            std::vector<int64_t> chests;
+            for (const polity& q : traced.polities)
+                if (q.alive && q.capital >= 0
+                 && static_cast<std::size_t>(q.capital) < ss_copy.regions.size())
+                    chests.push_back(ss_copy.regions[static_cast<std::size_t>(q.capital)].treasury);
+            std::sort(chests.begin(), chests.end());
+            if (!chests.empty())
+            {
+                row.treasury_1660_min = chests.front();
+                row.treasury_1660_med = chests[chests.size() / 2];
+                row.treasury_1660_max = chests.back();
+            }
+        }
+        row.sea_legs_rows     = static_cast<int64_t>(traced.sea_legs.size());
+        for (const sea_leg& l : traced.sea_legs)
+            if (l.uses >= ep2.sea_lane_tier1_uses) ++row.sea_legs_over_tier;
+        row.sea_legs_campaign = traced.sea_legs_noted_campaign;
+        row.sea_legs_purchase = traced.sea_legs_noted_purchase;
+        row.sea_legs_tribute  = traced.sea_legs_noted_tribute;
+        row.sea_lanes_opened  = traced.sea_lanes_opened;
 
         {
             std::vector<std::pair<uint16_t, uint16_t>> active_pairs;
@@ -2701,6 +2749,53 @@ int main(int argc, char** argv)
             ? "some polities hold subjects, most do not — asymmetry measured."
             : "no asymmetry measured on this spread — report to Ben (subjection_reach_q / "
               "subjection_treasury_margin_q may sit wrong for this seed spread).");
+
+        // BL-1096 -- BOUGHT OR TAKEN, per seed, with the treasury spread the
+        // price sits inside (EXPLORATION.md sec Two ways to claim ground across
+        // water: "measured across the seed library, never on one seed, with the
+        // treasury spread reported beside the bought/taken split"). REPORTED,
+        // never gated: a seed owes no purchase. The verdict the constants are
+        // held to -- a split not degenerate on at least 4 seeds -- is read off
+        // this table by the reader, and the summary line below counts it.
+        // BL-1097 -- the sea-leg record beside it: rows, legs over the lane
+        // tier, and which of the three sites wrote them (NR-921: with sea
+        // legs off in these spans the tribute-round leg carries the record).
+        std::printf("\n  purchase fork (BL-1096) and sea legs (BL-1097), per seed:\n");
+        int64_t seeds_split = 0, seeds_with_subjects = 0, bought_total = 0, spent_total = 0;
+        int64_t legs_total = 0, lanes_total = 0, seeds_with_legs = 0;
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok) continue;
+            const int64_t taken = r.subjections_formed - r.provinces_bought;
+            if (r.subjections_formed > 0) ++seeds_with_subjects;
+            if (r.provinces_bought > 0 && taken > 0) ++seeds_split;
+            bought_total += r.provinces_bought; spent_total += r.treasury_spent_on_purchases;
+            legs_total += r.sea_legs_rows; lanes_total += r.sea_lanes_opened;
+            if (r.sea_legs_rows > 0) ++seeds_with_legs;
+            std::printf("  purchase seed %u: bought=%lld taken=%lld spent=%lld (mean price %lld)%s"
+                        " | 1660 capital treasury min/med/max %lld/%lld/%lld"
+                        " | sea legs rows=%lld over-tier=%lld lanes=%lld (campaign %lld purchase %lld tribute-round %lld)\n",
+                        r.seed, static_cast<long long>(r.provinces_bought), static_cast<long long>(taken),
+                        static_cast<long long>(r.treasury_spent_on_purchases),
+                        static_cast<long long>(r.provinces_bought > 0
+                            ? r.treasury_spent_on_purchases / r.provinces_bought : 0),
+                        r.purchase_params_rejected ? " [PARAMS REJECTED]" : "",
+                        static_cast<long long>(r.treasury_1660_min), static_cast<long long>(r.treasury_1660_med),
+                        static_cast<long long>(r.treasury_1660_max),
+                        static_cast<long long>(r.sea_legs_rows), static_cast<long long>(r.sea_legs_over_tier),
+                        static_cast<long long>(r.sea_lanes_opened), static_cast<long long>(r.sea_legs_campaign),
+                        static_cast<long long>(r.sea_legs_purchase), static_cast<long long>(r.sea_legs_tribute));
+        }
+        std::printf("  split: %lld of %lld seeds with subjections bind BOTH bought and taken; "
+                    "bought total=%lld spent total=%lld | sea legs: %lld rows over %lld seeds, %lld lanes opened\n",
+                    static_cast<long long>(seeds_split), static_cast<long long>(seeds_with_subjects),
+                    static_cast<long long>(bought_total), static_cast<long long>(spent_total),
+                    static_cast<long long>(legs_total), static_cast<long long>(seeds_with_legs),
+                    static_cast<long long>(lanes_total));
+        std::printf("  %s\n", seeds_split >= 4
+            ? "the bought/taken split is not degenerate on at least 4 seeds — the price sits inside the spread."
+            : "the split is degenerate on this spread — the floor or the rate sits wrong (report to Ben; "
+              "never tune to make one seed buy).");
     }
 
     // -----------------------------------------------------------------------
@@ -3684,6 +3779,21 @@ int main(int argc, char** argv)
                              static_cast<long long>(r.tribute_remitted), static_cast<long long>(r.subjects_with_friction),
                              static_cast<long long>(r.subjects_with_divergent_top_want),
                              static_cast<long long>(r.live_pref_entries_1660));
+                // BL-1096 / BL-1097: the purchase split and the sea-leg record
+                std::fprintf(f, "   \"provinces_bought\": %lld, \"provinces_taken\": %lld, "
+                                "\"treasury_spent_on_purchases\": %lld, \"purchase_params_rejected\": %s, "
+                                "\"treasury_1660_min\": %lld, \"treasury_1660_med\": %lld, \"treasury_1660_max\": %lld, "
+                                "\"sea_legs_rows\": %lld, \"sea_legs_over_tier\": %lld, \"sea_lanes_opened\": %lld, "
+                                "\"sea_legs_campaign\": %lld, \"sea_legs_purchase\": %lld, \"sea_legs_tribute\": %lld,\n",
+                             static_cast<long long>(r.provinces_bought),
+                             static_cast<long long>(r.subjections_formed - r.provinces_bought),
+                             static_cast<long long>(r.treasury_spent_on_purchases),
+                             r.purchase_params_rejected ? "true" : "false",
+                             static_cast<long long>(r.treasury_1660_min), static_cast<long long>(r.treasury_1660_med),
+                             static_cast<long long>(r.treasury_1660_max),
+                             static_cast<long long>(r.sea_legs_rows), static_cast<long long>(r.sea_legs_over_tier),
+                             static_cast<long long>(r.sea_lanes_opened), static_cast<long long>(r.sea_legs_campaign),
+                             static_cast<long long>(r.sea_legs_purchase), static_cast<long long>(r.sea_legs_tribute));
                 // reading 7
                 std::fprintf(f, "   \"navy_holders\": %lld, \"navy_holders_expn_top\": %lld, \"navy_holders_expn_bottom\": %lld, "
                                 "\"spent_navies\": %lld, \"spent_ports\": %lld, \"spent_standing_armies\": %lld, "

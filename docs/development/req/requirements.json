@@ -7683,14 +7683,14 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: begin_adopts_check.js PASS",
       "headless: --autostart --epoch 0 vs --epoch 1960 opening hashes differ only by the calendar (report both)"
      ],
      "requirement": "A world whose history crossed opens industrial with no epoch read anywhere; --epoch 0 builds the same world dated 0 CE (the --band override for the ancient sandbox is NR-920's call and is not built here); state hash adopt == cold (begin_adopts_check.js).",
      "notes": "",
-     "result_metric": "begin_adopts_check on the merged tree is in the W2 gate run (2026-09-25); --epoch 0 builds the same world dated 0 CE (lane W2: world_determinism R3.8 epoch 0 == epoch 1960); no --band override built (NR-920)."
+     "result_metric": "begin_adopts_check.js PASS on the merged tree (2026-09-25 gate run after the W2 merge: adopted == cold state hash); --epoch 0 builds the same world dated 0 CE (world_determinism R3.8); no --band override built (NR-920)."
     },
     {
      "id": "R5",

@@ -802,6 +802,13 @@ struct history_sim_params
     /// `road_generation.cpp`'s measured `kAncientRoadUses` (4: one journey is
     /// a founding party that never returns, four is repeat traffic).
     int road_tier1_uses = 4;
+    /// BL-1097 -- SEA LEG uses before a leg is a SEA LANE (EXPLORATION.md sec
+    /// The colonial tie is a sea lane: "a leg earns the lane at the same use
+    /// count that earns a land corridor its Track"). Mirrors `road_tier1_uses`
+    /// deliberately, and is its own field so the water can be tuned apart
+    /// from the land if a measurement ever says so. The crossing notes a
+    /// `sea_lane_opened` event; nothing in the sim reads the tier back.
+    int sea_lane_tier1_uses = 4;
     /// Uses before a Track becomes a Road (tier 2), the ancient network's
     /// busiest lines. NO TIER EARNED BY TRAFFIC BEYOND THIS ONE — Highway-
     /// grade promotion wants a built work at both ends
@@ -1879,6 +1886,18 @@ struct history_sim_params
     const std::vector<grudge>*           resume_grudges   = nullptr;
     const std::vector<contact>*          resume_contacts  = nullptr;
     const std::vector<history_corridor>* resume_corridors = nullptr;
+    /// BL-1097 -- the prior span's sea-leg table (`exploration_output::sea_legs`),
+    /// copied into `history_sim_state::sea_legs` at the top and seeding the
+    /// live use count each leg opens on, exactly as `resume_corridors` seeds
+    /// the road count -- so a lane the Exploration span earned is a lane on
+    /// the Industrialisation span's first round, not a leg walked once more.
+    /// Null (the Empires -> Exploration handoff, and every fixture) starts
+    /// the table empty. Generation's Exploration -> Industrialisation call
+    /// (`hard_coded_world.cpp`, beside `resume_corridors`) hands
+    /// `exploration_output::sea_legs` here; the fidelity harness's gate 3
+    /// reads the shipped span against a resume that does, so the two agree
+    /// only when the caller hands it.
+    const std::vector<sea_leg>*          resume_sea_legs  = nullptr;
 
     // -----------------------------------------------------------------------
     // BL-1036 — A SPAN RESUMED FROM A HANDOFF STRUCT LOSES NOTHING THE STRUCT
@@ -2152,6 +2171,47 @@ struct history_sim_params
     /// standing in for a real overseas logistics model (§ Force persists now
     /// owns that model's actual mechanism; this is a gate, not a cost).
     int subjection_reach_q = 400;
+
+    // --- BL-1096: the purchase fork inside the subjection ------------------
+    // EXPLORATION.md sec Two ways to claim ground across water (Ben,
+    // 2026-09-24): a native bound by an arriving power is BOUGHT when its seat
+    // is coastal (`region::port_q > 0`, a purchase party can land) and the
+    // arriver's seat treasury covers the price; otherwise it is TAKEN as
+    // before. price = max(subjection_purchase_floor, native seat treasury x
+    // subjection_purchase_rate_q / 1000), debited from the buyer's seat and
+    // credited to the native's. The SELLER NEVER DECIDES -- the fork reads
+    // the ground and the purse, never a posture flag -- and the buyer's own
+    // choice among natives is the want ranking `choose_subjection_native`
+    // already makes (the 2026-08-18 polity grant, AI_OPPONENT.md sec 11).
+    //
+    // ZERO-DISABLED: with BOTH at zero no purchase is ever priced, every
+    // binding is a TAKE, no treasury moves and no `province_bought` is noted --
+    // the control run. REJECT, NEVER CLAMP (`subjection_purchase_params_valid`):
+    // a run whose two constants leave their stated domain buys NOTHING for
+    // the whole run and says so (`history_sim_state::
+    // subjection_purchase_params_rejected`), mutating nothing.
+    //
+    // MEASURED before they were fixed (BL-1096, 2026-09-24), on the 16 curated
+    // seeds with `exploration_sweep --seeds <library> --set ...`, never on one
+    // seed; the full table is in the item. The rate decides the split and the
+    // floor does not: bought/taken over the spread read 62/48 at 1000, 47/63
+    // at 2000 and 36/74 at 4000 (non-degenerate on 6, 8 and 9 of the 14 seeds
+    // that bound a subject), while at 2000 a floor of 0, 400 or 100000 gave
+    // the identical 47/63 -- every qualifying buyer holds far more than the
+    // floor, so the floor only prices an EMPTY seller. 2000 is the first
+    // point where the purse, not the coast alone, decides who is taken.
+
+    /// Per mille of the NATIVE seat's treasury the price is set at. Domain
+    /// 0-10000 (up to ten times the seller's own stock, so a price can sit
+    /// above what a poor seller holds); 1000 = the seller's whole chest,
+    /// 2000 = twice it -- a concession costs more than the seller's own
+    /// stores, which is what makes a rich buyer's purse the deciding fact.
+    int subjection_purchase_rate_q = 2000;
+    /// The floor a price never sits below, in treasury units. Domain 0-2^48
+    /// (the treasury's own clamp). A seller whose stores are empty is cheaper
+    /// down to this and no further; twice `subjection_treasury_margin_q`, on
+    /// the same scale, and above the median 1660 chest of a poor world.
+    int64_t subjection_purchase_floor = 400;
 
     /// Chebyshev capital-to-capital distance beyond which a subject refuses
     /// tribute renewal outright, reading the SAME "outran its network" idea
@@ -2716,19 +2776,20 @@ struct polity
     /// same footing as `parent` — this struct does not cross the save seam.
     int32_t overlord = -1;
 
-    /// 0 = trade province (a foothold; the native polity survives beside it),
-    /// 1 = subjected polity (the native realm itself, brought under the link,
-    /// whole), -1 = not a subject (`overlord < 0`). Derived once, at the round
-    /// `overlord` is first set, from whether the native seat itself carries a
-    /// port endowment (`region::port_q`) — a coastal seat is a foothold an
-    /// arriving sea power plants beside; an interior seat has no coast to
-    /// plant one on, so the whole realm is what changes hands. A DERIVED
-    /// READING, not a decision the loop makes twice — see run_history_sim's
-    /// subjection block for where it is set and why this is the honest proxy
-    /// available without a second, region-spawning placement pass (§ Where
-    /// subjects come from names both paths; this data model does not yet
-    /// carry a trade seat as a distinct region — a scope note, not a design
-    /// claim).
+    /// THE VERB THAT BOUND THIS SUBJECT, recorded at the binding and never a
+    /// proxy read off its coast (EXPLORATION.md sec Where subjects come from,
+    /// Ben 2026-09-24): 0 = BOUGHT (a trade province -- the price moved, no
+    /// grudge was written, the culture shares stand), 1 = TAKEN (a subjected
+    /// polity -- the link imposed, the ground recorded as taken), -1 = not a
+    /// subject (`overlord < 0`). Which verb binds is decided ONCE, inside
+    /// run_history_sim's subjection block, on the ground's terms: a coastal
+    /// seat (`region::port_q > 0`) whose price the arriver's seat covers is
+    /// bought (BL-1096, `purchase_price_q`); every other binding is taken. A
+    /// coastal people taken by force is therefore a subjected polity, and
+    /// nothing about its coast makes it a trade province. The trade province
+    /// is a LABEL on the bound native polity: the minted foothold seat
+    /// sec Where subjects come from also describes is a continuity-pass item,
+    /// not this field's claim.
     int8_t subject_kind = -1;
 
     /// BL-935 — THE NAVY, NEW AND ZERO EVERYWHERE AT 1200 CE (EXPLORATION.md
@@ -3609,6 +3670,13 @@ struct history_sim_capture
     /// `uses` counts walks, the live count is what a purchase or a refused
     /// promotion moved.
     std::vector<history_corridor> live_roads;
+
+    /// BL-1097 -- the LIVE sea-leg table at the capture: every leg in the
+    /// sim's live count map as (a, b, uses), sorted by (a, b). On a resumed
+    /// run this is what `resume_sea_legs` seeded, so a resume's opening must
+    /// equal the handoff's `sea_legs` row for row; on a continued run it is
+    /// every leg noted so far, which is what that handoff was folded from.
+    std::vector<sea_leg> sea_legs;
 };
 
 struct history_sim_state
@@ -3765,6 +3833,17 @@ struct history_sim_state
     ///
     /// NOT gated on `trace_battles`: generation is its consumer, not a harness.
     std::vector<history_corridor> supply_corridors;
+
+    /// BL-1097 -- THE SEA-LEG RECORD (EXPLORATION.md sec The colonial tie is a
+    /// sea lane), the water sibling of `supply_corridors` above and folded by
+    /// the same rule at the run's close: appended raw as legs are crossed,
+    /// then sorted by (a, b) and run-length encoded, merged onto whatever
+    /// `resume_sea_legs` handed in. Three sites write a leg -- a wet
+    /// campaign's launch (beside the land note, so the land record is
+    /// unchanged), a purchase party's crossing (BL-1096), and once per
+    /// decision round per standing tribute clause, overlord capital to
+    /// subject seat. Not gated on `trace_battles`, for the same reason.
+    std::vector<sea_leg> sea_legs;
 
     /// THE SPARSE, DIRECTED, DECAYING GRUDGE TABLE (BL-827).
     ///
@@ -4049,6 +4128,25 @@ struct history_sim_state
     int64_t subjections_formed = 0; ///< BL-934: new overlord links this run.
     int64_t subjections_freed  = 0; ///< BL-934: refused-renewal secessions this run.
     int64_t tribute_remitted   = 0; ///< BL-934: total treasury moved subject -> overlord.
+
+    /// BL-1096: of `subjections_formed`, how many were BOUGHT (the rest were
+    /// taken), and the treasury that changed hands for them, buyer seat to
+    /// native seat. The observable the purchase fork is measured on: a
+    /// bought/taken split of 0 or of all is a price set wrong, not a seed.
+    int64_t provinces_bought              = 0;
+    int64_t treasury_spent_on_purchases   = 0;
+    /// BL-1096: `subjection_purchase_params_valid` said no at the run's open,
+    /// so the fork was off for the whole run -- every binding taken, nothing
+    /// priced, nothing moved. REJECTED, never clamped.
+    bool    subjection_purchase_params_rejected = false;
+
+    /// BL-1097: sea legs noted this run, by site -- the wet campaign launch,
+    /// the purchase crossing, the standing tribute-round traffic -- and how
+    /// many legs crossed `sea_lane_tier1_uses` (each noting `sea_lane_opened`).
+    int64_t sea_legs_noted_campaign = 0;
+    int64_t sea_legs_noted_purchase = 0;
+    int64_t sea_legs_noted_tribute  = 0;
+    int64_t sea_lanes_opened        = 0;
 
     /// BL-935: treasury actually spent building each stock, this run — the
     /// observable that separates "the mechanism never fires" from "no polity
@@ -4773,6 +4871,32 @@ int want_leaned_campaign_value(int value, int w_want_q, int want_q);
 /// walk it replaces. Pure and order-independent in its input.
 int choose_subjection_native(const std::vector<std::pair<int, int>>& candidates);
 
+/// BL-1096 -- are the purchase fork's two constants inside their stated
+/// domains? `subjection_purchase_rate_q` 0-10000 per mille, the floor
+/// 0-2^48. False REJECTS the fork for the whole run (every binding taken,
+/// nothing priced, `history_sim_state::subjection_purchase_params_rejected`
+/// set), never clamps. Both at zero is VALID and means "off".
+bool subjection_purchase_params_valid(const history_sim_params& p);
+
+/// BL-1096 -- what buying @p native_seat's province costs: the greater of
+/// `subjection_purchase_floor` and the seat's treasury at
+/// `subjection_purchase_rate_q` per mille (EXPLORATION.md sec Two ways to
+/// claim ground across water: "a seller whose stores are empty is cheaper to
+/// buy from, down to the floor"). Pure; reads only the seat's treasury and
+/// the two constants, which the caller has validated. A negative seat
+/// treasury (never produced, but a fixture could) prices as zero stock.
+int64_t purchase_price_q(const region& native_seat, const history_sim_params& p);
+
+/// BL-1096 -- THE VERB, decided on the ground's terms and nothing else:
+/// 0 (bought) when the fork is on, @p native_seat is coastal (`port_q > 0`)
+/// and @p buyer_treasury covers `purchase_price_q`; 1 (taken) otherwise.
+/// "The fork is on" is both constants valid and not both zero. Pure, so the
+/// harness can put the three cases (coastal-affordable, interior,
+/// coastal-unaffordable) to it directly; `run_history_sim`'s subjection block
+/// calls this and nothing else to choose.
+int subjection_verb(const region& native_seat, int64_t buyer_treasury,
+                    const history_sim_params& p);
+
 // ---------------------------------------------------------------------------
 // The turbulence lean, resolved (BL-839)
 // ---------------------------------------------------------------------------
@@ -5058,6 +5182,23 @@ struct exploration_output
     /// Sorted ascending by (seller, buyer, good).
     std::vector<trade_flow> trade_flows;
 
+    /// BL-1097 -- the span's whole sea-leg record at the close
+    /// (`history_sim_state::sea_legs`), sorted ascending by (a, b), `uses`
+    /// summed. NOT filtered over this span's dead, unlike `surviving_corridors`
+    /// above, and on purpose: EXPLORATION.md sec The colonial tie is a sea
+    /// lane -- "a lane is what a colony leaves behind when the metropole
+    /// falls" -- so a leg whose both ends fell to nobody living still crosses.
+    /// The next span resumes it (`history_sim_params::resume_sea_legs`) and
+    /// a stamping pass reads it.
+    std::vector<sea_leg> sea_legs;
+
+    /// BL-1096 -- the purchase fork's two counters, crossed so a reader of the
+    /// close can see the bought/taken split without the sim state: of the
+    /// span's subjections, how many were bought, and the treasury that moved
+    /// for them. Copied from `history_sim_state`, never re-derived.
+    int64_t provinces_bought            = 0;
+    int64_t treasury_spent_on_purchases = 0;
+
     /// BL-1036 -- the civilisation and universal-creed records this span's
     /// run held at its close, in index order: the tables the carried
     /// `region::civilisation`, `region::universal_creed` and
@@ -5092,8 +5233,10 @@ exploration_output make_exploration_output(const settlement_state&  ss,
 /// good at positive volume, on a pair holding a standing trade_access clause;
 /// the culture table sized to `culture_count`, parents in range and below
 /// their child, coining years at or before `stop_year`, and -- when @p live
-/// is given -- equal row for row to the live `creed_state` (BL-969).
-/// Writes the first failure into @p why.
+/// is given -- equal row for row to the live `creed_state` (BL-969); every
+/// sea leg sorted by (a, b), a < b, both ends in range, uses positive
+/// (BL-1097 -- no living-holder filter, see the field). Writes the first
+/// failure into @p why.
 bool exploration_output_valid(const exploration_output& o, std::string* why,
                               const creed_state* live = nullptr);
 

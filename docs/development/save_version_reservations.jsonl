@@ -10,3 +10,4 @@
 {"version":21,"kind":"envelope","owner":"BL-1080 round six shows industry","ts":"2026-09-24T16:01:25.717Z","branch":"main"}
 {"version":22,"kind":"envelope","owner":"BL-1083 span seeds","ts":"2026-09-24T21:06:03.271Z","branch":"worktree-wf_ce38c127-8da-1"}
 {"version":26,"kind":"world","owner":"BL-1101 campaign_band","ts":"2026-09-24T21:07:12.230Z","branch":"worktree-wf_ce38c127-8da-4"}
+{"version":22,"kind":"envelope","owner":"BL-1096/1097 kinds (shares sprint 47's one envelope bump with BL-1083)","ts":"2026-09-24T21:11:05.932Z","branch":"worktree-wf_ce38c127-8da-3"}

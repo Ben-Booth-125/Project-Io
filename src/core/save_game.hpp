@@ -200,18 +200,23 @@ inline constexpr uint32_t save_game_magic =
 /// because the generation lane holds 20 (the v6 note above: two layouts never
 /// share a number).
 ///
-/// LAYOUT 22 = LAYOUT 21 PLUS FOUR U32 IN THE DESCRIPTOR, DIRECTLY AFTER
-/// `era_seed` (BL-1083, one seed per span): `world_params::span_seed[0..3]`,
-/// the per-round reroll counters for the migration, Empires, Exploration and
-/// Industrialisation, written by `w_world_params` and read back in the same
-/// place by `r_world_params`. They decide WHICH history the descriptor
-/// rebuilds exactly as `era_seed` does, so a descriptor without them is a
-/// different world. A MID-RECORD insertion, so a v21 stream misreads
-/// everything from `abundance` on -- refused whole on the same strict-equality
-/// contract. Sprint 47's one envelope bump: claimed through
-/// `next_save_version.js --kind envelope`, and every sprint-47 lane that
-/// needs the envelope shares this number.
-inline constexpr uint32_t save_game_version = 22; // BL-1083, one seed per span
+/// LAYOUT 22 = LAYOUT 21 PLUS SPRINT 47's ONE ENVELOPE BUMP, which every
+/// sprint-47 lane that needs the envelope shares (claimed once through
+/// `next_save_version.js --kind envelope`):
+///   - FOUR U32 IN THE DESCRIPTOR, DIRECTLY AFTER `era_seed` (BL-1083, one seed
+///     per span): `world_params::span_seed[0..3]`, the per-round reroll counters
+///     for the migration, Empires, Exploration and Industrialisation, written by
+///     `w_world_params` and read back in the same place by `r_world_params`.
+///     They decide WHICH history the descriptor rebuilds exactly as `era_seed`
+///     does, so a descriptor without them is a different world. A MID-RECORD
+///     insertion, so a v21 stream misreads everything from `abundance` on.
+///   - EVENT KINDS appended to `lapse_event_kind` (each moves `count` and so
+///     the event-kind range check; no field changes width):
+///     `province_bought` (BL-1096, a native bought rather than taken) and
+///     `sea_lane_opened` (BL-1097, a sea leg's uses crossing the lane tier);
+///     later sprint-47 lanes append theirs under this same number.
+/// A v21 stream is refused whole on the same strict-equality contract.
+inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

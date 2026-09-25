@@ -199,6 +199,8 @@ enum class lapse_event_kind : uint8_t
     subject_freed       = 15, ///< BL-934: a subject refused renewal; `polity` = the subject, `other` = the former overlord.
     schism              = 16, ///< BL-944: a reasserted people broke away over creed, not reach; `other` = the parent polity.
     furnace_lit         = 17, ///< BL-1080: a region crossed the furnace (`region::industrial_year`); `polity` = its holder. A resumed span notes the crossings it inherits, dated at their own (earlier) year, ahead of its first event (save_game_version 21).
+    province_bought     = 18, ///< BL-1096: a native was BOUGHT rather than taken (EXPLORATION.md sec Two ways to claim ground across water); `region` = the native seat, `polity` = the native, `other` = the buyer. Noted INSTEAD of `subject_bound` for that binding (save_game_version 22).
+    sea_lane_opened     = 19, ///< BL-1097: a sea leg's uses crossed `sea_lane_tier1_uses`; `region`/`other` = its ends (lo, hi), `polity` = the tier (1). The water analogue of `road_promoted` (save_game_version 22).
     count
 };
 
@@ -490,6 +492,25 @@ struct history_corridor
     /// promotion holds the live count one short of a walk the record still
     /// counts. So the rung is read HERE, and `uses` stays throughput.
     uint8_t  tier = 0;
+};
+
+/// ONE SEA LEG THE HISTORY ACTUALLY CROSSED, and how often (BL-1097;
+/// EXPLORATION.md sec The colonial tie is a sea lane). The water sibling of
+/// `history_corridor`: `a < b` always, the table sorted ascending by (a, b)
+/// with `uses` summed, so a stamping pass is order-independent by construction.
+/// Three things write a use -- a wet campaign's crossing at its launch, a
+/// purchase party's crossing, and the standing traffic between a metropole
+/// and each subject it holds, one per decision round while the link stands.
+/// No `tier`: a lane is EARNED BY TRAFFIC ONLY (`sea_lane_tier1_uses`), never
+/// bought, so its rung is a pure function of `uses` and is not carried twice.
+/// PURE OBSERVATION in the sense `history_corridor` once was: nothing in the
+/// sim reads a leg back, and a run with the table suppressed would be
+/// byte-identical in every other output.
+struct sea_leg
+{
+    uint16_t a    = 0; ///< Lower region index.
+    uint16_t b    = 0; ///< Higher region index.
+    int32_t  uses = 0; ///< Crossings recorded between the two.
 };
 
 /// Where one region stood, and what its own history invested in MOVING things.

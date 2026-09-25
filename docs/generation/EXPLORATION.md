@@ -357,7 +357,13 @@ and the grudge ledger will agree.
 never on one seed, with the treasury spread reported beside the bought/taken split. The
 requirement is a split that is not degenerate on a spread — a world where every province is
 bought has priced the purchase at nothing, and one where none is has priced it out of every purse
-(§ Open questions).
+(§ Open questions). The pair is one dial with an off position: `subjection_purchase_floor` (a
+treasury amount) and `subjection_purchase_rate_q` (per mille of the seller's chest), and with
+**both at zero the purchase is off** — every binding is taken, nothing is priced and no treasury
+moves, which is the control a change to the fork is read against. A pair outside its domain is
+**refused whole for the run, never clamped**; a refused fork buys nothing and says so. The record
+notes a purchase as `province_bought` *in place of* the plain binding, so a replay reads "buys"
+where it would otherwise read "falls under".
 
 **Both culminate as every major does.** The non-hegemony invariant is not relaxed for the sea; a
 metropole that overreaches fragments, and its colonies arrive at the epoch as nations with a
@@ -379,12 +385,17 @@ keeps a table of sea legs — one row per pair of shores, with a count of uses �
 write a use** (Ben, 2026-09-24): a wet campaign's crossing, at its launch, from the staging hub to
 the target; a purchase party's crossing, from the buyer's seat to the seat it buys (§ Two ways to
 claim ground across water); and the standing traffic between a metropole and each subject it
-holds, one use per decision round for as long as the link stands. **A leg earns the lane at the
-same use count that earns a land corridor its Track** (§ Goods move as throughput, never as cargo;
-`../economy/LOGISTICS.md` § 4a): traffic earns the tier, and a crossing made once is no lane. The
-year a leg crosses that count is recorded, so the time-lapse draws the lane as a line of its own
-from the moment it opened — distinct from the tie, which is drawn only while the link stands, from
-the binding to the freeing or the overlord's end. A pass immediately after the span stamps every
+holds, one use per decision round for as long as the link stands. A campaign's crossing is
+written *beside* its land corridor, never instead of it, so the road record is what it was. **A
+leg earns the lane at the same use count that earns a land corridor its Track** (§ Goods move as
+throughput, never as cargo; `../economy/LOGISTICS.md` § 4a): `sea_lane_tier1_uses`, one dial
+beside `road_tier1_uses` and equal to it — traffic earns the tier, and a crossing made once is no
+lane. The lane has one rung; it is never bought, so the record carries no tier of its own and the
+rung is a pure reading of the count. The year a leg crosses that count is recorded as
+`sea_lane_opened`, so the time-lapse draws the lane as a line of its own from the moment it opened
+— distinct from the tie, which is drawn only while the link stands, from the binding to the
+freeing or the overlord's end. The record crosses a span's close **whole**: no dead filter thins
+it as one thins the road record, because a lane outlives its maker. A pass immediately after the span stamps every
 earned leg onto the water as a **sea lane**: a lane level on each water tile the leg crosses,
 which traversal cost reads as one more multiplier, the water analogue of the ancient road. Purely
 additive; land tiles are untouched.

@@ -1521,6 +1521,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     dp.resume_grudges          = &kepler_exploration.grudges;
                     dp.resume_contacts         = &kepler_exploration.contacts;
                     dp.resume_corridors        = &kepler_exploration.surviving_corridors;
+                    // BL-1097: the sea legs Exploration walked seed the span's own record, so a
+                    // lane earned by 1660 is still a lane at 1960 (the review's integration line).
+                    dp.resume_sea_legs         = &kepler_exploration.sea_legs;
                     dp.resume_dated_objects    = &kepler_exploration.dated_objects;
                     dp.resume_civilisations    = &kepler_exploration.civilisations;
                     dp.resume_universal_creeds = &kepler_exploration.universal_creeds;

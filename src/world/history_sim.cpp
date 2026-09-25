@@ -610,6 +610,39 @@ int choose_subjection_native(const std::vector<std::pair<int, int>>& candidates)
 }
 
 // ---------------------------------------------------------------------------
+// BL-1096 -- the purchase fork inside the subjection (EXPLORATION.md sec Two
+// ways to claim ground across water). Three pure functions so the harness can
+// put the three cases to the verb directly and the loop cannot decide twice.
+// ---------------------------------------------------------------------------
+
+bool subjection_purchase_params_valid(const history_sim_params& p)
+{
+    return p.subjection_purchase_rate_q >= 0 && p.subjection_purchase_rate_q <= 10000
+        && p.subjection_purchase_floor  >= 0 && p.subjection_purchase_floor  <= (1LL << 48);
+}
+
+int64_t purchase_price_q(const region& native_seat, const history_sim_params& p)
+{
+    // stock <= 2^48 (the treasury's own clamp) and rate <= 10^4 < 2^14, so
+    // the product stays under 2^62; the caller validated both constants.
+    const int64_t stock = std::max<int64_t>(native_seat.treasury, 0);
+    const int64_t at_rate = (stock * p.subjection_purchase_rate_q) / 1000;
+    return std::max<int64_t>(p.subjection_purchase_floor, at_rate);
+}
+
+int subjection_verb(const region& native_seat, int64_t buyer_treasury,
+                    const history_sim_params& p)
+{
+    // OFF (both zero) or REJECTED (out of domain): every binding is a TAKE.
+    // Both are "the fork is not on", and neither prices anything -- a zero
+    // price would otherwise buy every coast for nothing.
+    if (!subjection_purchase_params_valid(p)) return 1;
+    if (p.subjection_purchase_rate_q == 0 && p.subjection_purchase_floor == 0) return 1;
+    if (native_seat.port_q <= 0) return 1;                     // no coast to land a party on
+    return buyer_treasury >= purchase_price_q(native_seat, p) ? 0 : 1;
+}
+
+// ---------------------------------------------------------------------------
 // BL-955 -- spend is ALLOCATED, not bought whenever affordable
 // ---------------------------------------------------------------------------
 
@@ -1507,6 +1540,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
     if (ss.regions.empty() || params.stop_year <= params.start_year)
         return out;
 
+    // BL-1096: the purchase fork's constants are judged ONCE, at the open, and
+    // a run whose pair leaves its domain buys nothing for the whole run and
+    // says so -- rejected, never clamped. `subjection_verb` also refuses on
+    // its own; this flag is the report.
+    out.subjection_purchase_params_rejected = !subjection_purchase_params_valid(params);
+
     // BL-914: seed the tap's geometry mirror with the regions this call
     // already opens on (round 4 always does — settlement/migration ran
     // first), so the very first renderer poll already has something to draw
@@ -1555,6 +1594,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (params.resume_contacts != nullptr) out.contacts = *params.resume_contacts;
         if (params.resume_corridors != nullptr)
             out.supply_corridors = *params.resume_corridors;
+        // BL-1097: the prior span's sea-leg record, on the same footing as the
+        // road record above -- inherited whole, and the close's fold SUMS this
+        // span's crossings onto it.
+        if (params.resume_sea_legs != nullptr)
+            out.sea_legs = *params.resume_sea_legs;
 
         // BL-1036: the three tables BL-931's four left behind. Copied as
         // handed -- the handoff sorts its dated objects and the sim appends in
@@ -1834,6 +1878,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // computed from region indices, never a walk in map order.
     std::unordered_map<uint64_t, int> road_uses_live;
 
+    // BL-1097 -- THE SEA-LEG RECORD, on the road record's exact footing: a
+    // raw (lo, hi) list appended as legs are crossed and folded into
+    // `out.sea_legs` at the close, plus a live count keyed like
+    // `road_uses_live` (point lookups only, never iterated) that
+    // `note_sea_leg` reads to notice the one tier crossing a lane has. The
+    // sim reads neither back: reach and supply still price water as they
+    // did, and the stamp is a later pass's (EXPLORATION.md sec The colonial
+    // tie is a sea lane). Capture copies the live map SORTED (see
+    // `capture_state`), so nothing about the map's layout can reach an
+    // output.
+    std::vector<std::pair<uint16_t, uint16_t>> sea_leg_uses;
+    std::unordered_map<uint64_t, int>          sea_uses_live;
+
     // BL-925 -- which cross-border corridors are CURRENTLY open to amicable
     // trade, keyed the same way as `road_uses_live` above. Point lookups and
     // point writes only, so the plain `unordered_map` note above applies here
@@ -1949,6 +2006,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
             slot = std::max(slot, live);
         }
     }
+
+    // BL-1097 -- A RESUMED SPAN OPENS ON THE LEGS IT INHERITED, seeded from
+    // the record's own `uses` (a lane is earned by traffic only, so there is
+    // no bought rung to clamp to, and the walks ARE the count). Walked in the
+    // record's sorted order; point-inserted only, so the order cannot reach
+    // an output. A leg already over the tier opens as a lane: no
+    // `sea_lane_opened` is re-noted for it, since the event is the CROSSING
+    // and the crossing happened in the span that recorded it.
+    if (params.resume_polities != nullptr && params.resume_sea_legs != nullptr)
+        for (const sea_leg& l : *params.resume_sea_legs)
+        {
+            if (l.a == l.b || l.uses <= 0) continue;
+            if (l.a >= owner_index_limit || l.b >= owner_index_limit) continue;
+            sea_uses_live[edge_key(l.a, l.b)] += l.uses;
+        }
 
     // BL-922 -- SUPPLY IS PRICED FROM THE CAPITAL OVER HELD GROUND ONLY, so
     // reach depends on WHO HOLDS WHAT, and a cache built against one
@@ -2110,6 +2182,33 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // corridor record's business, and a tier crossing is what a watcher
         // can see on the map.
         note_event(lapse_event_kind::road_promoted, lo, after, hi);
+    };
+
+    // BL-1097 -- ONE SEA LEG CROSSED, recorded where it is crossed. The
+    // water sibling of `note_corridor` with the money taken out: a lane is
+    // earned by traffic alone (EXPLORATION.md sec The colonial tie is a sea
+    // lane: "traffic earns the tier, and a crossing made once is no lane"),
+    // so there is no promotion to refuse and no seat to debit. The walk is
+    // always recorded; the ONE tier crossing (`sea_lane_tier1_uses`) notes a
+    // `sea_lane_opened` event, and that event is the only thing outside the
+    // fold that ever hears of a leg. Nothing below reads the count back.
+    const auto note_sea_leg = [&](int a, int b) {
+        if (a < 0 || b < 0 || a == b) return;
+        if (a >= static_cast<int>(owner_index_limit)
+         || b >= static_cast<int>(owner_index_limit)) return;
+        const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
+        const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
+        sea_leg_uses.push_back({lo, hi});
+
+        int& uses = sea_uses_live[edge_key(a, b)];
+        const bool before = uses >= params.sea_lane_tier1_uses;
+        ++uses;
+        const bool after = uses >= params.sea_lane_tier1_uses;
+        if (after && !before)
+        {
+            ++out.sea_lanes_opened;
+            note_event(lapse_event_kind::sea_lane_opened, lo, 1, hi);
+        }
     };
 
     // BL-929 -- A CORRIDOR BOUGHT OUTRIGHT, never merely walked into
@@ -2945,6 +3044,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
         }
         std::sort(cap.live_roads.begin(), cap.live_roads.end(),
                   [](const history_corridor& x, const history_corridor& y2) {
+                      return x.a != y2.a ? x.a < y2.a : x.b < y2.b;
+                  });
+        // BL-1097: the live sea-leg table, collected and sorted the same way.
+        cap.sea_legs.clear();
+        cap.sea_legs.reserve(sea_uses_live.size());
+        for (const auto& kv : sea_uses_live)
+        {
+            if (kv.second <= 0) continue;
+            sea_leg l;
+            l.a    = static_cast<uint16_t>(kv.first >> 32);
+            l.b    = static_cast<uint16_t>(kv.first & 0xFFFFFFFFull);
+            l.uses = kv.second;
+            cap.sea_legs.push_back(l);
+        }
+        std::sort(cap.sea_legs.begin(), cap.sea_legs.end(),
+                  [](const sea_leg& x, const sea_leg& y2) {
                       return x.a != y2.a ? x.a < y2.a : x.b < y2.b;
                   });
     };
@@ -3893,25 +4008,65 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (chosen >= 0)
                     {
                         polity& native = out.polities[static_cast<std::size_t>(chosen)];
+                        region& nseat = ss.regions[static_cast<std::size_t>(native.capital)];
+                        region& bseat = ss.regions[static_cast<std::size_t>(arriving.capital)];
 
-                        // ONE OF TWO PATHS, derived from the native seat's own
-                        // coast (§ scope note on `polity::subject_kind`): a
-                        // coastal seat is a foothold planted beside it; an
-                        // interior seat has no coast to plant one on.
-                        native.overlord = arriving.id;
-                        native.subject_kind =
-                            ss.regions[static_cast<std::size_t>(native.capital)].port_q > 0 ? 0 : 1;
+                        // BL-1096 -- BOUGHT OR TAKEN, decided on the ground's
+                        // terms and nothing else (EXPLORATION.md sec Two ways
+                        // to claim ground across water, Ben 2026-09-24): a
+                        // coastal seat whose price the arriver's seat covers is
+                        // BOUGHT -- the price moves, no grudge is written, the
+                        // culture shares stand; anything else is TAKEN as the
+                        // block always did. `subject_kind` is the VERB, recorded
+                        // here once and never a proxy read off the coast. The
+                        // seller never decides. With the fork off or its
+                        // constants rejected (`subjection_purchase_params_
+                        // rejected`) `subjection_verb` returns TAKEN for every
+                        // native, so the control run is what this block was.
+                        const int verb = out.subjection_purchase_params_rejected
+                            ? 1 : subjection_verb(nseat, bseat.treasury, params);
+                        native.overlord     = arriving.id;
+                        native.subject_kind = static_cast<int8_t>(verb);
 
+                        // Either way the tribute clause and its term bind
+                        // (EXPLORATION.md: "what differs is what the natives
+                        // keep and what they remember").
                         const int64_t tribute_expires =
                             y + std::max<int64_t>(params.treaty_term_years, 1);
                         out.dated_objects.push_back(dated_object{
                             tribute_expires, static_cast<int32_t>(treaty_clause::tribute),
                             static_cast<uint16_t>(native.id), static_cast<uint16_t>(arriving.id)});
 
-                        raise_grudge(native.id, arriving.id, grudge_kind::ground_taken,
-                                     native.capital, y, params.grudge_ground_taken / 2);
-                        note_event(lapse_event_kind::subject_bound,
-                                   native.capital, native.id, arriving.id);
+                        if (verb == 0)
+                        {
+                            // THE PRICE CHANGES HANDS rather than vanishing:
+                            // debited from the buyer's seat (covered, by the
+                            // verb's own test) and credited to the native's,
+                            // clamped exactly as tribute is. Nothing is
+                            // digested and nothing is resented, because
+                            // nothing was conquered.
+                            const int64_t price = purchase_price_q(nseat, params);
+                            bseat.treasury -= price;
+                            nseat.treasury  = clampi64(nseat.treasury + price, 0, 1LL << 48);
+                            ++out.provinces_bought;
+                            out.treasury_spent_on_purchases += price;
+                            // The purchase is a moment of its own, noted
+                            // INSTEAD of `subject_bound` so the ticker can say
+                            // "buys" rather than "falls under" for this binding.
+                            note_event(lapse_event_kind::province_bought,
+                                       native.capital, native.id, arriving.id);
+                            // BL-1097: the purchase party's crossing, buyer's
+                            // seat to the seat it buys, is a sea leg.
+                            note_sea_leg(arriving.capital, native.capital);
+                            ++out.sea_legs_noted_purchase;
+                        }
+                        else
+                        {
+                            raise_grudge(native.id, arriving.id, grudge_kind::ground_taken,
+                                         native.capital, y, params.grudge_ground_taken / 2);
+                            note_event(lapse_event_kind::subject_bound,
+                                       native.capital, native.id, arriving.id);
+                        }
                         ++out.subjections_formed; // one native per arriving power per round
                     }
                 }
@@ -3979,6 +4134,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         y + std::max<int64_t>(params.treaty_term_years, 1),
                         static_cast<int32_t>(treaty_clause::tribute),
                         static_cast<uint16_t>(subj.id), static_cast<uint16_t>(lord.id)});
+
+                // BL-1097 -- THE STANDING TRAFFIC between a metropole and what
+                // it holds: one sea leg, overlord capital to subject seat, per
+                // decision round for as long as the tribute clause stands
+                // (EXPLORATION.md sec The colonial tie is a sea lane). The
+                // clause stands here by construction -- the subject just
+                // renewed rather than refused -- and the leg is noted whether
+                // or not the remittance below finds anything to move, since
+                // the traffic is the link, not the amount.
+                if (subj.capital >= 0 && lord.capital >= 0 && subj.capital != lord.capital)
+                {
+                    note_sea_leg(lord.capital, subj.capital);
+                    ++out.sea_legs_noted_tribute;
+                }
 
                 if (params.treaty_tribute_rate_q > 0 && subj.capital >= 0 && lord.capital >= 0
                  && static_cast<std::size_t>(subj.capital) < ss.regions.size()
@@ -5706,6 +5875,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // remembered the winners would be a map of conquests rather
                 // than a map of routes.
                 note_corridor(src, static_cast<int>(ti), q.capital);
+                // BL-1097 -- A WET CAMPAIGN'S CROSSING is a sea leg too, noted
+                // BESIDE the land note above (never instead of it, so the road
+                // record is byte for byte what it was): staging hub to target,
+                // at launch, whenever the march is not over dry contact -- and only
+                // in the spans whose record the lane belongs to (Exploration and
+                // Industrialisation, the ones that run the upkeep; EXPLORATION.md
+                // § The colonial tie is a sea lane): the Empires span walks wet
+                // campaigns too and notes none, so round 4 draws no lane (the
+                // review's fix round on BL-1097).
+                if (!exec_dry && params.exploration_upkeep_enabled)
+                {
+                    note_sea_leg(src, static_cast<int>(ti));
+                    ++out.sea_legs_noted_campaign;
+                }
 
                 // The stall, counted where it actually happens (BL-312). The
                 // first cut incremented this AFTER resolve_battle and only at
@@ -7811,6 +7994,60 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // (a record out of the owner index range) keeps tier 0.
         for (history_corridor& c : out.supply_corridors)
             c.tier = static_cast<uint8_t>(road_tier_between(c.a, c.b));
+    }
+
+    // --- The sea-leg record, folded (BL-1097) -----------------------------
+    //
+    // The road fold above, restated for water: sort the raw (lo, hi) list,
+    // run-length encode it, and merge it onto whatever `resume_sea_legs`
+    // handed in -- both sorted by (a, b), one linear merge summing `uses` on
+    // a shared leg. No tier travels with the row: a lane is a pure function
+    // of `uses` against `sea_lane_tier1_uses`, earned by traffic and never
+    // bought, so there is no second count for the record to disagree with.
+    {
+        std::sort(sea_leg_uses.begin(), sea_leg_uses.end());
+        std::vector<sea_leg> fresh;
+        fresh.reserve(sea_leg_uses.size());
+        for (const auto& e : sea_leg_uses)
+        {
+            if (!fresh.empty() && fresh.back().a == e.first && fresh.back().b == e.second)
+            {
+                ++fresh.back().uses;
+                continue;
+            }
+            fresh.push_back(sea_leg{e.first, e.second, 1});
+        }
+        if (out.sea_legs.empty())
+        {
+            out.sea_legs = std::move(fresh);
+        }
+        else
+        {
+            std::vector<sea_leg> inherited = std::move(out.sea_legs);
+            std::sort(inherited.begin(), inherited.end(),
+                      [](const sea_leg& x, const sea_leg& y2) {
+                          return x.a != y2.a ? x.a < y2.a : x.b < y2.b;
+                      });
+            out.sea_legs.clear();
+            out.sea_legs.reserve(inherited.size() + fresh.size());
+            const auto push = [&](const sea_leg& l) {
+                if (!out.sea_legs.empty()
+                    && out.sea_legs.back().a == l.a && out.sea_legs.back().b == l.b)
+                    out.sea_legs.back().uses += l.uses;
+                else
+                    out.sea_legs.push_back(l);
+            };
+            std::size_t i = 0, j = 0;
+            while (i < inherited.size() || j < fresh.size())
+            {
+                const bool take_inherited =
+                    j >= fresh.size()
+                    || (i < inherited.size()
+                        && (inherited[i].a != fresh[j].a ? inherited[i].a < fresh[j].a
+                                                         : inherited[i].b <= fresh[j].b));
+                push(take_inherited ? inherited[i++] : fresh[j++]);
+            }
+        }
     }
 
     // --- The world median furnace year (BL-748) ---------------------------
@@ -9947,6 +10184,15 @@ exploration_output make_exploration_output(const settlement_state&  ss,
     o.holdings            = derive_holdings(o.regions, o.polities);
     o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
 
+    // BL-1097: the sea-leg record crosses WHOLE -- no dead filter, because a
+    // lane outlives the polity that made it (see the field). Already sorted
+    // and summed by the run's close fold.
+    o.sea_legs = hs.sea_legs;
+
+    // BL-1096: the purchase fork's two counters, copied not re-derived.
+    o.provinces_bought            = hs.provinces_bought;
+    o.treasury_spent_on_purchases = hs.treasury_spent_on_purchases;
+
     // BL-1036: the records the carried civilisation and creed indices point
     // into, copied whole and in index order so a resumed span continues the
     // numbering rather than restarting it (see the field comment for the gap).
@@ -10141,6 +10387,19 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
         if (!corridor_region_survives(o.regions, o.polities, c.a)
          && !corridor_region_survives(o.regions, o.polities, c.b))
             return fail("a surviving corridor has no living holder at either end");
+    }
+
+    // 9b. The sea-leg record (BL-1097). Sorted, a < b, both ends in range,
+    //     uses positive. No living-holder test: a lane outlives its maker.
+    std::pair<int, int> last_leg{-1, -1};
+    for (const sea_leg& l : o.sea_legs)
+    {
+        const std::pair<int, int> key{l.a, l.b};
+        if (!(last_leg < key)) return fail("sea legs are not sorted by (a, b)");
+        last_leg = key;
+        if (l.a >= l.b) return fail("a sea leg is not in canonical (a < b) order");
+        if (l.b >= o.regions.size()) return fail("a sea leg names a region out of range");
+        if (l.uses <= 0) return fail("a sea leg carries no uses");
     }
 
     // 10. Trade flows. Strictly ascending (seller, buyer, good), both parties
