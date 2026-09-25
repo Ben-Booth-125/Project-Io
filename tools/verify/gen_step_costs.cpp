@@ -43,7 +43,10 @@
 // history roads re-stamped from the fixture, must reproduce the built world's
 // road field tile for tile — otherwise the replay is not measuring the pass the
 // build ran, and the row says so. Each replay starts from a road-free body and
-// cold A* caches, exactly as the in-generation pass does. Not combinable with
+// cold A* caches, exactly as the in-generation pass does. Each row is followed by a
+// BAR line (BL-1119 round 2): the loading bar's unit plan per phase against the wall
+// time of the border walk, read off the pass's own report_sub from a sampler thread,
+// and the kBorderUnitsPerNation that would make the bar linear. Not combinable with
 // --finish (the finish stamps roads and grows centres; the replays leave the body
 // road-free), and it runs after the watcher stops, so it never reads as a still bar.
 
@@ -51,6 +54,7 @@
 #include "world/era_minus_one.hpp"
 #include "world/finish_campaign_world.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/logistics.hpp" // invalidate_logistics_caches
 #include "world/recipe_registry.hpp"
 #include "world/road_generation.hpp"
 #include "world/works_roster.hpp"
@@ -131,9 +135,41 @@ void clear_roads(world& w, entity_id body)
     for (auto& [tid, tc] : w.tiles)
         if (tc.body == body)
             tc.road_level = 0;
-    w.astar_cost_cache.clear();
-    w.logistics_flood_fields.clear();
-    w.body_reach_cost.clear();
+    invalidate_logistics_caches(w); // every traversal cache, through its one owner
+}
+
+/// One `generate_roads` call with the loading bar's own sub-progress watched from a
+/// second thread (BL-1119 round 2, the bar's weights): the wall time of the whole pass
+/// and of its BORDER WALK, which starts where the reported units cross the pass's own
+/// border base (`units_backbone + units_spurs`). Read from the sink the loading screen
+/// reads, so it measures exactly what the bar shows; no clock enters world code.
+double timed_generate_roads(world& w, entity_id body, long long floor, road_generation_stats& st,
+                            double& border_s)
+{
+    auto bar = std::make_unique<generation_progress>();
+    std::atomic<bool> stop{false};
+    std::vector<std::pair<double, int>> samples; // (seconds, sub_progress)
+    const clk::time_point t0 = clk::now();
+    std::thread sampler([&] {
+        while (!stop.load(std::memory_order_acquire))
+        {
+            samples.emplace_back(secs_between(t0, clk::now()),
+                                 bar->sub_progress.load(std::memory_order_relaxed));
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+    });
+    generate_roads(w, body, bar.get(), floor, &st);
+    const double total = secs_between(t0, clk::now());
+    stop.store(true, std::memory_order_release);
+    sampler.join();
+    // report_sub scales into int range only past a million units; the plans measured
+    // here are far below that, so the reported count IS the unit count.
+    const long long border_base = st.units_backbone + st.units_spurs;
+    double border_from = total;
+    for (const auto& [t, sub] : samples)
+        if (sub >= border_base) { border_from = t; break; }
+    border_s = total - border_from;
+    return total;
 }
 
 /// BL-1119 D1: the village size distribution the spur floor reads, then one row per
@@ -218,9 +254,8 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
     {
         clear_roads(w, body);
         road_generation_stats st{};
-        const clk::time_point t0 = clk::now();
-        generate_roads(w, body, nullptr, f, &st);
-        const double s = secs_between(t0, clk::now());
+        double border_s = 0.0;
+        const double s = timed_generate_roads(w, body, f, st, border_s);
         int tiers[4] = { 0, 0, 0, 0 };
         int streets = 0; // road tiles hosting a centre: the local streets
         for (const auto& [tid, tc] : w.tiles)
@@ -240,6 +275,21 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
                     st.villages, st.villages_below_floor, st.spurs_laid, st.spurs_failed,
                     st.villages_below_floor + st.spurs_failed, st.border_links,
                     st.border_links_street_only);
+        // THE BAR (BL-1072 weights): units per phase against its wall time. A linear inner
+        // bar wants border units / border seconds == other units / other seconds, so the
+        // fitting kBorderUnitsPerNation is border_s * (other units / other s) / nations.
+        const double    other_s     = s - border_s;
+        const long long other_units = st.units_backbone + st.units_spurs;
+        const int       nations     = st.nation_groups;
+        const double    fit_k = (other_s > 0.0 && nations > 0)
+            ? border_s * (static_cast<double>(other_units) / other_s) / nations : 0.0;
+        std::printf("  ROADS seed %u BAR floor %lld: units backbone %lld spurs %lld border %lld (%d nation"
+                    " groups) | border pairs %d, %d with no network endpoint | border walk %.2f s of"
+                    " %.2f s (%.0f%%), floods %lld of %lld | fitting kBorderUnitsPerNation %.0f\n",
+                    seed, f, st.units_backbone, st.units_spurs, st.units_border, nations,
+                    st.border_pairs, st.border_pairs_no_endpoint, border_s, s,
+                    s > 0.0 ? 100.0 * border_s / s : 0.0,
+                    st.flood_fields - st.flood_fields_before_border, st.flood_fields, fit_k);
         std::fflush(stdout);
         if (!map_dir.empty()) // this pass alone, no history roads
             write_road_map(w, body, centre_tiles,

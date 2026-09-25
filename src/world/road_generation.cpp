@@ -366,10 +366,18 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     // BL-1119: the floor is decided here, once per village, and the count reads
     // it — a village below the floor lays no spur, so it is no unit of work.
     std::vector<char> spurs(nodes.size(), 0); // 1 = a village at/above the spur floor
+    // 1 = a centre ON its nation's network: every town, and a village once its spur is
+    // laid. The border links end only on these (Ben, 2026-09-25).
+    std::vector<char> on_network(nodes.size(), 0);
     for (std::size_t i = 0; i < nodes.size(); ++i)
     {
+        if (nodes[i].scale >= kMajorScale)
+            ++st.majors;
         if (nodes[i].scale >= kMidScale)
+        {
+            on_network[i] = 1;
             continue;
+        }
         ++st.villages;
         if (village_spur_size(w, nodes[i].centre) >= spur_floor_heads)
             spurs[i] = 1;
@@ -388,10 +396,12 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                 if (nodes[m].scale >= kMidScale) ++t;
                 else if (spurs[static_cast<std::size_t>(m)]) ++v;
             }
-            if (t >= 2) units_total += t * (t - 1) / 2;
-            if (gw > 0) units_total += v;
+            if (t >= 2) st.units_backbone += t * (t - 1) / 2;
+            if (gw > 0) st.units_spurs += v;
         }
-        units_total += kBorderUnitsPerNation * static_cast<long long>(by_nation.size());
+        st.nation_groups = static_cast<int>(by_nation.size());
+        st.units_border  = kBorderUnitsPerNation * static_cast<long long>(by_nation.size());
+        units_total     = st.units_backbone + st.units_spurs + st.units_border;
     }
     const auto report_units = [&](long long done) {
         if (progress == nullptr || units_total <= 0) return;
@@ -544,7 +554,14 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                 const std::uint8_t tier =
                     edge_tier(nodes[towns[a]].scale, nodes[towns[b]].scale, qualification);
                 stamped.clear();
-                stamp_edge(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile, tier, &stamped);
+                const bool laid =
+                    stamp_edge(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile, tier, &stamped);
+                if (laid && nodes[towns[a]].scale >= kMajorScale
+                    && nodes[towns[b]].scale >= kMajorScale)
+                {
+                    ++st.links_two_major;
+                    if (tier == kHighway) ++st.links_highway;
+                }
                 for (const entity_id t : stamped)
                     if (nation_of(w, t) == nation)
                         add_target(t);
@@ -600,6 +617,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                     break;
                 }
                 ++(laid ? st.spurs_laid : st.spurs_failed);
+                if (laid) on_network[static_cast<std::size_t>(m)] = 1;
             }
         }
     }
@@ -658,13 +676,23 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     for (int cc = 0; cc < gw; ++cc)
         scan_line([&](int r) { return grid[static_cast<std::size_t>(r) * gw + cc]; }, gh, false);
 
-    // BL-1119: the rule is unchanged — the nearest centre pair, below-floor villages
-    // included — so the stats count the links that end on a street the floor left off
-    // the network (write-only; nothing below reads it).
+    // A BORDER LINK ENDS ONLY ON A TOWN OR A SPURRING VILLAGE (Ben, 2026-09-25, the
+    // density form; LOGISTICS.md § 4). Under the spur floor most villages keep a bare
+    // street, and a link ending on one joined nothing — 106 of seed 46's 151 links did.
+    // So each side's candidates are the centres ON their nation's network (`on_network`),
+    // in the same tile order; a nation with none (every centre a bare street) offers no
+    // endpoint, and that pair lays no link. `street_only` is kept as the stats' check
+    // that no link ever ends off the network (write-only).
+    std::map<entity_id, std::vector<int>> border_nodes;
     std::set<entity_id> street_only;
-    for (std::size_t i = 0; i < nodes.size(); ++i)
-        if (nodes[i].scale < kMidScale && !spurs[i])
-            street_only.insert(nodes[i].tile);
+    for (const auto& [nation, members] : by_nation)
+        for (const int m : members)
+        {
+            if (on_network[static_cast<std::size_t>(m)])
+                border_nodes[nation].push_back(m);
+            else
+                street_only.insert(nodes[m].tile);
+        }
     st.flood_fields_before_border = static_cast<long long>(w.logistics_flood_fields.size());
 
     // BL-1072: the border links carry the last units, spread over however
@@ -677,10 +705,16 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     {
         report_units(border_base + border_done * border_units / std::max(1LL, border_pairs));
         ++border_done;
-        const auto ia = by_nation.find(na);
-        const auto ib = by_nation.find(nb);
-        if (ia == by_nation.end() || ib == by_nation.end())
+        if (by_nation.find(na) == by_nation.end() || by_nation.find(nb) == by_nation.end())
+            continue; // a side with no centre at all on this body
+        ++st.border_pairs;
+        const auto ia = border_nodes.find(na);
+        const auto ib = border_nodes.find(nb);
+        if (ia == border_nodes.end() || ib == border_nodes.end())
+        {
+            ++st.border_pairs_no_endpoint; // one side is bare streets only
             continue;
+        }
 
         // BL-620 prefilter: rank all cross pairs by wrapped grid distance (cheap integer
         // work), then A* only the kBorderProbePairs closest. The pair chosen is the
@@ -733,10 +767,10 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     // it so the gameplay dispatch loop recomputes against the final road_level field
     // (the "invalidated when road_level changes" contract, world.hpp). The raster
     // index is road-independent and stays. Generation-time, so clearing all is cheap.
-    w.astar_cost_cache.clear();
-    w.logistics_flood_fields.clear(); // the fields cache the same road-dependent answers
-    // Roads change traversal cost, so they change reach too (BL-323 S2).
-    w.body_reach_cost.clear();
+    // Roads change traversal cost, so they change reach and the nearest-anchor field
+    // too: ONE call, the owner of the set (logistics.hpp), so a cache added later is
+    // never missed here — the hand-written clear this replaced missed lp_anchor_fields.
+    invalidate_logistics_caches(w);
 }
 
 // ---------------------------------------------------------------------------
@@ -805,9 +839,7 @@ void stamp_history_roads(world& w, entity_id body,
     }
 
     // Same contract as generate_roads' tail: road_level moved, so every cache
-    // keyed on traversal cost is stale.
-    w.astar_cost_cache.clear();
-    w.logistics_flood_fields.clear();
-    w.body_reach_cost.clear();
+    // keyed on traversal cost is stale — the whole set, through its one owner.
+    invalidate_logistics_caches(w);
 }
 
