@@ -45,7 +45,9 @@ struct generation_progress;
 //      (BL-620): spur tracks, not lattice membership. A village below the floor
 //      keeps only its local street.
 // Then, across nations: one TRACK border link between the nearest centre pair of
-// each territorially-adjacent nation pair, so the continent-wide lattice connects.
+// each territorially-adjacent nation pair, so the continent-wide network connects —
+// chosen only among centres ON their nation's network, towns and villages that laid a
+// spur (Ben, 2026-09-25): a link ending on a bare village street joined nothing.
 // Territorial adjacency tolerates a short unowned gap (a strait or an unclaimed margin),
 // so a coastal or island nation is reachable rather than silently left off the lattice.
 //
@@ -83,11 +85,12 @@ inline constexpr double kDetourRatio = 2.0;
 /// A centre with no slot (a coverage founding, a province anchor) reads its own
 /// headcount, `population * 1000` heads. See `village_spur_size`.
 ///
-/// PROVISIONAL (D1 of BL-1119 measures the ladder; the main session fixes it).
-/// 40,000 heads is about the 90th percentile of village size on the curated seeds
-/// (p50 ~16k, p90 ~38-46k): the top tenth of villages spur. Above ~15,000 the spurs
-/// add only tens of road tiles, so the floor trades pass time, not map density.
-/// 0 lays a spur from every village, the pre-BL-1119 behaviour.
+/// 40,000 heads (Ben, 2026-09-25, the density form; LOGISTICS.md § 4), read off the
+/// measured ladder (BL-1119 D1, `gen_step_costs --roads`): about the 90th percentile
+/// of village size on the curated seeds (p50 ~16k, p90 ~38-46k), so the top tenth of
+/// villages spur. Above ~15,000 the spurs add only tens of road tiles, so the floor
+/// buys pass time rather than map density. A floor of 0 lays a spur from every
+/// village, the pre-BL-1119 behaviour.
 inline constexpr long long kVillageSpurFloorHeads = 40000;
 
 /// A village's size for the spur floor, in heads — see kVillageSpurFloorHeads.
@@ -107,8 +110,24 @@ struct road_generation_stats
     int villages_below_floor = 0; ///< villages under the floor: street only, no spur tried
     int spurs_laid           = 0; ///< villages that laid a spur
     int spurs_failed         = 0; ///< at/above the floor, but no target within the cap / by land
+    int border_pairs         = 0; ///< territorially-adjacent nation pairs walked
+    /// Adjacent pairs where one side holds no centre on its network (no town, no
+    /// spurring village), so no link is tried (Ben, 2026-09-25: a border link ends only
+    /// on a town or a spurring village).
+    int border_pairs_no_endpoint = 0;
     int border_links         = 0; ///< cross-nation Track links laid
-    int border_links_street_only = 0; ///< of them, ending on a below-floor village's street
+    /// Of them, ending on a centre OFF its nation's network (a bare village street).
+    /// Zero by rule since the 2026-09-25 ruling; kept so a harness can assert it.
+    int border_links_street_only = 0;
+    int majors               = 0; ///< centres at scale >= 3 (City+) on the body
+    int links_two_major      = 0; ///< backbone links laid (tree or kept loop) between two City+
+    int links_highway        = 0; ///< of them, laid at the Highway tier (percentile-gated)
+    /// The loading bar's plan (BL-1072), in the units `report_sub` counts: one per
+    /// backbone town PAIR, one per spurring village, kBorderUnitsPerNation per nation.
+    long long units_backbone = 0;
+    long long units_spurs    = 0;
+    long long units_border   = 0;
+    int       nation_groups  = 0; ///< nations holding a centre on the body (unowned = one group)
     /// Whole-body flood fields cached when the pass ends — its WORK, independent of
     /// the machine's load: nearly every spur and every A* anchor costs one (a Dijkstra
     /// over the whole body, logistics.cpp § flood_field_for). Includes any field a

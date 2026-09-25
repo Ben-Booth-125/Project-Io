@@ -2,14 +2,14 @@
 // Builds the hard-coded world and asserts:
 //   R1 presence   — road generation stamps road_level > 0 on some Kepler land
 //                   tiles (the lattice exists), and never on ocean tiles.
-//   R2 three-tier — the tier ladder obeys BL-618 (roads scale with qualification):
-//                   the no_prehistory world's nations all sit at the never-
-//                   industrialised qualification floor (0.05), below both tier
-//                   gates, so the PRIMARY world is an all-Track lattice; the full
-//                   ladder — Road, and Highway across a seed sweep — is asserted
-//                   on a QUALIFIED regeneration (every nation's qualification
-//                   overridden high, road_level reset, generate_roads re-run).
-//                   No tile ever carries a tier beyond Highway (ceiling).
+//   R2 three-tier — the tier ladder obeys BL-618/BL-621 (percentile gates): the
+//                   no_prehistory world's nations all tie at the qualification
+//                   floor, so each grades 0.5 and the PRIMARY world carries Roads
+//                   and no Highway; the full ladder — Road, and Highway across a
+//                   seed sweep — is asserted on a QUALIFIED regeneration (a
+//                   three-band qualification spread, the top third the most urban
+//                   nations; road_level reset, generate_roads re-run). No tile
+//                   ever carries a tier beyond Highway (ceiling).
 //   Q  differential — the same world regenerated at floor vs high qualification
 //                   produces measurably different lattices (BL-618's contract):
 //                   promoted tiers appear only on the qualified run, and the
@@ -20,8 +20,9 @@
 //                   accounted for (below the floor, spurred, or failed); floor 0
 //                   is the unfloored pass; the shipped floor leaves some villages
 //                   on their street alone; the detour test refuses candidates and
-//                   the ration never keeps more than it admitted; and the floor
-//                   never touches the backbone (tree and loops identical at both).
+//                   the ration never keeps more than it admitted; the floor
+//                   never touches the backbone (tree and loops identical at both);
+//                   and no border link ends on a bare village street (R5f).
 //   R3 connectivity — EVERY population centre sits on, or orthogonally adjacent
 //                   to, a roaded tile — anchor foundings included (BL-623,
 //                   provinces before roads: anchors exist when the lattice is
@@ -36,6 +37,7 @@
 
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/logistics.hpp" // invalidate_logistics_caches
 #include "world/road_generation.hpp"
 #include "harness_params.hpp"
 #include "world/world.hpp"
@@ -65,8 +67,11 @@ static void regen_roads_at_qualification(world& w, entity_id body, float qual)
     for (auto& [tid, tc] : w.tiles)
         if (tc.body == body)
             tc.road_level = 0;
-    w.astar_cost_cache.clear();
-    w.body_reach_cost.clear();
+    // EVERY traversal cache, through its one owner (BL-1119 round 2). This used to
+    // clear only the pair cache and the reach field, so the regen read the built
+    // world's road-weighted FLOOD FIELDS and laid its "road-free" network on roaded
+    // costs — the instrument measured a different pass from the one generation runs.
+    invalidate_logistics_caches(w);
     generate_roads(w, body);
 }
 
@@ -74,12 +79,55 @@ static void regen_roads_at_qualification(world& w, entity_id body, float qual)
 /// ascending nation id — bottom third 0.05 (percentile ~0.17, below the Road gate),
 /// middle 0.30 (~0.5, Roads), top 0.60 (~0.83, Highways where two majors meet). All
 /// else fixed; deterministic by the id sort.
-static void regen_roads_with_spread(world& w, entity_id body)
+/// How the spread orders nations into its three bands.
+enum class spread_order
+{
+    by_id,    ///< ascending nation id — the Q rows' differential instrument
+    by_urban, ///< most City+ centres first, then most towns, then id — R2's Highway reading
+};
+
+/// City+ (scale >= 3) and Town+ (scale >= 2) centre counts per nation on @p body.
+static void urban_weight(const world& w, entity_id body, std::map<entity_id, std::pair<int, int>>& out)
+{
+    for (const auto& [cid, tile] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tile);
+        const auto pit = w.population_centres.find(cid);
+        const auto nit = w.tile_to_nation.find(tile);
+        if (tit == w.tiles.end() || tit->second.body != body || pit == w.population_centres.end()
+            || nit == w.tile_to_nation.end())
+            continue;
+        if (pit->second.scale >= 3) ++out[nit->second].first;
+        if (pit->second.scale >= 2) ++out[nit->second].second;
+    }
+}
+
+/// The nations in @p order's band order (bottom band first).
+static std::vector<entity_id> spread_ranking(const world& w, entity_id body, spread_order order)
 {
     std::vector<entity_id> nids;
     for (const auto& [nid, nc] : w.nations)
         nids.push_back(nid);
     std::sort(nids.begin(), nids.end());
+    if (order == spread_order::by_urban)
+    {
+        std::map<entity_id, std::pair<int, int>> wt;
+        urban_weight(w, body, wt);
+        // Ascending urban weight, so the most urban third lands in the TOP band; ties by
+        // id (stable over the id-sorted list), deterministic.
+        std::stable_sort(nids.begin(), nids.end(), [&](entity_id a, entity_id b) {
+            const auto wa = wt.count(a) ? wt[a] : std::pair<int, int>{ 0, 0 };
+            const auto wb = wt.count(b) ? wt[b] : std::pair<int, int>{ 0, 0 };
+            return wa < wb;
+        });
+    }
+    return nids;
+}
+
+static road_generation_stats regen_roads_with_spread(world& w, entity_id body,
+                                                     spread_order order = spread_order::by_id)
+{
+    const std::vector<entity_id> nids = spread_ranking(w, body, order);
     const int n = static_cast<int>(nids.size());
     for (int i = 0; i < n; ++i)
         w.nations[nids[static_cast<std::size_t>(i)]].qualification =
@@ -87,9 +135,10 @@ static void regen_roads_with_spread(world& w, entity_id body)
     for (auto& [tid, tc] : w.tiles)
         if (tc.body == body)
             tc.road_level = 0;
-    w.astar_cost_cache.clear();
-    w.body_reach_cost.clear();
-    generate_roads(w, body);
+    invalidate_logistics_caches(w); // every cache, as above (BL-1119 round 2)
+    road_generation_stats st{};
+    generate_roads(w, body, nullptr, kVillageSpurFloorHeads, &st);
+    return st;
 }
 
 /// BL-1119: re-run road generation on @p w's body at spur floor @p floor_heads from a
@@ -99,12 +148,44 @@ static road_generation_stats regen_roads_at_floor(world& w, entity_id body, long
     for (auto& [tid, tc] : w.tiles)
         if (tc.body == body)
             tc.road_level = 0;
-    w.astar_cost_cache.clear();
-    w.logistics_flood_fields.clear();
-    w.body_reach_cost.clear();
+    invalidate_logistics_caches(w);
     road_generation_stats st{};
     generate_roads(w, body, nullptr, floor_heads, &st);
     return st;
+}
+
+/// Why a world does or does not carry a Highway (BL-1119 round 2, the R2 finding): per
+/// nation, its City+ centres (scale >= 3) and whether the spread put it in the top band.
+struct highway_reading
+{
+    int nations = 0;
+    int nations_two_major = 0;          ///< nations holding >= 2 City+ centres
+    int two_major_band[3] = { 0, 0, 0 }; ///< of them, by band (bottom, middle, top)
+    int majors = 0, max_majors_one_nation = 0;
+};
+
+static highway_reading read_highway_inputs(const world& w, entity_id body, spread_order order)
+{
+    highway_reading r;
+    const std::vector<entity_id> nids = spread_ranking(w, body, order);
+    const int n = static_cast<int>(nids.size());
+    std::map<entity_id, std::pair<int, int>> wt;
+    urban_weight(w, body, wt);
+    r.nations = n;
+    for (int i = 0; i < n; ++i)
+    {
+        const int band = (i < n / 3) ? 0 : (i < 2 * n / 3) ? 1 : 2; // regen_roads_with_spread's
+        const auto it  = wt.find(nids[static_cast<std::size_t>(i)]);
+        const int  m   = (it != wt.end()) ? it->second.first : 0;
+        r.majors += m;
+        r.max_majors_one_nation = std::max(r.max_majors_one_nation, m);
+        if (m >= 2)
+        {
+            ++r.nations_two_major;
+            ++r.two_major_band[band];
+        }
+    }
+    return r;
 }
 
 /// Tier census of @p body's road_level field: counts[1..3], plus total in counts[0].
@@ -171,6 +252,19 @@ int main()
     // generator — assert the tier is REACHABLE across a seed sweep, each world
     // regenerated at high qualification. If no seed produces one, that is a real
     // regression and this still fails.
+    //
+    // WHICH NATIONS ARE "QUALIFIED" (BL-1119 round 2, why this row read 0 of 8). Since
+    // BL-621 the gates read the PERCENTILE, so "every nation high" grades everyone 0.5
+    // and promotes nothing; the regen needs a spread, and the spread decides which third
+    // is top. Banded by ascending nation id, the top third was never a multi-City nation:
+    // on all eight seeds every nation holding two City+ centres sat in the bottom or
+    // middle band (17 nations, none top — about 0.1% by chance), because nation ids run
+    // big-first. The City-City links were laid and the gate was right; the instrument
+    // simply never qualified a nation that could hold a Highway. So this row bands by
+    // URBAN WEIGHT (most City+, then most towns): the qualified third is the most urban,
+    // which is the shape qualification has in a real world (industrialisation is urban),
+    // and the assertion is unchanged — a Highway tile must actually be stamped. The
+    // id-banded placement is still printed per seed so the finding stays on record.
     {
         int seeds_with_highway = 0, seeds_with_road = 0, first = -1;
         for (uint32_t s = 0; s < 8; ++s)
@@ -178,9 +272,23 @@ int main()
             world_params wp;
             wp.seed = s * 0x9E3779B1u;
             world ws = make_hard_coded_world(no_prehistory(wp));
-            regen_roads_with_spread(ws, ws.home_body);
+            // Where the multi-City nations fall under the ID-banded spread — the instrument
+            // this row used to read, and the reason it could never pass (see above).
+            const highway_reading by_id = read_highway_inputs(ws, ws.home_body, spread_order::by_id);
+            const road_generation_stats hs =
+                regen_roads_with_spread(ws, ws.home_body, spread_order::by_urban);
+            const highway_reading hr = read_highway_inputs(ws, ws.home_body, spread_order::by_urban);
             int tc4[4];
             tier_census(ws, ws.home_body, tc4);
+            // The why, per seed: a Highway needs ONE backbone link whose two ends are both
+            // City+, in a nation at percentile >= 0.80 (the spread's top third).
+            std::printf("      (seed %u: nations %d | City+ %d, most in one nation %d | nations with"
+                        " >= 2 City+ %d: by-id bands b/m/t %d/%d/%d, by-urban bands %d/%d/%d |"
+                        " City-City links laid %d, at Highway %d | highway tiles %d)\n",
+                        s, hr.nations, hr.majors, hr.max_majors_one_nation, hr.nations_two_major,
+                        by_id.two_major_band[0], by_id.two_major_band[1], by_id.two_major_band[2],
+                        hr.two_major_band[0], hr.two_major_band[1], hr.two_major_band[2],
+                        hs.links_two_major, hs.links_highway, tc4[3]);
             if (tc4[2] > 0) ++seeds_with_road;
             if (tc4[3] > 0)
             {
@@ -268,11 +376,12 @@ int main()
         tier_census(w5, w5.home_body, tf);
         auto line = [](const char* what, const road_generation_stats& s, const int t[4]) {
             std::printf("      (%s: road tiles %d | towns %d tree %d candidates %d admitted %d kept %d |"
-                        " villages %d below %d spurs %d failed %d | border %d, %d on a below-floor"
-                        " street | floods %lld)\n",
+                        " villages %d below %d spurs %d failed %d | border pairs %d, %d with no"
+                        " network endpoint, links %d, %d on a bare street | floods %lld)\n",
                         what, t[0], s.towns, s.mst_links, s.loop_candidates, s.loops_admitted,
                         s.loops_kept, s.villages, s.villages_below_floor, s.spurs_laid,
-                        s.spurs_failed, s.border_links, s.border_links_street_only, s.flood_fields);
+                        s.spurs_failed, s.border_pairs, s.border_pairs_no_endpoint,
+                        s.border_links, s.border_links_street_only, s.flood_fields);
         };
         line("floor 0", s0, t0);
         std::printf("      (shipped floor %lld heads, detour ratio %.2f)\n",
@@ -293,6 +402,10 @@ int main()
                   && s0.loop_candidates == sf.loop_candidates
                   && s0.loops_admitted == sf.loops_admitted && s0.loops_kept == sf.loops_kept,
               "R5e the floor never touches the backbone (tree and loops identical at both floors)");
+        // Ben, 2026-09-25: a border link ends only on a town or a spurring village.
+        check(s0.border_links_street_only == 0 && sf.border_links_street_only == 0
+                  && sf.border_links > 0,
+              "R5f every border link ends on a centre on its nation's network (both floors)");
     }
 
     // Q — the BL-621 era-relative contract (Ben, 2026-08-25, ruling on NR-641): gates
