@@ -1043,15 +1043,6 @@ inline void lapse_map_frame(int gw, int gh, float avail_w, float avail_h,
     tl_y  = (avail_h - scale * static_cast<float>(gh)) * 0.5f;
 }
 
-/// BL-1091 -- THE GLOBE'S DISSOLVE into the Culture map: how much of the Life
-/// round's globe still shows over the map at @p year. The carry-fade rule
-/// (`lapse_carry_fade`) applied to the round with nothing behind it: 1 at
-/// the record's first year, 0 once the opening tenth of the span has passed,
-/// so the dissolve reads the same at every pace and is a function of the
-/// playhead alone -- a scripted capture parks the year and sees the fade.
-/// 0 on an empty record.
-float lapse_globe_fade(const history_lapse& h, int year);
-
 /// BL-1092 -- how many kin arrows the record has drawn by @p year: the
 /// foundings at or before it that had a previous region to come from. The
 /// board's migration counter and the verify API's read of the same bake.

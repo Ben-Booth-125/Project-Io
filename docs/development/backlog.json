@@ -1535,6 +1535,28 @@
     "src/world/corp_ai.cpp"
    ],
    "design": "FILED 2026-09-25 from NR-929 (Ben: B, per nation, overturning the per-world reading of 2026-09-24 and the BL-692 reasoning that per-nation banding is a second gate over tech). ERAS.md § Where the ladder starts owns the rule.\n\nTHE WORK. (1) Derive each nation's band at the 1960 fold from the realm it grew from (roster_band_for_capacity) -- DELEGATED READING: \"the realm it grew from\" rather than any realm folded into the nation; Ben may overturn. (2) Persist it on nation_component (a world save bump) and retire the world-wide world::campaign_band. (3) Make the registry actor-aware: every consumer of the band -- the browse roster, construction validity, the recipe pass, corp_ai's build choices, --serve/MCP validation -- asks for the acting corporation's nation's band. (4) The Industry mask (BL-1109) still seeds earned_techs within a band.\n\nREAD FIRST (Rule 0b): per seed, how many nations derive ancient -- NR-934 found every library seed industrial at WORLD grain, which says nothing of the spread per nation.\n\nDONE WHEN. Two nations on one world can open on different bands; a firm in an ancient nation is refused an industrial building through every front door (UI, command, MCP); save round trip carries the per-nation band; one re-bless if any digest moves."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1124",
+   "short_name": "SEA_LANES_SEEN",
+   "author": "Ben (2026-09-25, second live look at the sprint-47 build); filed by Claude",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "A player sees the sea lanes on the Exploration round without being told where to look",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/history_lapse.cpp",
+    "scripts/verify/sea_lanes.lua"
+   ],
+   "design": "FILED 2026-09-25 from BL-1097 R3 (moved here; Ben: \"I don't clearly see the sea lanes on exploration. Perhaps that is for sprint 48?\"). The record is built and the lane draws (sea_lanes.lua, seed 32: 16 lanes), first as a thin dashed line that hid under the colonial ties, then as a wide soft sea-blue band under them -- and the band was still not clearly seen at the live app.\n\nWHY IT HIDES. The tribute leg writes most lane uses (seed 46: 619 of 663), so almost every lane runs the same capital-to-capital line as its tie, and the lanes open late in the span.\n\nTHE WORK, with BL-1118 (round legends) beside it: the legend names the lane; the lane gets a form of its own that reads at a glance (candidates: a brighter core line inside the band, a shipping-route glyph at each end, or an arc bowed away from the tie). Once BL-1115 (sea legs in the later spans) lands, wet campaigns write lanes off the ties too -- read how many before choosing.\n\nDONE WHEN. Ben finds a lane at the live app without a pointer."
   }
  ]
 }

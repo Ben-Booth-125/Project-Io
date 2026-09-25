@@ -2224,9 +2224,8 @@ void app::draw_generation_screen()
             // blank pane between the Life round's globe and the migration map
             // broke the one continuity the wizard is built on. So the wait
             // keeps the Life round's globe in the pane under a 2400 BCE stamp,
-            // and once the record lands the globe DISSOLVES into the map over
-            // the opening tenth of the span (`lapse_globe_fade`): the first
-            // thing the map shows is the world the globe was showing.
+            // and once the record lands the map REPLACES it at once (Ben,
+            // 2026-09-25: a sharp jump, so the globe never covers the map).
             if (m_wiz_history_future[lapse_index].valid())
             {
                 if (lapse_index == 0)
@@ -2268,45 +2267,14 @@ void app::draw_generation_screen()
             }
             else
             {
-                const ImVec2 pane_origin = ImGui::GetCursorScreenPos();
-                const ImVec2 pane_avail  = ImGui::GetContentRegionAvail();
+                // A SHARP JUMP, NOT A DISSOLVE (Ben, 2026-09-25, at the live
+                // app: "we need to sharply jump from life to cultures, so the
+                // globe doesn't block a player's view"). The globe holds only
+                // through the wait, when there is no map yet; the moment the
+                // record lands the map is the whole pane. The cross-fade that
+                // painted the globe over the map's opening tenth is gone.
                 const ui::history_lapse& rec = m_wiz_history[lapse_index];
-                ImDrawList* dl = ImGui::GetWindowDrawList();
-
-                // THE DISSOLVE (BL-1091): a CROSS-FADE, globe to map, as the
-                // playhead leaves the record's first year. Both are drawn
-                // whole and then thinned -- the map's vertices to (1 - fade),
-                // the globe's, painted over it, to fade -- by a post-pass over
-                // the draw list's tail, so neither drawer learns about the
-                // other. At the first year the pane shows exactly what the
-                // wait showed (the globe alone, no map edge peeking out around
-                // it); by a tenth of the span in, the map alone. The stamp is
-                // re-drawn on top, so the header is legible at every point of
-                // the fade: the same corner, the same text, by the same
-                // framing rule.
-                const auto thin = [&](int from, float k) {
-                    for (int v = from; v < dl->VtxBuffer.Size; ++v)
-                    {
-                        ImU32& c = dl->VtxBuffer[v].col;
-                        const ImU32 a  = (c >> IM_COL32_A_SHIFT) & 0xFFu;
-                        const ImU32 a2 = static_cast<ImU32>(static_cast<float>(a) * k);
-                        c = (c & ~IM_COL32_A_MASK) | (a2 << IM_COL32_A_SHIFT);
-                    }
-                };
-                const float fade = (lapse_index == 0)
-                    ? ui::lapse_globe_fade(rec, m_wiz_history_year[lapse_index]) : 0.0f;
-                const int v_map = dl->VtxBuffer.Size;
                 ui::draw_lapse_map(rec, hist_slice, m_wiz_history_year[lapse_index]);
-                if (fade > 0.0f)
-                {
-                    thin(v_map, 1.0f - fade);
-                    const int v_globe = dl->VtxBuffer.Size;
-                    ImGui::SetCursorScreenPos(pane_origin);
-                    draw_life_globe();
-                    thin(v_globe, fade);
-                    draw_lapse_stamp(pane_origin, pane_avail, rec.body_name,
-                                     m_wiz_history_year[lapse_index]);
-                }
             }
         }
         else

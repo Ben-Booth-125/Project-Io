@@ -9,12 +9,11 @@
 --      now (generation_charts.cpp's chain table) -- and the Drawdown lean sits
 --      under it, on Life, not on Culture.
 --   2. Next on Life leaves no blank pane: the Culture round holds the Life
---      round's globe through its wait and DISSOLVES it into the migration map
---      under a 2400 BCE stamp. Under --verify the run is synchronous, so the
---      wait itself cannot be photographed; the dissolve is a function of the
---      playhead (ui::lapse_globe_fade: the opening tenth of the span), so it
---      is captured at the record's first year (globe whole), a twentieth in
---      (mid-fade) and a fifth in (map alone).
+--      round's globe through its wait, and the moment the record lands the
+--      migration map REPLACES it -- a sharp jump, no dissolve (Ben, 2026-09-25:
+--      "so the globe doesn't block a player's view"). Under --verify the run
+--      is synchronous, so the wait cannot be photographed; the record's first
+--      year is captured to show the map whole, with no globe over it.
 --   3. The ticker's first lines name each cradle and the package it raised:
 --      a `cradle` moment per people (lapse_event_kind::cradle, 23), read off
 --      the settlement's pure-output records.
@@ -51,7 +50,7 @@ verify.scroll_panel("wizard_charts", 1.0)
 shot("life_to_people_2_legacy_fold")
 verify.fold()
 
--- ── 2. The globe dissolves into the Culture map ──────────────────────────
+-- ── 2. The Culture map replaces the globe at once ────────────────────────
 -- `history_run(0)` adopts the harness's own finished record for the Culture
 -- round (the same fold generation makes), so the captures never race a run.
 verify.history_run(0)
@@ -63,11 +62,9 @@ verify.expect(last > first, "the Culture record has a span")
 local span = last - first
 
 verify.history_year(first)
-shot("life_to_people_3_globe_at_start")
-verify.history_year(first + math.floor(span * 0.05))
-shot("life_to_people_4_dissolve")
+shot("life_to_people_3_map_at_start")
 verify.history_year(first + math.floor(span * 0.20))
-shot("life_to_people_5_map")
+shot("life_to_people_4_map")
 
 -- ── 3. The cradles are announced ─────────────────────────────────────────
 local KIND_CRADLE = 23

@@ -409,8 +409,8 @@ above ~10–11.5 M⊕. A fully industrial world can be **planetbound**.
 
 **On screen this is the Life round's last fold (Ben, 2026-09-24).** The endowment, the endemics and
 the gate are walked as the round's closing panel, the `drawdown` lean is taken under it (§ S9,
-§ Preferences, not parameters), and with the gate cleared the globe dissolves into the Culture map
-stamped 2400 BCE — the joint this section names is shown, not skipped.
+§ Preferences, not parameters), and with the gate cleared the Culture map, stamped 2400 BCE,
+replaces the globe in one sharp jump — the joint this section names is shown, not skipped.
 
 ---
 

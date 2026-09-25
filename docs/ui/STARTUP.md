@@ -111,8 +111,9 @@ so the screen is never empty while there is no body yet; round 2, Life, draws th
 **homeworld**, from the tile raster of the Life-gate world that round builds (§ New World
 wizard). It is the primary view and the charts are the extras on top. **The globe does not
 leave with the Life round (Ben, 2026-09-24):** it holds in the pane through the Culture
-round's wait and cross-fades into that round's map under a 2400 BCE year stamp, so the first
-thing the map shows is the world the globe was showing.
+round's wait under a 2400 BCE year stamp, so the pane is never blank. **The moment the record
+lands, the map replaces it in one sharp jump (Ben, 2026-09-25):** no cross-fade, so the globe
+never covers the map a player is reading.
 
 **It spins on a clock, and it takes no mouse input. That is the design, not a
 gap** (Ben, 2026-08-10): the globe turns one revolution a minute on wall time,
@@ -173,7 +174,8 @@ realm, a people, a creed and a firm are the actors the rounds name, and a face o
 decoration. **Every lapse header names the body** the round is playing on.
 
 **Round 3 — Culture.** A 2D map in the globe's place — the globe holds through this round's
-wait and cross-fades into the map under a 2400 BCE year stamp (Ben, 2026-09-24; § The globe) —
+wait under a 2400 BCE year stamp and the map replaces it in one sharp jump (Ben, 2026-09-25;
+§ The globe) —
 playing the peopling of an empty world: where people started, the routes they took, and the
 cultures those routes produced. Its authority is
 [`COLONISATION.md`](../generation/COLONISATION.md). The map opens on the Life-gate world the

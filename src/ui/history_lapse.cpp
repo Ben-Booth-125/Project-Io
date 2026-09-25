@@ -2050,19 +2050,6 @@ int lapse_marker_window_years(const history_lapse& h)
 // BL-1091 / BL-1092 -- the Life -> people bridge and the migration's roads
 // ---------------------------------------------------------------------------
 
-float lapse_globe_fade(const history_lapse& h, int year)
-{
-    // The carry-fade rule (`lapse_carry_fade`) for the round with nothing
-    // behind it: a tenth of the span, so the dissolve reads the same at every
-    // pace and a scripted capture reaches the fade by parking the playhead.
-    if (h.empty() || h.lapse.years <= 0) return 0.0f;
-    const float over = static_cast<float>(h.lapse.years) * 0.10f;
-    const float gone = static_cast<float>(year - h.lapse.start_year);
-    if (gone <= 0.0f)  return 1.0f;
-    if (gone >= over)  return 0.0f;
-    return 1.0f - gone / over;
-}
-
 int lapse_kin_arrows_at(const history_lapse& h, int year)
 {
     // The bake is in change-list order, which is ascending by year, so the
