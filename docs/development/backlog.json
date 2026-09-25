@@ -1274,6 +1274,29 @@
     "src/ui/history_lapse.hpp"
    ],
    "design": "FILED 2026-09-25 (found by lane F2's cold review; documented as a known gap in history_lapse.hpp's fleets-and-ties layer comment). Not in sprint 47.\n\nTHE GAP. The fleets-and-ties bake (BL-1095) opens a tie on subject_bound / province_bought and an arc on treaty_formed, and closes them on subject_freed / treaty_broken / realm_ended, in one forward walk over ONE record. The Industrialisation span copies exploration_upkeep_enabled and so keeps running the subjection and treaty blocks -- but a link bound before 1660 has its opening kind on the Exploration record and only its closing kind on the Industrialisation one, so round 6 finds a close with no open and draws nothing for it; hulls, harbours and sails are whole (they read the span's own samples and kinds). The same shape BL-1088 met for a realm's founding and answered with the `inherited` kind (20).\n\nTHE WORK. At a resumed span's open, the sim emits one record-only restatement per standing subject link and per standing treaty -- either the existing `inherited` kind with `other` naming what is restated, or two kinds of their own (`tie_inherited`, `treaty_inherited`) numbered past 24 -- carrying the overlord/subject pair (or the treaty pair and its remaining term) so the bake can open the segment at the span's first year. Gated exactly as the closing kinds are; the f=0 control byte-identical; in the next envelope bump. The bake's walk then needs no change beyond opening on the new kind(s); fleets_and_ties.lua gains a round-6 assertion that a tie standing at 1660 on the reference world draws at 1660 + one window.\n\nDONE WHEN. On round 6 of the reference world the ties and arcs that stood at the close of round 5 are drawn from the first frame, and every one of them ends where the Industrialisation record ends it."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1113",
+   "short_name": "DEEP_DIGEST_SEES_THE_BIOGRAPHY",
+   "author": "Claude (2026-09-25, lane BL-1049's open question, handed to the main session to file)",
+   "category": "Engine",
+   "priority": "C",
+   "difficulty": 2,
+   "title": "world_determinism's deep digest folds the history log and the record tables, so a world whose biography changed no longer digests identically",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/world_determinism.cpp",
+    "src/world/world_digest.hpp",
+    "src/world/history_log.hpp"
+   ],
+   "design": "FILED 2026-09-25. Not in sprint 47.\n\nTHE GAP. world_determinism builds its worlds with make_hard_coded_world alone, on which world::history_log is never seeded (seed_genesis_history runs in finish_campaign_world), and its deep digest folds no record table -- so BL-1049, which drops duplicate civilisation coinings and five lines of the prose history on the reference world, moved none of the harness's four digests. The player_seed_sweep digests (D_land onward) did move. A determinism harness that cannot see a change to the world's own biography is blind to one whole class of generation change.\n\nTHE WORK. Fold into the deep digest (a) the world's history log after seed_genesis_history (run the finish's genesis step on the harness world, or fold the generation_report's per-body dated history directly), and (b) the civilisation and universal-creed tables and the polity-name / civilisation-name / creed-name tables the records carry, in index order. Record the moved digits old -> new with the change (a re-bless of the harness's own row only; the sweep pins do not move). DONE WHEN: a one-line change to a civilisation name on the reference world moves seedA/on; the harness still reads bit-identical run to run."
   }
  ]
 }

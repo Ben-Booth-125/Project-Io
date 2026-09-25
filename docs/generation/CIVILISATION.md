@@ -518,6 +518,7 @@ survived.
 | **The year a culture was coined** — the kinship clock | `culture::coined_year` — read by `culture_kinship_years` | **carried** |
 | Settlement seats and hinterland pointers | `region::is_seat`, `region::seat_region` (`settlement.hpp`) — one seat per polity at its capital, every hinterland region pointing at its seat | **carried** |
 | Material stores at the seat | `region::material_stock` — accumulates only where `is_seat`, falls with the seat | **carried** |
+| The civilisation and universal-creed records, in index order — every region's and polity's index points into them | `pass_one_output::civilisations` / `::universal_creeds` | **carried** |
 
 **The three culture rows are facts the migration computes and the contract keeps** — parentage,
 origin farm class, and the coining year that § The calls makes the kinship measure. Parentage is

@@ -1012,6 +1012,27 @@
     "docs/generation/COLONISATION.md"
    ],
    "resolution": ""
+  },
+  {
+   "id": "NR-943",
+   "title": "CALL: should the shipped-path validators range-check every civilisation and creed index at the 1200 and 1660 crossings, now that BL-1049 closed the gap?",
+   "raised": "2026-09-25",
+   "kind": "question",
+   "status": "open",
+   "source": "lane BL-1049's report and its cold review (2026-09-25): pass_one_output_valid does not range-check the two new tables, and the 1200 path calls make_exploration_output without a `from`, so the prefix check that guards the 1660 crossing never runs at 1200; the fidelity harness is the only check on the 1200 crossing",
+   "what": "The harness gate (industrialisation_sim_harness --fidelity, the BL-1049 section) now fails on any index past the table, any pair recorded twice, or a carried prefix short of the 1200 table, on 16/16 library seeds. The shipped path itself would still accept a regressed resume silently: a region::civilisation or universal_creed index at or past its table resolves to nothing and nothing crashes. Adding the >= size checks to pass_one_output_valid (1200) and exploration_output_valid (1660), as record_handoff_violation, is one loop each -- but exploration_sim_harness builds hand-made exploration_output values whose tables may be empty, so those fixtures would need their tables filled or the check made conditional on a non-empty table.",
+   "why_it_matters": "A validator on the shipped path catches the regression on every run of the app; the harness catches it only when someone runs --fidelity. BL-1036 chose harness-only parity at 1660; BL-1049 kept that parity rather than widen.",
+   "options": [
+    "A: keep harness-only parity (as shipped)",
+    "B: add the range checks to both validators, conditional on a non-empty table, and fill the exploration_sim_harness fixtures' tables (one small item)",
+    "C: add the checks unconditionally and rewrite the fixtures"
+   ],
+   "recommendation": "B, as a small Light item when convenient; not urgent while --fidelity is in the merge gates.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/exploration_sim_harness.cpp"
+   ],
+   "resolution": ""
   }
  ]
 }

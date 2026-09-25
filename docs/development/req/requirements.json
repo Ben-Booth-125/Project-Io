@@ -8456,64 +8456,64 @@
     }
    ]
   },
- {
-  "brief": "state-hash-folds-seat",
-  "title": "BL-1082 - The world state hash folds in the seat, so two different picks no longer hash alike",
-  "difficulty": 1,
-  "importance": "B",
-  "evaluated_difficulty": null,
-  "status": "pending",
-  "promoted_from": "backlog.json BL-1082 - sprint 47 re-bless rider (ruled 2026-09-24)",
-  "batch": "sprint-47",
-  "resolved": null,
-  "resolution": null,
-  "rows": [
-   {
-    "id": "R1",
-    "status": "complete",
-    "verification": [
-     "code: world.cpp; world.hpp",
-     "headless: seat_pick_check.js",
-     "visual: seat_pick.lua S5"
-    ],
-    "requirement": "world::state_hash folds each corporation's is_player (inside the sorted corp walk) and world::player_entity (once), integer-only and deterministic, so two different picks on one world hash differently while the same pick -- or the draw and a pick of the drawn firm -- hash alike. The declaration comment states what the hash covers and why the seat is the one folded field a tick never moves (item-spanning gate).",
-    "notes": "2026-09-25: the fold sits beside the balance in the existing sorted walk (world.cpp), player_entity after it; both halves folded so a world where the flag and the id disagree is visible to the hash. No skip-when-empty guard: every hash moves once, structurally, at the re-bless this item rides.",
-    "result_metric": "seat_pick_check.js on build_rel/ProjectIo.exe: 13 of 13 PASS, exit 0 -- \"draw : seat 61248  EF627D3AA20F98C8\", \"pick X: seat 61248  EF627D3AA20F98C8\" (pick of the drawn firm == the drawn state hash), \"pick Y: seat 61231  C8CDEE309F88B7CB\" twice (run 1 hash == run 2 hash), \"PASS  a different pick is a different seat (from the state hash alone)\" (C8CDEE309F88B7CB != EF627D3AA20F98C8). seat_pick.lua: every expect PASS, 0 golden failure(s), exit 0 -- \"(seed, pick) reproduces the seat: BDFEC590611D1E46 == BDFEC590611D1E46\" (pick 56807) and \"a different pick is a different seat, from the state hash alone: BC31BFBDE966D16D ~= BDFEC590611D1E46\" (pick 56800 vs 56807 on the rebuilt seed-1 world); S3 \"Back changed nothing (state hash unmoved)\" and S6 \"every refusal moved nothing\" still hold."
-   },
-   {
-    "id": "R2",
-    "status": "complete",
-    "verification": [
-     "headless: seat_pick_check.js",
-     "visual: seat_pick.lua"
-    ],
-    "requirement": "seat_pick_check.js asserts \"a different pick is a different seat\" from the state hash alone (y1.hash !== draw.hash); the player id read off the log is kept only as a diagnostic print. seat_pick.lua S5 asserts the same from the hash alone on the rebuilt world.",
-    "notes": "2026-09-25: the JS check's other rows (the drawn firm picked == the drawn hash; run 1 == run 2; the picked id names the firm) are BL-1076's reproducibility rows and stand unchanged; only the \"different seat\" claim moved onto the hash. In the Lua, `other` is guarded against pick_b (the reproducibility candidate) rather than the reference world's pick, since a firm id belongs to the world that generated it.",
-    "result_metric": "seat_pick_check.js: 13 of 13 PASS, exit 0 -- \"draw : seat 61248  EF627D3AA20F98C8\", \"pick X: seat 61248  EF627D3AA20F98C8\" (pick of the drawn firm == the drawn state hash), \"pick Y: seat 61231  C8CDEE309F88B7CB\" twice (run 1 hash == run 2 hash), \"PASS  a different pick is a different seat (from the state hash alone)\" (C8CDEE309F88B7CB != EF627D3AA20F98C8). seat_pick.lua: every expect PASS, 0 golden failure(s), exit 0 -- \"(seed, pick) reproduces the seat: BDFEC590611D1E46 == BDFEC590611D1E46\" (pick 56807) and \"a different pick is a different seat, from the state hash alone: BC31BFBDE966D16D ~= BDFEC590611D1E46\" (pick 56800 vs 56807 on the rebuilt seed-1 world); S3 \"Back changed nothing (state hash unmoved)\" and S6 \"every refusal moved nothing\" still hold."
-   },
-   {
-    "id": "R3",
-    "status": "complete",
-    "verification": [
-     "headless: begin_adopts_check.js; save_roundtrip",
-     "code: grep src/ tools/ scripts/ for state_hash readers spanning a seat change"
-    ],
-    "requirement": "Every reader that compares state_hash where the seat is the same still holds: begin_adopts_check (adopted == cold state hash), save_roundtrip P2 (a round trip restores the same hash -- is_player and player_entity are serialised); no reader in src/ or tools/ compares a hash before and after a re-seat expecting equality; any doc asserting the old coverage is corrected.",
-    "notes": "2026-09-25: the twelve hash harnesses that touch is_player/player_entity all set them at fixture construction before any hash; order_book_harness builds three worlds with different seats but never hash-compares them; exploration_sim_harness references neither state_hash nor world_digest.hpp, so its pinned counters cannot move. Two docs asserted \"state_hash does not fold the seat\": ACTIONS.json gameplay.take_seat expected_output (corrected, ACTIONS.md regenerated by render_actions.js) and MULTIPLAYER_PRINCIPLES.md's coverage sentence (the seat clause added). DEVELOPMENT_PRACTICES.md names the hash only as ai_skill_harness's R0 tier, not its coverage, so it is untouched.",
-    "result_metric": "begin_adopts_check.js on build_rel/ProjectIo.exe: 12 of 12 PASS, exit 0 -- \"adopt: EF627D3AA20F98C8\", \"cold : EF627D3AA20F98C8\", \"PASS  adopted == cold state hash\" (both paths seat the same drawn firm 61248; the same opening hash seat_pick_check's draw run printed). save_roundtrip: \"PASS P2 state_hash agrees across the round trip at the same tick\"; SAVE ROUND TRIP OK, exit 0."
-   },
-   {
-    "id": "R4",
-    "status": "complete",
-    "verification": [
-     "headless: world_determinism x2 (bit-identical run to run; old -> new against main recorded)"
-    ],
-    "requirement": "world_determinism run twice on the branch is bit-identical run to run; the digests that moved against main are recorded old -> new here and in the commit, and nothing is re-pinned on the branch (the moved pins are the re-bless's, taken by the main session after the merge).",
-    "notes": "2026-09-25: world_determinism's deep_digest folds world::state_hash(0), so its R3 digits move with this item by construction; spectator_determinism reports its unspectated hash without asserting it; player_seed_sweep was NOT run (the main session's re-bless).",
-    "result_metric": "world_determinism run 1 and run 2 (build_gen/verify/world_determinism.exe, Release /O2 /MD): both ALL PASS (0 failures); both print \"digest seedA/on  = 0570E3900D0BD53F and 0570E3900D0BD53F\", \"digest seedB/on  = D5616442F561DDD3\", \"digest seedA/off = B89B87C393B06FC9\", \"digest seedA/on/epoch0 = 0570E3900D0BD53F\" -- bit-identical run to run. OLD (main 6855a3cf): seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F. NEW (this branch): seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9 (all three moved)."
-   }
-  ]
- },
+  {
+   "brief": "state-hash-folds-seat",
+   "title": "BL-1082 - The world state hash folds in the seat, so two different picks no longer hash alike",
+   "difficulty": 1,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1082 - sprint 47 re-bless rider (ruled 2026-09-24)",
+   "batch": "sprint-47",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "code: world.cpp; world.hpp",
+      "headless: seat_pick_check.js",
+      "visual: seat_pick.lua S5"
+     ],
+     "requirement": "world::state_hash folds each corporation's is_player (inside the sorted corp walk) and world::player_entity (once), integer-only and deterministic, so two different picks on one world hash differently while the same pick -- or the draw and a pick of the drawn firm -- hash alike. The declaration comment states what the hash covers and why the seat is the one folded field a tick never moves (item-spanning gate).",
+     "notes": "2026-09-25: the fold sits beside the balance in the existing sorted walk (world.cpp), player_entity after it; both halves folded so a world where the flag and the id disagree is visible to the hash. No skip-when-empty guard: every hash moves once, structurally, at the re-bless this item rides.",
+     "result_metric": "seat_pick_check.js on build_rel/ProjectIo.exe: 13 of 13 PASS, exit 0 -- \"draw : seat 61248  EF627D3AA20F98C8\", \"pick X: seat 61248  EF627D3AA20F98C8\" (pick of the drawn firm == the drawn state hash), \"pick Y: seat 61231  C8CDEE309F88B7CB\" twice (run 1 hash == run 2 hash), \"PASS  a different pick is a different seat (from the state hash alone)\" (C8CDEE309F88B7CB != EF627D3AA20F98C8). seat_pick.lua: every expect PASS, 0 golden failure(s), exit 0 -- \"(seed, pick) reproduces the seat: BDFEC590611D1E46 == BDFEC590611D1E46\" (pick 56807) and \"a different pick is a different seat, from the state hash alone: BC31BFBDE966D16D ~= BDFEC590611D1E46\" (pick 56800 vs 56807 on the rebuilt seed-1 world); S3 \"Back changed nothing (state hash unmoved)\" and S6 \"every refusal moved nothing\" still hold."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: seat_pick_check.js",
+      "visual: seat_pick.lua"
+     ],
+     "requirement": "seat_pick_check.js asserts \"a different pick is a different seat\" from the state hash alone (y1.hash !== draw.hash); the player id read off the log is kept only as a diagnostic print. seat_pick.lua S5 asserts the same from the hash alone on the rebuilt world.",
+     "notes": "2026-09-25: the JS check's other rows (the drawn firm picked == the drawn hash; run 1 == run 2; the picked id names the firm) are BL-1076's reproducibility rows and stand unchanged; only the \"different seat\" claim moved onto the hash. In the Lua, `other` is guarded against pick_b (the reproducibility candidate) rather than the reference world's pick, since a firm id belongs to the world that generated it.",
+     "result_metric": "seat_pick_check.js: 13 of 13 PASS, exit 0 -- \"draw : seat 61248  EF627D3AA20F98C8\", \"pick X: seat 61248  EF627D3AA20F98C8\" (pick of the drawn firm == the drawn state hash), \"pick Y: seat 61231  C8CDEE309F88B7CB\" twice (run 1 hash == run 2 hash), \"PASS  a different pick is a different seat (from the state hash alone)\" (C8CDEE309F88B7CB != EF627D3AA20F98C8). seat_pick.lua: every expect PASS, 0 golden failure(s), exit 0 -- \"(seed, pick) reproduces the seat: BDFEC590611D1E46 == BDFEC590611D1E46\" (pick 56807) and \"a different pick is a different seat, from the state hash alone: BC31BFBDE966D16D ~= BDFEC590611D1E46\" (pick 56800 vs 56807 on the rebuilt seed-1 world); S3 \"Back changed nothing (state hash unmoved)\" and S6 \"every refusal moved nothing\" still hold."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: begin_adopts_check.js; save_roundtrip",
+      "code: grep src/ tools/ scripts/ for state_hash readers spanning a seat change"
+     ],
+     "requirement": "Every reader that compares state_hash where the seat is the same still holds: begin_adopts_check (adopted == cold state hash), save_roundtrip P2 (a round trip restores the same hash -- is_player and player_entity are serialised); no reader in src/ or tools/ compares a hash before and after a re-seat expecting equality; any doc asserting the old coverage is corrected.",
+     "notes": "2026-09-25: the twelve hash harnesses that touch is_player/player_entity all set them at fixture construction before any hash; order_book_harness builds three worlds with different seats but never hash-compares them; exploration_sim_harness references neither state_hash nor world_digest.hpp, so its pinned counters cannot move. Two docs asserted \"state_hash does not fold the seat\": ACTIONS.json gameplay.take_seat expected_output (corrected, ACTIONS.md regenerated by render_actions.js) and MULTIPLAYER_PRINCIPLES.md's coverage sentence (the seat clause added). DEVELOPMENT_PRACTICES.md names the hash only as ai_skill_harness's R0 tier, not its coverage, so it is untouched.",
+     "result_metric": "begin_adopts_check.js on build_rel/ProjectIo.exe: 12 of 12 PASS, exit 0 -- \"adopt: EF627D3AA20F98C8\", \"cold : EF627D3AA20F98C8\", \"PASS  adopted == cold state hash\" (both paths seat the same drawn firm 61248; the same opening hash seat_pick_check's draw run printed). save_roundtrip: \"PASS P2 state_hash agrees across the round trip at the same tick\"; SAVE ROUND TRIP OK, exit 0."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism x2 (bit-identical run to run; old -> new against main recorded)"
+     ],
+     "requirement": "world_determinism run twice on the branch is bit-identical run to run; the digests that moved against main are recorded old -> new here and in the commit, and nothing is re-pinned on the branch (the moved pins are the re-bless's, taken by the main session after the merge).",
+     "notes": "2026-09-25: world_determinism's deep_digest folds world::state_hash(0), so its R3 digits move with this item by construction; spectator_determinism reports its unspectated hash without asserting it; player_seed_sweep was NOT run (the main session's re-bless).",
+     "result_metric": "world_determinism run 1 and run 2 (build_gen/verify/world_determinism.exe, Release /O2 /MD): both ALL PASS (0 failures); both print \"digest seedA/on  = 0570E3900D0BD53F and 0570E3900D0BD53F\", \"digest seedB/on  = D5616442F561DDD3\", \"digest seedA/off = B89B87C393B06FC9\", \"digest seedA/on/epoch0 = 0570E3900D0BD53F\" -- bit-identical run to run. OLD (main 6855a3cf): seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F. NEW (this branch): seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9 (all three moved)."
+    }
+   ]
+  },
   {
    "brief": "civilisation-index-reuse-at-1200",
    "title": "BL-1049 - The civilisation and universal-creed tables cross the 1200 resume",

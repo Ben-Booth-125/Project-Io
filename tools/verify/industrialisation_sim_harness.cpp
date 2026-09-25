@@ -1301,6 +1301,7 @@ struct seed_fidelity
     // Both readings fold into gate 1 (a non-zero one is noted in open_tables).
     int  civ_rows_1200 = 0, civ_rows_1660 = 0, civ_rows_1960 = 0; ///< table sizes (reported)
     int  civ_carried_prefix = 0;   ///< rows of the 1660 table that are the 1200 table's, in order
+    int  creed_rows_1200 = 0, creed_carried_prefix = 0; ///< the creed table the same way (cold review: a prefix short of the 1200 table is a restarted resume, whatever the indices say)
     int  civ_past_1660 = 0, creed_past_1660 = 0; ///< indices at or past the table on the 1660 handoff
     int  civ_past_1960 = 0, creed_past_1960 = 0; ///< ... on the 1960 close
     int  civ_pairs_twice = 0;      ///< member pairs recorded twice across 1200 (must be 0)
@@ -1583,8 +1584,23 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             row.creed_past_1960 = t1960.creed_past;
             row.civ_pairs_twice = pairs_recorded_twice(fx.pre_exploration_civilisations, H.civilisations,
                                                        &row.civ_carried_prefix);
+            // THE CARRIED PREFIX IS GATED, NOT JUST PRINTED (cold review of BL-1049): a
+            // resume that restarted the tables can still read 0 indices past the table
+            // and 0 pairs twice on a seed where Exploration coins enough rows, so the
+            // gate also demands that the 1660 table BEGIN with the whole 1200 table --
+            // civilisations and creeds alike, the creeds element-wise by creed_eq.
+            row.creed_rows_1200 = static_cast<int>(fx.pre_exploration_universal_creeds.size());
+            row.creed_carried_prefix = 0;
+            for (std::size_t i = 0; i < fx.pre_exploration_universal_creeds.size()
+                                 && i < H.universal_creeds.size(); ++i)
+            {
+                if (!creed_eq(fx.pre_exploration_universal_creeds[i], H.universal_creeds[i])) break;
+                ++row.creed_carried_prefix;
+            }
             if (row.civ_past_1660 + row.creed_past_1660 + row.civ_past_1960 + row.creed_past_1960
-                + row.civ_pairs_twice != 0)
+                + row.civ_pairs_twice != 0
+             || row.civ_carried_prefix != row.civ_rows_1200
+             || row.creed_carried_prefix != row.creed_rows_1200)
                 row.open_tables.push_back(
                     "civilisation/creed tables (BL-1049): indices past the table 1660 civ "
                     + std::to_string(row.civ_past_1660) + " creed " + std::to_string(row.creed_past_1660)
@@ -1975,12 +1991,15 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
     for (const seed_fidelity& r : rows)
     {
         if (!r.ran) continue;
-        std::printf("  %5u  rows 1200 %3d -> 1660 %3d (carried prefix %3d) -> 1960 %3d | past the table: 1660 civ %d creed %d, "
+        std::printf("  %5u  rows 1200 %3d -> 1660 %3d (carried prefix %3d; creeds %d of %d) -> 1960 %3d | past the table: 1660 civ %d creed %d, "
                     "1960 civ %d creed %d | pairs recorded twice %d  %s\n",
-                    r.seed, r.civ_rows_1200, r.civ_rows_1660, r.civ_carried_prefix, r.civ_rows_1960,
+                    r.seed, r.civ_rows_1200, r.civ_rows_1660, r.civ_carried_prefix,
+                    r.creed_carried_prefix, r.creed_rows_1200, r.civ_rows_1960,
                     r.civ_past_1660, r.creed_past_1660, r.civ_past_1960, r.creed_past_1960, r.civ_pairs_twice,
-                    (r.civ_past_1660 + r.creed_past_1660 + r.civ_past_1960 + r.creed_past_1960
-                     + r.civ_pairs_twice) == 0 ? "PASS" : "FAIL");
+                    ((r.civ_past_1660 + r.creed_past_1660 + r.civ_past_1960 + r.creed_past_1960
+                      + r.civ_pairs_twice) == 0
+                     && r.civ_carried_prefix == r.civ_rows_1200
+                     && r.creed_carried_prefix == r.creed_rows_1200) ? "PASS" : "FAIL");
     }
 
     std::printf("\n=== ENTRY: where the handoff differs from the continued run at the top of 1660 (reported) ===\n");

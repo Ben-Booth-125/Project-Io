@@ -724,9 +724,19 @@ int main()
         // w_want_q = 0 VARIANT AND IS NOT THE PHASE'S READING: its span nearly stops
         // fighting (battles 322 -> 30), while exploration_sweep over the 16 parity seeds
         // is the verdict on whether displacement survives (see the wave A DEVLOG entry).
+        // RE-PINNED 2026-09-25 (Ben, sprint 47's one re-bless, authorised in principle
+        // 2026-09-24): tribute 228427344 -> 228427744. ONE CAUSE, +400 tribute and
+        // nothing else -- BL-1096 (the purchase verb): a realm may now BUY a
+        // province it reaches instead of taking it, at the ruled purchase rate, and
+        // the payment lands in the seller's tribute counter. Battles 30, conquests 27,
+        // foundings 816, subjections 3, freed 0, treaties 354, broken 1 and the
+        // 2061 owner changes are unmoved: on this w_want_q = 0 fixture the verb
+        // fires once. Read on the merged sprint-47 tree (894e736e) from a rebuilt
+        // harness; the sea-leg record (BL-1097), the band (BL-1101) and the tariff
+        // posture (BL-1102) touch nothing this fixture counts.
         check(ex1.battles == 30 && ex1.conquests == 27 && ex1.foundings == 816
            && ex1.subjections_formed == 3 && ex1.subjections_freed == 0
-           && ex1.tribute_remitted == 228427344 && ex1.treaties_formed == 354
+           && ex1.tribute_remitted == 228427744 && ex1.treaties_formed == 354
            && ex1.treaties_broken == 1 && ex1.owner_changes.size() == 2061,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");

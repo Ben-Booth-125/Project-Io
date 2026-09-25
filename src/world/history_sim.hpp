@@ -1945,7 +1945,9 @@ struct history_sim_params
     // The Industrialisation span (BL-1040, hard_coded_world.cpp) sets all
     // seven from its `exploration_output`; the Exploration span sets the two
     // record tables from its `pass_one_output` (BL-1049) and leaves the dated
-    // objects null, because the Empires span forms no treaty to carry.
+    // objects null (the 1200 resume does not carry them; whether the Empires
+    // span ever forms one is a per-seed fact nobody has counted -- outside
+    // BL-1049).
 
     /// Treaty clauses and tribute standing at the prior span's close
     /// (`exploration_output::dated_objects`), copied into this run's table at
@@ -1955,8 +1957,9 @@ struct history_sim_params
     /// Null here re-forms every treaty against an EMPTY table, which inflates
     /// each pair's trade value (it subtracts only OTHER partners' flows),
     /// binds pairs the history never bound, and expires the re-formed set
-    /// together one term later. The Exploration caller passes null because
-    /// the Empires span forms no treaty to carry.
+    /// together one term later. The Exploration caller passes null: the 1200
+    /// resume does not carry dated objects (whether the Empires span forms any
+    /// is uncounted; outside BL-1049).
     const std::vector<dated_object>* resume_dated_objects = nullptr;
 
     /// The civilisation and universal-creed records that the carried

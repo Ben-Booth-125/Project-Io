@@ -52,9 +52,9 @@ uint64_t world::state_hash(int tick) const
     // beside the hash to tell them apart (found by BL-1076). Both halves are
     // folded, not one: `player_entity` names the seat, the flags say exactly one
     // corp carries it, and a world where the two disagree is a broken invariant
-    // the hash should see. Integer-only and cheap. It moves every pinned hash
-    // once, structurally (new state, not new behaviour), at the re-bless it
-    // rides.
+    // the hash should see. Integer-only and cheap; every world carries a seat,
+    // so the fold moves every hash once, structurally (new state, not new
+    // behaviour).
     {
         std::vector<entity_id> ids;
         ids.reserve(corporations.size());
