@@ -232,19 +232,29 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     const fin_clock::time_point t_settle = fin_clock::now(); // reported only
     // Per-tick wall clock through a READ hook at the last lap: reported only,
     // so the slowest tick can be named below (see the result's field).
+    // The lap clock rides the same hook (BL-1117, NR-932): each tick's six lap
+    // times are kept so the slowest tick's line names the lap that costs it.
     struct tick_clock
     {
         fin_clock::time_point      last;
         std::vector<std::int64_t>* ms;
+        std::array<fin_clock::time_point, k_campaign_settle_lap_count + 1> laps{};
+        std::vector<std::array<std::int64_t, k_campaign_settle_lap_count>> lap_ms;
     } tc{t_settle, &out.settle_tick_ms};
     settle_tick_hooks hooks;
     hooks.ctx       = &tc;
+    hooks.lap_clock = &tc.laps;
     hooks.after_lap = [](const world&, int lap, void* ctx) {
         if (lap != k_campaign_settle_lap_count - 1) return;
         auto* c = static_cast<tick_clock*>(ctx);
         const fin_clock::time_point now = fin_clock::now();
         c->ms->push_back(ms_between(c->last, now));
         c->last = now;
+        std::array<std::int64_t, k_campaign_settle_lap_count> row{};
+        for (int i = 0; i < k_campaign_settle_lap_count; ++i)
+            row[static_cast<std::size_t>(i)] =
+                ms_between(c->laps[static_cast<std::size_t>(i)], c->laps[static_cast<std::size_t>(i) + 1]);
+        c->lap_ms.push_back(row);
     };
     run_settle(w, reg, k_campaign_settle_ticks, &hooks, progress);
     out.ms_settle = ms_between(t_settle, fin_clock::now());
@@ -264,6 +274,16 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
                 static_cast<long long>(out.ms_search), k_campaign_settle_ticks,
                 static_cast<long long>(out.ms_settle), slowest,
                 static_cast<long long>(slowest_ms), params.seed, w.corporations.size());
+    if (slowest >= 0 && static_cast<std::size_t>(slowest) < tc.lap_ms.size())
+    {
+        std::printf("[finish_campaign_world] slowest tick %d by lap:", slowest);
+        for (int i = 0; i < k_campaign_settle_lap_count; ++i)
+            std::printf(" %s %lld ms%s", k_campaign_settle_lap_names[i],
+                        static_cast<long long>(tc.lap_ms[static_cast<std::size_t>(slowest)]
+                                                        [static_cast<std::size_t>(i)]),
+                        i + 1 < k_campaign_settle_lap_count ? ";" : "");
+        std::printf("\n");
+    }
     std::fflush(stdout);
     return out;
 }

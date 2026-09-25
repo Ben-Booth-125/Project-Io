@@ -109,11 +109,40 @@ void run_settle(world& w, const recipe_registry& reg, int ticks,
     // what these ticks produce) at day tick 0 (the sim loop is rebuilt at Begin
     // and never advanced on the building screen). Econ steps 0..ticks-1: live
     // play continues the counter from `ticks`.
-    if (progress != nullptr) progress->report_sub(0, ticks);
+    //
+    // THE INNER BAR COUNTS LAPS, NOT TICKS (Ben, 2026-09-25, NR-932). One tick
+    // can cost 30-40x the others (tick 1: 44-62 s of a 69-114 s settle), so a
+    // per-tick count held the round-6 bar still for most of the wait -- the
+    // "a wait never looks stopped" rule failing by construction. The caller's
+    // hooks are chained, not replaced, and the report is write-only, so the
+    // tap cannot move a world. Why tick 1 costs what it does is BL-1117's.
+    constexpr int laps = k_campaign_settle_lap_count;
+    struct lap_tap
+    {
+        const settle_tick_hooks* inner;
+        generation_progress*     progress;
+        int                      step;
+        int                      total;
+    } tap{hooks, progress, 0, ticks * laps};
+    settle_tick_hooks chained;
+    if (hooks != nullptr) chained = *hooks;
+    if (progress != nullptr)
+    {
+        chained.ctx       = &tap;
+        chained.after_lap = [](const world& cw, int lap, void* ctx) {
+            auto* t = static_cast<lap_tap*>(ctx);
+            if (t->inner != nullptr && t->inner->after_lap != nullptr)
+                t->inner->after_lap(cw, lap, t->inner->ctx);
+            t->progress->report_sub(t->step * k_campaign_settle_lap_count + lap + 1, t->total);
+        };
+    }
+    const settle_tick_hooks* use = (progress != nullptr) ? &chained : hooks;
+
+    if (progress != nullptr) progress->report_sub(0, tap.total);
     for (int econ_step = 0; econ_step < ticks; ++econ_step)
     {
-        (void)run_settle_tick(w, reg, econ_step, /*day_tick=*/0, /*spectating=*/true, hooks);
-        if (progress != nullptr) progress->report_sub(econ_step + 1, ticks);
+        tap.step = econ_step;
+        (void)run_settle_tick(w, reg, econ_step, /*day_tick=*/0, /*spectating=*/true, use);
     }
     if (progress != nullptr) progress->report_sub(0, 0);
 }

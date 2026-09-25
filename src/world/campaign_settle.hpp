@@ -105,9 +105,10 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
 /// returns and prices it leaves ARE the opening position (ERAS.md § The opening
 /// position); the calendar is rebased at Begin, so it has no calendar meaning.
 ///
-/// @p progress, when non-null, has its inner bar counted per tick
-/// (`report_sub(done, ticks)`) and cleared at the end; nothing is read back.
-/// @p hooks is handed to every tick.
+/// @p progress, when non-null, has its inner bar counted per LAP
+/// (`report_sub(done, ticks * k_campaign_settle_lap_count)`; NR-932) and
+/// cleared at the end; nothing is read back. @p hooks is handed to every tick,
+/// chained ahead of the lap tap when both are set.
 void run_settle(world& w, const recipe_registry& reg, int ticks = k_campaign_settle_ticks,
                 const settle_tick_hooks* hooks = nullptr,
                 generation_progress* progress = nullptr);

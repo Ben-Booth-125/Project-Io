@@ -65,6 +65,11 @@ change built sprint-47 surfaces. Each is small; each is done before its item's l
   Guashe These since 1660 CE").
 - [ ] C4 BL-1085 (Begin retired into round six): a per-tick progress tap on the settle so the
   round-6 bar moves through tick 1 (NR-932 C; the cost itself is BL-1117, settle tick one cost).
+  PARTIAL 2026-09-25: the inner bar counts laps (12 x 6), not ticks, and the finish names the
+  slowest tick's laps. gen_step_costs --finish 0 (Release): LONGEST STILL 38.38 s (NR-932 read
+  90.91 s), and tick 1's 38.5 s is ALL `run_economy_step` (38453 ms; the other laps 33 ms). The
+  bar still holds for that one lap. Open for Ben: accept at lap grain until BL-1117 cuts the
+  cost, or thread a per-corporation tap into `run_economy_step`.
 
 ### Wave 0, lane G (generation seams) — BL-1083 (one seed per span). Group `span-seeds-per-round`.
 
