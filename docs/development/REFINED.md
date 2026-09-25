@@ -58,9 +58,23 @@ the file is 3,027 lines now. Re-read before trusting any `:NNN`.
 - [ ] K5 Cold review and its fix round (R8).
 
 **Roads — BL-1119 (roads tree and detour).**
-- [ ] D1 The floor, measured. Road tiles, spur count and road pass time per village-size floor
+- [x] D1 The floor, measured. Road tiles, spur count and road pass time per village-size floor
   candidate on the 16 curated seeds, Release (R1). The lane stops and reports; the main session
   fixes the floor.
+  DONE 2026-09-25 (branch commit e0267b2b; table in scratchpad lane-roads/d1_table.md): THE
+  "LATTICE" IS STREET TILES. Population centres cover 49-100% of land (seed 46: 15,240 centres on
+  15,240 land tiles) and every centre is a street, so road tiles barely move under any rule (tree
+  at floor 0 = old lattice on 15 of 16 seeds). The floor removes the spur mesh (off-street road
+  tiles, median 470 -> 25 at 40,000 heads). Size is the population step's key in heads (every
+  village's `population` is exactly 10k when roads are laid). Pass time, indicative: old 82 s
+  median; tree @40,000 18 s (1 of 16 seeds under 10 s); no spurs 13 s (4 of 16). Border-link
+  probes are 56-68% of the remaining searches. Provisional floor 40,000 (~p90). Digests move
+  (world_determinism seedA/on 0570E3900D0BD53F -> D356F1A2E9148EDE). road_generation_harness:
+  connectivity and determinism pass; "R2 highway tier reachable when qualified" FAILS (0 of 8
+  seeds), identically on unmodified b03fd52e — pre-existing, not weakened.
+  CALLS FOR BEN: street density (below-floor villages lose their street / the lens draws streets
+  apart / fix centre density upstream in POPULATION.md); the floor; border links ending on a
+  bare village street (106 of 151 on seed 46 at 40,000).
 - [ ] D2 The tree. Kruskal MST, then the detour test (`kDetourRatio`, 2.0: a link only where the
   network route costs more than twice the direct A* route); the percentile rationing applies to the
   loops it admits; the border link rule unchanged; spurs above the fixed floor only (R2, R3).
@@ -70,20 +84,44 @@ the file is 3,027 lines now. Re-read before trusting any `:NNN`.
 - R5 (the whole tail inside 35 s) closes in the main session with S2.
 
 **Settle — BL-1117 (settle tick one).**
-- [ ] S1 Time tick 1 by phase inside `run_economy_step` (write-only clocks; the corp AI cadence is
+- [x] S1 Time tick 1 by phase inside `run_economy_step` (write-only clocks; the corp AI cadence is
   the first suspect), seeds 0 and 28, Release. Name the phase with its milliseconds (R1). The lane
   stops and reports.
-- [ ] S2 The fix, written here from S1's reading (R2), then the whole-tail reading with D3 (BL-1119
-  R5).
+  DONE 2026-09-25 (branch commit 4e7d3cb4, indicative on a loaded machine): NOT the corp AI. Tick
+  1 is the settle's FIRST CONVOY COMMIT: `passive_lp_admit` -> `nearest_lp_anchor` loops every LP
+  anchor on the body and, on a double miss, floods the whole body from each one (9,038 floods on
+  seed 0, 6,079 on seed 28, ~10 ms each; lap 1 ~93 s and ~70 s). Tick 0 commits nothing (no clear
+  yet); ticks 2-11 reuse the fields. The fields stay on the world: ~1.7 GB on seed 28, est. ~2.5 GB
+  on seed 0. A loaded game's first commit should pay it again (caches clear on load; inferred).
+- [ ] S2 The fix (Ben's cut: in this sprint). One per-body multi-source field answers
+  `nearest_lp_anchor` (nearest anchor and cost per tile), cached and cleared with the other
+  logistics caches, a pure function of tiles and anchors (a harness row asserts warm = cold); the
+  clock declaration moves to `economy_system.hpp`. Measure tick 1, the fields alive, and digest
+  movement (a named re-bless cause). Check, not fix: whether cache-dependent path costs make a
+  save/load continuation diverge. Then the whole-tail reading with D3 (BL-1119 R5).
+  provides: the per-body nearest-anchor field. consumes: —.
 
 **UI — BL-1118 (round legends) + BL-1124 (sea lanes seen).**
-- [ ] U1 A legend per lapse round (Culture, Empires, Exploration, Industrialisation) listing the
+- [x] U1 A legend per lapse round (Culture, Empires, Exploration, Industrialisation) listing the
   layers that round draws, read from the painter's own predicates, glyphs by the painter's calls;
   its question-log entry; a capture per round (BL-1118 R1, R2).
   provides: the legend's layer predicates. consumes: —.
-- [ ] U2 Three lane forms on seed 32's close frame: a brighter core line inside the band, a
+  DONE 2026-09-25 (736a38aa, merged e4a6370b): one `lapse_layers_drawn(h)` decides per record
+  what each round draws; every map pass, the fleets reading and the legend read it; swatches are
+  the map's own `paint_*` calls. The Empires cut moved into it. Seed 32 keys: Culture 8 rows,
+  Empires 16, Exploration 25, Industrialisation 26. Also fixed: every lapse map clipped its east
+  120 px at 1920x1080 (`lapse_map_frame`). round_legends.lua and sea_lanes.lua re-run on main's
+  Release build (19:31): exit 0, 0 golden failures. UI-121 catalogued in ui_elements.json.
+  FOR BEN: the Empires map draws "Furnaces lit" squares that STARTUP.md § Round 4 neither lists
+  nor cuts; four labels drafted where the glossary is silent ("Merchant sail", "Treasury, 1200
+  CE", "Seat; slides if moved", "Kin line across water").
+- [x] U2 Three lane forms on seed 32's close frame: a brighter core line inside the band, a
   shipping glyph at each end, an arc bowed away from the tie; one capture each, and a temporary
   selector so the live app can show each (BL-1124 R1). The legend names the lane. consumes: U1.
+  DONE 2026-09-25 (same commit): a radio row above the Exploration and Industrialisation maps,
+  "Sea lane form (temporary, for the pick)", default (a). FOR BEN BEFORE HE PICKS: 13 of seed 32's
+  16 lanes draw under 8 px (short hops inside one archipelago); only three are long (136, 81, 36
+  px), and only form (b) marks the short ones.
 - [ ] U3 Ben picks at the live app; the other two forms and the selector are removed; the walk
   (BL-1124 R2, R3; BL-1118 R3).
 

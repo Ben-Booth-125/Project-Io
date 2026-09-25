@@ -6704,23 +6704,23 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: a capture per lapse round (Culture, Empires, Exploration, Industrialisation)"
      ],
      "requirement": "Each lapse round's legend lists the layers that round draws and only those, read from the painter's own predicates, with glyphs drawn by the painter's calls.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "2026-09-25, main e4a6370b, build_rel Release 19:31: scripts/verify/round_legends.lua exit 0, 0 golden failures, one capture per lapse round (seed 32). Keys read from lapse_layers_drawn(h), the per-record decision every map pass gates on: Culture 8 rows, Empires 16 (no caravan, captured ring, capital slide or fleets: the cut), Exploration 25, Industrialisation 26. Swatches are the map's own paint_* calls."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: docs/ui/question_log.json + render_question_log.js"
      ],
      "requirement": "The legend has its question-log entry.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "docs/ui/question_log.json gains wizard_round_legend (736a38aa); QUESTION_LOG.md regenerated; also catalogued as UI-121 in docs/ui/ui_elements.json."
     },
     {
      "id": "R3",
@@ -6748,13 +6748,13 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: sea_lanes.lua, seed 32 close frame, one capture per candidate"
      ],
      "requirement": "Three candidate lane forms (a brighter core line inside the band, a shipping glyph at each end, an arc bowed away from the tie) are captured at seed 32's close frame.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "2026-09-25, main e4a6370b: scripts/verify/sea_lanes.lua exit 0, 0 golden failures; captures sea_lanes_form_a_core_line / _b_end_anchors / _c_bowed_arc at seed 32's 1660 close frame, each switched by a real click on the temporary selector. 13 of the 16 lanes draw under 8 px."
     },
     {
      "id": "R2",

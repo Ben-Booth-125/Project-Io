@@ -1911,6 +1911,23 @@
    "checks": [
     "history_lapse_press"
    ]
+  },
+  {
+   "id": "UI-121",
+   "name": "Wizard lapse-round legend (rounds 3-6)",
+   "kind": "sub-element",
+   "parent": "UI-092",
+   "source": [
+    "docs/ui/STARTUP.md § Rounds (Round 4: the legend ruling)",
+    "src/ui/history_lapse.cpp lapse_layers_drawn / legend_columns"
+   ],
+   "summary": "A key under each lapse round's map (Culture, Empires, Exploration, Industrialisation) in five columns: the ground, who holds it, routes, marks, at sea. It lists exactly the layers the round draws on THIS record at any frame of its span, read from lapse_layers_drawn, the same per-round decision every map pass gates on; each swatch is drawn by the map's own paint call at the map's scale in the round's own colours. A layer cut from a round drops from its key by construction. The map shrinks to leave room; the key never covers it.",
+   "interesting_question": "The key is decided per round, not per frame: a layer that first appears late in the span (the sea lanes open late in Exploration) is keyed from the span's first year. Does naming a layer before it appears help the player look for it, or read as a key that is wrong?",
+   "resolution": "open",
+   "checks": [
+    "round_legends",
+    "sea_lanes"
+   ]
   }
  ]
 }
