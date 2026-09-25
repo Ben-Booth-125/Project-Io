@@ -1873,12 +1873,14 @@
    "source": [
     "docs/ui/STARTUP.md § Rounds 4, 5 and 6"
    ],
-   "summary": "A 2D political map in place of the globe, replaying a recorded ownership history (era_timelapse / owner_slice_at) at tile resolution with every land tile assigned to its nearest region; run-merged per row so a 261x121 raster stays inside ImGui 16-bit draw indices. Drawn by BOTH lapse rounds - round 4 The Migration and round 5 The History - each from its own record slot. Takes no mouse input, inheriting the globe rule; playback frozen under --verify.",
+   "summary": "A 2D political map in place of the globe, replaying a recorded ownership history (era_timelapse / owner_slice_at) at tile resolution with every land tile assigned to its nearest region; run-merged per row so a 261x121 raster stays inside ImGui 16-bit draw indices. Drawn by BOTH lapse rounds - round 4 The Migration and round 5 The History - each from its own record slot. Takes no mouse input, inheriting the globe rule; playback frozen under --verify. Every lapse round (3-6) draws it; the roads a round lays are handed on at the seam and drawn from the next round's first frame (BL-1134, roads carried across rounds), and a sea lane is a bowed arc off its colonial tie's line (BL-1124).",
    "interesting_question": "The wizard walks the two rounds the design asks for, but generation still emits ONE recorded age: rounds 4 and 5 run the same pass and replay the same span, so the migration does not yet stop where the history begins. Does a player read two rounds showing the same map as a bug?",
    "resolution": "Open, and named on screen rather than hidden: each round's caption says it replays the same recorded age as the other and why. The generation-side split - a migration span with its own terminating condition, then a history span to 1200 CE - is BL-858/BL-861.",
    "checks": [
     "history_lapse",
-    "history_lapse_press"
+    "history_lapse_press",
+    "sea_lanes",
+    "roads_carried"
    ]
   },
   {
