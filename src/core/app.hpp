@@ -827,7 +827,15 @@ private:
     /// the loading carve can colour by realm before the nation entities exist.
     /// True when a round's table was set; false when the wizard has none to
     /// give, and the caller derives from the report instead.
-    bool pin_realm_colours_from_wizard();
+    /// @param rep The report the table must belong to: the round's record has
+    ///            to be that report's own time-lapse (start year, span, region
+    ///            count, the change / event / sample / step counts and the realm
+    ///            name table all equal), else nothing is set and false comes
+    ///            back — a load must never wear a realm table the wizard left
+    ///            behind from a different world (the cold review's finding).
+    ///            nullptr means the caller vouches for the world: Begin waiting
+    ///            on round 6's own build, whose report does not exist yet.
+    bool pin_realm_colours_from_wizard(const generation_report* rep);
 
     // --- The seat (BL-630, 2026-08-26) --------------------------------------
     //

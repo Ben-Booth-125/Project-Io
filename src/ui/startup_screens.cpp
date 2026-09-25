@@ -2233,17 +2233,63 @@ std::vector<uint32_t> derive_realm_colours(const generation_report& rep,
     return realm;
 }
 
+/// Is the wizard round @p h holds THIS report's own record? A round's record
+/// is a copy of the homeworld's time-lapse for that round, so the descriptor
+/// (start year, span, region count), the list sizes and the realm name table
+/// all agree when it is, and a record of another world fails on the first of
+/// them that differs. Cheap: sizes and one string-vector compare.
+bool lapse_is_reports_own(const ui::history_lapse& h, int lapse_index, const generation_report& rep)
+{
+    const generation_report::body_entry* home = nullptr;
+    for (const generation_report::body_entry& b : rep.bodies)
+        if (b.is_homeworld) { home = &b; break; }
+    if (home == nullptr) return false;
+    const era_timelapse& t = lapse_index == 3 ? home->industrialisation_timelapse
+                           : lapse_index == 2 ? home->exploration_timelapse
+                                              : home->prehistory_timelapse;
+    const era_timelapse& r = h.lapse;
+    return r.start_year == t.start_year && r.years == t.years
+        && r.region_stride == t.region_stride
+        && r.changes.size() == t.changes.size() && r.events.size() == t.events.size()
+        && r.samples.size() == t.samples.size() && r.steps.size() == t.steps.size()
+        && r.polity_name == t.polity_name;
+}
+
 } // namespace
 
-bool app::pin_realm_colours_from_wizard()
+bool app::pin_realm_colours_from_wizard(const generation_report* rep)
 {
     // The last landed polity round holds the colours the player watched:
     // that table, verbatim, at its close. Nothing when the wizard did not run
     // (a cold Begin, `--autostart`), and the report path below fills in.
     for (int i = wizard_lapse_round_count - 1; i >= 1; --i)
     {
+        // A landed round the player never drew is derived here as at the
+        // hand-over: its slots are the derivation's.
+        if (!m_wiz_history_future[i].valid())
+            derive_lapse_for_handover(m_wiz_history[i], i + wizard_planetology_round_count + 1,
+                                      m_wiz_surface, m_wiz_terrain);
         const ui::history_lapse& h = m_wiz_history[i];
         if (h.empty() || !h.derived() || h.owners_are_cultures || h.polity_slot.empty()) continue;
+        // THE RECORD MUST BE THIS WORLD'S (the cold review's finding on
+        // BL-1089). The wizard's records survive a Begin, a load and a trip
+        // through the menu, and nothing else clears them; a save of another
+        // world loaded after a wizard run would otherwise index that world's
+        // nations into this one's slots, and the console would still say
+        // "pinned from the realms". The round's record is a copy of the
+        // report's own time-lapse, so equality on its descriptor and its
+        // tables is the test; a mismatch on the last landed round means the
+        // rounds below it are the same session's, so nothing is trusted.
+        if (rep != nullptr && !lapse_is_reports_own(h, i, *rep))
+        {
+            std::printf("[identity] the wizard's round %d record is not this world's "
+                        "(start %d, %d years, %d regions, %zu realms named): its realm table "
+                        "is not used; the report's own derivation stands\n",
+                        i + wizard_planetology_round_count + 1, h.lapse.start_year, h.lapse.years,
+                        h.lapse.region_stride, h.lapse.polity_name.size());
+            std::fflush(stdout);
+            return false;
+        }
         const int end = h.lapse.start_year + h.lapse.years;
         std::vector<uint32_t> realm(h.polity_slot.size(), 0u);
         for (std::size_t p = 0; p < h.polity_slot.size(); ++p)
@@ -2269,7 +2315,7 @@ void app::pin_nation_colours_from_report()
     // equality R2 promises between the round the player watched and the
     // table a load re-derives is a count printed here, not an assertion.
     // The derivation is three rasters and three assignments, cheap at Begin.
-    const bool wizard_table = pin_realm_colours_from_wizard();
+    const bool wizard_table = pin_realm_colours_from_wizard(&m_generation_report);
     const std::vector<uint32_t> derived =
         derive_realm_colours(m_generation_report, *home, m_world, wizard_lapse_round_count);
     if (!wizard_table)

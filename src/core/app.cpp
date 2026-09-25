@@ -630,8 +630,11 @@ void app::begin_new_game()
     // BL-1089: the realms' colours from the wizard's last landed round, so
     // the loading carve colours each nation by its realm before the nation
     // entities exist (the polity per nation index comes off the carve tap).
+    // Cleared here; SET only on the two paths that build the wizard's own
+    // world (the wait on round 6 below, and the adopt) — a cold build after a
+    // wizard run is another world, and its carve must not wear the wizard's
+    // slots (the cold review's finding on BL-1089).
     ui::palette::clear_nation_colour_table();
-    pin_realm_colours_from_wizard();
 
     // --- BL-1085: BEGIN WAITS FOR ROUND 6, THEN ADOPTS ----------------------
     //
@@ -655,6 +658,10 @@ void app::begin_new_game()
         // build's figures would otherwise show under a different world's wait
         // (the review's fix round on BL-1085). Cleared here, never a stale split.
         m_worldgen_progress.budget_ready.store(false, std::memory_order_relaxed);
+        // The world being built is the wizard's own (a stale run is dropped
+        // at its landing, and the final pin re-checks against the report), so
+        // the carve wears the wizard's realm colours: vouched, no report yet.
+        pin_realm_colours_from_wizard(nullptr);
         m_screen = app_screen::building;
         return;
     }
@@ -677,6 +684,10 @@ bool app::try_adopt_wizard_world()
         drop_wizard_world("its params no longer match the wizard's");
     if (!(m_wiz_world && m_wiz_world->ready))
         return false;
+
+    // BL-1089: the realm colours for the carve, checked against the cached
+    // world's own report — the record the wizard shows must be this report's.
+    pin_realm_colours_from_wizard(&m_wiz_world->report);
 
     m_worldgen_slot = std::move(m_wiz_world);
     m_wiz_world.reset(); // one world at most: the cache is spent
