@@ -6680,13 +6680,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold, author != reviewer)"
      ],
      "requirement": "A cold review of the merged change, fix round included, before the commit.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Cold review of 4e7d3cb4 + 1510870b (2026-09-25): no crash or determinism break; the multi-source field equals the old per-anchor minimum in float. Fix round in a2b3e948 and 5236d8fb: tie contract restated, F1 non-vacuous and counting every body, F2 reporting tie cells, stale comments fixed; road generation's hand-cleared caches replaced by invalidate_logistics_caches (BL-1119 round 2)."
     }
    ]
   },
@@ -6970,11 +6970,11 @@
    "difficulty": 3,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1126 - sprint 48 (Ben's density form, 2026-09-25)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-09-25",
+   "resolution": "Complete 2026-09-25: a path is directed and read one way only; a save/load continues identically; the direction is tested.",
    "rows": [
     {
      "id": "R1",
@@ -6999,13 +6999,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold, author != reviewer)"
      ],
      "requirement": "A cold review of the merged change, fix round included, before the commit.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Cold review of a2b3e948 (2026-09-25): no logic defect; the direction flip hand-checked on an east-west river hop and a row crossing; purity and every orientation reader confirmed. Fix round 5236d8fb (merged b82b0957): logistics_harness T4b/T4c/T4d test the direction (they FAIL when the flip is reverted; T4c alone fails a parity-only mutation), T4's symmetry assertion retired; lp_anchor_field_check L1 is a check (exits 1 on divergence, shown against 95bfb22a); F1 counts every anchored body (1 of 1 per seed); stale comments fixed. world_determinism unmoved by the fix round. Main: logistics_harness direction rows PASS."
     }
    ]
   }

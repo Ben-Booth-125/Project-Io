@@ -807,30 +807,6 @@
    "parked": false,
    "author": "Claude (sprint 48 wave 1 lanes, 2026-09-25)",
    "status": "designed",
-   "sprint": 48,
-   "id": "BL-1126",
-   "short_name": "PATH_COST_READS_THE_CACHE",
-   "category": "Economy",
-   "priority": "S",
-   "difficulty": 3,
-   "title": "A path's cost is a function of its two ends, never of which flood field happens to be cached, so a loaded game continues as the unsaved one does",
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "files": [
-    "src/world/logistics.cpp",
-    "src/world/logistics.hpp",
-    "tools/verify/lp_anchor_field_check.cpp",
-    "docs/economy/LOGISTICS.md"
-   ],
-   "design": "SETTLED (Ben, 2026-09-25, the density form): fix THIS sprint. LOGISTICS.md § 1 now states the rule: a path is directed; its cost is always origin -> destination, read one way only, never whichever direction a cache holds. A named cause in the sprint's one re-bless.\n\nFOUND 2026-09-25 by the settle lane (BL-1117 S2, row L1 of lp_anchor_field_check). A save and load after settle tick 1, then both worlds ticked in lockstep: the settle digest DIVERGES (seed 0 first at tick 2; seed 28 at tick 3 and through tick 11). Control: clearing the unsaved world's four logistics caches at the save point makes both match on every tick 2-11, so the cause is cache state, not the save's bytes.\n\nWHY. river_edge_discount makes an edge DIRECTED (downstream is cheaper than upstream), so the float sum of a path differs by direction; intra_body_path answers a pair from whichever endpoint's flood field exists (or which pair was asked first), and a load empties those caches, so the continuation re-derives some pairs from the other end. LOGISTICS.md § 1 still says \"an edge cost is the mean of its two nodes, which is what makes a path symmetric\" -- false against the code. The one-field nearest anchor (BL-1117) is already pure; the pair cache and flood fields are not.\n\nTHE WORK. Make intra_body_path(a, b) a pure function of (a, b): the cost of a path origin -> destination is always read from the destination's flood field (built if absent), never from the origin's; the pair cache keys the ordered pair. Measure the flood count this adds on the settle and on a play year. Correct LOGISTICS.md § 1 (edges are directed where a river discounts them; the path cost is origin -> destination). A world-mover: digests move wherever a read used to come off the origin's field.\n\nDONE WHEN. lp_anchor_field_check L1 matches on every tick 2-11 on seeds 0 and 28 WITHOUT the --cold-original control; flood count and settle time old -> new recorded; LOGISTICS.md states the direction."
-  },
-  {
-   "glyph": "✓",
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "author": "Claude (sprint 48 wave 1 lanes, 2026-09-25)",
-   "status": "designed",
    "sprint": null,
    "id": "BL-1127",
    "short_name": "MARKET_FOR_TILE_IGNORES_WRAP",
@@ -913,6 +889,27 @@
     "tools/verify/road_generation_harness.cpp"
    ],
    "design": "SETTLED (Ben, 2026-09-25, the density form) (POPULATION.md § Generation, \"Growth consolidates\"). FOUND BY THE ROADS LANE (BL-1119 D1, 2026-09-25): population centres cover 49-100% of land on the 16 curated seeds (seed 46: 15,240 centres on 15,240 land tiles), every centre is a street, so the \"lattice\" Ben saw is streets and no road rule can thin it; the carve markets (75% of ~311 a world, BL-1125's census) follow the same density. POPULATION.md already wants \"a few cities over many towns over a train of villages\" and records that the remaining displacements are regions \"wanting more cities than it has ground\".\n\nTHE RULE. As a region's urban heads rise, its villages merge into a town rather than a new village standing beside them; a region never carries more centres than its ground holds (their urban footprints fit inside its own cell); a built-out cell promotes a centre it already has instead of spilling one into a neighbour's cell. Pure integer functions of the region record, no RNG, as the rest of the demography.\n\nTHE WORK, measure first (Rule 0b). (1) Read where the region's `centres` integer grows (the history's urban growth and promotion) and where generate_population_centres spills; report centres per seed, land share covered by centres, scale distribution, spills -- old. (2) Build the rule. (3) Report the same -- new -- plus the carve's market count (market_census) and road tiles (gen_step_costs --roads), because both follow. Tune nothing to hit a count; if the rule as written leaves density far from the doc's shape, report and stop for Ben.\n\nA WORLD-MOVER AND A SIM BEAT: a named cause in the sprint's one re-bless, measured in its own worktree. DONE WHEN the rule runs, POPULATION.md states it (done at the ruling), the per-seed centre count and land share are recorded old -> new, and the densest seed's road lens shows land that is not street."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-25",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1131",
+   "short_name": "LOGISTICS_HARNESS_FIXTURE_NO_ANCHOR",
+   "author": "Claude (sprint 48, the BL-1126 review fix round, 2026-09-25)",
+   "category": "Tooling",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "logistics_harness's intra-body dispatch rows run on a fixture with a Logistic Point anchor, so they test dispatch rather than the passive-LP refusal",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "tools/verify/logistics_harness.cpp"
+   ],
+   "design": "FOUND 2026-09-25 by the settle lane (BL-1126 review fixes): six logistics_harness T7-T10 rows FAIL on main and identically on the pre-sprint logistics code (b03fd52e) -- \"intra-body shortfall dispatches one convoy\" and the cost, city-discount and hub-discount rows. Their fixture has no Logistic Point anchor, so the passive-LP gate (LOGISTICS.md § the LP split) refuses the convoy before any cost is priced, and the rows read a refusal as a failed dispatch. logistics_harness therefore exits 1 (35 PASS, 6 FAIL) and cannot gate anything. THE WORK: give the fixture an anchor (a city on the origin's body, or a built hub) and re-derive the expected discounts from the doc, not from the output; keep one row that asserts the refusal on an anchorless body. DONE WHEN logistics_harness exits 0 on main."
   }
  ]
 }
