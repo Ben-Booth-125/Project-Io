@@ -72,6 +72,10 @@ RNG anywhere on the path:
   rank-size share of its own urban heads, as many as keep the smallest a village's worth. **A
   region whose cell holds no land carries no centre** (Ben, 2026-09-25): it has no ground to stand
   one on, so nothing spills.
+  **A place's size is its people, never how many centres they are split into (Ben,
+  2026-09-25).** A history reader that asks how big or how valuable a region is — the campaign
+  prize, the reach relay — reads its urban heads, so the same people make the same prize however
+  the hierarchy divides them into villages and towns.
   **A 1960 world aims at roughly 500 centres (Ben, 2026-09-25)** — about a dozen for each
   market, most land open country between them. It is the aim the forces are calibrated against
   (settle spacing, consolidation, industrial urbanisation, abandonment), measured on the curated
