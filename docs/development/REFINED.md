@@ -185,6 +185,13 @@ LOGISTICS.md §§ 1, 4, 6.
 - [ ] C1 BL-1130 (centres consolidate): a committed centre census old -> new; villages merge into
   towns; no region carries more centres than its cell holds. Files: `settlement.*`,
   `population_generation.*`, `history_sim.cpp` (urban growth only). A new lane.
+  BUILT, NOT MERGED (ad38e422, stopped for Ben 2026-09-25): a rank-size hierarchy inside each
+  region, capped to its cell's land; two-pass placement. Pooled over 16 seeds: land under centres
+  70.4% -> 31.2% (seed 46 100% -> 40.2%), centres 164,982 -> 73,115, road tiles 168,050 ->
+  87,243, markets 4,984 -> 5,643 (more towns pass the carve's gate). What remains: settled cores
+  packed one region per tile, province anchors grown 2-3x. THE HISTORY MOVED (synthetic R1 battles
+  7 -> 98; seed 40 regions 1,461 -> 2,703), cause not isolated. Calls put to Ben (the BL-1130
+  form).
 - [ ] M4 BL-1125 build, after C1 lands: twins fold and gravity fold at the carve (the reach
   calibrated on the consolidated world), conquest consolidates in the history (`history_sim.cpp`,
   the market marking). The markets lane, opened when C1 reports.

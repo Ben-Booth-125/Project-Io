@@ -92,9 +92,10 @@ Results cache on `world.astar_cost_cache` under the **ordered** (origin, destina
 path is directed (§ 1), so the per-tick dispatch loop pays each search once.
 
 > **A trap worth carrying forward.** A cached path's tiles are stored low tile to high tile
-> whichever way it was asked, so a caller reading one must apply its own orientation. `body_surface_canvas.cpp` copies and conditionally
-> reverses it. Get the orientation wrong and a convoy's head lands at the wrong end of the lane half
-> the time — **invisible on screen, fatal to interdiction.**
+> whichever way it was asked, so a caller reading one must apply its own orientation.
+> `convoy_route_tiles` orients a convoy's route once for every reader (the canvas, interdiction),
+> and a unit's march orients its own. Get the orientation wrong and a convoy's head lands at the
+> wrong end of the lane half the time — **invisible on screen, fatal to interdiction.**
 
 ### 3. Reach — the placement constraint
 
