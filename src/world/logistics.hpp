@@ -49,10 +49,17 @@ float tile_traversal_cost(const tile_component& tc);
 /// an empty vector for an unknown body.
 const std::vector<entity_id>& body_tile_grid(world& w, entity_id body);
 
-/// Terrain-weighted A* between two tiles on the same body, with cylinder wrap and the
-/// road discount; caches on world.astar_cost_cache under a canonicalised endpoint key
-/// (edge cost is the average of the two tiles' costs, so the path is symmetric). Returns
-/// {reachable=false} if either tile is unknown or not on `body`.
+/// Terrain-weighted least-cost path between two tiles on the same body, with cylinder
+/// wrap, the road discount and the river discount. Returns {reachable=false} if either
+/// tile is unknown or not on `body`.
+///
+/// DIRECTED, AND A PURE FUNCTION OF THE ORDERED PAIR (BL-1126, path cost reads the
+/// cache; LOGISTICS.md § 1). A river discounts an edge one way only, so the cost is
+/// always the travel cost @p src_tile -> @p dst_tile, read from @p dst_tile's flood
+/// field (built if absent) and never from @p src_tile's, and cached on
+/// world.astar_cost_cache under the ORDERED key (body, src, dst). The answer is the
+/// same warm or cold, before or after a load. `tiles` stays stored lo -> hi (a
+/// reader wanting travel order flips it when src is the higher id).
 ///
 /// Returns a reference into the cache (BL-362: a cache hit used to copy the whole tile
 /// vector). Valid until invalidate_logistics_caches clears the map — read or copy it
@@ -194,9 +201,11 @@ using lp_pool_map = std::unordered_map<entity_id, std::unordered_map<entity_id, 
 std::unordered_map<entity_id, float>& lp_pool_for_body(lp_pool_map& pools_by_body, world& w,
                                                         entity_id body, float lp_per_anchor_tick);
 
-/// The anchor tile in @p pool (a body's per-anchor LP pool) nearest to
-/// @p from_tile by intra-body path cost — deterministic tiebreak: lowest
-/// cost, then lowest tile id, so hash-map iteration over @p pool cannot
+/// An anchor tile in @p pool (a body's per-anchor LP pool) at least
+/// intra-body path cost from @p from_tile (`intra_body_path(from_tile, anchor)`,
+/// origin -> anchor), with a FIXED CHOICE among exact ties — usually the lowest
+/// tile id, not always (logistics.cpp § build_lp_anchor_field: rounding can
+/// fold a one-ulp gap into a tie) — so hash-map iteration over @p pool cannot
 /// matter. Returns `null_entity` if none of @p pool's anchors is reachable
 /// from @p from_tile. Factored out of BL-596's `run_unit_march` (its own
 /// inline nearest-anchor reduction over a marching unit's current position)
@@ -207,11 +216,11 @@ std::unordered_map<entity_id, float>& lp_pool_for_body(lp_pool_map& pools_by_bod
 /// ONE FIELD PER BODY (BL-1117, settle tick one). Answered from the body's
 /// `lp_anchor_field` — one multi-source Dijkstra over @p pool's anchors, built
 /// on first use and cached on `world::lp_anchor_fields` — never from the
-/// per-pair path cache. The cost is the anchor's own flood distance to
-/// @p from_tile (edges relaxed outward from the anchor, which is what
-/// `intra_body_path` computes for this pair on a double miss), so the answer is
-/// a pure function of the body's tiles and @p pool's KEY SET: identical warm or
-/// cold, before or after a load. Builds no `logistics_flood_fields` entry.
+/// per-pair path cache. The cost is the anchor's own flood distance at
+/// @p from_tile — the from_tile -> anchor travel cost `intra_body_path` reads
+/// for this pair — so the answer is a pure function of the body's tiles and
+/// @p pool's KEY SET: identical warm or cold, before or after a load. Builds no
+/// `logistics_flood_fields` entry.
 entity_id nearest_lp_anchor(world& w, entity_id body, entity_id from_tile,
                             const std::unordered_map<entity_id, float>& pool);
 

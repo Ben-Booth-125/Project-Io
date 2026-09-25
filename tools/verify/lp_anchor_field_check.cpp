@@ -19,22 +19,33 @@
 //       `--cold-original logistics|derived` is the attribution control: the
 //       unsaved side's caches are emptied at the save point too, so if the two
 //       then agree, what parted them was cache state and not the save's bytes.
-//   F1  PURITY: on the settled (warm) world, every body's nearest-anchor field
-//       over the tick's anchor pool is read, `invalidate_logistics_caches` is
-//       called, and the field is read again — nearest anchor and cost, every
-//       cell, bit for bit. A sample of `nearest_lp_anchor` calls must read the
-//       same field.
+//   P1  (REPORTED) THE FLOODS AND THE TIME: flood fields and pairs alive after
+//       settle ticks 1 and 11, then a play year (four live ticks through
+//       run_app_live_window, spectating off, day ticks advancing) with its
+//       per-tick milliseconds and what it left alive (BL-1126 measures the
+//       floods reading one way costs).
+//   F1  PURITY: on the warm world (settle and play year done), every body's
+//       nearest-anchor field is read, `invalidate_logistics_caches` is called,
+//       and the field is read again — nearest anchor and cost, every cell, bit
+//       for bit. NOT VACUOUS: the warm read must REUSE the field the ticks
+//       themselves built (its anchor set compared to the pool's keys BEFORE the
+//       call); a body whose cached field is missing or over another anchor set
+//       is reported and not counted, and a seed with no reused field FAILS F1.
+//       A timed sample of `nearest_lp_anchor` calls must read the same field
+//       (the per-call cost is the pool walk `built_over` pays).
 //   F2  EXACTNESS against the per-pair rule it replaced, on every body with an
-//       anchor: one flood per anchor through `intra_body_path` itself (the
-//       double-miss path, anchored at the anchor), folding min over anchors of
-//       (cost, anchor tile id) per cell. Cost must match bit for bit; the anchor
-//       must match, except cells where an equal-cost anchor with a higher id won
-//       (the float case logistics.cpp names), which are COUNTED and printed. A
-//       cell whose field anchor is not at the minimum cost is a FAIL.
+//       anchor: one flood per anchor through `intra_body_path(probe, anchor)`
+//       itself (the anchor's own, destination-side field), folding min over anchors of
+//       (cost, anchor tile id) per cell. GATES: cost bit for bit, and the field's
+//       anchor AT the minimum cost (its own flood distance equals the minimum).
+//       The contract is "an anchor at least cost, a fixed choice among exact
+//       ties", so a cell where an equal-cost anchor with a higher id won is
+//       within it — COUNTED and printed on the verdict line, never hidden.
 //   F3  NO PER-ANCHOR FLOODS: building the field and answering the sample, from
 //       cold, leaves `logistics_flood_fields` and the pair cache empty.
 //
-// A seed PASSES on F1-F3. L1 is a finding for the main session, not a gate.
+// A seed PASSES on F1-F3. L1 is gated on nothing here; its verdict line says
+// MATCH or DIFFER (BL-1126's done-when: MATCH on every tick, no control).
 //
 // USAGE (repo root):
 //   ./build_gen/verify/lp_anchor_field_check.exe [--seeds 0,28] [--copy-after 2] [--no-brute]
@@ -113,8 +124,23 @@ bool same_bits(float a, float b)
 struct body_rows
 {
     bool f1 = true, f2 = true, f3 = true;
+    bool f1_counted = false; ///< the warm read reused the ticks' own field
     long long tie_cells = 0, wrong_cells = 0, cost_cells = 0;
 };
+
+/// True when @p w already caches a field for @p body built over exactly @p pool's
+/// keys — i.e. body_lp_anchor_field will REUSE it rather than rebuild.
+bool cached_over_pool(const world& w, entity_id body, const std::unordered_map<entity_id, float>& pool)
+{
+    const auto it = w.lp_anchor_fields.find(body);
+    if (it == w.lp_anchor_fields.end() || it->second.anchors.size() != pool.size())
+        return false;
+    std::vector<entity_id> keys;
+    keys.reserve(pool.size());
+    for (const auto& kv : pool) keys.push_back(kv.first);
+    std::sort(keys.begin(), keys.end());
+    return keys == it->second.anchors;
+}
 
 body_rows check_body(world& w, entity_id body, std::uint32_t seed, bool brute)
 {
@@ -128,7 +154,10 @@ body_rows check_body(world& w, entity_id body, std::uint32_t seed, bool brute)
     const std::size_t cells = grid.size();
 
     // --- F1: warm, then cold ---
-    const bool was_built = w.lp_anchor_fields.count(body) != 0; // by the settle's own draws
+    // Compared BEFORE the call: a field built here would make F1 compare two
+    // fresh builds of the same thing, which proves nothing (the S2 review).
+    const bool was_built = w.lp_anchor_fields.count(body) != 0;
+    const bool reused    = cached_over_pool(w, body, pool);
     const lp_anchor_field warm = body_lp_anchor_field(w, body, pool); // a copy
     const std::size_t floods_warm = w.logistics_flood_fields.size();
     const std::size_t pairs_warm  = w.astar_cost_cache.size();
@@ -141,9 +170,11 @@ body_rows check_body(world& w, entity_id body, std::uint32_t seed, bool brute)
         if (!same_bits(warm.cost[i], cold.cost[i])) ++cost_diff;
     }
     const bool sizes = warm.nearest.size() == cold.nearest.size() && warm.nearest.size() == cells;
-    // The API reads the field: a strided sample of real calls.
+    // The API reads the field: a strided, timed sample of real calls (each one
+    // walks the pool in built_over before it reads a cell).
     long long api_diff = 0, api_n = 0;
     const std::size_t stride = std::max<std::size_t>(1, cells / 997);
+    const clk::time_point t_api = clk::now();
     for (std::size_t i = 0; i < cells; i += stride)
     {
         const entity_id t = grid[i];
@@ -154,15 +185,20 @@ body_rows check_body(world& w, entity_id body, std::uint32_t seed, bool brute)
         const entity_id want = (cold.cost[i] < 1e30f) ? cold.nearest[i] : null_entity;
         if (got != want) ++api_diff;
     }
+    const double api_us = api_n > 0 ? secs(t_api, clk::now()) * 1e6 / static_cast<double>(api_n) : 0.0;
     long long reached = 0;
     for (std::size_t i = 0; i < cells; ++i)
         if (cold.cost[i] < 1e30f) ++reached;
     std::printf("  body %u: %zu anchors, %zu cells, %lld reached; warm world held %zu flood fields, "
-                "%zu pairs, and %s field for this body\n", static_cast<unsigned>(body), pool.size(),
+                "%zu pairs; its cached field: %s\n", static_cast<unsigned>(body), pool.size(),
                 cells, reached, floods_warm, pairs_warm,
-                was_built ? "the settle's own" : "NO (built here, so warm = first build)");
+                reused      ? "REUSED (the ticks' own, over the pool's anchor set)"
+                : was_built ? "REBUILT (cached over a different anchor set) -- F1 not counted"
+                            : "none cached -- built here, F1 not counted");
     std::printf("    F1 warm vs cold: %lld nearest differ, %lld costs differ; API sample %lld/%lld "
-                "differ\n", nearest_diff, cost_diff, api_diff, api_n);
+                "differ, %.1f us per call (the pool walk included)\n", nearest_diff, cost_diff,
+                api_diff, api_n, api_us);
+    out.f1_counted = reused;
     out.f1 = sizes && nearest_diff == 0 && cost_diff == 0 && api_diff == 0;
 
     // --- F3: nothing per-anchor was built answering from cold ---
@@ -303,8 +339,14 @@ int main(int argc, char** argv)
         std::printf("\nseed %u  (build + landscape %.1f s)\n", seed, secs(t_start, clk::now()));
 
         // --- L1: settle K ticks, load, continue both in lockstep ---
+        std::vector<std::size_t> floods_after(static_cast<std::size_t>(ticks), 0);
+        std::vector<std::size_t> pairs_after(static_cast<std::size_t>(ticks), 0);
         for (int t = 0; t < copy_after; ++t)
+        {
             run_app_validation_tick(a.w, a.reg, t);
+            floods_after[static_cast<std::size_t>(t)] = a.w.logistics_flood_fields.size();
+            pairs_after[static_cast<std::size_t>(t)]  = a.w.astar_cost_cache.size();
+        }
         std::printf("  L1 at the save: %zu flood fields, %zu pairs, %zu nearest-anchor fields\n",
                     a.w.logistics_flood_fields.size(), a.w.astar_cost_cache.size(),
                     a.w.lp_anchor_fields.size());
@@ -326,6 +368,8 @@ int main(int argc, char** argv)
         for (int t = copy_after; t < ticks; ++t)
         {
             run_app_validation_tick(a.w, a.reg, t);
+            floods_after[static_cast<std::size_t>(t)] = a.w.logistics_flood_fields.size();
+            pairs_after[static_cast<std::size_t>(t)]  = a.w.astar_cost_cache.size();
             run_app_validation_tick(*loaded, a.reg, t);
             const std::uint64_t d_o = world_state_digest(a.w);
             const std::uint64_t d_l = world_state_digest(*loaded);
@@ -337,32 +381,60 @@ int main(int argc, char** argv)
         if (first_diff >= 0)
         {
             ++l1_diverged;
-            std::printf("  L1 REPORT: the loaded world parts from the unsaved one at tick %d "
+            std::printf("  L1 DIFFER: the loaded world parts from the unsaved one at tick %d "
                         "(saved after tick %d)\n", first_diff, copy_after - 1);
         }
         else
-            std::printf("  L1 REPORT: the loaded world ticks as the unsaved one through tick %d\n",
-                        ticks - 1);
+            std::printf("  L1 MATCH: the loaded world ticks as the unsaved one on every tick %d-%d\n",
+                        copy_after, ticks - 1);
         loaded.reset();
+
+        // --- P1: floods over the settle, then a play year ---
+        if (ticks > 11)
+            std::printf("  P1 settle: flood fields alive after tick 1 %zu, after tick 11 %zu; pairs "
+                        "%zu / %zu\n", floods_after[1], floods_after[11], pairs_after[1],
+                        pairs_after[11]);
+        {
+            app_tick_timing year;
+            const std::size_t f0 = a.w.logistics_flood_fields.size();
+            const clk::time_point y0 = clk::now();
+            run_app_live_window(a.w, a.reg, /*first_econ_step=*/ticks, /*ticks=*/4, &year);
+            const double year_s = secs(y0, clk::now());
+            std::printf("  P1 play year (4 live ticks): %.1f s; tick ms", year_s);
+            for (const double ms : year.tick_ms) std::printf(" %.0f", ms);
+            std::printf("; flood fields alive %zu -> %zu, pairs %zu, convoys %zu\n", f0,
+                        a.w.logistics_flood_fields.size(), a.w.astar_cost_cache.size(),
+                        a.w.convoys.size());
+        }
 
         // --- F1-F3 per body, on the settled (warm) world ---
         body_rows all;
+        int f1_bodies = 0;
         for (const entity_id body : sorted_body_ids(a.w))
         {
             const body_rows r = check_body(a.w, body, seed, brute);
-            all.f1 = all.f1 && r.f1;
+            if (r.f1_counted)
+            {
+                ++f1_bodies;
+                all.f1 = all.f1 && r.f1;
+            }
             all.f2 = all.f2 && r.f2;
             all.f3 = all.f3 && r.f3;
             all.tie_cells += r.tie_cells;
         }
-        check(all.f1, "F1 the nearest-anchor field is identical warm and after invalidate_logistics_caches",
+        std::printf("  F1 counted on %d body(ies) whose warm field the ticks built\n", f1_bodies);
+        check(all.f1 && f1_bodies > 0,
+              "F1 the ticks' own nearest-anchor field is identical after invalidate_logistics_caches",
               seed);
         check(all.f3, "F3 answering from cold builds no per-anchor flood field and no pair", seed);
         if (brute)
         {
-            check(all.f2, "F2 the field equals min over per-anchor floods (cost bit for bit; anchor at the minimum)",
-                  seed);
-            std::printf("  F2 equal-cost higher-id ties on seed %u: %lld cells\n", seed, all.tie_cells);
+            char f2_label[256];
+            std::snprintf(f2_label, sizeof f2_label,
+                          "F2 the field equals min over per-anchor floods (cost bit for bit; anchor at "
+                          "the minimum; %lld equal-cost higher-id tie cell(s), within the contract)",
+                          all.tie_cells);
+            check(all.f2, f2_label, seed);
         }
         std::printf("  seed %u done in %.1f s\n", seed, secs(t_start, clk::now()));
         std::fflush(stdout);
