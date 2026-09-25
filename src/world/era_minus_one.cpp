@@ -377,6 +377,29 @@ history_sim_params exploration_sim_params(const world_params& params)
     // switch it off.
     hp.resume_seeds_corridor_tier = params.resume_seeds_corridor_tier;
 
+    // BL-1120 -- OCEAN CURRENTS PRICE EVERY SEA LEG, in this span and the
+    // Industrialisation span built on these params (EXPLORATION.md sec
+    // Currents are a force, not a picture). The one weight: a leg run fully
+    // with its current costs half of still water, fully against it half as
+    // much again; real legs read a fraction of that, because land along the
+    // line carries no current. The Empires round is NOT given it: the lane
+    // record belongs to these two spans, and a force moving round 4 is a
+    // separate call.
+    //
+    // MEASURED, `ocean_currents_harness --sweep` on the 16 curated seeds,
+    // 2026-09-25, weights 0/150/300/500/700/900 (both spans re-run from the
+    // fixture, weight 0 reproducing generation's own run on all 16): the
+    // share of wet battles run WITH their current climbs 0.27 -> 0.28 ->
+    // 0.32 -> 0.35 -> 0.35 -> 0.36 and the launched legs' mean alignment
+    // -58 -> -55 -> -40 -> -31 -> -28 -> -28, so the mix stops moving at
+    // 500; 900 begins to swing whole seeds (seed 9's wet launches 9 -> 1, its
+    // Industrialisation battles 44 -> 102). Displacement's pooled reading is
+    // flat across the ladder (2.96 at 0, 2.95 at 500) and lanes at 1960 move
+    // 105 -> 102. 500 is the knee: the smallest weight at which the current
+    // has done what it can to where fleets sail.
+    hp.sea_current_weight_q       = 500;
+    hp.sea_current_rotation_sense = 1; // the data model records no spin; prograde
+
     return hp;
 }
 

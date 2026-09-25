@@ -1250,6 +1250,36 @@ struct history_sim_params
     /// reached the naval rung.
     int sea_legs_port_q = 0;
 
+    /// OCEAN CURRENTS PRICE A SEA LEG (BL-1120; EXPLORATION.md sec Currents
+    /// are a force, not a picture). The ONE weight: a leg run fully with its
+    /// current costs `1000 - w` per mille of still water and fully against it
+    /// `1000 + w` (`ocean_current_leg_cost_q`), read off a field the span
+    /// builds once from the terrain it runs on (`build_ocean_currents`:
+    /// latitude band, the body's rotation sense below, the land mask).
+    ///
+    /// WHAT IT PRICES, AND IN WHICH CURRENCY. Every place a sea leg is costed:
+    /// a wet campaign's last hop onto its target, which is the step
+    /// `campaign_supply` adds to the hub's reach (so the scorer and execute
+    /// ask the identical question, the file's standing thesis), and the two
+    /// distance gates a colonial link is read against -- subjection's reach
+    /// from the arriving seat and a subject's secession distance from its
+    /// overlord's -- each read as the Chebyshev distance scaled by the leg's
+    /// cost. A leg is "wet" by the record's own test (`line_crosses_sea`),
+    /// and a leg with no sea along its line reads no current and pays
+    /// still-water price.
+    ///
+    /// Zero by default -- still water, no field built, every fixture
+    /// unchanged. Domain [0, 999]: outside it the run prices nothing and says
+    /// so (`history_sim_state::sea_current_params_rejected`), never clamped.
+    /// Set for the spans the lane record belongs to (`era_minus_one.cpp`).
+    int sea_current_weight_q = 0;
+    /// The body's rotation sense the current field is built with: +1
+    /// prograde, -1 retrograde (every wind, so every current, reversed). The
+    /// data model records no spin for a body, so this is an input rather than
+    /// a reading; +1 is the ordinary case. Any other value is rejected with
+    /// the weight above.
+    int sea_current_rotation_sense = 1;
+
     /// TRADE INCOME FROM THE NETWORK (BL-895; Ben, 2026-09-11: "we also need a
     /// simple cost for war, and this cost can be sourced by rich trade").
     /// Materials yielded per YEAR, per held region, per DISTINCT KIND OF
@@ -3755,6 +3785,21 @@ struct history_sim_capture
     std::vector<sea_leg> sea_legs;
 };
 
+/// BL-1120 -- one sea leg's uses this span, by the writer that noted them
+/// (EXPLORATION.md sec The colonial tie is a sea lane names the writers).
+/// `a < b`, as `sea_leg`.
+struct sea_leg_writer_row
+{
+    uint16_t a        = 0;
+    uint16_t b        = 0;
+    int32_t  campaign = 0; ///< a wet campaign's crossing, at its launch
+    int32_t  purchase = 0; ///< a purchase party's crossing
+    int32_t  tribute  = 0; ///< a metropole's standing traffic, one per round
+};
+
+/// The writer column a sea-leg note lands in (`sea_leg_writer_row`).
+enum class sea_leg_writer : uint8_t { campaign = 0, purchase = 1, tribute = 2 };
+
 struct history_sim_state
 {
     std::vector<polity> polities;
@@ -3920,6 +3965,13 @@ struct history_sim_state
     /// decision round per standing tribute clause, overlord capital to
     /// subject seat. Not gated on `trace_battles`, for the same reason.
     std::vector<sea_leg> sea_legs;
+
+    /// BL-1120 -- WHO WROTE THIS SPAN'S SEA-LEG USES, per leg: the notes the
+    /// span itself made (never the inherited `resume_sea_legs` count), split
+    /// by writer, sorted by (a, b). Summed over the three columns a row equals
+    /// the uses this span added to that leg in `sea_legs`. The observation a
+    /// report reads to say which writer earned a lane; nothing reads it back.
+    std::vector<sea_leg_writer_row> sea_leg_writers;
 
     /// THE SPARSE, DIRECTED, DECAYING GRUDGE TABLE (BL-827).
     ///
@@ -4223,6 +4275,24 @@ struct history_sim_state
     int64_t sea_legs_noted_purchase = 0;
     int64_t sea_legs_noted_tribute  = 0;
     int64_t sea_lanes_opened        = 0;
+
+    /// BL-1120: how the wet campaigns LAUNCHED this run ran against the
+    /// current field -- with it (alignment > 0), against it (< 0) or across
+    /// slack water (0), counted at launch beside `sea_legs_noted_campaign`
+    /// whenever the field is built, in every span that builds it. The sum of
+    /// the launched legs' alignments (per mille each) rides beside, so a
+    /// report can read the mean. Pure observation.
+    int64_t sea_campaigns_with_current    = 0;
+    int64_t sea_campaigns_against_current = 0;
+    int64_t sea_campaigns_slack_current   = 0;
+    int64_t sea_campaign_alignment_sum_q  = 0;
+    /// BL-1120: the current's weight or rotation sense left its domain at the
+    /// run's open, so the run priced every sea leg at still water. REJECTED,
+    /// never clamped.
+    bool    sea_current_params_rejected   = false;
+    /// BL-1120: the digest of the field this run priced its legs with (0 when
+    /// none was built), so a report can say which ocean it measured.
+    uint64_t sea_current_field_digest     = 0;
 
     /// BL-935: treasury actually spent building each stock, this run — the
     /// observable that separates "the mechanism never fires" from "no polity
