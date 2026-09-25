@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*45 entries — 24 open, 21 resolved.*
+*46 entries — 25 open, 21 resolved.*
 
 ---
 
@@ -362,6 +362,22 @@ R22's form is 'under <nation>, the realm of <X> since <year>', where X is the re
 > **Recommendation:** A -- the honest sentence in both cases, one branch, no field. Not applied without the call because the form is Ben's ruling (R22, STARTUP.md § The seat).
 
 *Files: `src/ui/seat_screen.cpp`, `docs/ui/STARTUP.md`, `docs/development/drafts/sprint-47-rulings.md`*
+
+### NR-942 — CALL: the kin arrow's dash threshold -- two interior water tiles, any graze, or the corridor majority rule
+*question · raised 2026-09-25 · from lane F1 fix round (BL-1092 routes and splits on the map), cold review [low] on history_lapse.hpp's lapse_kin_seg comment: the header cited lapse_corridor_over_water for the dash while the kin bake (finish_history_lapse's crosses_water lambda) dashes from two interior water tiles by its own per-tile sampler; the constant is now named k_kin_dash_water_tiles*
+
+COLONISATION.md sec The route record says a kin arrow is 'dashed where the line between the two anchors crosses water'. Three readings of 'crosses' were measured on the same tree, 2026-09-25, on library seed 13 (249 arrows) and seed 0: the road bake's majority rule (lapse_corridor_over_water, eight samples, more than half water) dashes 0 of 249; any single sampled water tile dashes 193 of 249; two interior water tiles (the rule shipped, k_kin_dash_water_tiles = 2) dashes 58 of 249. Seed 0 reads 0 dashed under every rule. The shipped rule was picked in-lane because a crude hop is a bounded crossing of up to three tiles (colonisation_max_hop_tiles) while a coast-hugging people's consecutive foundings graze a bay by one tile almost every time, so any-graze drowned the hops and the majority rule found none; it is a constant nobody ruled on.
+
+**Why it matters.** The dash is the one mark the round-3 map makes of a sea hop, and the threshold decides whether the migration's water-crossings read as 58 arrows, 193, or none. The doc's wording is honest about grain under any of the three; which one it MEANS is a design call, and the constant is named so the call is a one-line change.
+
+- A: keep two interior tiles (k_kin_dash_water_tiles = 2) -- 58 of 249 on seed 13; a graze is not a crossing, a strait is
+- B: any interior water tile -- 193 of 249 on seed 13; every wet founding dashed, the hops indistinguishable from the bay-grazes
+- C: the corridor's majority rule (lapse_corridor_over_water) -- 0 of 249 on seed 13; one sampler for roads and kin, and no hop ever dashes at region grain
+- D: tie the threshold to colonisation_max_hop_tiles rather than a bare 2 -- the hop's own bound as the dash's, so the two move together
+
+> **Recommendation:** A, as shipped -- the only reading of the three under which the hops are visible and the grazes are not; D is the principled form of A if the hop bound ever moves. Not applied beyond naming the constant: the threshold is the design's word 'crosses', which is Ben's.
+
+*Files: `src/ui/history_lapse.cpp`, `src/ui/history_lapse.hpp`, `docs/generation/COLONISATION.md`*
 
 ---
 

@@ -299,7 +299,8 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
   DONE 2026-09-25: a true cross-fade over the opening tenth of the span (`lapse_globe_fade`),
   framed by the one `lapse_map_frame` rule; the stamp reads "<body>  <year>" on every lapse round.
 - [x] T4 (1092) region-grain kin arrows baked from the change list and `culture_split` parents,
-  dashed over water (`lapse_corridor_over_water`); parent-then-daughter changes per
+  dashed over water by the kin bake's own `crosses_water` sampler (`k_kin_dash_water_tiles`, two
+  interior tiles; not `lapse_corridor_over_water`'s majority rule); parent-then-daughter changes per
   `culture_recultured` entry in the fold; the board census in place of folded-daughter lines; the
   400 BCE playhead clamp and caption. (1092 R1-R4)
   DONE 2026-09-25: the kin bake is its own pass with its own two-tile water sampler (the road

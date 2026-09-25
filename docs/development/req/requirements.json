@@ -8242,11 +8242,11 @@
      "status": "complete",
      "verification": [
       "code: startup_screens.cpp clamp",
-      "visual: scripts/verify/culture_overrun.lua (seed 3665124156)"
+      "visual: scripts/verify/culture_overrun.lua (library seed 9)"
      ],
      "requirement": "A presentation clamp holds the round-3 playhead at 400 BCE with the caption 'the migration ran N years past 400 BCE' on an overrun seed, and round 4 opens at 400 BCE; the record is untouched (BL-947).",
      "notes": "The playback block clamps the Culture round's `last` to world_params::empires_start_year (the year round 4 opens on), the scrubber ends there, and the caption reads 'The migration ran N years past 400 BCE; the Empires round opens there, on the ground as the migration left it.' The record is untouched: history_span still reads the true end and the hand-over folds it. The seed was measured with tools/verify/culture_round_coast_measure re-run on this tree (7 of 60 overrun; worst 3665124156, migration_end_year -2). Finding the seed exposed verify.new_world as a no-op since BL-1085 (setup_world generates only when no world is held); the binding now releases the world first.",
-     "result_metric": "2026-09-25 culture_overrun.lua: seed 3665124156 overruns by 398 years (record end -2, unclamped in history_span); capture 1 parked past the end shows the scrubber and stamp at 400 BCE with the caption on the board; expect_no_clipping 0 failures."
+     "result_metric": "2026-09-25 culture_overrun.lua: library seed 9 (the frontier with no neighbours) overruns 400 BCE by 143 years (record end -257, unclamped in history_span); capture 1 parked past the end shows the scrubber and stamp at 400 BCE with the caption on the board; expect_no_clipping 0 failures. Measurement note: culture_round_coast_measure's 60-hashed-seed sweep (7 of 60 overrun) puts the worst at seed 3665124156, 398 years over, record end -2 -- the sweep's reading, not the script's pin; the script pins the library seed because that is the world every other check is written about."
     },
     {
      "id": "R5",

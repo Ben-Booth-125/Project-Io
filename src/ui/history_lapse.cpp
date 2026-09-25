@@ -209,6 +209,18 @@ bool lapse_corridor_over_water(const std::vector<uint8_t>& band, int gw, int gh,
     return total > 0 && water * 2 > total;
 }
 
+/// BL-1092: the KIN arrow's dash threshold -- how many INTERIOR water tiles the
+/// straight line between two foundings' anchors must sample before the arrow is
+/// dashed as a crossing. The sampler is `finish_history_lapse`'s own
+/// `crosses_water` lambda (tile by tile along the line, the two anchors
+/// excluded), NOT `lapse_corridor_over_water` above: that majority rule is
+/// built for a caravan's mostly-dry corridor and reads a strait as land, so it
+/// dashed 0 of 249 arrows on library seed 13 (measured 2026-09-25). Any single
+/// water tile dashed 193 of 249 there -- a coast-hugging people grazes a bay by
+/// one tile almost every founding -- and this threshold 58 of 249; seed 0 reads
+/// 0 under every rule. The threshold is an open call (NR-942).
+constexpr int k_kin_dash_water_tiles = 2;
+
 /// BL-943 — one fleet or caravan exemplar, at a corridor's midpoint. `tier`
 /// (1 Track, 2 Road, 3 Post Road) grows the mark and rings it, so the road
 /// ladder's three rungs never draw the same mark; a trade corridor carries no
@@ -682,7 +694,7 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // not the road bake's majority rule, which is built for a caravan that
     // walks a mostly-dry corridor and reads a one-tile strait as land. The
     // line is sampled tile by tile and dashes from TWO interior water tiles
-    // up: a crude hop is a bounded crossing of up to three
+    // up (`k_kin_dash_water_tiles`): a crude hop is a bounded crossing of up to three
     // (`colonisation_max_hop_tiles`), while a coast-hugging people's
     // consecutive foundings graze a bay by one tile almost every time --
     // measured 2026-09-25 on library seed 13, where any-water dashed 193 of
@@ -707,7 +719,7 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
                 if (r < 0 || r >= gh) continue;
                 if (c < 0) c += gw;
                 if (c >= gw) c -= gw;
-                if (band[static_cast<std::size_t>(r * gw + c)] == 0xFFu && ++water >= 2) return true;
+                if (band[static_cast<std::size_t>(r * gw + c)] == 0xFFu && ++water >= k_kin_dash_water_tiles) return true;
             }
             return false;
         };
