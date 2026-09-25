@@ -40,17 +40,18 @@ struct asteroid_belt
 
 /// Result of an intra-body pathfind (BL-077): the terrain-weighted path cost, whether the
 /// cheapest path crosses ocean (=> sea mode, else land), and whether the endpoints connect.
-/// Symmetric in its endpoints (edge cost is the average of the two tiles), so it caches under
-/// a canonicalised (body, lo_tile, hi_tile) key.
+/// DIRECTED (BL-1126): a river discounts an edge in one direction, so the cost is the
+/// origin -> destination travel cost, read from the destination's flood field and cached under
+/// the ORDERED (body, src, dst) key -- never whichever direction a cache happens to hold.
 struct logistics_path
 {
     float cost          = 0.0f;
     bool  crosses_ocean = false;
     bool  reachable     = false;
-    /// The tile sequence of the best path, in canonical (lo→hi) endpoint order —
-    /// i.e. from min(src,dst) to max(src,dst), since the weighted path is symmetric
-    /// and cached on the unordered pair. A caller that dispatched src→dst reverses
-    /// this when src != lo. Empty when unreachable; a single tile when src == dst.
+    /// The tile sequence of the best path, stored in lo→hi endpoint order — i.e. from
+    /// min(src,dst) to max(src,dst) — even though the cost is directed (BL-1126): the
+    /// storage order is kept so every reader's orientation step still holds. A caller that
+    /// dispatched src→dst reverses this when src != lo. Empty when unreachable; a single tile when src == dst.
     /// Populated by intra_body_path (BL-152, for the convoy vision beam); the cost
     /// fields above stand alone for callers that ignore it.
     std::vector<entity_id> tiles;
@@ -79,10 +80,9 @@ struct logistics_flood_field
 /// whole body once per anchor (9,038 floods, ~90 s, on seed 0's first convoy).
 ///
 /// A PURE FUNCTION of the body's tiles and of `anchors`: the edges are the flood
-/// field's own (relaxed outward from the anchor, the direction `intra_body_path`
-/// floods on a double miss), so `cost[i]` is exactly the smallest of the anchors'
-/// own flood distances to cell i, and `nearest[i]` the lowest anchor tile id at
-/// that cost (see logistics.cpp § build_lp_anchor_field for the one float case).
+/// field's own (each hop priced toward the anchor, BL-1126), so `cost[i]` is exactly
+/// the smallest cell-i -> anchor travel cost, and `nearest[i]` an anchor at that least
+/// cost, a fixed choice among exact ties (see logistics.cpp § build_lp_anchor_field).
 struct lp_anchor_field
 {
     std::vector<entity_id> anchors; ///< The anchor tile set it was built over, ascending.
@@ -556,8 +556,8 @@ struct world
     /// a pure function of the body's tiles (independent of tiles-map iteration order).
     faithful_unordered_map<entity_id, std::vector<entity_id>> body_tile_index;
 
-    /// Route-cost cache for intra-body A* (BL-077), keyed by (body, lo_tile, hi_tile) with the
-    /// tile pair canonicalised (the weighted path is symmetric). A derived cache; invalidated
+    /// Route-cost cache for intra-body A* (BL-077), keyed by the ORDERED (body, src, dst) --
+    /// a path is directed (BL-1126). A derived cache; invalidated
     /// when road_level changes (road placement, BL-147). Keeps per-Tick per-lane A* off the
     /// dispatch hot path.
     std::map<std::tuple<entity_id, entity_id, entity_id>, logistics_path> astar_cost_cache;

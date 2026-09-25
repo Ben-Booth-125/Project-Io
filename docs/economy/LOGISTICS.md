@@ -88,11 +88,11 @@ Terrain-weighted A\* over a body's tile grid, respecting the **east-west cylinde
 topology matches `nation_generation.cpp`: 4-cardinal neighbours, raster index
 `grid_y × grid_width + grid_x`. The core pathing design is BL-077 (intra-body pathfinding).
 
-Results cache on `world.astar_cost_cache` under a **canonicalised endpoint key**, so the per-tick
-dispatch loop pays each search once.
+Results cache on `world.astar_cost_cache` under the **ordered** (origin, destination) key, since a
+path is directed (§ 1), so the per-tick dispatch loop pays each search once.
 
-> **A trap worth carrying forward.** Because the cache key is canonicalised, a caller reading a
-> cached path must apply its own orientation. `body_surface_canvas.cpp` copies and conditionally
+> **A trap worth carrying forward.** A cached path's tiles are stored low tile to high tile
+> whichever way it was asked, so a caller reading one must apply its own orientation. `body_surface_canvas.cpp` copies and conditionally
 > reverses it. Get the orientation wrong and a convoy's head lands at the wrong end of the lane half
 > the time — **invisible on screen, fatal to interdiction.**
 
