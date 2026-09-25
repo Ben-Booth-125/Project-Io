@@ -202,6 +202,13 @@ LOGISTICS.md §§ 1, 4, 6.
   packed one region per tile, province anchors grown 2-3x. THE HISTORY MOVED (synthetic R1 battles
   7 -> 98; seed 40 regions 1,461 -> 2,703), cause not isolated. Calls put to Ben (the BL-1130
   form).
+  ROUND 2 (db75a1c2, not merged): the move is three readers of region::centres, measured by
+  switching each back to main's count — the campaign prize's centres x 200 term (P) and the
+  reach relay's 150/centre rebate (R) look like scale artefacts (sized for the old count); the
+  re-settlement gate on razed centres (Z) is a legitimate consequence; the four "stands a centre"
+  gates are inert. Water-anchored regions carry no centre: spills 127,226 -> 0. Pooled 16 seeds:
+  centres 164,982 -> 69,447, land under centres 70.4% -> 29.6%, road tiles 168,582 -> 86,383,
+  markets 4,984 -> 5,329. P and R's reading put to Ben before the merge.
 - [ ] M4 BL-1125 build, after C1 lands: twins fold and gravity fold at the carve (the reach
   calibrated on the consolidated world), conquest consolidates in the history (`history_sim.cpp`,
   the market marking). The markets lane, opened when C1 reports.
