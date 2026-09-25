@@ -90,6 +90,17 @@ workflow (5 + 5).
   verify.new_world became a real rebuild and turned out to have been passing on one tick of
   leftover settle stock; it now stocks its inputs (`b7726c90`). Filed BL-1112 (ties inherited
   across the seam), NR-941 (the doubled origin sentence), NR-942 (the kin-dash threshold).
+- **The re-bless riders built first** (09:00-10:20). The plan said BL-1082 (the state hash folds
+  the seat) and BL-1049 (the civilisation and creed tables cross the 1200 resume) ride this
+  re-bless, and both were still unbuilt when the first measurement came in -- so that reading was
+  held, both were built as one workflow (cold reviews: merge, lows applied on main `d6558647`) and
+  merged `14cd0004` / `67993f80`. BL-1082 moves world_determinism by design (seedA/on
+  6DBC0094F0B6B0EF -> 0570E3900D0BD53F, seedB/on 95EEAD1204FD31AC -> D5616442F561DDD3, seedA/off
+  4834366D19271E5F -> B89B87C393B06FC9; bit-identical twice); BL-1049 moves it not at all, because
+  the harness world never seeds its history log (BL-1113 filed), while its fidelity row now fails
+  unless the 1660 table begins with the whole 1200 table (16/16 PASS). Gates green on that tree;
+  exploration R3b re-pinned to BL-1096's +400 tribute, the one counter that moved. The final
+  measurement (shipped and legacy digests, the library sweep) runs on this tree for the one commit.
 
 ### Open
 - Ben's five live clicks (BL-1068, 1072, 1073, 1076, 1080) — he opened the Release build and walked into
