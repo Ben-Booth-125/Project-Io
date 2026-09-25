@@ -896,10 +896,11 @@ struct world
     }
 
     /// Tick-boundary state hash (BL-204): an FNV-1a checksum over a deterministic
-    /// canonicalisation of the econ-tick snapshot — every corporation's balance,
-    /// every building's dial state (workforce target/assigned/auto, recipe,
-    /// decommissioned, ticks_remaining), every market's resolved price array, every
-    /// corp/body stockpile pool, and the order book. Sorted by entity id
+    /// canonicalisation of the econ-tick snapshot — every corporation's balance
+    /// and `is_player` flag with `player_entity` (the seat), every building's dial
+    /// state (workforce target/assigned/auto, recipe, decommissioned,
+    /// ticks_remaining), every market's resolved price array, every corp/body
+    /// stockpile pool, and the order book. Sorted by entity id
     /// (map/unordered_map iteration order is not itself trusted) so two
     /// structurally-identical worlds hash identically regardless of container
     /// internals — with the deliberate exception of the order book, whose *stored*
@@ -911,6 +912,15 @@ struct world
     /// MULTIPLAYER_PRINCIPLES.md — a remote peer's hash mismatch at a tick boundary
     /// is the desync signal. `tick` is folded in so a hash is tick-scoped (comparing
     /// hashes across different ticks is meaningless by construction).
+    ///
+    /// THE SEAT IS THE ONE FOLDED FIELD A TICK NEVER MOVES (BL-1082, Ben's ruling
+    /// of 2026-09-24). The rule this header states elsewhere — "state_hash folds
+    /// the fields a TICK may mutate" — stands for everything else; the seat is
+    /// folded because a different pick on the same world is a different campaign,
+    /// and a hash that could not tell two seats apart could not say that (seed,
+    /// pick) reproduces the seat (`tools/verify/seat_pick_check.js`,
+    /// `scripts/verify/seat_pick.lua` S5). Two picks on one world hash apart;
+    /// the same pick, or the draw and a pick of the drawn firm, hash alike.
     ///
     /// @param tick The sim day tick this snapshot is taken at (folded into the hash).
     /// @return An FNV-1a 64-bit checksum of the canonicalised snapshot.

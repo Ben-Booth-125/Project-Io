@@ -421,6 +421,33 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
   cold build — exit 0, "workers joined after 131961 ms"; a wizard round's wait — exit 0,
   "workers joined after 115675 ms"; no exception line either time.
 
+### Re-bless riders — BL-1082 (STATE_HASH_FOLDS_SEAT). Group `state-hash-folds-seat`.
+
+A digest mover BY DESIGN (Ben, 2026-09-24: it rides the one re-bless): every pinned world hash
+moves once, structurally. The lane reports old -> new and re-pins nothing; the main session takes
+the re-bless after the merge.
+
+- [x] T1 fold each corp's `is_player` inside `world::state_hash`'s sorted corp walk and
+  `player_entity` once after it, integer-only; the declaration comment names the seat as the one
+  folded field a tick never moves and why. (R1)
+  DONE 2026-09-25: world.cpp:~45-71 (`fnv1a_i32(h, cc.is_player ? 1 : 0)` per corp, then
+  `fnv1a_u32(h, player_entity)`); world.hpp's `state_hash` comment carries the seat and the
+  ruling. Release build clean (108 steps, world.cpp recompiled, no error lines).
+- [x] T2 `seat_pick_check.js` asserts "a different pick is a different seat" from the state hash
+  alone (the `[seat] picked` id stays a diagnostic print); `seat_pick.lua` S5 likewise, with
+  `other` guarded against the reproducibility pick. (R2)
+  DONE 2026-09-25: 13 of 13 PASS, exit 0 -- "draw : seat 61248  EF627D3AA20F98C8", "pick X: seat 61248  EF627D3AA20F98C8" (pick of the drawn firm == the drawn state hash), "pick Y: seat 61231  C8CDEE309F88B7CB" twice (run 1 hash == run 2 hash), "PASS  a different pick is a different seat (from the state hash alone)" (C8CDEE309F88B7CB != EF627D3AA20F98C8); seat_pick.lua: every expect PASS, 0 golden failure(s), exit 0 -- "(seed, pick) reproduces the seat: BDFEC590611D1E46 == BDFEC590611D1E46" (pick 56807) and "a different pick is a different seat, from the state hash alone: BC31BFBDE966D16D ~= BDFEC590611D1E46" (pick 56800 vs 56807 on the rebuilt seed-1 world); S3 "Back changed nothing (state hash unmoved)" and S6 "every refusal moved nothing" still hold.
+- [x] T3 the readers that must still hold: `begin_adopts_check` (adopted == cold), `save_roundtrip`
+  P2; src/ and tools/ grepped for a hash compared across a seat change. (R3)
+  DONE 2026-09-25: begin_adopts_check.js on build_rel/ProjectIo.exe: 12 of 12 PASS, exit 0 -- "adopt: EF627D3AA20F98C8", "cold : EF627D3AA20F98C8", "PASS  adopted == cold state hash" (both paths seat the same drawn firm 61248; the same opening hash seat_pick_check's draw run printed); save_roundtrip: "PASS P2 state_hash agrees across the round trip at the same tick"; SAVE ROUND TRIP OK, exit 0; the grep found no reader that hashes before and after a
+  re-seat (every hash harness sets the seat at fixture time; `order_book_harness`'s three worlds
+  are never hash-compared; `exploration_sim_harness` reads neither the hash nor the digest, so its
+  pinned counters cannot move). Two docs asserted the old coverage and were corrected:
+  `ACTIONS.json` gameplay.take_seat (mirror regenerated) and MULTIPLAYER_PRINCIPLES.md § the hash.
+- [x] T4 `world_determinism` twice, bit-identical; the moved digests recorded old -> new. (R4)
+  DONE 2026-09-25: world_determinism run 1 and run 2 (build_gen/verify/world_determinism.exe, Release /O2 /MD): both ALL PASS (0 failures); both print "digest seedA/on  = 0570E3900D0BD53F and 0570E3900D0BD53F", "digest seedB/on  = D5616442F561DDD3", "digest seedA/off = B89B87C393B06FC9", "digest seedA/on/epoch0 = 0570E3900D0BD53F" -- bit-identical run to run. OLD (main, 6855a3cf): seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F. NEW: seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9 (all three moved).
+- [ ] T5 main session: merge, the one re-bless (player_seed_sweep pins), cold review. (R4)
+
 ## Drained 2026-09-16
 
 Three finished blocks were cleared at the session close; each one's record lives in the

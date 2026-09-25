@@ -11,8 +11,8 @@
 --   S4  a firm the floor MARKED is pickable: Confirm on it seats the player;
 --   S5  (seed, pick) REPRODUCES THE SEAT: the same world and the same pick give
 --       the same player and the same state hash; a different pick gives a
---       different player (state_hash does not fold the seat, so the player id
---       is read beside it);
+--       DIFFERENT state hash (the hash folds the seat, BL-1082 -- the player
+--       id read beside it is the diagnostic, not the assertion);
 --   S6  the pick is validated as an untrusted input: an id that names nothing,
 --       and a background firm, are both refused and move nothing.
 --
@@ -104,18 +104,24 @@ verify.expect(hash_a == hash_b,
               "(seed, pick) reproduces the seat: " .. hash_a .. " == " .. hash_b)
 print("[seat_pick] seed " .. seed .. " pick " .. pick_a .. " state_hash " .. hash_a)
 
+-- A different pick on the SAME rebuilt world (seed 1 again). `other` is read
+-- off that world's own ranking and must not be pick_b -- the candidate the
+-- reproducibility rows seated -- or the two hashes would rightly agree.
 local other = verify.seat_candidate(0)
-if other == picked then other = verify.seat_candidate(1) end
+if other == pick_b then other = verify.seat_candidate(1) end
 verify.new_world(seed)
 local c = verify.take_seat(other)
 verify.expect(c == "applied", "a different pick applies")
 verify.expect(select(6, verify.seat_state()) == other, "a different pick seats a different firm")
--- NOT asserted: that the hash differs. `world::state_hash` folds balances and
--- building state but not `is_player` / `player_entity`, so two picks on one
--- world hash alike and the SEAT is read as the player id beside the hash. The
--- reproducibility claim above is (player, hash) equal; this one is player unequal.
-print("[seat_pick] different pick " .. other .. " state_hash " .. verify.state_hash()
-      .. " (state_hash does not fold the seat)")
+-- BL-1082: `world::state_hash` folds `is_player` / `player_entity`, so two
+-- picks on one world hash DIFFERENTLY and the seat is asserted from the hash
+-- alone. The player id read above is the diagnostic beside it, not the claim.
+local hash_c = verify.state_hash()
+verify.expect(other ~= pick_b and hash_c ~= hash_b,
+              "a different pick is a different seat, from the state hash alone: "
+              .. hash_c .. " ~= " .. hash_b)
+print("[seat_pick] different pick " .. other .. " state_hash " .. hash_c
+      .. " (vs pick " .. pick_b .. " " .. hash_b .. ")")
 
 -- S6 -------------------------------------------------------------------------
 local before = verify.state_hash()
