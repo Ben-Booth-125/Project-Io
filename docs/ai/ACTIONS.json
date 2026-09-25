@@ -2068,7 +2068,7 @@
    "preconditions": [
     "App is on the wizard screen."
    ],
-   "expected_output": "On rounds 2-3: steps back one round (a plain revision — there is no per-round snapshot, since rounds are causal). On round 1: returns to the main menu. Leaving costs nothing (nothing is generated until Begin), and preferences survive the trip, so re-entering resumes the same leans from round 1.",
+   "expected_output": "On any round after the first: steps back one round, keeping every round's record and world it passes (STARTUP.md section The world cache), so Back then Next recomputes nothing. On round 1: returns to the main menu and releases every world the wizard held. Preferences survive the trip, so re-entering resumes the same leans from round 1.",
    "reason_to_select": "To revise an earlier round's preferences, or to abandon world setup and return to the menu."
   },
   {
@@ -2087,12 +2087,13 @@
    "id": "chrome.wizard_continue",
    "family": "chrome",
    "surface": "New World wizard, footer button row (right edge)",
-   "press": "Click Continue.",
+   "press": "Click Next.",
    "args": [],
    "preconditions": [
-    "App is on the wizard screen, on round 1 or 2 (any round except the last)."
+    "App is on the wizard screen, on any round except the last (the last round carries Begin).",
+    "Next is enabled: on the Life round, its world has finished building; on a pass round (Culture, Empires, Exploration), that round's run has landed. While it is disabled its hover names what it waits on (Ben, 2026-09-25: Next waits for the round on screen)."
    ],
-   "expected_output": "Advances to the next round. The button reads Continue on non-final rounds and Begin on the last; this press generates nothing.",
+   "expected_output": "Advances to the next round. Arriving on a pass round starts its run on the world the round before closed (nothing is rebuilt; STARTUP.md section The world cache), and Next stays disabled until that run lands. Back then Next onto a round that has already landed recomputes nothing.",
    "reason_to_select": "To accept this round's roll and preferences and move to the next batch of decisions."
   },
   {

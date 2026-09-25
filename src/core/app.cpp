@@ -586,13 +586,11 @@ int app::run(autostart_mode autostart)
 // config is loaded HERE, on the render thread, and only make_hard_coded_world —
 // which is pure C++ — goes to the worker.
 
-namespace {
-
 /// BL-1073: every field of `world_params`, compared. The guard behind the
 /// wizard's world cache: invalidation is what keeps the cache honest, and this
 /// is the check that it did. A new field on `world_params` must join this list,
 /// or a world built under a different value could be adopted.
-bool same_world_params(const world_params& a, const world_params& b)
+bool app::same_world_params(const world_params& a, const world_params& b)
 {
     const world_preferences& x = a.preferences;
     const world_preferences& y = b.preferences;
@@ -616,8 +614,6 @@ bool same_world_params(const world_params& a, const world_params& b)
         && x.history_turbulence == y.history_turbulence
         && x.roll[0] == y.roll[0] && x.roll[1] == y.roll[1] && x.roll[2] == y.roll[2];
 }
-
-} // namespace
 
 void app::begin_new_game()
 {

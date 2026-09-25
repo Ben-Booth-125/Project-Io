@@ -1089,7 +1089,10 @@ every boundary the cursor, report and fixture are copied, the copy rebound, the 
 next stage run on the copy; **(c)** `make_hard_coded_world` itself against (a)'s tail. (a) and (b) must
 agree at every boundary on the ownership records (every span's `era_timelapse`), the polity tables, the
 world (world_determinism's deep digest, shared through `world_deep_digest.hpp`), the cursor's own
-members, and the report. A non-vacuity row asserts the digests can see every stage.
+members (by content, not size, wherever the tail or a later span reads them), and the report. A
+non-vacuity row asserts the digests can see every stage, and two **negative controls** perturb one
+member of a copied cursor (a settlement history line at culture, an Exploration sea leg at
+exploration) and assert the same comparison reports the difference.
 
 `--measure` (default seeds 0 and 28, no tail) prices the reroll path: copying a closed stage's cursor
 against replaying to it from a held Life-gate cursor and from the params, and asserts each replay lands
