@@ -7356,24 +7356,24 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: startup_screens.cpp lean handler",
       "visual: live click - change the lean on round 4, watch the round relaunch with Culture still behind Back"
      ],
      "requirement": "A turbulence-lean change on round 4 invalidates Empires onward only, keeps the Culture record, and relaunches round 4 at once (no m_wiz_dirty, no planetology re-preview).",
      "notes": "",
-     "result_metric": "Code in place; fix round 2026-09-25 relaunches a stale run that lands on the round the player is still on. Ben's live click owed."
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578). Code in place; fix round 2026-09-25 relaunches a stale run that lands on the round the player is still on. Ben's live click owed."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click on the Release build"
      ],
      "requirement": "LIVE: reroll round 5, Back to round 4, Next - round 4's 1200 board and frame are unchanged and round 5 opens on them; round 3 (Culture) shows no Reroll, only the line pointing to the Life round's (NR-931 C).",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     },
     {
      "id": "R7",
@@ -7436,7 +7436,7 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: begin_new_game",
       "headless: begin_adopts_check.js (adopt and cold runs)",
@@ -7444,7 +7444,7 @@
      ],
      "requirement": "Begin pressed while round 6's worker runs WAITS on it behind the wait surface; there is never a second concurrent build; with no cache (menu -> Begin, --autostart) the cold worker builds and calls the same function.",
      "notes": "2026-09-24: begin_new_game -> m_begin_waits_round6 while round 6's future is valid (poll_worldgen keeps polling the wizard's futures and draws round 6's sink), try_adopt_wizard_world on landing, launch_cold_build only when nothing landed. The windowed walk (--autostart-windowed) is the scripted press-during-the-wait: it now launches each lapse round on arrival as the Next press does (it never had), so Begin finds round 6 running. Ben's live press is R8's click. REVIEW 2026-09-24: carries a live-click clause not yet taken; pending with R8 until Ben's click.",
-     "result_metric": "--autostart-windowed log: '[begin] round 6 is still building: waiting on its worker (no second build)' -> '[wizard world] cached for Begin' -> '[begin] round 6 landed' -> '[begin] adopted the wizard's world' -> 'OK 120 in-game frames'; one [finish_campaign_world] line in the run; begin_adopts_check.js cold half: '[begin] no wizard world to adopt: building' then one finish, hash equal"
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578). --autostart-windowed log: '[begin] round 6 is still building: waiting on its worker (no second build)' -> '[wizard world] cached for Begin' -> '[begin] round 6 landed' -> '[begin] adopted the wizard's world' -> 'OK 120 in-game frames'; one [finish_campaign_world] line in the run; begin_adopts_check.js cold half: '[begin] no wizard world to adopt: building' then one finish, hash equal"
     },
     {
      "id": "R5",
@@ -7459,14 +7459,14 @@
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: hard_coded_world.hpp generation_stage_labels / step costs",
       "visual: live click - the caption names each step and the bar moves"
      ],
      "requirement": "The wait's caption and bar carry \"Searching the landscape\" and \"Proving the field\" with measured weights (the label table widened past 16); the search is re-measured in Release before the weights are set and the number is written into the item.",
      "notes": "2026-09-24: labels 16/17; generation_step_slot_count = 18 (ms_step and the static_assert read it); generation_progress::weight_after carries the finish's weight into generation's plan so the bar never reaches its end early; the search reports evaluations done/planned on the inner bar (landscape_search_params::progress, write-only). THE SETTLE'S OWN STILL: one tick (tick 1) runs 44-62 s on seed 0 with no inner count -- the bar holds still through it (gen_step_costs: LONGEST STILL 90.9 s / 53.6 s under Proving the field). Not this lane's to fix (a tick has no progress tap); flagged for the main session / NEEDS_REVIEW. The caption itself was seen on the wait via the label table; Ben's eye is R8. REVIEW 2026-09-24: carries a live-click clause not yet taken; pending with R8 until Ben's click. 2026-09-25 (NR-932 C): the settle's inner bar counts laps (12 x 6) rather than ticks. gen_step_costs --finish 0 (Release): LONGEST STILL 38.38 s under \"Proving the field\" (NR-932 read 90.91 s); tick 1 by lap -- run_economy_step 38453 ms, clear_markets 24, apply_budget+nation_step 9, the rest 0 -- so the remaining still is the one economy lap, BL-1117's.",
-     "result_metric": "gen_step_costs --finish 0 28 (Release, worktree, 2026-09-24): seed 0 build 84.61 s, search 28801 ms (13 evaluations), settle 113922 ms; seed 28 build 68.93 s, search 12623 ms, settle 68832 ms; weights set 16: 20000, 17: 90000; plan total 83911 -> 'Searching the landscape' enters at 63.1%, 'Proving the field' at 86.9%, final fraction 1.000"
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578). gen_step_costs --finish 0 28 (Release, worktree, 2026-09-24): seed 0 build 84.61 s, search 28801 ms (13 evaluations), settle 113922 ms; seed 28 build 68.93 s, search 12623 ms, settle 68832 ms; weights set 16: 20000, 17: 90000; plan total 83911 -> 'Searching the landscape' enters at 63.1%, 'Proving the field' at 86.9%, final fraction 1.000"
     },
     {
      "id": "R7",
@@ -7481,13 +7481,13 @@
     },
     {
      "id": "R8",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click on the Release build"
      ],
      "requirement": "LIVE: after round 6's playback, Begin opens the seat canvas with no freeze; the seat list is the firms of the world round 6 closed on; BL-1078's symptom is gone.",
      "notes": "2026-09-24: OWES Ben's live click (a lane agent cannot take it). What the scripted paths show: Begin after round 6 lands does no world work on the UI thread (poll_worldgen moves the slot, runs the presentation half, seats); the seat canvas ranks the finished world's specialists (seat_pick_check: 'the ranking is printed'). BL-1108's close-mid-build check on the same build: exit 0 both instances.",
-     "result_metric": "pending Ben's click on the Release build"
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578). pending Ben's click on the Release build"
     }
    ]
   },
@@ -7612,7 +7612,7 @@
       "visual: Ben's live click - a lane appears and persists on a seed with subjects"
      ],
      "requirement": "Round 5 bakes a persistent lane line from the events, drawn as its own water layer distinct from a colonial tie, present from the frame the leg earns the tier to the round's end.",
-     "notes": "",
+     "notes": "2026-09-25: NOT SEEN at Ben's live click (Release build_rel 15:06 on 50e5e822, seed 4219783578). The library sweep opens lanes on 14 of 16 seeds (0 on 12 and 37; 1-16 elsewhere; seed 0 has 7), so the record carries them; whether his seed earned any, or the line is lost among the round's layers, is unread. Stays pending.",
      "result_metric": "Round 5 bakes a dashed lane line from the events (short AddLine segments over water, its own layer). Ben's live click owed."
     },
     {
@@ -7830,14 +7830,14 @@
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click",
       "headless: world_determinism x2"
      ],
      "requirement": "LIVE: on a library seed a realm alive at 1200 has the same swatch on round 4's board at 1200 and round 5's at 1200, likewise at 1660; no two adjacent realms share a swatch; kin city states share a family; the base is under the fill; a ratchet is visible. Watched and unwatched runs byte-identical; digests unchanged.",
      "notes": "OWES Ben's live click (2026-09-25). Headless half done: world_determinism twice ALL PASS, bit-identical to itself (seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F on both runs); seedA/off equals main; seedA/on and seedB/on moved by BL-1089's name inheritance alone -- with kepler_np.polity_names left empty (one line), seedA/on 5BA2EE1EE993C201, seedB/on 4F7BBD76AEEF3431, seedA/off 4834366D19271E5F -- main's own values, ALL PASS. The world to click: the verify world (seed 0), round 4's close and round 5's open at 1200 agree except the clash rule's re-slot (polity 89, slot 61 -> 70, after the fix round's per-record raster). FIX ROUND (2026-09-25, on the merged tree with main at 1889f642): world_determinism twice ALL PASS, digests identical run to run and to the readings above (seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F); realm_identity.lua 24 expects PASS, 0 clipping; names_and_voice.lua (lane I3's, the ticker merge) 12 expects PASS. Still OWES the live click. MAIN 2026-09-25 04:48: world_determinism twice on main with I1 merged (f81d0d05) — ALL PASS, seedA/on 6DBC0094F0B6B0EF both runs (the sprint's one intended mover, BL-1089's name inheritance; was 5BA2EE1EE993C201); save_roundtrip OK; save_envelope_roundtrip PASS; span_seed_isolation 25/26 (S0, NR-931).",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     }
    ]
   },
@@ -7910,13 +7910,13 @@
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click across the 1200 and 1660 seams.",
      "notes": "OWES Ben's live click across the 1200 and 1660 seams (2026-09-25); the verify world's board names to look for: Theimai, Kakaira Kaikai, Rate.",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     }
    ]
   },
@@ -7977,13 +7977,13 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: pick the realm ranked #1 on round 6's final board — on the seat map its territory carries the same colour and the nation line its name; the band on the first in-game frame has not flipped.",
      "notes": "OWES Ben's live click (2026-09-25): the realm ranked #1 on round 6's final board (Theimai on the verify world) on the seat map, and the first frame's band.",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     }
    ]
   },
@@ -8022,13 +8022,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: at 1000 CE the realms over the threshold carry the heavier border, a peaceable seed of city states shows none, the flag holds across a single-step dip and carries into round 5 at 1200.",
      "notes": "OWES Ben's live click (2026-09-25). Seed 28 is the world to click: 6 realms hard at 1000 CE and 6 at the close under the pinned pair (9 ever); the verify world (seed 0) bolds two at 1000 CE and carries three into round 5 at 1200.",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     }
    ]
   },
@@ -8068,13 +8068,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: scrub round 4 to a seat_captured line and see the ring fade within a screen-second; a schism shows the crack; the diamond stays; a Post Road promotion pulses on round 6.",
      "notes": "OWES Ben's live click (2026-09-25): the ring fading within a screen-second under playback, a schism's crack, the diamond staying, a Post Road pulse on round 6. Note: at 1920x1080 the map's right 116 px sit past the pane's clip (map_nudge_x), so a mark there is off-screen on that layout.",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     }
    ]
   },
@@ -8114,13 +8114,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click on the Culture board and a schism line.",
      "notes": "Owed to Ben after the merge: round 3's board on a live run, and a schism line on round 4 (seed 0 has one at 1196 CE; hover the elided line for the creed). The cold review is the main session's (author != reviewer).",
-     "result_metric": "PENDING 2026-09-25: Release build clean on the lane's branch; the scripted run is green (names_and_voice.lua); the live click and the cold review are not the lane's to take."
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578). PENDING 2026-09-25: Release build clean on the lane's branch; the scripted run is green (names_and_voice.lua); the live click and the cold review are not the lane's to take."
     }
    ]
   },
@@ -8182,13 +8182,13 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click — Next on Life dissolves the globe into the map; the ticker names the cradles; the header carries the world's name; the Drawdown lean sits on Life.",
      "notes": "Owed: Ben's live click on the merged tree. What to watch for: the globe holds through 'Loading the Culture round' and dissolves over the first tenth of the span (the slice seams read as a faint grid while translucent); the Drawdown radio on Life relaunches the Life-gate surface and drops the lapse rounds.",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     }
    ]
   },
@@ -8251,13 +8251,13 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click on the Culture round.",
      "notes": "Owed: Ben's live click on the merged tree. What to watch for: the kin arrows fading in the peoples' hues (dashed where a hop crossed water -- seed 13 shows them early), a recultured range changing hue on its split line, the census under the board, and on an overrun world (library seed 9) the playhead stopping at 400 BCE with the caption.",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     }
    ]
   },
@@ -8308,13 +8308,13 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click — a tie appears at 'falls under the overlordship of' and vanishes or fades at 'breaks from'; a hull shrinks when the fleet lapses; a sail crosses; a landing shows.",
      "notes": "OWES Ben's live click (lane F2, 2026-09-25): scrub round 5 to a 'falls under the overlordship of' (or 'buys the province of') line for the dashed rose tie, to its 'refuses renewal and breaks from' line for the fade, watch a hull shrink as the fleet lapses, a sail cross on a 'sails against' line, and a landing on an over-water capture. On the reference world the tie churn sits at the span's open (1200-1223 CE); the arcs are deliberately faint (a hairline at a third of the tie's alpha, brightening only at a break). Also for the click: the 3f ring still draws under a landing -- STARTUP.md's 'rather than the inland ring' is one `continue` in 3f against h.landings, left for the merge session because three lanes edited 3f this week.",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     }
    ]
   },
@@ -8376,13 +8376,13 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click on round 6 and the briefing.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     }
    ]
   },
@@ -8411,13 +8411,13 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click — a ticker line names the first realm to cross and its capital shows the mark.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "LIVE CLICK PASSED (Ben, 2026-09-25, the sprint-47 live-click form; Release build_rel 15:06 on 50e5e822, seed 4219783578)."
     }
    ]
   },
