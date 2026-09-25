@@ -856,6 +856,19 @@ struct settlement_state
     /// directly, set where they are derived.
     std::vector<std::pair<int, int64_t>> cradle_coined_year;
 
+    /// THE CRADLE IS ANNOUNCED (BL-1091; Ben, 2026-09-24, rulings R12;
+    /// COLONISATION.md § The domestication package). Each cradle culture's
+    /// own NAME and the domestication PACKAGE its stream carried, as (culture
+    /// id, value) pairs in the same round-trip shape as the two records above
+    /// -- `run_settlement` holds the creeds by const reference and coins the
+    /// package on its source list, so neither reached the report before this.
+    /// PURE OUTPUTS of the pass: written once at the coining, read by
+    /// `build_migration_timelapse` to note a `cradle` moment per people and
+    /// by the Culture round's ticker to say it; read by nothing inside the
+    /// walk, by nothing at world setup, so the digest cannot see them.
+    std::vector<std::pair<int, std::string>>           cradle_name;
+    std::vector<std::pair<int, domestication_package>> cradle_package;
+
     /// THE CULTURES THE MIGRATION COINED (BL-856), in allocation order, with
     /// ids running one past the last cradle culture. Derived from their
     /// parents rather than rolled fresh, so a homeworld ends with a FAMILY of

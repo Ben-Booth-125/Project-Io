@@ -418,13 +418,47 @@ void w_settlement(std::ostream& o, const settlement_state& s)
     // count that sat here are gone with the pass that wrote them.
     w_i64(o, s.median_industrial_year);
     w_bool(o, s.urban_map_drawn); // save_game_version 5 (BL-766)
+    // --- save_game_version 22 (BL-1091, the cradle records) -- keep
+    // r_settlement in step. The two pure-output records the Culture round's
+    // ticker names each people from: (culture id, name) and (culture id,
+    // package), the package as its affinities then its breadth. Appended at
+    // the tail in their own block, so a sibling lane's settlement field
+    // merges beside rather than through them. ---
+    w_vec(o, s.cradle_name, [](std::ostream& out, const std::pair<int, std::string>& v) {
+        w_i32(out, v.first);
+        w_str(out, v.second);
+    });
+    w_vec(o, s.cradle_package, [](std::ostream& out, const std::pair<int, domestication_package>& v) {
+        w_i32(out, v.first);
+        for (int k = 0; k < farm_class_count; ++k)
+            w_u16(out, v.second.affinity[static_cast<std::size_t>(k)]);
+        w_u8(out, v.second.breadth);
+    });
+    // --- end BL-1091 ---
 }
 
 bool r_settlement(std::istream& i, settlement_state& s)
 {
-    return r_vec(i, s.regions, r_region) && r_vec(i, s.history, r_history_event)
+    if (!(r_vec(i, s.regions, r_region) && r_vec(i, s.history, r_history_event)
         && r_i64(i, s.median_industrial_year) // save_game_version 19 (BL-1074)
-        && r_bool(i, s.urban_map_drawn); // save_game_version 5 (BL-766)
+        && r_bool(i, s.urban_map_drawn))) // save_game_version 5 (BL-766)
+        return false;
+    // --- save_game_version 22 (BL-1091) -- keep w_settlement in step. A
+    // negative culture id cannot have been written; `r_str` refuses a hostile
+    // length prefix before allocating. ---
+    if (!r_vec(i, s.cradle_name, [](std::istream& in, std::pair<int, std::string>& v) {
+            return r_i32(in, v.first) && v.first >= 0 && r_str(in, v.second);
+        }))
+        return false;
+    if (!r_vec(i, s.cradle_package, [](std::istream& in, std::pair<int, domestication_package>& v) {
+            if (!(r_i32(in, v.first) && v.first >= 0)) return false;
+            for (int k = 0; k < farm_class_count; ++k)
+                if (!r_u16(in, v.second.affinity[static_cast<std::size_t>(k)])) return false;
+            return r_u8(in, v.second.breadth);
+        }))
+        return false;
+    // --- end BL-1091 ---
+    return true;
 }
 
 // ---------------------------------------------------------------------------

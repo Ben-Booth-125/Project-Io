@@ -204,7 +204,7 @@ enum class lapse_event_kind : uint8_t
     inherited           = 20, ///< BL-1088: a RESUMED span restating a living realm it inherited from the span before — `region` = its capital at the resume, `polity` = the realm, dated `start_year`. Ticker-silent: nothing rose (CIVILISATION.md sec A realm's name). Replaces the `founded` re-emit on the resume path only (save_game_version 22).
     works_chartered     = 21, ///< BL-1099: a region's `industry_points` crossed the next multiple of `works_event_fraction_q` x the RUNNING charter price (the world's stock so far over `k_stockpile_price_divisor`); `region` = the works' region, `polity` = its holder, `other` = the `industrial_focus` a firm chartered there takes (`focus_from_region`). RECORD-ONLY: no point is debited, at most `works_event_region_cap` per region per span (save_game_version 22).
     rung_crossed        = 22, ///< BL-1100: a POLITY's materials capacity reached the Industrial rung (`polity::industrial_year`, INDUSTRIALISATION.md sec Beat 1 "The span's industrial moment is the polity's crossing"); `region` = its capital that year, `polity` = the polity, `other` = none. ITS OWN KIND, not a reuse of `furnace_lit` (Ben's either/or, 2026-09-24, R16): a region furnace is Stage 4's ground-by-ground lag and never lights on a generated world, while this is the realm's crossing the sim computes -- one kind per fact, so the ember layer can mark the capital without claiming the region's furnace lit. RECORD-ONLY, noted once per polity (save_game_version 22).
-    count
+    cradle              = 23, ///< BL-1091: a cradle people's opening — `region` = the cradle seat (the first region it held), `polity` = the culture, dated the migration's start (2400 BCE); its name and package are the settlement's pure-output records, resolved read-side. Emitted by `build_migration_timelapse` alone; the migration record's second kind beside `culture_split` (save_game_version 22).    count
 };
 
 /// No party in this slot — a founding has no killer, a cradle culture no parent.
@@ -244,7 +244,7 @@ struct era_timelapse
 
     /// THE EVENT LAYER (BL-916) — the named moments, ascending by year. Empty
     /// with `record_playback` off and on every body the era never ran for; the
-    /// migration record carries `culture_split` alone.
+    /// migration record carries `cradle` and `culture_split` alone (BL-1091).
     std::vector<lapse_event>     events;
 
     /// THE NAME TABLE (BL-1106) — the names prose needs that no region can

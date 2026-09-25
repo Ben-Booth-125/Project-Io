@@ -118,37 +118,99 @@ era_timelapse build_migration_timelapse(const settlement_state& ss, const creed_
     t.years         = static_cast<int32_t>(std::max<int64_t>(0, end_year - start_year));
     t.region_stride = static_cast<int32_t>(ss.regions.size());
 
-    // BL-916: the first region each people is the plurality of, by founding
-    // year then index — where a daughter culture first shows on the map, and
-    // the ground its `culture_split` event is pinned to.
-    std::vector<int32_t> first_region(cs.cultures.size(), -1);
+    // BL-1092: A RANGE COMES APART AT THE SPLIT YEAR (Ben, 2026-09-24, rulings
+    // R11). The isolation pass rewrites a recultured region's culture to the
+    // daughter, so folding the plurality alone painted the daughter's hue
+    // from the region's FOUNDING year while the ticker fired the split at
+    // `coined_year` — the map contradicted its own ticker. The settlement's
+    // `culture_recultured` record says which regions moved, from whom, and
+    // when; each such region is emitted PARENT-THEN-DAUGHTER: founded by the
+    // people that reached it, re-owned by the daughter at the split step. The
+    // record's `region` indexes the pre-partition list, so the live region is
+    // found through its anchor (`region_reculture::anchor`). Report-side:
+    // nothing at world setup reads this fold.
+    std::vector<std::pair<int32_t, int32_t>> by_anchor; // (anchor, live index), sorted
+    by_anchor.reserve(ss.regions.size());
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
+        if (ss.regions[i].anchor >= 0)
+            by_anchor.emplace_back(ss.regions[i].anchor, static_cast<int32_t>(i));
+    std::sort(by_anchor.begin(), by_anchor.end());
+    std::vector<int32_t> founding_owner(ss.regions.size(), -1); // -1: the plurality
+    std::vector<std::vector<std::pair<int64_t, int32_t>>> reculture_steps(ss.regions.size());
+    for (const region_reculture& rc : ss.culture_recultured)
+    {
+        if (rc.anchor < 0 || rc.culture < 0) continue;
+        const auto it = std::lower_bound(by_anchor.begin(), by_anchor.end(),
+                                         std::make_pair(rc.anchor, INT32_MIN));
+        if (it == by_anchor.end() || it->first != rc.anchor) continue; // not in this list
+        const std::size_t live = static_cast<std::size_t>(it->second);
+        // The record is ascending by year, so the FIRST entry for a region
+        // names the people that founded it; a later one hands on again.
+        if (founding_owner[live] < 0) founding_owner[live] = rc.parent;
+        reculture_steps[live].emplace_back(rc.year, rc.culture);
+    }
 
-    t.changes.reserve(ss.regions.size());
+    t.changes.reserve(ss.regions.size() + ss.culture_recultured.size());
     for (std::size_t i = 0; i < ss.regions.size(); ++i)
     {
         const region& r = ss.regions[i];
+        // THE FOUNDER, NOT TODAY'S PLURALITY: `region::founding_culture` is
+        // the people that reached the ground and is never moved by the sim
+        // (the isolation pass alone rewrites it, and its reculture record
+        // above names the people before it). On the record built at the
+        // migration's end the two are one; on a record adopted from a
+        // FINISHED report (the --verify path, and every Begin/load
+        // derivation) the plurality has drifted toward the conquerors over
+        // sixteen centuries of assimilation, and folding it painted a
+        // daughter's hue on ground it never founded. The plurality stays as
+        // the fallback for a fixture that never set the founder.
         const int plurality = r.culture.plurality();
-        if (plurality < 0) continue; // Unpeopled ground never founded a region.
+        const int founder   = founding_owner[i] >= 0   ? founding_owner[i]
+                            : r.founding_culture >= 0 ? r.founding_culture
+                                                      : plurality;
+        if (founder < 0) continue; // Unpeopled ground never founded a region.
         t.changes.push_back(owner_change{
             static_cast<int32_t>(r.founded_year),
             static_cast<uint16_t>(i),
-            static_cast<uint16_t>(plurality)});
-        if (static_cast<std::size_t>(plurality) < first_region.size())
-        {
-            int32_t& fr = first_region[static_cast<std::size_t>(plurality)];
-            if (fr < 0 || r.founded_year < ss.regions[static_cast<std::size_t>(fr)].founded_year)
-                fr = static_cast<int32_t>(i);
-        }
+            static_cast<uint16_t>(founder)});
+        for (const auto& [year, daughter] : reculture_steps[i])
+            t.changes.push_back(owner_change{
+                static_cast<int32_t>(std::max<int64_t>(year, r.founded_year)),
+                static_cast<uint16_t>(i),
+                static_cast<uint16_t>(daughter)});
     }
     // ASCENDING BY YEAR, matching every other producer of this format
     // (`era_timelapse.hpp`'s "the replay substrate" contract) — `owner_slice_at`
     // walks it in order and stops at the first change past the query year.
+    // Stable, so a region's founding stays ahead of a same-year reculture.
     std::stable_sort(t.changes.begin(), t.changes.end(),
                      [](const owner_change& a, const owner_change& b) {
                          return a.year < b.year;
                      });
 
-    // THE MIGRATION'S ONE EVENT KIND (BL-916): a people splitting from its
+    // BL-916: the first region each people holds, by the year it came to hold
+    // it, then by the region's founding year, then by index — where a people
+    // first shows on the map, the ground its `culture_split` event is pinned
+    // to, and (BL-1091) a cradle's seat. Read off the sorted changes, so a
+    // daughter coined by isolation is pinned to the oldest region of the
+    // range that came apart rather than to nothing.
+    std::vector<int32_t> first_region(cs.cultures.size(), -1);
+    std::vector<int32_t> first_year(cs.cultures.size(), 0);
+    for (const owner_change& c : t.changes)
+    {
+        if (static_cast<std::size_t>(c.owner) >= first_region.size()) continue;
+        int32_t& fr = first_region[c.owner];
+        if (fr < 0) { fr = static_cast<int32_t>(c.region); first_year[c.owner] = c.year; continue; }
+        // A same-year tie (a range coming apart at one step) prefers the
+        // older ground. The list is ascending, so a later year never wins.
+        if (c.year == first_year[c.owner]
+            && ss.regions[static_cast<std::size_t>(c.region)].founded_year
+                   < ss.regions[static_cast<std::size_t>(fr)].founded_year)
+            fr = static_cast<int32_t>(c.region);
+    }
+
+    // THE SPLITS (BL-916; the migration's second kind, `cradle`, follows
+    // below, BL-1091): a people splitting from its
     // parent. `culture::parent` and `coined_year` are what `run_settlement`
     // materialised from the walk's spawn list, so this is the same fact the
     // creeds roster already carries, dated and placed. Cradles have no parent
@@ -174,9 +236,45 @@ era_timelapse build_migration_timelapse(const settlement_state& ss, const creed_
         e.other  = static_cast<uint16_t>(from);
         t.events.push_back(e);
     }
+
+    // THE CRADLE IS ANNOUNCED (BL-1091; Ben, 2026-09-24, rulings R12;
+    // COLONISATION.md § The domestication package): one `cradle` moment per
+    // cradle people, dated the migration's start and pinned to the cradle's
+    // seat — the first region it held. The cradle list is the settlement's
+    // own (`cradle_coined_year`, every cradle at `colonisation_start_year`);
+    // the name and the package the ticker says are the settlement's
+    // pure-output records (`cradle_name` / `cradle_package`), resolved on
+    // the read side, so the event carries the culture id and nothing else.
+    // Ascending by culture id, which is the roster's order.
+    {
+        std::vector<int32_t> cradle_ids;
+        for (const auto& [cid, year] : ss.cradle_coined_year)
+            if (cid >= 0 && static_cast<std::size_t>(cid) < cs.cultures.size())
+                cradle_ids.push_back(cid);
+        std::sort(cradle_ids.begin(), cradle_ids.end());
+        cradle_ids.erase(std::unique(cradle_ids.begin(), cradle_ids.end()), cradle_ids.end());
+        for (const int32_t cid : cradle_ids)
+        {
+            lapse_event e;
+            e.year   = static_cast<int32_t>(start_year);
+            e.kind   = static_cast<uint8_t>(lapse_event_kind::cradle);
+            e.region = first_region[static_cast<std::size_t>(cid)] >= 0
+                           ? static_cast<uint16_t>(first_region[static_cast<std::size_t>(cid)])
+                           : lapse_event_none;
+            e.polity = static_cast<uint16_t>(cid);
+            e.other  = lapse_event_none;
+            t.events.push_back(e);
+        }
+    }
+    // Ascending by year, and within a year the cradles first: the round's
+    // opening lines are the peoples, then what became of them. Stable, so
+    // the allocation order holds inside each class.
     std::stable_sort(t.events.begin(), t.events.end(),
                      [](const lapse_event& a, const lapse_event& b) {
-                         return a.year < b.year;
+                         if (a.year != b.year) return a.year < b.year;
+                         const bool ca = a.kind == static_cast<uint8_t>(lapse_event_kind::cradle);
+                         const bool cb = b.kind == static_cast<uint8_t>(lapse_event_kind::cradle);
+                         return ca && !cb;
                      });
     return t;
 }

@@ -893,6 +893,19 @@ settlement_state run_settlement(const planetology_state& pl,
                     col_lf [static_cast<std::size_t>(src0.tile)],
                     /*shoreline=*/false)));
 
+    // THE CRADLE IS ANNOUNCED (BL-1091): the people's own name off the roster
+    // and the package just coined on its source, retained as pure outputs
+    // beside the two records above. Written once, here, and read by nothing
+    // in this pass -- the walk reads `col_sources` directly, as it always did.
+    for (const colonisation_source& src0 : col_sources)
+    {
+        if (src0.culture < 0 || static_cast<std::size_t>(src0.culture) >= cs.cultures.size())
+            continue;
+        out.cradle_name.emplace_back(src0.culture,
+                                     cs.cultures[static_cast<std::size_t>(src0.culture)].name);
+        out.cradle_package.emplace_back(src0.culture, src0.package);
+    }
+
     // EVERY CRADLE CULTURE IS COINED THE SAME MOMENT (BL-870) — the flood
     // seeds every source at `colonisation_start_year` (see `col_sources`
     // above), so that is each cradle's `coined_year` too. Round-tripped

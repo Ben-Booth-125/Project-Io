@@ -240,6 +240,29 @@ struct lapse_lane_seg
     int32_t year_open = 0;      ///< The year the leg's uses crossed the lane tier.
 };
 
+/// ONE KIN ARROW (BL-1092; Ben, 2026-09-24, rulings R11; COLONISATION.md sec
+/// The route record, region grain), baked once when the record lands: a
+/// founding's line from its people's PREVIOUS region -- the region the same
+/// people most recently founded before it in the record, or, for a people's
+/// first founding, its parent's most recent region (the `culture_split`
+/// parent) -- to the new one, anchor centre to anchor centre in TILE units,
+/// the pane scale applied at draw time like every other baked layer here.
+/// Dashed where `lapse_corridor_over_water` says the line crosses water: the
+/// crude hop, at region grain. The arrow is honest about its grain -- it says
+/// a people was there and is now here, never which shore they walked; the hop
+/// record that could say so is BL-1093's. Drawn from `year` and fading over
+/// the marker windows after it; a cradle's own first region has no arrow.
+struct lapse_kin_seg
+{
+    uint16_t region_from = 0;
+    uint16_t region_to   = 0;
+    uint16_t culture     = 0;   ///< The people who founded `region_to`.
+    int32_t  year        = 0;   ///< The founding year.
+    float c0 = 0.0f, r0 = 0.0f; ///< The previous region's anchor centre.
+    float c1 = 0.0f, r1 = 0.0f; ///< The new region's, `c1` unwrapped the short way round.
+    bool  over_water = false;
+};
+
 /// The recorded era, plus the derived fields the map and the board need.
 ///
 /// Lifted whole out of `generation_report` on the worker that produced it (see
@@ -247,6 +270,37 @@ struct lapse_lane_seg
 /// reaches into a report another thread might be writing.
 struct history_lapse
 {
+    /// BL-1091: THE BODY THE ROUND PLAYS ON, for the lapse header -- the year
+    /// stamp over the map's corner reads "<body>  <year>" on every lapse round
+    /// (STARTUP.md § Rounds: "every lapse header names the body").
+    /// `generation_report::body_entry::name`, seed-pure (BL-257, the same
+    /// catalogue the wizard's charts label with). Empty on a record built
+    /// without a report, when the stamp is the year alone.
+    std::string body_name;
+
+    // --- The peoples (BL-1091 / BL-1092), read off the settlement record ---
+    // Filled by the app at the record's construction sites from
+    // `settlement_state`'s pure-output records, indexed by CULTURE id (the
+    // migration record's owner space). Empty on every polity round.
+
+    /// Culture -> the people's own name for themselves; "" where unknown.
+    std::vector<std::string> people_name;
+    /// Culture -> the cradle's domestication package as prose ("floodplain,
+    /// grassland and coast"); "" for a daughter, whose package is a fact of
+    /// the stream and not of the people (COLONISATION.md sec The domestication
+    /// package).
+    std::vector<std::string> people_package;
+    /// Culture -> 1 when the boundary fold absorbed it into an ancestor
+    /// (BL-1017, `culture::folded_into`): a name the Empires round never
+    /// receives, so its split line leaves the ticker for the board's census.
+    std::vector<uint8_t> culture_folded;
+    /// The fold census the board prints (`settlement_state::census`): how many
+    /// cradles the migration started with, how many peoples it coined on the
+    /// march, and how many of those folded back into an ancestor at the close.
+    int32_t peoples_cradles = 0;
+    int32_t peoples_coined  = 0;
+    int32_t peoples_folded  = 0;
+
     /// The record itself — the replay substrate, and the only thing here that
     /// generation actually emits.
     era_timelapse lapse;
@@ -416,6 +470,12 @@ struct history_lapse
     /// `sea_lane_opened` event (the Culture round, and any span in which no
     /// leg's traffic reached the tier).
     std::vector<lapse_lane_seg> lane_segs;
+
+    /// The kin arrows (BL-1092), baked from the change list and the
+    /// `culture_split` parents once at record time -- see `lapse_kin_seg`.
+    /// Empty on the polity rounds, whose owners are realms and whose record
+    /// carries no `culture_split`: a realm's founding is a seat, not a route.
+    std::vector<lapse_kin_seg> kin_segs;
 
     // --- The industry layer (BL-1080), baked once at record time ------------
     //
@@ -797,5 +857,48 @@ void draw_lapse_arc(const history_lapse& h);
 
 /// A signed calendar year as this surface prints it ("400 BCE", "1200 CE").
 std::string lapse_year_label(int year);
+
+// ---------------------------------------------------------------------------
+// BL-1091 / BL-1092 -- the Life -> people bridge and the migration's roads
+// ---------------------------------------------------------------------------
+
+/// THE MAP'S FRAME inside a pane of @p avail_w x @p avail_h: the raster of
+/// @p gw x @p gh tiles fitted aspect-preserved, centred, and nudged right by
+/// the authored `lapse_map_nudge_x` (Ben, 2026-09-09: centred in the pane the
+/// map sat visually left of the space it was given). ONE rule for the drawer
+/// and for the wizard's globe dissolve (BL-1091), which must stamp the year
+/// over the same corner the map's own stamp lands on: a second framing
+/// formula would be the drift a header exists to prevent. Pure geometry;
+/// `draw_lapse_map` calls it for its own frame.
+inline constexpr float lapse_map_nudge_x = 120.0f;
+inline void lapse_map_frame(int gw, int gh, float avail_w, float avail_h,
+                            float& tl_x, float& tl_y, float& scale)
+{
+    if (gw <= 0 || gh <= 0 || avail_w <= 0.0f || avail_h <= 0.0f)
+    {
+        tl_x = tl_y = 0.0f;
+        scale = 0.0f;
+        return;
+    }
+    const float sx = avail_w / static_cast<float>(gw);
+    const float sy = avail_h / static_cast<float>(gh);
+    scale = sx < sy ? sx : sy;
+    tl_x  = (avail_w - scale * static_cast<float>(gw)) * 0.5f + lapse_map_nudge_x;
+    tl_y  = (avail_h - scale * static_cast<float>(gh)) * 0.5f;
+}
+
+/// BL-1091 -- THE GLOBE'S DISSOLVE into the Culture map: how much of the Life
+/// round's globe still shows over the map at @p year. The carry-fade rule
+/// (`lapse_carry_fade`) applied to the round with nothing behind it: 1 at
+/// the record's first year, 0 once the opening tenth of the span has passed,
+/// so the dissolve reads the same at every pace and is a function of the
+/// playhead alone -- a scripted capture parks the year and sees the fade.
+/// 0 on an empty record.
+float lapse_globe_fade(const history_lapse& h, int year);
+
+/// BL-1092 -- how many kin arrows the record has drawn by @p year: the
+/// foundings at or before it that had a previous region to come from. The
+/// board's migration counter and the verify API's read of the same bake.
+int lapse_kin_arrows_at(const history_lapse& h, int year);
 
 } // namespace ui

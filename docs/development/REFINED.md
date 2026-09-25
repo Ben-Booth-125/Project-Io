@@ -283,21 +283,36 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
 
 ### Wave 2 (opens as wave 1's lanes land), lane F1 (Culture) — BL-1091 (from Life to people) → BL-1092 (routes and splits). Groups `from-life-to-people`, `routes-and-splits-on-the-map`.
 
-- [ ] T1 (1091) the chain table: Life = water..legacy, Spend alone in a third group captioned for the
+- [x] T1 (1091) the chain table: Life = water..legacy, Spend alone in a third group captioned for the
   History ledger (generation_charts.cpp:~30-43); the Legacy panel as the round's closing fold; the
   Drawdown lean row moves from Culture (startup_screens.cpp:~1555-1558) to Life under it. (1091 R1)
-- [ ] T2 (1091) `cradle` on the enum (append-only; the envelope bump); cradle names and packages as
+  DONE 2026-09-25 (lane F1): the ledger's third tab reads Spend; round 1's globe draws the drawdown
+  so the lean shows on the round that takes it.
+- [x] T2 (1091) `cradle` on the enum (append-only; the envelope bump); cradle names and packages as
   two pure-output records on `settlement_state` (settlement.cpp:~859-875 coins them), resolved
   read-side in `build_migration_timelapse`; the ticker's opening lines. (1091 R2)
-- [ ] T3 (1091) the globe held through the Culture wait and cross-faded into the map under a 2400 BCE
+  DONE 2026-09-25: kind 23 (21/22 held for F3); the records ride w_settlement's tail under
+  version 22 with a roundtrip fixture; world_determinism twice, digests unmoved.
+- [x] T3 (1091) the globe held through the Culture wait and cross-faded into the map under a 2400 BCE
   stamp (startup_screens.cpp wait branch ~:1325-1365 and the carry gate ~:473); the body name on
   every lapse header. (1091 R3)
-- [ ] T4 (1092) region-grain kin arrows baked from the change list and `culture_split` parents,
+  DONE 2026-09-25: a true cross-fade over the opening tenth of the span (`lapse_globe_fade`),
+  framed by the one `lapse_map_frame` rule; the stamp reads "<body>  <year>" on every lapse round.
+- [x] T4 (1092) region-grain kin arrows baked from the change list and `culture_split` parents,
   dashed over water (`lapse_corridor_over_water`); parent-then-daughter changes per
   `culture_recultured` entry in the fold; the board census in place of folded-daughter lines; the
   400 BCE playhead clamp and caption. (1092 R1-R4)
+  DONE 2026-09-25: the kin bake is its own pass with its own two-tile water sampler (the road
+  sampler's majority rule reads a strait as land); `region_reculture` carries the anchor so the
+  fold finds the live region; the fold reads each region's founder, not the drifted plurality;
+  the clamp is `world_params::empires_start_year`, captured on library seed 9 (143 years over).
 - [ ] T5 the verify captures named in the groups; Release build; `world_determinism` twice;
   `save_envelope_roundtrip`; cold review; Ben's live click. (R5s)
+  PART DONE 2026-09-25: life_to_people.lua, routes_and_splits.lua (seed 13 for the hop) and
+  culture_overrun.lua (seed 9) green on the lane's Release build; world_determinism twice, digests
+  unmoved; save_envelope_roundtrip PASS. OWED: the cold review and Ben's live click (the R5s).
+  FOUND ON THE WAY: `verify.new_world` had been a no-op since BL-1085 (setup_world builds only
+  into an empty world); restored, and seat_pick.lua's S5 re-reads its pick on the rebuilt world.
 
 ### Wave 2, lane F2 (Exploration) — BL-1095 (fleets and ties). Group `fleets-and-ties`.
 
