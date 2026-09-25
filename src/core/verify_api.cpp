@@ -1429,12 +1429,26 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // span when there is none. It lets a script PARK on the moment a realm
     // broke away and capture the ticker line with its marker lit, rather than
     // hoping the closing year happens to sit inside that event's window.
-    v.set_function("history_event_year", [this](int kind) -> int {
+    // BL-1094: two optional arguments. The second matches the event's `polity`
+    // field too -- for `road_promoted` that field is the TIER
+    // (era_timelapse.hpp), so a script can park on the last Post Road
+    // promotion rather than the last promotion of any rung; pass -1 to match
+    // any. The third bounds the year, so a script can pick the last event
+    // with a whole marker window still inside the span (the wizard clamps the
+    // playhead to the record, so an event at the close cannot be watched
+    // fading). Omitted, the read is what it always was.
+    v.set_function("history_event_year", [this](int kind, sol::optional<int> polity,
+                                                sol::optional<int> at_or_before) -> int {
         const int i = wizard_lapse_index();
         int year = m_wiz_history[i].lapse.start_year - 1;
         if (!m_wiz_history[i].empty())
             for (const lapse_event& e : m_wiz_history[i].lapse.events)
-                if (e.kind == static_cast<uint8_t>(kind)) year = e.year;
+            {
+                if (at_or_before && e.year > *at_or_before) break; // ascending by year
+                if (e.kind == static_cast<uint8_t>(kind)
+                 && (!polity || *polity < 0 || e.polity == static_cast<uint16_t>(*polity)))
+                    year = e.year;
+            }
         return year;
     });
 
