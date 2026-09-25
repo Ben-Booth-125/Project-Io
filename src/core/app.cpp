@@ -623,6 +623,11 @@ void app::begin_new_game()
 
     m_worldgen_params = m_pending_world_params;
     m_generation_report = generation_report{};
+    // BL-1084 (the cold review): BEGIN COMMITS, so the rounds' held worlds go
+    // now -- whichever of the three paths below runs. Round 6's world (the one
+    // Begin adopts or waits on) and every round's record stay; a still-running
+    // round 6 holds its own copy of the slot it started from.
+    release_wizard_slots("Begin commits the world");
     // BL-1089: the realms' colours from the wizard's last landed round, so
     // the loading carve colours each nation by its realm before the nation
     // entities exist (the polity per nation index comes off the carve tap).

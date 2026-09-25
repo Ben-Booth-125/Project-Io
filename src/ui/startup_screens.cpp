@@ -26,6 +26,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <atomic>
+#include <future>
+#include <optional>
 #include <random>
 #include <string>
 #include <vector>
@@ -92,7 +95,7 @@ bool wizard_slot_serves(const world_params& built, const world_params& pending, 
 
 } // namespace
 
-void app::drop_wizard_slots(const char* why)
+void app::release_wizard_slots(const char* why)
 {
     bool held = false;
     for (auto& s : m_wiz_slot)
@@ -105,6 +108,11 @@ void app::drop_wizard_slots(const char* why)
         std::printf("[wizard world] slots released: %s\n", why);
         std::fflush(stdout);
     }
+}
+
+void app::drop_wizard_slots(const char* why)
+{
+    release_wizard_slots(why);
     drop_wizard_world(why);
 }
 
@@ -724,8 +732,13 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         // built; Begin moves it into m_registry, so play runs on the registry
         // the settle ran on. The finish's two steps join the round's plan
         // (`plan_generation_progress` adds `weight_after` into its total).
+        // A STAGED --verify run keeps the harness's own registry: the load
+        // resets its band, and the scripts after this one read it.
+        std::optional<recipe_registry> verify_registry;
+        if (!m_golden_dir.empty()) verify_registry = m_registry;
         load_recipe_registry();
         cache->registry = m_registry;
+        if (verify_registry) m_registry = std::move(*verify_registry);
         prog.weight_after.store(finish_campaign_weight_ms(m_pending_world_params),
                                 std::memory_order_relaxed);
         m_wiz_world_pending = cache;
@@ -734,9 +747,28 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         m_wiz_round6_record   = round6_record->get_future();
     }
 
-    auto run = [this, lapse_index, stage, start, cfg, cache, round6_record,
+    // BL-1084: the run's stop flag (see `m_wiz_run_cancel`).
+    const auto cancel = std::make_shared<std::atomic<bool>>(false);
+    m_wiz_run_cancel[lapse_index] = cancel;
+
+    auto run = [this, lapse_index, stage, start, cfg, cache, round6_record, cancel,
                 params = m_pending_world_params]() -> wizard_landing {
         generation_progress* const prog = &m_wiz_history_progress[lapse_index];
+        // A stopped run hands back nothing: its round went stale, so the
+        // landing drops it anyway. Round 6's record channel is always answered,
+        // so the poll never reads a broken promise.
+        const auto stopped = [&]() {
+            if (!cancel->load(std::memory_order_relaxed)) return false;
+            std::printf("[wizard] round %d's superseded run stops at a stage boundary\n",
+                        lapse_index + wizard_planetology_round_count + 1);
+            std::fflush(stdout);
+            return true;
+        };
+        if (stopped())
+        {
+            if (round6_record) round6_record->set_value(ui::history_lapse{});
+            return wizard_landing{};
+        }
         std::shared_ptr<wizard_slot> out;
         if (start)
             out = copy_wizard_slot(*start);
@@ -746,6 +778,12 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
             out->cursor = begin_generation(params, &out->report, cfg, /*progress=*/nullptr,
                                            &m_works, /*fixture=*/nullptr);
         }
+        // THE REPORT SAYS WHAT THIS RUN WAS ASKED FOR (the cold review): a held
+        // slot may serve under a different turbulence lean than the one it was
+        // built with (`wizard_slot_serves`), and the Life gate stamped the
+        // preferences it saw -- so they are restamped from the run's own params,
+        // which is what a cold build writes.
+        out->report.preferences = params.preferences;
         generation_cursor& c = out->cursor;
         c.params   = params;   // the span seed a reroll moved; no predecessor read it
         c.works    = &m_works;
@@ -778,7 +816,11 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         const ui::history_lapse early = lapse; // for the self-check below
         round6_record->set_value(std::move(lapse));
 
+        // A reroll or an invalidation mid-run stops the build here or after
+        // the tail; `ready` stays false and the landing drops the world.
+        if (stopped()) return wizard_landing{};
         run_generation_to(c, generation_stage::tail);
+        if (stopped()) return wizard_landing{};
         // THE SAME CALL BEGIN'S COLD WORKER MAKES, in the same order
         // (STARTUP.md § Handoff), so an adopted world and a cold build open
         // the campaign on one state hash.
@@ -835,6 +877,40 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         poll_wizard_history();
 }
 
+float app::wizard_playback_rate(int lapse_index) const
+{
+    // THE LAPSE PLAYS AT ONE CONSTANT RATE, SET BY THE PACE CONTROL, FOR THE
+    // WHOLE SPAN (STARTUP.md § The wait, then the lapse): years per second is
+    // the span over the wall clock the viewer chose. While the run is LIVE the
+    // span's full length is the sink's own span counter (`sub_total`, set just
+    // before the sim starts), because `last - first` grows with every publish.
+    // Once the RECORD HAS LANDED the span is the record's own, and nothing
+    // else: round 6's worker goes on writing the TAIL's inner bars into the
+    // same sink (the nations' rows, the road walk, the search, the settle), and
+    // reading those as the span slowed the lapse and then raced it to 1960
+    // during "Laying roads" (BL-1084, the cold review's high finding).
+    if (lapse_index < 0 || lapse_index >= wizard_lapse_round_count) return 1.0f;
+    const ui::history_lapse& rec = m_wiz_history[lapse_index];
+    const int first     = rec.lapse.start_year;
+    const int true_last = first + rec.lapse.years;
+    // The Culture round's playhead stops at the Empires round's opening year
+    // (BL-1092, presentation only), so its span does too.
+    const int last = (lapse_index == 0)
+        ? std::min(true_last, static_cast<int>(m_pending_world_params.empires_start_year))
+        : true_last;
+    const bool live = m_wiz_history_future[lapse_index].valid()
+                      && !m_wiz_record_landed[lapse_index];
+    const int sub_total = live
+        ? m_wiz_history_progress[lapse_index].sub_total.load(std::memory_order_relaxed)
+        : 0;
+    const float span = sub_total > 0 ? static_cast<float>(sub_total)
+                                     : static_cast<float>(last - first);
+    const float run_secs = m_wiz_history_secs[lapse_index] > 0.0f
+                               ? m_wiz_history_secs[lapse_index]
+                               : wizard_lapse_secs_default;
+    return span > 0.0f ? span / run_secs : 1.0f;
+}
+
 void app::reroll_wizard_pass_round(int pass_index)
 {
     if (pass_index < 0 || pass_index >= wizard_pass_round_count) return;
@@ -849,8 +925,26 @@ void app::reroll_wizard_pass_round(int pass_index)
     // which is the whole reason the wait had to be worth watching
     // rather than merely tolerable.
     const int lapse_index = pass_index;
-    if (lapse_index < wizard_lapse_round_count && !m_wiz_history_future[lapse_index].valid())
+    if (lapse_index < wizard_lapse_round_count)
     {
+        // REROLLING RUNS IT AGAIN, EVEN MID-RUN (STARTUP.md § The wait, then
+        // the lapse; BL-1084, the cold review). Round 6's record plays while its
+        // worker still builds the tail, so its Reroll is live on the playing
+        // record -- and a press there used to bump the roll, skip the re-seed
+        // and let Begin adopt the un-rerolled world. A run in flight cannot be
+        // recalled, so it is marked stale (its record and world are dropped
+        // when it lands) and told to stop at its next stage boundary (round
+        // 6's tail and finish are skipped); the rerun starts the moment it has
+        // landed (`poll_wizard_history`), on a fresh copy of the round before.
+        if (m_wiz_history_future[lapse_index].valid())
+        {
+            m_wiz_history_stale[lapse_index] = true;
+            if (m_wiz_run_cancel[lapse_index])
+                m_wiz_run_cancel[lapse_index]->store(true, std::memory_order_relaxed);
+            std::printf("[wizard] round %d rerolled mid-run: its run is superseded and reruns "
+                        "once it lands\n", lapse_index + wizard_planetology_round_count + 1);
+            std::fflush(stdout);
+        }
         // A DIFFERENT AGE OVER THE SAME GROUND (Ben, 2026-09-09:
         // "reroll should produce differences regardless"), AND ONLY
         // THIS ROUND'S AGE (Ben, 2026-09-24; STARTUP.md § Each pass
@@ -878,7 +972,9 @@ void app::reroll_wizard_pass_round(int pass_index)
             m_wiz_slot[lapse_index + 1].reset();
         else
             drop_wizard_world("round 6 was rerolled");
-        launch_wizard_history_run(lapse_index); // deferred if a run is in flight
+        // Deferred if a run is in flight -- this round's superseded one
+        // included: the poll starts the rerun once it lands.
+        launch_wizard_history_run(lapse_index, m_wiz_live_verify);
     }
 }
 
@@ -906,6 +1002,7 @@ bool app::verify_stage_wait(int lapse_index)
     run_generation_to(s->cursor, before);
     m_wiz_slot[lapse_index] = std::move(s);
     if (lapse_index > 0) m_wiz_record_landed[lapse_index - 1] = true; // its record stands as it is
+    m_wiz_live_verify = true; // a superseded run's rerun starts for real, as on screen
     launch_wizard_history_run(lapse_index, /*live_under_verify=*/true);
     if (!m_wiz_history_future[lapse_index].valid()) return false;
     // The worker publishes the round's plan once its copy is taken.
@@ -922,9 +1019,15 @@ bool app::verify_stage_wait(int lapse_index)
 bool app::verify_land_wait(int lapse_index)
 {
     if (lapse_index < 0 || lapse_index >= wizard_lapse_round_count) return false;
-    if (!m_wiz_history_future[lapse_index].valid()) return m_wiz_record_landed[lapse_index];
-    m_wiz_history_future[lapse_index].wait();
-    poll_wizard_history();
+    m_wiz_live_verify = false;
+    if (m_wiz_history_future[lapse_index].valid())
+    {
+        m_wiz_history_future[lapse_index].wait();
+        poll_wizard_history();
+    }
+    // The staged run's worlds are the script's scratch: released once it has
+    // landed, so the scripts after it run on the harness's memory alone.
+    drop_wizard_slots("verify: the staged run landed");
     return m_wiz_record_landed[lapse_index];
 }
 
@@ -992,7 +1095,10 @@ void app::poll_wizard_history()
             if (!round6 || !m_wiz_round6_record.valid()) return;
             if (m_wiz_round6_record.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
                 return;
-            ui::history_lapse rec = m_wiz_round6_record.get();
+            ui::history_lapse rec;
+            try { rec = m_wiz_round6_record.get(); }
+            catch (const std::future_error&) { return; } // the worker threw; its main future says so
+            if (rec.empty() && m_wiz_history_stale[i]) return; // a stopped run's empty answer
             if (m_wiz_history_stale[i]) return; // its round went stale: never shown
             land_wizard_record(i, std::move(rec));
         };
@@ -1063,8 +1169,10 @@ void app::poll_wizard_history()
     // whose start was held back (another run in flight, a stale run landing,
     // a reroll or a lean change above a running round) starts here the moment
     // nothing runs -- the round ON SCREEN only, never a round the player has
-    // not reached. Never under --verify, where every round adopts.
-    if (m_golden_dir.empty() && m_screen == app_screen::generating)
+    // not reached. Never under --verify, where every round adopts -- except
+    // a script's staged real run (`verify_stage_wait`), which reruns as the
+    // wizard would.
+    if ((m_golden_dir.empty() || m_wiz_live_verify) && m_screen == app_screen::generating)
     {
         const int cur = m_wiz_round - wizard_planetology_round_count;
         if (cur >= 0 && cur < wizard_lapse_round_count && !m_wiz_record_landed[cur]
@@ -1073,7 +1181,7 @@ void app::poll_wizard_history()
             std::printf("[wizard] starting round %d now that nothing else is building\n",
                         cur + wizard_planetology_round_count + 1);
             std::fflush(stdout);
-            launch_wizard_history_run(cur);
+            launch_wizard_history_run(cur, m_wiz_live_verify);
         }
     }
 }
@@ -1820,18 +1928,10 @@ void app::draw_generation_screen()
             // publish already carries the WHOLE finished record, so
             // `last - first` is already the true total the first time this
             // branch ever runs for it, and never grows again afterward.
-            const int sub_total =
-                m_wiz_history_progress[lapse_index].sub_total.load(std::memory_order_relaxed);
-            const float span = sub_total > 0 ? static_cast<float>(sub_total)
-                                             : static_cast<float>(last - first);
             // BL-948: the viewer's own choice of wall clock for the whole span,
-            // not a fixed 30 s. The divisor is the only thing that changed; the
-            // "against the full span, never against how far it has got" rule
-            // above is what keeps a live round from slowing down as it runs.
-            const float run_secs = m_wiz_history_secs[lapse_index] > 0.0f
-                                       ? m_wiz_history_secs[lapse_index]
-                                       : wizard_lapse_secs_default;
-            const float rate = span > 0.0f ? span / run_secs : 1.0f;
+            // not a fixed 30 s. BL-1084 (the review): ONE CONSTANT RATE -- see
+            // `wizard_playback_rate`, which the verify API reads too.
+            const float rate = wizard_playback_rate(lapse_index);
             m_wiz_history_carry[lapse_index] += ImGui::GetIO().DeltaTime * rate;
             const int whole = static_cast<int>(m_wiz_history_carry[lapse_index]);
             if (whole > 0)

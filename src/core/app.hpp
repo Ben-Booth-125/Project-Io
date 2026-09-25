@@ -329,6 +329,9 @@ private:
             if (m_wiz_history_future[i].valid())
             {
                 m_wiz_history_stale[i] = true;
+                // BL-1084: and it stops at its next stage boundary -- a
+                // superseded round 6 skips its tail and finish.
+                if (m_wiz_run_cancel[i]) m_wiz_run_cancel[i]->store(true, std::memory_order_relaxed);
                 // BL-914: a live round already has a partial record drawn from
                 // its tap — that ground is gone the instant the planetology
                 // moved, exactly as much as a landed one would be, so it stops
@@ -376,6 +379,11 @@ private:
     /// the wizard for the menu: re-entering re-runs the chain and everything
     /// below it, so nothing held could be used.
     void drop_wizard_slots(const char* why);
+    /// The slots alone (not round 6's world, not the records): Begin commits,
+    /// so the pre-tail worlds the rounds were held for are released there --
+    /// round 6's worker, if still running, holds its own copy (the cold
+    /// review's finding: four worlds and their reports outlived Begin).
+    void release_wizard_slots(const char* why);
 
     /// Which lapse record the wizard's CURRENT round owns, clamped into range.
     /// A round that is not a lapse round answers 0 rather than a sentinel: every
@@ -757,6 +765,21 @@ private:
     /// the world lands later on `m_wiz_history_future[3]` and only swaps the
     /// world slot.
     std::future<ui::history_lapse> m_wiz_round6_record;
+    /// BL-1084 (the cold review): each run's STOP flag, shared with its worker.
+    /// Set wherever the run is marked stale (an invalidation, a reroll mid-run):
+    /// the worker stops at its next stage boundary -- a superseded round 6
+    /// skips its tail and finish -- so the rerun a player asked for starts
+    /// seconds, not minutes, later. Read only between stages; it never changes
+    /// what a run that is not stopped builds.
+    std::shared_ptr<std::atomic<bool>> m_wiz_run_cancel[wizard_lapse_round_count];
+    /// Verify only: a staged real run is in flight (`verify_stage_wait`), so
+    /// the poll may start a deferred rerun for real, as the wizard would.
+    bool m_wiz_live_verify = false;
+    /// BL-1084: the lapse's years per wall-clock second on lapse round @p i --
+    /// the record's own span over the pace setting, one constant rate (the
+    /// sink's span counter only while the run is still live). The draw and
+    /// the verify API read this one function.
+    float wizard_playback_rate(int lapse_index) const;
     /// The record just landed on round @p i: park and play it, carry the
     /// predecessor's close under it and re-pin its successor. One landing for
     /// every round, whichever channel the record came by.
