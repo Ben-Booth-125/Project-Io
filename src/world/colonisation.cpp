@@ -1254,7 +1254,8 @@ isolation_result run_isolation_splits(const colonisation_input&      in,
                 if (!present(oi) || find(oi) != ri) continue;
                 regions[o].culture = id;
                 isolated_since[o]  = NONE; // Its own people now; the clock is theirs.
-                out.recultured.push_back(region_reculture{oi, id, parent, y});
+                out.recultured.push_back(region_reculture{oi, id, parent, y,
+                                                          regions[o].tile}); // BL-1092: the anchor rides along
             }
         }
 

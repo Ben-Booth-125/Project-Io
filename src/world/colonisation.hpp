@@ -741,6 +741,13 @@ struct region_reculture
     int32_t culture = -1; ///< The daughter it now belongs to.
     int32_t parent  = -1; ///< The people it belonged to until then.
     int64_t year    = 0;  ///< The record step it happened at.
+    /// BL-1092: the region's ANCHOR tile (raster index), so a reader holding
+    /// the region list as the antiquity stop and the founding schedule left
+    /// it -- a different numbering from the one `region` indexes -- can still
+    /// find the region: `build_migration_timelapse` maps through it to emit
+    /// the parent-then-daughter changes that make a range come apart at the
+    /// split year. A record field, read by nothing inside the walk.
+    int32_t anchor  = -1;
 };
 
 /// What the isolation pass produced.

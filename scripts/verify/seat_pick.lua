@@ -75,18 +75,34 @@ verify.capture("seat_03_after_confirm")
 -- The same world, rebuilt from its seed, and the same pick: the same state.
 -- verify.new_world rebuilds through setup_world, so both sides take the same
 -- path; the first pick above is on the run_verify world and is not compared.
+--
+-- THE PICK IS RE-READ ON EACH REBUILT WORLD (2026-09-25, when BL-1092's lane
+-- restored new_world -- it had silently kept the reference world since
+-- BL-1085, so this check compared a world to itself). A firm id belongs to
+-- the world that generated it: seed 1's last-ranked candidate is read off
+-- its own ranking, on both sides, and the two picks must agree as the two
+-- hashes must.
 local seed = 1
-verify.new_world(seed)
-local a = verify.take_seat(picked)
-local hash_a = verify.state_hash()
-verify.new_world(seed)
-local b = verify.take_seat(picked)
-local hash_b = verify.state_hash()
+local function pick_on_rebuilt(s)
+    verify.new_world(s)
+    verify.show_seat_screen(true)
+    verify.frames(3)
+    local rows = select(2, verify.seat_state())
+    local firm = verify.seat_candidate(rows - 1)
+    verify.show_seat_screen(false)
+    verify.frames(1)
+    local r = verify.take_seat(firm)
+    return firm, r, verify.state_hash()
+end
+local pick_a, a, hash_a = pick_on_rebuilt(seed)
+local pick_b, b, hash_b = pick_on_rebuilt(seed)
 verify.expect(a == "applied" and b == "applied", "the pick applies on the rebuilt world")
-verify.expect(select(6, verify.seat_state()) == picked, "the rebuilt world is seated on the pick")
+verify.expect(pick_a == pick_b, "the rebuilt world ranks the same last candidate ("
+                                .. pick_a .. " == " .. pick_b .. ")")
+verify.expect(select(6, verify.seat_state()) == pick_b, "the rebuilt world is seated on the pick")
 verify.expect(hash_a == hash_b,
               "(seed, pick) reproduces the seat: " .. hash_a .. " == " .. hash_b)
-print("[seat_pick] seed " .. seed .. " pick " .. picked .. " state_hash " .. hash_a)
+print("[seat_pick] seed " .. seed .. " pick " .. pick_a .. " state_hash " .. hash_a)
 
 local other = verify.seat_candidate(0)
 if other == picked then other = verify.seat_candidate(1) end

@@ -8137,47 +8137,47 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: generation_charts.cpp chain table; startup_screens.cpp lean rows",
-      "visual: scripts/verify/<name>.lua (name it)"
+      "visual: scripts/verify/life_to_people.lua"
      ],
      "requirement": "The chart chain table gives Life = water..legacy with Spend parked in a third group captioned for the History ledger alone (no Inheritance question); the Legacy panel is the Life round's closing fold; the Drawdown lean row sits on the Life round under that fold and changing it re-runs the Life-gate world. (item-spanning gate: a verify script capturing the Life round's last fold and the Culture round's first frame)",
-     "notes": "",
-     "result_metric": ""
+     "notes": "generation_charts.cpp: Life = water..legacy, third group 'Spend' with no Inheritance question; tile_inspector.cpp's third tab reads Spend. startup_screens.cpp: round_pref_count(1) = 4, the Drawdown lean_row after Coal basins on case 1 (m_wiz_dirty re-runs the chain and invalidates every lapse round); generation_preview.cpp draws round 1's globe worked, so the lean's effect shows on the round that takes it.",
+     "result_metric": "2026-09-25 life_to_people.lua (Release, 1920x1080): capture 1 shows the Life round's five folds Water..Legacy with Drawdown as its fourth lean row; capture 2 the round's full-canvas takeover water through legacy; expect_no_clipping 0 failures over 8 records / 394 text draws."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: settlement.hpp records; hard_coded_world.cpp build_migration_timelapse; era_timelapse.hpp",
       "headless: world_determinism x2; save_envelope_roundtrip"
      ],
      "requirement": "A cradle lapse kind (region = the cradle seat, dated -2400; append-only; the envelope bump) is emitted per people, with cradle names and packages retained as two pure-output records on settlement_state and resolved read-side; the Culture ticker's first lines name each cradle and its package; digests unmoved.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "lapse_event_kind::cradle = 23 (21/22 held for lane F3); settlement_state::cradle_name / cradle_package written once at the coining (settlement.cpp), read by build_migration_timelapse (one cradle event per cradle_coined_year entry, region = first_region, sorted ahead of same-year splits) and by the app's lapse_from_report into history_lapse::people_name / people_package; prose 'The <People> begin at <Region>: <two classes> and N more.' (short, the ticker column elides at ~60 chars); the cradle takes the common ticker tier so the splits displace it. Both records ride w_settlement/r_settlement at the tail under save_game_version 22 with a roundtrip fixture.",
+     "result_metric": "2026-09-25: world_determinism ALL PASS twice on the branch, digests seedA/on 6DBC0094F0B6B0EF, seedB/on 95EEAD1204FD31AC, seedA/off 4834366D19271E5F, epoch0 6DBC0094F0B6B0EF -- identical to the baseline built from the untouched base the same day. save_envelope_roundtrip PASS (0 failures) including the new S3 cradle check. life_to_people.lua: 12 cradle events, all dated the span's first year; the ticker's 6 rows at 2400 BCE are all cradle lines, each carrying its package."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: startup_screens.cpp wait/cross-fade; history_lapse.cpp header",
-      "visual: capture at the fade"
+      "visual: scripts/verify/life_to_people.lua captures 3-5"
      ],
      "requirement": "The globe holds in the pane during the Culture wait and cross-fades into the map under a 2400 BCE stamp; no blank pane on Next from Life; the body name sits on every lapse header (rounds 3-6).",
-     "notes": "",
-     "result_metric": ""
+     "notes": "The right pane builds the Life globe once for every branch: the Culture wait draws it under a '<body>  2400 BCE' stamp (rounds 4-6 keep their blank wait, Ben 2026-09-16); once landed, lapse_globe_fade (the carry-fade rule: the opening tenth of the span, a function of the playhead) thins the map's draw-list vertices to 1-fade and the globe's, painted over, to fade, the stamp redrawn on top. lapse_map_frame (history_lapse.hpp) is the one framing rule, so the wait's stamp and the map's sit on one corner. history_lapse::body_name (report name, seed-pure; set at launch from m_wiz_names) leads the year stamp on every lapse round. The wait itself cannot be photographed under --verify (the run is synchronous).",
+     "result_metric": "2026-09-25 life_to_people.lua: capture 3 (first year) shows the globe alone under 'Huhaidar  2400 BCE'; capture 4 (a twentieth in) the globe at part alpha over the map with the kin arrows through it; capture 5 (a fifth in) the map alone, stamped with the body. The globe's slice seams read as a faint grid while translucent -- brief, and noted for Ben's live watch."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: docs/generation/PLANETOLOGY.md",
-      "visual: capture of the History ledger Chain view"
+      "visual: scripts/verify/life_to_people.lua capture 6"
      ],
      "requirement": "PLANETOLOGY.md § S8 Legacy / § Preferences, COLONISATION.md § The domestication package and STARTUP.md § Rounds match the built behaviour; the History ledger still shows Spend.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "Read against the build: PLANETOLOGY.md § Preferences (Life = Water..Legacy with drawdown, Spend parked for the ledger, the joint shown as the dissolve), COLONISATION.md § The domestication package ('the cradle is announced', the two pure-output records) and STARTUP.md § Rounds / § The globe / Round 3 all describe what is built; no doc edit was needed. ONE DISAGREEMENT LEFT ON THIS BASE, OWNED ELSEWHERE: STARTUP.md § Round 3 says the record is `generation_report::body_entry::migration_timelapse`, built on every full run and saved in the envelope -- that field is lane F3's BL-1104 (Culture record saved); on this base the Culture round still reads the stopped run's prehistory_timelapse or rebuilds from the settlement.",
+     "result_metric": "2026-09-25 life_to_people.lua capture 6: the History ledger's Chain view on its third tab, now labelled Spend, showing the Spend stage alone."
     },
     {
      "id": "R5",
@@ -8186,7 +8186,7 @@
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click — Next on Life dissolves the globe into the map; the ticker names the cradles; the header carries the world's name; the Drawdown lean sits on Life.",
-     "notes": "",
+     "notes": "Owed: Ben's live click on the merged tree. What to watch for: the globe holds through 'Loading the Culture round' and dissolves over the first tenth of the span (the slice seams read as a faint grid while translucent); the Drawdown radio on Life relaunches the Life-gate surface and drops the lapse rounds.",
      "result_metric": ""
     }
    ]
@@ -8205,48 +8205,48 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp arrow bake",
-      "visual: capture at the hop year"
+      "visual: scripts/verify/routes_and_splits.lua captures 2, 6 and 7 (seed 13 for the hop)"
      ],
      "requirement": "Each founding bakes a fading line from its people's previous region (owner_change + culture_split parent), dashed where lapse_corridor_over_water says so; on a seed with an overseas hop a dashed line is visible at its year. (item-spanning gate)",
-     "notes": "",
-     "result_metric": ""
+     "notes": "finish_history_lapse gains its own pass (lapse_kin_seg / history_lapse::kin_segs): a region's first change is its founding, the arrow leaves the founding people's most recent region or, for its first founding, its culture_split parent's; a reculture change draws nothing. NOT lapse_corridor_over_water as the row names: that sampler's majority rule is built for a caravan and reads a one-tile strait as land (0 dashed arrows on every seed tried), and any-water dashed 193 of 249 on seed 13 from coast-hugging grazes; the bake samples tile by tile and dashes from two interior water tiles up. Drawn in layer 3c'' in the people's lineage hue with an arrowhead, fading over three marker windows; a reference-world capture and a seed-13 capture (verify.new_world, restored) carry the check.",
+     "result_metric": "2026-09-25 routes_and_splits.lua: reference world 2610 arrows baked, 193 drawn by the span's end, none over water (its migration crosses no water under any rule); library seed 13 'the colonial world' 58 of 249 in-span arrows over water, the first at 2374 BCE (capture 6, inside the globe's dissolve) and capture 7 at 2199 BCE with several dashed hops in the frame. The probe over library seeds 13/31/46/9/37/25 read 52-73 dashed arrows each."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: hard_coded_world.cpp fold",
       "headless: world_determinism x2",
-      "visual: capture at a split year"
+      "visual: scripts/verify/routes_and_splits.lua captures 3-4"
      ],
      "requirement": "build_migration_timelapse emits parent-then-daughter changes for every culture_recultured entry so a recultured range changes hue at the ticker's split line, not before; report-side, digests unmoved.",
-     "notes": "",
-     "result_metric": ""
+     "notes": "region_reculture gains `anchor` (colonisation.hpp, set at the coin site) because its `region` indexes the pre-partition list; the fold maps through it, emits the region's founding under the entry's parent and one change per reculture at its step (clamped to the founding year), and reads every other region's founder off region::founding_culture (never moved by the sim) with the plurality as the fixture fallback -- on the adopted (finished-report) path the drifted plurality had painted 6 of 432 daughters early. first_region is read off the sorted changes (same-year tie: the older ground), so an isolation daughter's split pins to the oldest region of the range that came apart.",
+     "result_metric": "2026-09-25 routes_and_splits.lua on the reference world: 432 culture_split events, 0 daughters holding ground the year before their split line (was 6 before the founder rule); captures 3/4 frame the first split that took ground, the year before and the year of. world_determinism ALL PASS twice, digests unchanged against the baseline (6DBC0094F0B6B0EF / 95EEAD1204FD31AC / 4834366D19271E5F)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: history_lapse.cpp board",
-      "visual: capture of the Culture board"
+      "visual: scripts/verify/routes_and_splits.lua capture 5"
      ],
      "requirement": "Folded daughters leave the ticker; the board carries a peoples coined / folded census and a migration counter; the board reads peoples / Homeland with no battle cells (shared with BL-1106).",
-     "notes": "",
-     "result_metric": ""
+     "notes": "lapse_ticker_rows skips a culture_split whose daughter is folded (history_lapse::culture_folded, read off culture::folded_into at the record's construction); draw_lapse_scoreboard prints, on the peoples round, 'N cradles; N peoples coined on the march, N of them folded back into an ancestor; N migrations so far' from settlement_state::census and lapse_kin_arrows_at. The split lines name daughter and parent where the record carries names ('The Gakha part from the Khililki at Gakha Lekal.'). The header and battle cells were lane I3's (BL-1106) and were not touched.",
+     "result_metric": "2026-09-25 routes_and_splits.lua: no folded daughter's split on the ticker at the record's end or a third in (0 / 0), 6 + 6 living splits shown; census 12 cradles / 432 coined / 399 folded, the folded count equal to the record's own; capture 5 shows the board reading peoples / Homeland with the census line under it and '192 migrations so far'."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: startup_screens.cpp clamp",
-      "visual: capture on an overrun seed (name the seed)"
+      "visual: scripts/verify/culture_overrun.lua (seed 3665124156)"
      ],
      "requirement": "A presentation clamp holds the round-3 playhead at 400 BCE with the caption 'the migration ran N years past 400 BCE' on an overrun seed, and round 4 opens at 400 BCE; the record is untouched (BL-947).",
-     "notes": "",
-     "result_metric": ""
+     "notes": "The playback block clamps the Culture round's `last` to world_params::empires_start_year (the year round 4 opens on), the scrubber ends there, and the caption reads 'The migration ran N years past 400 BCE; the Empires round opens there, on the ground as the migration left it.' The record is untouched: history_span still reads the true end and the hand-over folds it. The seed was measured with tools/verify/culture_round_coast_measure re-run on this tree (7 of 60 overrun; worst 3665124156, migration_end_year -2). Finding the seed exposed verify.new_world as a no-op since BL-1085 (setup_world generates only when no world is held); the binding now releases the world first.",
+     "result_metric": "2026-09-25 culture_overrun.lua: seed 3665124156 overruns by 398 years (record end -2, unclamped in history_span); capture 1 parked past the end shows the scrubber and stamp at 400 BCE with the caption on the board; expect_no_clipping 0 failures."
     },
     {
      "id": "R5",
@@ -8255,7 +8255,7 @@
       "visual: Ben's live click"
      ],
      "requirement": "LIVE: Ben's click on the Culture round.",
-     "notes": "",
+     "notes": "Owed: Ben's live click on the merged tree. What to watch for: the kin arrows fading in the peoples' hues (dashed where a hop crossed water -- seed 13 shows them early), a recultured range changing hue on its split line, the census under the board, and on an overrun world (library seed 9) the playhead stopping at 400 BCE with the caption.",
      "result_metric": ""
     }
    ]
