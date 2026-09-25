@@ -553,7 +553,11 @@ void app::draw_seat_screen()
         {
             if (const auto t = m_world.tiles.find(hq_tile); t != m_world.tiles.end())
             {
-                const int gw = home->tiles.gw > 0 ? home->tiles.gw : home_grid_width;
+                // The homeworld's own grid width for the column wrap — the
+                // grid `region::col` and `tile_component::grid_x` index, not
+                // the report's `tiles.gw` (the generator's call record, which
+                // reads smaller than the body on a --verify world).
+                const int gw = home_grid_width;
                 int best = -1; long best_d = 0;
                 for (std::size_t r = 0; r < home->settlement.regions.size(); ++r)
                 {

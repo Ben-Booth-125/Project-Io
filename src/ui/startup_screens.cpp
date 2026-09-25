@@ -14,6 +14,7 @@
 #include "ui/generation_wait.hpp"      // BL-1072: the one wait surface
 #include "ui/generation_preview.hpp"
 #include "ui/history_lapse.hpp"      // BL-829/BL-830: round 4's map and its board
+#include "ui/presentation.hpp"       // ui::palette — the per-world nation/realm colour tables (BL-1089)
 #include "world/colonisation.hpp"   // colonisation_start_year -- the Culture round's own first year (BL-919)
 #include "world/era_timelapse.hpp"   // owner_slice_at — the whole replay substrate
 #include "world/logistics.hpp"       // body_tile_grid — the load path's water mask (BL-1089)
@@ -2013,15 +2014,30 @@ namespace {
 /// before handed over, coloured at the last record's close. The water mask
 /// is the world's own tiles, which is the surface the wizard's raster was
 /// packed from. Empty when the body carries no record.
+/// @param round_count The wizard's lapse round count (`app::wizard_lapse_round_count`),
+///                    passed in because this is a free function and the count is the app's.
 std::vector<uint32_t> derive_realm_colours(const generation_report& rep,
                                            const generation_report::body_entry& home,
-                                           world& w)
+                                           world& w, int round_count)
 {
     std::vector<uint32_t> realm;
-    const int gw = home.tiles.gw, gh = home.tiles.gh;
+    // The homeworld grid is the CONSTANT the lapse rounds raster over
+    // (`lapse_from_report` sets `grid_w`/`grid_h` from it) and the grid the
+    // world's own tiles sit on. NOT the report's `tiles.gw/gh`: that is the
+    // generator's call record and reads 180 x 84 on a --verify world while the
+    // body carries 261 x 121 tiles — measured 2026-09-25, when reading it here
+    // left every nation on the hash.
+    const int gw = home_grid_width, gh = home_grid_height;
     if (gw <= 0 || gh <= 0) return realm;
     const std::vector<entity_id>& grid = body_tile_grid(w, home.id);
-    if (grid.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh)) return realm;
+    if (grid.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+    {
+        // Said aloud rather than silently hashed: a grid that does not match
+        // the report's raster is a wiring fault, not a world with no history.
+        std::printf("[identity] realm colours NOT derived: body %llu grid %zu tiles vs %d x %d\n",
+                    static_cast<unsigned long long>(home.id), grid.size(), gw, gh);
+        return realm;
+    }
 
     std::vector<uint8_t> water(grid.size(), 1);
     for (std::size_t k = 0; k < grid.size(); ++k)
@@ -2038,12 +2054,13 @@ std::vector<uint32_t> derive_realm_colours(const generation_report& rep,
 
     polity_pins pins;
     bool has_pins = false;
-    int family_count = 0;
+    int family_count = 0, records = 0;
     std::vector<int32_t> last_slot, last_rung;
-    for (int i = 1; i < wizard_lapse_round_count; ++i)
+    for (int i = 1; i < round_count; ++i)
     {
         ui::history_lapse h = lapse_from_report(rep, i, /*adopted=*/true);
         if (h.empty()) continue;
+        ++records;
         family_count = h.family_count;
         const std::vector<int32_t> first = polity_first_region(h.lapse);
         const std::vector<int32_t> seat  = polity_seat_region(h.lapse, first);
@@ -2070,10 +2087,17 @@ std::vector<uint32_t> derive_realm_colours(const generation_report& rep,
         last_rung = pins.rung;
     }
     realm.assign(last_slot.size(), 0u);
+    std::size_t coloured = 0;
     for (std::size_t p = 0; p < last_slot.size(); ++p)
         if (last_slot[p] >= 0)
+        {
             realm[p] = static_cast<uint32_t>(ui::palette::polity_slot_colour(
                 last_slot[p], family_count, p < last_rung.size() ? last_rung[p] : 0));
+            ++coloured;
+        }
+    std::printf("[identity] realm colours derived from the report: %zu of %zu realms over %d record(s), "
+                "%d families, %d x %d raster, %zu regions\n",
+                coloured, last_slot.size(), records, family_count, gw, gh, col.size());
     return realm;
 }
 
@@ -2113,7 +2137,8 @@ void app::pin_nation_colours_from_report()
         bool found = false;
         ui::palette::realm_colour(0, &found);
         if (!found)
-            ui::palette::set_realm_colour_table(derive_realm_colours(m_generation_report, *home, m_world));
+            ui::palette::set_realm_colour_table(
+                derive_realm_colours(m_generation_report, *home, m_world, wizard_lapse_round_count));
     }
 
     std::vector<std::pair<entity_id, ImU32>> table;
@@ -2139,7 +2164,7 @@ void app::pin_nation_colours_from_report()
     // In ascending nation-index order, so the walk is deterministic.
     if (!ownerless_idx.empty())
     {
-        const int gw = home->tiles.gw, gh = home->tiles.gh;
+        const int gw = home_grid_width, gh = home_grid_height; // the world's grid, as above
         const std::vector<entity_id>& grid = body_tile_grid(m_world, home->id);
         std::vector<int32_t> tile_nation; // raster -> nation index, -1 none
         std::vector<std::vector<int32_t>> nbrs(home->nation_ids.size());
