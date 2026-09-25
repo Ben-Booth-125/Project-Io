@@ -313,6 +313,10 @@ MERGED 2026-09-25 (cc5e51d1); T3 closes with the wave-0 gate run; the stale enac
   unmoved; save_envelope_roundtrip PASS. OWED: the cold review and Ben's live click (the R5s).
   FOUND ON THE WAY: `verify.new_world` had been a no-op since BL-1085 (setup_world builds only
   into an empty world); restored, and seat_pick.lua's S5 re-reads its pick on the rebuilt world.
+  MAIN 2026-09-25: the other script on that binding, recipe_workforce.lua, went red on the real
+  rebuild (out=0.0 at 100 %); measured over twelve ticks on both worlds the facility had no inputs
+  (the old pass was one tick of leftover settle stock), so the script now stocks its inputs itself
+  through the new verify.stock_building_inputs and is green (0 % -> 0.0, 100 % -> 15.2) -- `b7726c90`.
 
 ### Wave 2, lane F2 (Exploration) — BL-1095 (fleets and ties). Group `fleets-and-ties`.
 
