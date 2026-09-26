@@ -27,6 +27,7 @@
 // era_world_harness / world_audit):  node tools/verify/build_harness.js centre_region_bind
 
 #include "world/hard_coded_world.hpp"
+#include "world/history_sim.hpp"
 #include "world/population_generation.hpp"
 #include "world/placement_rules.hpp"
 #include "world/settlement.hpp"
@@ -508,6 +509,17 @@ int main()
     // by construction. A CITY-BEARING region is now one whose materialised top
     // scale is a town or larger (`top >= 2`) — the size the heads a sack cuts
     // decide — and its controls are chosen the same way.
+    //
+    // THE SIM'S OWN SACK (the rebuild's review, 2026-09-26). At 600 per mille
+    // the walls' multiple (`urban_sack_multiple_q`, 2x) clamped the urban loss
+    // to the whole city, so every sacked region fell to nothing and the rows
+    // below passed by construction. The loss is the sim's shipped
+    // `sack_population_loss_q` (history_sim_params), the one a conquest applies,
+    // so a sack costs a city part of its heads — its size, and its centre only
+    // where the survivors fall below a village's worth — and the rows read the
+    // top-scale sum, which under one place a region carries both the count and
+    // the size.
+    const int sim_sack_q = history_sim_params{}.sack_population_loss_q;
     {
         settlement_state ss2 = ss;
         std::vector<int> sacked_idx;
@@ -516,7 +528,7 @@ int main()
             {
                 // Every OTHER eligible region, so the rest stay as controls.
                 if ((i % 2) != 0) continue;
-                sack_region_urban(ss2.regions[i], /*population_loss_q=*/600);
+                sack_region_urban(ss2.regions[i], sim_sack_q);
                 sacked_idx.push_back(static_cast<int>(i));
             }
 
@@ -555,22 +567,27 @@ int main()
         }
 
         std::printf("\n-- R2 controlled: sack half the town-or-larger regions, re-materialise --\n");
-        std::printf("   sacked %d regions at 600 per-mille countryside loss\n",
-                    static_cast<int>(sacked_idx.size()));
+        std::printf("   sacked %d regions at the sim's %d per-mille countryside loss (the walls twice that)\n",
+                    static_cast<int>(sacked_idx.size()), sim_sack_q);
         std::printf("   sacked   centres %d -> %d   top-scale sum %d -> %d   "
                     "fewer-or-smaller %d, unchanged %d, larger %d\n",
                     before, after, s_before, s_after, fell, flat, rose);
         std::printf("   control  centres %d -> %d   top-scale sum %d -> %d over %d untouched regions\n",
                     c_before, c_after, cs_before, cs_after, c_n);
-        std::printf("   sacked lose %.1f%% of their cities; controls %.1f%%\n",
+        std::printf("   sacked lose %.1f%% of their top-scale sum (%.1f%% of their centres); "
+                    "controls %.1f%% (%.1f%%)\n",
+                    s_before ? 100.0 * (s_before - s_after) / s_before : 0.0,
                     before ? 100.0 * (before - after) / before : 0.0,
+                    cs_before ? 100.0 * (cs_before - cs_after) / cs_before : 0.0,
                     c_before ? 100.0 * (c_before - c_after) / c_before : 0.0);
 
         check(!sacked_idx.empty(), "R2 the controlled experiment had regions to sack");
-        check(after < before,
-              "R2 sacking a region costs it cities on the materialised map");
+        check(s_after < s_before && after <= before,
+              "R2 sacking a region costs it city size on the materialised map (never a city gained)");
         check(fell > rose,
               "R2 far more sacked regions shrink than grow");
+        check(flat > 0,
+              "R2 the sack is not total: some sacked cities keep their rung (a real sack, not a wipe)");
         // The controls move a little, and the reason is worth stating rather
         // than tolerating: a control's OWN `centres` is untouched by the sack,
         // but some of what it was carrying was SPILL from a neighbour that had
@@ -578,7 +595,7 @@ int main()
         // control gives back borrowed cities. That is the binding working, not
         // a body-wide collapse — so the claim is that the control's loss is an
         // order of magnitude smaller than the sacked regions' own.
-        check((c_before - c_after) * 10 <= (before - after),
+        check((cs_before - cs_after) * 10 <= (s_before - s_after),
               "R2 the loss is LOCAL: controls give up under a tenth of what the sacked lose");
     }
 

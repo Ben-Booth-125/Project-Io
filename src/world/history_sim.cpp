@@ -410,28 +410,28 @@ int div_round_nearest(int x, int n)
     return x >= 0 ? (2 * x + n) / (2 * n) : -((-2 * x + n) / (2 * n));
 }
 
-/// BL-1137 (the centres cold review, 2026-09-26) — THE STREAM'S LINE STAYS ON
-/// LAND. True when the straight line between two regions' anchors — Chebyshev
-/// steps, the short way round the cylinder, both ends included — crosses no
-/// water tile. The supply graph (`supply_neighbours`) joins every region
-/// within its radius whatever lies between, so a colony across a strait, or a
-/// chain of held coastal water, sits in one piece with its home towns; people
-/// walk, and this is the line they walk. Pure: the substrate, two anchors, the
-/// grid. A substrate of the wrong size refuses nothing.
+} // namespace
+
 bool anchors_joined_by_land(const std::vector<terrain_substrate>& sub,
-                            const region& a, const region& b, int gw, int gh)
+                            const region& a_in, const region& b_in, int gw, int gh)
 {
     if (gw <= 0 || gh <= 0 || sub.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
         return true;
+    // Symmetric: draw from the endpoint earlier in (row, col) order.
+    const bool swap = (b_in.row < a_in.row) || (b_in.row == a_in.row && b_in.col < a_in.col);
+    const region& a = swap ? b_in : a_in;
+    const region& b = swap ? a_in : b_in;
     int dc = b.col - a.col;
     if (dc > gw / 2) dc -= gw;
     else if (dc < -(gw / 2)) dc += gw;
     const int dr = b.row - a.row;
     const int steps = std::max(std::abs(dc), std::abs(dr));
-    for (int s = 0; s <= steps; ++s)
+    // The tiles strictly BETWEEN the anchors (s = 1 .. steps - 1): an anchor is
+    // where the region's people stand, never a crossing.
+    for (int s = 1; s < steps; ++s)
     {
-        const int c = a.col + (steps > 0 ? div_round_nearest(dc * s, steps) : 0);
-        const int r = a.row + (steps > 0 ? div_round_nearest(dr * s, steps) : 0);
+        const int c = a.col + div_round_nearest(dc * s, steps);
+        const int r = a.row + div_round_nearest(dr * s, steps);
         if (r < 0 || r >= gh) return false;
         const int cc = ((c % gw) + gw) % gw;
         if (is_water(sub[static_cast<std::size_t>(r) * static_cast<std::size_t>(gw)
@@ -441,7 +441,22 @@ bool anchors_joined_by_land(const std::vector<terrain_substrate>& sub,
     return true;
 }
 
-} // namespace
+bool stream_land_lines::joined(const std::vector<region>& regions, int a, int b)
+{
+    if (substrate == nullptr) return true;
+    if (a < 0 || b < 0 || static_cast<std::size_t>(a) >= regions.size()
+        || static_cast<std::size_t>(b) >= regions.size())
+        return false;
+    const uint32_t lo = static_cast<uint32_t>(std::min(a, b));
+    const uint32_t hi = static_cast<uint32_t>(std::max(a, b));
+    const uint64_t key = (static_cast<uint64_t>(lo) << 32) | static_cast<uint64_t>(hi);
+    const auto it = memo.find(key);
+    if (it != memo.end()) return it->second;
+    const bool ok = anchors_joined_by_land(*substrate, regions[lo], regions[hi], gw, gh);
+    memo.emplace(key, ok);
+    ++measured;
+    return ok;
+}
 
 bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>& owner,
                             std::size_t i, int gw)
@@ -577,7 +592,8 @@ urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
     return out;
 }
 
-int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner, int gw)
+int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner,
+                             const std::vector<uint8_t>& on_ruin, int gw)
 {
     // Region order: a receiver stands a centre, so no stranded region receives
     // from another and the order decides nothing but distance ties.
@@ -585,7 +601,8 @@ int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int
     for (std::size_t i = 0; i < regions.size(); ++i)
     {
         const region& r = regions[i];
-        if (r.industry_points > 0 && r.centres <= 0 && r.centres_razed <= 0
+        const bool ruin = i < on_ruin.size() && on_ruin[i] != 0;
+        if (r.industry_points > 0 && r.centres <= 0 && !ruin
             && rehome_stranded_points(regions, owner, i, gw))
             ++moved;
     }
@@ -2252,6 +2269,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // no substrate (a synthetic fixture) nothing is measured and nothing caps.
     urban_ground_field urban_ground;
 
+    // BL-1141 (the rebuild's review, 2026-09-26) — WHICH SETTLEMENTS A SACK
+    // ENDED. Per region: 1 when the event that last took its centres to none
+    // was a sack (the points it earned sit on the ruin, NR-901), 0 when it was
+    // anything else (its ground taken, its people gone — the points go on).
+    // Read by the close's retry, which skips only the first. A razing in a
+    // region's past says nothing here: a sack that left the settlement
+    // standing never sets it. Local to the call; a call resumed inside the
+    // span opens with every point-holding region that stands nothing and was
+    // ever razed read as a ruin — the most it can know, and the old reading.
+    std::vector<uint8_t> settlement_ended_by_sack(ss.regions.size(), 0);
+    for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
+    {
+        const region& r = ss.regions[ri];
+        if (r.industry_points > 0 && r.centres <= 0 && r.centres_razed > 0)
+            settlement_ended_by_sack[ri] = 1;
+    }
+    const auto note_settlement_end = [&](std::size_t i, bool by_sack) {
+        if (settlement_ended_by_sack.size() <= i) settlement_ended_by_sack.resize(i + 1, 0);
+        settlement_ended_by_sack[i] = by_sack ? 1 : 0;
+    };
+
     // BL-1130 (review fix) — WHAT THE REACH CACHE WATCHES. The relay reads a
     // region's size only through the REBATE it buys: none below
     // `centre_reach_min_centres`, `size x centre_reach_rebate_q` above it,
@@ -2292,6 +2330,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // One rule, `rehome_stranded_points` (history_sim.hpp), which the span's
     // close calls again for whatever this left behind.
     const auto rehome_points = [&](std::size_t i) {
+        note_settlement_end(i, /*by_sack=*/false); // every caller: an end that was not a sack
         rehome_stranded_points(ss.regions, owner, i, gw);
     };
 
@@ -2317,24 +2356,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
     };
 
     // BL-1137 (the centres cold review) — THE STREAM'S LINE, memoised per
-    // corridor: anchors never move and the terrain is fixed for the run, so a
-    // corridor's answer is computed once. Read lower index to higher, so the
-    // answer is one per corridor whichever end asks. Lookups only: the map's
-    // layout never reaches a result. No substrate (a synthetic fixture): no
-    // water to cross, every corridor walks.
-    std::unordered_map<uint64_t, bool> stream_land_link;
-    const auto stream_link_on_land = [&](int a, int b) -> bool {
-        if (terrain.substrate == nullptr) return true;
-        const uint64_t key = edge_key(a, b);
-        const auto it = stream_land_link.find(key);
-        if (it != stream_land_link.end()) return it->second;
-        const int lo = std::min(a, b), hi = std::max(a, b);
-        const bool ok = anchors_joined_by_land(*terrain.substrate,
-                                               ss.regions[static_cast<std::size_t>(lo)],
-                                               ss.regions[static_cast<std::size_t>(hi)], gw, gh);
-        stream_land_link.emplace(key, ok);
-        return ok;
-    };
+    // corridor (`stream_land_lines`, history_sim.hpp): anchors never move and
+    // the terrain is fixed for the run, so a corridor's answer is computed
+    // once. No substrate (a synthetic fixture): no water to cross, every
+    // corridor walks.
+    stream_land_lines stream_lines;
+    stream_lines.substrate = terrain.substrate;
+    stream_lines.gw = gw;
+    stream_lines.gh = gh;
     const auto road_tier_for_uses = [&](int uses) {
         // BL-940: the third rung. ORDINARY TRAFFIC is not meant to reach
         // `road_tier3_uses` (see that field's own comment) — it is bought,
@@ -4468,7 +4497,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         rebate_before[ri] = relay_rebate_of(ss.regions[ri]);
                     const urbanisation_round ur = run_urbanisation_stream(
                         ss.regions, owner, supply_neighbours,
-                        [&](int a, int b) { return stream_link_on_land(a, b); }, credit, step_years);
+                        [&](int a, int b) { return stream_lines.joined(ss.regions, a, b); }, credit, step_years);
                     for (const int d : ur.destinations)
                         if (relay_rebate_of(ss.regions[static_cast<std::size_t>(d)])
                             != rebate_before[static_cast<std::size_t>(d)])
@@ -7060,7 +7089,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // network, the mirror of the demography loop's bump.
                     // BL-1130: the relay reads the settlement size, as above.
                     const int sacked_rebate_before = relay_rebate_of(tgt);
+                    const int sacked_centres_before = tgt.centres;
                     sack_region_urban(tgt, params.sack_population_loss_q);
+                    // BL-1141: a sack that ENDS the settlement leaves its
+                    // points on the ruin (NR-901); one it survives, nothing.
+                    if (sacked_centres_before > 0 && tgt.centres == 0)
+                        note_settlement_end(ti, /*by_sack=*/true);
                     if (relay_rebate_of(tgt) != sacked_rebate_before)
                         ++centres_version;
 
@@ -8808,7 +8842,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // receiver was at the ceiling. Whatever is still stranded when the span
     // closes is offered once more to its realm's nearest centre as the map now
     // stands. A sack's points stay on the ruin (NR-901).
-    rehome_stranded_at_close(ss.regions, owner, gw);
+    rehome_stranded_at_close(ss.regions, owner, settlement_ended_by_sack, gw);
 
     // THE CLOSING STEP, always taken, at the stop year. Without it the record's
     // last step is wherever the interval happened to land — up to one interval

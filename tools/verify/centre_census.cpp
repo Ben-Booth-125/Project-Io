@@ -86,6 +86,11 @@
 // the instrument's own honesty check (a world with no settlement record, or no
 // carved centre, would make every fit row vacuous), and THE CAP (BL-1130 review
 // fix) — the rule's own invariant on the saved sim record, not a density.
+// (The spacing, C10, fails the run too.) And THE CONSERVATION LEDGER (C13,
+// BL-1137 rebuild review): the ceiling the urbanisation stream moved sums to
+// exactly zero, and every region holds 0 <= farm-fed <= its farm-fed ceiling
+// and industrial <= urban <= population — on the generated world, not only on
+// fixtures.
 //
 // READ-ONLY OVER src/world/*. It calls the world's own functions and nothing in
 // src/ changes for it.
@@ -181,6 +186,37 @@ int64_t industrial_heads_of(const R& p)
         return -1;
 }
 
+/// THE CONSERVATION LEDGER'S READS (BL-1137 rebuild review, NR-958), where the
+/// tree carries them, so the same gate builds on a tree without the stream (it
+/// holds trivially there) and on the stream's FIRST build (8cbdbc9d~1), whose
+/// arithmetic it exists to catch:
+///   carried  — the ceiling the stream MOVED onto a region: `capacity_carried`
+///              where the tree carries it (+ in, - out, so it sums to zero), and
+///              on the first build `industrial_heads` itself, which is exactly
+///              what that build added to each destination's ceiling while no
+///              source gave any up;
+///   farm-fed ceiling — `region_farm_fed_ceiling` where the tree carries it; on
+///              any other tree the works-aware farm ceiling (on the first build
+///              its ceiling was K_farm + I, so K_farm + I - I).
+template <typename R>
+int64_t carried_of(const R& p)
+{
+    if constexpr (requires { p.capacity_carried; })
+        return static_cast<int64_t>(p.capacity_carried);
+    else if constexpr (requires { p.industrial_heads; })
+        return static_cast<int64_t>(p.industrial_heads);
+    else
+        return 0;
+}
+template <typename R>
+int64_t farm_fed_ceiling_of(const R& p)
+{
+    if constexpr (requires { p.capacity_carried; })
+        return region_farm_fed_ceiling(p);
+    else
+        return region_carrying_capacity(p.farm_q, p.work_capacity_mod);
+}
+
 std::vector<uint32_t> parse_seed_list(const std::string& s)
 {
     std::vector<uint32_t> out;
@@ -210,6 +246,14 @@ struct seed_record
     int64_t sim_centres = 0, sim_urban = 0;
     int64_t sim_population = 0, sim_urban_max = 0;
     int64_t sim_industrial = -1; ///< -1: the tree carries no `region::industrial_heads`
+    // THE CONSERVATION LEDGER (BL-1137 rebuild review; a FAIL row), over EVERY
+    // region at the close, living or not.
+    int64_t ledger_carried_sum = 0;  ///< sum of the ceiling the stream moved: exactly 0
+    int     ledger_farm_over = 0;    ///< regions whose farm-fed heads pass their farm-fed ceiling
+    int     ledger_farm_negative = 0;///< regions with more industrial heads than people
+    int     ledger_ind_over_urban = 0;///< industrial heads over urban heads
+    int     ledger_urban_over_pop = 0;///< urban heads over population
+    bool    ledger_ok = true;
     int     max_region_centres = 0, at_limit = 0;
     int     region_centre_hist[6] = {}; // 0, 1, 2-4, 5-9, 10-19, 20+
 
@@ -439,6 +483,16 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
     r.regions = static_cast<int>(ss.regions.size());
     for (const region& p : ss.regions)
     {
+        // THE LEDGER: people and ceiling conserved, every region.
+        {
+            const int64_t ind = std::max<int64_t>(industrial_heads_of(p), 0);
+            const int64_t farm_fed = p.population - ind;
+            r.ledger_carried_sum += carried_of(p);
+            if (farm_fed < 0) ++r.ledger_farm_negative;
+            else if (farm_fed > farm_fed_ceiling_of(p)) ++r.ledger_farm_over;
+            if (ind > p.urban_population) ++r.ledger_ind_over_urban;
+            if (p.urban_population > p.population) ++r.ledger_urban_over_pop;
+        }
         if (p.population > 0) ++r.living;
         if (p.population > 0 && p.centres > 0) ++r.standing;
         if (p.population > 0)
@@ -716,6 +770,8 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
 
     r.ok = ss.urban_map_drawn && r.carved > 0;
     r.cap_ok = r.sim_over_cell == 0 && r.groundless_standing == 0;
+    r.ledger_ok = r.ledger_carried_sum == 0 && r.ledger_farm_over == 0 && r.ledger_farm_negative == 0
+               && r.ledger_ind_over_urban == 0 && r.ledger_urban_over_pop == 0;
     return r;
 }
 
@@ -968,6 +1024,18 @@ int main(int argc, char** argv)
     std::printf("pool  %7s  %11" PRId64 " | %39" PRId64 " (%" PRId64 ") | %" PRId64 "\n", "",
                 cp_founded, cp_sim, cp_stacked, cp_pass);
 
+    // THE CONSERVATION LEDGER (BL-1137 rebuild review; NR-958: a migrant carries
+    // its food with it, a sack never lowers a ceiling). A FAIL row: the stream
+    // moves ceiling, never makes it, so the ceiling it moved sums to exactly
+    // zero over the world; and every region holds 0 <= farm-fed <= its
+    // farm-fed ceiling and industrial <= urban <= population.
+    std::printf("\n=== C13 the conservation ledger (every region at the close; a FAIL row) ===\n");
+    std::printf("seed  carried_sum | farm_fed>ceiling  farm_fed<0  industrial>urban  urban>population | ok\n");
+    for (const seed_record& r : recs)
+        std::printf("%4u  %11" PRId64 " | %16d  %10d  %16d  %16d | %s\n", r.seed, r.ledger_carried_sum,
+                    r.ledger_farm_over, r.ledger_farm_negative, r.ledger_ind_over_urban,
+                    r.ledger_urban_over_pop, r.ledger_ok ? "ok" : "FAIL");
+
     // Pooled.
     int64_t land = 0, centres = 0, ctiles = 0, spilled = 0, carved = 0, roads = 0, markets = 0;
     int64_t scales[5] = {};
@@ -980,6 +1048,7 @@ int main(int argc, char** argv)
         if (!r.ok) ++fails;
         if (!r.cap_ok) ++fails;
         if (!r.spacing_ok) ++fails;
+        if (!r.ledger_ok) ++fails;
     }
     // POPULATION.md § Generation: "a 1960 world aims at roughly 500 centres" --
     // an aim the forces are calibrated against, never a count any rule
@@ -1018,8 +1087,16 @@ int main(int argc, char** argv)
                         "sim-founded member (%d on one tile)\n",
                         r.seed, r.close_pairs_sim, generation_settle_spacing_tiles,
                         r.close_pairs_stacked);
+        if (!r.ledger_ok)
+            std::printf("FAIL  seed %u: the conservation ledger breaks -- the stream moved a net "
+                        "%" PRId64 " heads of ceiling into being; %d regions over their farm-fed "
+                        "ceiling, %d with more industrial heads than people, %d industrial over "
+                        "urban, %d urban over population\n",
+                        r.seed, r.ledger_carried_sum, r.ledger_farm_over, r.ledger_farm_negative,
+                        r.ledger_ind_over_urban, r.ledger_urban_over_pop);
     }
-    std::printf("\n%s\n", fails == 0 ? "centre_census: OK (the cap and the spacing hold; no density is asserted)"
+    std::printf("\n%s\n", fails == 0 ? "centre_census: OK (the cap, the spacing and the conservation ledger hold; "
+                                       "no density is asserted)"
                                      : "centre_census: FAIL (see the FAIL rows)");
     return fails == 0 ? 0 : 1;
 }

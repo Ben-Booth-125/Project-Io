@@ -2292,19 +2292,38 @@ bool region_stands_a_town(const region& p)
 namespace {
 
 /// The logistic term dP = r * P * (K - P) / K, all integer. EXACT, as it always
-/// was, on ground whose numbers fit 31 bits — every ceiling farmland and works
+/// was, on ground whose numbers fit 30 bits — every ceiling farmland and works
 /// alone can raise — and staged so nothing leaves int64 on ground whose
-/// ceiling the stream carried past that.
+/// ceiling the stream carried past that. The bound is 2^30, not 2^31 (the
+/// rebuild's review): r * P * (K - P) <= 12 * K^2 / 4, which is under 2^63 for
+/// K < 2^30 and over it from K of about 1.75e9.
 int64_t logistic_growth(int64_t P, int64_t K)
 {
     if (P <= 0 || K <= 0) return 0;
-    if (P < (1LL << 31) && K < (1LL << 31))
+    if (P < (1LL << 30) && K < (1LL << 30))
         return (demog_growth_rate_q * P * (K - P)) / (K * 1000);
     const int64_t gap_ppm = clampi64(((K - P) * 1000000) / K, -1000000, 1000000);
     return ((demog_growth_rate_q * P) / 1000) * gap_ppm / 1000000;
 }
 
 } // namespace
+
+int64_t remove_region_people(region& p, int64_t heads)
+{
+    if (heads <= 0 || p.population <= 0) return 0;
+    const int64_t P = p.population;
+    const int64_t h = clampi64(heads, 0, P);
+    p.industrial_heads = clampi64(p.industrial_heads, 0, P);
+    // The industrial heads' share of the dead, in parts per million of the
+    // population (h * 10^6 and I * 10^6 both stay under 2^61 at P <= 2^40).
+    const int64_t frac_ppm = (h * 1000000) / P;
+    const int64_t ind_loss = (p.industrial_heads * frac_ppm) / 1000000;
+    p.population = P - h;
+    // Rounding can leave an industrial head over the survivors; it is one of the dead.
+    p.industrial_heads = clampi64(p.industrial_heads - ind_loss, 0, p.population);
+    p.urban_population = clampi64(p.urban_population, 0, p.population);
+    return h;
+}
 
 void advance_region_demography(region& p, int years, int war_pressure_q)
 {
@@ -2405,7 +2424,9 @@ bool resolve_plague_event(std::vector<region>& regions,
                 if (loss_q <= 0) continue;
 
                 const int64_t loss = (p.population * loss_q) / 1000;
-                p.population = clampi64(p.population - loss, 0, p.population);
+                // The one direct cut (the rebuild's review): the dead fall on
+                // the industrial and the farm-fed heads in proportion.
+                remove_region_people(p, loss);
                 replenish_manpower(p); // The ceiling just fell with the population.
             }
             applied = true;

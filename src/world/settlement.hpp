@@ -668,7 +668,11 @@ struct region
     /// (`settle_urban_migrants`); a sack turns the ones its walls no longer hold
     /// out into the countryside (`sack_region_urban`). GENERATION SCRATCH, NOT
     /// SAVED, on `network_supply_q`'s precedent: the campaign reads the urban
-    /// heads they are part of, never this split.
+    /// heads they are part of, never this split. A save taken mid-span, or
+    /// any play-side demography, must carry this and `capacity_carried`
+    /// before it may clamp a region to a ceiling: without them a works city
+    /// reads as a region over its farmland, and the clamp deletes the people
+    /// the stream moved there.
     int64_t industrial_heads = 0;
 
     /// NR-958 (A MIGRANT CARRIES ITS FOOD WITH IT, 2026-09-26) — the ceiling
@@ -680,7 +684,10 @@ struct region
     /// regrow into the ceiling that left with its people. The region's ceiling
     /// is its farmland's plus this (`region_ceiling`); a sack never touches it.
     /// Zero everywhere the stream has not run. GENERATION SCRATCH, NOT SAVED,
-    /// as `industrial_heads`: only the Era -1 demography reads it.
+    /// as `industrial_heads`: only the Era -1 demography reads it. THE TRAP:
+    /// any play-side demography (or a save taken mid-span) must read this
+    /// before it may clamp a region to a ceiling — `region_ceiling` without
+    /// it is the farmland's alone, and a destination sits far above that.
     int64_t capacity_carried = 0;
 
     /// BL-872 (CIVILISATION.md "Centres are derived by supply and
@@ -1229,6 +1236,17 @@ int64_t region_carrying_capacity(int farm_q);
 /// Clamped at the bottom so a (currently impossible) negative modifier cannot
 /// drive the ceiling under the subsistence floor.
 int64_t region_carrying_capacity(int farm_q, int capacity_mod_q);
+
+/// A DIRECT CUT TO A REGION'S PEOPLE — @p heads dead of a famine, a plague, or
+/// any future cause that kills rather than moves (clamped to the population).
+/// The loss falls on the INDUSTRIAL and the FARM-FED heads in proportion, so a
+/// cut never empties the farmland under a works city (a cut taken wholly from
+/// the farm-fed heads would leave the farmland unworked at 50%, and the
+/// logistic term grows nothing from zero). The urban headcount is held to the
+/// survivors. The ceiling is untouched: the dead leave their food behind. The
+/// ONE helper every such mechanism uses (`resolve_plague_event` does). Returns
+/// the heads removed.
+int64_t remove_region_people(region& p, int64_t heads);
 
 /// Advance one region's population by `years` simulated years: logistic
 /// growth toward `region_carrying_capacity(p.farm_q)`, war drawdown scaled

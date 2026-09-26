@@ -63,6 +63,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <unordered_map>
 #include <limits>
 #include <string>
 #include <utility>
@@ -4632,10 +4633,56 @@ bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>
 /// @p regions still holding points on no settlement is offered once more to
 /// its realm's nearest centre (`rehome_stranded_points`), in region order, as
 /// the map stands at the span's close — the handoff made when a settlement
-/// ended can have found nothing then. A RAZED region (`centres_razed` > 0) is
-/// skipped: a sack's points stay on the ruin (NR-901), exactly as the budget
-/// reads its razed reason. Returns how many regions' points moved.
-int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner, int gw);
+/// ended can have found nothing then. SKIPPED ONLY WHERE THE POINTS SIT ON A
+/// RUIN: @p on_ruin[i] != 0 when the event that last ended region i's
+/// settlement was a SACK (NR-901, the works went with the towns). A razing in
+/// a region's PAST is not a ruin — every conquest sacks, so "ever razed" is
+/// near "ever conquered" (the rebuild's review, 2026-09-26): a region sacked
+/// in one century whose settlement survived, and ended by ground loss in
+/// another, hands its points on like any other. A region past the end of
+/// @p on_ruin is not a ruin. Returns how many regions' points moved.
+int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner,
+                             const std::vector<uint8_t>& on_ruin, int gw);
+
+/// BL-1137 (the centres cold review, 2026-09-26) — THE STREAM'S LINE STAYS ON
+/// LAND. True when no water tile lies BETWEEN two regions' anchors on the
+/// straight line joining them: Chebyshev steps, the short way round the
+/// cylinder, the anchors themselves not tested. The supply graph
+/// (`supply_neighbours`) joins every region within its radius whatever lies
+/// between, so without this a colony across a strait sits in one piece with
+/// its home towns; people walk, and this is the line they walk.
+///
+/// THE ANCHORS ARE NOT TESTED (the rebuild's review, 2026-09-26): a region
+/// anchored on a shoreline or lake tile (`region_domain::coastal_water`, which
+/// a founding can land on) stands its people there, and a line that tested its
+/// own first tile would cut it out of the stream entirely — never sending,
+/// never receiving. Its line to an inland neighbour walks; its line across the
+/// water does not. THE LIMIT, accepted: a region anchored IN a one-tile strait
+/// has land on both sides one step away, so it joins both shores — the one
+/// way a strait is bridged, and only by a settlement standing on it.
+///
+/// SYMMETRIC: the line is drawn from the endpoint earlier in (row, col) order,
+/// so (a, b) and (b, a) walk the same tiles, including the half-way-round tie
+/// on an even-width cylinder. Pure. A substrate of the wrong size refuses
+/// nothing; a line leaving the grid's rows is refused.
+bool anchors_joined_by_land(const std::vector<terrain_substrate>& sub,
+                            const region& a, const region& b, int gw, int gh);
+
+/// `anchors_joined_by_land`, memoised per corridor — the sim's own line test,
+/// exposed so a harness exercises the same object the sim does. Anchors never
+/// move and terrain is fixed for a run, so a corridor (keyed by its lower and
+/// higher region index) is measured once. Lookups only: the map's layout never
+/// reaches a result. No substrate: every corridor walks.
+struct stream_land_lines
+{
+    const std::vector<terrain_substrate>* substrate = nullptr;
+    int gw = 0;
+    int gh = 0;
+    std::unordered_map<uint64_t, bool> memo;
+    std::size_t measured = 0; ///< corridors actually walked (memo misses)
+
+    bool joined(const std::vector<region>& regions, int a, int b);
+};
 
 /// One round of the urbanisation stream's outcome (`run_urbanisation_stream`).
 struct urbanisation_round
