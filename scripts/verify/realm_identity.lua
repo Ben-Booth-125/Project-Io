@@ -95,9 +95,46 @@ shot("realm_identity_0_round4_800ce")
 -- THE RATCHET AT ITS MOMENT (BL-1087 R4): the frame `civilisation_formed`
 -- (kind 6) fires for a realm, its rung steps up by one against the frame
 -- before, and the colour slot does not move — the shade is the ratchet, the
--- hue is the identity. The last such moment in the span with a frame after it.
-local civ_year = verify.history_event_year(6, -1, r4_last - 1)
-if civ_year >= r4_first then
+-- hue is the identity.
+--
+-- THE MOMENT MUST BE ONE THAT CAN RATCHET. Each named moment fires ONCE in a
+-- realm's life (world/polity_identity.cpp § 4; STARTUP.md § Identity across
+-- the rounds: a realm darkens a rung "and holds that rung"), so a realm's
+-- second or third civilisation darkens nothing. This script used to take the
+-- span's LAST civilisation_formed, which was a first until BL-1130 (centres
+-- consolidate) moved the history: on the default world that is now 868 CE,
+-- polity 66's THIRD civilisation (it coined others at 48 and 356), at rung 2
+-- before and after -- correctly unmoved. So the moment is the LAST
+-- civilisation_formed that is its realm's FIRST, coined by a realm holding
+-- ground the frame before (so there is a "before" to step from), with a frame
+-- after it inside the span. A world with civilisations must offer one.
+local civ_year, civ_realm = nil, nil
+do
+    local y = verify.history_event_year(6, -1, r4_last - 1)
+    while y > r4_first and civ_year == nil do
+        verify.history_year(y - 1)
+        local held_before = {}
+        for _, p in ipairs(verify.history_holders()) do held_before[p] = true end
+        verify.history_year(y)
+        for _, p in ipairs(verify.history_holders()) do
+            if held_before[p]
+               and verify.history_event_year(6, p, y) == y          -- it coined one at y...
+               and verify.history_event_year(6, p, y - 1) < r4_first -- ...and none before
+            then
+                civ_year, civ_realm = y, p
+                break
+            end
+        end
+        y = verify.history_event_year(6, -1, y - 1)
+    end
+end
+if verify.history_event_count(6, r4_last - 1) > 0 then
+    verify.expect(civ_year ~= nil, "round 4 has a realm's first civilisation to watch the ratchet at ("
+                  .. tostring(civ_year) .. ")")
+end
+if civ_year ~= nil then
+    print(string.format("realm_identity: the ratchet moment is %d, polity %d's first civilisation",
+                        civ_year, civ_realm))
     local before = identity_at(civ_year - 1)
     shot("realm_identity_0_round4_ratchet_before")
     local after  = identity_at(civ_year)
@@ -111,6 +148,10 @@ if civ_year >= r4_first then
         end
     end
     verify.expect(stepped > 0, "a civilisation_formed at " .. civ_year .. " ratchets a realm one rung (" .. stepped .. ")")
+    -- And the realm that coined it is one of them: its own rung rises.
+    local rb, ra = before[civ_realm].rung, (after[civ_realm] or before[civ_realm]).rung
+    verify.expect(ra > rb, "the coining realm " .. civ_realm .. " darkens at " .. civ_year
+                  .. " (rung " .. rb .. " -> " .. ra .. ")")
     verify.expect(slot_moved == 0, "the ratchet moves no colour slot (" .. slot_moved .. " moved)")
 end
 identity_at(r4_last)
