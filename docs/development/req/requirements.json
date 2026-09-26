@@ -7434,13 +7434,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold)"
      ],
      "requirement": "A cold review: whether the population rise is the stream's consequence or a double count, and whether points have become headcount by another name (INDUSTRIALISATION.md § 1).",
      "notes": "Cold review 2026-09-26: DO NOT MERGE as built. The stream adds each migrant to the destination ceiling (capacity created: the population rise); a sack clamps the ceiling and deletes ~40% of a sacked city silently; a razing above 320,000 heads is not recorded; the new rules asserted only in prose; points left behind never retried. It had been merged (b591d1e9) before the review returned; reverted on main (8cbdbc9d). Rebuild in the centres lane under NR-958.",
-     "result_metric": ""
+     "result_metric": "Rebuild dccf7e05 + fixes d79e0c81 on the lane branch: the cold review found no conservation bug; census C13 gates carried capacity summing to 0 and farm-fed within its ceiling on all 16 seeds (it fails all 16 on the first build: 7.2B heads of ceiling created); the close retry skips only a ruin; the real water test exercised; R2 at the real sack; a direct cut proportional (remove_region_people); overflow bound 2^30. Centres 22,521 -> 20,922 (-7.1%), carved -17.6%, urban share 67.4%, population 6.077B -> 6.045B. NOT MERGED: Beat 2 wants far fewer centres; R4 is Ben's."
     },
     {
      "id": "R4",
