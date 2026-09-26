@@ -7,6 +7,13 @@
 //       2026-08-21, NR-438), the ascending-id contract, seeded determinism,
 //       THE DERIVED-IDENTITY CONTRACT (P8: an id IS its lowest member tile),
 //       and the settlement seeds (P9).
+//       SCOPED BY BL-1133 (a province is its centre's ground; Ben, 2026-09-26):
+//       on COVERED land (a body with seed centres) the fill runs until the
+//       land is covered, so the band and the cap no longer bind there — the
+//       size rows (P5a/P5a2, D1/D1a) read the HINTERLAND land the band still
+//       draws, covered land's sizes are reported, and its own claims are G1
+//       (an anchor founding stands only on an uncentred island), G2 (the
+//       fill's ledger) and P9c by the anchor's scale.
 //   C — THE COST MODEL, MEASURED. The pinning instrument for the height
 //       coefficient province.hpp declares measurement-pinned, plus the
 //       direction checks that prove the model draws the borders Ben ruled:
@@ -286,6 +293,25 @@ int main()
         dims[bid]  = { bc.grid_width, bc.grid_height };
     }
 
+    // COVERED BODIES (BL-1133, a province is its centre's ground; Ben,
+    // 2026-09-26). A body with a SEED centre (any centre not an anchor
+    // founding) on its land has that land drawn by the unbounded centre fill,
+    // and the size band no longer binds a province there; every other body's
+    // land is still the spaced hinterland, drawn by the band. Re-derived here
+    // from the centres, not read out of province.cpp. The size rows below are
+    // scoped to what the band still draws, and the covered land gets rows of
+    // its own (G, and P9c by the anchor's scale).
+    std::set<entity_id> covered_bodies;
+    for (const auto& [cid, tid] : w.population_centre_tile)
+    {
+        const auto pit = w.population_centres.find(cid);
+        if (pit == w.population_centres.end() || pit->second.province_anchor)
+            continue;
+        const auto tit = w.tiles.find(tid);
+        if (tit != w.tiles.end() && domain_matches(tit->second.substrate, province_kind::land))
+            covered_bodies.insert(tit->second.body);
+    }
+
     const auto collect_land_edges = [](const world& sw,
                                        const std::map<entity_id, std::vector<entity_id>>& gs,
                                        const std::map<entity_id, std::pair<int, int>>& ds) {
@@ -339,18 +365,31 @@ int main()
     //      is a claim about the fill, and the fill is the same one in all three
     //      domains. The land-only half of the old row moved to P2b, narrowed
     //      rather than deleted (NR-428).
-    // P5 — the size band, MEASURED OVER LAND PROVINCES. It is a GROWTH BUDGET,
-    //      not a clamp (Ben, 2026-08-21): 7-12 soft, 3-12 hard, and TINY
-    //      PROVINCES ARE KEPT. The water bands are section W's; mixing them into
-    //      this histogram would make both unreadable and would silently move a
-    //      land number nobody changed.
+    // P5 — the size band, MEASURED OVER HINTERLAND LAND PROVINCES. It is a
+    //      GROWTH BUDGET, not a clamp (Ben, 2026-08-21): 7-12 soft, 3-12 hard,
+    //      and TINY PROVINCES ARE KEPT. The water bands are section W's; mixing
+    //      them into this histogram would make both unreadable and would
+    //      silently move a land number nobody changed.
+    //
+    //      RE-SCOPED (BL-1133, a province is its centre's ground; Ben,
+    //      2026-09-26): the band now binds only the land of a body with NO seed
+    //      centre — the spaced hinterland. A covered body's land grows until it
+    //      is covered, with no budget, no 12 and no 20, so its sizes are not a
+    //      claim the band can make; they are REPORTED below (n, median, p90,
+    //      max) and their own claims are rows G1-G2 and P9c.
     {
         bool                       all_connected = true;
         std::map<std::size_t, int> hist;
+        std::vector<std::size_t>   covered_sizes;
         for (const province& p : part.provinces)
         {
             if (province_kind_of(w, p) == province_kind::land)
-                ++hist[p.tiles.size()];
+            {
+                if (covered_bodies.count(p.body))
+                    covered_sizes.push_back(p.tiles.size());
+                else
+                    ++hist[p.tiles.size()];
+            }
 
             const auto& grid = grids.at(p.body);
             const int   gw   = dims.at(p.body).first;
@@ -387,8 +426,19 @@ int main()
         check(all_connected,
               "P4  every province is hex-connected on its body's grid (all three domains)");
 
+        {
+            std::sort(covered_sizes.begin(), covered_sizes.end());
+            const std::size_t n = covered_sizes.size();
+            std::printf("        COVERED land (%zu bodies): %zu provinces, size median %zu, p90 %zu,"
+                        " max %zu — REPORTED; the band does not bind here (BL-1133)\n",
+                        covered_bodies.size(), n, n ? covered_sizes[n / 2] : 0,
+                        n ? covered_sizes[std::min(n - 1, static_cast<std::size_t>(0.9 * double(n)))]
+                          : 0,
+                        n ? covered_sizes.back() : 0);
+        }
+
         std::size_t in_band = 0, total = 0, under_soft = 0, under_hard = 0, over = 0;
-        std::printf("        size histogram:");
+        std::printf("        HINTERLAND land size histogram:");
         for (const auto& [size, count] : hist)
         {
             std::printf(" %zu:%d", size, count);
@@ -448,10 +498,12 @@ int main()
             province_absorption_stats st5;
             build_province_partition(w5, part.seed, &st5);
 
-            std::printf("        largest LAND province %zu tiles (hard cap %zu, preferred %zu)\n",
-                        largest, k_province_hard_cap_tiles, k_province_max_tiles);
-            check(largest <= k_province_hard_cap_tiles,
-                  "P5a  no LAND province exceeds the HARD CAP (Ben, 2026-08-21: 20 tiles)");
+            std::printf("        largest HINTERLAND land province %zu tiles over %zu provinces"
+                        " (hard cap %zu, preferred %zu)\n",
+                        largest, total, k_province_hard_cap_tiles, k_province_max_tiles);
+            check(total > 0 && largest <= k_province_hard_cap_tiles,
+                  "P5a  no HINTERLAND land province (a body with no seed centre) exceeds the"
+                  " HARD CAP (Ben, 2026-08-21: 20 tiles; scoped by BL-1133)");
 
             std::printf("        %zu provinces over the %zu-tile PREFERENCE, %zu tiles of"
                         " excess; absorption made %d of them (%d singletons: %d absorbed,"
@@ -464,8 +516,8 @@ int main()
             // each water domain against its own figure.
             check(excess == static_cast<std::size_t>(
                       st5.over_ceiling_by_domain[static_cast<std::size_t>(province_kind::land)]),
-                  "P5a2 every LAND tile above the PREFERRED ceiling arrived by absorption"
-                  " (growth's own clamp still holds)");
+                  "P5a2 every HINTERLAND land tile above the PREFERRED ceiling arrived by"
+                  " absorption (growth's own clamp still holds where it still applies)");
 
             std::printf("        P5a3 REPORTED, never asserted: %.2f%% of provinces exceed the"
                         " preferred %zu (%zu of %zu). \"Rare\" is Ben's call against this"
@@ -718,18 +770,34 @@ int main()
             ++province_centres[pid];
             (void)scale;
         }
-        for (const auto& [tid, scale] : seed_tile_scale)
+        // RE-SCOPED (BL-1133): P9c reads each COVERED-land province ONCE, by its
+        // ANCHOR's scale — the highest summed seed-centre scale standing in it,
+        // ties to the lowest tile — rather than once per seed centre. On
+        // covered land half the centres can share a province (a centre hemmed
+        // to its own tile by a larger one's reach is absorbed into it), so a
+        // per-seed read would credit every hemmed village with the metropolis
+        // province that swallowed it: the question is what a centre of each
+        // scale DRAWS, and that is the province it anchors. Anchor foundings
+        // anchor uncentred islands, not a seed's reach, and stay out of it.
+        std::vector<std::size_t> seeded_sizes_by_anchor[6];
+        for (const province& p : part.provinces)
         {
-            const uint32_t pid = part.province_of(tid);
-            if (pid == 0)
+            if (province_kind_of(w, p) != province_kind::land || !covered_bodies.count(p.body))
                 continue;
-            const province* p = part.find(pid);
-            if (p != nullptr)
+            int anchor_scale = 0;
+            for (const entity_id tid : p.tiles)
             {
-                auto& row = by_scale[scale];
-                ++row.first;
-                row.second += p->tiles.size();
+                const auto sit = seed_tile_scale.find(tid);
+                if (sit != seed_tile_scale.end() && sit->second > anchor_scale)
+                    anchor_scale = sit->second;
             }
+            if (anchor_scale == 0)
+                continue; // an uncentred island's anchor founding — G1's subject
+            const int bucket = std::clamp(anchor_scale, 1, 5);
+            auto& row = by_scale[bucket];
+            ++row.first;
+            row.second += p.tiles.size();
+            seeded_sizes_by_anchor[bucket].push_back(p.tiles.size());
         }
         check(all_placed, "P9a every population-centre tile belongs to a province");
 
@@ -814,33 +882,143 @@ int main()
                   "A3  no water province holds a population centre (water domains unchanged)");
         }
 
+        // G — A PROVINCE IS ITS CENTRE'S GROUND (Ben, 2026-09-26; BL-1133). On
+        // covered land the centre fill runs until its nation's land within its
+        // settled cell is covered, so:
+        //
+        //   G1  every covered-land province resting on an ANCHOR FOUNDING alone
+        //       is an UNCENTRED ISLAND — asserted on the shipped partition,
+        //       re-derived from tiles, nations and the settled set: no tile of
+        //       it touches land of its own nation and settlement verdict
+        //       outside it. (If one did, that ground belongs to a province some
+        //       centre reached, and the fill would have reached this one too.)
+        //   G2  the ledger, asserted: anchor-only provinces == anchor foundings
+        //       == the partition's uncentred islands; and every seeded centre
+        //       tile on covered land heads a province of its own except the
+        //       ones absorbed as one-tile singletons — seeded provinces == seed
+        //       tiles - centre singletons absorbed. That is "provinces =
+        //       centres" stated with its one counted exception.
+        {
+            std::size_t anchor_only = 0, not_island = 0, seeded_provinces = 0, seed_tiles = 0;
+            for (const auto& [tid, scale] : seed_tile_scale)
+            {
+                (void)scale;
+                const auto tit = w.tiles.find(tid);
+                if (tit != w.tiles.end() && covered_bodies.count(tit->second.body)
+                    && domain_matches(tit->second.substrate, province_kind::land))
+                    ++seed_tiles;
+            }
+            for (const province& p : part.provinces)
+            {
+                if (province_kind_of(w, p) != province_kind::land
+                    || !covered_bodies.count(p.body))
+                    continue;
+                bool seeded = false, any_centre = false;
+                for (const entity_id tid : p.tiles)
+                {
+                    if (seed_tile_scale.count(tid)) seeded = true;
+                    if (centre_tile_scale.count(tid)) any_centre = true;
+                }
+                if (seeded) { ++seeded_provinces; continue; }
+                if (!any_centre)
+                    continue; // A1's failure, not G's
+                ++anchor_only;
+                const auto nat = w.tile_to_nation.find(p.tiles.front());
+                const entity_id own_nation =
+                    (nat == w.tile_to_nation.end()) ? null_entity : nat->second;
+                const bool own_settled =
+                    w.tile_settled.find(p.tiles.front()) != w.tile_settled.end();
+                const auto& grid = grids.at(p.body);
+                const int   gw   = dims.at(p.body).first;
+                const int   gh   = dims.at(p.body).second;
+                bool touches = false;
+                for (const entity_id t : p.tiles)
+                {
+                    const auto tit = w.tiles.find(t);
+                    if (tit == w.tiles.end())
+                        continue;
+                    for (int s = 0; s < 6 && !touches; ++s)
+                    {
+                        const auto c =
+                            hex_neighbors::neighbour(tit->second.grid_x, tit->second.grid_y, s);
+                        if (c.gy < 0 || c.gy >= gh)
+                            continue;
+                        int nx = c.gx % gw;
+                        if (nx < 0)
+                            nx += gw;
+                        const entity_id n = grid[static_cast<std::size_t>(c.gy) * gw + nx];
+                        if (n == null_entity || part.province_of(n) == p.id)
+                            continue;
+                        const auto nit = w.tiles.find(n);
+                        if (nit == w.tiles.end()
+                            || !domain_matches(nit->second.substrate, province_kind::land))
+                            continue;
+                        const auto nn = w.tile_to_nation.find(n);
+                        const entity_id n_nation =
+                            (nn == w.tile_to_nation.end()) ? null_entity : nn->second;
+                        if (n_nation != own_nation)
+                            continue;
+                        if ((w.tile_settled.find(n) != w.tile_settled.end()) != own_settled)
+                            continue;
+                        touches = true;
+                    }
+                    if (touches)
+                        break;
+                }
+                if (touches)
+                    ++not_island;
+            }
+
+            world                     wg = w;
+            province_absorption_stats sg;
+            build_province_partition(wg, part.seed, &sg);
+            std::printf("        covered land: %zu seed-centre tiles head %zu provinces (%d hemmed"
+                        " centre singletons absorbed); %zu rest on an anchor founding (%d uncentred"
+                        " islands, %zu anchor foundings)\n",
+                        seed_tiles, seeded_provinces, sg.covered_centre_singletons_absorbed,
+                        anchor_only, sg.uncentred_regions, anchor_foundings);
+            check(!covered_bodies.empty() && not_island == 0,
+                  "G1  every covered-land province on an anchor founding alone is an UNCENTRED"
+                  " ISLAND (touches no land of its nation and settlement verdict outside itself)");
+            check(anchor_only == anchor_foundings
+                      && anchor_only == static_cast<std::size_t>(sg.uncentred_regions)
+                      && seeded_provinces + static_cast<std::size_t>(
+                             sg.covered_centre_singletons_absorbed) == seed_tiles,
+                  "G2  the fill's ledger: anchor foundings == uncentred islands, and seeded"
+                  " provinces == seed-centre tiles - hemmed singletons absorbed");
+        }
+
         std::printf("        %zu anchor foundings excluded (not seeds, BL-611)\n",
                     anchor_foundings);
-        std::printf("        centre-seeded province size by SEED scale:");
+        std::printf("        covered-land province size by ANCHOR scale (n@mean, median/p90/max):");
         for (const auto& [scale, row] : by_scale)
-            std::printf(" s%d:%d@%.2f", scale, row.first,
-                        row.first ? double(row.second) / double(row.first) : 0.0);
+        {
+            std::vector<std::size_t> v = seeded_sizes_by_anchor[scale];
+            std::sort(v.begin(), v.end());
+            const std::size_t n = v.size();
+            std::printf(" s%d:%d@%.2f(%zu/%zu/%zu)", scale, row.first,
+                        row.first ? double(row.second) / double(row.first) : 0.0,
+                        n ? v[n / 2] : 0,
+                        n ? v[std::min(n - 1, static_cast<std::size_t>(0.9 * double(n)))] : 0,
+                        n ? v.back() : 0);
+        }
         std::printf("\n");
 
-        // P9c — SEED STRENGTH SCALES WITH CENTRE SCALE. The budget runs 7 tiles
-        // at scale 1 to 12 at scale 5, so the mean province of the largest scale
-        // present must beat the mean of the smallest. Terrain can stop any one
-        // of them short; it cannot invert the whole population.
+        // P9c — SEED STRENGTH SCALES WITH CENTRE SCALE (ruling 1), RE-SCOPED by
+        // BL-1133. The budget that used to carry it (7 tiles at scale 1 to 12 at
+        // scale 5) is gone; the WEIGHT ON REACH carries it now (NR-953: a
+        // centre's scale divides its step cost, so a metropolis reaches five
+        // times as far over the same ground). The claim is unchanged — the mean
+        // province of the largest anchor scale present must beat the mean of the
+        // smallest — and it is read over covered-land provinces by their
+        // ANCHOR's scale (see above for why not per seed).
         //
-        // WHEN THIS IS RED, READ THE SCALE ROW ABOVE IT. The row is over the SEED
-        // SET the partition actually used — anchor foundings excluded, which is
-        // the population this claim is about and which the row did not always
-        // report. What it shows is that realised size does NOT track scale: the
-        // top bucket is often a single centre, so one terrain-stopped
-        // seed inverts the comparison, and the buckets that do carry a population
-        // are not ordered either. The BUDGET does scale — `province.cpp` sets
-        // `r.target` from the clamped scale, exactly 7 to 12 — but growth is a
-        // SIMULTANEOUS multi-source fill, and a large centre sits in a denser
-        // neighbourhood than a village, so competition takes back what the budget
-        // granted. Whether the realised size is meant to track scale, or the
-        // budget is the whole of the ruling, is a design call and not a threshold
-        // this harness may invent: the row stays asserted rather than demoted to
-        // a report, so the question stays visible.
+        // WHEN THIS IS RED, READ THE SCALE ROW ABOVE IT. The top bucket is often
+        // a handful of centres, so one terrain-boxed metropolis can invert the
+        // comparison; a large centre also stands in a denser neighbourhood, so
+        // competition can take back what the weight grants. Whether that is a
+        // fault of the weight is a design call, not a threshold this harness may
+        // invent: the row stays asserted so the question stays visible.
         if (by_scale.size() >= 2)
         {
             const auto& lo = *by_scale.begin();
@@ -855,7 +1033,8 @@ int main()
                             hi.first, hi.second.first, hi_mean,
                             lo.first, lo.second.first, lo_mean);
             check(hi_mean > lo_mean,
-                  "P9c a larger centre draws a larger province (seed strength scales with scale)");
+                  "P9c a larger centre draws a larger province (the weight on reach, NR-953;"
+                  " covered land, by the anchor's scale)");
         }
         else
             std::printf("        (P9c skipped — only one centre scale present)\n");
@@ -999,9 +1178,16 @@ int main()
         std::size_t all_singles = 0, all_absorbed = 0, all_islands = 0, all_breach = 0;
         bool        sums_ok = true;
 
+        // RE-SCOPED (BL-1133, a province is its centre's ground): the band
+        // columns, and D1/D1a beneath them, read only HINTERLAND land (a body
+        // with no seed centre) — the land the band still draws. COVERED land is
+        // its own line per seed, REPORTED (count, median, p90, max, the
+        // uncentred islands and the hemmed singletons absorbed): nothing bounds
+        // it, so no size of it is a claim.
+        std::vector<std::size_t> all_covered;
         std::printf("  seed | provinces |  min  max   mean | <7  <3  >12 | %% in 7-12 |"
-                    " 1-tile absorbed islands breach   (sizes LAND only; the three singleton"
-                    " columns are ALL-DOMAIN, breach is land's)\n");
+                    " 1-tile absorbed islands breach   (band columns HINTERLAND land only; the"
+                    " three singleton columns are ALL-DOMAIN, breach is land's)\n");
         for (int sd = 0; sd < k_seeds; ++sd)
         {
             world_params wp;
@@ -1010,6 +1196,19 @@ int main()
 
             province_absorption_stats st;
             build_province_partition(sw, sw.provinces.seed, &st);
+
+            std::set<entity_id> sw_covered; // re-derived as for the primary world
+            for (const auto& [cid, tid] : sw.population_centre_tile)
+            {
+                const auto pit = sw.population_centres.find(cid);
+                if (pit == sw.population_centres.end() || pit->second.province_anchor)
+                    continue;
+                const auto tit = sw.tiles.find(tid);
+                if (tit != sw.tiles.end()
+                    && domain_matches(tit->second.substrate, province_kind::land))
+                    sw_covered.insert(tit->second.body);
+            }
+            std::vector<std::size_t> covered;
 
             std::size_t n = 0, tiles = 0, lo = 0, hi = 0, us = 0, uh = 0, over = 0, in_band = 0;
             bool        lo_seen = false;
@@ -1020,6 +1219,11 @@ int main()
                 // like-for-like comparison. Water has its own table, section W.
                 if (province_kind_of(sw, p) != province_kind::land)
                     continue;
+                if (sw_covered.count(p.body))
+                {
+                    covered.push_back(p.tiles.size());
+                    continue;
+                }
                 const std::size_t sz = p.tiles.size();
                 ++n;
                 tiles += sz;
@@ -1036,6 +1240,18 @@ int main()
                         n ? 100.0 * double(in_band) / double(n) : 0.0, st.singletons_before,
                         st.absorbed, st.true_islands,
                         st.over_ceiling_by_domain[static_cast<std::size_t>(province_kind::land)]);
+            {
+                std::sort(covered.begin(), covered.end());
+                const std::size_t c = covered.size();
+                std::printf("       covered land: %zu provinces, median %zu p90 %zu max %zu;"
+                            " %d uncentred islands, %d hemmed centre singletons absorbed\n",
+                            c, c ? covered[c / 2] : 0,
+                            c ? covered[std::min(c - 1, static_cast<std::size_t>(0.9 * double(c)))]
+                              : 0,
+                            c ? covered.back() : 0, st.uncentred_regions,
+                            st.covered_centre_singletons_absorbed);
+                all_covered.insert(all_covered.end(), covered.begin(), covered.end());
+            }
             std::fflush(stdout);
 
             all_singles  += static_cast<std::size_t>(st.singletons_before);
@@ -1066,18 +1282,29 @@ int main()
                     all_under_hard, all_over,
                     all_total ? 100.0 * double(all_in_band) / double(all_total) : 0.0, all_singles,
                     all_absorbed, all_islands, all_breach);
-        std::printf("  3x3 BASELINE (superseded)    |    1   18   9.11 | 109   -  336 |  97.90%%\n");
-        std::printf("  BL-515 PRE-ABSORPTION        |    1   12   7.87 |6195 3008    0 |  74.71%%\n");
+        {
+            std::sort(all_covered.begin(), all_covered.end());
+            const std::size_t c = all_covered.size();
+            std::printf("  ALL covered land: %zu provinces, median %zu p90 %zu max %zu"
+                        " (REPORTED; BL-1133 lifts the band there)\n",
+                        c, c ? all_covered[c / 2] : 0,
+                        c ? all_covered[std::min(c - 1, static_cast<std::size_t>(0.9 * double(c)))]
+                          : 0,
+                        c ? all_covered.back() : 0);
+        }
+        std::printf("  3x3 BASELINE (superseded, all land) |    1   18   9.11 | 109   -  336 |  97.90%%\n");
+        std::printf("  BL-515 PRE-ABSORPTION (all land)    |    1   12   7.87 |6195 3008    0 |  74.71%%\n");
 
         // D1 — THE HARD CAP, across every seed. This is the size claim the
         // sweep asserts, and after Ben's 2026-08-21 ruling on NR-438 it is the
         // ONLY one: 12 is the preference growth clamps to, 20 is the bound
         // nothing may cross. `worst_ceiling` is the largest province over all
         // six seeds, so one number carries the whole sweep.
-        std::printf("  worst-case province across %d seeds: %zu tiles (hard cap %zu)\n",
+        std::printf("  worst-case HINTERLAND province across %d seeds: %zu tiles (hard cap %zu)\n",
                     k_seeds, worst_ceiling, k_province_hard_cap_tiles);
-        check(worst_ceiling <= k_province_hard_cap_tiles,
-              "D1  no province on any seed exceeds the HARD CAP of 20 tiles (NR-438)");
+        check(all_total > 0 && worst_ceiling <= k_province_hard_cap_tiles,
+              "D1  no HINTERLAND land province on any seed exceeds the HARD CAP of 20 tiles"
+              " (NR-438; scoped by BL-1133)");
 
         // D1a — the accounting identity, kept separate from the cap so growth's
         // own clamp is still proven on its own terms. Absorption is the ONLY
@@ -1087,7 +1314,8 @@ int main()
         // is defined by. If growth itself ever leaks past 12, `all_over` outruns
         // the breach count and this fails.
         check(all_over <= all_breach,
-              "D1a nothing exceeds the PREFERRED 12 except where absorption breached it");
+              "D1a no HINTERLAND land province exceeds the PREFERRED 12 except where absorption"
+              " breached it");
 
         // D1b — "rare", REPORTED and never asserted. Ben ruled that over-12 is
         // "permitted in rare cases" without naming what rare is, and inventing a

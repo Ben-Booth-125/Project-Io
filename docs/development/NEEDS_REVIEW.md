@@ -24,56 +24,73 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*54 entries — 3 open, 51 resolved.*
+*59 entries — 4 open, 55 resolved.*
 
 ---
 
 ## Open
 
-### NR-948 — DECISION TAKEN: in play an abandoned centre drops to the razed tier (a ruin that keeps its province anchor) rather than vanishing
-*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
+### NR-952 — DECISION TAKEN: a province whose abandoned centre has no same-nation neighbour to merge into keeps it as a ruin (the razed tier)
+*decision · raised 2026-09-26 · from Ben's review form, 2026-09-26 (NR-948 overturned to delete-and-merge)*
 
-Play follows the history's abandonment rule (NR-947). But a centre is its province's capture anchor, and razing is already a tier, not an erasure. Taken on your behalf: a centre whose population falls below a village's worth in play drops to the razed tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle), so no province loses its anchor. POPULATION.md § Growth, decline and razing states it.
+Ben ruled that in play an abandoned centre is deleted and its province merges into its nearest neighbouring province of the same nation. A province with no such neighbour (an island province, or the last province of a nation) would then have no capture anchor, which breaks the conquest unit. Taken on your behalf: only in that case the centre stays as a ruin at the razed tier.
 
-**Why it matters.** The alternative -- deleting the centre and handing the province to a neighbour at runtime -- changes ownership and conquest mid-campaign.
+**Why it matters.** It keeps every province takeable; the alternatives are merging across a national border (an ownership change no one decided) or deleting a nation's last province.
 
-- A: keep (abandoned = razed tier)
-- B: delete the centre and merge its province into its nearest neighbour at runtime
+- A: keep the ruin fallback
+- B: merge into the nearest province of any nation (ownership passes)
 - C: other
 
 > **Recommendation:** A.
 
 *Files: `docs/economy/POPULATION.md`*
 
-### NR-949 — DECISION TAKEN: ocean currents follow each latitude band's prevailing wind and turn along the coasts, so a basin circulates
-*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
+### NR-953 — DECISION TAKEN: with the budget gone, a centre's scale weights its reach, so a metropolis still draws the larger province
+*decision · raised 2026-09-26 · from Ben's province form, 2026-09-26 (A: a province is its centre's ground)*
 
-Ben ruled currents are built this sprint and shape the lanes (BL-1120). The generation was open. Taken on your behalf: each ocean region's current follows its latitude band's prevailing wind (easterly in the tropics, westerly in the mid-latitudes, its sense set by the body's rotation) and is turned along the coasts the continents present; a leg with its current costs less, against it more, by one measured weight. Real ocean circulation is the mechanism reference, never a name source. EXPLORATION.md § Currents states it.
+The partition grew each centre by a budget of 7 tiles (village) to 12 (metropolis); ruling A removes the stop, so the budget can no longer carry "a metropolis draws a larger province than a village does" (PROVINCES.md ruling 1). Taken on your behalf: the centre's scale divides its step cost in the multi-source fill (a weighted fill), so bigger centres claim more ground before competition meets them.
 
-**Why it matters.** It decides where every lane bends and how far trade across water reaches.
+**Why it matters.** Without a weight, every province would be a plain nearest-centre cell and a metropolis would hold no more ground than a village beside it.
 
-- A: keep the wind-band-and-coast reading
-- B: a simpler field (one prevailing current per hemisphere)
+- A: keep the scale weight on reach
+- B: an unweighted fill (plain nearest-centre cells)
 - C: other
-
-> **Recommendation:** A: it gives basins that circulate, which is what makes a return route differ from the outbound.
-
-*Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`*
-
-### NR-950 — DECISION TAKEN: the market trunk links each market centre to its nearest neighbouring market centres, at Road tier
-*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
-
-Ben ruled roads pull toward market centres and bridge across markets (BL-1138). The trunk's shape was open. Taken on your behalf: each market centre is joined to its nearest neighbouring market centres by traversal cost (a Delaunay-like neighbour set, never all pairs), over a border where the neighbour lies across one, laid at Road tier; the detour test still refuses a trunk link a serviceable route already gives. LOGISTICS.md § 4 states it.
-
-**Why it matters.** It decides how connected the world's markets are by road and so how far a large trade reaches.
-
-- A: keep (nearest neighbours, Road tier)
-- B: a spanning tree over market centres only (fewer links)
-- C: Highway tier for the trunk
 
 > **Recommendation:** A.
 
-*Files: `docs/economy/LOGISTICS.md`, `src/world/road_generation.cpp`*
+*Files: `docs/generation/PROVINCES.md`, `src/world/province.cpp`*
+
+### NR-954 — CALL: three consequences of "a province is its centre's ground" (hemmed villages absorbed; anchors kept by the settled-ground lock; giant provinces)
+*question · raised 2026-09-26 · from BL-1133 as merged (5cab560b), 2026-09-26*
+
+Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, every province invariant green. Three consequences. (1) 21,457 seed centres (47%) end on their own tile, hemmed by a larger neighbour's reach, and singleton absorption (the 2026-08-21 ruling) folds each into its cheapest neighbour, so provinces = centres holds with that counted exception. (2) 3,753 of the 6,856 remaining anchor villages exist only because the settlement lock (BL-849) stops the fill crossing from settled into never-settled ground. (3) Provinces now reach 1,315 tiles (a lone village over lightly settled land); p90 stays 7-13.
+
+**Why it matters.** (2) is the remaining gap to a world without villages founded on empty ground; (3) decides whether a province can be a continent-sized conquest unit.
+
+- A: keep all three as built
+- B: let the fill cross the settled line (relaxes BL-849; removes most of (2))
+- C: bound a province's size again on sparsely settled land (a cap that splits a giant into anchored pieces)
+- D: other
+
+> **Recommendation:** A for (1); read (2) and (3) again after BL-1137 (industrial urbanisation) and BL-1132 (settle spacing) land, since both change what is settled and how many centres stand.
+
+*Files: `src/world/province.cpp`, `docs/generation/PROVINCES.md`*
+
+### NR-955 — DECISION TAKEN + CALL: how a sea lane is laid (ports, direction), and whether a lane should compete with land
+*decision · raised 2026-09-26 · from BL-1098 (the sea-lane tier stamped), merged 7238f8ef, 2026-09-26*
+
+Taken on your behalf by the lane: a seat's port is its nearest sea tile within nine tiles (the sim's neighbour radius); the walk runs toward the busier end (the lane record carries no direction), as the old-road stamp does; a laned sea tile costs x0.50. Two consequences: (1) 41 of 137 earned lanes (30%) are not laid because a seat has no sea within nine tiles; (2) a laned sea tile (2.5 -> 1.25) is still dearer than plains (1.0) or a road (0.5-0.67), so a lane carries traffic only between landmasses, never along a coast a road already serves. The market junction degree was not extended with lanes (it would add markets at lane ports). LOGISTICS.md § 4b states the rules.
+
+**Why it matters.** Your vision is lanes as the routes of inter-continental trade; (1) drops a third of them and (2) decides whether the sea ever beats the road.
+
+- A: keep all as built
+- B: a realm's port is its nearest coastal region's seat (lays the lost 30%)
+- C: B, and a deeper lane discount so a lane can beat a coastal road (sea was the faster medium: ~130 km/day against ~25)
+- D: other
+
+> **Recommendation:** B now; C read against the haulage baseline before it is set.
+
+*Files: `src/world/road_generation.cpp`, `src/world/logistics.cpp`, `docs/economy/LOGISTICS.md`*
 
 ---
 
@@ -897,7 +914,7 @@ A centre already stands in exactly one province, so a province without one canno
 
 > **Recommendation:** A: a province is the ground a centre can hold; one with nothing to hold it is hinterland of its neighbour.
 
-> **RESOLVED.** RULED (Ben, 2026-09-25, the centres-and-routes form): A, keep -- a centre-less province joins its nearest neighbouring province of the same nation. BL-1133 builds it.
+> **RESOLVED.** RULED (Ben, 2026-09-25, the centres-and-routes form): A, keep -- a centre-less province joins its nearest neighbouring province of the same nation. BL-1133 builds it. SUPERSEDED (Ben, 2026-09-26, the province form): a province is its centre's ground -- the fill covers the land, so no centre-less province is left to join; the join branch (232cf4db) is not merged.
 
 *Files: `src/world/population_generation.cpp`, `docs/economy/POPULATION.md`, `docs/generation/PROVINCES.md`*
 
@@ -917,4 +934,72 @@ Taken on your behalf: the threshold is the smallest rung, a village's worth -- t
 > **RESOLVED.** RULED (Ben, 2026-09-25, the centres-and-routes form): the threshold stays a village's worth, AND play follows too (he picked both "history only" and "play follows too"; read together: the village threshold, applied in play as well). The play half is BL-1139 (centres abandoned in play), with the anchor hand-off read as the razed tier (NR-948).
 
 *Files: `docs/economy/POPULATION.md`, `src/world/history_sim.cpp`*
+
+### NR-948 — DECISION TAKEN: in play an abandoned centre drops to the razed tier (a ruin that keeps its province anchor) rather than vanishing
+*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
+
+Play follows the history's abandonment rule (NR-947). But a centre is its province's capture anchor, and razing is already a tier, not an erasure. Taken on your behalf: a centre whose population falls below a village's worth in play drops to the razed tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle), so no province loses its anchor. POPULATION.md § Growth, decline and razing states it.
+
+**Why it matters.** The alternative -- deleting the centre and handing the province to a neighbour at runtime -- changes ownership and conquest mid-campaign.
+
+- A: keep (abandoned = razed tier)
+- B: delete the centre and merge its province into its nearest neighbour at runtime
+- C: other
+
+> **Recommendation:** A.
+
+> **RESOLVED.** OVERTURNED (Ben, 2026-09-26, the review form): B -- in play an abandoned centre is DELETED and its province merges into the adjacent province of its own nation whose centre is nearest (the NR-946 join, at runtime). A province with no such neighbour falls back to the razed tier so it keeps an anchor (NR-952, a delegated fallback). POPULATION.md § Growth, decline and razing states it; BL-1139 builds it.
+
+*Files: `docs/economy/POPULATION.md`*
+
+### NR-949 — DECISION TAKEN: ocean currents follow each latitude band's prevailing wind and turn along the coasts, so a basin circulates
+*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
+
+Ben ruled currents are built this sprint and shape the lanes (BL-1120). The generation was open. Taken on your behalf: each ocean region's current follows its latitude band's prevailing wind (easterly in the tropics, westerly in the mid-latitudes, its sense set by the body's rotation) and is turned along the coasts the continents present; a leg with its current costs less, against it more, by one measured weight. Real ocean circulation is the mechanism reference, never a name source. EXPLORATION.md § Currents states it.
+
+**Why it matters.** It decides where every lane bends and how far trade across water reaches.
+
+- A: keep the wind-band-and-coast reading
+- B: a simpler field (one prevailing current per hemisphere)
+- C: other
+
+> **Recommendation:** A: it gives basins that circulate, which is what makes a return route differ from the outbound.
+
+> **RESOLVED.** RULED (Ben, 2026-09-26, the review form): A, keep the wind-band-and-coast field (built, BL-1120 stage 1, weight 500).
+
+*Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`*
+
+### NR-950 — DECISION TAKEN: the market trunk links each market centre to its nearest neighbouring market centres, at Road tier
+*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
+
+Ben ruled roads pull toward market centres and bridge across markets (BL-1138). The trunk's shape was open. Taken on your behalf: each market centre is joined to its nearest neighbouring market centres by traversal cost (a Delaunay-like neighbour set, never all pairs), over a border where the neighbour lies across one, laid at Road tier; the detour test still refuses a trunk link a serviceable route already gives. LOGISTICS.md § 4 states it.
+
+**Why it matters.** It decides how connected the world's markets are by road and so how far a large trade reaches.
+
+- A: keep (nearest neighbours, Road tier)
+- B: a spanning tree over market centres only (fewer links)
+- C: Highway tier for the trunk
+
+> **Recommendation:** A.
+
+> **RESOLVED.** RULED (Ben, 2026-09-26, the review form): A, keep -- the market trunk links each market centre to its nearest neighbouring market centres at Road tier. BL-1138 builds it after the market folds.
+
+*Files: `docs/economy/LOGISTICS.md`, `src/world/road_generation.cpp`*
+
+### NR-951 — DECISION TAKEN: a centre's urban footprint stops at its region's cell edge, and "no land" means no ground a centre can stand on
+*decision · raised 2026-09-26 · from BL-1130 (centres consolidate) cold review, 2026-09-26*
+
+Two readings taken on your behalf to make your rulings hold as written. (1) The sim sizes a region's centres by its own hierarchy, but the carve gives them body-wide rank-size scales and paves their footprints from those, so a large region could pave its neighbours' cells. Reading: a footprint is cut short at its own region's cell edge, exactly as it already is at a coast; scales unchanged. (2) A region whose cell has land but no tile a centre can stand on kept centres in the sim and earned industry points the carve could never spend. Reading: your water ruling ("a cell that holds no land carries no centre") counts ground a centre can stand on, so such a region carries none and earns nothing. POPULATION.md states both.
+
+**Why it matters.** (1) keeps "footprints fit inside the region's own cell" true by construction; (2) stops industry points vanishing into regions with nowhere to stand a centre.
+
+- A: keep both readings
+- B: for (1), size the carve's centres by each region's own hierarchy instead (overturns the body-wide rank-size)
+- C: other
+
+> **Recommendation:** A: both are the smallest change that makes the ruled rules true.
+
+> **RESOLVED.** RULED (Ben, 2026-09-26, the review form): A, keep both -- a footprint stops at its region's cell edge, and "no land" means no ground a centre can stand on.
+
+*Files: `docs/economy/POPULATION.md`, `src/world/population_generation.cpp`, `src/world/settlement.cpp`*
 

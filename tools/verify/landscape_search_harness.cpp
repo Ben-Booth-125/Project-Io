@@ -19,7 +19,7 @@
 // --curve (BL-1136, fewer search evaluations) — THE CONVERGENCE CURVE, a
 // reading rather than the R-block above. See `curve::run` below.
 //   landscape_search_harness.exe --curve [--seeds 0,28,...] [--rounds 6]
-//                                        [--check-k 3] [--check-threads 1]
+//                                        [--check-k 3] [--check-threads 1] [--print-check]
 //   Default seeds: docs/generation/seed_library.json, in library order.
 //   --check-threads N scores P1's genuine walk on N threads: P1 is then also
 //   thread invariance on the shipped budget world, and its wall time is what
@@ -170,9 +170,30 @@ void print_path(const landscape_search_result& r)
 // FILETIME is two little-endian DWORDs, i.e. one 64-bit count of 100 ns.
 extern "C" __declspec(dllimport) int   __stdcall GetThreadTimes(void*, void*, void*, void*, void*);
 extern "C" __declspec(dllimport) void* __stdcall GetCurrentThread();
+// PROCESS_MEMORY_COUNTERS_EX, restated field for field (psapi.h), and the
+// kernel32 export psapi's GetProcessMemoryInfo forwards to.
+struct curve_pmc_ex
+{
+    std::uint32_t cb;
+    std::uint32_t PageFaultCount;
+    std::size_t   PeakWorkingSetSize;
+    std::size_t   WorkingSetSize;
+    std::size_t   QuotaPeakPagedPoolUsage;
+    std::size_t   QuotaPagedPoolUsage;
+    std::size_t   QuotaPeakNonPagedPoolUsage;
+    std::size_t   QuotaNonPagedPoolUsage;
+    std::size_t   PagefileUsage;
+    std::size_t   PeakPagefileUsage;
+    std::size_t   PrivateUsage;
+};
+extern "C" __declspec(dllimport) int   __stdcall K32GetProcessMemoryInfo(void*, void*, std::uint32_t);
+extern "C" __declspec(dllimport) void* __stdcall GetCurrentProcess();
 #else
 #include <time.h>
 #endif
+
+#include <atomic>
+#include <thread>
 
 namespace curve
 {
@@ -185,8 +206,8 @@ double ms_since(clk::time_point t0)
 }
 
 /// This thread's CPU time (user + kernel), ms. The load-robust twin of the wall
-/// clock: the search runs serially on the calling thread (thread_count 1, the
-/// campaign's), so its CPU time is what one evaluation costs with the machine
+/// clock: the reference walk runs serially on the calling thread (thread_count
+/// 1; the campaign's is 2), so its CPU time is what one evaluation costs with the machine
 /// to itself, whatever else is running. ~15.6 ms resolution on Windows, against
 /// evaluations of about a second.
 double thread_cpu_ms()
@@ -201,6 +222,64 @@ double thread_cpu_ms()
     return static_cast<double>(ts.tv_sec) * 1e3 + static_cast<double>(ts.tv_nsec) / 1e6;
 #endif
 }
+
+/// The process's working set and private bytes now, and its lifetime peak
+/// working set, MB. Zero off Windows (not measured there).
+struct mem_now
+{
+    double ws_mb = 0, private_mb = 0, peak_ws_mb = 0;
+};
+
+mem_now read_mem()
+{
+    mem_now m;
+#ifdef _WIN32
+    curve_pmc_ex c{};
+    c.cb = sizeof c;
+    if (K32GetProcessMemoryInfo(GetCurrentProcess(), &c, sizeof c) != 0)
+    {
+        constexpr double mb = 1024.0 * 1024.0;
+        m.ws_mb      = static_cast<double>(c.WorkingSetSize) / mb;
+        m.private_mb = static_cast<double>(c.PrivateUsage) / mb;
+        m.peak_ws_mb = static_cast<double>(c.PeakWorkingSetSize) / mb;
+    }
+#endif
+    return m;
+}
+
+/// The highest working set and private bytes seen while a call runs, sampled
+/// every 5 ms from a second thread. The lifetime peak cannot say this: the
+/// generation that built the base peaks first. A READ of OS counters only —
+/// nothing in the world or the search can see it.
+class mem_sampler
+{
+public:
+    mem_sampler() : m_thread([this] {
+        while (!m_stop.load(std::memory_order_relaxed))
+        {
+            const mem_now n = read_mem();
+            m_ws      = std::max(m_ws, n.ws_mb);
+            m_private = std::max(m_private, n.private_mb);
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    }) {}
+    ~mem_sampler() { stop(); }
+    void stop()
+    {
+        if (m_thread.joinable())
+        {
+            m_stop.store(true, std::memory_order_relaxed);
+            m_thread.join();
+        }
+    }
+    double peak_ws_mb() const      { return m_ws; }
+    double peak_private_mb() const { return m_private; }
+
+private:
+    std::atomic<bool> m_stop{ false };
+    double m_ws = 0, m_private = 0;
+    std::thread m_thread;
+};
 
 /// The library's seeds in library order — market_census's minimal scan, so the
 /// two instruments read one list.
@@ -331,6 +410,12 @@ struct seed_curve
     double relay_copy = 0, relay_apply = 0, relay_score = 0; ///< V5's split, mean ms
     int    relays = 0;
     double t_gen_s = 0;
+    // Memory, MB (Windows only; 0 elsewhere). Sampled every 5 ms during each walk.
+    double mem_base_ws = 0, mem_base_private = 0;    ///< before the walk: the base world held
+    double mem_walk_ws = 0, mem_walk_private = 0;    ///< peak during the serial walk
+    double mem_check_ws = 0, mem_check_private = 0;  ///< peak during P1's walk (--check-threads)
+    double mem_copy_private = 0;                     ///< one `world` copy of the base, private bytes
+    double mem_process_peak_ws = 0;                  ///< the process's lifetime peak, after the seed
 };
 
 const char* short_axis(int a)
@@ -350,7 +435,7 @@ double share(double ck, double c0, double cr)
 }
 
 seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
-                    int check_threads, int& failures)
+                    int check_threads, bool print_check, int& failures)
 {
     seed_curve sc;
     sc.seed = seed;
@@ -370,16 +455,30 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
     // the world's own stockpile budget at the shipped divisor and its spend.
     landscape_search_params sp = shipped_search_params(seed, out->cfg.corporation_count);
     sp.rounds = rounds;
+    // THE WALK IS THE SERIAL REFERENCE. The campaign scores on
+    // k_campaign_search_threads (2, BL-1136); the walk every row is read off
+    // runs on ONE, so P1 with --check-threads compares the campaign's threaded
+    // search against it rather than against itself.
+    sp.thread_count = 1;
     const stockpile_budget sb    = build_stockpile_budget(base, k_stockpile_price_divisor);
     const charter_spend_params spend = stockpile_charter_spend(sb);
     sp.budget = &sb.budget;
     sp.spend  = spend;
 
+    {
+        const mem_now m = read_mem();
+        sc.mem_base_ws      = m.ws_mb;
+        sc.mem_base_private = m.private_mb;
+    }
     t0 = clk::now();
     double cpu0 = thread_cpu_ms();
+    mem_sampler walk_mem;
     const landscape_search_result walk = search_landscape(base, out->reg, sp);
     const double ms_walk  = ms_since(t0);
     const double cpu_walk = thread_cpu_ms() - cpu0;
+    walk_mem.stop();
+    sc.mem_walk_ws      = walk_mem.peak_ws_mb();
+    sc.mem_walk_private = walk_mem.peak_private_mb();
     sc.refused      = walk.charter_refused;
     sc.fell_back    = walk.charter_fell_back;
     sc.budget_world = !sb.budget.empty() && !walk.charter_refused && !walk.charter_fell_back;
@@ -393,7 +492,7 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
     {
         landscape_search_params cp = sp;
         cp.rounds       = check_k;
-        cp.print_rounds = false;
+        cp.print_rounds = print_check; // --print-check: the genuine walk's own round lines
         // --check-threads N: the genuine run scores each round's proposals on N
         // threads, so P1 is ALSO thread invariance on this (budget) world —
         // the serial walk's prefix against a threaded search — and its wall
@@ -402,9 +501,13 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
         cp.thread_count = check_threads;
         t0 = clk::now();
         cpu0 = thread_cpu_ms();
+        mem_sampler check_mem;
         const landscape_search_result genuine = search_landscape(base, out->reg, cp);
         const double ms_check  = ms_since(t0);
         const double cpu_check = thread_cpu_ms() - cpu0;
+        check_mem.stop();
+        sc.mem_check_ws      = check_mem.peak_ws_mb();
+        sc.mem_check_private = check_mem.peak_private_mb();
         sc.cpu_eval_check = check_threads <= 1 ? cpu_check / std::max(1, genuine.evaluations) : -1.0;
         const landscape_search_result pre = prefix_of(walk, check_k);
         sc.check_k       = check_k;
@@ -431,8 +534,11 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
         for (const relay_memo& m : memo)
             if (same_candidate(m.c, c)) return m.ok;
         clk::time_point a = clk::now();
+        const double private_before = read_mem().private_mb;
         world relay = base;
         sc.relay_copy += ms_since(a);
+        if (sc.relays == 0)
+            sc.mem_copy_private = read_mem().private_mb - private_before;
         a = clk::now();
         apply_landscape_candidate(relay, out->reg, c, /*regenerate_specialists=*/true,
                                   &sb.budget, spend, /*report=*/nullptr);
@@ -516,13 +622,22 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
     std::printf("\n  CPU ms/eval: walk %.0f  |  P1 %.0f", sc.cpu_eval_walk, sc.cpu_eval_check);
     std::printf("\n  one evaluation, split (V5's %d re-lays, mean): copy %.0f ms, apply %.0f ms, score %.0f ms\n",
                 sc.relays, sc.relay_copy, sc.relay_apply, sc.relay_score);
+    sc.mem_process_peak_ws = read_mem().peak_ws_mb;
+    std::printf("  memory, MB (working set / private): base held %.0f / %.0f; serial walk peak %.0f / %.0f; "
+                "P1 walk on %d thread(s) peak %.0f / %.0f; one world copy %.0f private; "
+                "process lifetime peak working set %.0f\n",
+                sc.mem_base_ws, sc.mem_base_private, sc.mem_walk_ws, sc.mem_walk_private,
+                sc.check_threads, sc.mem_check_ws, sc.mem_check_private, sc.mem_copy_private,
+                sc.mem_process_peak_ws);
     // One machine-readable line per seed, for a sweep to collect.
     std::printf("CURVE seed=%u live=%d markets=%d ms_eval_walk=%.1f ms_eval_check=%.1f "
                 "cpu_eval_walk=%.1f cpu_eval_check=%.1f check_threads=%d check_s=%.2f "
-                "walk_first_k_s=%.2f p1=%d composite",
+                "walk_first_k_s=%.2f mem_base=%.0f mem_walk=%.0f mem_check=%.0f mem_copy=%.0f "
+                "mem_peak=%.0f p1=%d composite",
                 seed, sc.live_axes, sc.markets, sc.ms_eval_walk, sc.ms_eval_check,
                 sc.cpu_eval_walk, sc.cpu_eval_check, sc.check_threads, sc.ms_check_s,
-                sc.ms_walk_first_k_s, sc.p1 ? 1 : 0);
+                sc.ms_walk_first_k_s, sc.mem_base_private, sc.mem_walk_private,
+                sc.mem_check_private, sc.mem_copy_private, sc.mem_process_peak_ws, sc.p1 ? 1 : 0);
     for (const row& w : sc.rows) std::printf(" %.12g", w.score.composite);
     std::printf(" moved");
     for (const row& w : sc.rows) std::printf(" %d", w.moved_axis);
@@ -539,6 +654,7 @@ int run(int argc, char** argv)
     int rounds  = 6;
     int check_k = 3;
     int check_threads = 1;
+    bool print_check = false;
     for (int i = 1; i < argc; ++i)
     {
         if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc)
@@ -549,6 +665,8 @@ int run(int argc, char** argv)
             check_k = std::atoi(argv[++i]);
         else if (std::strcmp(argv[i], "--check-threads") == 0 && i + 1 < argc)
             check_threads = std::max(1, std::atoi(argv[++i]));
+        else if (std::strcmp(argv[i], "--print-check") == 0)
+            print_check = true;
     }
     if (seeds.empty())
         seeds = library_seeds("docs/generation/seed_library.json");
@@ -566,7 +684,7 @@ int run(int argc, char** argv)
     int failures = 0;
     std::vector<seed_curve> all;
     for (const std::uint32_t s : seeds)
-        all.push_back(run_seed(lua, s, rounds, check_k, check_threads, failures));
+        all.push_back(run_seed(lua, s, rounds, check_k, check_threads, print_check, failures));
 
     // --- pooled -----------------------------------------------------------------
     std::printf("\n=== POOLED over %zu seeds ============================================\n",

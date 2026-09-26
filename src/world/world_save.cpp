@@ -82,6 +82,7 @@ void w_tile(std::ostream& o, const tile_component& t)
     w_u8(o, t.river_edges);
     w_u8(o, t.river_downstream);
     w_f32(o, t.height);
+    w_u8(o, t.lane_level); // BL-1098 (v28): the sea-lane tier, at the record's tail
 }
 
 bool r_tile(std::istream& i, tile_component& t)
@@ -92,7 +93,8 @@ bool r_tile(std::istream& i, tile_component& t)
         && r_f32_array(i, t.resource_deposit) && r_f32_array(i, t.resource_remaining)
         && r_f32(i, t.hazard_level) && r_f32(i, t.habitability)
         && r_f32(i, t.substrate_density) && r_u8(i, t.road_level)
-        && r_u8(i, t.river_edges) && r_u8(i, t.river_downstream) && r_f32(i, t.height);
+        && r_u8(i, t.river_edges) && r_u8(i, t.river_downstream) && r_f32(i, t.height)
+        && r_u8(i, t.lane_level); // BL-1098 (v28)
 }
 
 void w_body(std::ostream& o, const body_component& b)

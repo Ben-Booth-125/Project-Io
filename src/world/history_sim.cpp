@@ -1,5 +1,7 @@
 #include "history_sim.hpp"
 
+#include "ocean_currents.hpp" // BL-1120: the current field a sea leg is priced with
+
 #include "charter_price.hpp"  // BL-1099: the running charter price the works notes are read against
 #include "unit_roster.hpp"
 #include "terrain_combat.hpp" // BL-384 trace: the defence term the scorer never sees
@@ -810,6 +812,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
     if (treaties != nullptr && !treaties->empty())
     {
         trade_ctx = build_trade_context(regions, polities, corridors);
+        // BL-1140: the span's current prices every sea line this round.
+        if (spend_ctx != nullptr && spend_ctx->currents != nullptr)
+        {
+            trade_ctx.currents         = spend_ctx->currents;
+            trade_ctx.current_weight_q = params.sea_current_weight_q;
+        }
         flows = compute_trade_flows(trade_ctx, regions, polities, *treaties);
     }
     std::vector<int64_t> trade_volume(polities.size(), 0); // both ends, per polity
@@ -1359,9 +1367,25 @@ int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& reg
     // LINE: the better of land (a corridor joining the two realms) and sea
     // (both seats' built ports, carried by the SELLER's navy).
     const int land_q = trade_land_line_q(ctx, seller, buyer);
-    const int sea_q = ps.navy_stock > 0
-                    ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
-                    : 0;
+    int sea_q = ps.navy_stock > 0
+              ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
+              : 0;
+    // BL-1140 -- THE SEA LINE IS PRICED WITH ITS CURRENT, seller's seat to
+    // buyer's: the leg's cost against still water divides the line, so a
+    // current carrying the goods widens it and one set against them narrows
+    // it. The one place trade across water is decided -- this line is what
+    // sizes the flow (`compute_trade_flows`) AND what a binding is worth in
+    // trade (`pair_trade_value_q`), so the current decides both how much
+    // moves and whether the pair binds to move it. Exactly antisymmetric in
+    // direction (`ocean_current_alignment_q`), so a pair trades more the way
+    // the water runs. Land is never priced: a road has no current.
+    if (sea_q > 0 && ctx.currents != nullptr && ctx.current_weight_q > 0)
+    {
+        const int align = ocean_current_alignment_q(*ctx.currents, seller_seat.col, seller_seat.row,
+                                                    buyer_seat.col, buyer_seat.row);
+        const int cost = ocean_current_leg_cost_q(ctx.current_weight_q, align); // >= 1: weight < 1000
+        sea_q = clampi(static_cast<int>((static_cast<int64_t>(sea_q) * 1000) / std::max(1, cost)), 0, 1000);
+    }
     const int line_q = std::max(land_q, sea_q);
 
     return std::max(0, std::min({want_q, holding_q, line_q}));
@@ -1558,6 +1582,68 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // says so -- rejected, never clamped. `subjection_verb` also refuses on
     // its own; this flag is the report.
     out.subjection_purchase_params_rejected = !subjection_purchase_params_valid(params);
+
+    // BL-1120 -- THE CURRENT FIELD, built once for this span from the terrain
+    // it already runs on (EXPLORATION.md sec Currents are a force, not a
+    // picture). A pure function of the substrate, the grid and the rotation
+    // sense, so every caller that runs a span on this ground -- generation,
+    // a fixture re-run, a sweep -- prices its legs with the identical field
+    // without carrying one. Judged once at the open like the purchase fork: a
+    // weight or sense outside its domain prices nothing for the whole run and
+    // says so. At weight 0 no field is built and every leg costs still water,
+    // which is every fixture's meaning unchanged.
+    const bool currents_legal =
+        ocean_current_weight_valid(params.sea_current_weight_q)
+     && (params.sea_current_rotation_sense == 1 || params.sea_current_rotation_sense == -1);
+    out.sea_current_params_rejected = !currents_legal;
+    const ocean_current_field currents =
+        (currents_legal && params.sea_current_weight_q > 0 && terrain.substrate != nullptr)
+            ? build_ocean_currents(*terrain.substrate, gw, gh, params.sea_current_rotation_sense)
+            : ocean_current_field{};
+    const bool currents_on = !currents.empty();
+    out.sea_current_field_digest = currents_on ? ocean_current_digest(currents) : 0;
+    // The current along a leg FROM region `from` TO region `to`, per mille
+    // (`ocean_current_alignment_q`: exactly antisymmetric, so a return leg
+    // reads the negation of the outbound), and the leg's cost against still
+    // water. One weight, both directions.
+    const auto sea_leg_alignment_q = [&](int from, int to) -> int {
+        if (!currents_on || from < 0 || to < 0) return 0;
+        const region& ra = ss.regions[static_cast<std::size_t>(from)];
+        const region& rb = ss.regions[static_cast<std::size_t>(to)];
+        return ocean_current_alignment_q(currents, ra.col, ra.row, rb.col, rb.row);
+    };
+    const auto sea_leg_cost_q = [&](int from, int to) -> int {
+        if (!currents_on) return 1000;
+        return ocean_current_leg_cost_q(params.sea_current_weight_q, sea_leg_alignment_q(from, to));
+    };
+    // A DISTANCE GATE READ ACROSS A LEG, priced with the leg's current: the
+    // Chebyshev distance scaled by the leg's cost. Asked only where the price
+    // could decide -- a raw distance that clears the gate even at the dearest
+    // cost the weight allows (or fails it even at the cheapest) is answered
+    // without sampling the line, which is exact, not an approximation.
+    // BL-1140 -- WHICH LANDMASS EACH TILE STANDS ON, once per span, for the
+    // fourth writer's test (trade between realms on different landmasses).
+    // Only the spans that keep the lane record need it.
+    const std::vector<int32_t> landmass =
+        (params.exploration_upkeep_enabled && terrain.substrate != nullptr)
+            ? landmass_labels(*terrain.substrate, gw, gh)
+            : std::vector<int32_t>{};
+    // A seat's landmass (`landmass_at`: a seat on the shoreline ring reads
+    // the landmass it borders); -1 writes no trade leg.
+    const auto landmass_of_region = [&](int ri) -> int32_t {
+        if (ri < 0 || static_cast<std::size_t>(ri) >= ss.regions.size()) return -1;
+        const region& r = ss.regions[static_cast<std::size_t>(ri)];
+        if (r.col < 0 || r.row < 0 || r.col >= gw || r.row >= gh) return -1;
+        return landmass_at(landmass, gw, gh, r.col, r.row);
+    };
+    const auto sea_leg_distance_within = [&](int from, int to, int raw_dist, int gate) -> bool {
+        if (!currents_on) return raw_dist <= gate;
+        const int64_t w = params.sea_current_weight_q;
+        if (static_cast<int64_t>(raw_dist) * (1000 + w) <= static_cast<int64_t>(gate) * 1000) return true;
+        if (static_cast<int64_t>(raw_dist) * (1000 - w) >  static_cast<int64_t>(gate) * 1000) return false;
+        return static_cast<int64_t>(raw_dist) * sea_leg_cost_q(from, to)
+            <= static_cast<int64_t>(gate) * 1000;
+    };
 
     // BL-914: seed the tap's geometry mirror with the regions this call
     // already opens on (round 4 always does — settlement/migration ran
@@ -1934,6 +2020,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // output.
     std::vector<std::pair<uint16_t, uint16_t>> sea_leg_uses;
     std::unordered_map<uint64_t, int>          sea_uses_live;
+    // BL-1120 -- the same notes with their writer (`sea_leg_writer`), folded
+    // into `out.sea_leg_writers` at the close by the same sort-and-count.
+    std::vector<std::array<uint16_t, 3>>       sea_leg_writer_notes;
 
     // BL-925 -- which cross-border corridors are CURRENTLY open to amicable
     // trade, keyed the same way as `road_uses_live` above. Point lookups and
@@ -1972,6 +2061,44 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // Local to this call: a resumed span re-measures on its first year. With
     // no substrate (a synthetic fixture) nothing is measured and nothing caps.
     urban_ground_field urban_ground;
+
+    // BL-1130 (review fix) — WHAT THE REACH CACHE WATCHES. The relay reads a
+    // region's size only through the REBATE it buys: none below
+    // `centre_reach_min_centres`, `size x centre_reach_rebate_q` above it,
+    // capped at `centre_reach_rebate_cap_q` (`rebuild_reach`). So the cache's
+    // version moves when a region's rebate moves, not when its size does: a
+    // town growing past the cap relays exactly as it did, and rebuilding every
+    // polity's reach for it changed no value. 0 with the relay off, where the
+    // cache never reads the version at all.
+    const auto relay_rebate_of = [&](const region& r) -> int {
+        if (!params.centre_chain_reach) return 0;
+        const int size = region_settlement_size(r);
+        if (size < std::max(1, params.centre_reach_min_centres)) return 0;
+        return static_cast<int>(std::min<int64_t>(
+            static_cast<int64_t>(size) * clampi(params.centre_reach_rebate_q, 0, 999),
+            clampi(params.centre_reach_rebate_cap_q, 0, 999)));
+    };
+
+    // BL-1130 (review fix) — THE RECORD NEVER OUTLIVES ITS CELL. Re-measure the
+    // partition and hold every region's centres to its ground (a merge, never a
+    // razing). Called once a year before the urban step, and — only when a
+    // founding has appended a region since the last measure — at every polity's
+    // turn, at the round's end and at the span's close, so a Settle founding
+    // late in a year is measured before any later reader and no span closes on
+    // a cell a founding cut. Cheap when nothing was founded: the guard is one
+    // size compare.
+    const auto hold_to_ground = [&](bool only_after_founding) {
+        if (terrain.substrate == nullptr) return;
+        if (only_after_founding && ss.regions.size() == urban_ground.measured) return;
+        if (!update_urban_ground(ss, urban_ground, *terrain.substrate, terrain.standable, gw, gh))
+            return;
+        for (region& r : ss.regions)
+        {
+            const int rebate_before = relay_rebate_of(r);
+            if (hold_region_to_ground(r) && relay_rebate_of(r) != rebate_before)
+                ++centres_version;
+        }
+    };
 
     const auto edge_key = [](int a, int b) -> uint64_t {
         const uint32_t lo = static_cast<uint32_t>(a < b ? a : b);
@@ -2249,13 +2376,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // always recorded; the ONE tier crossing (`sea_lane_tier1_uses`) notes a
     // `sea_lane_opened` event, and that event is the only thing outside the
     // fold that ever hears of a leg. Nothing below reads the count back.
-    const auto note_sea_leg = [&](int a, int b) {
+    const auto note_sea_leg = [&](int a, int b, sea_leg_writer writer) {
         if (a < 0 || b < 0 || a == b) return;
         if (a >= static_cast<int>(owner_index_limit)
          || b >= static_cast<int>(owner_index_limit)) return;
         const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
         const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
         sea_leg_uses.push_back({lo, hi});
+        sea_leg_writer_notes.push_back({lo, hi, static_cast<uint16_t>(writer)}); // BL-1120
 
         int& uses = sea_uses_live[edge_key(a, b)];
         const bool before = uses >= params.sea_lane_tier1_uses;
@@ -2265,6 +2393,72 @@ history_sim_state run_history_sim(settlement_state&         ss,
         {
             ++out.sea_lanes_opened;
             note_event(lapse_event_kind::sea_lane_opened, lo, 1, hi);
+        }
+    };
+
+    // BL-1140 -- THE FOURTH WRITER: TRADE ACROSS WATER (EXPLORATION.md sec
+    // The colonial tie is a sea lane, "A lane is a route of the ocean's
+    // currents and of trade between continents"). Read after the round's
+    // upkeep has rebuilt `out.trade_flows`: every pair of realms trading this
+    // round whose seats stand on DIFFERENT landmasses writes ONE use, seller
+    // seat to buyer seat, however many goods or directions the pair moves --
+    // the link is the traffic, not the tonnage, as it is for tribute. The
+    // pairs are collected into a sorted, deduplicated list first, so the
+    // notes land in pair order and no flow order can reach the record.
+    // The leg's direction for the current reading is the pair's NET flow
+    // this round (the heavier direction's seller seat to its buyer's; a tie
+    // reads lower id selling), counted with/against/slack when the field is
+    // built -- pure observation, read by nothing below.
+    const auto note_trade_legs = [&]() {
+        if (landmass.empty() || out.trade_flows.empty()) return;
+        // (lo, hi) -> volume lo sells hi, volume hi sells lo.
+        std::vector<std::array<int64_t, 4>> pairs; // {lo, hi, vol lo->hi, vol hi->lo}
+        pairs.reserve(out.trade_flows.size());
+        for (const trade_flow& f : out.trade_flows)
+        {
+            if (f.volume_q <= 0 || f.seller == f.buyer) continue;
+            if (f.seller >= out.polities.size() || f.buyer >= out.polities.size()) continue;
+            const int lo = std::min<int>(f.seller, f.buyer), hi = std::max<int>(f.seller, f.buyer);
+            pairs.push_back({lo, hi, f.seller == lo ? f.volume_q : 0, f.seller == lo ? 0 : f.volume_q});
+        }
+        std::sort(pairs.begin(), pairs.end());
+        std::size_t i = 0;
+        while (i < pairs.size())
+        {
+            const int64_t lo = pairs[i][0], hi = pairs[i][1];
+            int64_t fwd = 0, back = 0;
+            for (; i < pairs.size() && pairs[i][0] == lo && pairs[i][1] == hi; ++i)
+            {
+                fwd  += pairs[i][2];
+                back += pairs[i][3];
+            }
+            const polity& pl = out.polities[static_cast<std::size_t>(lo)];
+            const polity& ph = out.polities[static_cast<std::size_t>(hi)];
+            const int32_t ml = landmass_of_region(pl.capital), mh = landmass_of_region(ph.capital);
+            if (ml < 0 || mh < 0 || ml == mh) continue; // one landmass: no water between the realms
+            const bool lo_sells = fwd >= back;
+            const int from = lo_sells ? pl.capital : ph.capital;
+            const int to   = lo_sells ? ph.capital : pl.capital;
+            note_sea_leg(from, to, sea_leg_writer::trade);
+            ++out.sea_legs_noted_trade;
+            out.sea_trade_volume_q += fwd + back;
+            if (currents_on)
+            {
+                const int a = sea_leg_alignment_q(from, to);
+                if (a > 0)      ++out.sea_trade_with_current;
+                else if (a < 0) ++out.sea_trade_against_current;
+                else            ++out.sea_trade_slack_current;
+                out.sea_trade_alignment_sum_q += a;
+                // Each direction's volume against its own reading: `a` runs
+                // from -> to, the reverse is its exact negation.
+                const int a_lo_hi = lo_sells ? a : -a;
+                const auto split = [&](int64_t vol, int align) {
+                    if (align > 0)      out.sea_trade_volume_with_q    += vol;
+                    else if (align < 0) out.sea_trade_volume_against_q += vol;
+                };
+                split(fwd, a_lo_hi);
+                split(back, -a_lo_hi);
+            }
         }
     };
 
@@ -3539,8 +3733,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // BL-1130: this year's cells, after this year's foundings, so a region
         // whose cell a founding just cut holds its centres to what is left of
         // it in the same year's urban step below.
-        if (terrain.substrate != nullptr)
-            update_urban_ground(ss, urban_ground, *terrain.substrate, gw, gh);
+        hold_to_ground(/*only_after_founding=*/false);
 
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {
@@ -3577,10 +3770,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // BL-1130: what the relay reads is the region's settlement size
             // (`region_settlement_size`), so THAT is what is watched — it moves
             // both ways with the heads, where the old count only ratcheted up.
-            const int size_before = region_settlement_size(ss.regions[i]);
+            // BL-1130 (review fix): the cache watches the rebate the size buys.
+            const int rebate_before = relay_rebate_of(ss.regions[i]);
             advance_region_urban(ss.regions[i],
                 ss.regions[i].network_supply_q > params.sustainable_settlement_floor_q);
-            if (region_settlement_size(ss.regions[i]) != size_before)
+            if (relay_rebate_of(ss.regions[i]) != rebate_before)
                 ++centres_version;
             // BL-835 — ONE YEAR OF THE MUSTER, for every region whether or not
             // anyone is fighting over it. This is what makes an undefended
@@ -3998,11 +4192,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
             spend_ctx.state  = &out;
             spend_ctx.creeds = cs;
             spend_ctx.prefs  = &round_prefs;
+            spend_ctx.currents = currents_on ? &currents : nullptr; // BL-1140
             // BL-954: the state's treaties open this round's flows, rebuilt
             // into `out.trade_flows` (never accumulated).
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
                                    params, y, step_years, &upkeep_spend,
                                    &out.dated_objects, &out.trade_flows, &spend_ctx);
+            note_trade_legs(); // BL-1140: the round's trade across water, the fourth writer
             out.treasury_spent_on_ports           += upkeep_spend.ports;
             out.treasury_spent_on_navies          += upkeep_spend.navies;
             out.treasury_spent_on_standing_armies += upkeep_spend.standing_armies;
@@ -4096,8 +4292,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // re-score: nothing between here and the end of the break walk
             // changes who holds what, and the raw signal was refreshed by
             // the upkeep step above.
-            const trade_context treaty_trade_ctx =
-                build_trade_context(ss.regions, out.polities, out.supply_corridors);
+            // BL-1140: priced with the same current the round's flows were,
+            // so a binding is worth what its trade would actually carry.
+            const trade_context treaty_trade_ctx = [&]() {
+                trade_context t = build_trade_context(ss.regions, out.polities, out.supply_corridors);
+                if (currents_on)
+                {
+                    t.currents         = &currents;
+                    t.current_weight_q = params.sea_current_weight_q;
+                }
+                return t;
+            }();
 
             // BL-1018 DIAGNOSTIC (trace only): the raw capability each side
             // of every living NEAR-HOME pair reads of the other this round,
@@ -4285,7 +4490,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int dist = region_distance(
                             ss.regions[static_cast<std::size_t>(arriving.capital)],
                             ss.regions[static_cast<std::size_t>(native.capital)], gw);
-                        if (dist > params.subjection_reach_q) continue;
+                        // BL-1120: the reach is read across the leg the
+                        // purchase party or the binding would sail, arriving
+                        // seat to native seat, priced with its current.
+                        if (!sea_leg_distance_within(arriving.capital, native.capital,
+                                                     dist, params.subjection_reach_q)) continue;
 
                         const int64_t arriving_treasury =
                             ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
@@ -4372,7 +4581,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                        native.capital, native.id, arriving.id);
                             // BL-1097: the purchase party's crossing, buyer's
                             // seat to the seat it buys, is a sea leg.
-                            note_sea_leg(arriving.capital, native.capital);
+                            note_sea_leg(arriving.capital, native.capital, sea_leg_writer::purchase);
                             ++out.sea_legs_noted_purchase;
                         }
                         else
@@ -4415,8 +4624,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     dist = region_distance(ss.regions[static_cast<std::size_t>(subj.capital)],
                                            ss.regions[static_cast<std::size_t>(lord.capital)], gw);
 
+                // BL-1120: the distance is read across the overlord's leg to
+                // its subject, lord seat to subject seat, priced with its
+                // current (INT32_MAX -- no seat -- is read raw, as before).
                 const bool outrun = !reachable
-                                  || dist > params.subject_secession_distance_q
+                                  || (dist == INT32_MAX
+                                          ? dist > params.subject_secession_distance_q
+                                          : !sea_leg_distance_within(lord.capital, subj.capital, dist,
+                                                                     params.subject_secession_distance_q))
                                   || subj.cohesion_q <= params.subject_secession_cohesion_q;
                 if (outrun)
                 {
@@ -4460,7 +4675,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // the traffic is the link, not the amount.
                 if (subj.capital >= 0 && lord.capital >= 0 && subj.capital != lord.capital)
                 {
-                    note_sea_leg(lord.capital, subj.capital);
+                    note_sea_leg(lord.capital, subj.capital, sea_leg_writer::tribute);
                     ++out.sea_legs_noted_tribute;
                 }
 
@@ -4502,6 +4717,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
         ++prof.decision_rounds;
         for (polity& q : out.polities)
         {
+            // BL-1130 (review fix): an earlier polity's Settle this round cut
+            // its neighbours' cells; measure before this turn reads them.
+            hold_to_ground(/*only_after_founding=*/true);
             if (!q.alive) continue;
 
             // Holdings, and whether the capital still stands.
@@ -4857,12 +5075,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // terrain cost (BL-321): reach_mod is authored as a discount on the
             // supply cost through/from a region, so it is the staging
             // holding's roads and wharves doing the carrying, not the capital's.
-            const auto campaign_supply = [&](std::size_t ti, int hub) {
+            //
+            // BL-1120 -- A SEA LEG'S LAST HOP IS PRICED WITH ITS CURRENT.
+            // `sea_cost_q` is the leg's cost against still water
+            // (`sea_leg_cost_q`, hub to target), passed by the caller that has
+            // already asked whether the line is wet; 1000 -- a dry hop, or
+            // still water -- is the step exactly as it always was. The hop is
+            // the one piece of this reach that crosses the water, so it is the
+            // one the current can shorten or lengthen. The reach is carried in
+            // THOUSANDTHS of a step so the priced hop is never rounded to a
+            // whole step (a 7-step hop at cost 950 is 6.65 steps, not 6): at
+            // cost 1000 the thousandths are exact multiples and the terrain
+            // cost below is the old `reach_here * cost / 100` digit for digit.
+            const auto campaign_supply = [&](std::size_t ti, int hub, int sea_cost_q = 1000) {
                 const std::size_t hs = static_cast<std::size_t>(hub);
                 const bool hub_reached = hub >= 0 && hs < reach.size() && reach[hs] < (1 << 27);
-                const int reach_here = hub_reached
-                                     ? reach[hs] + edge_step(hub, static_cast<int>(ti))
-                                     : (1 << 27);
+                const int64_t reach_milli = hub_reached
+                    ? static_cast<int64_t>(reach[hs]) * 1000
+                        + static_cast<int64_t>(edge_step(hub, static_cast<int>(ti))) * sea_cost_q
+                    : static_cast<int64_t>(1 << 27) * 1000;
                 // (BL-973: the tree's `reach` term is NOT added here either —
                 // see the holdings-supply site above for the finding.)
                 const int hub_reach_q = (hub >= 0)
@@ -4870,8 +5101,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     : 0;
                 // 64-bit for the same reason as the holdings loop above: the
                 // sentinel times the cost does not fit an `int`.
-                const int64_t terrain_cost = static_cast<int64_t>(reach_here)
-                                           * leaned_terrain_reach_cost_q(params) / 100;
+                const int64_t terrain_cost = reach_milli
+                                           * leaned_terrain_reach_cost_q(params) / 100 / 1000;
                 const int64_t terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
                 return static_cast<int>(clampi64(1000
                             - terrain_paid
@@ -5337,10 +5568,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // on the reduced ration its people's creed earned. Same
                     // `campaign_supply`, scaled; never a bonus added on top.
                     const int sl_ration = forages ? 0 : sea_legs_ration(hi);
+                    // BL-1120: a wet hop is priced with its current, hub to
+                    // target -- the same leg execute prices below. (A starved
+                    // crossing lands on nothing whatever the current, so its
+                    // line is not sampled.)
+                    const int sl_cost = (dry || (!forages && sl_ration <= 0))
+                                      ? 1000 : sea_leg_cost_q(hi, tn);
                     const int supply_here =
-                        forages ? campaign_supply(ti, hi)
+                        forages ? campaign_supply(ti, hi, sl_cost)
                                 : (sl_ration > 0
-                                       ? (campaign_supply(ti, hi) * sl_ration) / 1000
+                                       ? (campaign_supply(ti, hi, sl_cost) * sl_ration) / 1000
                                        : 0);
 
                     // BL-837 — REACH GATES A CAMPAIGN; IT DOES NOT MERELY
@@ -6165,7 +6402,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // what this march would have drawn foraging. `campaign_supply`
                 // is a pure read of this round's reach and burden, so asking it
                 // here rather than inside each arm below changes no value.
-                const int exec_forage_supply = campaign_supply(ti, src);
+                //
+                // BL-1120: the wet hop priced with its current, hub to target,
+                // by the identical rule the scorer used; counted at launch as
+                // with, against or across slack water (pure observation).
+                const int exec_align = (!exec_dry && currents_on)
+                                     ? sea_leg_alignment_q(src, static_cast<int>(ti)) : 0;
+                const int exec_sea_cost = currents_on
+                    ? ocean_current_leg_cost_q(params.sea_current_weight_q, exec_align) : 1000;
+                if (!exec_dry && currents_on)
+                {
+                    if (exec_align > 0)      ++out.sea_campaigns_with_current;
+                    else if (exec_align < 0) ++out.sea_campaigns_against_current;
+                    else                     ++out.sea_campaigns_slack_current;
+                    out.sea_campaign_alignment_sum_q += exec_align;
+                }
+                const int exec_forage_supply = campaign_supply(ti, src, exec_sea_cost);
                 const int atk_supply =
                     exec_forages ? exec_forage_supply
                                  : (exec_ration > 0
@@ -6201,7 +6453,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // review's fix round on BL-1097).
                 if (!exec_dry && params.exploration_upkeep_enabled)
                 {
-                    note_sea_leg(src, static_cast<int>(ti));
+                    note_sea_leg(src, static_cast<int>(ti), sea_leg_writer::campaign);
                     ++out.sea_legs_noted_campaign;
                     // BL-1095 -- THE WET CAMPAIGN IS A MOMENT OF ITS OWN on the
                     // record (EXPLORATION.md § Force persists now): its target,
@@ -6464,9 +6716,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // BL-887: a razed city is a relay REMOVED from the
                     // network, the mirror of the demography loop's bump.
                     // BL-1130: the relay reads the settlement size, as above.
-                    const int sacked_size_before = region_settlement_size(tgt);
+                    const int sacked_rebate_before = relay_rebate_of(tgt);
                     sack_region_urban(tgt, params.sack_population_loss_q);
-                    if (region_settlement_size(tgt) != sacked_size_before)
+                    if (relay_rebate_of(tgt) != sacked_rebate_before)
                         ++centres_version;
 
                     // BL-835 — THE ARMY THAT TOOK IT IS THE ARMY THAT HOLDS IT,
@@ -8183,6 +8435,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // Ownership changes are appended where they happen (conquest, founding),
         // so there is nothing to snapshot at the end of a year.
 
+        // BL-1130 (review fix): the round's last founding, measured before the
+        // record is taken and before next year reads it.
+        hold_to_ground(/*only_after_founding=*/true);
+
         // ---- THE RECORDED STEP (BL-817) ----------------------------------
         //
         // Reached only on a decision round — the gate above `continue`s past it
@@ -8196,6 +8452,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             && (last_record_year == INT64_MIN || y - last_record_year >= record_interval))
             record_step(y);
     }
+
+    // BL-1130 (review fix): the span closes on a measured record.
+    hold_to_ground(/*only_after_founding=*/true);
 
     // THE CLOSING STEP, always taken, at the stop year. Without it the record's
     // last step is wherever the interval happened to land — up to one interval
@@ -8292,6 +8551,28 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // of `uses` against `sea_lane_tier1_uses`, earned by traffic and never
     // bought, so there is no second count for the record to disagree with.
     {
+        // BL-1120: who wrote this span's notes, per leg, by the same
+        // sort-and-count (a sorted array of (lo, hi, writer) has no container
+        // order to leak).
+        std::sort(sea_leg_writer_notes.begin(), sea_leg_writer_notes.end());
+        out.sea_leg_writers.clear();
+        for (const std::array<uint16_t, 3>& n : sea_leg_writer_notes)
+        {
+            if (out.sea_leg_writers.empty()
+             || out.sea_leg_writers.back().a != n[0] || out.sea_leg_writers.back().b != n[1])
+            {
+                sea_leg_writer_row row;
+                row.a = n[0];
+                row.b = n[1];
+                out.sea_leg_writers.push_back(row);
+            }
+            sea_leg_writer_row& row = out.sea_leg_writers.back();
+            if (n[2] == static_cast<uint16_t>(sea_leg_writer::campaign))      ++row.campaign;
+            else if (n[2] == static_cast<uint16_t>(sea_leg_writer::purchase)) ++row.purchase;
+            else if (n[2] == static_cast<uint16_t>(sea_leg_writer::tribute))  ++row.tribute;
+            else                                                              ++row.trade; // BL-1140
+        }
+
         std::sort(sea_leg_uses.begin(), sea_leg_uses.end());
         std::vector<sea_leg> fresh;
         fresh.reserve(sea_leg_uses.size());

@@ -55,9 +55,12 @@
 // inspectable rather than being one draw among hundreds.
 //
 // PARALLELISM IS AN OPTIMISATION. The static ruling deleted the budget argument
-// that once made it load-bearing; what survives is the constraint it imposed,
-// and `thread_count` exists mainly so a harness can PROVE the winner does not
-// vary with it.
+// that once made it load-bearing; what survives is the constraint it imposed —
+// the winner never varies with `thread_count`, which the harness PROVES. The
+// campaign scores a round's proposals on two threads (BL-1136, Ben 2026-09-26:
+// round 6's tail wait), so the constraint is exercised on every new game, not
+// only in a harness. Each thread holds its own copy of the base world while it
+// scores, so peak memory grows by one world per thread.
 //
 // NOTHING HERE IS PERSISTENT. The search runs at generation time and its output
 // is a world, not a field — so it adds nothing to the flat-binary save path.
@@ -151,8 +154,10 @@ struct landscape_search_params
     std::uint8_t min_road_tier    = 1;
     std::uint8_t max_road_tier    = 3;
 
-    /// Threads used to score one round's proposals. 1 = serial. The result must
-    /// not depend on this value; that is the property the harness asserts.
+    /// Threads used to score one round's proposals. 1 = serial (the default
+    /// here); the campaign passes `k_campaign_search_threads` (2, BL-1136). The
+    /// result must not depend on this value; that is the property the harness
+    /// asserts.
     int thread_count = 1;
 
     landscape_score_params score{};

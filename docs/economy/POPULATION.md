@@ -71,7 +71,9 @@ RNG anywhere on the path:
   **The merge is a size hierarchy inside the region (Ben, 2026-09-25):** its centres are a
   rank-size share of its own urban heads, as many as keep the smallest a village's worth. **A
   region whose cell holds no land carries no centre** (Ben, 2026-09-25): it has no ground to stand
-  one on, so nothing spills.
+  one on, so nothing spills. "Land" here is ground a centre can stand on — the carve's own
+  placement gate — so a cell of land no centre can stand on counts as none (delegated reading,
+  NR-951).
   **A place's size is its people, never how many centres they are split into (Ben,
   2026-09-25).** A history reader that asks how big or how valuable a region is — the campaign
   prize, the reach relay — reads its urban heads, so the same people make the same prize however
@@ -140,11 +142,11 @@ RNG anywhere on the path:
   the centre takes the province (`docs/generation/PROVINCES.md` § The partition; BL-567,
   province is the conquest unit). This retires the centre-less hinterland province. The
   guarantee is structural: after the partition ships, any land province the centre-seeded fill
-  left without one is anchored by **a centre that already stands** (Ben, 2026-09-25; BL-1133,
-  anchors reuse a centre): it joins the adjacent province of its own nation whose centre is
-  nearest, so the merged province's centre is its anchor (delegated reading, NR-946;
-  `../generation/PROVINCES.md` § The partition). Only where no such neighbour exists does it
-  receive a **scale-1 anchor founding** on its
+  left without one is anchored by **a centre that already stands** (Ben, 2026-09-25; BL-1133):
+  since 2026-09-26 a province **is** its centre's ground — the fill covers the land, so no
+  centre-less province is left to anchor (`../generation/PROVINCES.md` § The partition). Only
+  ground no centre of the nation can reach at all (an uncentred island) receives a **scale-1
+  anchor founding** on its
   best ground (`ensure_province_anchor_centres` — argmax of habitability × richness, the placement
   gate preferred and relaxed only where no tile passes it, counted rather than hidden). Founding a
   village for every uncovered province had grown the anchors to a fifth to two fifths of all
@@ -153,7 +155,8 @@ RNG anywhere on the path:
   A centre arrives with an urban land-use footprint scaled by its tier, so city ground is
   scarce and contested from turn one rather than notionally open (§ Land use). The footprint
   is the centre's own tile plus its most-livable land neighbours — 1/1/2/4/7 tiles by scale
-  (`k_urban_footprint_tiles`); a footprint the coast cuts short stays short, and a tile two
+  (`k_urban_footprint_tiles`); a footprint the coast cuts short stays short, and so does one its
+  own region's cell edge cuts short (delegated reading, NR-951), and a tile two
   cities share is stamped once. Extraction already standing is grandfathered
   (`docs/economy/TILES.md` § Urban transform).
 
@@ -237,9 +240,12 @@ be rare because the occupier almost always prefers to occupy. **This rule is pla
 history the centre follows its heads both ways and is abandoned below a village's worth (Ben,
 2026-09-25; § Generation), and **play follows it too (Ben, 2026-09-25, NR-947; BL-1139,
 centres abandoned in play)**: a centre whose population falls below a village's worth is
-abandoned. In play it drops to the **razed tier** below rather than vanishing (delegated reading,
-NR-948), because a centre is its province's capture anchor and the ruin keeps the anchor: the
-place stops being a place, and the province can still be taken and cheaply re-settled.
+abandoned. **In play an abandoned centre is deleted, and its province merges into a neighbour
+(Ben, 2026-09-26, NR-948):** it joins the adjacent province of its own nation whose centre is
+nearest, the same join generation makes for a centre-less province (§ Generation), so the merged
+province's centre is its capture anchor. Only a province with no such neighbour keeps its centre
+as a ruin at the **razed tier** below, so no province is ever left without an anchor (delegated
+fallback, NR-952). Abandonment is not razing: razing stays a deliberate act and stays a tier.
 
 **A razed settlement is a TIER, not an erasure** (Ben, 2026-08-25; BL-624, razed settlement
 tier). Razing demotes the centre to the **razed** state: population zeroed, no labour, no

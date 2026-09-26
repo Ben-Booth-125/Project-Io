@@ -70,6 +70,9 @@ void print_coverage(const char* what, const world& w, const era_minus_one_fixtur
     std::map<int, int> road_tier;
     for (const auto& [tid, tc] : w.tiles)
         if (tc.road_level != 0) { ++road_tiles; ++road_tier[tc.road_level]; }
+    std::size_t lane_tiles = 0; // BL-1098: the sea lanes the deep digest folds
+    for (const auto& [tid, tc] : w.tiles)
+        if (tc.lane_level != 0) ++lane_tiles;
 
     int64_t region_treasury = 0, standing = 0;
     int64_t port_stock = 0;
@@ -99,9 +102,9 @@ void print_coverage(const char* what, const world& w, const era_minus_one_fixtur
     double nation_treasury = 0.0;
     for (const auto& [nid, nc] : w.nations) nation_treasury += nc.treasury;
 
-    std::printf("     coverage %-14s sentiment rows=%zu | road tiles=%zu (T1 %d, T2 %d, T3 %d)\n",
+    std::printf("     coverage %-14s sentiment rows=%zu | road tiles=%zu (T1 %d, T2 %d, T3 %d) | lane tiles=%zu\n",
                 what, w.sentiment.pairs.size(), road_tiles,
-                road_tier[1], road_tier[2], road_tier[3]);
+                road_tier[1], road_tier[2], road_tier[3], lane_tiles);
     std::printf("         regions=%zu treasury=%lld port_stock_q=%lld standing_army=%lld |"
                 " navy=%lld | nation treasury=%.0f\n",
                 regions, static_cast<long long>(region_treasury),

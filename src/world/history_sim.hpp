@@ -96,6 +96,14 @@ struct sim_terrain_view
     /// May be null independently of the rest, in which case a caller (e.g.
     /// `run_colonisation`) treats every tile as riverless.
     const std::vector<std::uint8_t>*      river     = nullptr;
+
+    /// Non-zero where a population centre can stand on the tile — the carve's
+    /// own placement gate (`placement_rules::can_place_population_centre`:
+    /// land, habitable). BL-1130 (review fix): the ground a region's cell holds
+    /// is counted in THESE tiles, so a region whose cell holds none carries no
+    /// centre in the sim, exactly as the carve gives it none. Null counts every
+    /// non-water tile instead (a caller with geology only).
+    const std::vector<std::uint8_t>*      standable = nullptr;
 };
 
 // ---------------------------------------------------------------------------
@@ -142,6 +150,7 @@ struct polity;
 struct grudge;
 struct contact;
 struct history_corridor;
+struct ocean_current_field; // BL-1120/BL-1140: ocean_currents.hpp
 struct dated_object;    // BL-1036's resume pointers, on the same footing.
 struct universal_creed; // (`civilisation` is complete already: creeds.hpp.)
 
@@ -1277,6 +1286,36 @@ struct history_sim_params
     /// is what stops an ancient people out-raiding a realm that has actually
     /// reached the naval rung.
     int sea_legs_port_q = 0;
+
+    /// OCEAN CURRENTS PRICE A SEA LEG (BL-1120; EXPLORATION.md sec Currents
+    /// are a force, not a picture). The ONE weight: a leg run fully with its
+    /// current costs `1000 - w` per mille of still water and fully against it
+    /// `1000 + w` (`ocean_current_leg_cost_q`), read off a field the span
+    /// builds once from the terrain it runs on (`build_ocean_currents`:
+    /// latitude band, the body's rotation sense below, the land mask).
+    ///
+    /// WHAT IT PRICES, AND IN WHICH CURRENCY. Every place a sea leg is costed:
+    /// a wet campaign's last hop onto its target, which is the step
+    /// `campaign_supply` adds to the hub's reach (so the scorer and execute
+    /// ask the identical question, the file's standing thesis), and the two
+    /// distance gates a colonial link is read against -- subjection's reach
+    /// from the arriving seat and a subject's secession distance from its
+    /// overlord's -- each read as the Chebyshev distance scaled by the leg's
+    /// cost. A leg is "wet" by the record's own test (`line_crosses_sea`),
+    /// and a leg with no sea along its line reads no current and pays
+    /// still-water price.
+    ///
+    /// Zero by default -- still water, no field built, every fixture
+    /// unchanged. Domain [0, 999]: outside it the run prices nothing and says
+    /// so (`history_sim_state::sea_current_params_rejected`), never clamped.
+    /// Set for the spans the lane record belongs to (`era_minus_one.cpp`).
+    int sea_current_weight_q = 0;
+    /// The body's rotation sense the current field is built with: +1
+    /// prograde, -1 retrograde (every wind, so every current, reversed). The
+    /// data model records no spin for a body, so this is an input rather than
+    /// a reading; +1 is the ordinary case. Any other value is rejected with
+    /// the weight above.
+    int sea_current_rotation_sense = 1;
 
     /// TRADE INCOME FROM THE NETWORK (BL-895; Ben, 2026-09-11: "we also need a
     /// simple cost for war, and this cost can be sourced by rich trade").
@@ -2533,6 +2572,10 @@ struct exploration_spend_context
     const history_sim_state*                    state  = nullptr;
     const creed_state*                          creeds = nullptr;
     const std::vector<culture_good_preference>* prefs  = nullptr;
+    /// BL-1140: the span's current field, which the round's trade context
+    /// prices its sea lines with (`trade_context::currents`); null is still
+    /// water.
+    const ocean_current_field*                  currents = nullptr;
 };
 
 ///
@@ -3783,6 +3826,22 @@ struct history_sim_capture
     std::vector<sea_leg> sea_legs;
 };
 
+/// BL-1120 -- one sea leg's uses this span, by the writer that noted them
+/// (EXPLORATION.md sec The colonial tie is a sea lane names the writers).
+/// `a < b`, as `sea_leg`.
+struct sea_leg_writer_row
+{
+    uint16_t a        = 0;
+    uint16_t b        = 0;
+    int32_t  campaign = 0; ///< a wet campaign's crossing, at its launch
+    int32_t  purchase = 0; ///< a purchase party's crossing
+    int32_t  tribute  = 0; ///< a metropole's standing traffic, one per round
+    int32_t  trade    = 0; ///< BL-1140: a trade link across water, one per round it runs
+};
+
+/// The writer column a sea-leg note lands in (`sea_leg_writer_row`).
+enum class sea_leg_writer : uint8_t { campaign = 0, purchase = 1, tribute = 2, trade = 3 };
+
 struct history_sim_state
 {
     std::vector<polity> polities;
@@ -3946,8 +4005,17 @@ struct history_sim_state
     /// campaign's launch (beside the land note, so the land record is
     /// unchanged), a purchase party's crossing (BL-1096), and once per
     /// decision round per standing tribute clause, overlord capital to
-    /// subject seat. Not gated on `trace_battles`, for the same reason.
+    /// subject seat -- and a fourth (BL-1140): once per decision round per
+    /// trade link between seats on different landmasses. Not gated on
+    /// `trace_battles`, for the same reason.
     std::vector<sea_leg> sea_legs;
+
+    /// BL-1120 -- WHO WROTE THIS SPAN'S SEA-LEG USES, per leg: the notes the
+    /// span itself made (never the inherited `resume_sea_legs` count), split
+    /// by writer, sorted by (a, b). Summed over the three columns a row equals
+    /// the uses this span added to that leg in `sea_legs`. The observation a
+    /// report reads to say which writer earned a lane; nothing reads it back.
+    std::vector<sea_leg_writer_row> sea_leg_writers;
 
     /// THE SPARSE, DIRECTED, DECAYING GRUDGE TABLE (BL-827).
     ///
@@ -4251,6 +4319,44 @@ struct history_sim_state
     int64_t sea_legs_noted_purchase = 0;
     int64_t sea_legs_noted_tribute  = 0;
     int64_t sea_lanes_opened        = 0;
+    /// BL-1140: the FOURTH writer -- a trade link between realms whose seats
+    /// stand on different landmasses (`landmass_labels`), one use per
+    /// decision round it carries a flow, seller seat to buyer seat. Beside
+    /// it, how those uses ran against the current field (the net direction
+    /// of the round's volume, seller seat to buyer seat): with it, against
+    /// it, across slack water, and the alignment sum -- counted whenever the
+    /// field is built. Pure observation.
+    int64_t sea_legs_noted_trade          = 0;
+    int64_t sea_trade_with_current        = 0;
+    int64_t sea_trade_against_current     = 0;
+    int64_t sea_trade_slack_current       = 0;
+    int64_t sea_trade_alignment_sum_q     = 0;
+    /// BL-1140: the VOLUME those links moved, summed over the rounds (both
+    /// directions), and how much of it sailed with / against the current
+    /// (each direction read on its own, seller seat to buyer seat) -- the
+    /// reading that says whether more trade runs with the water than against
+    /// it. The split is counted whenever the field is built.
+    int64_t sea_trade_volume_q            = 0;
+    int64_t sea_trade_volume_with_q       = 0;
+    int64_t sea_trade_volume_against_q    = 0;
+
+    /// BL-1120: how the wet campaigns LAUNCHED this run ran against the
+    /// current field -- with it (alignment > 0), against it (< 0) or across
+    /// slack water (0), counted at launch beside `sea_legs_noted_campaign`
+    /// whenever the field is built, in every span that builds it. The sum of
+    /// the launched legs' alignments (per mille each) rides beside, so a
+    /// report can read the mean. Pure observation.
+    int64_t sea_campaigns_with_current    = 0;
+    int64_t sea_campaigns_against_current = 0;
+    int64_t sea_campaigns_slack_current   = 0;
+    int64_t sea_campaign_alignment_sum_q  = 0;
+    /// BL-1120: the current's weight or rotation sense left its domain at the
+    /// run's open, so the run priced every sea leg at still water. REJECTED,
+    /// never clamped.
+    bool    sea_current_params_rejected   = false;
+    /// BL-1120: the digest of the field this run priced its legs with (0 when
+    /// none was built), so a report can say which ocean it measured.
+    uint64_t sea_current_field_digest     = 0;
 
     /// BL-935: treasury actually spent building each stock, this run — the
     /// observable that separates "the mechanism never fires" from "no polity
@@ -4944,6 +5050,19 @@ struct trade_context
         int32_t  line_q = 0;
     };
     std::vector<land_line> land_lines;
+
+    /// BL-1140 -- THE SEA LINE IS PRICED WITH ITS CURRENT (EXPLORATION.md sec
+    /// Currents are a force, not a picture: the current decides "which
+    /// trades across water are worth making"). When set, a flow's sea line
+    /// is divided by the cost of the leg from the seller's seat to the
+    /// buyer's (`ocean_current_leg_cost_q` at `current_weight_q`), so goods
+    /// that run with the current arrive in greater volume than goods beating
+    /// against it, and the pair's binding is worth more in the direction the
+    /// water carries. Null -- every caller that builds a context and sets
+    /// nothing -- is still water, the line exactly as it was. Not owned: the
+    /// sim points it at the span's field for the round.
+    const ocean_current_field* currents = nullptr;
+    int                        current_weight_q = 0;
 };
 
 trade_context build_trade_context(const std::vector<region>&           regions,
@@ -4957,6 +5076,9 @@ trade_context build_trade_context(const std::vector<region>&           regions,
 /// `port_stock_q`, buyer seat `port_stock_q`) while the seller holds a navy
 /// (`navy_stock > 0`), else 0. 0 for a dead or out-of-range party, the same
 /// polity on both sides, a capital out of range, or @p good outside 0..3.
+/// BL-1140: with `ctx.currents` set, sea is priced with the current along
+/// the leg from the seller's seat to the buyer's -- divided by the leg's
+/// cost and held to 1000 -- before the max; land is never priced.
 int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& regions,
                         const std::vector<polity>& polities,
                         int seller, int buyer, int good);

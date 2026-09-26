@@ -23,23 +23,22 @@
 //       town (50k), city (200k), metropolis (1M), megacity (5M).
 //     * FIT — SPILLS: carved centres standing outside their source region's
 //       cell (`nearest_region` of the centre's tile differs from the carve
-//       slot's region). OVERFULL: regions whose carved centres' urban
-//       footprints (`k_urban_footprint_tiles` by the CARVE's scale, which is
-//       the body-wide rank-size's) add up to more land tiles than the
-//       region's own cell holds — split out, the regions carrying ONE carved
-//       centre, which the rule's floor keeps whatever its footprint; regions
-//       carrying more carved centres than their cell has placeable tiles;
-//       PLACELESS regions (living, standing centres, a cell with no placeable
-//       tile — the only regions the carve could ever spill); GROUNDLESS
-//       regions (living, a cell with no land at all — Ben's 2026-09-25 ruling
-//       gives them no centre); and the SIM RECORD against the final
-//       partition: living regions with more than one centre whose OWN
-//       hierarchy's footprint outruns their cell's land (`hierarchy_footprint`
-//       below, a mirror of settlement.cpp's `region_centre_footprint` — the
-//       quantity `region_centres_fit` judges — restated so the census still
-//       builds on a tree without BL-1130, which is where its BEFORE reading is
-//       taken; on such a tree the row reads the old count as if it were a
-//       hierarchy and means nothing).
+//       slot's region). NOMINAL OVERFULL: regions whose carved centres'
+//       footprints BY SCALE (`k_urban_footprint_tiles` of the carve's
+//       body-wide rank-size scale) add up to more land than the cell holds —
+//       what the centres would pave uncut; the one-centre regions split out.
+//       PAVED ACROSS: urban tiles no centre of their own cell stands on or
+//       beside — paving that crossed a cell edge (zero once the stamp stops a
+//       footprint at the cell, BL-1130 review fix), and the cells it fell in.
+//       Regions carrying more carved centres than their cell has placeable
+//       tiles; PLACELESS and GROUNDLESS regions (living, a cell with no
+//       standable tile) and how many still carry a centre; and THE CAP: the
+//       SIM RECORD against the final partition by `region_centres_fit` on the
+//       cell's standable ground — a FAIL row, with the groundless-standing
+//       count, since no region may carry more centres than its ground holds.
+//     * THE STOCKPILE (BL-1042) — the points the carve's slots receive and
+//       every unspent reason; a region that earned points the carve gave no
+//       slot lands in the `no_carved_centre` residual.
 //     * THE HISTORY — per span (Empires, Exploration, Industrialisation), the
 //       battles, conquests and foundings the generation report carries, since
 //       the Era -1 sim reads `region::centres` (BL-1130 round 2 attributes the
@@ -51,19 +50,28 @@
 //     * WHAT FOLLOWS — road tiles on the body (`road_level > 0`), split into
 //       STREETS (a road on a centre's own tile) and the network; and markets on
 //       the body (`world::markets`), which the carve gates on centres.
-//     * THE SPACING LADDER ROW (BL-1132, settle spacing) — one compact row per
+//     * THE PROVINCES (C7/C8; BL-1133, a province is its centre's ground) —
+//       the home body's land provinces against its centres: how many hold a
+//       SEED centre (any centre not an anchor founding), how many hold more
+//       than one centre, how many rest on an anchor founding alone; and the
+//       size distribution in land tiles (median, p90, max), overall and by
+//       the ANCHOR's scale — the anchor being the highest summed centre scale
+//       standing in the province, ties to the lowest tile id, exactly as
+//       `seed_province_holders` derives it.
+//     * THE SPACING LADDER ROW (C9; BL-1132, settle spacing) — one compact row per
 //       seed of what a settle-spacing candidate moves: regions, living, living
 //       regions by cell land (1 / 2-4 / 5-9 / 10-24 / 25+ tiles), centres, the
-//       land share under them, and the three spans' battles / conquests /
-//       foundings; pooled below it. The header names the spacing the binary was
+//       land share under them, the land provinces, and the three spans'
+//       battles / conquests / foundings; pooled below it. The header names the spacing the binary was
 //       built with (`generation_settle_spacing_tiles`), so a ladder is a set of
 //       runs of builds that differ in that one constant.
 //
-// A READING, NOT A GATE. Nothing here asserts a centre count, a land share or a
-// scale mix: those are what the rule is ruled against, and a harness that
-// pinned them would be making that call. The one failing row (exit 1) is the
-// instrument's own honesty check: a world with no settlement record, or no
-// carved centre, would make every fit row vacuous.
+// A READING, NOT A GATE ON DENSITY. Nothing here asserts a centre count, a land
+// share or a scale mix: those are what the rule is ruled against, and a harness
+// that pinned them would be making that call. Two rows FAIL the run (exit 1):
+// the instrument's own honesty check (a world with no settlement record, or no
+// carved centre, would make every fit row vacuous), and THE CAP (BL-1130 review
+// fix) — the rule's own invariant on the saved sim record, not a density.
 //
 // READ-ONLY OVER src/world/*. It calls the world's own functions and nothing in
 // src/ changes for it.
@@ -83,7 +91,9 @@
 // Voronoi `nearest_region` reads (the SAME call the carve partitions its
 // candidates with), taken on the FINAL region table (`world::gen_settlement`).
 // A cell's LAND is its non-water tiles; its PLACEABLE ground is the tiles that
-// pass `placement_rules::can_place_population_centre`, the carve's own gate.
+// pass `placement_rules::can_place_population_centre`, the carve's own gate —
+// and the ground the sim measures (`region::urban_ground`), so the cap is read
+// on the same tiles the rule was held to.
 //
 // Build:  bash tools/verify/build_lua_harness.sh centre_census
 // Run:    ./build_gen/verify/centre_census.exe [--seeds 46,28] [--map DIR]
@@ -97,10 +107,13 @@
 
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
+#include "world/hex_neighbors.hpp"
 #include "world/placement_rules.hpp"
 #include "world/era_minus_one.hpp"         // BL-1132: generation_settle_spacing_tiles
 #include "world/population_generation.hpp"
+#include "world/province.hpp"
 #include "world/settlement.hpp"
+#include "world/stockpile_budget.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -142,29 +155,16 @@ std::vector<uint32_t> library_seeds(const char* path)
     return out;
 }
 
-/// MIRROR of settlement.cpp `region_centre_footprint` (BL-1130), restated so the
-/// census builds on a tree that predates it (see the header). Centre k of n
-/// stands U/(k*H_n) heads, banded to the nearest `k_population_for_scale` rung
-/// in log space (the geometric midpoints between the rungs), and paves
-/// `k_urban_footprint_tiles` of that rung.
-int hierarchy_footprint(int64_t urban_heads, int n)
+/// `region::industrial_heads` (BL-1137, industrial urbanisation) where the tree
+/// carries it, -1 where it does not — so the census still builds on a tree
+/// without the stream, which is where its BEFORE reading is taken.
+template <typename R>
+int64_t industrial_heads_of(const R& p)
 {
-    constexpr int64_t bands[4] = { 22360, 100000, 447213, 2236067 };
-    if (n <= 0) return 0;
-    n = std::min(n, 32);
-    const int64_t u = std::clamp<int64_t>(urban_heads, 0, int64_t{1} << 40);
-    int64_t h = 0;
-    for (int i = 1; i <= n; ++i) h += 1000000 / i;
-    int tiles = 0;
-    for (int k = 1; k <= n; ++k)
-    {
-        const int64_t share = (u * 1000000) / (static_cast<int64_t>(k) * h);
-        int s = 1;
-        for (int i = 0; i < 4; ++i)
-            if (share >= bands[i]) s = i + 2;
-        tiles += k_urban_footprint_tiles[s - 1];
-    }
-    return tiles;
+    if constexpr (requires { p.industrial_heads; })
+        return static_cast<int64_t>(p.industrial_heads);
+    else
+        return -1;
 }
 
 std::vector<uint32_t> parse_seed_list(const std::string& s)
@@ -183,10 +183,13 @@ struct seed_record
     uint32_t seed = 0;
     double   build_s = 0.0;
     bool     ok = false;
+    bool     cap_ok = true; ///< the sim record fits its final cells (BL-1130 review fix)
 
     // The sim record.
     int     regions = 0, living = 0, standing = 0;
     int64_t sim_centres = 0, sim_urban = 0;
+    int64_t sim_population = 0, sim_urban_max = 0;
+    int64_t sim_industrial = -1; ///< -1: the tree carries no `region::industrial_heads`
     int     max_region_centres = 0, at_limit = 0;
     int     region_centre_hist[6] = {}; // 0, 1, 2-4, 5-9, 10-19, 20+
 
@@ -211,9 +214,20 @@ struct seed_record
     int placeless_regions = 0;      ///< living, standing centres, cell with no placeable tile
     int placeless_water = 0;        ///< ...whose anchor tile is water (a shore or lake founding)
     int placeless_stacked = 0;      ///< ...whose anchor tile a lower-index region already holds
-    int sim_over_cell = 0;          ///< living, centres > 1, own-hierarchy footprint > final cell land
-    int groundless_regions = 0;     ///< living, cell with no land at all
-    int groundless_standing = 0;    ///< ...whose sim record still carries a centre
+    int sim_over_cell = 0;          ///< living, centres > what its final cell's ground holds (FAIL)
+    int groundless_regions = 0;     ///< living, cell with no standable ground
+    int groundless_standing = 0;    ///< ...whose sim record still carries a centre (FAIL)
+    int paved_across = 0;           ///< urban tiles no centre of their own cell touches
+    int cells_paved_into = 0;       ///< distinct cells those tiles lie in
+
+    // The stockpile (BL-1042) the carve's slots receive, and where the rest went.
+    int64_t stock_total = 0, stock_to_centres = 0;
+    int64_t stock_unspent[stockpile_unspent_reason_count] = {};
+    /// The `no_carved_centre` residual by WHY the region carved nothing: its
+    /// people are gone (population 0), its cell holds no standable ground, its
+    /// centres went to zero on ground it still has, or it stands centres yet
+    /// the carve gave it no slot.
+    int64_t resid_emptied = 0, resid_groundless = 0, resid_no_centre = 0, resid_other = 0;
 
     // The history, per span: Empires (the report's prehistory), Exploration,
     // Industrialisation.
@@ -227,6 +241,21 @@ struct seed_record
     int carved_in_single = 0;      ///< carved centres whose source region's cell is one land tile
 
     // What follows.
+    // The provinces (BL-1133): the home body's LAND provinces.
+    int land_provinces = 0;      ///< every land province on the body
+    int seeded_provinces = 0;    ///< ...holding at least one seed (non-anchor) centre
+    int multi_centre = 0;        ///< ...holding more than one centre of any kind
+    int anchor_only = 0;         ///< ...holding an anchor founding and no seed centre
+    int unanchored = 0;          ///< ...holding no centre at all (the invariant says 0)
+    int anchor_only_unsettled = 0; ///< anchor-only provinces on ground the colonisation never settled
+    std::vector<int> anchor_only_sizes; ///< land tiles per anchor-only province
+    std::vector<int> sizes;      ///< land tiles per province
+    std::vector<int> sizes_by_anchor[5]; ///< ...split by the anchor's scale (1-5)
+    /// The partition's own ledger, read off a rebuild ON A COPY from the stored
+    /// seed (province_partition_harness P6: the rebuild IS the shipped
+    /// partition): uncentred islands, and centre singletons absorbed.
+    province_absorption_stats part_stats;
+
     int road_tiles = 0, street_tiles = 0;
     int markets = 0;
 };
@@ -348,7 +377,15 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
     {
         if (p.population > 0) ++r.living;
         if (p.population > 0 && p.centres > 0) ++r.standing;
-        if (p.population > 0) { r.sim_centres += p.centres; r.sim_urban += p.urban_population; }
+        if (p.population > 0)
+        {
+            r.sim_centres += p.centres;
+            r.sim_urban += p.urban_population;
+            r.sim_population += p.population;
+            r.sim_urban_max = std::max(r.sim_urban_max, p.urban_population);
+            const int64_t ind = industrial_heads_of(p);
+            if (ind >= 0) r.sim_industrial = std::max<int64_t>(r.sim_industrial, 0) + ind;
+        }
         r.max_region_centres = std::max(r.max_region_centres, p.centres);
         if (p.centres >= region_centre_limit) ++r.at_limit;
         const int c = p.population > 0 ? p.centres : 0;
@@ -368,6 +405,7 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
         tile_raster[tid] = idx;
     }
     std::vector<int> cell_land(ss.regions.size(), 0), cell_place(ss.regions.size(), 0);
+    std::vector<int> cell_of(static_cast<std::size_t>(gw) * gh, -1);
     for (int idx = 0; idx < gw * gh; ++idx)
     {
         const tile_component* tc = grid[static_cast<std::size_t>(idx)];
@@ -377,6 +415,7 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
         if (place) ++r.placeable;
         const int ri = nearest_region(ss, idx % gw, idx / gw, gw);
         if (ri < 0 || ri >= static_cast<int>(ss.regions.size())) continue;
+        cell_of[static_cast<std::size_t>(idx)] = ri;
         ++cell_land[static_cast<std::size_t>(ri)];
         if (place) ++cell_place[static_cast<std::size_t>(ri)];
     }
@@ -458,15 +497,80 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
             if (stacked) ++r.placeless_stacked;
             else if (at != nullptr && is_water(at->substrate)) ++r.placeless_water;
         }
-        // The rule on the sim record itself: the region's OWN hierarchy (the
-        // one `region_centres_fit` judges) against the FINAL partition's land.
-        if (p.population > 0 && p.centres > 1
-            && hierarchy_footprint(p.urban_population, p.centres) > cell_land[i])
+        // THE CAP, ASSERTED (BL-1130 review fix; a FAIL row): the sim record
+        // itself against the FINAL partition's standable ground, by the sim's
+        // own rule -- no living region carries more centres than its cell
+        // holds, and none on a cell with no ground carries one.
+        if (p.population > 0 && p.centres > 0
+            && region_centres_fit(p.urban_population, p.centres, cell_place[i]) < p.centres)
             ++r.sim_over_cell;
-        if (p.population > 0 && cell_land[i] == 0)
+        if (p.population > 0 && cell_place[i] == 0)
         {
             ++r.groundless_regions;
             if (p.centres > 0) ++r.groundless_standing;
+        }
+    }
+
+    // PAVED ACROSS A CELL EDGE (BL-1130 review fix): an urban tile that no
+    // centre of its own cell stands on or beside was paved by a centre in a
+    // neighbouring cell. A lower bound (a tile paved across an edge next to
+    // one of its own cell's centres is not counted); zero once footprints stop
+    // at the cell.
+    {
+        std::vector<char> hosts(static_cast<std::size_t>(gw) * gh, 0);
+        for (const auto& [cid, tid] : w.population_centre_tile)
+        {
+            const auto rit = tile_raster.find(tid);
+            if (rit != tile_raster.end()) hosts[static_cast<std::size_t>(rit->second)] = 1;
+        }
+        std::set<int> into;
+        for (const auto& [tid, lu] : w.land_use)
+        {
+            if (lu.use != land_use_component::type::urban) continue;
+            const auto rit = tile_raster.find(tid);
+            if (rit == tile_raster.end()) continue;
+            const int idx = rit->second;
+            const int c = cell_of[static_cast<std::size_t>(idx)];
+            if (c < 0 || hosts[static_cast<std::size_t>(idx)]) continue;
+            bool touched = false;
+            for (int sd = 0; sd < 6 && !touched; ++sd)
+            {
+                const auto [nx_raw, ny] = hex_neighbors::neighbour(idx % gw, idx / gw, sd);
+                if (ny < 0 || ny >= gh) continue;
+                const int nx = ((nx_raw % gw) + gw) % gw;
+                const int ni = ny * gw + nx;
+                touched = hosts[static_cast<std::size_t>(ni)] && cell_of[static_cast<std::size_t>(ni)] == c;
+            }
+            if (!touched) { ++r.paved_across; into.insert(c); }
+        }
+        r.cells_paved_into = static_cast<int>(into.size());
+    }
+
+    // THE STOCKPILE the carve's slots receive (BL-1042), and every reason the
+    // rest went unspent -- a region earning points the carve gives no slot
+    // lands in the `no_carved_centre` residual.
+    {
+        const stockpile_budget sb = build_stockpile_budget(w);
+        r.stock_total      = sb.points_total;
+        r.stock_to_centres = sb.points_to_centres;
+        for (int k = 0; k < stockpile_unspent_reason_count; ++k)
+            r.stock_unspent[k] = sb.unspent[static_cast<std::size_t>(k)];
+
+        std::vector<char> slotted(ss.regions.size(), 0);
+        for (const auto& [cid, slot] : w.gen_carve_centres)
+            if (slot.region >= 0 && static_cast<std::size_t>(slot.region) < slotted.size())
+                slotted[static_cast<std::size_t>(slot.region)] = 1;
+        for (const carve_dropped_slot& d : w.gen_carve_dropped)
+            if (d.region >= 0 && static_cast<std::size_t>(d.region) < slotted.size())
+                slotted[static_cast<std::size_t>(d.region)] = 1;
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+        {
+            const region& p = ss.regions[i];
+            if (p.industry_points <= 0 || slotted[i] || p.centres_razed > 0) continue;
+            if (p.population <= 0)          r.resid_emptied    += p.industry_points;
+            else if (cell_place[i] == 0)    r.resid_groundless += p.industry_points;
+            else if (p.centres <= 0)        r.resid_no_centre  += p.industry_points;
+            else                            r.resid_other      += p.industry_points;
         }
     }
 
@@ -486,6 +590,50 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
     for (const auto& [mid, mc] : w.markets)
         if (mc.body == body) ++r.markets;
 
+    // --- the provinces (BL-1133) --------------------------------------------
+    {
+        std::map<entity_id, int> scale_on_tile, seeds_on_tile, centres_on_tile;
+        for (const auto& [cid, tid] : w.population_centre_tile)
+        {
+            const auto pit = w.population_centres.find(cid);
+            if (pit == w.population_centres.end()) continue;
+            scale_on_tile[tid] += pit->second.scale;
+            ++centres_on_tile[tid];
+            if (!pit->second.province_anchor) ++seeds_on_tile[tid];
+        }
+        for (const province& pr : w.provinces.provinces)
+        {
+            if (pr.body != body || province_kind_of(w, pr) != province_kind::land) continue;
+            ++r.land_provinces;
+            int centres_here = 0, seeds_here = 0, anchor_scale = 0;
+            for (const entity_id t : pr.tiles) // ascending: strictly-greater keeps the lowest id
+            {
+                const auto cit = centres_on_tile.find(t);
+                if (cit == centres_on_tile.end()) continue;
+                centres_here += cit->second;
+                const auto sit = seeds_on_tile.find(t);
+                if (sit != seeds_on_tile.end()) seeds_here += sit->second;
+                const int s = scale_on_tile[t];
+                if (s > anchor_scale) anchor_scale = s;
+            }
+            if (seeds_here > 0) ++r.seeded_provinces;
+            if (centres_here > 1) ++r.multi_centre;
+            if (centres_here > 0 && seeds_here == 0)
+            {
+                ++r.anchor_only;
+                r.anchor_only_sizes.push_back(static_cast<int>(pr.tiles.size()));
+                if (w.tile_settled.find(pr.tiles.front()) == w.tile_settled.end())
+                    ++r.anchor_only_unsettled;
+            }
+            if (centres_here == 0) { ++r.unanchored; continue; }
+            const int n = static_cast<int>(pr.tiles.size());
+            r.sizes.push_back(n);
+            r.sizes_by_anchor[std::clamp(anchor_scale, 1, 5) - 1].push_back(n);
+        }
+        world wc = w; // read-only over the census world: the rebuild runs on a copy
+        build_province_partition(wc, w.provinces.seed, &r.part_stats);
+    }
+
     if (!map_dir.empty())
     {
         char name[64];
@@ -496,10 +644,25 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
     }
 
     r.ok = ss.urban_map_drawn && r.carved > 0;
+    r.cap_ok = r.sim_over_cell == 0 && r.groundless_standing == 0;
     return r;
 }
 
 double pct(int64_t a, int64_t b) { return b > 0 ? 100.0 * static_cast<double>(a) / static_cast<double>(b) : 0.0; }
+
+/// n, median, p90 and max of a size list (nearest-rank on the sorted list).
+struct size_summary { int n = 0, median = 0, p90 = 0, max = 0; };
+size_summary summarise(std::vector<int> v)
+{
+    size_summary s;
+    if (v.empty()) return s;
+    std::sort(v.begin(), v.end());
+    s.n = static_cast<int>(v.size());
+    s.median = v[v.size() / 2];
+    s.p90 = v[std::min(v.size() - 1, static_cast<std::size_t>(0.9 * static_cast<double>(v.size())))];
+    s.max = v.back();
+    return s;
+}
 
 } // namespace
 
@@ -563,6 +726,18 @@ int main(int argc, char** argv)
                     r.conquests[1], r.foundings[1], r.battles[2], r.conquests[2], r.foundings[2],
                     r.regions);
 
+    std::printf("\n=== C1b urbanisation (living regions, the sim record at the close) ===\n");
+    std::printf("seed    population   urban_heads  urban%%  industrial_heads  largest_region_urban\n");
+    for (const seed_record& r : recs)
+    {
+        char ind[32];
+        if (r.sim_industrial < 0) std::snprintf(ind, sizeof ind, "n/a");
+        else std::snprintf(ind, sizeof ind, "%" PRId64, r.sim_industrial);
+        std::printf("%4u  %12" PRId64 "  %12" PRId64 "  %6.1f  %16s  %20" PRId64 "\n", r.seed,
+                    r.sim_population, r.sim_urban, pct(r.sim_urban, r.sim_population), ind,
+                    r.sim_urban_max);
+    }
+
     std::printf("\n=== C1 the sim record (living regions) ===\n");
     std::printf("seed  regions  living  standing  sum_centres   urban_heads  max  @limit | "
                 "per-region centres: 0  1  2-4  5-9  10-19  20+\n");
@@ -590,17 +765,28 @@ int main(int argc, char** argv)
                     r.scale_count[1], r.scale_count[2], r.scale_count[3], r.scale_count[4]);
 
     std::printf("\n=== C4 fit (carved centres against their source region's cell) ===\n");
-    std::printf("seed  spilled  spilled%%  | overfull_regions (one centre)  footprint_excess_tiles | "
-                "regions_over_placeable  placeless(water/stacked/other) | groundless (standing) | "
-                "sim_record_over_cell\n");
+    std::printf("seed  spilled  spilled%%  | nominal: overfull (one centre)  excess_tiles | "
+                "PAVED ACROSS: tiles  cells | regions_over_placeable  placeless(water/stacked/other) | "
+                "groundless (standing) | sim_record_over_cell\n");
     for (const seed_record& r : recs)
-        std::printf("%4u  %7d  %7.1f  | %16d (%10d)  %22" PRId64 " | %22d  %9d (%d/%d/%d) | "
+        std::printf("%4u  %7d  %7.1f  | %17d (%10d)  %12" PRId64 " | %19d  %5d | %22d  %9d (%d/%d/%d) | "
                     "%10d (%8d) | %20d\n",
                     r.seed, r.spilled, pct(r.spilled, r.carved), r.overfull_regions,
-                    r.overfull_single, r.overfull_excess, r.overcount_regions, r.placeless_regions,
+                    r.overfull_single, r.overfull_excess, r.paved_across, r.cells_paved_into,
+                    r.overcount_regions, r.placeless_regions,
                     r.placeless_water, r.placeless_stacked,
                     r.placeless_regions - r.placeless_water - r.placeless_stacked,
                     r.groundless_regions, r.groundless_standing, r.sim_over_cell);
+
+    std::printf("\n=== C8 the stockpile (BL-1042): points, to carved centres, and unspent by reason ===\n");
+    std::printf("seed  points_total  to_centres  | carve_dropped  carve_no_tile  razed  no_carved_centre  rejected"
+                "  | residual by why: emptied  groundless  no_centre_on_ground  other\n");
+    for (const seed_record& r : recs)
+        std::printf("%4u  %12" PRId64 "  %10" PRId64 "  | %13" PRId64 "  %13" PRId64 "  %5" PRId64
+                    "  %16" PRId64 "  %8" PRId64 "  | %24" PRId64 "  %10" PRId64 "  %19" PRId64 "  %5" PRId64 "\n",
+                    r.seed, r.stock_total, r.stock_to_centres, r.stock_unspent[0], r.stock_unspent[1],
+                    r.stock_unspent[2], r.stock_unspent[3], r.stock_unspent[4], r.resid_emptied,
+                    r.resid_groundless, r.resid_no_centre, r.resid_other);
 
     std::printf("\n=== C5 where the density is: regions packed one to a tile ===\n");
     std::printf("seed  living  single_tile_cells  | centres  carved_in_single_tile_cells  "
@@ -617,31 +803,83 @@ int main(int argc, char** argv)
                     pct(r.road_tiles, r.land), r.street_tiles, r.road_tiles - r.street_tiles,
                     r.markets);
 
-    std::printf("\n=== C7 the settle-spacing ladder row (BL-1132; spacing %d tiles) ===\n",
+    std::printf("\n=== C7 provinces on the home body (BL-1133, a province is its centre's ground) ===\n");
+    std::printf("seed  land_provinces  centres  seeded  multi_centre  anchor_only  unanchored |"
+                "  size: median  p90   max | road_tiles | uncentred_islands  singletons_absorbed\n");
+    for (const seed_record& r : recs)
+    {
+        const size_summary s = summarise(r.sizes);
+        std::printf("%4u  %14d  %7d  %6d  %12d  %11d  %10d | %13d  %4d  %4d | %10d | %17d  %19d\n",
+                    r.seed, r.land_provinces, r.centres, r.seeded_provinces, r.multi_centre,
+                    r.anchor_only, r.unanchored, s.median, s.p90, s.max, r.road_tiles,
+                    r.part_stats.uncentred_regions, r.part_stats.covered_centre_singletons_absorbed);
+    }
+
+    std::printf("\nC7b the provinces resting on an anchor founding alone\n");
+    std::printf("seed  anchor_only  on_unsettled_ground | size: median  p90   max  one_tile\n");
+    for (const seed_record& r : recs)
+    {
+        const size_summary s = summarise(r.anchor_only_sizes);
+        const int one = static_cast<int>(
+            std::count(r.anchor_only_sizes.begin(), r.anchor_only_sizes.end(), 1));
+        std::printf("%4u  %11d  %19d | %12d  %4d  %4d  %8d\n", r.seed, r.anchor_only,
+                    r.anchor_only_unsettled, s.median, s.p90, s.max, one);
+    }
+
+    std::printf("\n=== C8 province size (land tiles) by the ANCHOR's scale: n / median / p90 / max ===\n");
+    std::printf("seed  %-22s  %-22s  %-22s  %-22s  %-22s\n", "village(1)", "town(2)", "city(3)",
+                "metropolis(4)", "megacity(5)");
+    std::vector<int> pooled_by_anchor[5];
+    for (const seed_record& r : recs)
+    {
+        std::printf("%4u", r.seed);
+        for (int k = 0; k < 5; ++k)
+        {
+            const size_summary s = summarise(r.sizes_by_anchor[k]);
+            char cell[64];
+            std::snprintf(cell, sizeof cell, "%d/%d/%d/%d", s.n, s.median, s.p90, s.max);
+            std::printf("  %-22s", cell);
+            pooled_by_anchor[k].insert(pooled_by_anchor[k].end(), r.sizes_by_anchor[k].begin(),
+                                       r.sizes_by_anchor[k].end());
+        }
+        std::printf("\n");
+    }
+    std::printf(" ALL");
+    for (int k = 0; k < 5; ++k)
+    {
+        const size_summary s = summarise(pooled_by_anchor[k]);
+        char cell[64];
+        std::snprintf(cell, sizeof cell, "%d/%d/%d/%d", s.n, s.median, s.p90, s.max);
+        std::printf("  %-22s", cell);
+    }
+    std::printf("\n");
+
+    std::printf("\n=== C9 the settle-spacing ladder row (BL-1132; spacing %d tiles) ===\n",
                 generation_settle_spacing_tiles);
-    std::printf("seed  regions  living | cells by land: 1  2-4  5-9  10-24  25+ | centres  land%% | "
+    std::printf("seed  regions  living | cells by land: 1  2-4  5-9  10-24  25+ | centres  land%%  provinces | "
                 "empires b/c/f | exploration b/c/f | industrialisation b/c/f\n");
     int64_t lr_regions = 0, lr_living = 0, lr_hist[5] = {}, lr_centres = 0, lr_ctiles = 0, lr_land = 0;
+    int64_t lr_provinces = 0;
     int64_t lr_b[3] = {}, lr_c[3] = {}, lr_f[3] = {};
     for (const seed_record& r : recs)
     {
-        std::printf("%4u  %7d  %6d | %17d %4d %4d %6d %4d | %7d  %5.1f | %6" PRId64 "/%" PRId64 "/%" PRId64
+        std::printf("%4u  %7d  %6d | %17d %4d %4d %6d %4d | %7d  %5.1f  %9d | %6" PRId64 "/%" PRId64 "/%" PRId64
                     " | %6" PRId64 "/%" PRId64 "/%" PRId64 " | %6" PRId64 "/%" PRId64 "/%" PRId64 "\n",
                     r.seed, r.regions, r.living, r.cell_land_hist[0], r.cell_land_hist[1],
                     r.cell_land_hist[2], r.cell_land_hist[3], r.cell_land_hist[4], r.centres,
-                    pct(r.centre_tiles, r.land), r.battles[0], r.conquests[0], r.foundings[0],
+                    pct(r.centre_tiles, r.land), r.land_provinces, r.battles[0], r.conquests[0], r.foundings[0],
                     r.battles[1], r.conquests[1], r.foundings[1], r.battles[2], r.conquests[2],
                     r.foundings[2]);
         lr_regions += r.regions; lr_living += r.living; lr_centres += r.centres;
-        lr_ctiles += r.centre_tiles; lr_land += r.land;
+        lr_ctiles += r.centre_tiles; lr_land += r.land; lr_provinces += r.land_provinces;
         for (int k = 0; k < 5; ++k) lr_hist[k] += r.cell_land_hist[k];
         for (int k = 0; k < 3; ++k) { lr_b[k] += r.battles[k]; lr_c[k] += r.conquests[k]; lr_f[k] += r.foundings[k]; }
     }
     std::printf("pool  %7" PRId64 "  %6" PRId64 " | %17" PRId64 " %4" PRId64 " %4" PRId64 " %6" PRId64
-                " %4" PRId64 " | %7" PRId64 "  %5.1f | %6" PRId64 "/%" PRId64 "/%" PRId64 " | %6" PRId64
+                " %4" PRId64 " | %7" PRId64 "  %5.1f  %9" PRId64 " | %6" PRId64 "/%" PRId64 "/%" PRId64 " | %6" PRId64
                 "/%" PRId64 "/%" PRId64 " | %6" PRId64 "/%" PRId64 "/%" PRId64 "\n",
                 lr_regions, lr_living, lr_hist[0], lr_hist[1], lr_hist[2], lr_hist[3], lr_hist[4],
-                lr_centres, pct(lr_ctiles, lr_land), lr_b[0], lr_c[0], lr_f[0], lr_b[1], lr_c[1],
+                lr_centres, pct(lr_ctiles, lr_land), lr_provinces, lr_b[0], lr_c[0], lr_f[0], lr_b[1], lr_c[1],
                 lr_f[1], lr_b[2], lr_c[2], lr_f[2]);
 
     // Pooled.
@@ -654,7 +892,17 @@ int main(int argc, char** argv)
         spilled += r.spilled; carved += r.carved; roads += r.road_tiles; markets += r.markets;
         for (int s = 0; s < 5; ++s) scales[s] += r.scale_count[s];
         if (!r.ok) ++fails;
+        if (!r.cap_ok) ++fails;
     }
+    // POPULATION.md § Generation: "a 1960 world aims at roughly 500 centres" --
+    // an aim the forces are calibrated against, never a count any rule
+    // enforces. Printed as a reading against it, never gated.
+    std::printf("\n=== C7 against the aim (~500 centres a 1960 world; an aim, not a gate) ===\n");
+    std::printf("seed  centres  x_aim  | carved  anchors+coverage\n");
+    for (const seed_record& r : recs)
+        std::printf("%4u  %7d  %5.1f  | %6d  %16d\n", r.seed, r.centres, r.centres / 500.0,
+                    r.carved, r.anchors + r.coverage);
+
     std::printf("\n=== pooled over %zu seeds ===\n", recs.size());
     std::printf("centres %" PRId64 " on %" PRId64 " land tiles (%.1f%% of land hosts a centre); "
                 "scales %" PRId64 "/%" PRId64 "/%" PRId64 "/%" PRId64 "/%" PRId64
@@ -663,10 +911,20 @@ int main(int argc, char** argv)
                 scales[4], pct(spilled, carved), roads, markets);
 
     for (const seed_record& r : recs)
+    {
         if (!r.ok)
-            std::printf("FAIL  seed %u: no settlement record / urban map, or no carved centre — "
+            std::printf("FAIL  seed %u: no settlement record / urban map, or no carved centre -- "
                         "every fit row is vacuous\n", r.seed);
-    std::printf("\n%s\n", fails == 0 ? "centre_census: OK (a reading; no density is asserted)"
-                                     : "centre_census: FAIL (the instrument could not see its subject)");
+        // BL-1130 review fix, the cap asserted: the saved sim record against
+        // its final cells by `region_centres_fit` (POPULATION.md "a region never
+        // carries more centres than its ground holds"; "a region whose cell
+        // holds no land carries no centre").
+        if (!r.cap_ok)
+            std::printf("FAIL  seed %u: %d living regions carry more centres than their cell's ground "
+                        "holds, %d carry one on a cell with no standable ground\n",
+                        r.seed, r.sim_over_cell, r.groundless_standing);
+    }
+    std::printf("\n%s\n", fails == 0 ? "centre_census: OK (the cap holds; no density is asserted)"
+                                     : "centre_census: FAIL (see the FAIL rows)");
     return fails == 0 ? 0 : 1;
 }

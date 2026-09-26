@@ -17,6 +17,7 @@
 
 #include "world/components.hpp"
 #include "world/history_sim.hpp"
+#include "world/placement_rules.hpp" // BL-1130: the placement gate the standable raster reads
 
 #include <vector>
 
@@ -31,10 +32,12 @@ struct sim_terrain_arrays
     std::vector<std::uint8_t>      density;
     std::vector<terrain_landform>  landform;
     std::vector<std::uint8_t>      river; ///< Non-zero where a river edge touches the tile (BL-853).
+    /// Non-zero where a centre can stand (the carve's placement gate; BL-1130).
+    std::vector<std::uint8_t>      standable;
 
     sim_terrain_view view() const
     {
-        return sim_terrain_view{ &substrate, &cover, &density, &landform, &river };
+        return sim_terrain_view{ &substrate, &cover, &density, &landform, &river, &standable };
     }
 };
 
@@ -49,6 +52,9 @@ inline sim_terrain_arrays build_sim_terrain(const world& w, entity_id body, int 
     out.density.assign(n, 150u);
     out.landform.assign(n, terrain_landform::plains);
     out.river.assign(n, 0u);
+    // A cell with no tile is ground no centre can stand on — the carve's
+    // candidates are tiles, so the two read the same set.
+    out.standable.assign(n, 0u);
 
     for (const auto& [id, t] : w.tiles)
     {
@@ -61,6 +67,7 @@ inline sim_terrain_arrays build_sim_terrain(const world& w, entity_id body, int 
         out.density[idx]   = t.cover_density;
         out.landform[idx]  = t.landform;
         out.river[idx]     = t.river_edges != 0 ? 1u : 0u;
+        out.standable[idx] = placement_rules::can_place_population_centre(t) ? 1u : 0u;
     }
     return out;
 }

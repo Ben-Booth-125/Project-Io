@@ -678,7 +678,7 @@
     "src/world/history_sim.cpp",
     "src/ui/history_lapse.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form): BUILD THIS SPRINT, reshaping the lane tier now. EXPLORATION.md § Currents are a force, not a picture, now states the generation as a DELEGATED READING (NR-949): each ocean region's current follows its latitude band's prevailing wind (easterly in the tropics, westerly in the mid-latitudes, sense set by the body's rotation) and is turned along the coasts the continents present, so a basin circulates; a leg with its current costs less and against it more, by one weight measured on the curated seeds. PLANETOLOGY.md / CONTINENTS.md own the inputs. Measure first: legs, lanes and displacement on the 16 seeds before and after, and the weight's ladder. A sim beat and a world-mover.\n\nCONTINUITY PASS (Ben, 2026-09-25): filed from the round-feedback form -- \"chart ocean currents as part of the exploration stage\"; Ben chose a FORCE over a drawing (\"currents shape sea legs\"). EXPLORATION.md § Currents are a force, not a picture.\n\nOPEN DESIGN (a design pass before build): what generates a current (latitude bands and the body's rotation, the continents' shape -- PLANETOLOGY.md / CONTINENTS.md own the inputs), its grain (per ocean region), and its weight on a sea leg's cost with and against. A sim beat: it moves sea legs, lanes, displacement and every pin -- read on the 16 seeds first, one re-bless. Pairs with BL-1115 (sea legs in the later spans), which should land first so currents act on legs that run."
+   "design": "STAGE 1 LANDED (cf8cfca3, merged b80a5b5d, 2026-09-26): src/world/ocean_currents.* -- a stream function per sea tile (latitude-band wind profile x distance to ground, curl by integer centred differences; coasts are streamlines; basins circulate, reversed by a retrograde spin), read per 7x7 ocean region; a leg's alignment sampled tile by tile, exactly antisymmetric; cost x (1 - w x align), w = 500 per mille (the measured knee). Applied to wet campaigns' crossings in Exploration and Industrialisation (Empires unpriced), and the inert subjection/secession gates. ocean_currents_harness 28 rows ALL PASS. Reading: currents barely move lanes (105 -> 102 at 1960) because tribute writes ~90% of lane uses and a current cannot decide standing traffic -- they bite through trade (BL-1140) and the lane stamp's water walker (BL-1098). Rotation sense is a param (+1 prograde) because the data model records no spin: PLANETOLOGY.md owns it as a body property (to file). 5 of 16 fingerprints move; world_determinism unmoved.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form): BUILD THIS SPRINT, reshaping the lane tier now. EXPLORATION.md § Currents are a force, not a picture, now states the generation as a DELEGATED READING (NR-949): each ocean region's current follows its latitude band's prevailing wind (easterly in the tropics, westerly in the mid-latitudes, sense set by the body's rotation) and is turned along the coasts the continents present, so a basin circulates; a leg with its current costs less and against it more, by one weight measured on the curated seeds. PLANETOLOGY.md / CONTINENTS.md own the inputs. Measure first: legs, lanes and displacement on the 16 seeds before and after, and the weight's ladder. A sim beat and a world-mover.\n\nCONTINUITY PASS (Ben, 2026-09-25): filed from the round-feedback form -- \"chart ocean currents as part of the exploration stage\"; Ben chose a FORCE over a drawing (\"currents shape sea legs\"). EXPLORATION.md § Currents are a force, not a picture.\n\nOPEN DESIGN (a design pass before build): what generates a current (latitude bands and the body's rotation, the continents' shape -- PLANETOLOGY.md / CONTINENTS.md own the inputs), its grain (per ocean region), and its weight on a sea leg's cost with and against. A sim beat: it moves sea legs, lanes, displacement and every pin -- read on the 16 seeds first, one re-bless. Pairs with BL-1115 (sea legs in the later spans), which should land first so currents act on legs that run."
   },
   {
    "status": "designed",
@@ -945,19 +945,19 @@
    "blocked_on": null,
    "parked": false,
    "id": "BL-1133",
-   "short_name": "ANCHORS_REUSE_A_CENTRE",
+   "short_name": "PROVINCE_IS_ITS_CENTRES_GROUND",
    "author": "Ben (2026-09-25, the open-calls form); filed by Claude",
    "category": "Generation",
-   "priority": "A",
+   "priority": "S",
    "difficulty": 3,
-   "title": "A province with no centre is anchored by one that already stands, not by a newly founded village",
-   "authority_doc": "docs/economy/POPULATION.md",
+   "title": "A province is its centre's ground: the fill covers the land, so no province is left without a centre",
+   "authority_doc": "docs/generation/PROVINCES.md",
    "files": [
     "src/world/population_generation.cpp",
     "src/world/province.cpp",
     "tools/verify/centre_census.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app). POPULATION.md § Generation, \"Every province is anchored by a centre\". FOUND by the centres lane (BL-1130): ensure_province_anchor_centres founds a village for every centre-less province, which grew to 22-39% of all centres after consolidation (seed 46: 0 -> 1,320). DELEGATED READING (NR-946): a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, so the merged province's centre anchors it; a scale-1 founding only where no such neighbour exists. PROVINCES.md § The partition owns the merge. THE WORK: read the anchors founded per seed (old); build the join; record provinces, anchors founded and centres old -> new; the conquest unit invariant (every province has a centre) holds. A world-mover."
+   "design": "RE-RULED (Ben, 2026-09-26, the province form: A). The join (232cf4db, on its branch, NOT merged) cut anchors only 9% (20,467 -> 18,622) because the fill's budget and the 20-tile cap leave ~2,700 provinces a world, every one needing a centre -- a floor far above the ~500 aim; 12,181 anchors stood on ground the history never settled. PROVINCES.md § The partition now states: every centre's province grows until its nation's land within its settled cell is covered; the budget becomes a weight on reach (NR-953: scale divides step cost); the 20-tile cap and the preferred 12 retire; an anchor founding survives only for ground no centre of the nation can reach (an uncentred island). THE WORK: rebuild the fill; the size-band harness rows re-scoped to the ruling (P9c ordering kept under the weight); provinces = centres per seed recorded old -> new; the conquest invariant holds. A world-mover.\n\nSETTLED (Ben, 2026-09-25, the open-calls form at the live app). POPULATION.md § Generation, \"Every province is anchored by a centre\". FOUND by the centres lane (BL-1130): ensure_province_anchor_centres founds a village for every centre-less province, which grew to 22-39% of all centres after consolidation (seed 46: 0 -> 1,320). DELEGATED READING (NR-946): a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, so the merged province's centre anchors it; a scale-1 founding only where no such neighbour exists. PROVINCES.md § The partition owns the merge. THE WORK: read the anchors founded per seed (old); build the join; record provinces, anchors founded and centres old -> new; the conquest unit invariant (every province has a centre) holds. A world-mover."
   },
   {
    "status": "designed",
@@ -1026,7 +1026,7 @@
     "tools/verify/landscape_search_harness.cpp",
     "tools/verify/gen_step_costs.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app). GENERATION_STRATEGY.md § Phase 6 states the rule. The quiet reading (2026-09-25): seed 0's round 6 lands in ~48 s against 35 s; the search is 13 evaluations, ~17.3 s (1.33 s each). THE WORK, measure first: the search's score per round count (1..6 rounds) on the 16 curated seeds -- the winner's composite and whether it validates -- and the time per evaluation; recommend the smallest count whose curve has flattened; Ben fixes it. Re-read after BL-1130 and BL-1137 land (fewer centres shrink the charter budget). A world-mover if a winner changes."
+   "design": "RULED (Ben, 2026-09-26, the review form): A -- keep 6 rounds; score each round's proposals on 2 threads (thread_count 2 in campaign_search_params; the lane measured -8.6 s on seed 0, -5.8 s on seed 28, winners bit-identical); re-read the count after the market folds (scoring is ~90% of an evaluation and grows with the market count). GENERATION_STRATEGY.md § Phase 6 states it.\n\nSETTLED (Ben, 2026-09-25, the open-calls form at the live app). GENERATION_STRATEGY.md § Phase 6 states the rule. The quiet reading (2026-09-25): seed 0's round 6 lands in ~48 s against 35 s; the search is 13 evaluations, ~17.3 s (1.33 s each). THE WORK, measure first: the search's score per round count (1..6 rounds) on the 16 curated seeds -- the winner's composite and whether it validates -- and the time per evaluation; recommend the smallest count whose curve has flattened; Ben fixes it. Re-read after BL-1130 and BL-1137 land (fewer centres shrink the charter budget). A world-mover if a winner changes."
   },
   {
    "status": "designed",
@@ -1085,7 +1085,9 @@
    "written": "2026-09-25",
    "blocked_on": null,
    "parked": false,
-   "requires": [],
+   "requires": [
+    "BL-1133"
+   ],
    "id": "BL-1139",
    "short_name": "CENTRES_ABANDONED_IN_PLAY",
    "author": "Ben (2026-09-25, the centres-and-routes form: \"NR-947: play follows too\"); filed by Claude",
@@ -1096,10 +1098,12 @@
    "authority_doc": "docs/economy/POPULATION.md",
    "files": [
     "src/world/economy_system.cpp",
+    "src/world/province.cpp",
     "src/world/corp_command.cpp",
+    "src/world/world_save.cpp",
     "tools/verify/econ_harness.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form). POPULATION.md § Growth, decline and razing states it: play follows the history's abandonment rule. DELEGATED READING (NR-948): in play an abandoned centre drops to the existing RAZED tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle) rather than vanishing, because a centre is its province's capture anchor. THE WORK: the runtime decline check (the ordinary growth pass) demotes a centre below a village's worth to razed; no province loses its anchor; a save round-trips it. The last item in the sprint's order; the first to slip if the wave runs long. Not a generation world-mover (play only), but it moves every settled world whose centres decline in the settle -- measure the settle digests."
+   "design": "OVERTURNED (Ben, 2026-09-26, the review form, NR-948): in play an abandoned centre is DELETED and its province merges into the adjacent province of its own nation whose centre is nearest (the BL-1133 join, at runtime); only a province with no such neighbour keeps its centre as a ruin at the razed tier (NR-952). THE WORK now: the runtime decline check abandons a centre below a village's worth; the province join at runtime moves ownership records, provinces, anchors, any buildings on the centre's tile and the map's province lens consistently; a save round-trips it. Heavier than the ruin reading: it touches the province partition in play, so it waits for BL-1133 and slips first.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form). POPULATION.md § Growth, decline and razing states it: play follows the history's abandonment rule. DELEGATED READING (NR-948): in play an abandoned centre drops to the existing RAZED tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle) rather than vanishing, because a centre is its province's capture anchor. THE WORK: the runtime decline check (the ordinary growth pass) demotes a centre below a village's worth to razed; no province loses its anchor; a save round-trips it. The last item in the sprint's order; the first to slip if the wave runs long. Not a generation world-mover (play only), but it moves every settled world whose centres decline in the settle -- measure the settle digests."
   },
   {
    "status": "designed",

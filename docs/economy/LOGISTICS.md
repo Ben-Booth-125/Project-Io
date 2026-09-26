@@ -309,7 +309,17 @@ a land corridor to its first rung, Track (`src/world/history_sim.hpp`), and the 
 the campaign map reads as a Road (`kAncientRoadUses`, § 4a) — so a crossing made once is no lane.
 **Purely additive and purely water**: land tiles are untouched, and the § 4a rule that a
 corridor crossing open ocean is not stamped as road is unchanged — the crossing becomes a lane
-instead.
+instead. Trade across water is the fourth writer of a use (`EXPLORATION.md`).
+
+**How a lane is laid (BL-1098).** A lane's path is walked over the sea only — ocean and coast, never
+a lake, eight-connected with the columns wrapping, and never cutting a corner between two land
+tiles — so a lane goes round a headland rather than across it. Each step is priced by its length
+and by the current it runs with or against (`EXPLORATION.md` § Currents), so a lane bends along the
+current. A seat's port is its nearest sea tile within the sim's neighbour radius (nine tiles). The
+lane record carries no direction, so the walk runs toward the busier end — the seat more lanes
+touch — as the old-road stamp does (§ 4a), which is where tribute and trade flow (delegated
+readings, NR-955). A laned sea tile's traversal cost is **halved** (× 0.50): the lane is the road
+ladder's second rung on water, as four uses make a Road on land.
 
 **A tie is therefore a force on the map, never a preference inside an actor.** Because § 1 is one
 weight function, a lane is read by everything that reads traversal cost: a convoy between a
