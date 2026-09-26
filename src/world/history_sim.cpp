@@ -2847,6 +2847,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // ONE SITE RULE, a pure function of (parent, polity salt, year, the region
     // list): writes the chosen tile to (nc, nr), or -1/-1 when the six rings
     // hold no ground far enough from every standing region.
+    //
+    // TWO READERS, ONE ANSWER: the Settle scorer asks it whether a source has
+    // room (a realm settles only where there is room; Ben, 2026-09-26) and the
+    // verb asks it where to found. Nothing between the two touches the region
+    // list, so the site the scorer saw is the site the verb founds on.
     const auto find_settle_site = [&](const region& src, uint32_t qs, int64_t y,
                                       int& nc, int& nr) {
         const int spacing    = std::max(1, params.settle_min_spacing_tiles);
@@ -5920,7 +5925,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int64_t K = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
                     if (K <= 0) continue;
                     const int pressure = static_cast<int>(clampi64((p.population * 1000) / K, 0, 1000));
-                    if (pressure > pressure_best) { pressure_best = pressure; pressure_src = hi; }
+                    if (pressure <= pressure_best) continue;
+                    // BL-1132 — A REALM SETTLES ONLY WHERE THERE IS ROOM (Ben,
+                    // 2026-09-26; CIVILISATION.md § The unit is the city state).
+                    // A source is scored only if `find_settle_site` finds it a
+                    // site that passes the spacing — the same call, on the same
+                    // (parent, salt, year, region list), that the verb then
+                    // founds with, so a chosen Settle always founds. Without it
+                    // the scorer picked the most crowded razed region whether or
+                    // not its neighbourhood was full, and the round was spent on
+                    // a founding that could not happen (main wasted 634 / 1,977 /
+                    // 2,911 Settle rounds across the three spans on the curated
+                    // seeds; spacing 3 made it 85% of the Empires span's). A
+                    // region below the pressure gate is skipped outright: it
+                    // could only ever fail the gate below, so it needs no site.
+                    if (pressure < params.settle_pressure_q) continue;
+                    int site_c = -1, site_r = -1;
+                    find_settle_site(p, qs, y, site_c, site_r);
+                    if (site_c < 0) continue;
+                    pressure_best = pressure; pressure_src = hi;
                 }
                 // A polity fighting for its life does not colonise (BL-308).
                 // Letting it was the main reason losers regrew faster than they
@@ -6914,7 +6937,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const region& src = ss.regions[static_cast<std::size_t>(best_target)];
 
                 // WHERE: the site rule above (BL-310, BL-1132) -- an unoccupied
-                // tile at least `settle_min_spacing_tiles` from every region.
+                // tile at least `settle_min_spacing_tiles` from every region. The
+                // scorer only chose this source because the same call found a
+                // site, so the guard below is never taken; it stays as the guard.
                 int nc = -1, nr = -1;
                 find_settle_site(src, qs, y, nc, nr);
                 if (nc < 0) break; // Neighbourhood full — no room to expand here.
