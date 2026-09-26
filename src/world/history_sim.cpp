@@ -1552,13 +1552,22 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
     {
         const int ends[2][2] = { { pr.first, pr.second }, { pr.second, pr.first } };
         for (const auto& e : ends)
+        {
+            // THE CARRYING LINE, once per directed pair (it reads no good): the
+            // sea one where it beats the road -- the cargo loss's own test.
+            int land_q = 0, sea_q = 0, align = 0;
+            const bool lines = trade_lines(ctx, regions, polities, e[0], e[1], land_q, sea_q, align);
+            const uint8_t by_sea = (lines && sea_q > land_q) ? 1 : 0;
             for (int g = 0; g < 4; ++g)
             {
                 const int v = trade_flow_volume_q(ctx, regions, polities, e[0], e[1], g);
                 if (v <= 0) continue;
-                flows.push_back(trade_flow{static_cast<uint16_t>(e[0]), static_cast<uint16_t>(e[1]),
-                                           static_cast<uint8_t>(g), static_cast<int32_t>(v)});
+                trade_flow f{static_cast<uint16_t>(e[0]), static_cast<uint16_t>(e[1]),
+                             static_cast<uint8_t>(g), static_cast<int32_t>(v)};
+                f.by_sea = by_sea;
+                flows.push_back(f);
             }
+        }
     }
 
     // ONE WANT, SHARED ACROSS SELLERS. Each flow above is bounded by the
@@ -2542,8 +2551,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // BL-1140 -- THE FOURTH WRITER: TRADE ACROSS WATER (EXPLORATION.md sec
     // The colonial tie is a sea lane, "A lane is a route of the ocean's
     // currents and of trade between continents"). Read after the round's
-    // upkeep has rebuilt `out.trade_flows`: every pair of realms trading this
-    // round whose seats stand on DIFFERENT landmasses writes ONE use, seller
+    // upkeep has rebuilt `out.trade_flows`: every pair of realms trading BY
+    // SEA this round (a flow whose carrying line is the sea one,
+    // `trade_flow::by_sea` -- a road between two coasts earns no lane) whose
+    // seats stand on DIFFERENT landmasses writes ONE use, seller
     // seat to buyer seat, however many goods or directions the pair moves --
     // the link is the traffic, not the tonnage, as it is for tribute. The
     // pairs are collected into a sorted, deduplicated list first, so the
@@ -2560,6 +2571,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         for (const trade_flow& f : out.trade_flows)
         {
             if (f.volume_q <= 0 || f.seller == f.buyer) continue;
+            if (!f.by_sea) continue; // carried by road: not trade across water
             if (f.seller >= out.polities.size() || f.buyer >= out.polities.size()) continue;
             const int lo = std::min<int>(f.seller, f.buyer), hi = std::max<int>(f.seller, f.buyer);
             pairs.push_back({lo, hi, f.seller == lo ? f.volume_q : 0, f.seller == lo ? 0 : f.volume_q});

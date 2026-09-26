@@ -33,9 +33,9 @@
 //       break agree, a seat that moves across the water changes nothing, a far
 //       pair on one landmass still reads the land's 700 -- and an out-of-range
 //       cargo loss is rejected, never clamped
-//   W8  BL-1140: on the real body, trade between realms on different
-//       landmasses writes sea-leg uses, only such trade does, and each use is
-//       read against the current
+//   W8  BL-1140: on the real body, trade BY SEA between realms on different
+//       landmasses writes sea-leg uses (a road between them writes none),
+//       only such trade does, and each use is read against the current
 //   W1-W7 the same properties on a real body (seed 32 by default, --seed N),
 //       plus the sim: a fixture re-run at generation's own weight reproduces
 //       generation's Exploration span, weight 0 builds no field, a weighted
@@ -423,6 +423,13 @@ void synthetic_rows()
                   "C8  a flow a road carries loses nothing to the current, though its seats stand across water");
             check(vol(by_sea, 0, 1) == east_got && lost_narrow == lost,
                   "C8  a flow the sea still carries past a narrower road loses what C7's does");
+            // The same line test marks the flow for the fourth sea-leg writer:
+            // a flow the road carries is not trade across water.
+            bool road_marked_land = !by_road.empty(), sea_marked_sea = !by_sea.empty();
+            for (const trade_flow& f : by_road) if (f.by_sea != 0) road_marked_land = false;
+            for (const trade_flow& f : by_sea)  if (f.by_sea != 1) sea_marked_sea = false;
+            check(road_marked_land && sea_marked_sea,
+                  "C8  compute_trade_flows marks a flow by sea only where its sea line carries it (the lane's writer reads the mark)");
         }
 
         // C9 (BL-1142 review): A BINDING IS WORTH WHAT ARRIVES. The pair's
@@ -1060,9 +1067,13 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
           && tt == weighted_a.sea_legs_noted_tribute && tr == weighted_a.sea_legs_noted_trade,
           "W7  the writer record sums to the leg table, leg by leg and writer by writer (four writers)");
 
-    // W8 (BL-1140): the fourth writer. Every trade-written leg joins seats on
-    // different landmasses; trade writes on this body; its uses were read
-    // against the current, and the span with them is deterministic (W5).
+    // W8 (BL-1140): the fourth writer, on the Exploration re-run: every
+    // trade-written leg joins seats on different landmasses and its uses are
+    // read against the current, the same way twice. Only trade that GOES TO
+    // SEA writes (`trade_flow::by_sea`), and a span whose trade across water
+    // crosses by road where two realms' ground meets writes none -- seed 32's
+    // Exploration span, printed below. The positive half is read on the span
+    // whose trade does go to sea, in W10's resumed Industrialisation runs.
     {
         std::vector<region> regions_after;
         {
@@ -1096,14 +1107,12 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
                     static_cast<long long>(weighted_a.sea_trade_slack_current),
                     tn > 0 ? static_cast<double>(weighted_a.sea_trade_alignment_sum_q) / tn : 0.0,
                     static_cast<long long>(same_mass));
-        check(weighted_a.sea_legs_noted_trade > 0 && trade_legs > 0 && same_mass == 0,
-              "W8  trade between realms on different landmasses writes sea-leg uses, and only such trade does");
+        check(same_mass == 0 && (trade_legs > 0) == (weighted_a.sea_legs_noted_trade > 0),
+              "W8  only trade between realms on different landmasses writes sea-leg uses (Exploration)");
         check(tn == weighted_a.sea_legs_noted_trade
               && weighted_a.sea_trade_with_current == weighted_b.sea_trade_with_current
               && weighted_a.sea_trade_alignment_sum_q == weighted_b.sea_trade_alignment_sum_q,
-              "W8  every trade use is read against the current, the same way twice");
-        check(still.sea_legs_noted_trade > 0 && still.sea_trade_with_current == 0,
-              "W8  the writer runs in still water too (it is the record, not the price)");
+              "W8  every trade use is read against the current, the same way twice (Exploration)");
     }
 
     // W9 (BL-1142): generation's own Industrialisation span. Realms across
@@ -1199,6 +1208,64 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
         };
         const int gen_loss = fx.industrialisation_params.sea_current_cargo_loss_q;
         const history_sim_state gen = run_loss(gen_loss), over = run_loss(1001), zero = run_loss(0);
+        // W8, the positive half: the span whose trade goes to sea writes trade
+        // uses, only between realms on different landmasses, read against the
+        // current the same way twice -- and in still water too.
+        {
+            const std::vector<int32_t> mass = landmass_labels(sub, fx.gw, fx.gh);
+            const std::vector<region>& R = fx.industrialisation_handoff.regions;
+            int64_t legs = 0, same = 0;
+            for (const sea_leg_writer_row& r : gen.sea_leg_writers)
+            {
+                if (r.trade <= 0) continue;
+                ++legs;
+                const auto m = [&](int ri) -> int32_t {
+                    if (ri < 0 || static_cast<std::size_t>(ri) >= R.size()) return -1;
+                    return landmass_at(mass, fx.gw, fx.gh, R[static_cast<std::size_t>(ri)].col,
+                                       R[static_cast<std::size_t>(ri)].row);
+                };
+                if (m(r.a) < 0 || m(r.a) == m(r.b)) ++same;
+            }
+            const int64_t tn_i = gen.sea_trade_with_current + gen.sea_trade_against_current + gen.sea_trade_slack_current;
+            const auto run_still = [&]() {
+                history_sim_params dp = fx.industrialisation_params;
+                dp.trace_battles           = false;
+                dp.sea_current_weight_q    = 0;
+                dp.resume_polities         = &eo.polities;
+                dp.resume_grudges          = &eo.grudges;
+                dp.resume_contacts         = &eo.contacts;
+                dp.resume_corridors        = &eo.surviving_corridors;
+                dp.resume_sea_legs         = &eo.sea_legs;
+                dp.resume_dated_objects    = &eo.dated_objects;
+                dp.resume_civilisations    = &eo.civilisations;
+                dp.resume_universal_creeds = &eo.universal_creeds;
+                settlement_state ss;
+                ss.regions = eo.regions;
+                survey_regions_at_span_open(w, ids, fx.gw, fx.gh, ss.regions);
+                creed_state cs;
+                cs.cultures = eo.cultures;
+                return run_history_sim(ss, &cs, fx.terrain.view(), fx.gw, fx.gh, dp, fx.industrialisation_seed,
+                                       nullptr, fx.works, nullptr);
+            };
+            const history_sim_state still_i = run_still();
+            std::printf("      Industrialisation trade by sea: %lld uses on %lld legs (%lld with / %lld against / %lld slack),"
+                        " volume %lld; legs joining one landmass: %lld; in still water %lld uses\n",
+                        static_cast<long long>(gen.sea_legs_noted_trade), static_cast<long long>(legs),
+                        static_cast<long long>(gen.sea_trade_with_current),
+                        static_cast<long long>(gen.sea_trade_against_current),
+                        static_cast<long long>(gen.sea_trade_slack_current),
+                        static_cast<long long>(gen.sea_trade_volume_q), static_cast<long long>(same),
+                        static_cast<long long>(still_i.sea_legs_noted_trade));
+            check(gen.sea_legs_noted_trade > 0 && legs > 0 && same == 0,
+                  "W8  trade by sea between realms on different landmasses writes sea-leg uses, and only such trade does"
+                  " (Industrialisation)");
+            check(tn_i == gen.sea_legs_noted_trade
+                  && gen.sea_trade_with_current == fx.industrialisation_state.sea_trade_with_current
+                  && gen.sea_trade_alignment_sum_q == fx.industrialisation_state.sea_trade_alignment_sum_q,
+                  "W8  every trade use is read against the current, the same way twice (Industrialisation)");
+            check(still_i.sea_legs_noted_trade > 0 && still_i.sea_trade_with_current == 0,
+                  "W8  the writer runs in still water too (it is the record, not the price)");
+        }
         std::printf("      Industrialisation resumed from the 1660 handoff: at generation's %d cargo lost %lld"
                     " (generation's own span %lld), battles %lld (%lld); at 1001 rejected %d, lost %lld,"
                     " volume across water %lld; at 0 volume %lld\n",

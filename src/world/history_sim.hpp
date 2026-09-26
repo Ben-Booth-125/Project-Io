@@ -2546,6 +2546,12 @@ struct trade_flow
     uint16_t buyer    = 0;
     uint8_t  good     = 0;
     int32_t  volume_q = 0;
+    /// 1 when the flow's CARRYING LINE is the sea one -- its sea line (the
+    /// seller's navy, both seats' ports, priced with the current) beat its
+    /// land line when it was sized, the test the cargo loss reads; 0 where a
+    /// road carries it. Set by `compute_trade_flows`; what the fourth sea-leg
+    /// writer reads, so only trade that goes to sea earns a lane.
+    uint8_t  by_sea   = 0;
 };
 
 /// THE UPKEEP STEP ITSELF (BL-931/BL-932), called once per decision round
@@ -4395,7 +4401,8 @@ struct history_sim_state
     int64_t sea_lanes_opened        = 0;
     /// BL-1140: the FOURTH writer -- a trade link between realms whose seats
     /// stand on different landmasses (`landmass_labels`), one use per
-    /// decision round it carries a flow, seller seat to buyer seat. Beside
+    /// decision round it carries a flow BY SEA (`trade_flow::by_sea`; a road
+    /// carries none across water), seller seat to buyer seat. Beside
     /// it, how those uses ran against the current field (the net direction
     /// of the round's volume, seller seat to buyer seat): with it, against
     /// it, across slack water, and the alignment sum -- counted whenever the
@@ -4409,7 +4416,9 @@ struct history_sim_state
     /// directions), and how much of it sailed with / against the current
     /// (each direction read on its own, seller seat to buyer seat) -- the
     /// reading that says whether more trade runs with the water than against
-    /// it. The split is counted whenever the field is built.
+    /// it. The split is counted whenever the field is built. Only flows that
+    /// go to sea count (`trade_flow::by_sea`): a road between two realms on
+    /// different landmasses carries no volume across water.
     int64_t sea_trade_volume_q            = 0;
     int64_t sea_trade_volume_with_q       = 0;
     int64_t sea_trade_volume_against_q    = 0;
