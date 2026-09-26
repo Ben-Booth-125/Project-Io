@@ -498,6 +498,10 @@ currents). Tribute is standing traffic, not a choice, so a current cannot decide
 trade instead — which trades across water are worth making (§ The colonial tie is a sea lane, the
 fourth writer) — and where a lane physically runs, because the lane stamp's water walker prices
 its path with the current, so a lane bends along it rather than hugging the straight line.
+**A leg run against its current delivers less (Ben, 2026-09-26; BL-1142):** a trade across water
+loses part of its cargo in proportion to how hard it ran against the current, applied after the
+flow is sized, so the current shapes how much actually arrives even where the seller's stock or the
+buyer's want, not the sea, limits the trade.
 
 **The record keeps the fleet and the harbour, year by year (Ben, 2026-09-24).** Each polity's
 sample on the round's record carries its standing navy and its capital's port stock at every
