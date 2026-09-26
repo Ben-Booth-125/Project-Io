@@ -18,6 +18,16 @@
 //       return leg reads the outbound's negation), a leg along a current
 //       cheaper than still water and the same leg against it dearer, weight 0
 //       prices nothing, the domain is [0, 999]
+//   C5  BL-1140: a trade's SEA LINE is priced with its current -- goods
+//       riding the trades arrive in greater volume than goods beating
+//       against them, one weight, exactly antisymmetric; no field is still
+//       water
+//   C6  BL-1140: landmasses are what the sea separates (a lake does not
+//       split one, a corner joins one) and a shore seat reads the landmass it
+//       borders
+//   W8  BL-1140: on the real body, trade between realms on different
+//       landmasses writes sea-leg uses, only such trade does, and each use is
+//       read against the current
 //   W1-W7 the same properties on a real body (seed 32 by default, --seed N),
 //       plus the sim: a fixture re-run at generation's own weight reproduces
 //       generation's Exploration span, weight 0 builds no field, a weighted
@@ -32,8 +42,12 @@
 //   span-open survey on the generated tiles, and a traced re-run of the
 //   Industrialisation span (1660 -> 1960) on that fold -- generation's own
 //   chain, with the weight the only change. Per seed per weight: the sea-leg
-//   table, lanes and which writer earned them, the launches with and against
-//   the current, battles, and displacement (frontier / neighbour battles,
+//   table, lanes at 1660 and 1960 and which writer earned them (campaign /
+//   purchase / tribute / trade), trade across water (uses, legs, volume, and
+//   how much of it ran with the current), what bounds each cross-water flow
+//   at a span's close (want / holding / land line / sea line -- only the sea
+//   line is one a current can move), the launches with and against the
+//   current, battles, and displacement (frontier / neighbour battles,
 //   neighbour = a pair already in contact at the span's open). The rung at
 //   generation's own weight (always added to the ladder) is checked against
 //   generation's own untraced run (FIDELITY): a sweep whose control does not
@@ -255,6 +269,68 @@ void synthetic_rows()
           "C4  the weight's domain is [0, 999] and no leg is ever free");
     check(build_ocean_currents(two, ww, wh, 0).empty() && build_ocean_currents(two, ww - 1, wh, 1).empty(),
           "C4  a sense other than +/-1, or a raster of the wrong size, builds no field");
+
+    // C5 (BL-1140): a trade's sea line is priced with its current. Two seats
+    // either side of basin A on the trades' row: the western continent's east
+    // coast (6, 25) and the eastern continent's west coast (42, 25). Each
+    // sells the other what it holds, over a sea line of 400 (both ports 400,
+    // both navies up). The trades run west, so goods sailing west ride the
+    // current and goods sailing east beat against it.
+    {
+        std::vector<region> rg(2);
+        rg[0].col = 6;  rg[0].row = 25; rg[0].anchor = 25 * ww + 6;  rg[0].nation = 0;
+        rg[1].col = 42; rg[1].row = 25; rg[1].anchor = 25 * ww + 42; rg[1].nation = 1;
+        rg[0].dominant = region_class::farm; rg[1].dominant = region_class::ore;
+        rg[0].port_stock_q = 400; rg[1].port_stock_q = 400;
+        rg[1].scarcity_raw_q[0] = 900; // the east wants the west's farm goods
+        rg[0].scarcity_raw_q[1] = 900; // the west wants the east's ore
+        std::vector<polity> qs(2);
+        for (int k = 0; k < 2; ++k) { qs[k].id = k; qs[k].alive = true; qs[k].capital = k; qs[k].navy_stock = 500; }
+        trade_context ctx = build_trade_context(rg, qs, {});
+        const int east_still = trade_flow_volume_q(ctx, rg, qs, 0, 1, 0); // west sells farm, sails east
+        const int west_still = trade_flow_volume_q(ctx, rg, qs, 1, 0, 1); // east sells ore, sails west
+        ctx.currents = &fb;
+        ctx.current_weight_q = 500;
+        const int east_priced = trade_flow_volume_q(ctx, rg, qs, 0, 1, 0);
+        const int west_priced = trade_flow_volume_q(ctx, rg, qs, 1, 0, 1);
+        const int a_west = ocean_current_alignment_q(fb, 42, 25, 6, 25);
+        std::printf("      trade across basin A at w=500: still water %d / %d; priced, sailing east %d, sailing west %d"
+                    " (alignment west %d)\n", east_still, west_still, east_priced, west_priced, a_west);
+        check(east_still == 400 && west_still == 400,
+              "C5  in still water the sea line is the smaller built port, both ways");
+        check(a_west > 0 && west_priced > 400 && east_priced < 400,
+              "C5  priced with the current: goods riding the trades arrive in greater volume than goods beating against them");
+        check(west_priced == std::min(1000, 400 * 1000 / ocean_current_leg_cost_q(500, a_west))
+              && east_priced == 400 * 1000 / ocean_current_leg_cost_q(500, -a_west),
+              "C5  the line is divided by the leg's cost, one weight, exactly antisymmetric in direction");
+        ctx.currents = nullptr;
+        check(trade_flow_volume_q(ctx, rg, qs, 0, 1, 0) == 400,
+              "C5  a context with no field is still water");
+    }
+
+    // C6 (BL-1140): landmasses are what the SEA separates. The two-continent
+    // body has two; a lake inside one continent does not split it, ground
+    // touching at a corner is one landmass, and a seat on the shoreline reads
+    // the landmass it borders.
+    {
+        std::vector<terrain_substrate> body = two;
+        body[static_cast<std::size_t>(30) * ww + 3] = terrain_substrate::lake;   // a lake in the west
+        body[static_cast<std::size_t>(30) * ww + 4] = terrain_substrate::lake;
+        const std::vector<int32_t> m = landmass_labels(body, ww, wh);
+        const int32_t west = landmass_at(m, ww, wh, 2, 30), east = landmass_at(m, ww, wh, 45, 30);
+        int32_t top = -1;
+        for (int32_t v : m) top = std::max(top, v);
+        check(top == 1 && west >= 0 && east >= 0 && west != east && landmass_at(m, ww, wh, 5, 30) == west,
+              "C6  the sea separates two landmasses; a lake inside one does not split it");
+        check(landmass_at(m, ww, wh, 8, 20) == west && landmass_at(m, ww, wh, 41, 20) == east
+              && landmass_at(m, ww, wh, 24, 20) == -1,
+              "C6  a place on the shore reads the landmass it borders; open sea reads none");
+        std::vector<terrain_substrate> corner(static_cast<std::size_t>(10) * 10, terrain_substrate::ocean);
+        corner[static_cast<std::size_t>(4) * 10 + 4] = terrain_substrate::sedimentary;
+        corner[static_cast<std::size_t>(5) * 10 + 5] = terrain_substrate::sedimentary;
+        const std::vector<int32_t> mc = landmass_labels(corner, 10, 10);
+        check(mc[44] == 0 && mc[55] == 0, "C6  ground touching at a corner is one landmass (movement is eight-connected)");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -317,6 +393,10 @@ struct span_read
     int64_t table = 0;                ///< legs in the span's closing table
     int64_t lanes = 0;                ///< of which at or over the lane tier
     int64_t noted_campaign = 0, noted_purchase = 0, noted_tribute = 0, opened = 0;
+    int64_t noted_trade = 0;          ///< BL-1140: the fourth writer's uses this span
+    int64_t trade_legs = 0;           ///< legs this span's trade wrote at least one use to
+    int64_t tr_with = 0, tr_against = 0, tr_slack = 0, tr_align_sum = 0; ///< trade uses vs the current
+    int64_t tr_volume = 0, tr_volume_with = 0, tr_volume_against = 0;     ///< volume across water, by direction
     int64_t with = 0, against = 0, slack = 0, align_sum = 0;
     /// The same with/against reading taken off the battle traces against the
     /// body's field, so it exists at weight 0 too (where the sim builds none):
@@ -358,6 +438,12 @@ span_read read_span(const history_sim_state& hs, const std::set<std::pair<int, i
     s.noted_campaign = hs.sea_legs_noted_campaign;
     s.noted_purchase = hs.sea_legs_noted_purchase;
     s.noted_tribute  = hs.sea_legs_noted_tribute;
+    s.noted_trade    = hs.sea_legs_noted_trade;
+    for (const sea_leg_writer_row& r : hs.sea_leg_writers) if (r.trade > 0) ++s.trade_legs;
+    s.tr_with = hs.sea_trade_with_current; s.tr_against = hs.sea_trade_against_current;
+    s.tr_slack = hs.sea_trade_slack_current; s.tr_align_sum = hs.sea_trade_alignment_sum_q;
+    s.tr_volume = hs.sea_trade_volume_q; s.tr_volume_with = hs.sea_trade_volume_with_q;
+    s.tr_volume_against = hs.sea_trade_volume_against_q;
     s.opened         = hs.sea_lanes_opened;
     s.with = hs.sea_campaigns_with_current; s.against = hs.sea_campaigns_against_current;
     s.slack = hs.sea_campaigns_slack_current; s.align_sum = hs.sea_campaign_alignment_sum_q;
@@ -374,24 +460,24 @@ std::set<std::pair<int, int>> contact_set(const std::vector<contact>& cs)
 }
 
 /// Lanes at the arc's close, attributed to the writer that noted most of their
-/// uses over both spans (ties go campaign < purchase < tribute, the enum order).
+/// uses over both spans (ties go campaign < purchase < tribute < trade, the enum order).
 struct lane_writers
 {
     int64_t lanes = 0;
-    int64_t by_writer[3] = {0, 0, 0};    ///< lanes whose uses are mostly this writer's
-    int64_t uses_by_writer[3] = {0, 0, 0}; ///< every use on a lane, by writer
+    int64_t by_writer[4] = {0, 0, 0, 0};    ///< lanes whose uses are mostly this writer's (c/p/t/trade)
+    int64_t uses_by_writer[4] = {0, 0, 0, 0}; ///< every use on a lane, by writer
 };
 
 lane_writers attribute_lanes(const std::vector<sea_leg>& table,
                              const std::vector<sea_leg_writer_row>& w1,
                              const std::vector<sea_leg_writer_row>& w2, int lane_tier)
 {
-    std::map<std::pair<int, int>, std::array<int64_t, 3>> by_leg;
+    std::map<std::pair<int, int>, std::array<int64_t, 4>> by_leg;
     for (const auto* rows : {&w1, &w2})
         for (const sea_leg_writer_row& r : *rows)
         {
-            std::array<int64_t, 3>& a = by_leg[{r.a, r.b}];
-            a[0] += r.campaign; a[1] += r.purchase; a[2] += r.tribute;
+            std::array<int64_t, 4>& a = by_leg[{r.a, r.b}];
+            a[0] += r.campaign; a[1] += r.purchase; a[2] += r.tribute; a[3] += r.trade;
         }
     lane_writers out;
     for (const sea_leg& l : table)
@@ -400,11 +486,11 @@ lane_writers attribute_lanes(const std::vector<sea_leg>& table,
         ++out.lanes;
         const auto it = by_leg.find({l.a, l.b});
         if (it == by_leg.end()) continue;
-        const std::array<int64_t, 3>& a = it->second;
+        const std::array<int64_t, 4>& a = it->second;
         int best = 0;
-        for (int k = 1; k < 3; ++k) if (a[k] > a[best]) best = k;
+        for (int k = 1; k < 4; ++k) if (a[k] > a[best]) best = k;
         ++out.by_writer[best];
-        for (int k = 0; k < 3; ++k) out.uses_by_writer[k] += a[k];
+        for (int k = 0; k < 4; ++k) out.uses_by_writer[k] += a[k];
     }
     return out;
 }
@@ -574,21 +660,67 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
 
     // W7: the writer record against the table (Exploration inherits no legs).
     bool sums = true;
-    int64_t tc = 0, tp = 0, tt = 0;
+    int64_t tc = 0, tp = 0, tt = 0, tr = 0;
     {
         std::map<std::pair<int, int>, int64_t> uses;
         for (const sea_leg& l : weighted_a.sea_legs) uses[{l.a, l.b}] = l.uses;
         for (const sea_leg_writer_row& r : weighted_a.sea_leg_writers)
         {
-            tc += r.campaign; tp += r.purchase; tt += r.tribute;
+            tc += r.campaign; tp += r.purchase; tt += r.tribute; tr += r.trade;
             const auto it = uses.find({r.a, r.b});
-            if (it == uses.end() || it->second != r.campaign + r.purchase + r.tribute) sums = false;
+            if (it == uses.end() || it->second != r.campaign + r.purchase + r.tribute + r.trade) sums = false;
         }
         if (weighted_a.sea_leg_writers.size() != weighted_a.sea_legs.size()) sums = false;
     }
     check(sums && tc == weighted_a.sea_legs_noted_campaign && tp == weighted_a.sea_legs_noted_purchase
-          && tt == weighted_a.sea_legs_noted_tribute,
-          "W7  the writer record sums to the leg table, leg by leg and writer by writer");
+          && tt == weighted_a.sea_legs_noted_tribute && tr == weighted_a.sea_legs_noted_trade,
+          "W7  the writer record sums to the leg table, leg by leg and writer by writer (four writers)");
+
+    // W8 (BL-1140): the fourth writer. Every trade-written leg joins seats on
+    // different landmasses; trade writes on this body; its uses were read
+    // against the current, and the span with them is deterministic (W5).
+    {
+        std::vector<region> regions_after;
+        {
+            history_sim_params ep = exploration_rerun_params(fx, wq, /*trace=*/false);
+            settlement_state ss = fx.pre_exploration_settlement;
+            creed_state      cs = fx.pre_exploration_creeds;
+            (void)run_history_sim(ss, &cs, fx.terrain.view(), fx.gw, fx.gh, ep, fx.exploration_seed,
+                                  nullptr, fx.works, nullptr);
+            regions_after = ss.regions;
+        }
+        const std::vector<int32_t> mass = landmass_labels(sub, fx.gw, fx.gh);
+        const auto mass_of = [&](int ri) -> int32_t {
+            if (ri < 0 || static_cast<std::size_t>(ri) >= regions_after.size()) return -1;
+            const region& r = regions_after[static_cast<std::size_t>(ri)];
+            return landmass_at(mass, fx.gw, fx.gh, r.col, r.row);
+        };
+        int64_t trade_legs = 0, same_mass = 0;
+        for (const sea_leg_writer_row& r : weighted_a.sea_leg_writers)
+        {
+            if (r.trade <= 0) continue;
+            ++trade_legs;
+            if (mass_of(r.a) < 0 || mass_of(r.a) == mass_of(r.b)) ++same_mass;
+        }
+        const int64_t tn = weighted_a.sea_trade_with_current + weighted_a.sea_trade_against_current
+                         + weighted_a.sea_trade_slack_current;
+        std::printf("      trade across water: %lld uses on %lld legs (%lld with / %lld against / %lld slack, "
+                    "mean alignment %.0f); legs joining one landmass: %lld\n",
+                    static_cast<long long>(weighted_a.sea_legs_noted_trade), static_cast<long long>(trade_legs),
+                    static_cast<long long>(weighted_a.sea_trade_with_current),
+                    static_cast<long long>(weighted_a.sea_trade_against_current),
+                    static_cast<long long>(weighted_a.sea_trade_slack_current),
+                    tn > 0 ? static_cast<double>(weighted_a.sea_trade_alignment_sum_q) / tn : 0.0,
+                    static_cast<long long>(same_mass));
+        check(weighted_a.sea_legs_noted_trade > 0 && trade_legs > 0 && same_mass == 0,
+              "W8  trade between realms on different landmasses writes sea-leg uses, and only such trade does");
+        check(tn == weighted_a.sea_legs_noted_trade
+              && weighted_a.sea_trade_with_current == weighted_b.sea_trade_with_current
+              && weighted_a.sea_trade_alignment_sum_q == weighted_b.sea_trade_alignment_sum_q,
+              "W8  every trade use is read against the current, the same way twice");
+        check(still.sea_legs_noted_trade > 0 && still.sea_trade_with_current == 0,
+              "W8  the writer runs in still water too (it is the record, not the price)");
+    }
     (void)known; (void)lane_tier;
 }
 
@@ -596,11 +728,67 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
 // --sweep
 // ---------------------------------------------------------------------------
 
+/// WHAT BOUNDS TRADE ACROSS WATER, read at a span's close off its last round
+/// of flows (a snapshot, so a diagnosis rather than a total): each flow whose
+/// seats stand on different landmasses, sized again from the close's own
+/// regions and polities as `trade_flow_volume_q` sizes it -- min(want,
+/// holding, max(land line, sea line priced with the current)) -- and filed
+/// under the term that sets that minimum. Only a flow the SEA line bounds is
+/// one a current can move.
+struct binding_census
+{
+    int64_t flows = 0, by_want = 0, by_holding = 0, by_land = 0, by_sea = 0;
+};
+
+binding_census census_cross_water(const history_sim_state& hs, const std::vector<region>& regions,
+                                  const ocean_current_field& field, const std::vector<int32_t>& mass,
+                                  int gw, int gh, int weight)
+{
+    binding_census c;
+    const trade_context ctx = build_trade_context(regions, hs.polities, hs.supply_corridors);
+    const auto land_line = [&](int a, int b) {
+        const uint16_t lo = static_cast<uint16_t>(std::min(a, b)), hi = static_cast<uint16_t>(std::max(a, b));
+        for (const trade_context::land_line& l : ctx.land_lines)
+            if (l.lo == lo && l.hi == hi) return static_cast<int>(l.line_q);
+        return 0;
+    };
+    for (const trade_flow& f : hs.trade_flows)
+    {
+        if (f.seller >= hs.polities.size() || f.buyer >= hs.polities.size() || f.good >= 4) continue;
+        const polity& ps = hs.polities[f.seller];
+        const polity& pb = hs.polities[f.buyer];
+        if (ps.capital < 0 || pb.capital < 0 || static_cast<std::size_t>(ps.capital) >= regions.size()
+         || static_cast<std::size_t>(pb.capital) >= regions.size()) continue;
+        const region& s = regions[static_cast<std::size_t>(ps.capital)];
+        const region& b = regions[static_cast<std::size_t>(pb.capital)];
+        const int32_t ms = landmass_at(mass, gw, gh, s.col, s.row), mb = landmass_at(mass, gw, gh, b.col, b.row);
+        if (ms < 0 || mb < 0 || ms == mb) continue;
+        ++c.flows;
+        const int want = b.scarcity_raw_q[f.good];
+        const int hold = ctx.holding_q[f.seller][f.good];
+        const int land = land_line(f.seller, f.buyer);
+        int sea = ps.navy_stock > 0 ? std::clamp(std::min(s.port_stock_q, b.port_stock_q), 0, 1000) : 0;
+        if (sea > 0 && weight > 0 && !field.empty())
+        {
+            const int cost = ocean_current_leg_cost_q(weight, ocean_current_alignment_q(field, s.col, s.row, b.col, b.row));
+            sea = std::clamp(static_cast<int>((static_cast<int64_t>(sea) * 1000) / std::max(1, cost)), 0, 1000);
+        }
+        const int line = std::max(land, sea);
+        const int m = std::min({want, hold, line});
+        if (m == line && line > 0) (sea >= land ? ++c.by_sea : ++c.by_land);
+        else if (m == want)        ++c.by_want;
+        else                       ++c.by_holding;
+    }
+    return c;
+}
+
 struct weight_row
 {
     int weight = 0;
+    binding_census bind_e, bind_i; ///< what bounds trade across water at each span's close
     span_read e, i;
     lane_writers lw;     ///< lanes at the 1960 close, attributed over both spans
+    lane_writers lw1660; ///< lanes at the 1660 close, attributed over Exploration's notes
     int64_t lanes_1660 = 0;
     double secs = 0.0;
 };
@@ -620,12 +808,18 @@ void print_span(const char* tag, const span_read& s)
 {
     const double disp = s.neighbour > 0 ? static_cast<double>(s.frontier) / s.neighbour : -1.0;
     std::printf("    %-4s bat %6lld wet %5lld nb %5lld fr %5lld disp %6.2f | legs %4lld lanes %3lld opened %3lld"
-                " | notes c/p/t %5lld/%4lld/%5lld | wet battles w/a/s %4lld/%4lld/%4lld mean %5.0f | subj %3lld bought %3lld freed %3lld\n",
+                " | notes c/p/t/trade %5lld/%4lld/%5lld/%5lld (trade legs %3lld, w/a/s %4lld/%4lld/%4lld mean %5.0f, volume %6lld with %6lld against %6lld) | wet battles w/a/s %4lld/%4lld/%4lld mean %5.0f | subj %3lld bought %3lld freed %3lld\n",
                 tag, static_cast<long long>(s.battles), static_cast<long long>(s.wet_battles),
                 static_cast<long long>(s.neighbour), static_cast<long long>(s.frontier), disp,
                 static_cast<long long>(s.table), static_cast<long long>(s.lanes), static_cast<long long>(s.opened),
                 static_cast<long long>(s.noted_campaign), static_cast<long long>(s.noted_purchase),
-                static_cast<long long>(s.noted_tribute),
+                static_cast<long long>(s.noted_tribute), static_cast<long long>(s.noted_trade),
+                static_cast<long long>(s.trade_legs),
+                static_cast<long long>(s.tr_with), static_cast<long long>(s.tr_against), static_cast<long long>(s.tr_slack),
+                (s.tr_with + s.tr_against + s.tr_slack) > 0
+                    ? static_cast<double>(s.tr_align_sum) / (s.tr_with + s.tr_against + s.tr_slack) : 0.0,
+                static_cast<long long>(s.tr_volume), static_cast<long long>(s.tr_volume_with),
+                static_cast<long long>(s.tr_volume_against),
                 static_cast<long long>(s.t_with), static_cast<long long>(s.t_against), static_cast<long long>(s.t_slack),
                 (s.t_with + s.t_against + s.t_slack) > 0
                     ? static_cast<double>(s.t_align_sum) / (s.t_with + s.t_against + s.t_slack) : 0.0,
@@ -639,6 +833,9 @@ void put_span(std::FILE* f, const char* key, const span_read& s)
                     "\"noted_campaign\": %lld, \"noted_purchase\": %lld, \"noted_tribute\": %lld, "
                     "\"with\": %lld, \"against\": %lld, \"slack\": %lld, \"align_sum\": %lld, "
                     "\"t_with\": %lld, \"t_against\": %lld, \"t_slack\": %lld, \"t_align_sum\": %lld, "
+                    "\"noted_trade\": %lld, \"trade_legs\": %lld, \"tr_with\": %lld, \"tr_against\": %lld, "
+                    "\"tr_slack\": %lld, \"tr_align_sum\": %lld, "
+                    "\"tr_volume\": %lld, \"tr_volume_with\": %lld, \"tr_volume_against\": %lld, "
                     "\"subjections\": %lld, \"bought\": %lld, \"freed\": %lld, \"conquests\": %lld, \"foundings\": %lld}",
                  key, static_cast<long long>(s.battles), static_cast<long long>(s.wet_battles),
                  static_cast<long long>(s.neighbour), static_cast<long long>(s.frontier),
@@ -650,6 +847,11 @@ void put_span(std::FILE* f, const char* key, const span_read& s)
                  static_cast<long long>(s.align_sum),
                  static_cast<long long>(s.t_with), static_cast<long long>(s.t_against),
                  static_cast<long long>(s.t_slack), static_cast<long long>(s.t_align_sum),
+                 static_cast<long long>(s.noted_trade), static_cast<long long>(s.trade_legs),
+                 static_cast<long long>(s.tr_with), static_cast<long long>(s.tr_against),
+                 static_cast<long long>(s.tr_slack), static_cast<long long>(s.tr_align_sum),
+                 static_cast<long long>(s.tr_volume), static_cast<long long>(s.tr_volume_with),
+                 static_cast<long long>(s.tr_volume_against),
                  static_cast<long long>(s.subjections),
                  static_cast<long long>(s.bought), static_cast<long long>(s.freed),
                  static_cast<long long>(s.conquests), static_cast<long long>(s.foundings));
@@ -683,6 +885,7 @@ seed_row sweep_seed(shipped_inputs& shipped, uint32_t seed, const std::vector<in
     row.shipped_i = read_span(fx.industrialisation_state, known_1660, lane_tier);
     const std::vector<entity_id> ids = body_tile_ids(w, fx.body, fx.gw, fx.gh);
     const ocean_current_field field = build_ocean_currents(fx.terrain.substrate, fx.gw, fx.gh, 1);
+    const std::vector<int32_t> mass = landmass_labels(fx.terrain.substrate, fx.gw, fx.gh);
 
     // Industrialisation's params as generation derived them (captured without
     // their resume pointers); the fixture's own copy when it has one.
@@ -702,7 +905,9 @@ seed_row sweep_seed(shipped_inputs& shipped, uint32_t seed, const std::vector<in
                                                      fx.exploration_seed, nullptr, fx.works, nullptr);
         const exploration_output eo = make_exploration_output(ss, he, &cs);
         wr.e = read_span(he, known_1200, lane_tier, &field, &ss.regions);
+        wr.bind_e = census_cross_water(he, ss.regions, field, mass, fx.gw, fx.gh, wgt);
         for (const sea_leg& l : eo.sea_legs) if (l.uses >= lane_tier) ++wr.lanes_1660;
+        wr.lw1660 = attribute_lanes(eo.sea_legs, he.sea_leg_writers, {}, lane_tier);
 
         // The Industrialisation span on this fold, exactly as generation opens
         // it: the handoff's tables as the resume, its regions surveyed off the
@@ -723,6 +928,7 @@ seed_row sweep_seed(shipped_inputs& shipped, uint32_t seed, const std::vector<in
         const history_sim_state hi = run_history_sim(ss, &cs, fx.terrain.view(), fx.gw, fx.gh, dp,
                                                      dseed, nullptr, fx.works, nullptr);
         wr.i  = read_span(hi, contact_set(eo.contacts), lane_tier, &field, &ss.regions);
+        wr.bind_i = census_cross_water(hi, ss.regions, field, mass, fx.gw, fx.gh, wgt);
         wr.lw = attribute_lanes(hi.sea_legs, he.sea_leg_writers, hi.sea_leg_writers, lane_tier);
         wr.secs = seconds_since(t1);
 
@@ -761,16 +967,26 @@ void run_sweep(shipped_inputs& shipped, const std::vector<uint32_t>& seeds, cons
             print_span("gen I", r.shipped_i);
             for (const weight_row& wr : r.weights)
             {
-                std::printf("   w=%3d (%.0f s)  lanes 1660 %lld, 1960 %lld: by writer c/p/t %lld/%lld/%lld,"
-                            " lane uses c/p/t %lld/%lld/%lld\n",
+                std::printf("   w=%3d (%.0f s)  lanes 1660 %lld (c/p/t/trade %lld/%lld/%lld/%lld), 1960 %lld (c/p/t/trade"
+                            " %lld/%lld/%lld/%lld), lane uses c/p/t/trade %lld/%lld/%lld/%lld\n",
                             wr.weight, wr.secs, static_cast<long long>(wr.lanes_1660),
+                            static_cast<long long>(wr.lw1660.by_writer[0]), static_cast<long long>(wr.lw1660.by_writer[1]),
+                            static_cast<long long>(wr.lw1660.by_writer[2]), static_cast<long long>(wr.lw1660.by_writer[3]),
                             static_cast<long long>(wr.lw.lanes),
                             static_cast<long long>(wr.lw.by_writer[0]), static_cast<long long>(wr.lw.by_writer[1]),
-                            static_cast<long long>(wr.lw.by_writer[2]),
+                            static_cast<long long>(wr.lw.by_writer[2]), static_cast<long long>(wr.lw.by_writer[3]),
                             static_cast<long long>(wr.lw.uses_by_writer[0]), static_cast<long long>(wr.lw.uses_by_writer[1]),
-                            static_cast<long long>(wr.lw.uses_by_writer[2]));
+                            static_cast<long long>(wr.lw.uses_by_writer[2]), static_cast<long long>(wr.lw.uses_by_writer[3]));
                 print_span("  E", wr.e);
                 print_span("  I", wr.i);
+                std::printf("        cross-water flows at the close, bounded by want/holding/land/sea: "
+                            "1660 %lld of %lld/%lld/%lld/%lld, 1960 %lld of %lld/%lld/%lld/%lld",
+                            static_cast<long long>(wr.bind_e.flows), static_cast<long long>(wr.bind_e.by_want),
+                            static_cast<long long>(wr.bind_e.by_holding), static_cast<long long>(wr.bind_e.by_land),
+                            static_cast<long long>(wr.bind_e.by_sea), static_cast<long long>(wr.bind_i.flows),
+                            static_cast<long long>(wr.bind_i.by_want), static_cast<long long>(wr.bind_i.by_holding),
+                            static_cast<long long>(wr.bind_i.by_land), static_cast<long long>(wr.bind_i.by_sea));
+                std::printf("%c", 10);
             }
             std::fflush(stdout);
         }
@@ -796,11 +1012,21 @@ void run_sweep(shipped_inputs& shipped, const std::vector<uint32_t>& seeds, cons
             {
                 const weight_row& wr = r.weights[k];
                 std::fprintf(f, "   {\"weight\": %d, \"secs\": %.1f, \"lanes_1660\": %lld, \"lanes_1960\": %lld, "
-                                "\"lanes_by_writer\": [%lld, %lld, %lld], \"lane_uses_by_writer\": [%lld, %lld, %lld], ",
+                                "\"lanes_by_writer\": [%lld, %lld, %lld, %lld], \"lane_uses_by_writer\": [%lld, %lld, %lld, %lld], "
+                                "\"lanes_1660_by_writer\": [%lld, %lld, %lld, %lld], "
+                                "\"bind_e\": [%lld, %lld, %lld, %lld, %lld], \"bind_i\": [%lld, %lld, %lld, %lld, %lld], ",
                              wr.weight, wr.secs, static_cast<long long>(wr.lanes_1660), static_cast<long long>(wr.lw.lanes),
                              static_cast<long long>(wr.lw.by_writer[0]), static_cast<long long>(wr.lw.by_writer[1]),
-                             static_cast<long long>(wr.lw.by_writer[2]), static_cast<long long>(wr.lw.uses_by_writer[0]),
-                             static_cast<long long>(wr.lw.uses_by_writer[1]), static_cast<long long>(wr.lw.uses_by_writer[2]));
+                             static_cast<long long>(wr.lw.by_writer[2]), static_cast<long long>(wr.lw.by_writer[3]),
+                             static_cast<long long>(wr.lw.uses_by_writer[0]), static_cast<long long>(wr.lw.uses_by_writer[1]),
+                             static_cast<long long>(wr.lw.uses_by_writer[2]), static_cast<long long>(wr.lw.uses_by_writer[3]),
+                             static_cast<long long>(wr.lw1660.by_writer[0]), static_cast<long long>(wr.lw1660.by_writer[1]),
+                             static_cast<long long>(wr.lw1660.by_writer[2]), static_cast<long long>(wr.lw1660.by_writer[3]),
+                             static_cast<long long>(wr.bind_e.flows), static_cast<long long>(wr.bind_e.by_want),
+                             static_cast<long long>(wr.bind_e.by_holding), static_cast<long long>(wr.bind_e.by_land),
+                             static_cast<long long>(wr.bind_e.by_sea), static_cast<long long>(wr.bind_i.flows),
+                             static_cast<long long>(wr.bind_i.by_want), static_cast<long long>(wr.bind_i.by_holding),
+                             static_cast<long long>(wr.bind_i.by_land), static_cast<long long>(wr.bind_i.by_sea));
                 put_span(f, "e", wr.e); std::fprintf(f, ", ");
                 put_span(f, "i", wr.i);
                 std::fprintf(f, "}%s\n", k + 1 < r.weights.size() ? "," : "");

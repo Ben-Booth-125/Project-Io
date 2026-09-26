@@ -219,6 +219,75 @@ int ocean_current_alignment_q(const ocean_current_field& f,
     return flip ? -align : align;
 }
 
+std::vector<int32_t> landmass_labels(const std::vector<terrain_substrate>& substrate, int gw, int gh)
+{
+    std::vector<int32_t> mass(substrate.size(), -1);
+    if (gw <= 0 || gh <= 0
+     || substrate.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return mass;
+    // A depth-first fill from each unlabelled non-sea tile, walked in raster
+    // order: the components are a property of the raster, and the numbering
+    // is the raster order of each component's first tile.
+    int32_t next = 0;
+    std::vector<int> stack;
+    for (int start = 0; start < gw * gh; ++start)
+    {
+        if (mass[static_cast<std::size_t>(start)] >= 0 || is_sea(substrate[static_cast<std::size_t>(start)]))
+            continue;
+        mass[static_cast<std::size_t>(start)] = next;
+        stack.push_back(start);
+        while (!stack.empty())
+        {
+            const int idx = stack.back();
+            stack.pop_back();
+            const int c = idx % gw, r = idx / gw;
+            for (int dr = -1; dr <= 1; ++dr)
+                for (int dc = -1; dc <= 1; ++dc)
+                {
+                    if (dr == 0 && dc == 0) continue;
+                    const int rr = r + dr;
+                    if (rr < 0 || rr >= gh) continue;
+                    const int ni = rr * gw + ((c + dc + gw) % gw);
+                    if (mass[static_cast<std::size_t>(ni)] >= 0 || is_sea(substrate[static_cast<std::size_t>(ni)]))
+                        continue;
+                    mass[static_cast<std::size_t>(ni)] = next;
+                    stack.push_back(ni);
+                }
+        }
+        ++next;
+    }
+    return mass;
+}
+
+int32_t landmass_at(const std::vector<int32_t>& labels, int gw, int gh, int col, int row)
+{
+    if (gw <= 0 || gh <= 0 || col < 0 || row < 0 || col >= gw || row >= gh) return -1;
+    if (labels.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh)) return -1;
+    const int32_t here = labels[static_cast<std::size_t>(row) * static_cast<std::size_t>(gw)
+                                + static_cast<std::size_t>(col)];
+    if (here >= 0) return here;
+    std::vector<std::pair<int32_t, int>> seen; // (label, count): at most 24 entries
+    for (int dr = -2; dr <= 2; ++dr)
+        for (int dc = -2; dc <= 2; ++dc)
+        {
+            const int rr = row + dr;
+            if (rr < 0 || rr >= gh) continue;
+            const int cc = ((col + dc) % gw + gw) % gw;
+            const int32_t m = labels[static_cast<std::size_t>(rr) * static_cast<std::size_t>(gw)
+                                     + static_cast<std::size_t>(cc)];
+            if (m < 0) continue;
+            bool found = false;
+            for (auto& e : seen)
+                if (e.first == m) { ++e.second; found = true; break; }
+            if (!found) seen.push_back({m, 1});
+        }
+    int32_t best = -1;
+    int     best_n = 0;
+    for (const auto& e : seen)
+        if (e.second > best_n || (e.second == best_n && e.first < best)) { best = e.first; best_n = e.second; }
+    return best;
+}
+
 uint64_t ocean_current_digest(const ocean_current_field& f)
 {
     uint64_t h = 1469598103934665603ULL;
