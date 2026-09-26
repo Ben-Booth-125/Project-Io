@@ -74,6 +74,17 @@
 //      to 20 is permitted in rare cases"); the absolute bound is 20, and it is
 //      the only size claim the harness asserts.
 //
+// A PROVINCE IS ITS CENTRE'S GROUND (Ben, 2026-09-26; BL-1133) — superseding
+// rulings 3 and 4 ON THE LAND OF A BODY THAT HAS CENTRES ("covered land"): the
+// centre fill runs until its nation's land within its settled cell is covered,
+// so provinces = centres and none is left without one; the budget becomes a
+// WEIGHT ON REACH (delegated reading NR-953: scale divides step cost), which
+// is what keeps ruling 1 true; the 20-tile cap and the preferred 12 no longer
+// bind there. Leftover ground exists only where no centre of the nation can
+// reach at all — an uncentred island — and gets an anchor founding, counted.
+// The size band below still binds the two water domains and the land of an
+// UNSETTLED body (no centre anywhere), where rulings 3 and 4 still stand.
+//
 // THE ID ORDER IS STILL THE CONTRACT. Downstream code walks provinces in
 // ascending `province::id` and gets an order that does not depend on container
 // internals, tile-map iteration order, or the order bodies were created in.
@@ -89,6 +100,14 @@ struct world;
 // ---------------------------------------------------------------------------
 // The size band — a GROWTH BUDGET, not a clamp (Ben's ruling, 2026-08-21)
 // ---------------------------------------------------------------------------
+// RETIRED ON COVERED LAND (Ben, 2026-09-26; BL-1133, a province is its
+// centre's ground; PROVINCES.md § The size band): nothing stops a body's centre
+// fill before its land is covered, so none of the four numbers below binds a
+// province there. They are KEPT because two things still read them — the
+// coastal-water domain, which Ben gave land's band ("3-12 size coastal tile
+// provinces"), hard cap included; and the spaced hinterland of an UNSETTLED
+// body's land (no centre anywhere), which is still drawn by the band. Every
+// size claim the harness makes is scoped to those two.
 
 /// Soft floor of the target band, and the growth budget a hinterland seed is
 /// given. SOFT: a region grows freely until it holds this many tiles, and past
@@ -112,7 +131,9 @@ inline constexpr std::size_t k_province_max_tiles = 12;
 /// HARD CAP — the bound that really is absolute, and the only size assertion
 /// the harness makes (Ben, 2026-08-21, NR-438). Nothing in the partition may
 /// ship a province larger than this; `province_partition_harness` § P5a fails
-/// if one does.
+/// if one does. SCOPED since BL-1133 (a province is its centre's ground) to
+/// what the band still draws: coastal water and an unsettled body's
+/// hinterland. Covered land has no cap.
 ///
 /// It is not enforced by a clamp, and deliberately so. Absorption picks a
 /// singleton's CHEAPEST neighbour, and choosing a costlier one to respect a
@@ -308,7 +329,28 @@ struct province_absorption_stats
     /// headroom. Ben's 80-tile sea ceiling is the one number he chose for the
     /// water, and it carries no separate hard cap, so it needs a check that
     /// cannot be satisfied by accident.
+    ///
+    /// COVERED LAND COUNTS NOTHING HERE (BL-1133): a body whose centres seed
+    /// its land grows with no ceiling, so it has no breach to count, and the
+    /// land identity is asserted over an UNSETTLED body's hinterland only.
     int over_ceiling_by_domain[3] = { 0, 0, 0 };
+
+    // --- Covered land (BL-1133, a province is its centre's ground) ----------
+
+    /// Bodies whose land the centres seeded, so the fill ran unbounded.
+    int covered_bodies = 0;
+
+    /// Leftover provinces on covered land: each an UNCENTRED ISLAND — ground
+    /// of a nation (and settlement verdict) that no centre of it can reach at
+    /// all — grown whole, and the ones `ensure_province_anchor_centres` founds
+    /// a village in.
+    int uncentred_regions = 0;
+
+    /// Centre singletons absorbed on covered land: a centre whose province
+    /// was only its own tile (hemmed in by larger reach) joins its cheapest
+    /// neighbour under pass 3, so its province holds two centres. The one way
+    /// covered land ends with fewer provinces than seeded centre tiles.
+    int covered_centre_singletons_absorbed = 0;
 };
 
 /// One province — a contiguous run of land tiles on a single body.
@@ -434,17 +476,21 @@ province_kind province_kind_of(const world& w, uint32_t id);
 /// pass still DRAWS it — the lock changes which tiles a region MAY claim, not
 /// who claims first or how the cost model prices an edge.
 ///
-/// Two passes (BL-515's settled algorithm):
+/// The passes (BL-515's settled algorithm, as BL-1133 re-ruled pass 1):
 ///
-///   1. SETTLEMENT GROWTH. Every population centre on the body is a seed, in
-///      ascending tile id, with a growth budget scaled by its centre scale
-///      (1 -> 7 tiles .. 5 -> 12). All seeds grow SIMULTANEOUSLY as one
+///   1. SETTLEMENT GROWTH — A PROVINCE IS ITS CENTRE'S GROUND (Ben,
+///      2026-09-26; BL-1133). Every population centre on the body is a seed, in
+///      ascending tile id, and all seeds grow SIMULTANEOUSLY as one
 ///      cost-weighted multi-source fill, so neighbouring centres meet on the
-///      terrain between them rather than in the order they were listed. Every
-///      region takes its first `k_province_hard_min_tiles` whatever they cost,
-///      grows freely to its budget, then annexes only ground no harder to reach
-///      than what it already holds, and stops at `k_province_max_tiles`
-///      outright.
+///      terrain between them rather than in the order they were listed. NOTHING
+///      STOPS IT but the locks: it runs until its nation's land within its
+///      settled cell is covered — no budget, no brake, no 12, no 20. The budget
+///      that used to scale with the centre (1 -> 7 tiles .. 5 -> 12) becomes a
+///      WEIGHT ON REACH (delegated reading NR-953): a region's path cost is its
+///      step costs times 60 / scale, so a metropolis reaches five times as far
+///      as a village over the same ground and still draws the larger province.
+///      A body with centres is COVERED LAND; its leftovers (below) are only the
+///      uncentred islands, each grown whole.
 ///
 ///   2. HINTERLAND. Land no centre reached is partitioned under the SAME cost
 ///      rules. Seeds are chosen from the LEAST-ACCESSIBLE unclaimed tile
@@ -460,6 +506,12 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///      regions that hit the ceiling — is seeded in the same fixed order
 ///      afterwards. That is where a genuinely tiny province comes from, and it
 ///      is KEPT.
+///
+///      ON COVERED LAND the spaced pass never runs, and the leftover pass meets
+///      only UNCENTRED ISLANDS — a nation's ground, on one side of the settled
+///      line, that no centre of it can reach — and grows each one unbounded,
+///      so it becomes one province, counted (`uncentred_regions`), and the
+///      province `ensure_province_anchor_centres` founds its village in.
 ///
 ///   3. SINGLETON ABSORPTION (Ben, 2026-08-21, a NARROW retraction of "don't
 ///      reject tiny provinces", made on seeing the organic borders rendered:
@@ -495,6 +547,13 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///      falling back to a full one) was measured, reported and then DELETED under
 ///      this ruling: it bought a tighter distribution by deliberately choosing a
 ///      costlier neighbour, and the ceiling breach was its only justification.
+///
+///      ON COVERED LAND there is no ceiling to exceed, and the only singleton
+///      with a neighbour it may join is a CENTRE hemmed to its own tile by a
+///      larger centre's reach; it joins its cheapest neighbour like any other
+///      (`covered_centre_singletons_absorbed`), and its province then holds two
+///      centres, the larger its anchor. It is the one way covered land ends
+///      with fewer provinces than seeded centre tiles.
 ///
 /// There is still NO merge-to-floor repair pass, by ruling: nothing else is
 /// merged away to satisfy a floor, and a province that ran out of land at two

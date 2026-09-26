@@ -51,6 +51,14 @@
 //     * WHAT FOLLOWS — road tiles on the body (`road_level > 0`), split into
 //       STREETS (a road on a centre's own tile) and the network; and markets on
 //       the body (`world::markets`), which the carve gates on centres.
+//     * THE PROVINCES (C7/C8; BL-1133, a province is its centre's ground) —
+//       the home body's land provinces against its centres: how many hold a
+//       SEED centre (any centre not an anchor founding), how many hold more
+//       than one centre, how many rest on an anchor founding alone; and the
+//       size distribution in land tiles (median, p90, max), overall and by
+//       the ANCHOR's scale — the anchor being the highest summed centre scale
+//       standing in the province, ties to the lowest tile id, exactly as
+//       `seed_province_holders` derives it.
 //
 // A READING, NOT A GATE. Nothing here asserts a centre count, a land share or a
 // scale mix: those are what the rule is ruled against, and a harness that
@@ -92,6 +100,7 @@
 #include "scripting/lua_state.hpp"
 #include "world/placement_rules.hpp"
 #include "world/population_generation.hpp"
+#include "world/province.hpp"
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
@@ -216,6 +225,21 @@ struct seed_record
     int carved_in_single = 0;      ///< carved centres whose source region's cell is one land tile
 
     // What follows.
+    // The provinces (BL-1133): the home body's LAND provinces.
+    int land_provinces = 0;      ///< every land province on the body
+    int seeded_provinces = 0;    ///< ...holding at least one seed (non-anchor) centre
+    int multi_centre = 0;        ///< ...holding more than one centre of any kind
+    int anchor_only = 0;         ///< ...holding an anchor founding and no seed centre
+    int unanchored = 0;          ///< ...holding no centre at all (the invariant says 0)
+    int anchor_only_unsettled = 0; ///< anchor-only provinces on ground the colonisation never settled
+    std::vector<int> anchor_only_sizes; ///< land tiles per anchor-only province
+    std::vector<int> sizes;      ///< land tiles per province
+    std::vector<int> sizes_by_anchor[5]; ///< ...split by the anchor's scale (1-5)
+    /// The partition's own ledger, read off a rebuild ON A COPY from the stored
+    /// seed (province_partition_harness P6: the rebuild IS the shipped
+    /// partition): uncentred islands, and centre singletons absorbed.
+    province_absorption_stats part_stats;
+
     int road_tiles = 0, street_tiles = 0;
     int markets = 0;
 };
@@ -472,6 +496,50 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
     for (const auto& [mid, mc] : w.markets)
         if (mc.body == body) ++r.markets;
 
+    // --- the provinces (BL-1133) --------------------------------------------
+    {
+        std::map<entity_id, int> scale_on_tile, seeds_on_tile, centres_on_tile;
+        for (const auto& [cid, tid] : w.population_centre_tile)
+        {
+            const auto pit = w.population_centres.find(cid);
+            if (pit == w.population_centres.end()) continue;
+            scale_on_tile[tid] += pit->second.scale;
+            ++centres_on_tile[tid];
+            if (!pit->second.province_anchor) ++seeds_on_tile[tid];
+        }
+        for (const province& pr : w.provinces.provinces)
+        {
+            if (pr.body != body || province_kind_of(w, pr) != province_kind::land) continue;
+            ++r.land_provinces;
+            int centres_here = 0, seeds_here = 0, anchor_scale = 0;
+            for (const entity_id t : pr.tiles) // ascending: strictly-greater keeps the lowest id
+            {
+                const auto cit = centres_on_tile.find(t);
+                if (cit == centres_on_tile.end()) continue;
+                centres_here += cit->second;
+                const auto sit = seeds_on_tile.find(t);
+                if (sit != seeds_on_tile.end()) seeds_here += sit->second;
+                const int s = scale_on_tile[t];
+                if (s > anchor_scale) anchor_scale = s;
+            }
+            if (seeds_here > 0) ++r.seeded_provinces;
+            if (centres_here > 1) ++r.multi_centre;
+            if (centres_here > 0 && seeds_here == 0)
+            {
+                ++r.anchor_only;
+                r.anchor_only_sizes.push_back(static_cast<int>(pr.tiles.size()));
+                if (w.tile_settled.find(pr.tiles.front()) == w.tile_settled.end())
+                    ++r.anchor_only_unsettled;
+            }
+            if (centres_here == 0) { ++r.unanchored; continue; }
+            const int n = static_cast<int>(pr.tiles.size());
+            r.sizes.push_back(n);
+            r.sizes_by_anchor[std::clamp(anchor_scale, 1, 5) - 1].push_back(n);
+        }
+        world wc = w; // read-only over the census world: the rebuild runs on a copy
+        build_province_partition(wc, w.provinces.seed, &r.part_stats);
+    }
+
     if (!map_dir.empty())
     {
         char name[64];
@@ -486,6 +554,20 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
 }
 
 double pct(int64_t a, int64_t b) { return b > 0 ? 100.0 * static_cast<double>(a) / static_cast<double>(b) : 0.0; }
+
+/// n, median, p90 and max of a size list (nearest-rank on the sorted list).
+struct size_summary { int n = 0, median = 0, p90 = 0, max = 0; };
+size_summary summarise(std::vector<int> v)
+{
+    size_summary s;
+    if (v.empty()) return s;
+    std::sort(v.begin(), v.end());
+    s.n = static_cast<int>(v.size());
+    s.median = v[v.size() / 2];
+    s.p90 = v[std::min(v.size() - 1, static_cast<std::size_t>(0.9 * static_cast<double>(v.size())))];
+    s.max = v.back();
+    return s;
+}
 
 } // namespace
 
@@ -600,6 +682,57 @@ int main(int argc, char** argv)
         std::printf("%4u  %10d  %9.1f  %7d  %7d | %7d\n", r.seed, r.road_tiles,
                     pct(r.road_tiles, r.land), r.street_tiles, r.road_tiles - r.street_tiles,
                     r.markets);
+
+    std::printf("\n=== C7 provinces on the home body (BL-1133, a province is its centre's ground) ===\n");
+    std::printf("seed  land_provinces  centres  seeded  multi_centre  anchor_only  unanchored |"
+                "  size: median  p90   max | road_tiles | uncentred_islands  singletons_absorbed\n");
+    for (const seed_record& r : recs)
+    {
+        const size_summary s = summarise(r.sizes);
+        std::printf("%4u  %14d  %7d  %6d  %12d  %11d  %10d | %13d  %4d  %4d | %10d | %17d  %19d\n",
+                    r.seed, r.land_provinces, r.centres, r.seeded_provinces, r.multi_centre,
+                    r.anchor_only, r.unanchored, s.median, s.p90, s.max, r.road_tiles,
+                    r.part_stats.uncentred_regions, r.part_stats.covered_centre_singletons_absorbed);
+    }
+
+    std::printf("\nC7b the provinces resting on an anchor founding alone\n");
+    std::printf("seed  anchor_only  on_unsettled_ground | size: median  p90   max  one_tile\n");
+    for (const seed_record& r : recs)
+    {
+        const size_summary s = summarise(r.anchor_only_sizes);
+        const int one = static_cast<int>(
+            std::count(r.anchor_only_sizes.begin(), r.anchor_only_sizes.end(), 1));
+        std::printf("%4u  %11d  %19d | %12d  %4d  %4d  %8d\n", r.seed, r.anchor_only,
+                    r.anchor_only_unsettled, s.median, s.p90, s.max, one);
+    }
+
+    std::printf("\n=== C8 province size (land tiles) by the ANCHOR's scale: n / median / p90 / max ===\n");
+    std::printf("seed  %-22s  %-22s  %-22s  %-22s  %-22s\n", "village(1)", "town(2)", "city(3)",
+                "metropolis(4)", "megacity(5)");
+    std::vector<int> pooled_by_anchor[5];
+    for (const seed_record& r : recs)
+    {
+        std::printf("%4u", r.seed);
+        for (int k = 0; k < 5; ++k)
+        {
+            const size_summary s = summarise(r.sizes_by_anchor[k]);
+            char cell[64];
+            std::snprintf(cell, sizeof cell, "%d/%d/%d/%d", s.n, s.median, s.p90, s.max);
+            std::printf("  %-22s", cell);
+            pooled_by_anchor[k].insert(pooled_by_anchor[k].end(), r.sizes_by_anchor[k].begin(),
+                                       r.sizes_by_anchor[k].end());
+        }
+        std::printf("\n");
+    }
+    std::printf(" ALL");
+    for (int k = 0; k < 5; ++k)
+    {
+        const size_summary s = summarise(pooled_by_anchor[k]);
+        char cell[64];
+        std::snprintf(cell, sizeof cell, "%d/%d/%d/%d", s.n, s.median, s.p90, s.max);
+        std::printf("  %-22s", cell);
+    }
+    std::printf("\n");
 
     // Pooled.
     int64_t land = 0, centres = 0, ctiles = 0, spilled = 0, carved = 0, roads = 0, markets = 0;

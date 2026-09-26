@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <istream>
+#include <limits>
 #include <map>
 #include <ostream>
 #include <queue>
@@ -151,7 +152,23 @@ struct region
     /// SOFT brake reads — see grow_regions.
     long long   step_cost_sum = 0;
     std::size_t step_count    = 0;
+
+    /// THE WEIGHT ON REACH (Ben, 2026-09-26; BL-1133, a province is its
+    /// centre's ground — delegated reading NR-953). What one step of edge cost
+    /// adds to this region's path cost. On COVERED land (a body whose centres
+    /// seed its land, see build_province_partition) a centre's scale DIVIDES
+    /// its step cost, so a metropolis reaches five times as far for the same
+    /// ground as a village and still draws the larger province once the budget
+    /// no longer stops anyone. Kept integral and exact by scaling every step by
+    /// `k_reach_scale_lcm` (60 = lcm(1..5)): the multiplier is 60 / scale, so
+    /// 60 / 30 / 20 / 15 / 12 for scales 1-5 and no division ever rounds.
+    /// 1 everywhere else — the water domains, an unsettled body's hinterland
+    /// and a covered body's leftover ground grow exactly as before.
+    long long   reach_mult = 1;
 };
+
+/// lcm(1..5): the common scale that keeps the reach weight's division exact.
+constexpr long long k_reach_scale_lcm = 60;
 
 /// A frontier entry: reaching @p tile from @p seed's region at total @p cost,
 /// where the LAST edge crossed cost @p step. `step` is what the soft-target
@@ -159,7 +176,7 @@ struct region
 /// is a property of the edge itself, not of the path that got there.
 struct frontier_entry
 {
-    int         cost   = 0;
+    long long   cost   = 0; ///< Path cost, the step costs times the region's `reach_mult`.
     int         step   = 0;
     entity_id   seed   = null_entity;
     entity_id   tile   = null_entity;
@@ -264,7 +281,9 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, const domain_spe
         region& r = regions[f.region_index];
 
         // The one hard clamp in the file. Per DOMAIN since BL-516: 12 on land
-        // and in the shallows, 80 on the open ocean.
+        // and in the shallows, 80 on the open ocean — and NONE on covered land
+        // (BL-1133: a province is its centre's ground, so the caller hands a
+        // covered body's land an unbounded ceiling and unbounded targets).
         if (r.tiles.size() >= dom.max_tiles)
             continue;
 
@@ -329,7 +348,7 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, const domain_spe
 
             frontier_entry e;
             e.step         = edge_cost_impl(seed, f.tile, tc, n, nit->second, s);
-            e.cost         = f.cost + e.step;
+            e.cost         = f.cost + static_cast<long long>(e.step) * r.reach_mult; // BL-1133
             e.seed         = f.seed;
             e.tile         = n;
             e.region_index = f.region_index;
@@ -557,17 +576,32 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
         std::vector<region>    regions;
         std::vector<entity_id> centre_seeds; ///< Ascending; pass 2 spaces itself off these.
 
-        // --- Pass 1: SETTLEMENT GROWTH.
+        // THE EFFECTIVE DOMAIN. Identical to `dom` everywhere but COVERED LAND
+        // (BL-1133, below): the land of a body whose centres seed it, where no
+        // ceiling stops the fill. Every later pass reads `eff`, so the water
+        // domains and an unsettled body's land see exactly the band they did.
+        domain_spec eff = dom;
+        bool covered = false;
+
+        // --- Pass 1: SETTLEMENT GROWTH — A PROVINCE IS ITS CENTRE'S GROUND.
         //
         // Every population centre on this body is a seed, in ascending tile id,
-        // with a growth budget scaled by its centre scale (1 = village ..
-        // 5 = metropolis): a metropolis draws a larger province than a village.
-        // The budget spans the soft band over the scale's own defined domain,
-        // so nothing here is a tuned number — scale 1 gets k_province_min_tiles
-        // and scale 5 gets k_province_max_tiles.
-        //
-        // All seeds grow SIMULTANEOUSLY, as one multi-source fill, so two
+        // and all of them grow SIMULTANEOUSLY, as one multi-source fill, so two
         // centres meet on the terrain between them rather than in list order.
+        //
+        // Ben, 2026-09-26 (BL-1133; PROVINCES.md § The partition): the fill no
+        // longer stops at a growth budget. Every centre's province grows until
+        // its nation's land within its settled cell is covered — the nation
+        // lock and BL-849's settlement lock still bound it, nothing else does —
+        // so a body has as many provinces as seeded centres and none is left
+        // without one. The 20-tile cap and the preferred 12 retire here (they
+        // still bind the water domains and an unsettled body's hinterland).
+        //
+        // THE BUDGET BECOMES A WEIGHT ON REACH (delegated reading NR-953): a
+        // centre's scale divides its step cost (`region::reach_mult`), so a
+        // metropolis claims ground five times as far off as a village does for
+        // the same terrain and still draws the larger province (ruling 1),
+        // while competition still decides every border.
         if (dom.settled) // BL-516: only land is settled; water is all hinterland.
         {
             std::vector<std::size_t> active;
@@ -584,14 +618,19 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 r.seed   = tile_id;
                 r.nation = nation_of_tile(w, tile_id); // BL-611: the lock's key
                 r.settled = settled_of_tile(w, tile_id); // BL-849: the settlement lock's key
-                r.target = k_province_min_tiles
-                           + static_cast<std::size_t>((clamped - 1))
-                                 * (k_province_max_tiles - k_province_min_tiles) / 4u;
+                r.target     = std::numeric_limits<std::size_t>::max(); // no budget
+                r.reach_mult = k_reach_scale_lcm / clamped;             // 60 / scale, exact
                 centre_seeds.push_back(tile_id);
                 active.push_back(regions.size());
                 regions.push_back(std::move(r));
             }
-            grow_regions(bw, w, seed, dom, regions, active);
+            if (!centre_seeds.empty())
+            {
+                covered       = true;
+                eff.max_tiles = std::numeric_limits<std::size_t>::max(); // no ceiling
+                tally.covered_bodies += 1;
+            }
+            grow_regions(bw, w, seed, eff, regions, active);
         }
 
         // --- Pass 2: HINTERLAND — water's primary mechanism, land's retired one.
@@ -725,17 +764,21 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
             }
 
             // --- Leftovers. Ground the primary fill could not reach —
-            // enclosed by regions that hit the hard ceiling, cut off behind a
-            // border too expensive to cross, or (on settled land, BL-611)
-            // simply farther from every centre than any budget stretches: ice
-            // caps, deep deserts, the far side of a nation border no centre
-            // stands behind. Seeded in the same fixed least-accessible-first
-            // order and grown one at a time, because by now they are pockets
-            // rather than open country. This is where a genuinely tiny
-            // province comes from, and it is KEPT. On settled land these are
-            // the provinces the anchor-founding pass
-            // (ensure_province_anchor_centres, population_generation.cpp)
-            // gives their centre AFTER the partition ships.
+            // enclosed by regions that hit the hard ceiling, or cut off behind
+            // a border too expensive to cross. Seeded in the same fixed
+            // least-accessible-first order and grown one at a time, because by
+            // now they are pockets rather than open country. This is where a
+            // genuinely tiny province comes from, and it is KEPT.
+            //
+            // ON COVERED LAND (BL-1133) nothing stops the centre fill, so the
+            // only ground left is ground NO CENTRE OF ITS NATION CAN REACH AT
+            // ALL under the locks — an UNCENTRED ISLAND: a nation's island with
+            // no centre on it, or ground on the unsettled side of BL-849's line
+            // where no centre stands. Each is grown unbounded, so one leftover
+            // province covers one such island whole, and it is the province
+            // the anchor-founding pass (ensure_province_anchor_centres,
+            // population_generation.cpp) gives its centre AFTER the partition
+            // ships — counted in `uncentred_regions`, never hidden.
             for (const auto& [neg_walls, t] : ranked)
             {
                 (void)neg_walls;
@@ -745,10 +788,12 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 r.seed    = t;
                 r.nation  = nation_of_tile(w, t);
                 r.settled = settled_of_tile(w, t); // BL-849
-                r.target  = dom.soft_target;
+                r.target  = covered ? std::numeric_limits<std::size_t>::max() : dom.soft_target;
                 const std::size_t ri = regions.size();
                 regions.push_back(std::move(r));
-                grow_regions(bw, w, seed, dom, regions, { ri });
+                grow_regions(bw, w, seed, eff, regions, { ri });
+                if (covered)
+                    ++tally.uncentred_regions;
             }
         }
 
@@ -882,7 +927,15 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                     bw.owner[t] = static_cast<uint32_t>(best_index) + 1u;
                     ++absorbed_here;
                     ++tally.absorbed;
-                    if (regions[best_index].tiles.size() > dom.max_tiles)
+                    // BL-1133: on covered land the only singleton with a
+                    // neighbour it may join is a CENTRE's — a leftover covers
+                    // its whole uncentred island, so it has none — and the
+                    // absorption is the one route by which covered land ends
+                    // with fewer provinces than seeded centres. Counted.
+                    if (covered)
+                        ++tally.covered_centre_singletons_absorbed;
+                    // No ceiling on covered land (`eff`), so no breach to count.
+                    if (regions[best_index].tiles.size() > eff.max_tiles)
                     {
                         ++tally.over_ceiling_created;
                         ++tally.over_ceiling_by_domain[static_cast<std::size_t>(dom.kind)];

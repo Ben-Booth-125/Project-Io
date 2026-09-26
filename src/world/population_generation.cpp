@@ -699,6 +699,15 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
 // ---------------------------------------------------------------------------
 // Province anchors (BL-611) — every land province holds a centre
 // ---------------------------------------------------------------------------
+// BL-1133 (Ben, 2026-09-26; PROVINCES.md § The partition — a province is its
+// centre's ground): a FOUNDING IS THE LAST RESORT. The partition's centre fill
+// now runs unbounded over its nation's land within its settled cell, so every
+// province it draws already holds the centre that grew it. What reaches this
+// pass is only an UNCENTRED ISLAND — ground no centre of its nation can reach
+// at all under the nation and settlement locks — which the partition covers
+// with one leftover province apiece (`province_absorption_stats::
+// uncentred_regions`); each keeps the scale-1 founding below. The walk itself
+// is unchanged: it founds in whatever land province still holds no centre.
 
 int ensure_province_anchor_centres(world& w, entity_id body_id, int* gate_relaxed)
 {
