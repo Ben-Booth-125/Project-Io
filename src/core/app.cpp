@@ -1022,7 +1022,14 @@ void app::draw_building_screen()
 /// The live carve (BL-305): the world's politics being DECIDED rather than
 /// handed over. It appears when generate_nations opens the carve and stays for
 /// the rest of the screen, so the borders grow, settle, and are then staked by
-/// the charters — all in the order the passes actually do it.
+/// the charters — in the order the passes actually do it. WHICH charters
+/// depends on the world (BL-1086): with no charter budget they are the roster
+/// generation lays at "Placing companies"; on a budget world generation lays no
+/// roster, and the rows and markers are the landscape search WINNER's
+/// specialists, published once its web is applied (`publish_charter_web`, in
+/// finish_campaign_world) — after "Searching the landscape", while the field
+/// is being proven. No row is marked as the player's there: the seat is drawn
+/// at Begin.
 ///
 /// Reads `m_worldgen_progress` and NOTHING else. The world belongs to the
 /// worker thread until poll_worldgen adopts it, so every read here is an atomic
