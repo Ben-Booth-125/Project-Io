@@ -7119,27 +7119,27 @@
      ],
      "requirement": "The merged change is deterministic run to run and moves no gate beyond the known pre-existing failures.",
      "notes": "",
-     "result_metric": "Main at 89d3bb4b, 2026-09-26: world_determinism ALL PASS twice, seedA/on C811B1C4BD1C44F1 both runs (seedA/off 6A3141DE4AE18B4D unchanged); save_roundtrip OK; province_partition_harness only D A1 (pre-existing); history_sim_harness only R3a2/R3a3 (pre-existing); centre_census OK, pooled centres 42,251 (18.0% of land), road tiles 86,631, markets 5,784."
+     "result_metric": "Main at 89d3bb4b, 2026-09-26: world_determinism ALL PASS twice, seedA/on C811B1C4BD1C44F1 both runs (seedA/off 6A3141DE4AE18B4D unchanged); save_roundtrip OK; province_partition_harness only D A1 (pre-existing); history_sim_harness only R3a2/R3a3 (pre-existing); centre_census OK, pooled centres 42,251 (18.0% of land), road tiles 86,631, markets 5,784. Re-gated after the fix at 3392406d: world_determinism ALL PASS twice at 7F94AFDA0A85E26E (identical to 15da1bd2, so the fix moves no world); history_sim_harness only R3a2/R3a3 (R7 passes); exploration_sim_harness only R3b/R3d.1 (the known-moved pins); centre_census OK."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold, author != reviewer)"
      ],
      "requirement": "A cold review of the merged change, fix round included, before the item closes.",
      "notes": "Cold review 2026-09-26: claims 2, 3, 5 hold; claim 1 failed (scheduled foundings bypass the spacing) and claim 4 failed (the spacing is a per-params field and exploration_sim_harness ran 1). Fix round sent to the spacing lane: pending anchors reserved (NR-956), a too-close pair count in the census, the cohesion gate hoisted, the cost measured, comments. Re-gate after it.",
-     "result_metric": ""
+     "result_metric": "Fix round 69834473, merged 3392406d: pending anchors refused by the site search (NR-956, option a); exploration_sim_harness copies the spacing; the cohesion gate hoisted (digests identical with the hoist alone); comments corrected. No world moves on the 16 seeds. The history step grew 1.5-2.2x from BL-1132 through the doubled war, not the site search (0.5-7% of the decision round), so no occupancy grid was built."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: centre_census too-close pair count on the 16 seeds"
      ],
      "requirement": "No two region seats stand closer than the spacing where either was founded by the sim; the count reads 0.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "centre_census C10 on main 3392406d: 0 too-close pairs pooled over 11,862 sim-founded regions; negative control (one tile wider) fires 672 / 1,291 on seeds 28 / 40. Holds for scheduled foundings while the spacing stays at or under the settlement pass separation (7 tiles here)."
     }
    ]
   },
