@@ -945,19 +945,19 @@
    "blocked_on": null,
    "parked": false,
    "id": "BL-1133",
-   "short_name": "ANCHORS_REUSE_A_CENTRE",
+   "short_name": "PROVINCE_IS_ITS_CENTRES_GROUND",
    "author": "Ben (2026-09-25, the open-calls form); filed by Claude",
    "category": "Generation",
-   "priority": "A",
+   "priority": "S",
    "difficulty": 3,
-   "title": "A province with no centre is anchored by one that already stands, not by a newly founded village",
-   "authority_doc": "docs/economy/POPULATION.md",
+   "title": "A province is its centre's ground: the fill covers the land, so no province is left without a centre",
+   "authority_doc": "docs/generation/PROVINCES.md",
    "files": [
     "src/world/population_generation.cpp",
     "src/world/province.cpp",
     "tools/verify/centre_census.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app). POPULATION.md § Generation, \"Every province is anchored by a centre\". FOUND by the centres lane (BL-1130): ensure_province_anchor_centres founds a village for every centre-less province, which grew to 22-39% of all centres after consolidation (seed 46: 0 -> 1,320). DELEGATED READING (NR-946): a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, so the merged province's centre anchors it; a scale-1 founding only where no such neighbour exists. PROVINCES.md § The partition owns the merge. THE WORK: read the anchors founded per seed (old); build the join; record provinces, anchors founded and centres old -> new; the conquest unit invariant (every province has a centre) holds. A world-mover."
+   "design": "RE-RULED (Ben, 2026-09-26, the province form: A). The join (232cf4db, on its branch, NOT merged) cut anchors only 9% (20,467 -> 18,622) because the fill's budget and the 20-tile cap leave ~2,700 provinces a world, every one needing a centre -- a floor far above the ~500 aim; 12,181 anchors stood on ground the history never settled. PROVINCES.md § The partition now states: every centre's province grows until its nation's land within its settled cell is covered; the budget becomes a weight on reach (NR-953: scale divides step cost); the 20-tile cap and the preferred 12 retire; an anchor founding survives only for ground no centre of the nation can reach (an uncentred island). THE WORK: rebuild the fill; the size-band harness rows re-scoped to the ruling (P9c ordering kept under the weight); provinces = centres per seed recorded old -> new; the conquest invariant holds. A world-mover.\n\nSETTLED (Ben, 2026-09-25, the open-calls form at the live app). POPULATION.md § Generation, \"Every province is anchored by a centre\". FOUND by the centres lane (BL-1130): ensure_province_anchor_centres founds a village for every centre-less province, which grew to 22-39% of all centres after consolidation (seed 46: 0 -> 1,320). DELEGATED READING (NR-946): a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, so the merged province's centre anchors it; a scale-1 founding only where no such neighbour exists. PROVINCES.md § The partition owns the merge. THE WORK: read the anchors founded per seed (old); build the join; record provinces, anchors founded and centres old -> new; the conquest unit invariant (every province has a centre) holds. A world-mover."
   },
   {
    "status": "designed",

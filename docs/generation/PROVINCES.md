@@ -79,6 +79,17 @@ and Ben overruled it, 2026-08-21: *"packing each province perfectly looks nice, 
 how borders were defined in history."* What a province *is*, and everything downstream, is
 independent of how the shapes are drawn.
 
+**A province is its centre's ground (Ben, 2026-09-26; BL-1133).** The fill no longer stops at a
+growth budget: every centre's province grows until its nation's land — within its settled cell
+(§ The settled cells are a binding input) — is covered, so a world has as many provinces as
+centres and none is left without one. The budget becomes a **weight on reach** (delegated reading,
+NR-953): a centre's scale divides its step cost, so a metropolis still draws the larger province
+(ruling 1) and competition still decides the border. The 20-tile cap and the preferred 12 retire
+(§ The size band); leftover ground, and the anchor founding it needs, exist only where no centre
+of the nation can reach at all — an uncentred island — counted rather than hidden. This is what
+lets a world of ~500 centres (`../economy/POPULATION.md` § Generation) be a world of ~500
+provinces rather than of thousands of villages founded on empty ground.
+
 **The five rulings the algorithm implements:**
 
 1. **Provinces grow from population centres**, and seed strength scales with the centre's scale
@@ -147,6 +158,9 @@ single-nation guarantee true by construction rather than by a check. It reorders
 chain, so it stays the road not taken and is recorded rather than rediscovered.
 
 ### The size band, and why it has three numbers
+
+*Retired by "a province is its centre's ground" (Ben, 2026-09-26): nothing stops the fill before
+the land is covered, so the band below no longer binds; kept for the record of what it was.*
 
 | Constant | Value | Meaning |
 |---|---|---|

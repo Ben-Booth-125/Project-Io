@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*56 entries — 1 open, 55 resolved.*
+*57 entries — 2 open, 55 resolved.*
 
 ---
 
@@ -44,6 +44,21 @@ Ben ruled that in play an abandoned centre is deleted and its province merges in
 > **Recommendation:** A.
 
 *Files: `docs/economy/POPULATION.md`*
+
+### NR-953 — DECISION TAKEN: with the budget gone, a centre's scale weights its reach, so a metropolis still draws the larger province
+*decision · raised 2026-09-26 · from Ben's province form, 2026-09-26 (A: a province is its centre's ground)*
+
+The partition grew each centre by a budget of 7 tiles (village) to 12 (metropolis); ruling A removes the stop, so the budget can no longer carry "a metropolis draws a larger province than a village does" (PROVINCES.md ruling 1). Taken on your behalf: the centre's scale divides its step cost in the multi-source fill (a weighted fill), so bigger centres claim more ground before competition meets them.
+
+**Why it matters.** Without a weight, every province would be a plain nearest-centre cell and a metropolis would hold no more ground than a village beside it.
+
+- A: keep the scale weight on reach
+- B: an unweighted fill (plain nearest-centre cells)
+- C: other
+
+> **Recommendation:** A.
+
+*Files: `docs/generation/PROVINCES.md`, `src/world/province.cpp`*
 
 ---
 
@@ -867,7 +882,7 @@ A centre already stands in exactly one province, so a province without one canno
 
 > **Recommendation:** A: a province is the ground a centre can hold; one with nothing to hold it is hinterland of its neighbour.
 
-> **RESOLVED.** RULED (Ben, 2026-09-25, the centres-and-routes form): A, keep -- a centre-less province joins its nearest neighbouring province of the same nation. BL-1133 builds it.
+> **RESOLVED.** RULED (Ben, 2026-09-25, the centres-and-routes form): A, keep -- a centre-less province joins its nearest neighbouring province of the same nation. BL-1133 builds it. SUPERSEDED (Ben, 2026-09-26, the province form): a province is its centre's ground -- the fill covers the land, so no centre-less province is left to join; the join branch (232cf4db) is not merged.
 
 *Files: `src/world/population_generation.cpp`, `docs/economy/POPULATION.md`, `docs/generation/PROVINCES.md`*
 

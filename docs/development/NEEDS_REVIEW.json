@@ -1096,7 +1096,7 @@
     "docs/economy/POPULATION.md",
     "docs/generation/PROVINCES.md"
    ],
-   "resolution": "RULED (Ben, 2026-09-25, the centres-and-routes form): A, keep -- a centre-less province joins its nearest neighbouring province of the same nation. BL-1133 builds it."
+   "resolution": "RULED (Ben, 2026-09-25, the centres-and-routes form): A, keep -- a centre-less province joins its nearest neighbouring province of the same nation. BL-1133 builds it. SUPERSEDED (Ben, 2026-09-26, the province form): a province is its centre's ground -- the fill covers the land, so no centre-less province is left to join; the join branch (232cf4db) is not merged."
   },
   {
    "id": "NR-947",
@@ -1220,6 +1220,27 @@
    "recommendation": "A.",
    "files": [
     "docs/economy/POPULATION.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-953",
+   "title": "DECISION TAKEN: with the budget gone, a centre's scale weights its reach, so a metropolis still draws the larger province",
+   "raised": "2026-09-26",
+   "kind": "decision",
+   "status": "open",
+   "source": "Ben's province form, 2026-09-26 (A: a province is its centre's ground)",
+   "what": "The partition grew each centre by a budget of 7 tiles (village) to 12 (metropolis); ruling A removes the stop, so the budget can no longer carry \"a metropolis draws a larger province than a village does\" (PROVINCES.md ruling 1). Taken on your behalf: the centre's scale divides its step cost in the multi-source fill (a weighted fill), so bigger centres claim more ground before competition meets them.",
+   "why_it_matters": "Without a weight, every province would be a plain nearest-centre cell and a metropolis would hold no more ground than a village beside it.",
+   "options": [
+    "A: keep the scale weight on reach",
+    "B: an unweighted fill (plain nearest-centre cells)",
+    "C: other"
+   ],
+   "recommendation": "A.",
+   "files": [
+    "docs/generation/PROVINCES.md",
+    "src/world/province.cpp"
    ],
    "resolution": null
   }

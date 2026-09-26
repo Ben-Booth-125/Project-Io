@@ -142,11 +142,11 @@ RNG anywhere on the path:
   the centre takes the province (`docs/generation/PROVINCES.md` § The partition; BL-567,
   province is the conquest unit). This retires the centre-less hinterland province. The
   guarantee is structural: after the partition ships, any land province the centre-seeded fill
-  left without one is anchored by **a centre that already stands** (Ben, 2026-09-25; BL-1133,
-  anchors reuse a centre): it joins the adjacent province of its own nation whose centre is
-  nearest, so the merged province's centre is its anchor (delegated reading, NR-946;
-  `../generation/PROVINCES.md` § The partition). Only where no such neighbour exists does it
-  receive a **scale-1 anchor founding** on its
+  left without one is anchored by **a centre that already stands** (Ben, 2026-09-25; BL-1133):
+  since 2026-09-26 a province **is** its centre's ground — the fill covers the land, so no
+  centre-less province is left to anchor (`../generation/PROVINCES.md` § The partition). Only
+  ground no centre of the nation can reach at all (an uncentred island) receives a **scale-1
+  anchor founding** on its
   best ground (`ensure_province_anchor_centres` — argmax of habitability × richness, the placement
   gate preferred and relaxed only where no tile passes it, counted rather than hidden). Founding a
   village for every uncovered province had grown the anchors to a fifth to two fifths of all
