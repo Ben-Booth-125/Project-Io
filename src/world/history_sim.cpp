@@ -2615,6 +2615,119 @@ history_sim_state run_history_sim(settlement_state&         ss,
     };
     for (std::size_t i = 0; i < ss.regions.size(); ++i) link_region(i);
 
+    // --- Where a Settle founds (BL-310, BL-1132) --------------------------
+    //
+    // BL-310: find an UNOCCUPIED cell, widening the ring as the
+    // neighbourhood fills. The first cut offered nine candidate
+    // cells with no occupancy test and re-picked the same mature
+    // parent every year, so regions piled up — 132 regions on
+    // 33 distinct cells in one measured run, worst stack nine deep.
+    // Co-located regions then had region_distance 0 and the
+    // Ages map drew a whole stack as one dot.
+    //
+    // BL-1132 — AND AT A DISTANCE, NOT ON THE NEAREST FREE TILE
+    // (CIVILISATION.md § The unit is the city state; Ben,
+    // 2026-09-25). "Unoccupied" meant only "no region on this very
+    // tile", so a razed parent re-settling every round packed its
+    // whole neighbourhood a region to a tile, and every tile of a
+    // core became a one-tile cell whose one centre paved it. A
+    // candidate is now refused while ANY region's anchor stands
+    // nearer than `settle_min_spacing_tiles` (Chebyshev, columns
+    // wrapping — the partition's own metric; history_sim.hpp says
+    // why tiles). At 1 that is exactly the old occupancy test.
+    //
+    // THE SEARCH KEEPS ITS SIX RINGS, STARTING AT THE SPACING.
+    // Every probe of a ring nearer than the spacing lies within it
+    // of the parent itself (a clamped row only shortens the
+    // offset), so those rings can never succeed and are skipped;
+    // the six rings searched are the spacing and the five beyond
+    // it — 1..6 at spacing 1, the old search exactly. The probe
+    // hash reads only the year and the probe index, so skipping a
+    // ring moves no later probe.
+    //
+    // THE NEAR LIST is an exact filter, not a heuristic: a region
+    // further than (last ring + spacing - 1) from the parent can
+    // never stand within the spacing of any probe, so only the
+    // regions inside that radius are tested, once per probe.
+    //
+    // ONE SITE RULE, a pure function of (parent, polity salt, year, the region
+    // list): writes the chosen tile to (nc, nr), or -1/-1 when the six rings
+    // hold no ground far enough from every standing region.
+    const auto find_settle_site = [&](const region& src, uint32_t qs, int64_t y,
+                                      int& nc, int& nr) {
+        const int spacing    = std::max(1, params.settle_min_spacing_tiles);
+        const int ring_first = spacing;
+        const int ring_last  = spacing + 5;
+        const auto tile_gap = [gw](int c0, int r0, int c1, int r1) {
+            int dc = c0 - c1;
+            if (dc < 0) dc = -dc;
+            if (gw > 0 && dc > gw / 2) dc = gw - dc; // region_distance's wrap
+            int dr = r0 - r1;
+            if (dr < 0) dr = -dr;
+            return dc > dr ? dc : dr;
+        };
+        std::vector<int> near_regions;
+        for (std::size_t ei = 0; ei < ss.regions.size(); ++ei)
+            if (tile_gap(ss.regions[ei].col, ss.regions[ei].row, src.col, src.row)
+                <= ring_last + spacing - 1)
+                near_regions.push_back(static_cast<int>(ei));
+
+        nc = -1; nr = -1;
+        for (int ring = ring_first; ring <= ring_last && nc < 0; ++ring)
+        {
+            const int span = 2 * ring + 1;
+            for (int probe = 0; probe < span * span; ++probe)
+            {
+                const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 131u
+                                            + static_cast<uint32_t>(probe));
+                const int dc = static_cast<int>(h % static_cast<uint32_t>(span)) - ring;
+                const int dr = static_cast<int>((h >> 8) % static_cast<uint32_t>(span)) - ring;
+                if (dc == 0 && dr == 0) continue;
+
+                int cc = src.col + dc;
+                if (gw > 0) cc = ((cc % gw) + gw) % gw;
+                const int rr = clampi(src.row + dr, 0, gh > 0 ? gh - 1 : 0);
+
+                // BL-777 — NOBODY FOUNDS ON OPEN OCEAN.
+                //
+                // This probe applied no terrain test at all, so 447 of
+                // 1754 regions across three seeds were anchored on
+                // water and 183 of those on open ocean (measured by
+                // sim_water_census, 2026-09-06). `terrain_combat`
+                // returns 0 defence and 0 forage for every water kind,
+                // so those regions were silently undefendable.
+                //
+                // IT IS NOT A "NO WATER" TEST, and the distinction is
+                // the design. Under the ownership ruling (BL-776,
+                // PROVINCES.md § Who owns water) coastal water belongs
+                // to whoever owns the shore, so founding on the
+                // shoreline ring or a lake is LEGITIMATE — there is an
+                // owner to found under. Open ocean has no owner at all,
+                // structurally, so it is the only domain refused. That
+                // is ~183 sites rather than the ~447 a blanket ban
+                // would have deleted.
+                //
+                // A caller with no terrain is unaffected: `sub_at`
+                // hands out the neutral dry default, so every synthetic
+                // harness case probes exactly the cells it always did.
+                const int cand = (gw > 0) ? rr * gw + cc : -1;
+                if (region_domain_of(sub_at(terrain, cand)) == region_domain::open_ocean)
+                    continue;
+
+                // The parent first: it refuses most of a ring's inner
+                // square without walking the list.
+                if (tile_gap(cc, rr, src.col, src.row) < spacing) continue;
+                bool taken = false;
+                for (const int ei : near_regions)
+                {
+                    const region& e = ss.regions[static_cast<std::size_t>(ei)];
+                    if (tile_gap(cc, rr, e.col, e.row) < spacing) { taken = true; break; }
+                }
+                if (!taken) { nc = cc; nr = rr; break; }
+            }
+        }
+    };
+
     // --- Terrain-weighted reach (BL-314 S2) -------------------------------
     //
     // Distance from the capital is a COST over the neighbour graph, not a
@@ -6548,61 +6661,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             {
                 const region& src = ss.regions[static_cast<std::size_t>(best_target)];
 
-                // BL-310: find an UNOCCUPIED cell, widening the ring as the
-                // neighbourhood fills. The first cut offered nine candidate
-                // cells with no occupancy test and re-picked the same mature
-                // parent every year, so regions piled up — 132 regions on
-                // 33 distinct cells in one measured run, worst stack nine deep.
-                // Co-located regions then had region_distance 0 and the
-                // Ages map drew a whole stack as one dot.
+                // WHERE: the site rule above (BL-310, BL-1132) -- an unoccupied
+                // tile at least `settle_min_spacing_tiles` from every region.
                 int nc = -1, nr = -1;
-                for (int ring = 1; ring <= 6 && nc < 0; ++ring)
-                {
-                    const int span = 2 * ring + 1;
-                    for (int probe = 0; probe < span * span; ++probe)
-                    {
-                        const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 131u
-                                                    + static_cast<uint32_t>(probe));
-                        const int dc = static_cast<int>(h % static_cast<uint32_t>(span)) - ring;
-                        const int dr = static_cast<int>((h >> 8) % static_cast<uint32_t>(span)) - ring;
-                        if (dc == 0 && dr == 0) continue;
-
-                        int cc = src.col + dc;
-                        if (gw > 0) cc = ((cc % gw) + gw) % gw;
-                        const int rr = clampi(src.row + dr, 0, gh > 0 ? gh - 1 : 0);
-
-                        // BL-777 — NOBODY FOUNDS ON OPEN OCEAN.
-                        //
-                        // This probe applied no terrain test at all, so 447 of
-                        // 1754 regions across three seeds were anchored on
-                        // water and 183 of those on open ocean (measured by
-                        // sim_water_census, 2026-09-06). `terrain_combat`
-                        // returns 0 defence and 0 forage for every water kind,
-                        // so those regions were silently undefendable.
-                        //
-                        // IT IS NOT A "NO WATER" TEST, and the distinction is
-                        // the design. Under the ownership ruling (BL-776,
-                        // PROVINCES.md § Who owns water) coastal water belongs
-                        // to whoever owns the shore, so founding on the
-                        // shoreline ring or a lake is LEGITIMATE — there is an
-                        // owner to found under. Open ocean has no owner at all,
-                        // structurally, so it is the only domain refused. That
-                        // is ~183 sites rather than the ~447 a blanket ban
-                        // would have deleted.
-                        //
-                        // A caller with no terrain is unaffected: `sub_at`
-                        // hands out the neutral dry default, so every synthetic
-                        // harness case probes exactly the cells it always did.
-                        const int cand = (gw > 0) ? rr * gw + cc : -1;
-                        if (region_domain_of(sub_at(terrain, cand)) == region_domain::open_ocean)
-                            continue;
-
-                        bool taken = false;
-                        for (const region& e : ss.regions)
-                            if (e.col == cc && e.row == rr) { taken = true; break; }
-                        if (!taken) { nc = cc; nr = rr; break; }
-                    }
-                }
+                find_settle_site(src, qs, y, nc, nr);
                 if (nc < 0) break; // Neighbourhood full — no room to expand here.
 
                 region np;

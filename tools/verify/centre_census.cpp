@@ -51,6 +51,13 @@
 //     * WHAT FOLLOWS — road tiles on the body (`road_level > 0`), split into
 //       STREETS (a road on a centre's own tile) and the network; and markets on
 //       the body (`world::markets`), which the carve gates on centres.
+//     * THE SPACING LADDER ROW (BL-1132, settle spacing) — one compact row per
+//       seed of what a settle-spacing candidate moves: regions, living, living
+//       regions by cell land (1 / 2-4 / 5-9 / 10-24 / 25+ tiles), centres, the
+//       land share under them, and the three spans' battles / conquests /
+//       foundings; pooled below it. The header names the spacing the binary was
+//       built with (`generation_settle_spacing_tiles`), so a ladder is a set of
+//       runs of builds that differ in that one constant.
 //
 // A READING, NOT A GATE. Nothing here asserts a centre count, a land share or a
 // scale mix: those are what the rule is ruled against, and a harness that
@@ -91,6 +98,7 @@
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
 #include "world/placement_rules.hpp"
+#include "world/era_minus_one.hpp"         // BL-1132: generation_settle_spacing_tiles
 #include "world/population_generation.hpp"
 #include "world/settlement.hpp"
 #include "world/world.hpp"
@@ -213,6 +221,9 @@ struct seed_record
 
     // Where the density is.
     int single_tile_cells = 0;     ///< living regions whose cell holds exactly one land tile
+    /// BL-1132: living regions by cell land — 1, 2-4, 5-9, 10-24, 25+ tiles
+    /// (0 land, the groundless, is C4's row).
+    int cell_land_hist[5] = {};
     int carved_in_single = 0;      ///< carved centres whose source region's cell is one land tile
 
     // What follows.
@@ -376,6 +387,9 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
             {
                 sorted.push_back(cell_land[i]);
                 if (cell_land[i] == 1) ++r.single_tile_cells;
+                const int cl = cell_land[i];
+                if (cl >= 1)
+                    ++r.cell_land_hist[cl == 1 ? 0 : cl <= 4 ? 1 : cl <= 9 ? 2 : cl <= 24 ? 3 : 4];
             }
         std::sort(sorted.begin(), sorted.end());
         if (!sorted.empty())
@@ -520,6 +534,8 @@ int main(int argc, char** argv)
                 "population centres\n");
     std::printf("world: the shipped arc (world_params{}), harness_params' build_app_base_world "
                 "(generation + setup + recipes; no search)\n");
+    std::printf("settle spacing: %d tiles (generation_settle_spacing_tiles, BL-1132)\n",
+                generation_settle_spacing_tiles);
     std::printf("seeds (%s, %zu):", from_args ? "--seeds" : "docs/generation/seed_library.json",
                 seeds.size());
     for (const uint32_t s : seeds) std::printf(" %u", s);
@@ -600,6 +616,33 @@ int main(int argc, char** argv)
         std::printf("%4u  %10d  %9.1f  %7d  %7d | %7d\n", r.seed, r.road_tiles,
                     pct(r.road_tiles, r.land), r.street_tiles, r.road_tiles - r.street_tiles,
                     r.markets);
+
+    std::printf("\n=== C7 the settle-spacing ladder row (BL-1132; spacing %d tiles) ===\n",
+                generation_settle_spacing_tiles);
+    std::printf("seed  regions  living | cells by land: 1  2-4  5-9  10-24  25+ | centres  land%% | "
+                "empires b/c/f | exploration b/c/f | industrialisation b/c/f\n");
+    int64_t lr_regions = 0, lr_living = 0, lr_hist[5] = {}, lr_centres = 0, lr_ctiles = 0, lr_land = 0;
+    int64_t lr_b[3] = {}, lr_c[3] = {}, lr_f[3] = {};
+    for (const seed_record& r : recs)
+    {
+        std::printf("%4u  %7d  %6d | %17d %4d %4d %6d %4d | %7d  %5.1f | %6" PRId64 "/%" PRId64 "/%" PRId64
+                    " | %6" PRId64 "/%" PRId64 "/%" PRId64 " | %6" PRId64 "/%" PRId64 "/%" PRId64 "\n",
+                    r.seed, r.regions, r.living, r.cell_land_hist[0], r.cell_land_hist[1],
+                    r.cell_land_hist[2], r.cell_land_hist[3], r.cell_land_hist[4], r.centres,
+                    pct(r.centre_tiles, r.land), r.battles[0], r.conquests[0], r.foundings[0],
+                    r.battles[1], r.conquests[1], r.foundings[1], r.battles[2], r.conquests[2],
+                    r.foundings[2]);
+        lr_regions += r.regions; lr_living += r.living; lr_centres += r.centres;
+        lr_ctiles += r.centre_tiles; lr_land += r.land;
+        for (int k = 0; k < 5; ++k) lr_hist[k] += r.cell_land_hist[k];
+        for (int k = 0; k < 3; ++k) { lr_b[k] += r.battles[k]; lr_c[k] += r.conquests[k]; lr_f[k] += r.foundings[k]; }
+    }
+    std::printf("pool  %7" PRId64 "  %6" PRId64 " | %17" PRId64 " %4" PRId64 " %4" PRId64 " %6" PRId64
+                " %4" PRId64 " | %7" PRId64 "  %5.1f | %6" PRId64 "/%" PRId64 "/%" PRId64 " | %6" PRId64
+                "/%" PRId64 "/%" PRId64 " | %6" PRId64 "/%" PRId64 "/%" PRId64 "\n",
+                lr_regions, lr_living, lr_hist[0], lr_hist[1], lr_hist[2], lr_hist[3], lr_hist[4],
+                lr_centres, pct(lr_ctiles, lr_land), lr_b[0], lr_c[0], lr_f[0], lr_b[1], lr_c[1],
+                lr_f[1], lr_b[2], lr_c[2], lr_f[2]);
 
     // Pooled.
     int64_t land = 0, centres = 0, ctiles = 0, spilled = 0, carved = 0, roads = 0, markets = 0;
