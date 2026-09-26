@@ -68,8 +68,14 @@ RNG anywhere on the path:
   before it widens it — a few cities over many towns over a train of villages — and a region whose
   cell is built out promotes a centre it already has instead of spilling a new one. The streets
   and the markets that follow the centres thin with them.
-  **The merge is a size hierarchy inside the region (Ben, 2026-09-25):** its centres are a
-  rank-size share of its own urban heads, as many as keep the smallest a village's worth. **A
+  **A region deepens into one place (Ben, 2026-09-26, superseding the in-region hierarchy of
+  2026-09-25):** it stands **one** centre, whose scale is the rung its urban heads have reached —
+  village, town, city, metropolis, megacity — so growth makes a place bigger, never more numerous.
+  Pouring people into a city widened it into as many as thirty-two centres under the hierarchy;
+  under this rule it becomes one larger city. A region's centre count is therefore one while it
+  stands a settlement and zero once it is abandoned. **Points a place earned go with its people
+  (Ben, 2026-09-26):** industry points a region earned before losing its ground or its settlement
+  pass to the nearest centre of the same realm, never vanish. **A
   region whose cell holds no land carries no centre** (Ben, 2026-09-25): it has no ground to stand
   one on, so nothing spills. "Land" here is ground a centre can stand on — the carve's own
   placement gate — so a cell of land no centre can stand on counts as none (delegated reading,
@@ -130,10 +136,11 @@ RNG anywhere on the path:
   thousand heads remains the scale→headcount mapping. The carve is a pure integer function of
   the region record, no RNG: the **count** is the sum of the living regions' own `centres` —
   the settlements the era drew, grew and left standing, so a razed region contributes nothing
-  and a sacked one contributes fewer; the **scales** are a rank-size share-out of the body's
-  whole urban headcount, banded to the nearest `k_population_for_scale` rung in log space — a
-  few cities over many towns over a train of villages, real settlement concentration as
-  mechanism, never a name. A body whose urban map was never drawn falls back to the flat urban
+  and a sacked one contributes fewer; each region's **scale** is the `k_population_for_scale`
+  rung its own urban heads have reached (a region deepens into one place, above; Ben,
+  2026-09-26, superseding the body-wide rank-size share-out) — a few cities over many towns over
+  a train of villages, because regions differ in how many people they hold, never because a
+  ranking was imposed on them. A body whose urban map was never drawn falls back to the flat urban
   share of population the carve used before it, and a body with no settlement record at all
   keeps the land-area fallback.
 - **Every province is anchored by a centre** (Ben, 2026-08-25; BL-611, province centre anchor).

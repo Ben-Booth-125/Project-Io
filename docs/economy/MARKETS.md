@@ -86,6 +86,11 @@ to another, idle and unbuilt. Three in-world causes remove them, and none is a c
 A folded market's catchment, inventory and pools pass to the market that absorbs it. The junction
 rule above still only lowers the gate; the folds run after it, on the whole set.
 
+**On a world whose firms come from the charter budget, the competitors the carve counts are the
+budget's planned firms (Ben, 2026-09-26; BL-1086)** — the firms each nation's centres can afford —
+so no roster is laid only to be discarded, and the landscape search, which scores the carve's
+markets, still runs after the carve.
+
 **Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
 (`market_for_tile`). **A corporation clears in every market it holds a pool in** (Ben, 2026-09-15):
 goods pools are per `(corp, market)` (`PRODUCTION.md` § Stockpile and output flow), so a building

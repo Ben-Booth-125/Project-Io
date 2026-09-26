@@ -657,7 +657,10 @@ Emigration's line needs contact, far trade (property 7) needs relationships betw
 polities, and a world war spreads only through bindings that reach across the map. So this phase
 raises contact and binds far pairs itself — through trade, migration and alliance — rather than
 inheriting a treaty graph that never reached past the old neighbourhood. Exploration is not
-revisited for it.
+revisited for it. **Far pairs bind across water, not only across a border (Ben, 2026-09-26;
+BL-1142, far pairs across water):** the binding reaches realms on other landmasses, so the
+inter-continental trade the sea lanes carry is common rather than a handful of pairs — seven realm
+pairs on six of sixteen curated worlds before it.
 
 **Migration carries culture.** A stream moves culture shares into its destination centre, so a
 destination becomes mixed while its countryside stays plain. **This is what produces property 4's

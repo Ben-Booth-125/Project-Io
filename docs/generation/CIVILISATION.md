@@ -100,8 +100,12 @@ it needs no new actor type — the sim's `polity` already is one.
 settle spacing).** Founding on the nearest free ground packed the settled cores one region to a
 tile (seed 46: 3,304 of 4,682 regions held a one-tile cell), so every tile of a core was a seat and
 its streets paved it solid — the opposite of sparse. A founding party goes far enough from the
-regions already standing that the new one can grow a hinterland of its own; how far is measured
-on the curated seeds before it is fixed.
+regions already standing that the new one can grow a hinterland of its own: **three tiles** from
+any standing region's seat (Ben, 2026-09-26, from the measured ladder — the knee where one-tile
+cells fall from 26,232 to 231 pooled). **A realm chooses to settle only where a site with room
+exists (Ben, 2026-09-26):** Settle is scored only when a site passes the spacing, so no decision
+round is spent on a founding that cannot happen, and the rounds that would have been wasted go to
+the realm's other choices.
 
 **SETTLED (Ben, 2026-09-09, elicitation): a settlement is a SEAT FLAG ON A REGION, and every
 region points at the seat it feeds.** No new table and no new id space. The region already carries

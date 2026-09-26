@@ -289,7 +289,7 @@
     "src/core/verify_api.cpp",
     "src/main.cpp"
    ],
-   "design": "CARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nFILED (delegated reading, 2026-09-24, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R4). Stretch item in sprint 47: rides the sprint's one re-bless if the relocation (BL-1085) lands with time; otherwise slips.\n\nWHY. Even with Begin's work inside the round-6 worker, stage 11 lays a world-gen roster that the search removes and re-charters (landscape_search.cpp:296-298), and the market carve at stage 12 reads that roster's clusters (hard_coded_world.cpp:2097-2103) — the work is done twice, which is what Ben's brief forbids.\n\nTHE WORK. Fold finish_campaign_world's search into make_hard_coded_world at bump(11) so the carve reads the searched roster; retire the laid-then-removed roster; every pin, golden, --verify and --serve world moves (a design change to what the carve reads, not a move), so it lands in the re-bless with the other world-movers or not at all this sprint.\n\nDONE WHEN. The carve ledger lists the searched roster; no roster is generated and discarded in a Release build log; the re-bless records the movement."
+   "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form): option A -- on a budget world the carve counts the charter budget's planned firms; no roster is laid at stage 11 to be discarded; the search stays after the carve in finish_campaign_world (MARKETS.md). The bump-11 move is superseded: the carve and the search were circular (the carve read the roster; the search scores the carve's markets).\n\nCARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nFILED (delegated reading, 2026-09-24, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R4). Stretch item in sprint 47: rides the sprint's one re-bless if the relocation (BL-1085) lands with time; otherwise slips.\n\nWHY. Even with Begin's work inside the round-6 worker, stage 11 lays a world-gen roster that the search removes and re-charters (landscape_search.cpp:296-298), and the market carve at stage 12 reads that roster's clusters (hard_coded_world.cpp:2097-2103) — the work is done twice, which is what Ben's brief forbids.\n\nTHE WORK. Fold finish_campaign_world's search into make_hard_coded_world at bump(11) so the carve reads the searched roster; retire the laid-then-removed roster; every pin, golden, --verify and --serve world moves (a design change to what the carve reads, not a move), so it lands in the re-bless with the other world-movers or not at all this sprint.\n\nDONE WHEN. The carve ledger lists the searched roster; no roster is generated and discarded in a Release build log; the re-bless records the movement."
   },
   {
    "status": "designed",
@@ -934,7 +934,7 @@
     "src/world/settlement.cpp",
     "tools/verify/centre_census.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app). CIVILISATION.md § The unit is the city state, and settlements are sparse states the rule. FOUND by the centres lane (BL-1130): the settle verb founds each new region on the nearest free tile, so on seed 46 3,304 of 4,682 regions hold a one-tile cell and 3,012 centres (49%) stand in such cells -- each rightly one centre, so the cores stay solid street. THE WORK, measure first: find every path that founds a region (the settlement pass and the sims' Settle verb); a spacing candidate ladder (minimum distance from standing regions, in tiles or traversal cost) on the 16 curated seeds -- regions, one-tile cells, centres, land under centres, the history's battles/conquests/foundings; then Ben fixes the spacing. A sim beat and a world-mover (the one re-bless). DONE WHEN the spacing is fixed and recorded old -> new per seed with the history readings."
+   "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form): SPACING 3 TILES (the ladder's knee), and a realm scores Settle only where a site with room exists (the room-aware scorer). CIVILISATION.md states both.\n\nSETTLED (Ben, 2026-09-25, the open-calls form at the live app). CIVILISATION.md § The unit is the city state, and settlements are sparse states the rule. FOUND by the centres lane (BL-1130): the settle verb founds each new region on the nearest free tile, so on seed 46 3,304 of 4,682 regions hold a one-tile cell and 3,012 centres (49%) stand in such cells -- each rightly one centre, so the cores stay solid street. THE WORK, measure first: find every path that founds a region (the settlement pass and the sims' Settle verb); a spacing candidate ladder (minimum distance from standing regions, in tiles or traversal cost) on the 16 curated seeds -- regions, one-tile cells, centres, land under centres, the history's battles/conquests/foundings; then Ben fixes the spacing. A sim beat and a world-mover (the one re-bless). DONE WHEN the spacing is fixed and recorded old -> new per seed with the history readings."
   },
   {
    "status": "designed",
@@ -1033,7 +1033,9 @@
    "glyph": "✓",
    "sprint": 48,
    "written": "2026-09-25",
-   "requires": [],
+   "requires": [
+    "BL-1141"
+   ],
    "blocked_on": null,
    "parked": false,
    "id": "BL-1137",
@@ -1050,7 +1052,7 @@
     "tools/verify/centre_census.cpp",
     "tools/verify/industrialisation_sim_harness.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form): THE AIM IS ~500 CENTRES a 1960 world (POPULATION.md), about a dozen per market -- an aim the forces are calibrated against, never a count enforced. \"Dramatically fewer\" is read against it; report the per-seed count after the stream and stop for Ben if it is far from the aim.\n\nSET (Ben, 2026-09-25): INDUSTRIALISATION.md § Beat 2 (the urbanisation stream, now set) and POPULATION.md § Generation (\"Centres follow the heads both ways\": a centre below a village's worth is abandoned in the history; NR-947 holds the threshold reading and whether play follows). THE WORK: build Beat 2's URBANISATION stream (a region's countryside and villages -> a centre in the same polity, pulled by industry-point output at the centre, pushed by depleted or strained ground, along held corridors); let a centre's count follow its heads both ways so an emptied village is abandoned. Emigration (between polities) is Beat 2's other stream and is NOT in this item unless the reading shows urbanisation alone cannot thin the map. Measure first and after on the 16 seeds: centres per seed by scale, land under centres, the history's counters. Tune nothing to hit a count; report and stop for Ben if the stream leaves the map far from \"dramatically fewer\". A sim beat and a world-mover."
+   "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form): REBUILD on the deepen rule (BL-1141) and read again -- as built (997b8b52, not merged) it raised centres +8%, markets 5,269 -> 24,123 and industry points ~4x because the in-region hierarchy widened growing cities.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form): THE AIM IS ~500 CENTRES a 1960 world (POPULATION.md), about a dozen per market -- an aim the forces are calibrated against, never a count enforced. \"Dramatically fewer\" is read against it; report the per-seed count after the stream and stop for Ben if it is far from the aim.\n\nSET (Ben, 2026-09-25): INDUSTRIALISATION.md § Beat 2 (the urbanisation stream, now set) and POPULATION.md § Generation (\"Centres follow the heads both ways\": a centre below a village's worth is abandoned in the history; NR-947 holds the threshold reading and whether play follows). THE WORK: build Beat 2's URBANISATION stream (a region's countryside and villages -> a centre in the same polity, pulled by industry-point output at the centre, pushed by depleted or strained ground, along held corridors); let a centre's count follow its heads both ways so an emptied village is abandoned. Emigration (between polities) is Beat 2's other stream and is NOT in this item unless the reading shows urbanisation alone cannot thin the map. Measure first and after on the 16 seeds: centres per seed by scale, land under centres, the history's counters. Tune nothing to hit a count; report and stop for Ben if the stream leaves the map far from \"dramatically fewer\". A sim beat and a world-mover."
   },
   {
    "status": "designed",
@@ -1130,6 +1132,59 @@
     "scripts/verify/sea_lanes.lua"
    ],
    "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form). EXPLORATION.md § The colonial tie is a sea lane, \"A lane is a route of the ocean's currents and of trade between continents\": a fourth writer of a sea-leg use -- trade between realms whose goods cross water writes one use per decision round it runs -- and every leg is priced with its current (BL-1120). THE WORK, measure first: find the spans' trade links between realms on different landmasses (Exploration and Industrialisation), read how many legs and lanes trade would write on the 16 seeds, then write them; the lane record (BL-1097) and the lapse draw them unchanged. Lanes old -> new per seed (count, tribute-written vs trade-written). A sim beat and a world-mover. Pairs with BL-1098 (the lane tier stamped), which then stamps a world whose lanes are trade routes."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-26",
+   "blocked_on": null,
+   "parked": false,
+   "requires": [
+    "BL-1130"
+   ],
+   "id": "BL-1141",
+   "short_name": "CENTRES_DEEPEN",
+   "author": "Ben (2026-09-26, the density-and-trade form: \"Deepen\"); filed by Claude",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 3,
+   "title": "A region deepens into one place: one centre whose scale is the rung its heads have reached",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/settlement.hpp",
+    "src/world/population_generation.cpp",
+    "src/world/stockpile_budget.cpp",
+    "tools/verify/centre_census.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form). POPULATION.md § Generation (\"A region deepens into one place\"; the carve's scale sentence) states it, superseding BL-1130's in-region hierarchy and the body-wide rank-size share-out: a region stands ONE centre while settled (zero once abandoned), its scale the k_population_for_scale rung its own urban heads reached. Also ruled: points go with their people -- industry points a region earned before losing its ground or its settlement pass to the nearest centre of the same realm. FOUND by BL-1137: under the hierarchy a growing city widened into up to 32 centres, so urbanisation RAISED centres (+8%) and markets (5,269 -> 24,123). THE WORK: the count and the carve as ruled; stranded points re-homed; census old -> new against the ~500 aim. A world-mover."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-26",
+   "blocked_on": null,
+   "parked": false,
+   "requires": [
+    "BL-1140"
+   ],
+   "id": "BL-1142",
+   "short_name": "FAR_PAIRS_ACROSS_WATER",
+   "author": "Ben (2026-09-26, the density-and-trade form: \"Both\"); filed by Claude",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Far realms across water bind in the Industrialisation span, and a trade leg run against its current delivers less",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/ocean_currents_harness.cpp",
+    "tools/verify/industrialisation_sim_harness.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form). INDUSTRIALISATION.md § Far pairs meet and bind (far pairs bind across water, not only a border) and EXPLORATION.md § Currents (\"A leg run against its current delivers less\") state it. FOUND by BL-1140: inter-continental trade was 7 realm pairs on 6 of 16 worlds, limited by the seller's stock or the buyer's want, never the sea, so pricing the sea line was nearly inert. THE WORK, measure first: extend the span's far-pair binding to realms on other landmasses; apply a cargo loss after the flow is sized, in proportion to running against the current, one named weight on a ladder. Report cross-water pairs, flows and volume, trade-written lanes, with/against shares. A sim beat and a world-mover."
   }
  ]
 }
