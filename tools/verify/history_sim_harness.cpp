@@ -1978,6 +1978,147 @@ int main()
               "BL1141d7 a razing is counted in village-worths of heads lost, uncapped (a halved ten-million city: 500)");
     }
 
+    // ---------------------------------------------------------------------
+    // BL-1137 — the urbanisation stream, rebuilt under NR-958 (a migrant
+    // carries its food with it; a sack never lowers a region's ceiling).
+    // Fixtures on the region record. The conservation rows (s3, s4) are
+    // written on the move and sack primitives alone, so the same rows build
+    // against the first build and show what it broke; the rows between the
+    // [rebuild-api] markers read functions only the rebuild has.
+    // ---------------------------------------------------------------------
+    {
+        const auto make_region = [](int farm_q, int64_t population, int64_t urban) {
+            region r;
+            r.farm_q = farm_q;
+            r.population = population;
+            r.urban_population = urban;
+            r.centres = urban >= region_centre_heads ? 1 : 0;
+            return r;
+        };
+        const auto ceiling_of = [](int farm_q) { return region_carrying_capacity(farm_q, 0); };
+
+        // S5 CENTRES FOLLOW THE HEADS BOTH WAYS. A village whose heads shrink
+        // below a village's worth is ABANDONED — people leaving, not a sack, so
+        // nothing is razed. A seed below a village's worth that is GROWING is
+        // kept: only a shrinking count abandons.
+        region shrinking = make_region(500, 50000, region_centre_heads + 400); // target 6,000 heads
+        region growing   = make_region(500, 50000, 2000);
+        growing.centres  = 1; // the draw's seed, standing before its heads reach a village's worth
+        int years_to_abandon = -1;
+        for (int y = 0; y < 20; ++y)
+        {
+            advance_region_urban(shrinking, /*network_ok=*/true);
+            advance_region_urban(growing,   /*network_ok=*/true);
+            if (years_to_abandon < 0 && shrinking.centres == 0) years_to_abandon = y + 1;
+        }
+        std::printf("      both ways: shrinking village abandoned after %d years at %lld heads (razed %d); "
+                    "growing seed centres=%d at %lld heads\n",
+                    years_to_abandon, static_cast<long long>(shrinking.urban_population),
+                    shrinking.centres_razed, growing.centres,
+                    static_cast<long long>(growing.urban_population));
+        check(years_to_abandon > 0 && shrinking.urban_population < region_centre_heads
+              && shrinking.centres_razed == 0,
+              "BL1137s5 a centre whose heads shrink below a village's worth is ABANDONED, never razed");
+        check(growing.centres == 1,
+              "BL1137s6 a seed below a village's worth that is GROWING keeps its centre");
+
+        // S3 THE CEILING IS CONSERVED BY A MOVE. Two regions at their ceilings;
+        // 50,000 of the source's countryside move to the town's works. Three
+        // centuries later the world holds exactly the people it held: the
+        // source's emptied countryside has NOT regrown into the ceiling that
+        // left with its people, and the town has not lost them.
+        {
+            region src = make_region(600, ceiling_of(600), 36000);
+            region dst = make_region(800, ceiling_of(800), 60000);
+            const int64_t world_before = src.population + dst.population;
+            const int64_t moved = take_countryside(src, 50000);
+            settle_urban_migrants(dst, moved);
+            const int64_t src_after_move = src.population;
+            for (int y = 0; y < 300; ++y)
+            {
+                advance_region_demography(src, 1, 0);
+                advance_region_demography(dst, 1, 0);
+            }
+            const int64_t world_after = src.population + dst.population;
+            std::printf("      move: %lld heads; world %lld -> %lld after 300 years; source %lld -> %lld\n",
+                        static_cast<long long>(moved), static_cast<long long>(world_before),
+                        static_cast<long long>(world_after), static_cast<long long>(src_after_move),
+                        static_cast<long long>(src.population));
+            check(moved == 50000 && world_after == world_before,
+                  "BL1137s3 a move conserves the world's people for good: the emptied countryside "
+                  "does not regrow into the ceiling that left with it");
+            check(src.population == src_after_move,
+                  "BL1137s3b the source sits AT its lowered ceiling: it regrows nothing into what left");
+        }
+
+        // S4 A SACK MOVES NO ONE OUT OF THE REGION'S COUNT. A town that took
+        // 200,000 of a neighbour's countryside is sacked (its walls lose half
+        // their heads, more than it has works people left inside them). The
+        // turned-out heads scatter into its own countryside: its people are
+        // unchanged by the sack and fifty years after it.
+        {
+            region src  = make_region(600, ceiling_of(600), 36000);
+            region city = make_region(800, ceiling_of(800), 60000);
+            settle_urban_migrants(city, take_countryside(src, 200000));
+            const int64_t before = city.population;
+            sack_region_urban(city, /*population_loss_q=*/250); // the walls lose 500 per mille
+            const int64_t right_after = city.population;
+            for (int y = 0; y < 50; ++y)
+            {
+                advance_region_demography(city, 1, 0);
+                advance_region_urban(city, /*network_ok=*/true);
+            }
+            std::printf("      sacked works town: people %lld -> %lld at the sack -> %lld fifty years on "
+                        "(urban %lld)\n",
+                        static_cast<long long>(before), static_cast<long long>(right_after),
+                        static_cast<long long>(city.population),
+                        static_cast<long long>(city.urban_population));
+            check(right_after == before && city.population == before,
+                  "BL1137s4 a sack moves no one out of the region's count, at the sack or after it");
+        }
+        // [rebuild-api]
+        // S1/S2 THE STREAM ITSELF, one round of `run_urbanisation_stream`:
+        // realm 0 holds a town (0), a village at its ceiling (1) and a colony
+        // (2) whose only corridor crosses water; realm 1 holds region 3. The
+        // round conserves the world's people and its ceiling exactly, the
+        // colony across the water sends nobody, and the foreign region is
+        // untouched.
+        {
+            std::vector<region> w;
+            w.push_back(make_region(800, 300000, 60000));               // 0: an industrialising town
+            w.push_back(make_region(600, ceiling_of(600), 30000));      // 1: a village at its ceiling
+            w.push_back(make_region(600, 200000, 10000));               // 2: the colony over the water
+            w.push_back(make_region(700, 300000, 40000));               // 3: another realm's
+            const std::vector<int> own = { 0, 0, 0, 1 };
+            const std::vector<std::vector<int>> nbr = { { 1, 2, 3 }, { 0, 2, 3 }, { 0, 1, 3 }, { 0, 1, 2 } };
+            const auto over_water = [](int a, int b) { return a != 2 && b != 2; };
+            const std::vector<int64_t> credit = { 1000, 0, 0, 500 };
+            int64_t people_before = 0, ceiling_before = 0;
+            for (const region& r : w) { people_before += r.population; ceiling_before += region_ceiling(r); }
+            const region colony = w[2], foreign = w[3];
+            const urbanisation_round ur = run_urbanisation_stream(w, own, nbr, over_water, credit, 10);
+            int64_t people_after = 0, ceiling_after = 0;
+            for (const region& r : w) { people_after += r.population; ceiling_after += region_ceiling(r); }
+            std::printf("      stream round: moved %lld to %d town(s); people %lld -> %lld; ceiling %lld -> %lld; "
+                        "town industrial %lld\n",
+                        static_cast<long long>(ur.moved), static_cast<int>(ur.destinations.size()),
+                        static_cast<long long>(people_before), static_cast<long long>(people_after),
+                        static_cast<long long>(ceiling_before), static_cast<long long>(ceiling_after),
+                        static_cast<long long>(w[0].industrial_heads));
+            check(ur.moved > 0 && ur.destinations.size() == 1 && ur.destinations[0] == 0
+                  && people_after == people_before,
+                  "BL1137s1 a stream round conserves the world's people (world total before = after)");
+            check(ceiling_after == ceiling_before && w[1].capacity_carried < 0
+                  && w[0].capacity_carried + w[1].capacity_carried == 0,
+                  "BL1137s1b a stream round conserves the world's ceiling: what the town gains the countryside lost");
+            check(w[2].population == colony.population && w[2].capacity_carried == 0
+                  && w[3].population == foreign.population && w[3].capacity_carried == 0,
+                  "BL1137s2 the stream's line stays on land and in the realm: the colony over the water "
+                  "and the foreign region send nobody");
+        }
+        // [/rebuild-api]
+    }
+
     // --- M1  over-muster starves industry (BL-867) --------------------------
     //
     // CIVILISATION.md § Materials are spent: "a polity that musters too hard

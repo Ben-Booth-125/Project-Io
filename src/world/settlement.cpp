@@ -1771,6 +1771,10 @@ namespace {
 constexpr int64_t demog_capacity_floor    = 5000;  // Headcount at farm_q = 0.
 constexpr int64_t demog_capacity_per_q    = 500;   // Extra headcount per farm_q point.
 constexpr int64_t demog_growth_rate_q     = 12;     // ~1.2%/yr logistic rate, low-density.
+/// BL-1137: per mille a year of a fully strained countryside that leaves for
+/// the towns. A CHOSEN CONSTANT (the centres cold review, 2026-09-26): equal in
+/// value to `demog_growth_rate_q` as a first cut, derived from nothing.
+constexpr int64_t urbanisation_rate_per_mille = 12;
 constexpr int64_t demog_war_drawdown_q    = 40;     // Up to ~4%/yr loss at war_pressure_q = 1000.
 constexpr int64_t demog_manpower_frac_q   = 50;     // Ceiling: 5% of population under arms at once.
 constexpr int64_t demog_manpower_recover_q = 250;   // Stock closes 25% of the ceiling gap per step.
@@ -1962,9 +1966,13 @@ int region_urban_share_q(int farm_q)
 
 namespace {
 
-/// Promote `centres` to whatever `urban_population` now stands up, never
-/// demote on growth. POPULATION.md's asymmetry: passive failure shrinks a
-/// centre and never destroys one, so only `sack_region_urban` razes one.
+/// Let `centres` follow what `urban_population` now stands up.
+///
+/// BL-1137 — CENTRES FOLLOW THE HEADS BOTH WAYS (Ben, 2026-09-25, superseding
+/// "growth only promotes"): growing heads promote; @p shrinking heads (this
+/// year's step took the headcount down) hold the count to what they still
+/// stand, so a centre whose heads fell below a village's worth is ABANDONED —
+/// people leaving, not a sack, so `centres_razed` is untouched.
 ///
 /// BL-1141 — A REGION DEEPENS INTO ONE PLACE: what the heads stand up is one
 /// centre once they reach a village's worth (`region_centres_wanted`), held to
@@ -1973,14 +1981,18 @@ namespace {
 /// off the heads at the carve — never more numerous.
 ///
 /// BL-872 — `network_ok` false FREEZES growth: the ground the network can no
-/// longer feed or govern stands up no NEW centre. The ground hold still
-/// applies — a cell that lost its ground holds none whether or not the seat
-/// reaches it — and `sack_region_urban` stays the only place a centre is razed.
-void promote_centres(region& p, bool network_ok)
+/// longer feed or govern stands up no NEW centre. The ground hold and the
+/// abandonment still apply — a cell that lost its ground holds none, and heads
+/// that left are gone, whether or not the seat reaches it — and
+/// `sack_region_urban` stays the only place a centre is DESTROYED (razed).
+void promote_centres(region& p, bool network_ok, bool shrinking)
 {
     int c = p.centres;
+    const int wanted = region_centres_wanted(p.urban_population);
     if (network_ok)
-        c = std::max(c, region_centres_wanted(p.urban_population));
+        c = std::max(c, wanted);
+    if (shrinking)
+        c = std::min(c, wanted);
     p.centres = region_centres_fit(c, p.urban_ground);
 }
 
@@ -2115,7 +2127,7 @@ void draw_region_urban(region& p)
     // (`advance_region_urban`), never on the one-centre opening seed every
     // farmable region gets regardless of network, above.
     p.centres = 1;
-    promote_centres(p, /*network_ok=*/true);
+    promote_centres(p, /*network_ok=*/true, /*shrinking=*/false);
 }
 
 void draw_urban_map(settlement_state& s)
@@ -2133,18 +2145,27 @@ void advance_region_urban(region& p, bool network_ok)
         // touched here: nobody sacked these walls, the people simply went.
         p.urban_population = 0;
         p.centres          = 0;
+        p.industrial_heads = 0;
         return;
     }
 
-    const int64_t target =
-        clampi64((p.population * region_urban_share_q(p.farm_q)) / 1000, 0, 1LL << 40);
+    // BL-1137: the industrial heads are people this region holds (a plague
+    // that took them leaves fewer), and they all live in its centres, so the
+    // target is the farm-fed people's urban share PLUS every industrial head.
+    // With none — every span before the Industrialisation span's stream — the
+    // target is exactly `population * share`, as it always was.
+    p.industrial_heads = clampi64(p.industrial_heads, 0, p.population);
+    const int64_t farm_fed = p.population - p.industrial_heads;
+    const int64_t target = clampi64(
+        (farm_fed * region_urban_share_q(p.farm_q)) / 1000 + p.industrial_heads, 0, 1LL << 40);
+    const int64_t before = p.urban_population;
     const int64_t gap = target - p.urban_population;
     // Integer division truncates toward zero in both directions, so the step is
     // symmetric and a gap smaller than 1000/urban_converge_q simply stalls —
     // which is the correct behaviour for a town already at its ground's size.
     p.urban_population = clampi64(p.urban_population + (gap * urban_converge_q) / 1000,
                                   0, 1LL << 40);
-    promote_centres(p, network_ok);
+    promote_centres(p, network_ok, /*shrinking=*/p.urban_population < before);
 }
 
 void sack_region_urban(region& p, int population_loss_q)
@@ -2163,6 +2184,16 @@ void sack_region_urban(region& p, int population_loss_q)
                   * urban_sack_multiple_q) / 1000, 0, 1000);
     p.urban_population = clampi64(
         p.urban_population - (p.urban_population * loss_q) / 1000, 0, 1LL << 40);
+    // NR-958 — A SACK NEVER LOWERS A REGION'S CEILING. The works' people are
+    // city people, and the ones the walls no longer hold scatter into the
+    // region's own countryside, where the capacity they carried still feeds
+    // them: `industrial_heads` falls to what the walls hold and every head it
+    // loses is a farm-fed head of the same region. `population` and
+    // `capacity_carried` are untouched, so the ceiling stands where it stood and
+    // nobody leaves the count — the first build cut the ceiling with the heads
+    // and the next year's clamp deleted ~40% of a sacked city (the centres cold
+    // review). War does not consume people (BL-835).
+    p.industrial_heads = clampi64(p.industrial_heads, 0, p.urban_population);
 
     // What the survivors can still stand up. BL-1130: "stand up" is the same
     // rule growth builds by (one centre, BL-1141), on the same ground, so a sack and a promotion
@@ -2188,6 +2219,93 @@ void sack_region_urban(region& p, int population_loss_q)
             0, std::numeric_limits<int>::max()));
 }
 
+// ---------------------------------------------------------------------------
+// The urbanisation stream (BL-1137; INDUSTRIALISATION.md § Beat 2)
+// ---------------------------------------------------------------------------
+
+int64_t region_ceiling(const region& p)
+{
+    return clampi64(region_carrying_capacity(p.farm_q, p.work_capacity_mod) + p.capacity_carried,
+                    0, 1LL << 40);
+}
+
+int64_t region_farm_fed_ceiling(const region& p)
+{
+    return clampi64(region_ceiling(p) - clampi64(p.industrial_heads, 0, 1LL << 40), 0, 1LL << 40);
+}
+
+int urbanisation_rate_q()
+{
+    return static_cast<int>(urbanisation_rate_per_mille);
+}
+
+int64_t urbanisation_outflow(const region& p, int step_years)
+{
+    if (p.population <= 0 || step_years <= 0) return 0;
+    const int64_t countryside = clampi64(p.population - p.urban_population, 0, 1LL << 40);
+    if (countryside <= 0) return 0;
+    // THE PUSH: the strain on the ground — its farm-fed people over what its
+    // farmland feeds, per mille. The industrial heads are fed by the capacity
+    // they carried, so they strain nothing; a countryside the stream has
+    // thinned is less strained and pushes less.
+    const int64_t K_farm   = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
+    const int64_t farm_fed = clampi64(p.population - p.industrial_heads, 0, 1LL << 40);
+    const int64_t strain_q = (K_farm > 0) ? clampi64((farm_fed * 1000) / K_farm, 0, 1000) : 1000;
+    // countryside x rate x strain x years, staged so nothing leaves int64:
+    // countryside <= 2^40, rate x strain <= 12,000, years clamped to 1000.
+    const int64_t years = clampi64(step_years, 0, 1000);
+    const int64_t per_year = (countryside * urbanisation_rate_per_mille * strain_q) / 1000000;
+    return clampi64(per_year * years, 0, countryside);
+}
+
+int64_t take_countryside(region& p, int64_t heads)
+{
+    if (heads <= 0 || p.population <= 0) return 0;
+    // The countryside is farm-fed by construction (the industrial heads live in
+    // the centres); both bounds are read so a record that broke it cannot hand
+    // the stream an industrial head as a farmer.
+    const int64_t countryside = clampi64(p.population - p.urban_population, 0, 1LL << 40);
+    const int64_t farm_fed    = clampi64(p.population - p.industrial_heads, 0, 1LL << 40);
+    const int64_t taken = clampi64(heads, 0, std::min(countryside, farm_fed));
+    p.population -= taken;
+    // NR-958: the migrant carries its food with it — the ceiling leaves too.
+    p.capacity_carried = clampi64(p.capacity_carried - taken, -(1LL << 40), 1LL << 40);
+    return taken;
+}
+
+void settle_urban_migrants(region& p, int64_t heads)
+{
+    if (heads <= 0) return;
+    p.population       = clampi64(p.population + heads, 0, 1LL << 40);
+    p.urban_population = clampi64(p.urban_population + heads, 0, 1LL << 40);
+    p.industrial_heads = clampi64(p.industrial_heads + heads, 0, p.population);
+    // NR-958: ...and arrives with it, so the heads are fed and the farm-fed
+    // people's ceiling (`region_farm_fed_ceiling`) is exactly what it was.
+    p.capacity_carried = clampi64(p.capacity_carried + heads, -(1LL << 40), 1LL << 40);
+}
+
+bool region_stands_a_town(const region& p)
+{
+    return p.urban_population >= static_cast<int64_t>(k_population_for_scale[1]) * 1000;
+}
+
+namespace {
+
+/// The logistic term dP = r * P * (K - P) / K, all integer. EXACT, as it always
+/// was, on ground whose numbers fit 31 bits — every ceiling farmland and works
+/// alone can raise — and staged so nothing leaves int64 on ground whose
+/// ceiling the stream carried past that.
+int64_t logistic_growth(int64_t P, int64_t K)
+{
+    if (P <= 0 || K <= 0) return 0;
+    if (P < (1LL << 31) && K < (1LL << 31))
+        return (demog_growth_rate_q * P * (K - P)) / (K * 1000);
+    const int64_t gap_ppm = clampi64(((K - P) * 1000000) / K, -1000000, 1000000);
+    return ((demog_growth_rate_q * P) / 1000) * gap_ppm / 1000000;
+}
+
+} // namespace
+
 void advance_region_demography(region& p, int years, int war_pressure_q)
 {
     if (years <= 0) return;
@@ -2197,24 +2315,37 @@ void advance_region_demography(region& p, int years, int war_pressure_q)
     // one-off population grant: it lifts the asymptote the logistic term is
     // growing toward, which is a permanent change in trajectory rather than a
     // step that growth would simply re-flatten.
-    const int64_t K = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
-
+    //
+    // NR-958 — A MIGRANT CARRIES ITS FOOD WITH IT. The ceiling is the
+    // farmland's plus the capacity the urbanisation stream carried in, minus
+    // what it carried out (`region_ceiling`), so a move conserves the world's
+    // ceiling. And ONLY THE FARM-FED PEOPLE BREED: births are the logistic term
+    // on the people the ceiling feeds once its industrial heads are fed
+    // (`region_farm_fed_ceiling`), so moved capacity never inflates the density
+    // term — a destination's natives grow against exactly their farmland's
+    // ceiling, and a source's thinned countryside sits AT its lowered ceiling
+    // and regrows nothing into what left. With no stream (every span before
+    // the Industrialisation span's) both are zero and this is the old step,
+    // term for term.
     for (int y = 0; y < years; ++y)
     {
-        if (p.population <= 0) { p.population = 0; continue; } // Nothing to grow from.
+        if (p.population <= 0) { p.population = 0; p.industrial_heads = 0; continue; } // Nothing to grow from.
 
-        const int64_t P = p.population;
-        // Logistic growth term: dP = r * P * (K - P) / K, all integer.
-        const int64_t delta = (demog_growth_rate_q * P * (K - P)) / (K * 1000);
-        int64_t next = P + delta;
+        p.industrial_heads = clampi64(p.industrial_heads, 0, p.population);
+        int64_t ind = p.industrial_heads;
+        const int64_t F  = p.population - ind;
+        const int64_t Kf = region_farm_fed_ceiling(p);
+        int64_t next = F + logistic_growth(F, Kf);
 
         if (wq > 0)
         {
             const int64_t loss = (next * static_cast<int64_t>(wq) * demog_war_drawdown_q) / (1000 * 1000);
             next -= loss;
+            ind  -= (ind * static_cast<int64_t>(wq) * demog_war_drawdown_q) / (1000 * 1000);
         }
 
-        p.population = clampi64(next, 0, K);
+        p.industrial_heads = ind;
+        p.population = clampi64(next, 0, Kf) + ind;
     }
 
     p.last_demography_year += years;

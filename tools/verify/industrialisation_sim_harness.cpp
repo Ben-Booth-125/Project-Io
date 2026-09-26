@@ -837,6 +837,8 @@ void region_fields(const region& a, const region& b, field_census& out)
     FID_CMP(population); FID_CMP(last_demography_year); FID_CMP(manpower_stock); FID_CMP(army_stock);
     FID_CMP(centres); FID_CMP(centres_razed); FID_CMP(urban_population); FID_CMP(network_supply_q);
     FID_CMP(urban_ground);                            // BL-1130: the cell's ground, generation scratch
+    FID_CMP(industrial_heads);                        // BL-1137: the urbanisation stream's heads
+    FID_CMP(capacity_carried);                        // NR-958: the ceiling the stream moved
     FID_CMP(creed_hold); FID_CMP(universal_creed); FID_CMP(creed_residue_culture);
     FID_CMP(creed_hold_years); FID_CMP(works_built); FID_CMP(work_capacity_mod);
     FID_CMP(work_manpower_mod); FID_CMP(work_reach_mod); FID_CMP(work_defence_mod);
@@ -847,26 +849,26 @@ void region_fields(const region& a, const region& b, field_census& out)
     FID_CMP(industry_points_from_treasury);           // BL-1056: the report-only treasury tally
 }
 /// `region`'s data members, and so the fields `region_fields` must list.
-constexpr int k_region_fields = 58;
+constexpr int k_region_fields = 60;
 
 /// COMPILE-TIME: a structured binding of a `region` must name exactly as many
 /// members as it has, so this stops compiling the moment `region` gains or
 /// loses one -- until `k_region_fields` and the list above follow it.
 [[maybe_unused]] void region_member_count(const region& r)
 {
-    static_assert(k_region_fields == 58, "bind every region member below");
+    static_assert(k_region_fields == 60, "bind every region member below");
     const auto& [m01, m02, m03, m04, m05, m06, m07, m08, m09, m10,
                  m11, m12, m13, m14, m15, m16, m17, m18, m19, m20,
                  m21, m22, m23, m24, m25, m26, m27, m28, m29, m30,
                  m31, m32, m33, m34, m35, m36, m37, m38, m39, m40,
                  m41, m42, m43, m44, m45, m46, m47, m48, m49, m50,
-                 m51, m52, m53, m54, m55, m56, m57, m58] = r;
+                 m51, m52, m53, m54, m55, m56, m57, m58, m59, m60] = r;
     (void)m01; (void)m02; (void)m03; (void)m04; (void)m05; (void)m06; (void)m07; (void)m08; (void)m09; (void)m10;
     (void)m11; (void)m12; (void)m13; (void)m14; (void)m15; (void)m16; (void)m17; (void)m18; (void)m19; (void)m20;
     (void)m21; (void)m22; (void)m23; (void)m24; (void)m25; (void)m26; (void)m27; (void)m28; (void)m29; (void)m30;
     (void)m31; (void)m32; (void)m33; (void)m34; (void)m35; (void)m36; (void)m37; (void)m38; (void)m39; (void)m40;
     (void)m41; (void)m42; (void)m43; (void)m44; (void)m45; (void)m46; (void)m47; (void)m48; (void)m49; (void)m50;
-    (void)m51; (void)m52; (void)m53; (void)m54; (void)m55; (void)m56; (void)m57; (void)m58;
+    (void)m51; (void)m52; (void)m53; (void)m54; (void)m55; (void)m56; (void)m57; (void)m58; (void)m59; (void)m60;
 }
 
 /// RUN-TIME: `region_fields` names exactly `k_region_fields` DISTINCT fields.

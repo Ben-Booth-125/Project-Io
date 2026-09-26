@@ -402,6 +402,47 @@ int region_distance(const region& a, const region& b, int gw)
     return dc > dr ? dc : dr; // Chebyshev — movement is eight-connected.
 }
 
+namespace {
+
+/// Round x / n to the nearest integer, halves away from zero (n > 0).
+int div_round_nearest(int x, int n)
+{
+    return x >= 0 ? (2 * x + n) / (2 * n) : -((-2 * x + n) / (2 * n));
+}
+
+/// BL-1137 (the centres cold review, 2026-09-26) — THE STREAM'S LINE STAYS ON
+/// LAND. True when the straight line between two regions' anchors — Chebyshev
+/// steps, the short way round the cylinder, both ends included — crosses no
+/// water tile. The supply graph (`supply_neighbours`) joins every region
+/// within its radius whatever lies between, so a colony across a strait, or a
+/// chain of held coastal water, sits in one piece with its home towns; people
+/// walk, and this is the line they walk. Pure: the substrate, two anchors, the
+/// grid. A substrate of the wrong size refuses nothing.
+bool anchors_joined_by_land(const std::vector<terrain_substrate>& sub,
+                            const region& a, const region& b, int gw, int gh)
+{
+    if (gw <= 0 || gh <= 0 || sub.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return true;
+    int dc = b.col - a.col;
+    if (dc > gw / 2) dc -= gw;
+    else if (dc < -(gw / 2)) dc += gw;
+    const int dr = b.row - a.row;
+    const int steps = std::max(std::abs(dc), std::abs(dr));
+    for (int s = 0; s <= steps; ++s)
+    {
+        const int c = a.col + (steps > 0 ? div_round_nearest(dc * s, steps) : 0);
+        const int r = a.row + (steps > 0 ? div_round_nearest(dr * s, steps) : 0);
+        if (r < 0 || r >= gh) return false;
+        const int cc = ((c % gw) + gw) % gw;
+        if (is_water(sub[static_cast<std::size_t>(r) * static_cast<std::size_t>(gw)
+                         + static_cast<std::size_t>(cc)]))
+            return false;
+    }
+    return true;
+}
+
+} // namespace
+
 bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>& owner,
                             std::size_t i, int gw)
 {
@@ -427,6 +468,113 @@ bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>
     from.industry_points = 0;
     from.industry_points_from_treasury = 0;
     return true;
+}
+
+urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
+                                           const std::vector<int>& owner,
+                                           const std::vector<std::vector<int>>& neighbours,
+                                           const std::function<bool(int, int)>& linked,
+                                           const std::vector<int64_t>& credit,
+                                           int step_years)
+{
+    urbanisation_round out;
+    const std::size_t n = regions.size();
+    if (step_years <= 0 || n == 0) return out;
+    std::vector<int> piece(n, -1);
+    std::vector<int> members, dests;
+    std::vector<int64_t> pull;
+    for (std::size_t start = 0; start < n; ++start)
+    {
+        const int q = (start < owner.size()) ? owner[start] : -1;
+        if (q < 0 || piece[start] >= 0) continue;
+        // THE LINE: the realm's held ground its own corridors join.
+        members.clear();
+        piece[start] = static_cast<int>(start);
+        members.push_back(static_cast<int>(start));
+        for (std::size_t f = 0; f < members.size(); ++f)
+        {
+            const int at = members[f];
+            if (static_cast<std::size_t>(at) >= neighbours.size()) continue;
+            for (int nb : neighbours[static_cast<std::size_t>(at)])
+            {
+                if (nb < 0 || static_cast<std::size_t>(nb) >= n) continue;
+                const std::size_t ni = static_cast<std::size_t>(nb);
+                if (piece[ni] >= 0 || ni >= owner.size() || owner[ni] != q) continue;
+                if (linked && !linked(at, nb)) continue;
+                piece[ni] = static_cast<int>(start);
+                members.push_back(nb);
+            }
+        }
+        std::sort(members.begin(), members.end()); // ascending: a total order
+
+        // THE DESTINATIONS, and their pull.
+        dests.clear();
+        pull.clear();
+        int64_t pull_total = 0;
+        for (int m : members)
+        {
+            const region& r = regions[static_cast<std::size_t>(m)];
+            if (r.population <= 0 || !region_stands_a_town(r)) continue;
+            const int64_t c = (static_cast<std::size_t>(m) < credit.size())
+                                  ? credit[static_cast<std::size_t>(m)] : 0;
+            if (c <= 0) continue;
+            // A weight, saturated at 2^30 a region (a round's credit past a
+            // billion points in one region is beyond anything the span makes).
+            dests.push_back(m);
+            pull.push_back(std::min<int64_t>(c, 1LL << 30));
+            pull_total += pull.back();
+        }
+        if (dests.empty() || pull_total <= 0) continue;
+        // Weights kept under 2^31 in total, so the apportionment's products
+        // stay inside int64; halving every weight keeps their proportions.
+        // Never taken at any credit the span produces.
+        while (pull_total >= (1LL << 31))
+        {
+            pull_total = 0;
+            for (int64_t& v : pull) { v = std::max<int64_t>(1, v >> 1); pull_total += v; }
+        }
+
+        // THE PUSH: every countryside of the piece, with the ceiling it carries.
+        int64_t pool = 0;
+        for (int m : members)
+        {
+            region& r = regions[static_cast<std::size_t>(m)];
+            pool += take_countryside(r, urbanisation_outflow(r, step_years));
+        }
+        if (pool <= 0) continue;
+
+        // THE PULL. Largest remainder, exact: pool = sum of shares
+        // (part < pull_total < 2^31 and a weight < 2^31, so part * pull < 2^62).
+        const int64_t whole = pool / pull_total, part = pool % pull_total;
+        std::vector<int64_t> share(dests.size(), 0), rem(dests.size(), 0);
+        int64_t given = 0;
+        for (std::size_t k = 0; k < dests.size(); ++k)
+        {
+            const int64_t num = part * pull[k];
+            share[k] = whole * pull[k] + num / pull_total;
+            rem[k]   = num % pull_total;
+            given   += share[k];
+        }
+        int64_t left = pool - given; // 0 <= left < dests.size()
+        if (left > 0)
+        {
+            std::vector<std::size_t> order(dests.size());
+            for (std::size_t k = 0; k < order.size(); ++k) order[k] = k;
+            std::stable_sort(order.begin(), order.end(),
+                             [&rem](std::size_t a, std::size_t b) { return rem[a] > rem[b]; });
+            for (std::size_t k = 0; k < order.size() && left > 0; ++k, --left)
+                ++share[order[k]];
+        }
+        for (std::size_t k = 0; k < dests.size(); ++k)
+        {
+            if (share[k] <= 0) continue;
+            settle_urban_migrants(regions[static_cast<std::size_t>(dests[k])], share[k]);
+            out.destinations.push_back(dests[k]);
+        }
+        out.moved += pool;
+    }
+    std::sort(out.destinations.begin(), out.destinations.end());
+    return out;
 }
 
 int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner, int gw)
@@ -2166,6 +2314,26 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const uint32_t lo = static_cast<uint32_t>(a < b ? a : b);
         const uint32_t hi = static_cast<uint32_t>(a < b ? b : a);
         return (static_cast<uint64_t>(lo) << 32) | static_cast<uint64_t>(hi);
+    };
+
+    // BL-1137 (the centres cold review) — THE STREAM'S LINE, memoised per
+    // corridor: anchors never move and the terrain is fixed for the run, so a
+    // corridor's answer is computed once. Read lower index to higher, so the
+    // answer is one per corridor whichever end asks. Lookups only: the map's
+    // layout never reaches a result. No substrate (a synthetic fixture): no
+    // water to cross, every corridor walks.
+    std::unordered_map<uint64_t, bool> stream_land_link;
+    const auto stream_link_on_land = [&](int a, int b) -> bool {
+        if (terrain.substrate == nullptr) return true;
+        const uint64_t key = edge_key(a, b);
+        const auto it = stream_land_link.find(key);
+        if (it != stream_land_link.end()) return it->second;
+        const int lo = std::min(a, b), hi = std::max(a, b);
+        const bool ok = anchors_joined_by_land(*terrain.substrate,
+                                               ss.regions[static_cast<std::size_t>(lo)],
+                                               ss.regions[static_cast<std::size_t>(hi)], gw, gh);
+        stream_land_link.emplace(key, ok);
+        return ok;
     };
     const auto road_tier_for_uses = [&](int uses) {
         // BL-940: the third rung. ORDINARY TRAFFIC is not meant to reach
@@ -4168,6 +4336,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
             else
             {
                 const scoped_ns prof_points(prof.ns_industry_points); // report-only
+                // BL-1137: the stock before this round's accrual, so the
+                // urbanisation stream below reads each town's OUTPUT this
+                // round (its pull) as the accrual's own credit.
+                std::vector<int64_t> urb_points_before(ss.regions.size(), 0);
+                for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
+                    urb_points_before[ri] = ss.regions[ri].industry_points;
                 const industry_points_round pr =
                     accrue_industry_points(ss.regions, out.polities, params, step_years);
                 out.industry_points_from_scale += pr.credited;
@@ -4260,6 +4434,45 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             }
                         }
                     }
+                }
+
+                // ---- BL-1137: THE URBANISATION STREAM -----------------------
+                //
+                // INDUSTRIALISATION.md sec Beat 2 (SET, Ben 2026-09-25: this span
+                // encourages more migration, and migration is how the map thins).
+                // Once a decision round, off this round's accrual, behind the
+                // same switch and open year as the points themselves, so every
+                // other span is untouched. `run_urbanisation_stream` is the rule
+                // (history_sim.hpp); the sim hands it the realm map, the supply
+                // corridors with a line that stays on land, and this round's
+                // credit.
+                //
+                // A MIGRANT CARRIES ITS FOOD WITH IT (NR-958): each head leaves
+                // its countryside with one head of ceiling and lands with it, so
+                // the round conserves the world's people AND its carrying
+                // capacity, and a thinned countryside cannot regrow into what
+                // left. The villages empty as a CONSEQUENCE: a region whose
+                // countryside leaves has a smaller urban target, its heads
+                // shrink toward it, and a centre whose heads fall below a
+                // village's worth is abandoned (`advance_region_urban`, both
+                // ways) and hands its points to the realm's nearest centre.
+                {
+                    const std::size_t n = ss.regions.size();
+                    std::vector<int64_t> credit(n, 0);
+                    for (std::size_t ri = 0; ri < n && ri < urb_points_before.size(); ++ri)
+                        credit[ri] = ss.regions[ri].industry_points - urb_points_before[ri];
+                    // The reach cache watches the rebate (BL-1130 review fix):
+                    // only a destination's heads move, so only they are read.
+                    std::vector<int> rebate_before(n, 0);
+                    for (std::size_t ri = 0; ri < n; ++ri)
+                        rebate_before[ri] = relay_rebate_of(ss.regions[ri]);
+                    const urbanisation_round ur = run_urbanisation_stream(
+                        ss.regions, owner, supply_neighbours,
+                        [&](int a, int b) { return stream_link_on_land(a, b); }, credit, step_years);
+                    for (const int d : ur.destinations)
+                        if (relay_rebate_of(ss.regions[static_cast<std::size_t>(d)])
+                            != rebate_before[static_cast<std::size_t>(d)])
+                            ++centres_version;
                 }
             }
         }
@@ -6023,9 +6236,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // sack_region_urban) -- so this reads "has this ground ever
                     // been sacked", not "is it empty right now".
                     if (params.settle_requires_razed_ground && p.centres_razed <= 0) continue;
-                    const int64_t K = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
+                    // NR-958: the ceiling growth reads — the farm-fed people
+                    // against what the region's ceiling feeds once its
+                    // industrial heads are fed (`region_farm_fed_ceiling`),
+                    // exactly the works-aware farm ceiling wherever the
+                    // urbanisation stream has not run.
+                    const int64_t K = region_farm_fed_ceiling(p);
                     if (K <= 0) continue;
-                    const int pressure = static_cast<int>(clampi64((p.population * 1000) / K, 0, 1000));
+                    const int64_t farm_fed = clampi64(p.population - p.industrial_heads, 0, p.population);
+                    const int pressure = static_cast<int>(clampi64((farm_fed * 1000) / K, 0, 1000));
                     if (pressure <= pressure_best) continue;
                     // BL-1132 — A REALM SETTLES ONLY WHERE THERE IS ROOM (Ben,
                     // 2026-09-26; CIVILISATION.md § The unit is the city state).

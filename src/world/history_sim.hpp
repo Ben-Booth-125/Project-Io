@@ -62,6 +62,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <string>
 #include <utility>
@@ -4635,6 +4636,44 @@ bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>
 /// skipped: a sack's points stay on the ruin (NR-901), exactly as the budget
 /// reads its razed reason. Returns how many regions' points moved.
 int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner, int gw);
+
+/// One round of the urbanisation stream's outcome (`run_urbanisation_stream`).
+struct urbanisation_round
+{
+    int64_t          moved = 0;    ///< heads that left a countryside for a town this round
+    std::vector<int> destinations; ///< regions that took any, ascending
+};
+
+/// THE URBANISATION STREAM, ONE DECISION ROUND (BL-1137; INDUSTRIALISATION.md
+/// § Beat 2: "a region's countryside -> a centre in the same polity; pull:
+/// industry-point output at the centre; push: depleted or strained ground;
+/// line: held corridors").
+///
+///   THE LINE. Each realm's held ground (`owner`) splits into the pieces its
+///   own corridors join: edges of @p neighbours between two regions it holds
+///   that @p linked accepts (the sim passes a line that stays on land, so the
+///   supply graph's reach across a strait is not a road people walk). People
+///   move only inside one piece.
+///   THE DESTINATIONS. The piece's regions of at least a town's people
+///   (`region_stands_a_town`) with industry-point output this round
+///   (@p credit > 0).
+///   THE PUSH. Every region of the piece sends its countryside at
+///   `urbanisation_outflow` over @p step_years.
+///   THE PULL. The piece's pooled migrants are shared over its destinations in
+///   proportion to their @p credit (largest remainder, exact, ties to the lower
+///   region index), and land as industrial heads (`settle_urban_migrants`).
+///
+/// A piece with no industrialising town sends nobody. CONSERVING (NR-958): every
+/// head is taken whole from a countryside with its ceiling (`take_countryside`)
+/// and landed whole in a town with it, so the world's people and its carrying
+/// capacity are both unchanged by the round. Pure and deterministic over its
+/// arguments: pieces are walked from the lowest region index, members sorted.
+urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
+                                           const std::vector<int>& owner,
+                                           const std::vector<std::vector<int>>& neighbours,
+                                           const std::function<bool(int, int)>& linked,
+                                           const std::vector<int64_t>& credit,
+                                           int step_years);
 
 /// Years between decision rounds at calendar year @p y, read from @p p's band
 /// table. Returns the first band whose `until_year` exceeds @p y, falling back

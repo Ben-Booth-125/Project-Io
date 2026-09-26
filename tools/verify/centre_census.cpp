@@ -252,6 +252,8 @@ struct seed_record
     // The history, per span: Empires (the report's prehistory), Exploration,
     // Industrialisation.
     int64_t battles[3] = {}, conquests[3] = {}, foundings[3] = {};
+    int64_t army_close = 0;  ///< men under arms at the close, summed over living regions
+    int     garrisons  = 0;  ///< living regions standing any army at the close
 
     // Where the density is.
     int single_tile_cells = 0;     ///< living regions whose cell holds exactly one land tile
@@ -445,6 +447,8 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
             r.sim_urban += p.urban_population;
             r.sim_population += p.population;
             r.sim_urban_max = std::max(r.sim_urban_max, p.urban_population);
+            r.army_close += p.army_stock;
+            if (p.army_stock > 0) ++r.garrisons;
             const int64_t ind = industrial_heads_of(p);
             if (ind >= 0) r.sim_industrial = std::max<int64_t>(r.sim_industrial, 0) + ind;
         }
@@ -785,13 +789,13 @@ int main(int argc, char** argv)
 
     std::printf("\n=== C0 the history (generation report, per span) ===\n");
     std::printf("seed | empires: battles conquests foundings | exploration: battles conquests "
-                "foundings | industrialisation: battles conquests foundings | regions\n");
+                "foundings | industrialisation: battles conquests foundings | regions | armies at the close: men, garrisons\n");
     for (const seed_record& r : recs)
         std::printf("%4u | %16" PRId64 " %9" PRId64 " %9" PRId64 " | %20" PRId64 " %9" PRId64
-                    " %9" PRId64 " | %26" PRId64 " %9" PRId64 " %9" PRId64 " | %7d\n",
+                    " %9" PRId64 " | %26" PRId64 " %9" PRId64 " %9" PRId64 " | %7d | %12" PRId64 " %6d\n",
                     r.seed, r.battles[0], r.conquests[0], r.foundings[0], r.battles[1],
                     r.conquests[1], r.foundings[1], r.battles[2], r.conquests[2], r.foundings[2],
-                    r.regions);
+                    r.regions, r.army_close, r.garrisons);
 
     std::printf("\n=== C1b urbanisation (living regions, the sim record at the close) ===\n");
     std::printf("seed    population   urban_heads  urban%%  industrial_heads  largest_region_urban\n");
