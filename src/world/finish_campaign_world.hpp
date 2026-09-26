@@ -71,11 +71,18 @@ struct world_params;
 /// earned and a harness never bands differently from the app.
 era_band campaign_band_from_world(const world& w);
 
+/// BL-1136 (Ben, 2026-09-26): the threads a round's proposals are scored on.
+/// Two, because a budget world proposes two per round. The result does not
+/// depend on it (landscape_search.hpp § what keeps it deterministic); only the
+/// wall time and the peak memory do — one world copy per thread is held at once.
+inline constexpr int k_campaign_search_threads = 2;
+
 /// The search params the campaign passes, keyed from the world seed exactly
 /// as Begin always keyed them: `regenerate_specialists` (every candidate
 /// replaces the world-gen roster, BL-977), placement seed `world_seed ^
-/// 0x8A21F00D`, the parsed config's starting roster count. The budget and
-/// spend are set by the caller from the stockpile.
+/// 0x8A21F00D`, the parsed config's starting roster count, and
+/// `k_campaign_search_threads`. The budget and spend are set by the caller
+/// from the stockpile.
 landscape_search_params campaign_search_params(std::uint32_t world_seed,
                                                int corporation_count);
 
