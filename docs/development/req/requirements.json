@@ -7488,13 +7488,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice, history_sim_harness, exploration_sim_harness, world_cursor_equivalence on main"
      ],
      "requirement": "Deterministic on main; only the known failures.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Main e5be22bf: world_determinism ALL PASS twice at DE356678C6844F9D (seedB 00DE77E01E029591, prehistory-off 69277979DF8A52E9 unmoved); save_roundtrip OK; ocean_currents_harness, sea_lane_stamp_harness, world_cursor_equivalence ALL PASS; history_sim_harness only R3a2/R3a3; exploration_sim_harness only R3b/R3d.1."
     },
     {
      "id": "R4",
