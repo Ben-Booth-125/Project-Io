@@ -563,8 +563,10 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
         // itself against the FINAL partition's standable ground, by the sim's
         // own rule -- no living region carries more centres than its cell
         // holds, and none on a cell with no ground carries one.
+        // BL-1141: a region deepens into one place, so a settled region carries
+        // exactly one centre; more than one is a breach too.
         if (p.population > 0 && p.centres > 0
-            && region_centres_fit(p.urban_population, p.centres, cell_place[i]) < p.centres)
+            && (p.centres > 1 || region_centres_fit(p.centres, cell_place[i]) < p.centres))
             ++r.sim_over_cell;
         if (p.population > 0 && cell_place[i] == 0)
         {
@@ -840,7 +842,7 @@ int main(int argc, char** argv)
                     r.placeless_regions - r.placeless_water - r.placeless_stacked,
                     r.groundless_regions, r.groundless_standing, r.sim_over_cell);
 
-    std::printf("\n=== C8 the stockpile (BL-1042): points, to carved centres, and unspent by reason ===\n");
+    std::printf("\n=== C11 the stockpile (BL-1042): points, to carved centres, and unspent by reason ===\n");
     std::printf("seed  points_total  to_centres  | carve_dropped  carve_no_tile  razed  no_carved_centre  rejected"
                 "  | residual by why: emptied  groundless  no_centre_on_ground  other\n");
     for (const seed_record& r : recs)
@@ -975,7 +977,7 @@ int main(int argc, char** argv)
     // POPULATION.md § Generation: "a 1960 world aims at roughly 500 centres" --
     // an aim the forces are calibrated against, never a count any rule
     // enforces. Printed as a reading against it, never gated.
-    std::printf("\n=== C7 against the aim (~500 centres a 1960 world; an aim, not a gate) ===\n");
+    std::printf("\n=== C12 against the aim (~500 centres a 1960 world; an aim, not a gate) ===\n");
     std::printf("seed  centres  x_aim  | carved  anchors+coverage\n");
     for (const seed_record& r : recs)
         std::printf("%4u  %7d  %5.1f  | %6d  %16d\n", r.seed, r.centres, r.centres / 500.0,
