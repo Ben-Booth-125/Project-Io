@@ -4143,12 +4143,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
             else
             {
                 const scoped_ns prof_points(prof.ns_industry_points); // report-only
-                // BL-1137: the stock before this round's accrual, so the
-                // urbanisation stream below can read each town's OUTPUT this
-                // round (its pull) as the accrual's own credit.
-                std::vector<int64_t> urb_points_before(ss.regions.size(), 0);
-                for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
-                    urb_points_before[ri] = ss.regions[ri].industry_points;
                 const industry_points_round pr =
                     accrue_industry_points(ss.regions, out.polities, params, step_years);
                 out.industry_points_from_scale += pr.credited;
@@ -4239,121 +4233,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                     ++k;
                                 }
                             }
-                        }
-                    }
-                }
-
-                // ---- BL-1137: THE URBANISATION STREAM -----------------------
-                //
-                // INDUSTRIALISATION.md sec Beat 2 (SET, Ben 2026-09-25: this span
-                // encourages more migration, and migration is how the map thins).
-                // "A region's countryside -> a centre in the same polity; pull:
-                // industry-point output at the centre; push: depleted or strained
-                // ground; line: held corridors." Once a decision round, off this
-                // round's accrual, behind the same switch and open year as the
-                // points themselves, so every other span is untouched.
-                //
-                //   THE LINE. Each polity's held ground splits into the pieces its
-                //   own network joins (`supply_neighbours` over regions it holds —
-                //   the graph its reach is priced over); people move only inside
-                //   one piece, so a realm's colony across the water is not its
-                //   home towns' countryside.
-                //   THE DESTINATIONS. The towns and cities that industrialise: the
-                //   piece's regions of at least a town's people
-                //   (`region_stands_a_town`) that built industry points this round.
-                //   THE PUSH. Every region of the piece sends its countryside at
-                //   `urbanisation_outflow` — the countryside x the rate x the strain
-                //   on its ground (settlement.cpp states the rate and why).
-                //   THE PULL. The piece's pooled migrants are shared over its
-                //   destinations in proportion to this round's industry-point
-                //   output there (largest remainder, exact, ties to the lower region
-                //   index), and land in each destination's centres as industrial
-                //   heads (`settle_urban_migrants`).
-                //
-                // A piece with no industrialising town sends nobody. People are
-                // conserved (taken whole from the countryside, landed whole in the
-                // towns). The villages empty as a CONSEQUENCE: a region whose
-                // countryside leaves has a smaller urban target, its heads shrink
-                // toward it, and a centre whose share falls below a village's
-                // worth is abandoned (`advance_region_urban`, both ways).
-                {
-                    const std::size_t n = ss.regions.size();
-                    std::vector<int> piece(n, -1);
-                    std::vector<int> members, dests;
-                    std::vector<int64_t> pull;
-                    for (std::size_t start = 0; start < n; ++start)
-                    {
-                        const int q = (start < owner.size()) ? owner[start] : -1;
-                        if (q < 0 || piece[start] >= 0) continue;
-                        members.clear();
-                        piece[start] = static_cast<int>(start);
-                        members.push_back(static_cast<int>(start));
-                        for (std::size_t f = 0; f < members.size(); ++f)
-                        {
-                            const std::size_t at = static_cast<std::size_t>(members[f]);
-                            for (int nb : supply_neighbours[at])
-                            {
-                                if (nb < 0 || static_cast<std::size_t>(nb) >= n) continue;
-                                const std::size_t ni = static_cast<std::size_t>(nb);
-                                if (piece[ni] >= 0 || ni >= owner.size() || owner[ni] != q) continue;
-                                piece[ni] = static_cast<int>(start);
-                                members.push_back(nb);
-                            }
-                        }
-                        std::sort(members.begin(), members.end()); // ascending: a total order
-
-                        dests.clear();
-                        pull.clear();
-                        int64_t pull_total = 0;
-                        for (int m : members)
-                        {
-                            const region& r = ss.regions[static_cast<std::size_t>(m)];
-                            if (r.population <= 0 || !region_stands_a_town(r)) continue;
-                            const int64_t credit =
-                                r.industry_points - urb_points_before[static_cast<std::size_t>(m)];
-                            if (credit <= 0) continue;
-                            dests.push_back(m);
-                            pull.push_back(credit);
-                            pull_total += credit;
-                        }
-                        if (dests.empty() || pull_total <= 0) continue;
-
-                        int64_t pool = 0;
-                        for (int m : members)
-                        {
-                            region& r = ss.regions[static_cast<std::size_t>(m)];
-                            pool += take_countryside(r, urbanisation_outflow(r, step_years));
-                        }
-                        if (pool <= 0) continue;
-
-                        // Largest remainder, exact: pool = sum of shares.
-                        const int64_t whole = pool / pull_total, part = pool % pull_total;
-                        std::vector<int64_t> share(dests.size(), 0), rem(dests.size(), 0);
-                        int64_t given = 0;
-                        for (std::size_t k = 0; k < dests.size(); ++k)
-                        {
-                            const int64_t num = part * pull[k];
-                            share[k] = whole * pull[k] + num / pull_total;
-                            rem[k]   = num % pull_total;
-                            given   += share[k];
-                        }
-                        int64_t left = pool - given; // 0 <= left < dests.size()
-                        if (left > 0)
-                        {
-                            std::vector<std::size_t> order(dests.size());
-                            for (std::size_t k = 0; k < order.size(); ++k) order[k] = k;
-                            std::stable_sort(order.begin(), order.end(),
-                                             [&rem](std::size_t a, std::size_t b) { return rem[a] > rem[b]; });
-                            for (std::size_t k = 0; k < order.size() && left > 0; ++k, --left)
-                                ++share[order[k]];
-                        }
-                        for (std::size_t k = 0; k < dests.size(); ++k)
-                        {
-                            region& d = ss.regions[static_cast<std::size_t>(dests[k])];
-                            const int rebate_before = relay_rebate_of(d);
-                            settle_urban_migrants(d, share[k]);
-                            // The reach cache watches the rebate (BL-1130 review fix).
-                            if (relay_rebate_of(d) != rebate_before) ++centres_version;
                         }
                     }
                 }
