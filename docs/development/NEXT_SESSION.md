@@ -1,54 +1,63 @@
 # Sprint 48 running handoff — the world moves forward (OPEN)
 
-Updated 2026-09-25 late evening. Read this, then `REFINED.md` § Sprint 48 (wave 3 lists the
+Updated 2026-09-26 afternoon. Read this, then `REFINED.md` § Sprint 48 (wave 3 lists the
 chains in order) and the sprint 48 row in `sprints.json`. The DEVLOG's 2026-09-25 (evening) entry
-is the session record so far.
+is the session record up to the first merges.
 
 ## Landed on main (all gated there)
 
-- **BL-1084 (world built once and moved):** the cursor (K1-K2), the wizard (K4) and its review
-  fixes. Byte-identical proof: world_determinism, both digest-check arcs 16/16, the 16-seed
-  cursor equivalence with negative controls, and `stop_path_digests` (base vs HEAD, identical).
-  Next waits; reroll works mid-tail; round 6 keeps its pace; slots freed at Begin. Live clicks
-  R4-R6 still owed at a walk.
-- **BL-1117 (settle tick one):** one nearest-anchor field per body; settle 116 s -> ~18 s on seed 0.
-- **BL-1126 (path cost reads the cache): CLOSED.** A path is directed; a save/load continues
-  identically.
-- **BL-1119 (roads tree and detour), rounds 1-4:** Kruskal + detour test, the 40,000-head spur
-  floor, border links on the network, layable links only (NR-945 kept), flood reuse (step 15
-  21.7 -> 2.0 s). R5 (35 s) FAILED on seed 0 (~48 s quiet; seed 28 ~31 s) — the search and the
-  corps' strategy step remain; BL-1136 cuts the search.
-- **BL-1114 (epoch 0 retired): CLOSED.** **BL-1118/BL-1124** legends and the lane forms (Ben picked
-  the bowed arc). Market census and centre census harnesses committed.
+- **BL-1084 (world built once and moved):** the cursor, the wizard and its review fixes;
+  byte-identical proof. Live clicks R4-R6 still owed at a walk.
+- **BL-1117 (settle tick one), BL-1126 (path cost reads the cache, CLOSED), BL-1114 (epoch 0
+  retired, CLOSED), BL-1119 rounds 1-4 (roads tree and detour).** BL-1119 R5 (the 35 s tail)
+  FAILED on seed 0 earlier; re-read owed quiet (the settle step read 49.6 s on seed 0 under load).
+- **BL-1130 (centres consolidate) + review fixes; BL-1133 (a province is its centre's ground).**
+- **BL-1132 (settle spacing 3 tiles, room-aware) + review fix:** regions 43,130 -> 15,194 pooled;
+  a Settle refuses a scheduled founding's ground (NR-956); C10 too-close pairs 0. War ~1.6x.
+- **BL-1141 (a region deepens into one centre):** centres 42,251 -> 22,521 pooled, 9.6% of land;
+  the history unmoved; the partition harness's D A1 now passes.
+- **BL-1136 (search on two threads) + review fixes; BL-1086 (the carve counts the budget's planned
+  firms) + review fixes:** the plan honours the 120-a-body ceiling; the loading screen's charter
+  list published again (live click owed, cold path --autostart seed 0).
+- **Sea: BL-1120 currents, BL-1140 lanes from trade, BL-1098 lanes stamped (save v28).**
+- **UI:** the bowed-arc lane, roads carried across rounds, the Culture round worded as the record.
+- **Tools:** stockpile_budget_check --firm-census (BL-1146).
 
-## Landed since (2026-09-26)
+## Reverted
 
-- **BL-1130 (centres consolidate)** merged with its review fixes: centres 164,982 -> ~66,000 pooled, land under centres 70% -> 28%, spills 0; the prize and relay read heads; a settled place is worth at least a village; a razing is counted in people.
-- **BL-1133 (a province is its centre's ground)** merged: provinces 45,199 -> 30,894, anchors 20,505 -> 6,856 (NR-954 open).
-- **BL-1136** the search on two threads (six rounds kept); **BL-1120** ocean currents, **BL-1140** lanes from trade, **BL-1098** lanes stamped bending with the current (world save v28; NR-955 open).
-- UI: the bowed-arc lane, roads carried across rounds (BL-1134), the Culture round worded as the record (BL-1135, a draft for the walk), realm_identity's script fixed.
+- **BL-1137 (industrial urbanisation)** merged b591d1e9 then reverted 8cbdbc9d: it created carrying
+  capacity (population 6.08B -> 10.92B) and a sack deleted ~40% of a city silently.
 
-## In flight (worktree lanes, 2026-09-26)
+## In flight (worktree lanes)
 
-- **Centres:** BL-1141 (a region deepens into ONE centre, its scale from its heads; stranded points to the realm's nearest centre) then BL-1137 (urbanisation) rebuilt on it and read against the ~500 aim.
-- **Spacing:** BL-1132 at three tiles, Settle scored only where there is room.
-- **Search:** BL-1086 option A (the carve counts the charter budget's planned firms; no discarded roster).
-- **Sea:** BL-1142 (far pairs bind across water; a leg against its current delivers less).
+- **Centres:** BL-1141 fixes + BL-1137 rebuilt under NR-958 (a migrant carries its food; a sack
+  never lowers a ceiling; razing counted uncapped; conservation rows).
+- **Sea:** BL-1142 (far pairs across water, cargo against the current) + the four-way lane walk,
+  built on its branch, NOT merged: fix round running (stale ladder, seat-move break, loss only on
+  sea legs, seller's navy). Then BL-1147 (naval points carry over; Ben's ruling today).
 
 ## Then
 
-BL-1125 (markets fold: twins, gravity aimed at 20-40, conquest) on the thinned world -> BL-1138 (roads pull to markets) -> NR-944 / NR-954 re-read -> BL-1107 -> BL-1139 (abandonment in play: delete and merge the province) -> the one re-bless (every cause named; the pins R3b/R3d.1 and every digest are red by design until then) -> the live walk (Next waits, reroll, round 6 pace, the Culture wording, the arc, carried roads).
+BL-1125 (markets fold: twins, gravity aimed at 20-40, conquest) on the thinned world, after the
+BL-1137 rebuild -> BL-1138 (roads pull to markets) -> NR-944 / NR-954 re-read -> BL-1145 (province
+front-tile readers) -> BL-1107 -> BL-1139 (abandonment in play) -> the one re-bless (every cause
+named; the pins R3b/R3d.1 and every digest are red by design until then) -> the live walk.
 
 ## Open for Ben
 
-NR-952 (the ruin fallback), NR-953 (scale weights reach), NR-954 (hemmed villages, anchors by the settled line, giant provinces), NR-955 (inland ports, lane vs road cost).
+NR-952 (ruin fallback), NR-953 (scale weights reach), NR-954 (hemmed villages, anchors, giant
+provinces; ~half of all centres are anchors), NR-955 (inland ports, lane vs road cost; option E
+added), NR-956 (pending ground reserved), NR-957 (what the carve counts), NR-958 (the stream
+conserves), NR-959 (sea far-penalty; held for the re-run ladder), NR-960 (the firm cap).
+Filed for later sprints: BL-1143 (asymmetric hex table), BL-1144 (colonial distance gates inert).
 
 ## Hazards this sprint taught
 
+- A lane report with a large shift in a conserved quantity waits for its cold review before it
+  merges (BL-1137 cost a revert). Six of seven reviewed merges carried real defects.
+- TaskStop can leave a gate script's bash running; give every rerun a NEW output folder and check
+  log mtimes against the run's start.
 - Five lanes on one PC: every agent timing is indicative; take headline numbers quiet.
-- A background `X=... && (...) &` scopes X to the list; a keep-awake holder inside a script's
-  `wait` deadlocks on its own lock — release the lock before waiting on it.
-- `--verify-all` carries state between scripts; run a failing wizard script alone before
-  believing it.
-- Main-session build: `scratchpad/main_session_build_rel.bat` (writes BUILD_REL_EXIT). Close the
-  live app before rebuilding.
+- `--verify-all` carries state between scripts; run a failing wizard script alone first.
+- Main-session build: `scratchpad/main_session_build_rel.bat` (writes BUILD_REL_EXIT). The
+  "ProjectIo" Start-menu entry points at an old worktree build; screen access needs the right exe.
