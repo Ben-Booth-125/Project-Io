@@ -131,8 +131,18 @@ inline constexpr int k_urban_footprint_tiles[5] = { 1, 1, 2, 4, 7 };
 /// once. A footprint the coast cuts short stays short: an island city paves
 /// what it has.
 ///
+/// BL-1130 (review fix): with @p settlement, a footprint also STOPS AT THE
+/// CENTRE'S OWN CELL of the settlement partition (`nearest_region`), exactly as
+/// it stops at the coast — POPULATION.md "their urban footprints fit inside the
+/// region's own cell". The carve's body-wide rank-size can give a large region's
+/// centres scales whose footprints its own hierarchy never sized, and without
+/// the cut they paved into a neighbour's cell. Scales are unchanged; only the
+/// paving is cut short. Null keeps the coast-only rule (a caller with no
+/// settlement record).
+///
 /// @returns the number of tiles stamped urban.
-int stamp_urban_land_use(world& w, entity_id body_id);
+int stamp_urban_land_use(world& w, entity_id body_id,
+                         const settlement_state* settlement = nullptr);
 
 /// Founds one scale-1 population centre in every LAND province on @p body_id
 /// that holds none (BL-611, province centre anchor) — the structural half of

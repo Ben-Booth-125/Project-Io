@@ -2062,6 +2062,44 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // no substrate (a synthetic fixture) nothing is measured and nothing caps.
     urban_ground_field urban_ground;
 
+    // BL-1130 (review fix) — WHAT THE REACH CACHE WATCHES. The relay reads a
+    // region's size only through the REBATE it buys: none below
+    // `centre_reach_min_centres`, `size x centre_reach_rebate_q` above it,
+    // capped at `centre_reach_rebate_cap_q` (`rebuild_reach`). So the cache's
+    // version moves when a region's rebate moves, not when its size does: a
+    // town growing past the cap relays exactly as it did, and rebuilding every
+    // polity's reach for it changed no value. 0 with the relay off, where the
+    // cache never reads the version at all.
+    const auto relay_rebate_of = [&](const region& r) -> int {
+        if (!params.centre_chain_reach) return 0;
+        const int size = region_settlement_size(r);
+        if (size < std::max(1, params.centre_reach_min_centres)) return 0;
+        return static_cast<int>(std::min<int64_t>(
+            static_cast<int64_t>(size) * clampi(params.centre_reach_rebate_q, 0, 999),
+            clampi(params.centre_reach_rebate_cap_q, 0, 999)));
+    };
+
+    // BL-1130 (review fix) — THE RECORD NEVER OUTLIVES ITS CELL. Re-measure the
+    // partition and hold every region's centres to its ground (a merge, never a
+    // razing). Called once a year before the urban step, and — only when a
+    // founding has appended a region since the last measure — at every polity's
+    // turn, at the round's end and at the span's close, so a Settle founding
+    // late in a year is measured before any later reader and no span closes on
+    // a cell a founding cut. Cheap when nothing was founded: the guard is one
+    // size compare.
+    const auto hold_to_ground = [&](bool only_after_founding) {
+        if (terrain.substrate == nullptr) return;
+        if (only_after_founding && ss.regions.size() == urban_ground.measured) return;
+        if (!update_urban_ground(ss, urban_ground, *terrain.substrate, terrain.standable, gw, gh))
+            return;
+        for (region& r : ss.regions)
+        {
+            const int rebate_before = relay_rebate_of(r);
+            if (hold_region_to_ground(r) && relay_rebate_of(r) != rebate_before)
+                ++centres_version;
+        }
+    };
+
     const auto edge_key = [](int a, int b) -> uint64_t {
         const uint32_t lo = static_cast<uint32_t>(a < b ? a : b);
         const uint32_t hi = static_cast<uint32_t>(a < b ? b : a);
@@ -3582,8 +3620,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // BL-1130: this year's cells, after this year's foundings, so a region
         // whose cell a founding just cut holds its centres to what is left of
         // it in the same year's urban step below.
-        if (terrain.substrate != nullptr)
-            update_urban_ground(ss, urban_ground, *terrain.substrate, gw, gh);
+        hold_to_ground(/*only_after_founding=*/false);
 
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {
@@ -3620,10 +3657,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // BL-1130: what the relay reads is the region's settlement size
             // (`region_settlement_size`), so THAT is what is watched — it moves
             // both ways with the heads, where the old count only ratcheted up.
-            const int size_before = region_settlement_size(ss.regions[i]);
+            // BL-1130 (review fix): the cache watches the rebate the size buys.
+            const int rebate_before = relay_rebate_of(ss.regions[i]);
             advance_region_urban(ss.regions[i],
                 ss.regions[i].network_supply_q > params.sustainable_settlement_floor_q);
-            if (region_settlement_size(ss.regions[i]) != size_before)
+            if (relay_rebate_of(ss.regions[i]) != rebate_before)
                 ++centres_version;
             // BL-835 — ONE YEAR OF THE MUSTER, for every region whether or not
             // anyone is fighting over it. This is what makes an undefended
@@ -4566,6 +4604,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
         ++prof.decision_rounds;
         for (polity& q : out.polities)
         {
+            // BL-1130 (review fix): an earlier polity's Settle this round cut
+            // its neighbours' cells; measure before this turn reads them.
+            hold_to_ground(/*only_after_founding=*/true);
             if (!q.alive) continue;
 
             // Holdings, and whether the capital still stands.
@@ -6562,9 +6603,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // BL-887: a razed city is a relay REMOVED from the
                     // network, the mirror of the demography loop's bump.
                     // BL-1130: the relay reads the settlement size, as above.
-                    const int sacked_size_before = region_settlement_size(tgt);
+                    const int sacked_rebate_before = relay_rebate_of(tgt);
                     sack_region_urban(tgt, params.sack_population_loss_q);
-                    if (region_settlement_size(tgt) != sacked_size_before)
+                    if (relay_rebate_of(tgt) != sacked_rebate_before)
                         ++centres_version;
 
                     // BL-835 — THE ARMY THAT TOOK IT IS THE ARMY THAT HOLDS IT,
@@ -8332,6 +8373,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // Ownership changes are appended where they happen (conquest, founding),
         // so there is nothing to snapshot at the end of a year.
 
+        // BL-1130 (review fix): the round's last founding, measured before the
+        // record is taken and before next year reads it.
+        hold_to_ground(/*only_after_founding=*/true);
+
         // ---- THE RECORDED STEP (BL-817) ----------------------------------
         //
         // Reached only on a decision round — the gate above `continue`s past it
@@ -8345,6 +8390,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             && (last_record_year == INT64_MIN || y - last_record_year >= record_interval))
             record_step(y);
     }
+
+    // BL-1130 (review fix): the span closes on a measured record.
+    hold_to_ground(/*only_after_founding=*/true);
 
     // THE CLOSING STEP, always taken, at the stop year. Without it the record's
     // last step is wherever the interval happened to land — up to one interval

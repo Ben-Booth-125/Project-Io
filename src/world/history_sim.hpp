@@ -96,6 +96,14 @@ struct sim_terrain_view
     /// May be null independently of the rest, in which case a caller (e.g.
     /// `run_colonisation`) treats every tile as riverless.
     const std::vector<std::uint8_t>*      river     = nullptr;
+
+    /// Non-zero where a population centre can stand on the tile — the carve's
+    /// own placement gate (`placement_rules::can_place_population_centre`:
+    /// land, habitable). BL-1130 (review fix): the ground a region's cell holds
+    /// is counted in THESE tiles, so a region whose cell holds none carries no
+    /// centre in the sim, exactly as the carve gives it none. Null counts every
+    /// non-water tile instead (a caller with geology only).
+    const std::vector<std::uint8_t>*      standable = nullptr;
 };
 
 // ---------------------------------------------------------------------------
