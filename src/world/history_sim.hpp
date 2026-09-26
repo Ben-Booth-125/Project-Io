@@ -2269,6 +2269,45 @@ struct history_sim_params
     /// half that quiets neighbours.
     int treaty_far_penalty_q = 700;
 
+    // --- BL-1142: far realms across water meet and bind ---------------------
+    // INDUSTRIALISATION.md sec Far pairs meet and bind, and this phase makes
+    // them ("far pairs bind across water, not only across a border"). Two
+    // halves, both the Industrialisation span's alone (`industrialisation_sim_
+    // params`); the struct defaults are Exploration's world, unchanged.
+
+    /// MEETING BY SEA. Contact otherwise comes only from a campaign crossing
+    /// onto the other's ground (a water-blind 9-tile neighbourhood) or from
+    /// inheriting a victim's contacts, so realms on other landmasses meet only
+    /// across a narrow sea. With this on, each decision round every pair of
+    /// living realms whose seats stand on different landmasses (`landmass_at`)
+    /// and have never met MEETS when a trade across water is open between
+    /// them -- one sells a good the other's market wants, and the seller's
+    /// navy and both seats' built ports carry it (`trade_flow_volume_q` > 0,
+    /// either way): the fleet that could carry the cargo finds the market.
+    /// Recorded as `contact_kind::trade`. Off by default.
+    bool far_pairs_meet_by_sea = false;
+
+    /// THE FAR PENALTY FOR A PAIR ACROSS WATER, per mille, in place of
+    /// `treaty_far_penalty_q` for a far pair (met after the near-home cutoff)
+    /// whose seats stand on different landmasses -- read by formation and by
+    /// the break re-score alike, so a pair that binds on it does not fall
+    /// apart the next round on the land penalty. The one measured dial of the
+    /// binding half: at 700 (the default, = the land penalty) nothing changes.
+    int treaty_far_sea_penalty_q = 700;
+
+    /// A LEG RUN AGAINST ITS CURRENT DELIVERS LESS (EXPLORATION.md sec
+    /// Currents, "Where currents bite"; BL-1142). Per mille: a trade between
+    /// realms on different landmasses delivers
+    ///     volume x (1000 - loss x max(0, -alignment) / 1000) / 1000
+    /// of what was sized, alignment the current along the leg from the
+    /// seller's seat to the buyer's (`ocean_current_alignment_q`). Applied
+    /// AFTER the flow is sized (after the want and the holding are shared),
+    /// so it bites where the seller's stock or the buyer's want, not the sea,
+    /// limits the trade; a leg with its current delivers what was sized, never
+    /// more. The binding's trade value reads the delivered amount too.
+    /// 0 = no loss (the default). Domain [0, 1000]; needs the current field.
+    int sea_current_cargo_loss_q = 0;
+
     // --- BL-934: colonies ----------------------------------------------------
     // EXPLORATION.md sec A colony is a subject, and it wants things of its own.
 
@@ -2576,6 +2615,14 @@ struct exploration_spend_context
     /// prices its sea lines with (`trade_context::currents`); null is still
     /// water.
     const ocean_current_field*                  currents = nullptr;
+    /// BL-1142: the body's landmass labels (`landmass_labels`) and grid, which
+    /// the round's trade context reads to find the trades across water that
+    /// run against their current (`trade_context::landmass`); the cargo they
+    /// lose is added to `*cargo_lost_out` when set.
+    const std::vector<int32_t>*                 landmass = nullptr;
+    int                                         grid_w   = 0;
+    int                                         grid_h   = 0;
+    int64_t*                                    cargo_lost_out = nullptr;
 };
 
 ///
@@ -3724,8 +3771,9 @@ enum class contact_kind : uint8_t
 {
     campaign  = 0, ///< A campaign crossed onto the other's ground (won or not).
     inherited = 1, ///< Carried forward from a conquered polity's own contacts.
+    trade     = 2, ///< BL-1142: met by sea, a trade across water open between them.
 };
-inline constexpr int contact_kind_count = 2;
+inline constexpr int contact_kind_count = 3;
 
 /// The event that FIRST joined the pair. Unlike a grudge, contact does not
 /// decay and does not accumulate a score — meeting is a fact, not a magnitude
@@ -3884,7 +3932,7 @@ struct history_sim_state
     /// New contact PAIRS raised during the run, by `contact_kind`
     /// ([0] campaign -- a crossing onto the other's ground, [1] inherited
     /// from a conquered polity). The span's first-contact count.
-    int64_t contacts_raised_trace[2] = {};
+    int64_t contacts_raised_trace[3] = {}; // BL-1142: [2] met by sea
     /// Per contact class (as `campaign_class_trace`), over candidates that
     /// passed every gate and were scored: [0] count, and sums of [1] the
     /// ground's worth before odds (after `campaign_gain_q`), [2] `p_win_q`,
@@ -4339,6 +4387,15 @@ struct history_sim_state
     int64_t sea_trade_volume_q            = 0;
     int64_t sea_trade_volume_with_q       = 0;
     int64_t sea_trade_volume_against_q    = 0;
+    /// BL-1142: the cargo trades across water LOST running against their
+    /// current (`sea_current_cargo_loss_q`), summed over the rounds; the pairs
+    /// that met by sea (`contact_kind::trade`); the treaties formed between
+    /// realms on different landmasses; and, for the latter, how many of them
+    /// were far pairs (met after the near-home cutoff).
+    int64_t sea_trade_cargo_lost_q        = 0;
+    int64_t contacts_met_by_sea           = 0;
+    int64_t treaties_formed_across_water  = 0;
+    int64_t far_treaties_formed_across_water = 0;
 
     /// BL-1120: how the wet campaigns LAUNCHED this run ran against the
     /// current field -- with it (alignment > 0), against it (< 0) or across
@@ -4800,7 +4857,8 @@ int treaty_value_q(const history_sim_params& p,
                     int grudge_against_other_q, int grudge_from_other_q,
                     int counterpart_treaties_broken, int decider_aggression_q,
                     int alarm_from_other_q, bool near_home,
-                    int trade_value_q);
+                    int trade_value_q,
+                    int far_penalty_q = -1); // BL-1142: >= 0 replaces p.treaty_far_penalty_q
 
 /// BL-941 — VISIBLE CAPABILITY, 0-1000. What a neighbour reads of
 /// `polity_id`'s capital `region::army_stock` plus its own `polity::navy_stock`,
@@ -5063,6 +5121,18 @@ struct trade_context
     /// sim points it at the span's field for the round.
     const ocean_current_field* currents = nullptr;
     int                        current_weight_q = 0;
+
+    /// BL-1142 -- THE CARGO A LEG AGAINST ITS CURRENT LOSES
+    /// (`history_sim_params::sea_current_cargo_loss_q`). When `landmass` is set
+    /// with `currents` and a loss above 0, a flow between realms on different
+    /// landmasses delivers only its share (`compute_trade_flows`, after the
+    /// sharing; `pair_trade_value_q` alike). `cargo_lost`, when set, adds the
+    /// volume lost. Not owned; null is no loss.
+    const std::vector<int32_t>* landmass     = nullptr;
+    int                         grid_w       = 0;
+    int                         grid_h       = 0;
+    int                         cargo_loss_q = 0;
+    int64_t*                    cargo_lost   = nullptr;
 };
 
 trade_context build_trade_context(const std::vector<region>&           regions,

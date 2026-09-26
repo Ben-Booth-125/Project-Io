@@ -817,6 +817,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         {
             trade_ctx.currents         = spend_ctx->currents;
             trade_ctx.current_weight_q = params.sea_current_weight_q;
+            // BL-1142: the cargo a leg against its current loses.
+            trade_ctx.landmass     = spend_ctx->landmass;
+            trade_ctx.grid_w       = spend_ctx->grid_w;
+            trade_ctx.grid_h       = spend_ctx->grid_h;
+            trade_ctx.cargo_loss_q = params.sea_current_cargo_loss_q;
+            trade_ctx.cargo_lost   = spend_ctx->cargo_lost_out;
         }
         flows = compute_trade_flows(trade_ctx, regions, polities, *treaties);
     }
@@ -1391,6 +1397,25 @@ int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& reg
     return std::max(0, std::min({want_q, holding_q, line_q}));
 }
 
+/// BL-1142 -- the share of a sized flow that ARRIVES, per mille: 1000 unless
+/// the context carries the landmass labels, the current field and a loss above
+/// 0 and the two seats stand on different landmasses, when it is
+/// `1000 - loss x max(0, -alignment) / 1000` for the leg seller seat -> buyer
+/// seat. Pure; both ids and capitals must already be known in range.
+static int trade_delivered_share_q(const trade_context& ctx, const std::vector<region>& regions,
+                                   const std::vector<polity>& polities, int seller, int buyer)
+{
+    if (ctx.landmass == nullptr || ctx.currents == nullptr || ctx.cargo_loss_q <= 0) return 1000;
+    const region& s = regions[static_cast<std::size_t>(polities[static_cast<std::size_t>(seller)].capital)];
+    const region& b = regions[static_cast<std::size_t>(polities[static_cast<std::size_t>(buyer)].capital)];
+    const int32_t ms = landmass_at(*ctx.landmass, ctx.grid_w, ctx.grid_h, s.col, s.row);
+    const int32_t mb = landmass_at(*ctx.landmass, ctx.grid_w, ctx.grid_h, b.col, b.row);
+    if (ms < 0 || mb < 0 || ms == mb) return 1000; // no water between them
+    const int align = ocean_current_alignment_q(*ctx.currents, s.col, s.row, b.col, b.row);
+    const int against = align < 0 ? -align : 0;
+    return clampi(1000 - (clampi(ctx.cargo_loss_q, 0, 1000) * against) / 1000, 0, 1000);
+}
+
 int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regions,
                        const std::vector<polity>& polities, int a, int b,
                        const std::vector<trade_flow>& flows)
@@ -1430,7 +1455,10 @@ int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regi
             const int holding_q = ctx.holding_q[static_cast<std::size_t>(seller)][static_cast<std::size_t>(g)];
             const int64_t want_room = std::max<int64_t>(0, want_q - in_other[buyer_side][g]);
             const int64_t hold_room = std::max<int64_t>(0, holding_q - out_other[seller_side][g]);
-            total += static_cast<int>(std::min<int64_t>({static_cast<int64_t>(v), want_room, hold_room}));
+            // BL-1142: the binding is worth what ARRIVES, after a leg run
+            // against its current has lost its share.
+            const int64_t arrives = std::min<int64_t>({static_cast<int64_t>(v), want_room, hold_room});
+            total += static_cast<int>((arrives * trade_delivered_share_q(ctx, regions, polities, seller, buyer)) / 1000);
         }
     return total; // bounded by 8 * 1000
 }
@@ -1550,6 +1578,25 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
     flows.erase(std::remove_if(flows.begin(), flows.end(),
                                [](const trade_flow& f) { return f.volume_q <= 0; }),
                 flows.end());
+
+    // BL-1142 -- A LEG RUN AGAINST ITS CURRENT DELIVERS LESS, applied AFTER the
+    // flow is sized: the want and the holding were shared on what was sent,
+    // and what arrives is the sent volume's delivered share. The loss is cargo
+    // gone, so the want it would have met stays unmet.
+    if (ctx.landmass != nullptr && ctx.currents != nullptr && ctx.cargo_loss_q > 0)
+    {
+        for (trade_flow& f : flows)
+        {
+            const int share = trade_delivered_share_q(ctx, regions, polities, f.seller, f.buyer);
+            if (share >= 1000) continue;
+            const int delivered = static_cast<int>((static_cast<int64_t>(f.volume_q) * share) / 1000);
+            if (ctx.cargo_lost != nullptr) *ctx.cargo_lost += f.volume_q - delivered;
+            f.volume_q = delivered;
+        }
+        flows.erase(std::remove_if(flows.begin(), flows.end(),
+                                   [](const trade_flow& f) { return f.volume_q <= 0; }),
+                    flows.end());
+    }
 
     std::sort(flows.begin(), flows.end(), [](const trade_flow& x, const trade_flow& y) {
         if (x.seller != y.seller) return x.seller < y.seller;
@@ -2676,7 +2723,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                    int region_idx, int64_t year) {
         if (a < 0 || b < 0 || a == b) return;
         if (contact_exists(a, b)) return; // symmetric: (a,b) implies (b,a)
-        if (params.trace_battles) ++out.contacts_raised_trace[static_cast<int>(kind) & 1]; // BL-1019, trace only
+        if (params.trace_battles) ++out.contacts_raised_trace[clampi(static_cast<int>(kind), 0, 2)]; // BL-1019/BL-1142, trace only
         contact_event e;
         e.year   = static_cast<int32_t>(year);
         e.region = (region_idx >= 0 && region_idx < static_cast<int>(owner_index_limit))
@@ -4198,6 +4245,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             spend_ctx.creeds = cs;
             spend_ctx.prefs  = &round_prefs;
             spend_ctx.currents = currents_on ? &currents : nullptr; // BL-1140
+            spend_ctx.landmass = landmass.empty() ? nullptr : &landmass;  // BL-1142
+            spend_ctx.grid_w   = gw;
+            spend_ctx.grid_h   = gh;
+            spend_ctx.cargo_lost_out = &out.sea_trade_cargo_lost_q;
             // BL-954: the state's treaties open this round's flows, rebuilt
             // into `out.trade_flows` (never accumulated).
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
@@ -4305,9 +4356,69 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     t.currents         = &currents;
                     t.current_weight_q = params.sea_current_weight_q;
+                    // BL-1142: a binding is worth what arrives.
+                    t.landmass     = landmass.empty() ? nullptr : &landmass;
+                    t.grid_w       = gw;
+                    t.grid_h       = gh;
+                    t.cargo_loss_q = params.sea_current_cargo_loss_q;
                 }
                 return t;
             }();
+
+            // BL-1142 -- REALMS ACROSS WATER MEET BY SEA (INDUSTRIALISATION.md
+            // sec Far pairs meet and bind). Two living realms whose seats
+            // stand on different landmasses, and which have never met, MEET
+            // this round when a trade across water is open between them in
+            // either direction: one holds a good the other's market wants and
+            // the seller's navy and both seats' built ports carry it -- the
+            // fleet that could carry the cargo finds the market. Pairs walked
+            // in id order; `raise_contact` is a no-op on a pair already met,
+            // so the record keeps the first meeting. The cheap tests (alive,
+            // ports, a navy on one side, different landmasses, not met) run
+            // before the volume read, which is what keeps the walk small.
+            if (params.far_pairs_meet_by_sea && !landmass.empty())
+            {
+                const std::size_t pc = out.polities.size();
+                for (std::size_t ai = 0; ai < pc; ++ai)
+                {
+                    const polity& pa = out.polities[ai];
+                    if (!pa.alive || pa.capital < 0
+                     || static_cast<std::size_t>(pa.capital) >= ss.regions.size()) continue;
+                    if (ss.regions[static_cast<std::size_t>(pa.capital)].port_stock_q <= 0) continue;
+                    const int32_t ma = landmass_of_region(pa.capital);
+                    if (ma < 0) continue;
+                    for (std::size_t bi = ai + 1; bi < pc; ++bi)
+                    {
+                        const polity& pb = out.polities[bi];
+                        if (!pb.alive || pb.capital < 0
+                         || static_cast<std::size_t>(pb.capital) >= ss.regions.size()) continue;
+                        if (pa.navy_stock <= 0 && pb.navy_stock <= 0) continue;
+                        if (ss.regions[static_cast<std::size_t>(pb.capital)].port_stock_q <= 0) continue;
+                        const int32_t mb = landmass_of_region(pb.capital);
+                        if (mb < 0 || mb == ma) continue;
+                        const int ia = static_cast<int>(ai), ib = static_cast<int>(bi);
+                        if (contact_exists(ia, ib)) continue;
+                        bool open = false;
+                        for (int g = 0; g < 4 && !open; ++g)
+                            open = trade_flow_volume_q(treaty_trade_ctx, ss.regions, out.polities, ia, ib, g) > 0
+                                || trade_flow_volume_q(treaty_trade_ctx, ss.regions, out.polities, ib, ia, g) > 0;
+                        if (!open) continue;
+                        raise_contact(ia, ib, contact_kind::trade, pa.capital, y);
+                        ++out.contacts_met_by_sea;
+                    }
+                }
+            }
+            // BL-1142: the far penalty a pair reads -- the sea's own where its
+            // seats stand on different landmasses (formation and the break
+            // re-score read the same, so a pair that binds on it holds).
+            const auto crosses_water = [&](int a, int b) -> bool {
+                const int32_t ma = landmass_of_region(out.polities[static_cast<std::size_t>(a)].capital);
+                const int32_t mb = landmass_of_region(out.polities[static_cast<std::size_t>(b)].capital);
+                return ma >= 0 && mb >= 0 && ma != mb;
+            };
+            const auto far_penalty_for = [&](int a, int b) -> int {
+                return crosses_water(a, b) ? params.treaty_far_sea_penalty_q : params.treaty_far_penalty_q;
+            };
 
             // BL-1018 DIAGNOSTIC (trace only): the raw capability each side
             // of every living NEAR-HOME pair reads of the other this round,
@@ -4352,10 +4463,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
                 const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
                                                              out.trade_flows);
+                const int far_pen = far_penalty_for(a, b); // BL-1142
                 const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
-                                                    alarm_a, near_home, trade_ab);
+                                                    alarm_a, near_home, trade_ab, far_pen);
                 const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
-                                                    alarm_b, near_home, trade_ab);
+                                                    alarm_b, near_home, trade_ab, far_pen);
                 if (value_a < params.treaty_formation_threshold_q
                  || value_b < params.treaty_formation_threshold_q) continue;
 
@@ -4376,6 +4488,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         expires, static_cast<int32_t>(tc), lo, hi_});
                 note_event(lapse_event_kind::treaty_formed, pa.capital, a, b);
                 ++out.treaties_formed;
+                if (crosses_water(a, b))
+                {
+                    ++out.treaties_formed_across_water; // BL-1142
+                    if (!near_home) ++out.far_treaties_formed_across_water;
+                }
             }
 
             // ---- BL-933: BREAKING A TREATY, "legal and costly" ------------
@@ -4414,10 +4531,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
                     const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
                                                              out.trade_flows);
+                    const int far_pen = far_penalty_for(a, b); // BL-1142
                     const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
-                                                        alarm_a, near_home, trade_ab);
+                                                        alarm_a, near_home, trade_ab, far_pen);
                     const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
-                                                        alarm_b, near_home, trade_ab);
+                                                        alarm_b, near_home, trade_ab, far_pen);
 
                     int defector = -1, wronged = -1;
                     if (value_a < break_bar && value_a <= value_b) { defector = a; wronged = b; }
@@ -9924,7 +10042,7 @@ int treaty_value_q(const history_sim_params& p,
                     int grudge_against_other_q, int grudge_from_other_q,
                     int counterpart_treaties_broken, int decider_aggression_q,
                     int alarm_from_other_q, bool near_home,
-                    int trade_value_q)
+                    int trade_value_q, int far_penalty_q)
 {
     // BASE: a treaty is worth more the less either side already resents the
     // other -- a biting mutual history makes a promise of peace both less
@@ -9960,7 +10078,7 @@ int treaty_value_q(const history_sim_params& p,
         value += clampi(alarm_from_other_q, 0, 1000)
                * clampi(p.deterrence_alarm_weight_q, 0, 1000) / 1000;
     else
-        value -= clampi(p.treaty_far_penalty_q, 0, 1000);
+        value -= clampi(far_penalty_q >= 0 ? far_penalty_q : p.treaty_far_penalty_q, 0, 1000); // BL-1142
 
     // BL-954 -- TRADE, NEAR AND FAR ALIKE. The flow the pair's trade-access
     // clause would open (both directions, every good) is part of what the
