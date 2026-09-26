@@ -2326,6 +2326,48 @@ struct history_sim_params
     /// never clamped. Needs the current field.
     int sea_current_cargo_loss_q = 0;
 
+    // --- BL-1147: naval points carry over -----------------------------------
+    // EXPLORATION.md sec Force persists now (Ben, 2026-09-26): "the navy
+    // CARRIES too, as a starting fleet earned at sea in the Empires age." A
+    // polity tallies its naval DEEDS through the Empires span
+    // (`polity::naval_coastal_years`, `naval_crossings`, `naval_sea_techs`);
+    // at a resumed span's open its NAVAL POINTS -- the deeds weighted below --
+    // become its opening `navy_stock` (`naval_opening_fleet`). The points pass
+    // to the polity that earned them: nothing is read off the regions it holds
+    // at the handoff, and a polity dead by then carries nothing.
+
+    /// Tally the naval deeds in this span. The Empires round's alone
+    /// (`era_minus_one_sim_params`); off by default, so no later span adds to
+    /// a ledger it did not earn.
+    bool naval_points_accrue = false;
+
+    /// THE THREE DEEDS' WEIGHTS, naval points per deed -- a coastal province
+    /// held for a year, a sea crossing made, a coastal sea tech taken. How the
+    /// deeds weigh against each other is a READING FOR BEN (BL-1147); these
+    /// make each deed comparable in magnitude on the 16 curated seeds. MEASURED
+    /// (`ocean_currents_harness --naval`, 2026-09-26): the 1,665 polities
+    /// living at 1200 did 4,842,144 coastal province-years, 7,819 crossings and
+    /// took 230 coastal sea techs, so at 1 / 600 / 20000 the three pooled
+    /// shares are 4.84M / 4.69M / 4.60M points -- a third each. Per polity the
+    /// deeds spread very differently (coastal years: median 224, max 71,396;
+    /// crossings: 424 polities, median 4, max 333; techs: 134 polities, at
+    /// most 3), which is the reading. Domain [0, 100000] each.
+    int64_t naval_points_per_coastal_year = 1;
+    int64_t naval_points_per_crossing     = 600;
+    int64_t naval_points_per_sea_tech     = 20000;
+
+    /// THE CONVERSION, the one named constant: navy hulls per 1000 naval
+    /// points, applied ONCE at a resumed span's open to every LIVING polity
+    /// (`naval_opening_fleet`), on top of the fleet it resumed with. The
+    /// Exploration open's alone (`exploration_sim_params`; the
+    /// Industrialisation span sets it back to 0, since its polities already
+    /// sail the fleet 1200 carried). 0 = no fleet carries, today's world
+    /// byte for byte. Read on a measured ladder over the curated seeds; Ben
+    /// picks the rung. Domain [0, 100000]: outside it, or with a weight
+    /// outside its own, no fleet opens and the run says so
+    /// (`history_sim_state::naval_points_params_rejected`), never clamped.
+    int64_t naval_points_navy_per_1000 = 0;
+
     // --- BL-934: colonies ----------------------------------------------------
     // EXPLORATION.md sec A colony is a subject, and it wants things of its own.
 
@@ -2546,6 +2588,12 @@ struct trade_flow
     uint16_t buyer    = 0;
     uint8_t  good     = 0;
     int32_t  volume_q = 0;
+    /// 1 when the flow's CARRYING LINE is the sea one -- its sea line (the
+    /// seller's navy, both seats' ports, priced with the current) beat its
+    /// land line when it was sized, the test the cargo loss reads; 0 where a
+    /// road carries it. Set by `compute_trade_flows`; what the fourth sea-leg
+    /// writer reads, so only trade that goes to sea earns a lane.
+    uint8_t  by_sea   = 0;
 };
 
 /// THE UPKEEP STEP ITSELF (BL-931/BL-932), called once per decision round
@@ -2995,7 +3043,28 @@ struct polity
     /// fleet). A headcount-like scalar, built from a funded port's treasury
     /// spend and decaying every round regardless — "a fleet is a running
     /// cost, not a purchase." NOT SERIALISED, same footing as `overlord`.
+    /// BL-1147 (Ben, 2026-09-26, superseding "the navy is new and starts at
+    /// zero"): a resumed span opens it at the fleet the polity's naval points
+    /// carry (`naval_opening_fleet`), zero where the conversion is 0.
     int64_t navy_stock = 0;
+
+    /// BL-1147 -- THE NAVAL LEDGER: what this polity did at sea in the Empires
+    /// span, deed by deed, tallied where `history_sim_params::naval_points_accrue`
+    /// is on and never after. `naval_coastal_years`: the coastal provinces it
+    /// held, counted per year held (a held region with a port window,
+    /// `region::port_q > 0`, per decision round times the round's years).
+    /// `naval_crossings`: the sea crossings it made (its wet campaigns
+    /// launched, staging hub to target across water). `naval_sea_techs`: the
+    /// coastal sea techs it took (EM-RD-2b Deep-Hull Sail, EM-RD-3b Lateen &
+    /// Long-Range Rig, EM-RD-4a Ocean-Rated Hulls; at most 3). The deeds stay
+    /// on the polity that did them -- a polity that loses its coast keeps its
+    /// sailors -- and cross every handoff unchanged with the polity table.
+    /// Weighted into naval points (`naval_points_of`) they are why a polity
+    /// has the fleet it opens the Exploration age with. NOT SERIALISED, same
+    /// footing as `navy_stock`.
+    int64_t naval_coastal_years = 0;
+    int64_t naval_crossings     = 0;
+    int64_t naval_sea_techs     = 0;
 
     /// BL-933 — HOW MANY TREATIES THIS POLITY HAS BROKEN, ever. The smallest
     /// quantity that makes "the cost lands on every OTHER party's willingness
@@ -4395,7 +4464,8 @@ struct history_sim_state
     int64_t sea_lanes_opened        = 0;
     /// BL-1140: the FOURTH writer -- a trade link between realms whose seats
     /// stand on different landmasses (`landmass_labels`), one use per
-    /// decision round it carries a flow, seller seat to buyer seat. Beside
+    /// decision round it carries a flow BY SEA (`trade_flow::by_sea`; a road
+    /// carries none across water), seller seat to buyer seat. Beside
     /// it, how those uses ran against the current field (the net direction
     /// of the round's volume, seller seat to buyer seat): with it, against
     /// it, across slack water, and the alignment sum -- counted whenever the
@@ -4409,7 +4479,9 @@ struct history_sim_state
     /// directions), and how much of it sailed with / against the current
     /// (each direction read on its own, seller seat to buyer seat) -- the
     /// reading that says whether more trade runs with the water than against
-    /// it. The split is counted whenever the field is built.
+    /// it. The split is counted whenever the field is built. Only flows that
+    /// go to sea count (`trade_flow::by_sea`): a road between two realms on
+    /// different landmasses carries no volume across water.
     int64_t sea_trade_volume_q            = 0;
     int64_t sea_trade_volume_with_q       = 0;
     int64_t sea_trade_volume_against_q    = 0;
@@ -4426,6 +4498,16 @@ struct history_sim_state
     int64_t contacts_met_by_sea           = 0;
     int64_t treaties_formed_across_water  = 0;
     int64_t far_treaties_formed_across_water = 0;
+    /// BL-1147: at a resumed open whose conversion is on, the naval points the
+    /// LIVING polities carried into fleets, the points held by polities
+    /// already dead (which carry nothing), the fleets opened and their hulls;
+    /// and whether the constants left their domain (rejected whole: no fleet
+    /// opens, never clamped).
+    int64_t naval_points_carried   = 0;
+    int64_t naval_points_died      = 0;
+    int64_t naval_fleets_opened    = 0;
+    int64_t naval_hulls_opened     = 0;
+    bool    naval_points_params_rejected = false;
 
     /// BL-1120: how the wet campaigns LAUNCHED this run ran against the
     /// current field -- with it (alignment > 0), against it (< 0) or across
@@ -5202,6 +5284,25 @@ int trade_sea_volume_q(const trade_context& ctx, const std::vector<region>& regi
 /// across water, the land's (`treaty_far_penalty_q`) otherwise. Formation and
 /// the break re-score both read it, off the same recorded class.
 int treaty_far_penalty_for(const history_sim_params& p, bool met_across_water);
+
+/// BL-1147 -- A POLITY'S NAVAL POINTS, deed by deed: its ledger
+/// (`polity::naval_coastal_years`, `naval_crossings`, `naval_sea_techs`) times
+/// the three weights, and their sum. What a reader reads to see why a polity
+/// has its fleet. Assumes the weights in domain (`naval_points_params_valid`).
+struct naval_points_split
+{
+    int64_t coast = 0, crossings = 0, techs = 0, total = 0;
+};
+naval_points_split naval_points_of(const polity& q, const history_sim_params& p);
+
+/// BL-1147: the three weights and the conversion each in [0, 100000].
+bool naval_points_params_valid(const history_sim_params& p);
+
+/// BL-1147 -- THE FLEET A POLITY'S POINTS CARRY: points x
+/// `naval_points_navy_per_1000` / 1000 hulls for a LIVING polity; 0 for a
+/// dead one, at a conversion of 0, or with the constants out of domain. Pure;
+/// the resumed open adds exactly this to each polity's `navy_stock`.
+int64_t naval_opening_fleet(const polity& q, const history_sim_params& p);
 
 /// THE MARGINAL TRADE A BINDING WOULD OPEN, ignoring the clause gate —
 /// computable before the pair binds, which is what `treaty_value_q` needs.

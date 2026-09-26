@@ -1436,6 +1436,53 @@ int treaty_far_penalty_for(const history_sim_params& p, bool met_across_water)
     return met_across_water ? p.treaty_far_sea_penalty_q : p.treaty_far_penalty_q;
 }
 
+/// BL-1147 -- the three coastal sea techs whose taking is a naval deed
+/// (EMPIRE_TREE.md: Deep-Hull Sail, Lateen & Long-Range Rig, Ocean-Rated
+/// Hulls), as a mask over the empire tree's node indices, found by id once.
+static uint64_t coastal_sea_tech_mask()
+{
+    static const uint64_t mask = [] {
+        uint64_t m = 0;
+        for (int i = 0; i < io::empire_tree::node_count; ++i)
+        {
+            const std::string id = io::empire_tree::nodes[i].id;
+            if (id == "EM-RD-2b" || id == "EM-RD-3b" || id == "EM-RD-4a") m |= (1ULL << i);
+        }
+        return m;
+    }();
+    return mask;
+}
+
+naval_points_split naval_points_of(const polity& q, const history_sim_params& p)
+{
+    naval_points_split s;
+    s.coast     = q.naval_coastal_years * p.naval_points_per_coastal_year;
+    s.crossings = q.naval_crossings     * p.naval_points_per_crossing;
+    s.techs     = q.naval_sea_techs     * p.naval_points_per_sea_tech;
+    s.total     = s.coast + s.crossings + s.techs;
+    return s;
+}
+
+bool naval_points_params_valid(const history_sim_params& p)
+{
+    const auto weight_ok = [](int64_t w) { return w >= 0 && w <= 100000; };
+    return weight_ok(p.naval_points_per_coastal_year) && weight_ok(p.naval_points_per_crossing)
+        && weight_ok(p.naval_points_per_sea_tech)
+        && p.naval_points_navy_per_1000 >= 0 && p.naval_points_navy_per_1000 <= 100000;
+}
+
+int64_t naval_opening_fleet(const polity& q, const history_sim_params& p)
+{
+    if (!q.alive || p.naval_points_navy_per_1000 <= 0 || !naval_points_params_valid(p)) return 0;
+    if (q.naval_coastal_years < 0 || q.naval_crossings < 0 || q.naval_sea_techs < 0) return 0;
+    const int64_t pts = naval_points_of(q, p).total;
+    // points / 1000 x rate, then the remainder: the product never overflows
+    // however long the ledger (the same split the works note uses).
+    const int64_t k = p.naval_points_navy_per_1000;
+    const int64_t hulls = (pts / 1000) * k + ((pts % 1000) * k) / 1000;
+    return std::min<int64_t>(hulls, int64_t{1} << 48);
+}
+
 /// BL-1142 -- the share of a sized flow that ARRIVES, per mille: 1000 unless
 /// the context carries the seats' landmasses, the current field and a loss in
 /// (0, 1000], the two seats stand on different landmasses, AND the sea line is
@@ -1552,13 +1599,22 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
     {
         const int ends[2][2] = { { pr.first, pr.second }, { pr.second, pr.first } };
         for (const auto& e : ends)
+        {
+            // THE CARRYING LINE, once per directed pair (it reads no good): the
+            // sea one where it beats the road -- the cargo loss's own test.
+            int land_q = 0, sea_q = 0, align = 0;
+            const bool lines = trade_lines(ctx, regions, polities, e[0], e[1], land_q, sea_q, align);
+            const uint8_t by_sea = (lines && sea_q > land_q) ? 1 : 0;
             for (int g = 0; g < 4; ++g)
             {
                 const int v = trade_flow_volume_q(ctx, regions, polities, e[0], e[1], g);
                 if (v <= 0) continue;
-                flows.push_back(trade_flow{static_cast<uint16_t>(e[0]), static_cast<uint16_t>(e[1]),
-                                           static_cast<uint8_t>(g), static_cast<int32_t>(v)});
+                trade_flow f{static_cast<uint16_t>(e[0]), static_cast<uint16_t>(e[1]),
+                             static_cast<uint8_t>(g), static_cast<int32_t>(v)};
+                f.by_sea = by_sea;
+                flows.push_back(f);
             }
+        }
     }
 
     // ONE WANT, SHARED ACROSS SELLERS. Each flow above is bounded by the
@@ -1822,6 +1878,29 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // the one working copy the rest of this function actually consults —
         // BL-769's own comment on the field is exactly this reuse.
         out.polities = *params.resume_polities;
+        // BL-1147 -- THE FLEET THE EMPIRE AGE EARNED (EXPLORATION.md sec Force
+        // persists now): every LIVING polity's naval points become the fleet
+        // it opens this span with, added to what it resumed with. Read off the
+        // polity's own ledger, never the regions it holds now -- a polity that
+        // lost its coast keeps its sailors -- and a polity already dead
+        // carries nothing. Judged once, here: constants out of domain open no
+        // fleet and say so. At a conversion of 0 nothing moves.
+        if (params.naval_points_navy_per_1000 != 0)
+        {
+            out.naval_points_params_rejected = !naval_points_params_valid(params);
+            if (!out.naval_points_params_rejected)
+                for (polity& q : out.polities)
+                {
+                    const int64_t pts = naval_points_of(q, params).total;
+                    if (!q.alive) { out.naval_points_died += pts; continue; }
+                    out.naval_points_carried += pts;
+                    const int64_t hulls = naval_opening_fleet(q, params);
+                    if (hulls <= 0) continue;
+                    q.navy_stock = clampi64(q.navy_stock + hulls, 0, 1LL << 48);
+                    ++out.naval_fleets_opened;
+                    out.naval_hulls_opened += hulls;
+                }
+        }
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
             owner[i] = ss.regions[i].nation;
         if (params.resume_grudges  != nullptr) out.grudges  = *params.resume_grudges;
@@ -2542,8 +2621,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // BL-1140 -- THE FOURTH WRITER: TRADE ACROSS WATER (EXPLORATION.md sec
     // The colonial tie is a sea lane, "A lane is a route of the ocean's
     // currents and of trade between continents"). Read after the round's
-    // upkeep has rebuilt `out.trade_flows`: every pair of realms trading this
-    // round whose seats stand on DIFFERENT landmasses writes ONE use, seller
+    // upkeep has rebuilt `out.trade_flows`: every pair of realms trading BY
+    // SEA this round (a flow whose carrying line is the sea one,
+    // `trade_flow::by_sea` -- a road between two coasts earns no lane) whose
+    // seats stand on DIFFERENT landmasses writes ONE use, seller
     // seat to buyer seat, however many goods or directions the pair moves --
     // the link is the traffic, not the tonnage, as it is for tribute. The
     // pairs are collected into a sorted, deduplicated list first, so the
@@ -2560,6 +2641,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         for (const trade_flow& f : out.trade_flows)
         {
             if (f.volume_q <= 0 || f.seller == f.buyer) continue;
+            if (!f.by_sea) continue; // carried by road: not trade across water
             if (f.seller >= out.polities.size() || f.buyer >= out.polities.size()) continue;
             const int lo = std::min<int>(f.seller, f.buyer), hi = std::max<int>(f.seller, f.buyer);
             pairs.push_back({lo, hi, f.seller == lo ? f.volume_q : 0, f.seller == lo ? 0 : f.volume_q});
@@ -4230,6 +4312,23 @@ history_sim_state run_history_sim(settlement_state&         ss,
             continue;
         step_years    = step_for_year(params, y);
         next_decision = y + step_years;
+
+        // ---- BL-1147: THE COASTAL PROVINCES HELD, per year held -----------
+        // Every region with a port window (`port_q > 0`) counts the years this
+        // round covers to the polity holding it, off the round's OPENING map.
+        // A tally of deeds (`polity::naval_coastal_years`), read by nothing in
+        // the sim; the Empires round's alone (`naval_points_accrue`).
+        if (params.naval_points_accrue)
+        {
+            const int64_t years = std::max<int64_t>(0, std::min<int64_t>(step_years, params.stop_year - y));
+            for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
+            {
+                const int o = owner[i];
+                if (o < 0 || static_cast<std::size_t>(o) >= out.polities.size()) continue;
+                if (ss.regions[i].port_q <= 0) continue;
+                out.polities[static_cast<std::size_t>(o)].naval_coastal_years += years;
+            }
+        }
 
         // ---- BL-931: OBJECTS WITH A TERM, AND THE UPKEEP STEP -------------
         //
@@ -6733,6 +6832,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // § The colonial tie is a sea lane): the Empires span walks wet
                 // campaigns too and notes none, so round 4 draws no lane (the
                 // review's fix round on BL-1097).
+                // BL-1147 -- A SEA CROSSING MADE is a naval deed of the polity
+                // that launched it (`polity::naval_crossings`), the Empires
+                // round's alone; a tally read by nothing in the sim.
+                if (!exec_dry && params.naval_points_accrue) ++q.naval_crossings;
                 if (!exec_dry && params.exploration_upkeep_enabled)
                 {
                     note_sea_leg(src, static_cast<int>(ti), sea_leg_writer::campaign);
@@ -7521,6 +7624,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (q.empire_progress_q >= tn_cost)
                         {
                             q.empire_mask |= (1ULL << q.empire_investing);
+                            // BL-1147: a coastal sea tech taken is a naval deed.
+                            if (params.naval_points_accrue
+                             && (coastal_sea_tech_mask() & (1ULL << q.empire_investing)) != 0)
+                                ++q.naval_sea_techs;
                             q.empire_progress_q = 0;
                             q.empire_investing  = -1;
                             apply_tree_effects(q); // BL-973: the surface follows the mask at once
@@ -10914,6 +11021,17 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
         }
     }
 
+    // 1b. BL-1147: the naval ledger is a tally of deeds -- never negative, and
+    //     never more coastal sea techs than the tree holds.
+    for (std::size_t i = 0; i < o.polities.size(); ++i)
+    {
+        const polity& q = o.polities[i];
+        if (q.naval_coastal_years < 0 || q.naval_crossings < 0 || q.naval_sea_techs < 0)
+            return fail("polity " + std::to_string(i) + " carries a negative naval ledger");
+        if (q.naval_sea_techs > 3)
+            return fail("polity " + std::to_string(i) + " took more coastal sea techs than the tree holds");
+    }
+
     // 2. The holdings. Ascending polity ids, ascending region indices, every
     //    region held at most once, and every holder a living polity.
     std::vector<char> claimed(o.regions.size(), 0);
@@ -11211,6 +11329,8 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
                         + " has an overlord and a subject_kind that disagree");
         if (q.navy_stock < 0)
             return fail("polity " + std::to_string(i) + " carries a negative navy_stock");
+        if (q.naval_coastal_years < 0 || q.naval_crossings < 0 || q.naval_sea_techs < 0)
+            return fail("polity " + std::to_string(i) + " carries a negative naval ledger"); // BL-1147
     }
 
     // 3. The holdings. Ascending, in range, held by the living, each region
@@ -11497,8 +11617,16 @@ bool industrialisation_output_valid(const industrialisation_output& o, std::stri
         if (o.polities.size() < from->polities.size())
             return fail("the polity table shrank across the span");
         for (std::size_t i = 0; i < from->polities.size(); ++i)
+        {
             if (o.polities[i].id != from->polities[i].id)
                 return fail("polity " + std::to_string(i) + " changed its id across the span");
+            // BL-1147: THE NAVAL LEDGER IS CONSERVED. The deeds were the
+            // Empires round's; no later span adds to or takes from them.
+            if (o.polities[i].naval_coastal_years != from->polities[i].naval_coastal_years
+             || o.polities[i].naval_crossings     != from->polities[i].naval_crossings
+             || o.polities[i].naval_sea_techs     != from->polities[i].naval_sea_techs)
+                return fail("polity " + std::to_string(i) + "'s naval ledger changed across the span");
+        }
 
         if (o.culture_count < from->culture_count)
             return fail("the culture table shrank across the span");

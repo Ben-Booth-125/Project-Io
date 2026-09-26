@@ -33,9 +33,9 @@
 //       break agree, a seat that moves across the water changes nothing, a far
 //       pair on one landmass still reads the land's 700 -- and an out-of-range
 //       cargo loss is rejected, never clamped
-//   W8  BL-1140: on the real body, trade between realms on different
-//       landmasses writes sea-leg uses, only such trade does, and each use is
-//       read against the current
+//   W8  BL-1140: on the real body, trade BY SEA between realms on different
+//       landmasses writes sea-leg uses (a road between them writes none),
+//       only such trade does, and each use is read against the current
 //   W1-W7 the same properties on a real body (seed 32 by default, --seed N),
 //       plus the sim: a fixture re-run at generation's own weight reproduces
 //       generation's Exploration span, weight 0 builds no field, a weighted
@@ -71,7 +71,22 @@
 // --picture — a headless map of the field: --picture writes the body's ground
 //   and one arrow per ocean region to --png path (default ocean_currents.png).
 //
-// --synthetic — the C and F rows alone (no real body, no data layer).
+// --synthetic — the C, F and N rows alone (no real body, no data layer).
+//
+// --naval — BL-1147's census: per seed of the library (or --seeds), one
+//   generation, then the naval ledger the Empires round left at 1200 -- each
+//   deed's raw tally and weighted points over the living polities, what the
+//   polities dead by 1200 held, the polities that lost their coast -- and the
+//   ledger's conservation across both later handoffs. --out path writes JSON.
+//   A rung prefix "e:" (--rung) applies a dial to the Exploration re-run only:
+//   the conversion `naval_points_navy_per_1000` is read there.
+//
+// BL-1147 rows: N1-N6 on a resumed two-island span (a polity that lost its
+//   coast keeps its points; a dead polity carries none; at 0 nothing moves;
+//   an out-of-domain constant is rejected; no later span adds to the ledger;
+//   a coastal province counts one per year held), N7-N8 on the real body (the
+//   ledger is conserved across both handoffs; the conversion opens every
+//   living polity at exactly its points' fleet and reaches the sim).
 //
 // Build (needs the shipped data layer, so a live Lua state):
 //   bash tools/verify/build_lua_harness.sh ocean_currents_harness
@@ -423,6 +438,13 @@ void synthetic_rows()
                   "C8  a flow a road carries loses nothing to the current, though its seats stand across water");
             check(vol(by_sea, 0, 1) == east_got && lost_narrow == lost,
                   "C8  a flow the sea still carries past a narrower road loses what C7's does");
+            // The same line test marks the flow for the fourth sea-leg writer:
+            // a flow the road carries is not trade across water.
+            bool road_marked_land = !by_road.empty(), sea_marked_sea = !by_sea.empty();
+            for (const trade_flow& f : by_road) if (f.by_sea != 0) road_marked_land = false;
+            for (const trade_flow& f : by_sea)  if (f.by_sea != 1) sea_marked_sea = false;
+            check(road_marked_land && sea_marked_sea,
+                  "C8  compute_trade_flows marks a flow by sea only where its sea line carries it (the lane's writer reads the mark)");
         }
 
         // C9 (BL-1142 review): A BINDING IS WORTH WHAT ARRIVES. The pair's
@@ -618,6 +640,109 @@ void far_pair_rows()
 }
 
 // ---------------------------------------------------------------------------
+// N1-N6 (BL-1147): the naval ledger and the fleet it carries
+// ---------------------------------------------------------------------------
+
+/// The two-island world bound across water (F2's shape, polity 1 seated on
+/// East), with a ledger: polity 0 did 3,000 coastal province-years, 12
+/// crossings and took 2 sea techs, yet holds no port window now (its one
+/// region's `port_q` is 0 -- it LOST ITS COAST); polity 1 did nothing and holds
+/// a port window (its seat's `port_q` 500); polity 2 did 500 / 3 / 1 and is
+/// DEAD, holding nothing.
+far_world make_naval_world()
+{
+    far_world w = make_far_world(36, -1, true, true);
+    w.ss.regions[1].port_q = 500;
+    w.polities[0].naval_coastal_years = 3000; w.polities[0].naval_crossings = 12; w.polities[0].naval_sea_techs = 2;
+    polity dead;
+    dead.id = 2; dead.culture = 2; dead.capital = -1; dead.alive = false; dead.aggression_q = 600;
+    dead.naval_coastal_years = 500; dead.naval_crossings = 3; dead.naval_sea_techs = 1;
+    w.polities.push_back(dead);
+    return w;
+}
+
+history_sim_state run_naval_span(const far_world& w, int64_t per_1000, bool accrue, int64_t stop = 1704)
+{
+    history_sim_params p = exploration_sim_params(world_params{});
+    p.start_year = 1700;
+    p.stop_year  = stop;
+    p.tick_bands[0]   = { stop, 4 };
+    p.tick_band_count = 1;
+    p.trace_battles   = false;
+    p.naval_points_navy_per_1000 = per_1000;
+    p.naval_points_accrue        = accrue;
+    p.capture_year               = 1700; // the OPENING state, after the conversion
+    p.resume_polities      = &w.polities;
+    p.resume_contacts      = &w.contacts;
+    p.resume_dated_objects = &w.objects;
+    settlement_state ss = w.ss;
+    sim_terrain_view view;
+    view.substrate = &w.ground;
+    return run_history_sim(ss, nullptr, view, far_world::gw, far_world::gh, p, 4242u);
+}
+
+void naval_rows()
+{
+    std::printf("\n--- N1-N6: the naval ledger and the fleet it carries ---\n");
+    const far_world w = make_naval_world();
+    const history_sim_params dp = exploration_sim_params(world_params{});
+    const auto pts = [&](const polity& q) {
+        return q.naval_coastal_years * dp.naval_points_per_coastal_year + q.naval_crossings * dp.naval_points_per_crossing
+             + q.naval_sea_techs * dp.naval_points_per_sea_tech;
+    };
+    const int64_t k = 250;
+    const history_sim_state on = run_naval_span(w, k, false);
+    const auto opening = [](const history_sim_state& hs, int id) -> int64_t {
+        return hs.capture.captured && static_cast<std::size_t>(id) < hs.capture.polities.size()
+                   ? hs.capture.polities[static_cast<std::size_t>(id)].navy_stock : -1;
+    };
+    const int64_t p0 = pts(w.polities[0]), p2 = pts(w.polities[2]);
+    std::printf("      at %lld hulls per 1000 points: polity 0 (%lld points, no port window held) opens with %lld;"
+                " polity 1 (0 points) %lld; dead polity 2 (%lld points) %lld; carried %lld, died %lld,"
+                " fleets opened %lld\n",
+                static_cast<long long>(k), static_cast<long long>(p0), static_cast<long long>(opening(on, 0)),
+                static_cast<long long>(opening(on, 1)), static_cast<long long>(p2),
+                static_cast<long long>(opening(on, 2)), static_cast<long long>(on.naval_points_carried),
+                static_cast<long long>(on.naval_points_died), static_cast<long long>(on.naval_fleets_opened));
+    check(w.ss.regions[0].port_q == 0 && p0 > 0 && opening(on, 0) == (p0 * k) / 1000 && opening(on, 0) > 0
+          && opening(on, 0) == naval_opening_fleet(w.polities[0], [&] { history_sim_params q = dp; q.naval_points_navy_per_1000 = k; return q; }()),
+          "N1  a polity that lost its coast keeps its points: it opens with points x rate / 1000 hulls, off its ledger alone");
+    check(opening(on, 2) == 0 && on.naval_points_died == p2 && on.naval_points_carried == p0
+          && on.naval_fleets_opened == 1 && opening(on, 1) == 0,
+          "N2  a polity dead at the open carries nothing: its points die with it, counted");
+    // N3: at 0 nothing moves -- the same world with its ledgers wiped runs identically.
+    far_world wiped = w;
+    for (polity& q : wiped.polities) { q.naval_coastal_years = 0; q.naval_crossings = 0; q.naval_sea_techs = 0; }
+    const history_sim_state off = run_naval_span(w, 0, false), off_wiped = run_naval_span(wiped, 0, false);
+    bool same = off.battles == off_wiped.battles && off.treaties_formed == off_wiped.treaties_formed
+             && off.treaties_broken == off_wiped.treaties_broken && off.polities.size() == off_wiped.polities.size()
+             && off.naval_fleets_opened == 0 && opening(off, 0) == 0;
+    for (std::size_t i = 0; same && i < off.polities.size(); ++i)
+        if (off.polities[i].navy_stock != off_wiped.polities[i].navy_stock) same = false;
+    check(same, "N3  at a conversion of 0 the ledger moves nothing: the world runs as if it were empty");
+    // N4: rejected, never clamped.
+    const history_sim_state neg = run_naval_span(w, -1, false), big = run_naval_span(w, 100001, false);
+    check(neg.naval_points_params_rejected && big.naval_points_params_rejected
+          && opening(neg, 0) == 0 && opening(big, 0) == 0 && !on.naval_points_params_rejected,
+          "N4  a conversion outside [0, 100000] is rejected at the open and says so: no fleet opens");
+    // N5: a span that does not accrue leaves the ledger as it resumed it.
+    bool kept = on.polities.size() == w.polities.size();
+    for (std::size_t i = 0; kept && i < w.polities.size(); ++i)
+        kept = on.polities[i].naval_coastal_years == w.polities[i].naval_coastal_years
+            && on.polities[i].naval_crossings == w.polities[i].naval_crossings
+            && on.polities[i].naval_sea_techs == w.polities[i].naval_sea_techs;
+    check(kept, "N5  a span that does not accrue ends with the ledger it resumed (conserved across the span)");
+    // N6: a coastal province counts one per year held -- 20 years, 5 rounds.
+    const history_sim_state acc = run_naval_span(w, 0, true, 1720);
+    const int64_t d0 = acc.polities[0].naval_coastal_years - w.polities[0].naval_coastal_years;
+    const int64_t d1 = acc.polities[1].naval_coastal_years - w.polities[1].naval_coastal_years;
+    std::printf("      accruing over 1700-1720: polity 1 (a port window held) +%lld coastal years, polity 0 (none) +%lld\n",
+                static_cast<long long>(d1), static_cast<long long>(d0));
+    check(d1 == 20 && d0 == 0 && acc.polities[2].naval_coastal_years == w.polities[2].naval_coastal_years,
+          "N6  where the ledger accrues, a held region with a port window counts one per year held; none else does");
+}
+
+// ---------------------------------------------------------------------------
 // The shipped data layer (the app's order, as exploration_sweep loads it)
 // ---------------------------------------------------------------------------
 
@@ -665,6 +790,11 @@ bool apply_set(history_sim_params& p, const std::string& name, int v)
     if (name == "treaty_far_sea_penalty_q")      { p.treaty_far_sea_penalty_q = v; return true; }
     if (name == "sea_current_cargo_loss_q")      { p.sea_current_cargo_loss_q = v; return true; }
     if (name == "treaty_far_penalty_q")          { p.treaty_far_penalty_q = v; return true; }
+    // BL-1147: the conversion and the three deeds' weights.
+    if (name == "naval_points_navy_per_1000")    { p.naval_points_navy_per_1000 = v; return true; }
+    if (name == "naval_points_per_coastal_year") { p.naval_points_per_coastal_year = v; return true; }
+    if (name == "naval_points_per_crossing")     { p.naval_points_per_crossing = v; return true; }
+    if (name == "naval_points_per_sea_tech")     { p.naval_points_per_sea_tech = v; return true; }
     return false;
 }
 
@@ -680,6 +810,7 @@ struct rung_spec
 {
     std::string label;
     std::vector<std::pair<std::string, int>> both, ind;
+    std::vector<std::pair<std::string, int>> expl; ///< BL-1147: "e:" -- the Exploration re-run only
 };
 std::vector<rung_spec> g_rungs;
 
@@ -693,15 +824,16 @@ bool parse_rung(const std::string& spec, rung_spec& r)
         const std::size_t j = std::min(spec.find(',', i), spec.size());
         std::string kv = spec.substr(i, j - i);
         i = j + 1;
-        bool ind = false;
+        bool ind = false, expl = false;
         if (kv.rfind("i:", 0) == 0) { ind = true; kv = kv.substr(2); }
+        else if (kv.rfind("e:", 0) == 0) { expl = true; kv = kv.substr(2); }
         const std::size_t eq = kv.find('=');
         if (eq == std::string::npos) return false;
         history_sim_params probe;
         const std::string name = kv.substr(0, eq);
         const int v = std::atoi(kv.c_str() + eq + 1);
         if (!apply_set(probe, name, v)) return false;
-        (ind ? r.ind : r.both).push_back({name, v});
+        (ind ? r.ind : expl ? r.expl : r.both).push_back({name, v});
     }
     return true;
 }
@@ -745,6 +877,13 @@ struct span_read
     /// different landmasses in contact / bound by trade access.
     int64_t met_by_sea = 0, treaties_across = 0, far_treaties_across = 0, cargo_lost = 0;
     int64_t cross_contacted = 0, cross_bound = 0, cross_far_bound = 0;
+    /// BL-1147: the span's first crossing (the year of its first traced wet
+    /// campaign; 0 = none); the fleets standing at its close (living polities
+    /// with navy > 0), their hulls in total and the largest; the navy steps the
+    /// span bought and the treasury it spent keeping fleets.
+    int64_t first_crossing_year = 0;
+    int64_t fleets_close = 0, navy_close = 0, navy_close_max = 0;
+    int64_t navy_steps = 0, navy_upkeep_spent = 0;
 };
 
 bool contact_known(const std::set<std::pair<int, int>>& known, int a, int b)
@@ -794,7 +933,88 @@ span_read read_span(const history_sim_state& hs, const std::set<std::pair<int, i
     s.treaties_across = hs.treaties_formed_across_water;
     s.far_treaties_across = hs.far_treaties_formed_across_water;
     s.cargo_lost = hs.sea_trade_cargo_lost_q;
+    for (const battle_trace& bt : hs.battle_traces)
+        if (!bt.exec_dry && (s.first_crossing_year == 0 || bt.year < s.first_crossing_year))
+            s.first_crossing_year = bt.year;
+    for (const polity& q : hs.polities)
+    {
+        if (!q.alive || q.navy_stock <= 0) continue;
+        ++s.fleets_close;
+        s.navy_close += q.navy_stock;
+        s.navy_close_max = std::max<int64_t>(s.navy_close_max, q.navy_stock);
+    }
+    s.navy_steps = hs.navy_steps_bought;
+    s.navy_upkeep_spent = hs.treasury_spent_on_navy_upkeep;
     return s;
+}
+
+/// BL-1147: the fleets at one moment -- how many living polities hold one,
+/// their hulls in total, the largest and the median (over those holding one),
+/// the annual bill for keeping them (`navy_upkeep_per_1000_units_year_q`) and
+/// the treasuries at their capitals (every living polity's).
+struct fleet_read
+{
+    int64_t fleets = 0, navy = 0, max = 0, median = 0, bill_year = 0, treasury = 0;
+};
+
+/// BL-1147: the naval ledger at 1200 -- the living polities' raw deeds and
+/// weighted points by deed; how many hold any; what the polities already dead
+/// held (they carry nothing); and the living polities that LOST THEIR COAST
+/// (a coastal tally, but no held region with a port window at 1200), with
+/// their points.
+struct naval_read
+{
+    int64_t alive = 0, with_points = 0;
+    int64_t raw_coast = 0, raw_crossings = 0, raw_techs = 0;
+    int64_t pts_coast = 0, pts_crossings = 0, pts_techs = 0, pts_total = 0, pts_max = 0;
+    int64_t dead_with_points = 0, dead_points = 0;
+    int64_t lost_coast = 0, lost_coast_points = 0;
+};
+
+naval_read read_naval(const std::vector<polity>& ps, const std::vector<region>& regions, const history_sim_params& p)
+{
+    naval_read n;
+    std::vector<uint8_t> holds_window(ps.size(), 0);
+    for (const region& r : regions)
+        if (r.port_q > 0 && r.nation >= 0 && static_cast<std::size_t>(r.nation) < ps.size())
+            holds_window[static_cast<std::size_t>(r.nation)] = 1;
+    for (std::size_t i = 0; i < ps.size(); ++i)
+    {
+        const polity& q = ps[i];
+        const naval_points_split sp = naval_points_of(q, p);
+        if (!q.alive)
+        {
+            if (sp.total > 0) { ++n.dead_with_points; n.dead_points += sp.total; }
+            continue;
+        }
+        ++n.alive;
+        if (sp.total > 0) ++n.with_points;
+        n.raw_coast += q.naval_coastal_years; n.raw_crossings += q.naval_crossings; n.raw_techs += q.naval_sea_techs;
+        n.pts_coast += sp.coast; n.pts_crossings += sp.crossings; n.pts_techs += sp.techs; n.pts_total += sp.total;
+        n.pts_max = std::max(n.pts_max, sp.total);
+        if (q.naval_coastal_years > 0 && !holds_window[i]) { ++n.lost_coast; n.lost_coast_points += sp.total; }
+    }
+    return n;
+}
+
+fleet_read read_fleets(const std::vector<polity>& ps, const std::vector<region>* regions, int64_t rate_per_1000)
+{
+    fleet_read f;
+    std::vector<int64_t> sizes;
+    for (const polity& q : ps)
+    {
+        if (!q.alive) continue;
+        if (regions != nullptr && q.capital >= 0 && static_cast<std::size_t>(q.capital) < regions->size())
+            f.treasury += (*regions)[static_cast<std::size_t>(q.capital)].treasury;
+        if (q.navy_stock <= 0) continue;
+        ++f.fleets;
+        f.navy += q.navy_stock;
+        sizes.push_back(q.navy_stock);
+        f.bill_year += (q.navy_stock * rate_per_1000) / 1000;
+    }
+    std::sort(sizes.begin(), sizes.end());
+    if (!sizes.empty()) { f.max = sizes.back(); f.median = sizes[sizes.size() / 2]; }
+    return f;
 }
 
 std::set<std::pair<int, int>> contact_set(const std::vector<contact>& cs)
@@ -1060,9 +1280,13 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
           && tt == weighted_a.sea_legs_noted_tribute && tr == weighted_a.sea_legs_noted_trade,
           "W7  the writer record sums to the leg table, leg by leg and writer by writer (four writers)");
 
-    // W8 (BL-1140): the fourth writer. Every trade-written leg joins seats on
-    // different landmasses; trade writes on this body; its uses were read
-    // against the current, and the span with them is deterministic (W5).
+    // W8 (BL-1140): the fourth writer, on the Exploration re-run: every
+    // trade-written leg joins seats on different landmasses and its uses are
+    // read against the current, the same way twice. Only trade that GOES TO
+    // SEA writes (`trade_flow::by_sea`), and a span whose trade across water
+    // crosses by road where two realms' ground meets writes none -- seed 32's
+    // Exploration span, printed below. The positive half is read on the span
+    // whose trade does go to sea, in W10's resumed Industrialisation runs.
     {
         std::vector<region> regions_after;
         {
@@ -1096,14 +1320,12 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
                     static_cast<long long>(weighted_a.sea_trade_slack_current),
                     tn > 0 ? static_cast<double>(weighted_a.sea_trade_alignment_sum_q) / tn : 0.0,
                     static_cast<long long>(same_mass));
-        check(weighted_a.sea_legs_noted_trade > 0 && trade_legs > 0 && same_mass == 0,
-              "W8  trade between realms on different landmasses writes sea-leg uses, and only such trade does");
+        check(same_mass == 0 && (trade_legs > 0) == (weighted_a.sea_legs_noted_trade > 0),
+              "W8  only trade between realms on different landmasses writes sea-leg uses (Exploration)");
         check(tn == weighted_a.sea_legs_noted_trade
               && weighted_a.sea_trade_with_current == weighted_b.sea_trade_with_current
               && weighted_a.sea_trade_alignment_sum_q == weighted_b.sea_trade_alignment_sum_q,
-              "W8  every trade use is read against the current, the same way twice");
-        check(still.sea_legs_noted_trade > 0 && still.sea_trade_with_current == 0,
-              "W8  the writer runs in still water too (it is the record, not the price)");
+              "W8  every trade use is read against the current, the same way twice (Exploration)");
     }
 
     // W9 (BL-1142): generation's own Industrialisation span. Realms across
@@ -1199,6 +1421,64 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
         };
         const int gen_loss = fx.industrialisation_params.sea_current_cargo_loss_q;
         const history_sim_state gen = run_loss(gen_loss), over = run_loss(1001), zero = run_loss(0);
+        // W8, the positive half: the span whose trade goes to sea writes trade
+        // uses, only between realms on different landmasses, read against the
+        // current the same way twice -- and in still water too.
+        {
+            const std::vector<int32_t> mass = landmass_labels(sub, fx.gw, fx.gh);
+            const std::vector<region>& R = fx.industrialisation_handoff.regions;
+            int64_t legs = 0, same = 0;
+            for (const sea_leg_writer_row& r : gen.sea_leg_writers)
+            {
+                if (r.trade <= 0) continue;
+                ++legs;
+                const auto m = [&](int ri) -> int32_t {
+                    if (ri < 0 || static_cast<std::size_t>(ri) >= R.size()) return -1;
+                    return landmass_at(mass, fx.gw, fx.gh, R[static_cast<std::size_t>(ri)].col,
+                                       R[static_cast<std::size_t>(ri)].row);
+                };
+                if (m(r.a) < 0 || m(r.a) == m(r.b)) ++same;
+            }
+            const int64_t tn_i = gen.sea_trade_with_current + gen.sea_trade_against_current + gen.sea_trade_slack_current;
+            const auto run_still = [&]() {
+                history_sim_params dp = fx.industrialisation_params;
+                dp.trace_battles           = false;
+                dp.sea_current_weight_q    = 0;
+                dp.resume_polities         = &eo.polities;
+                dp.resume_grudges          = &eo.grudges;
+                dp.resume_contacts         = &eo.contacts;
+                dp.resume_corridors        = &eo.surviving_corridors;
+                dp.resume_sea_legs         = &eo.sea_legs;
+                dp.resume_dated_objects    = &eo.dated_objects;
+                dp.resume_civilisations    = &eo.civilisations;
+                dp.resume_universal_creeds = &eo.universal_creeds;
+                settlement_state ss;
+                ss.regions = eo.regions;
+                survey_regions_at_span_open(w, ids, fx.gw, fx.gh, ss.regions);
+                creed_state cs;
+                cs.cultures = eo.cultures;
+                return run_history_sim(ss, &cs, fx.terrain.view(), fx.gw, fx.gh, dp, fx.industrialisation_seed,
+                                       nullptr, fx.works, nullptr);
+            };
+            const history_sim_state still_i = run_still();
+            std::printf("      Industrialisation trade by sea: %lld uses on %lld legs (%lld with / %lld against / %lld slack),"
+                        " volume %lld; legs joining one landmass: %lld; in still water %lld uses\n",
+                        static_cast<long long>(gen.sea_legs_noted_trade), static_cast<long long>(legs),
+                        static_cast<long long>(gen.sea_trade_with_current),
+                        static_cast<long long>(gen.sea_trade_against_current),
+                        static_cast<long long>(gen.sea_trade_slack_current),
+                        static_cast<long long>(gen.sea_trade_volume_q), static_cast<long long>(same),
+                        static_cast<long long>(still_i.sea_legs_noted_trade));
+            check(gen.sea_legs_noted_trade > 0 && legs > 0 && same == 0,
+                  "W8  trade by sea between realms on different landmasses writes sea-leg uses, and only such trade does"
+                  " (Industrialisation)");
+            check(tn_i == gen.sea_legs_noted_trade
+                  && gen.sea_trade_with_current == fx.industrialisation_state.sea_trade_with_current
+                  && gen.sea_trade_alignment_sum_q == fx.industrialisation_state.sea_trade_alignment_sum_q,
+                  "W8  every trade use is read against the current, the same way twice (Industrialisation)");
+            check(still_i.sea_legs_noted_trade > 0 && still_i.sea_trade_with_current == 0,
+                  "W8  the writer runs in still water too (it is the record, not the price)");
+        }
         std::printf("      Industrialisation resumed from the 1660 handoff: at generation's %d cargo lost %lld"
                     " (generation's own span %lld), battles %lld (%lld); at 1001 rejected %d, lost %lld,"
                     " volume across water %lld; at 0 volume %lld\n",
@@ -1215,6 +1495,60 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
               && over.sea_trade_volume_q == zero.sea_trade_volume_q,
               "W10 a cargo loss outside [0, 1000] is rejected whole: where 500 loses cargo, the run loses none,"
               " runs as a loss of 0 does, and says so");
+    }
+
+    // N7-N8 (BL-1147): the naval ledger on the real body.
+    {
+        const std::vector<polity>& P = fx.pre_exploration_polities;
+        const auto same_ledger = [](const polity& a, const polity& b) {
+            return a.naval_coastal_years == b.naval_coastal_years && a.naval_crossings == b.naval_crossings
+                && a.naval_sea_techs == b.naval_sea_techs;
+        };
+        int64_t moved = 0, coast = 0, cross = 0, techs = 0;
+        for (std::size_t i = 0; i < P.size(); ++i)
+        {
+            coast += P[i].naval_coastal_years; cross += P[i].naval_crossings; techs += P[i].naval_sea_techs;
+            if (i < fx.exploration_handoff.polities.size() && !same_ledger(P[i], fx.exploration_handoff.polities[i])) ++moved;
+            if (fx.industrialisation_ran && i < fx.industrialisation_handoff.polities.size()
+             && !same_ledger(P[i], fx.industrialisation_handoff.polities[i])) ++moved;
+        }
+        std::printf("      naval ledger at 1200: %zu polities, coastal province-years %lld, crossings %lld, sea techs %lld;"
+                    " ledgers moved at the 1660 or 1960 handoff: %lld\n",
+                    P.size(), static_cast<long long>(coast), static_cast<long long>(cross),
+                    static_cast<long long>(techs), static_cast<long long>(moved));
+        check(moved == 0 && coast > 0 && cross > 0,
+              "N7  the Empires round tallies naval deeds, and the ledger crosses both later handoffs unchanged");
+
+        const int64_t k = 100;
+        history_sim_params ep = exploration_rerun_params(fx, wq, /*trace=*/false);
+        ep.naval_points_navy_per_1000 = k;
+        ep.capture_year = ep.start_year; // the OPENING state, after the conversion
+        settlement_state ss = fx.pre_exploration_settlement;
+        creed_state      cs = fx.pre_exploration_creeds;
+        const history_sim_state hk = run_history_sim(ss, &cs, fx.terrain.view(), fx.gw, fx.gh, ep, fx.exploration_seed,
+                                                     nullptr, fx.works, nullptr);
+        bool exact = hk.capture.captured && hk.capture.polities.size() == P.size();
+        int64_t fleets = 0, hulls = 0;
+        for (std::size_t i = 0; exact && i < P.size(); ++i)
+        {
+            const int64_t add = naval_opening_fleet(P[i], ep);
+            if (hk.capture.polities[i].navy_stock != P[i].navy_stock + add) exact = false;
+            if (add > 0) { ++fleets; hulls += add; }
+        }
+        const naval_read n = read_naval(P, fx.pre_exploration_settlement.regions, ep);
+        std::printf("      at %lld hulls per 1000 points: %lld fleets open (%lld hulls); %lld polities lost their coast"
+                    " (%lld points); dead polities held %lld points; battles %lld (at 0: %lld), navy steps %lld (%lld)\n",
+                    static_cast<long long>(k), static_cast<long long>(fleets), static_cast<long long>(hulls),
+                    static_cast<long long>(n.lost_coast), static_cast<long long>(n.lost_coast_points),
+                    static_cast<long long>(n.dead_points), static_cast<long long>(hk.battles),
+                    static_cast<long long>(weighted_a.battles), static_cast<long long>(hk.navy_steps_bought),
+                    static_cast<long long>(weighted_a.navy_steps_bought));
+        check(exact && fleets > 0 && fleets == hk.naval_fleets_opened && hulls == hk.naval_hulls_opened
+              && hk.naval_points_died == n.dead_points,
+              "N8  the conversion opens every living polity at exactly its points' fleet, the dead at nothing");
+        check(!same_run(hk, weighted_a) || hk.navy_steps_bought != weighted_a.navy_steps_bought
+              || hk.treasury_spent_on_navy_upkeep != weighted_a.treasury_spent_on_navy_upkeep,
+              "N8  the carried fleet reaches the sim: the span at a conversion above 0 is not the span at 0");
     }
     (void)known; (void)lane_tier;
 }
@@ -1287,6 +1621,11 @@ struct weight_row
     lane_writers lw1660; ///< lanes at the 1660 close, attributed over Exploration's notes
     int64_t lanes_1660 = 0;
     double secs = 0.0;
+    /// BL-1147: the fleets the Exploration span opened with (1200), stood at
+    /// in 1300 (a capture of the traced re-run, read by nothing in the sim)
+    /// and closed with (1660).
+    fleet_read fleets_open, fleets_1300, fleets_1660;
+    naval_read naval; ///< BL-1147: the ledger at 1200, weighted with this rung's weights
 };
 
 struct seed_row
@@ -1345,7 +1684,9 @@ void put_span(std::FILE* f, const char* key, const span_read& s)
                     "\"tr_volume\": %lld, \"tr_volume_with\": %lld, \"tr_volume_against\": %lld, "
                     "\"subjections\": %lld, \"bought\": %lld, \"freed\": %lld, \"conquests\": %lld, \"foundings\": %lld, "
                     "\"met_by_sea\": %lld, \"treaties_across\": %lld, \"far_treaties_across\": %lld, \"cargo_lost\": %lld, "
-                    "\"cross_contacted\": %lld, \"cross_bound\": %lld, \"cross_far_bound\": %lld}",
+                    "\"cross_contacted\": %lld, \"cross_bound\": %lld, \"cross_far_bound\": %lld, "
+                    "\"first_crossing_year\": %lld, \"fleets_close\": %lld, \"navy_close\": %lld, "
+                    "\"navy_close_max\": %lld, \"navy_steps\": %lld, \"navy_upkeep_spent\": %lld}",
                  key, static_cast<long long>(s.battles), static_cast<long long>(s.wet_battles),
                  static_cast<long long>(s.neighbour), static_cast<long long>(s.frontier),
                  static_cast<long long>(s.ambiguous), static_cast<long long>(s.table),
@@ -1367,7 +1708,34 @@ void put_span(std::FILE* f, const char* key, const span_read& s)
                  static_cast<long long>(s.met_by_sea), static_cast<long long>(s.treaties_across),
                  static_cast<long long>(s.far_treaties_across), static_cast<long long>(s.cargo_lost),
                  static_cast<long long>(s.cross_contacted), static_cast<long long>(s.cross_bound),
-                 static_cast<long long>(s.cross_far_bound));
+                 static_cast<long long>(s.cross_far_bound),
+                 static_cast<long long>(s.first_crossing_year), static_cast<long long>(s.fleets_close),
+                 static_cast<long long>(s.navy_close), static_cast<long long>(s.navy_close_max),
+                 static_cast<long long>(s.navy_steps), static_cast<long long>(s.navy_upkeep_spent));
+}
+
+void put_naval(std::FILE* f, const char* key, const naval_read& n)
+{
+    std::fprintf(f, "\"%s\": {\"alive\": %lld, \"with_points\": %lld, \"raw_coast\": %lld, \"raw_crossings\": %lld, "
+                    "\"raw_techs\": %lld, \"pts_coast\": %lld, \"pts_crossings\": %lld, \"pts_techs\": %lld, "
+                    "\"pts_total\": %lld, \"pts_max\": %lld, \"dead_with_points\": %lld, \"dead_points\": %lld, "
+                    "\"lost_coast\": %lld, \"lost_coast_points\": %lld}",
+                 key, static_cast<long long>(n.alive), static_cast<long long>(n.with_points),
+                 static_cast<long long>(n.raw_coast), static_cast<long long>(n.raw_crossings),
+                 static_cast<long long>(n.raw_techs), static_cast<long long>(n.pts_coast),
+                 static_cast<long long>(n.pts_crossings), static_cast<long long>(n.pts_techs),
+                 static_cast<long long>(n.pts_total), static_cast<long long>(n.pts_max),
+                 static_cast<long long>(n.dead_with_points), static_cast<long long>(n.dead_points),
+                 static_cast<long long>(n.lost_coast), static_cast<long long>(n.lost_coast_points));
+}
+
+void put_fleets(std::FILE* f, const char* key, const fleet_read& r)
+{
+    std::fprintf(f, "\"%s\": {\"fleets\": %lld, \"navy\": %lld, \"max\": %lld, \"median\": %lld, "
+                    "\"bill_year\": %lld, \"treasury\": %lld}",
+                 key, static_cast<long long>(r.fleets), static_cast<long long>(r.navy),
+                 static_cast<long long>(r.max), static_cast<long long>(r.median),
+                 static_cast<long long>(r.bill_year), static_cast<long long>(r.treasury));
 }
 
 // ---------------------------------------------------------------------------
@@ -1550,11 +1918,24 @@ seed_row sweep_seed(shipped_inputs& shipped, uint32_t seed, const std::vector<in
 
         history_sim_params ep = exploration_rerun_params(fx, wgt, /*trace=*/true);
         apply_sets(ep, g_set_both); // BL-1142 measurement dials
-        if (rung != nullptr) apply_sets(ep, rung->both);
+        if (rung != nullptr) { apply_sets(ep, rung->both); apply_sets(ep, rung->expl); }
+        ep.capture_year = 1300; // BL-1147: the fleets a century in (read by nothing in the sim)
         settlement_state ss = fx.pre_exploration_settlement;
         creed_state      cs = fx.pre_exploration_creeds;
         const history_sim_state he = run_history_sim(ss, &cs, fx.terrain.view(), fx.gw, fx.gh, ep,
                                                      fx.exploration_seed, nullptr, fx.works, nullptr);
+        {
+            const int64_t rate = ep.navy_upkeep_per_1000_units_year_q;
+            // The fleets the open converts: `naval_opening_fleet` on each
+            // living polity, the very function the resumed open adds (N8).
+            std::vector<polity> opened = fx.pre_exploration_polities;
+            for (polity& q : opened) q.navy_stock += naval_opening_fleet(q, ep);
+            wr.fleets_open = read_fleets(opened, &fx.pre_exploration_settlement.regions, rate);
+            wr.naval = read_naval(fx.pre_exploration_polities, fx.pre_exploration_settlement.regions, ep);
+            if (he.capture.captured)
+                wr.fleets_1300 = read_fleets(he.capture.polities, &he.capture.regions, rate);
+            wr.fleets_1660 = read_fleets(he.polities, &ss.regions, rate);
+        }
         const exploration_output eo = make_exploration_output(ss, he, &cs);
         wr.e = read_span(he, known_1200, lane_tier, &field, &ss.regions);
         wr.bind_e = census_cross_water(he, ss.regions, field, mass, fx.gw, fx.gh, wgt);
@@ -1602,7 +1983,7 @@ seed_row sweep_seed(shipped_inputs& shipped, uint32_t seed, const std::vector<in
         // FIDELITY: the rung at generation's own weight must reproduce
         // generation's own untraced runs, or the sweep measured another world.
         if (wgt == fx.exploration_params.sea_current_weight_q
-            && (rung == nullptr || (rung->both.empty() && rung->ind.empty())))
+            && (rung == nullptr || (rung->both.empty() && rung->ind.empty() && rung->expl.empty())))
         {
             const span_read& a = wr.e; const span_read& b = row.shipped_e;
             row.fidelity_e = a.battles == b.battles && a.conquests == b.conquests && a.foundings == b.foundings
@@ -1616,6 +1997,76 @@ seed_row sweep_seed(shipped_inputs& shipped, uint32_t seed, const std::vector<in
         row.weights.push_back(wr);
     }
     return row;
+}
+
+/// BL-1147's census (--naval): the ledger generation's own Empires round left.
+void run_naval(shipped_inputs& shipped, const std::vector<uint32_t>& seeds, const std::string& out_path)
+{
+    std::printf("\n=== --naval: the naval ledger at 1200, %zu seeds (timings indicative on a shared machine) ===\n",
+                seeds.size());
+    std::FILE* f = out_path.empty() ? nullptr : std::fopen(out_path.c_str(), "wb");
+    if (f) std::fprintf(f, "{\"seeds\": [\n");
+    bool first = true;
+    for (uint32_t seed : seeds)
+    {
+        const auto t0 = std::chrono::steady_clock::now();
+        world_params wp;
+        wp.seed = seed;
+        generation_report rep;
+        era_minus_one_fixture fx;
+        world_gen_config cfg = shipped.cfg;
+        cfg.stop_after_industrialisation = true;
+        const world w = make_hard_coded_world(wp, &rep, cfg, nullptr, &shipped.works, &fx);
+        (void)w;
+        if (!fx.ran || !fx.exploration_ran) { std::printf("  seed %u: spans did not run\n", seed); continue; }
+        const history_sim_params& ep = fx.exploration_params;
+        const naval_read n = read_naval(fx.pre_exploration_polities, fx.pre_exploration_settlement.regions, ep);
+        // Conservation: every polity's ledger at 1660 and 1960 is its 1200 one.
+        int64_t moved_1660 = 0, moved_1960 = 0;
+        const auto same_ledger = [](const polity& a, const polity& b) {
+            return a.naval_coastal_years == b.naval_coastal_years && a.naval_crossings == b.naval_crossings
+                && a.naval_sea_techs == b.naval_sea_techs;
+        };
+        for (std::size_t i = 0; i < fx.pre_exploration_polities.size(); ++i)
+        {
+            if (i < fx.exploration_handoff.polities.size()
+             && !same_ledger(fx.pre_exploration_polities[i], fx.exploration_handoff.polities[i])) ++moved_1660;
+            if (fx.industrialisation_ran && i < fx.industrialisation_handoff.polities.size()
+             && !same_ledger(fx.pre_exploration_polities[i], fx.industrialisation_handoff.polities[i])) ++moved_1960;
+        }
+        std::printf("  seed %2u (%.0f s): %lld alive at 1200, %lld with points | raw deeds coast-years %lld,"
+                    " crossings %lld, sea techs %lld | points coast %lld / crossings %lld / techs %lld = %lld"
+                    " (max %lld) | dead: %lld with %lld points | lost their coast: %lld with %lld points |"
+                    " ledgers moved at 1660 %lld, at 1960 %lld\n",
+                    seed, seconds_since(t0), static_cast<long long>(n.alive), static_cast<long long>(n.with_points),
+                    static_cast<long long>(n.raw_coast), static_cast<long long>(n.raw_crossings),
+                    static_cast<long long>(n.raw_techs), static_cast<long long>(n.pts_coast),
+                    static_cast<long long>(n.pts_crossings), static_cast<long long>(n.pts_techs),
+                    static_cast<long long>(n.pts_total), static_cast<long long>(n.pts_max),
+                    static_cast<long long>(n.dead_with_points), static_cast<long long>(n.dead_points),
+                    static_cast<long long>(n.lost_coast), static_cast<long long>(n.lost_coast_points),
+                    static_cast<long long>(moved_1660), static_cast<long long>(moved_1960));
+        std::fflush(stdout);
+        if (f)
+        {
+            std::fprintf(f, "%s {\"seed\": %u, ", first ? "" : ",\n", seed);
+            put_naval(f, "naval", n);
+            std::fprintf(f, ", \"moved_1660\": %lld, \"moved_1960\": %lld, \"polities\": [",
+                         static_cast<long long>(moved_1660), static_cast<long long>(moved_1960));
+            bool fp = true;
+            for (const polity& q : fx.pre_exploration_polities)
+            {
+                if (q.naval_coastal_years == 0 && q.naval_crossings == 0 && q.naval_sea_techs == 0) continue;
+                std::fprintf(f, "%s[%d, %d, %lld, %lld, %lld]", fp ? "" : ", ", q.id, q.alive ? 1 : 0,
+                             static_cast<long long>(q.naval_coastal_years), static_cast<long long>(q.naval_crossings),
+                             static_cast<long long>(q.naval_sea_techs));
+                fp = false;
+            }
+            std::fprintf(f, "]}");
+            first = false;
+        }
+    }
+    if (f) { std::fprintf(f, "\n]}\n"); std::fclose(f); }
 }
 
 void run_sweep(shipped_inputs& shipped, const std::vector<uint32_t>& seeds, const std::vector<int>& weights,
@@ -1650,6 +2101,21 @@ void run_sweep(shipped_inputs& shipped, const std::vector<uint32_t>& seeds, cons
                 print_span("  I", wr.i);
                 print_span_1142("  E", wr.e);
                 print_span_1142("  I", wr.i);
+                const auto fl = [](const fleet_read& f) {
+                    char b[160];
+                    std::snprintf(b, sizeof b, "%lld fleets, %lld hulls (max %lld, median %lld), bill %lld/yr of treasury %lld",
+                                  static_cast<long long>(f.fleets), static_cast<long long>(f.navy),
+                                  static_cast<long long>(f.max), static_cast<long long>(f.median),
+                                  static_cast<long long>(f.bill_year), static_cast<long long>(f.treasury));
+                    return std::string(b);
+                };
+                std::printf("        fleets: open %s | 1300 %s | 1660 %s | 1960 %lld fleets, %lld hulls;"
+                            " first crossing E %lld, I %lld; navy steps E %lld I %lld\n",
+                            fl(wr.fleets_open).c_str(), fl(wr.fleets_1300).c_str(), fl(wr.fleets_1660).c_str(),
+                            static_cast<long long>(wr.i.fleets_close), static_cast<long long>(wr.i.navy_close),
+                            static_cast<long long>(wr.e.first_crossing_year),
+                            static_cast<long long>(wr.i.first_crossing_year),
+                            static_cast<long long>(wr.e.navy_steps), static_cast<long long>(wr.i.navy_steps));
                 std::printf("        cross-water flows at the close, bounded by want/holding/land/sea: "
                             "1660 %lld of %lld/%lld/%lld/%lld, 1960 %lld of %lld/%lld/%lld/%lld",
                             static_cast<long long>(wr.bind_e.flows), static_cast<long long>(wr.bind_e.by_want),
@@ -1699,6 +2165,10 @@ void run_sweep(shipped_inputs& shipped, const std::vector<uint32_t>& seeds, cons
                              static_cast<long long>(wr.bind_e.by_sea), static_cast<long long>(wr.bind_i.flows),
                              static_cast<long long>(wr.bind_i.by_want), static_cast<long long>(wr.bind_i.by_holding),
                              static_cast<long long>(wr.bind_i.by_land), static_cast<long long>(wr.bind_i.by_sea));
+                put_fleets(f, "fleets_open", wr.fleets_open); std::fprintf(f, ", ");
+                put_naval(f, "naval", wr.naval); std::fprintf(f, ", ");
+                put_fleets(f, "fleets_1300", wr.fleets_1300); std::fprintf(f, ", ");
+                put_fleets(f, "fleets_1660", wr.fleets_1660); std::fprintf(f, ", ");
                 put_span(f, "e", wr.e); std::fprintf(f, ", ");
                 put_span(f, "i", wr.i);
                 std::fprintf(f, "}%s\n", k + 1 < r.weights.size() ? "," : "");
@@ -1831,6 +2301,7 @@ std::vector<int> parse_ints(const char* s)
 int main(int argc, char** argv)
 {
     bool sweep = false, picture = false, pairs = false, explicit_weights = false, synthetic_only = false;
+    bool naval = false;
     std::vector<uint32_t> seeds(std::begin(k_library), std::end(k_library));
     std::vector<int> weights = {0, 150, 300, 500, 700, 900};
     std::string out_path, png_path = "ocean_currents.png";
@@ -1841,6 +2312,7 @@ int main(int argc, char** argv)
         if (a == "--sweep") sweep = true;
         else if (a == "--pairs") pairs = true;
         else if (a == "--synthetic") synthetic_only = true;
+        else if (a == "--naval") naval = true;
         else if (a == "--picture") picture = true;
         else if (a == "--seeds" && i + 1 < argc)
         {
@@ -1873,6 +2345,7 @@ int main(int argc, char** argv)
     {
         synthetic_rows();
         far_pair_rows();
+        naval_rows();
         std::printf("\n%s: %d failure(s)\n", g_failures == 0 ? "ALL PASS" : "FAILED", g_failures);
         return g_failures == 0 ? 0 : 1;
     }
@@ -1890,6 +2363,11 @@ int main(int argc, char** argv)
         run_pairs(shipped, seeds);
         return 0;
     }
+    if (naval)
+    {
+        run_naval(shipped, seeds, out_path);
+        return 0;
+    }
     if (sweep)
     {
         // Still water rides the default ladder; an explicit --weights list is taken as given.
@@ -1904,6 +2382,7 @@ int main(int argc, char** argv)
 
     synthetic_rows();
     far_pair_rows();
+    naval_rows();
     const int shipped_weight = exploration_sim_params(world_params{}).sea_current_weight_q;
     real_body_rows(shipped, seed, shipped_weight > 0 ? shipped_weight : 300);
     std::printf("\n%s: %d failure(s)\n", g_failures == 0 ? "ALL PASS" : "FAILED", g_failures);

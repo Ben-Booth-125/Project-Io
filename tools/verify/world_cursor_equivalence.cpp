@@ -208,6 +208,9 @@ void fold_polity(uint64_t& h, const polity& p)
     fold_i32(h, p.overlord);
     fold_i32(h, p.subject_kind);
     fold_i64(h, p.navy_stock);
+    fold_i64(h, p.naval_coastal_years); // BL-1147: the naval ledger crosses every handoff
+    fold_i64(h, p.naval_crossings);
+    fold_i64(h, p.naval_sea_techs);
     fold_i32(h, p.treaties_broken);
     fold_u32(h, p.tree_keys);
 }
