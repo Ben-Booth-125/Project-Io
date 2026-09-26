@@ -1991,9 +1991,11 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
 //
 // TIMINGS ARE WALL CLOCK and only as clean as the machine was quiet. `--note`
 // records the run conditions into the JSON; the build type prints on every header.
-//   search   ms per evaluation at thread_count 1 (the app's): round_ms[0] is the
-//            seed candidate's evaluation; the rest of round_ms over the rest of
-//            the evaluations is the per-proposal mean.
+//   search   at the campaign's own thread count (`shipped_search_params`, 2 since
+//            BL-1136; the header prints it): round_ms[0] is the seed candidate's
+//            evaluation; the rest of round_ms over the rest of the evaluations is
+//            WALL time per evaluation (`wall/ev`) -- with a round's proposals
+//            scored in parallel it is not one evaluation's cost.
 //   val      ms per economy tick over the 12 validation ticks (run_app_validation_settle).
 //   live     ms per economy tick over the live window after the seat
 //            (run_app_live_window — app.cpp:380-423 into step_economy, not
@@ -2219,7 +2221,12 @@ struct cost_row
     // --- the search ---
     int    evaluations = 0;
     int    accepted = 0;
-    double seed_eval_ms = 0.0, proposal_mean_ms = 0.0, search_ms = 0.0, landscape_ms = 0.0;
+    /// `proposal_wall_ms_per_eval` is WALL time per evaluation: the rounds' wall
+    /// clock over their evaluations. Since BL-1136 a round's proposals are scored
+    /// in parallel (`k_campaign_search_threads`), so this is NOT one evaluation's
+    /// cost -- it roughly halves with two threads while each evaluation costs
+    /// what it did. It was `proposal_mean_ms` when the search was serial.
+    double seed_eval_ms = 0.0, proposal_wall_ms_per_eval = 0.0, search_ms = 0.0, landscape_ms = 0.0;
     std::vector<double> round_ms;
 
     // --- ticks ---
@@ -2617,7 +2624,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
     row.seed_eval_ms = sr.round_ms.empty() ? 0.0 : sr.round_ms.front();
     for (const double ms : sr.round_ms)
         row.search_ms += ms;
-    row.proposal_mean_ms = (sr.evaluations > 1)
+    row.proposal_wall_ms_per_eval = (sr.evaluations > 1)
         ? (row.search_ms - row.seed_eval_ms) / static_cast<double>(sr.evaluations - 1) : 0.0;
 
     const world& w = run->w;
@@ -2974,8 +2981,9 @@ void write_cost_json(const std::string& path, const cost_options& opt,
     for (std::size_t i = 0; i < opt.argv.size(); ++i)
         std::fprintf(f, "%s\"%s\"", i ? ", " : "", json_escape(opt.argv[i]).c_str());
     std::fprintf(f, "],\n");
-    std::fprintf(f, "  \"validation_ticks\": %d,\n  \"live_ticks\": %d,\n  \"search_thread_count\": 1,\n",
-                 k_settle_ticks, opt.live_ticks);
+    std::fprintf(f, "  \"validation_ticks\": %d,\n  \"live_ticks\": %d,\n  \"search_thread_count\": %d,\n",
+                 k_settle_ticks, opt.live_ticks,
+                 shipped_search_params(0u).thread_count); // the campaign's own (BL-1136)
     if (opt.stockpile)
     {
         // BL-1043's P_f axis: points per firm charter, one row set per entry —
@@ -3259,9 +3267,9 @@ void write_cost_json(const std::string& path, const cost_options& opt,
                          r.at_land.background, r.at_land.busiest, r.at_land.busiest_corps,
                          r.at_land.busiest_background);
             std::fprintf(f, ",\n          \"search\": { \"evaluations\": %d, \"accepted\": %d, "
-                            "\"seed_eval_ms\": %.1f, \"proposal_mean_ms\": %.1f, \"search_ms\": %.1f, "
+                            "\"seed_eval_ms\": %.1f, \"proposal_wall_ms_per_eval\": %.1f, \"search_ms\": %.1f, "
                             "\"landscape_phase_ms\": %.1f, \"round_ms\": [",
-                         r.evaluations, r.accepted, r.seed_eval_ms, r.proposal_mean_ms, r.search_ms,
+                         r.evaluations, r.accepted, r.seed_eval_ms, r.proposal_wall_ms_per_eval, r.search_ms,
                          r.landscape_ms);
             for (std::size_t i = 0; i < r.round_ms.size(); ++i)
                 std::fprintf(f, "%s%.1f", i ? ", " : "", r.round_ms[i]);
@@ -3401,7 +3409,7 @@ void print_cost_table_header(const cost_options& opt)
                     "%11s | %9s | %5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
                     "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window",
                     "body", "ceil", "remain", "nonat", "late", "refsd", "share", "nospec", "anyS", "natSh",
-                    "hold in/out", "corps/bg", "evals", "seed_ms", "prop_ms", "val med/mean",
+                    "hold in/out", "corps/bg", "evals", "seed_ms", "wall/ev", "val med/mean",
                     "live med/mean", "short", "trail8 min/med/max", "neg%", "evalsDue");
         return;
     }
@@ -3442,7 +3450,7 @@ void print_cost_table_header(const cost_options& opt)
                 "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window", "body",
                 "ceil", "remain", "nonat", "late", "refsd", "share", "nospec", "anyS", "natSh", "hold in/out",
                 "corps/bg", "evals",
-                "seed_ms", "prop_ms", "val med/mean", "live med/mean", "short", "trail8 min/med/max",
+                "seed_ms", "wall/ev", "val med/mean", "live med/mean", "short", "trail8 min/med/max",
                 "neg%", "evalsDue");
 }
 
@@ -3517,7 +3525,7 @@ void print_cost_row(const cost_row& r, bool wide = false)
                 u(charter_unspent_reason::late_shortfall), u(charter_unspent_reason::refused),
                 u(charter_unspent_reason::share_unplaced), u(charter_unspent_reason::no_specialist),
                 r.any_specialist ? "yes" : "NO", r.largest_nation_share, hold, corps,
-                r.evaluations, r.seed_eval_ms, r.proposal_mean_ms);
+                r.evaluations, r.seed_eval_ms, r.proposal_wall_ms_per_eval);
     if (r.build_only)
     {
         std::printf(" | %15s | %15s | build only%s\n", "-", "-",
@@ -3971,8 +3979,9 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
 #ifdef _MSC_FULL_VER
     std::printf(", _MSC_FULL_VER %lld", static_cast<long long>(_MSC_FULL_VER));
 #endif
-    std::printf("; search thread_count 1 (the app's); %d validation ticks; %d live ticks after the "
-                "seat, not spectating\n", k_settle_ticks, opt.live_ticks);
+    std::printf("; search thread_count %d (the app's); %d validation ticks; %d live ticks after the "
+                "seat, not spectating\n", shipped_search_params(0u).thread_count, k_settle_ticks,
+                opt.live_ticks);
     std::printf("TIMINGS ARE WALL CLOCK — only as clean as the machine was quiet.%s%s\n",
                 opt.note.empty() ? "" : " note: ", opt.note.c_str());
     std::printf("TIMINGS ARE A LOWER BOUND on the app's step_economy: laps 0-5 only (phase 5 = "

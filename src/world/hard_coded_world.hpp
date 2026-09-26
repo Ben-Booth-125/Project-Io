@@ -878,6 +878,32 @@ struct generation_report
     /// measure the whole era rather than this term.
     int64_t markets_from_trade   = 0;
 
+    // --- The carve ledger: what the carve counted as competitors (BL-1086) --
+    //
+    // The nation gate's competitor term (BL-132 change 3) reads, per nation, how
+    // many corporations compete in its territory. On a world whose firms come
+    // from the charter budget that is the budget's PLANNED charters — the
+    // specialists and firms each nation's centres can afford — because such a
+    // world lays no roster before the carve (Ben, 2026-09-26, option A); on any
+    // other world it is the laid roster's distinct corporations. Recorded here
+    // because the roster the carve read is otherwise unrecoverable once the
+    // search has chartered its own (tools/verify/market_census.cpp said so).
+    //
+    // NOT SAVED, on the footing `grudge_sentiment_rows` is: a generation-time
+    // reading for the build that made it; a loaded game's report carries it
+    // empty. Nothing in generation or play reads it back.
+    struct carve_competitor_row
+    {
+        entity_id nation              = null_entity;
+        int64_t   competitors         = 0; ///< what the gate counted
+        int64_t   planned_specialists = 0; ///< budget worlds: centres affording a specialist
+        int64_t   planned_firms       = 0; ///< budget worlds: firms the rest of their points buy
+    };
+    /// True: the carve counted the budget's planned charters; false: the laid roster.
+    bool                              carve_competitors_from_budget = false;
+    /// Ascending nation id; a nation with no competitor is absent.
+    std::vector<carve_competitor_row> carve_competitors;
+
     // --- The handoff validators' verdict (BL-969) ---------------------------
     //
     // `pass_one_output_valid` and `exploration_output_valid` run on the

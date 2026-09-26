@@ -22,6 +22,7 @@
 #include "population_generation.hpp"
 #include "road_generation.hpp"
 #include "settlement.hpp"
+#include "stockpile_budget.hpp"  // BL-1086: the carve's competitors on a budget world
 #include "tile_generation.hpp"
 #include "river_generation.hpp"
 
@@ -34,6 +35,7 @@
 #include <cstdio>
 #include <initializer_list>
 #include <iterator>
+#include <limits>       // BL-1086: the planned-charter count, saturated into the carve's int
 #include <map>
 #include <random>
 #include <unordered_set>
@@ -527,7 +529,12 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
         // evaluations (a budget world skips the roster axis); the twelve-tick
         // settle 113,922 / 68,832 ms -- of which ONE tick is 50-90 s and the
         // rest ~1.5 s each (the `[finish_campaign_world]` line names it).
-        20000, // 16 Searching the landscape (build_stockpile_budget .. apply)
+        // RE-MEASURED 2026-09-26 (the BL-1136 review; Release, indicative on a
+        // loaded machine) after the search went to two threads (BL-1136) and the
+        // carve to the budget's planned firms (BL-1086): the search 8,208 /
+        // 4,007 ms on seeds 0 / 28 (20000 before, measured serially), so the bar
+        // no longer spends a third of itself on eight seconds of work.
+        6000,  // 16 Searching the landscape (build_stockpile_budget .. apply)
         18000, // 17 Proving the field (run_settle, twelve ticks; 90000 before BL-1117)
     };
     if (label_index < 0 || label_index >= generation_stage_label_count) return 0;
@@ -2533,10 +2540,55 @@ void run_tail(generation_cursor& c)
     // above are in w.buildings for corporate asset placement to collision-avoid.
     // Corporations: 6-10 actors registered in the generated nations, including
     // the player's (which sets w.player_entity). See CORPORATION_GENERATION.md.
+    //
+    // BL-1086 — ON A BUDGET WORLD NO ROSTER IS LAID HERE (Ben, 2026-09-26,
+    // option A; MARKETS.md § Market centres and seeding). A world whose firms
+    // come from the charter budget has its whole web chartered by the landscape
+    // search's winner (finish_campaign_world), which removed whatever this stage
+    // laid: the roster was generated to be discarded, and the carve below read
+    // it. So on such a world this stage lays nothing, and the carve counts the
+    // budget's PLANNED charters per nation (`plan_charters_by_nation`) as the
+    // competitors it reads — the firms each nation's centres can afford, which
+    // is the roster the budget will buy.
+    //
+    // THE BUDGET IS THE ONE finish_campaign_world BUILDS: the same builder
+    // (`build_stockpile_budget`) over the same three inputs — the settlement's
+    // regions (copied into `world::gen_settlement` at the tail's end), the
+    // population carve's founded and dropped slots — at the shipped divisor, and
+    // the same spend (`stockpile_charter_spend`). A BUDGET WORLD is the search's
+    // own test, read the same way: a non-empty budget, spend params not refused,
+    // and a centre that affords a specialist (NR-910). The one refusal it cannot
+    // read here is `charter_spend_world_refusal`, which needs the recipe
+    // registry; on such a world the search runs its no-budget branch, which
+    // regenerates the specialist roster itself, so the world still gets one.
+    //
+    // EVERY OTHER WORLD IS TODAY'S, BYTE FOR BYTE: an empty budget (the legacy
+    // arc, a no-prehistory fixture), a refused spend, or a budget that opens no
+    // specialist lays the world-gen roster below and the carve reads it. The
+    // budget read is pure: no entity, no draw, no write.
     bump(c, 11);
-    generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count,
-                                                 .seed_starting_force = gen_cfg.seed_starting_force },
-        /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement, progress);
+    const stockpile_budget carve_stockpile =
+        build_stockpile_budget(&kepler_settlement.regions, w.gen_carve_centres, w.gen_carve_dropped);
+    const charter_spend_params carve_spend = stockpile_charter_spend(carve_stockpile);
+    const bool carve_budget_world =
+        !carve_stockpile.budget.empty()
+        && charter_spend_refusal(carve_stockpile.budget, carve_spend) == nullptr
+        && charter_budget_affords_specialist(w, carve_stockpile.budget, carve_spend);
+    std::map<entity_id, charter_nation_plan> carve_planned;
+    if (carve_budget_world)
+    {
+        carve_planned = plan_charters_by_nation(w, carve_stockpile.budget, carve_spend);
+        // No roster, so no player corporation: the seat is drawn after the
+        // search from the web it charters — the state `remove_specialist_roster`
+        // left the world in when this stage still laid one.
+        w.player_entity = null_entity;
+    }
+    else
+    {
+        generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count,
+                                                     .seed_starting_force = gen_cfg.seed_starting_force },
+            /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement, progress);
+    }
 
     // BL-1072: "Finishing" is entered HERE, so its caption covers what is
     // actually left -- the markets, the other bodies, laws, provinces and
@@ -2587,22 +2639,59 @@ void run_tail(generation_cursor& c)
         // of the geological concentration term below, rather than replacing it
         // — richness says there's something worth trading, corp presence says
         // multiple actors are already trading it.
+        //
+        // BL-1086: ON A BUDGET WORLD THE COMPETITORS ARE THE BUDGET'S PLANNED
+        // CHARTERS (Ben, 2026-09-26, option A) — the specialists and firms each
+        // nation's centres can afford, counted at bump 11 above — because that
+        // world lays no roster to count, and the roster the search will charter
+        // is the budget's. Every other world counts the laid roster, as always.
         std::map<entity_id, int> corps_in_nation; // std::map → ascending id (deterministic)
-        for (const auto& [cid, cc] : w.corporations)
+        if (carve_budget_world)
         {
-            std::unordered_set<entity_id> nations_touched;
-            for (const entity_id bid : cc.assets)
+            for (const auto& [nid, plan] : carve_planned)
+                corps_in_nation[nid] = static_cast<int>(
+                    std::min<int64_t>(plan.total(), std::numeric_limits<int>::max()));
+        }
+        else
+        {
+            for (const auto& [cid, cc] : w.corporations)
             {
-                const auto bit = w.buildings.find(bid);
-                if (bit == w.buildings.end())
-                    continue;
-                const auto nit = w.tile_to_nation.find(bit->second.tile);
-                if (nit == w.tile_to_nation.end())
-                    continue;
-                nations_touched.insert(nit->second);
+                std::unordered_set<entity_id> nations_touched;
+                for (const entity_id bid : cc.assets)
+                {
+                    const auto bit = w.buildings.find(bid);
+                    if (bit == w.buildings.end())
+                        continue;
+                    const auto nit = w.tile_to_nation.find(bit->second.tile);
+                    if (nit == w.tile_to_nation.end())
+                        continue;
+                    nations_touched.insert(nit->second);
+                }
+                for (const entity_id nid : nations_touched)
+                    ++corps_in_nation[nid];
             }
-            for (const entity_id nid : nations_touched)
-                ++corps_in_nation[nid];
+        }
+        // THE CARVE LEDGER (BL-1086): what the gate below counted, per nation,
+        // and from which source — so a reader can see the carve's competitors
+        // rather than infer them from a roster the search has since replaced.
+        // Write-only, like every report field.
+        if (report != nullptr)
+        {
+            report->carve_competitors_from_budget = carve_budget_world;
+            report->carve_competitors.clear();
+            for (const auto& [nid, n] : corps_in_nation)
+            {
+                generation_report::carve_competitor_row row;
+                row.nation      = nid;
+                row.competitors = n;
+                if (carve_budget_world)
+                {
+                    const charter_nation_plan& plan = carve_planned.at(nid);
+                    row.planned_specialists = plan.specialists;
+                    row.planned_firms       = plan.firms;
+                }
+                report->carve_competitors.push_back(row);
+            }
         }
         const float corp_presence_gain = gen_cfg.market_carving.corp_presence_gain;
 

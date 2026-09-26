@@ -3317,6 +3317,38 @@ bool charter_budget_affords_specialist(const world& w, const charter_budget& bud
     return false;
 }
 
+std::map<entity_id, charter_nation_plan> plan_charters_by_nation(
+    const world& w, const charter_budget& budget, const charter_spend_params& spend)
+{
+    std::map<entity_id, charter_nation_plan> out;   // std::map: ascending nation id
+    const int64_t fp = spend.firm_price_points;
+    if (budget.empty() || fp <= 0)
+        return out;
+    const int64_t specialist_price = spend.specialist_price_points();
+    for (const auto& [centre_id, pts] : budget.points())
+    {
+        // The walk's own resolution: the centre's tile, and the nation owning it
+        // (a centre without one charters nothing).
+        const auto tile_it = w.population_centre_tile.find(centre_id);
+        if (tile_it == w.population_centre_tile.end() || w.tiles.count(tile_it->second) == 0)
+            continue;
+        const auto own = w.tile_to_nation.find(tile_it->second);
+        if (own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
+            continue;
+        const int64_t specialists =
+            (specialist_price > 0 && static_cast<int64_t>(pts) >= specialist_price) ? 1 : 0;
+        // charter_centre_firm_points is already net of the specialist's price
+        // and whole firm charters, so the division is exact.
+        const int64_t firms = charter_centre_firm_points(pts, spend) / fp;
+        if (specialists == 0 && firms == 0)
+            continue;
+        charter_nation_plan& p = out[own->second];
+        p.specialists += specialists;
+        p.firms       += firms;
+    }
+    return out;
+}
+
 std::vector<entity_id> charter_web_from_budget(world& w,
                                                const recipe_registry& reg,
                                                const charter_budget& budget,
