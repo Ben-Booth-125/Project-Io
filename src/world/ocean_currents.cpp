@@ -241,18 +241,19 @@ std::vector<int32_t> landmass_labels(const std::vector<terrain_substrate>& subst
             const int idx = stack.back();
             stack.pop_back();
             const int c = idx % gw, r = idx / gw;
-            for (int dr = -1; dr <= 1; ++dr)
-                for (int dc = -1; dc <= 1; ++dc)
-                {
-                    if (dr == 0 && dc == 0) continue;
-                    const int rr = r + dr;
-                    if (rr < 0 || rr >= gh) continue;
-                    const int ni = rr * gw + ((c + dc + gw) % gw);
-                    if (mass[static_cast<std::size_t>(ni)] >= 0 || is_sea(substrate[static_cast<std::size_t>(ni)]))
-                        continue;
-                    mass[static_cast<std::size_t>(ni)] = next;
-                    stack.push_back(ni);
-                }
+            // Four cardinal neighbours, columns wrapping: the grid every traversal
+            // reader walks (logistics.cpp), so two landmasses are two exactly when
+            // no four-way walk over ground joins them.
+            const int nb[4][2] = { {(c + 1) % gw, r}, {(c + gw - 1) % gw, r}, {c, r + 1}, {c, r - 1} };
+            for (const auto& n : nb)
+            {
+                if (n[1] < 0 || n[1] >= gh) continue;
+                const int ni = n[1] * gw + n[0];
+                if (mass[static_cast<std::size_t>(ni)] >= 0 || is_sea(substrate[static_cast<std::size_t>(ni)]))
+                    continue;
+                mass[static_cast<std::size_t>(ni)] = next;
+                stack.push_back(ni);
+            }
         }
         ++next;
     }
@@ -266,7 +267,11 @@ int32_t landmass_at(const std::vector<int32_t>& labels, int gw, int gh, int col,
     const int32_t here = labels[static_cast<std::size_t>(row) * static_cast<std::size_t>(gw)
                                 + static_cast<std::size_t>(col)];
     if (here >= 0) return here;
-    std::vector<std::pair<int32_t, int>> seen; // (label, count): at most 24 entries
+    // (label, count) over the 5x5 window: at most 24 distinct land labels (the
+    // centre is sea), held in a fixed array -- no allocation per read.
+    int32_t seen_label[25];
+    int     seen_count[25];
+    int     seen_n = 0;
     for (int dr = -2; dr <= 2; ++dr)
         for (int dc = -2; dc <= 2; ++dc)
         {
@@ -276,15 +281,16 @@ int32_t landmass_at(const std::vector<int32_t>& labels, int gw, int gh, int col,
             const int32_t m = labels[static_cast<std::size_t>(rr) * static_cast<std::size_t>(gw)
                                      + static_cast<std::size_t>(cc)];
             if (m < 0) continue;
-            bool found = false;
-            for (auto& e : seen)
-                if (e.first == m) { ++e.second; found = true; break; }
-            if (!found) seen.push_back({m, 1});
+            int k = 0;
+            while (k < seen_n && seen_label[k] != m) ++k;
+            if (k < seen_n) ++seen_count[k];
+            else { seen_label[seen_n] = m; seen_count[seen_n] = 1; ++seen_n; }
         }
     int32_t best = -1;
     int     best_n = 0;
-    for (const auto& e : seen)
-        if (e.second > best_n || (e.second == best_n && e.first < best)) { best = e.first; best_n = e.second; }
+    for (int k = 0; k < seen_n; ++k)
+        if (seen_count[k] > best_n || (seen_count[k] == best_n && seen_label[k] < best))
+        { best = seen_label[k]; best_n = seen_count[k]; }
     return best;
 }
 

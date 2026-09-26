@@ -399,7 +399,7 @@ int region_distance(const region& a, const region& b, int gw)
     if (gw > 0 && dc > gw / 2) dc = gw - dc; // Columns wrap: the map is a cylinder.
     int dr = a.row - b.row;
     if (dr < 0) dr = -dr;
-    return dc > dr ? dc : dr; // Chebyshev — movement is eight-connected.
+    return dc > dr ? dc : dr; // Chebyshev: the sim's water-blind region radius, not the tile pathfinder's four-way grid
 }
 
 int step_for_year(const history_sim_params& p, int64_t y)
@@ -817,6 +817,10 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         {
             trade_ctx.currents         = spend_ctx->currents;
             trade_ctx.current_weight_q = params.sea_current_weight_q;
+            // BL-1142: the cargo a leg against its current loses.
+            trade_ctx.seat_landmass = spend_ctx->seat_landmass;
+            trade_ctx.cargo_loss_q  = spend_ctx->cargo_loss_q;
+            trade_ctx.cargo_lost    = spend_ctx->cargo_lost_out;
         }
         flows = compute_trade_flows(trade_ctx, regions, polities, *treaties);
     }
@@ -1338,38 +1342,35 @@ trade_context build_trade_context(const std::vector<region>&           regions,
     return ctx;
 }
 
-int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& regions,
-                        const std::vector<polity>& polities,
-                        int seller, int buyer, int good)
+/// The two LINES one directed (seller, buyer) trade could run on, and the
+/// current along the sea one: land is the pair's best corridor (0 without
+/// one); sea is the smaller of both seats' built ports while the SELLER holds a
+/// navy (0 otherwise), priced with the current seller seat -> buyer seat when
+/// the context carries the field. False for a dead or out-of-range party, the
+/// same polity twice, or a capital out of range. `align_out` is the current's
+/// alignment along the leg (0 where no field or no sea line).
+static bool trade_lines(const trade_context& ctx, const std::vector<region>& regions,
+                        const std::vector<polity>& polities, int seller, int buyer,
+                        int& land_q, int& sea_q, int& align_out)
 {
-    if (good < 0 || good >= 4) return 0;
-    if (seller < 0 || buyer < 0 || seller == buyer) return 0;
+    land_q = 0; sea_q = 0; align_out = 0;
+    if (seller < 0 || buyer < 0 || seller == buyer) return false;
     if (static_cast<std::size_t>(seller) >= polities.size()
-     || static_cast<std::size_t>(buyer) >= polities.size()) return 0;
+     || static_cast<std::size_t>(buyer) >= polities.size()) return false;
     const polity& ps = polities[static_cast<std::size_t>(seller)];
     const polity& pb = polities[static_cast<std::size_t>(buyer)];
-    if (!ps.alive || !pb.alive) return 0;
-    if (ps.capital < 0 || static_cast<std::size_t>(ps.capital) >= regions.size()) return 0;
-    if (pb.capital < 0 || static_cast<std::size_t>(pb.capital) >= regions.size()) return 0;
+    if (!ps.alive || !pb.alive) return false;
+    if (ps.capital < 0 || static_cast<std::size_t>(ps.capital) >= regions.size()) return false;
+    if (pb.capital < 0 || static_cast<std::size_t>(pb.capital) >= regions.size()) return false;
     const region& seller_seat = regions[static_cast<std::size_t>(ps.capital)];
     const region& buyer_seat  = regions[static_cast<std::size_t>(pb.capital)];
 
-    // WANT: the buyer capital market's RAW signal (0 where it stands no market).
-    const int want_q = buyer_seat.scarcity_raw_q[good];
-    if (want_q <= 0) return 0;
-
-    // HOLDER: the seller's share of held ground dominant in the good.
-    const int holding_q = static_cast<std::size_t>(seller) < ctx.holding_q.size()
-                        ? ctx.holding_q[static_cast<std::size_t>(seller)][static_cast<std::size_t>(good)]
-                        : 0;
-    if (holding_q <= 0) return 0;
-
     // LINE: the better of land (a corridor joining the two realms) and sea
     // (both seats' built ports, carried by the SELLER's navy).
-    const int land_q = trade_land_line_q(ctx, seller, buyer);
-    int sea_q = ps.navy_stock > 0
-              ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
-              : 0;
+    land_q = trade_land_line_q(ctx, seller, buyer);
+    sea_q = ps.navy_stock > 0
+          ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
+          : 0;
     // BL-1140 -- THE SEA LINE IS PRICED WITH ITS CURRENT, seller's seat to
     // buyer's: the leg's cost against still water divides the line, so a
     // current carrying the goods widens it and one set against them narrows
@@ -1381,14 +1382,83 @@ int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& reg
     // the water runs. Land is never priced: a road has no current.
     if (sea_q > 0 && ctx.currents != nullptr && ctx.current_weight_q > 0)
     {
-        const int align = ocean_current_alignment_q(*ctx.currents, seller_seat.col, seller_seat.row,
-                                                    buyer_seat.col, buyer_seat.row);
-        const int cost = ocean_current_leg_cost_q(ctx.current_weight_q, align); // >= 1: weight < 1000
+        align_out = ocean_current_alignment_q(*ctx.currents, seller_seat.col, seller_seat.row,
+                                              buyer_seat.col, buyer_seat.row);
+        const int cost = ocean_current_leg_cost_q(ctx.current_weight_q, align_out); // >= 1: weight < 1000
         sea_q = clampi(static_cast<int>((static_cast<int64_t>(sea_q) * 1000) / std::max(1, cost)), 0, 1000);
     }
-    const int line_q = std::max(land_q, sea_q);
+    return true;
+}
 
+/// The want and the holding a directed trade reads (0 where either is absent).
+static void trade_want_holding(const trade_context& ctx, const std::vector<region>& regions,
+                               const std::vector<polity>& polities, int seller, int buyer, int good,
+                               int& want_q, int& holding_q)
+{
+    // WANT: the buyer capital market's RAW signal (0 where it stands no market).
+    want_q = regions[static_cast<std::size_t>(polities[static_cast<std::size_t>(buyer)].capital)]
+                 .scarcity_raw_q[good];
+    // HOLDER: the seller's share of held ground dominant in the good.
+    holding_q = static_cast<std::size_t>(seller) < ctx.holding_q.size()
+              ? ctx.holding_q[static_cast<std::size_t>(seller)][static_cast<std::size_t>(good)]
+              : 0;
+}
+
+int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& regions,
+                        const std::vector<polity>& polities,
+                        int seller, int buyer, int good)
+{
+    if (good < 0 || good >= 4) return 0;
+    int land_q = 0, sea_q = 0, align = 0;
+    if (!trade_lines(ctx, regions, polities, seller, buyer, land_q, sea_q, align)) return 0;
+    int want_q = 0, holding_q = 0;
+    trade_want_holding(ctx, regions, polities, seller, buyer, good, want_q, holding_q);
+    if (want_q <= 0 || holding_q <= 0) return 0;
+    const int line_q = std::max(land_q, sea_q);
     return std::max(0, std::min({want_q, holding_q, line_q}));
+}
+
+int trade_sea_volume_q(const trade_context& ctx, const std::vector<region>& regions,
+                       const std::vector<polity>& polities,
+                       int seller, int buyer, int good)
+{
+    if (good < 0 || good >= 4) return 0;
+    int land_q = 0, sea_q = 0, align = 0;
+    if (!trade_lines(ctx, regions, polities, seller, buyer, land_q, sea_q, align)) return 0;
+    if (sea_q <= 0) return 0; // no navy for the seller, or no built port at a seat
+    int want_q = 0, holding_q = 0;
+    trade_want_holding(ctx, regions, polities, seller, buyer, good, want_q, holding_q);
+    return std::max(0, std::min({want_q, holding_q, sea_q}));
+}
+
+int treaty_far_penalty_for(const history_sim_params& p, bool met_across_water)
+{
+    return met_across_water ? p.treaty_far_sea_penalty_q : p.treaty_far_penalty_q;
+}
+
+/// BL-1142 -- the share of a sized flow that ARRIVES, per mille: 1000 unless
+/// the context carries the seats' landmasses, the current field and a loss in
+/// (0, 1000], the two seats stand on different landmasses, AND the sea line is
+/// what carries the flow (it beats the land line -- a flow a road carries has
+/// no current), when it is `1000 - loss x max(0, -alignment) / 1000` for the
+/// leg seller seat -> buyer seat. A loss outside [0, 1000] delivers as sized
+/// (the sim rejects such a run at its open). Pure.
+static int trade_delivered_share_q(const trade_context& ctx, const std::vector<region>& regions,
+                                   const std::vector<polity>& polities, int seller, int buyer)
+{
+    if (ctx.seat_landmass == nullptr || ctx.currents == nullptr) return 1000;
+    if (ctx.cargo_loss_q <= 0 || ctx.cargo_loss_q > 1000) return 1000;
+    const std::vector<int32_t>& seat = *ctx.seat_landmass;
+    if (seller < 0 || buyer < 0
+     || static_cast<std::size_t>(seller) >= seat.size() || static_cast<std::size_t>(buyer) >= seat.size())
+        return 1000;
+    const int32_t ms = seat[static_cast<std::size_t>(seller)], mb = seat[static_cast<std::size_t>(buyer)];
+    if (ms < 0 || mb < 0 || ms == mb) return 1000; // no water between them
+    int land_q = 0, sea_q = 0, align = 0;
+    if (!trade_lines(ctx, regions, polities, seller, buyer, land_q, sea_q, align)) return 1000;
+    if (sea_q <= land_q) return 1000; // the road carries it: no current
+    const int against = align < 0 ? -align : 0;
+    return clampi(1000 - (ctx.cargo_loss_q * against) / 1000, 0, 1000);
 }
 
 int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regions,
@@ -1430,7 +1500,10 @@ int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regi
             const int holding_q = ctx.holding_q[static_cast<std::size_t>(seller)][static_cast<std::size_t>(g)];
             const int64_t want_room = std::max<int64_t>(0, want_q - in_other[buyer_side][g]);
             const int64_t hold_room = std::max<int64_t>(0, holding_q - out_other[seller_side][g]);
-            total += static_cast<int>(std::min<int64_t>({static_cast<int64_t>(v), want_room, hold_room}));
+            // BL-1142: the binding is worth what ARRIVES, after a leg run
+            // against its current has lost its share.
+            const int64_t arrives = std::min<int64_t>({static_cast<int64_t>(v), want_room, hold_room});
+            total += static_cast<int>((arrives * trade_delivered_share_q(ctx, regions, polities, seller, buyer)) / 1000);
         }
     return total; // bounded by 8 * 1000
 }
@@ -1551,6 +1624,26 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
                                [](const trade_flow& f) { return f.volume_q <= 0; }),
                 flows.end());
 
+    // BL-1142 -- A LEG RUN AGAINST ITS CURRENT DELIVERS LESS, applied AFTER the
+    // flow is sized: the want and the holding were shared on what was sent,
+    // and what arrives is the sent volume's delivered share. The loss is cargo
+    // gone, so the want it would have met stays unmet.
+    if (ctx.seat_landmass != nullptr && ctx.currents != nullptr
+     && ctx.cargo_loss_q > 0 && ctx.cargo_loss_q <= 1000)
+    {
+        for (trade_flow& f : flows)
+        {
+            const int share = trade_delivered_share_q(ctx, regions, polities, f.seller, f.buyer);
+            if (share >= 1000) continue;
+            const int delivered = static_cast<int>((static_cast<int64_t>(f.volume_q) * share) / 1000);
+            if (ctx.cargo_lost != nullptr) *ctx.cargo_lost += f.volume_q - delivered;
+            f.volume_q = delivered;
+        }
+        flows.erase(std::remove_if(flows.begin(), flows.end(),
+                                   [](const trade_flow& f) { return f.volume_q <= 0; }),
+                    flows.end());
+    }
+
     std::sort(flows.begin(), flows.end(), [](const trade_flow& x, const trade_flow& y) {
         if (x.seller != y.seller) return x.seller < y.seller;
         if (x.buyer != y.buyer) return x.buyer < y.buyer;
@@ -1616,16 +1709,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (!currents_on) return 1000;
         return ocean_current_leg_cost_q(params.sea_current_weight_q, sea_leg_alignment_q(from, to));
     };
-    // A DISTANCE GATE READ ACROSS A LEG, priced with the leg's current: the
-    // Chebyshev distance scaled by the leg's cost. Asked only where the price
-    // could decide -- a raw distance that clears the gate even at the dearest
-    // cost the weight allows (or fails it even at the cheapest) is answered
-    // without sampling the line, which is exact, not an approximation.
+    // BL-1142 -- THE CARGO LOSS is judged once at the open as well: a loss
+    // outside [0, 1000] loses no cargo for the whole run and says so --
+    // rejected, never clamped.
+    const bool cargo_loss_legal =
+        params.sea_current_cargo_loss_q >= 0 && params.sea_current_cargo_loss_q <= 1000;
+    out.sea_cargo_loss_rejected = !cargo_loss_legal;
+    const int cargo_loss_q = cargo_loss_legal ? params.sea_current_cargo_loss_q : 0;
+
     // BL-1140 -- WHICH LANDMASS EACH TILE STANDS ON, once per span, for the
-    // fourth writer's test (trade between realms on different landmasses).
-    // Only the spans that keep the lane record need it.
+    // fourth writer's test (trade between realms on different landmasses)
+    // and, BL-1142, for the class every contact records at the meeting
+    // (`contact_event::across_water`) -- so every span that runs on terrain
+    // keeps it, the Empires round included: a pair it joins carries its
+    // class into the spans that read it.
     const std::vector<int32_t> landmass =
-        (params.exploration_upkeep_enabled && terrain.substrate != nullptr)
+        (terrain.substrate != nullptr)
             ? landmass_labels(*terrain.substrate, gw, gh)
             : std::vector<int32_t>{};
     // A seat's landmass (`landmass_at`: a seat on the shoreline ring reads
@@ -1636,13 +1735,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (r.col < 0 || r.row < 0 || r.col >= gw || r.row >= gh) return -1;
         return landmass_at(landmass, gw, gh, r.col, r.row);
     };
-    const auto sea_leg_distance_within = [&](int from, int to, int raw_dist, int gate) -> bool {
-        if (!currents_on) return raw_dist <= gate;
-        const int64_t w = params.sea_current_weight_q;
-        if (static_cast<int64_t>(raw_dist) * (1000 + w) <= static_cast<int64_t>(gate) * 1000) return true;
-        if (static_cast<int64_t>(raw_dist) * (1000 - w) >  static_cast<int64_t>(gate) * 1000) return false;
-        return static_cast<int64_t>(raw_dist) * sea_leg_cost_q(from, to)
-            <= static_cast<int64_t>(gate) * 1000;
+    // BL-1142 -- EACH POLITY'S SEAT LANDMASS, read ONCE per decision round,
+    // ahead of the upkeep (nothing between it and the break walk moves a
+    // capital), and shared by the round's trade contexts, meeting by sea and
+    // the fourth writer: one lookup per polity, never per pair or per flow.
+    std::vector<int32_t> seat_landmass;
+    const auto refresh_seat_landmass = [&]() {
+        seat_landmass.assign(out.polities.size(), -1);
+        if (landmass.empty()) return;
+        for (std::size_t i = 0; i < out.polities.size(); ++i)
+            seat_landmass[i] = landmass_of_region(out.polities[i].capital);
+    };
+    const auto seat_landmass_of = [&](int pid) -> int32_t {
+        return (pid >= 0 && static_cast<std::size_t>(pid) < seat_landmass.size())
+                   ? seat_landmass[static_cast<std::size_t>(pid)] : -1;
     };
 
     // BL-914: seed the tap's geometry mirror with the regions this call
@@ -2471,7 +2577,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
             const polity& pl = out.polities[static_cast<std::size_t>(lo)];
             const polity& ph = out.polities[static_cast<std::size_t>(hi)];
-            const int32_t ml = landmass_of_region(pl.capital), mh = landmass_of_region(ph.capital);
+            const int32_t ml = seat_landmass_of(static_cast<int>(lo)), mh = seat_landmass_of(static_cast<int>(hi));
             if (ml < 0 || mh < 0 || ml == mh) continue; // one landmass: no water between the realms
             const bool lo_sells = fwd >= back;
             const int from = lo_sells ? pl.capital : ph.capital;
@@ -2713,12 +2819,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                    int region_idx, int64_t year) {
         if (a < 0 || b < 0 || a == b) return;
         if (contact_exists(a, b)) return; // symmetric: (a,b) implies (b,a)
-        if (params.trace_battles) ++out.contacts_raised_trace[static_cast<int>(kind) & 1]; // BL-1019, trace only
+        if (params.trace_battles) ++out.contacts_raised_trace[clampi(static_cast<int>(kind), 0, 2)]; // BL-1019/BL-1142, trace only
         contact_event e;
         e.year   = static_cast<int32_t>(year);
         e.region = (region_idx >= 0 && region_idx < static_cast<int>(owner_index_limit))
                      ? static_cast<uint16_t>(region_idx) : owner_none;
         e.kind   = kind;
+        // BL-1142: WHAT KIND OF PAIR MET, recorded once off the two seats as
+        // they stand at the meeting and never re-read -- a capital that later
+        // moves onto the other landmass does not change it. Read live (not
+        // the round's seat table): a campaign or an inheritance can meet
+        // after a seat has moved this round.
+        {
+            const auto seat_mass = [&](int pid) -> int32_t {
+                if (static_cast<std::size_t>(pid) >= out.polities.size()) return -1;
+                return landmass_of_region(out.polities[static_cast<std::size_t>(pid)].capital);
+            };
+            const int32_t ma = seat_mass(a), mb = seat_mass(b);
+            e.across_water = (ma >= 0 && mb >= 0 && ma != mb) ? 1 : 0;
+        }
         if (contact* c = contact_slot(a, b)) c->first = e;
         if (contact* c = contact_slot(b, a)) c->first = e;
     };
@@ -4263,6 +4382,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             spend_ctx.creeds = cs;
             spend_ctx.prefs  = &round_prefs;
             spend_ctx.currents = currents_on ? &currents : nullptr; // BL-1140
+            refresh_seat_landmass();                                 // BL-1142: once per round
+            spend_ctx.seat_landmass  = landmass.empty() ? nullptr : &seat_landmass;
+            spend_ctx.cargo_loss_q   = cargo_loss_q; // judged in domain at the open
+            spend_ctx.cargo_lost_out = &out.sea_trade_cargo_lost_q;
             // BL-954: the state's treaties open this round's flows, rebuilt
             // into `out.trade_flows` (never accumulated).
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
@@ -4370,9 +4493,63 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     t.currents         = &currents;
                     t.current_weight_q = params.sea_current_weight_q;
+                    // BL-1142: a binding is worth what arrives.
+                    t.seat_landmass = landmass.empty() ? nullptr : &seat_landmass;
+                    t.cargo_loss_q  = cargo_loss_q;
                 }
                 return t;
             }();
+
+            // BL-1142 -- REALMS ACROSS WATER MEET BY SEA (INDUSTRIALISATION.md
+            // sec Far pairs meet and bind). Two living realms whose seats
+            // stand on different landmasses, and which have never met, MEET
+            // this round when a trade BY SEA is open between them in either
+            // direction: the seller holds a navy, both seats hold built
+            // ports, and the seller holds a good the buyer's market wants
+            // (`trade_sea_volume_q` -- the sea line alone; a land corridor's
+            // volume never counts) -- the fleet that could carry the cargo
+            // finds the market. Pairs walked in id order; `raise_contact` is
+            // a no-op on a pair already met, so the record keeps the first
+            // meeting. The cheap tests (alive, ports, a navy on one side,
+            // different landmasses, not met) run before the volume read,
+            // which is what keeps the walk small.
+            if (params.far_pairs_meet_by_sea && !landmass.empty())
+            {
+                const std::size_t pc = out.polities.size();
+                for (std::size_t ai = 0; ai < pc; ++ai)
+                {
+                    const polity& pa = out.polities[ai];
+                    if (!pa.alive || pa.capital < 0
+                     || static_cast<std::size_t>(pa.capital) >= ss.regions.size()) continue;
+                    if (ss.regions[static_cast<std::size_t>(pa.capital)].port_stock_q <= 0) continue;
+                    const int32_t ma = seat_landmass_of(static_cast<int>(ai));
+                    if (ma < 0) continue;
+                    for (std::size_t bi = ai + 1; bi < pc; ++bi)
+                    {
+                        const polity& pb = out.polities[bi];
+                        if (!pb.alive || pb.capital < 0
+                         || static_cast<std::size_t>(pb.capital) >= ss.regions.size()) continue;
+                        if (pa.navy_stock <= 0 && pb.navy_stock <= 0) continue;
+                        if (ss.regions[static_cast<std::size_t>(pb.capital)].port_stock_q <= 0) continue;
+                        const int32_t mb = seat_landmass_of(static_cast<int>(bi));
+                        if (mb < 0 || mb == ma) continue;
+                        const int ia = static_cast<int>(ai), ib = static_cast<int>(bi);
+                        if (contact_exists(ia, ib)) continue;
+                        bool open = false;
+                        for (int g = 0; g < 4 && !open; ++g)
+                            open = trade_sea_volume_q(treaty_trade_ctx, ss.regions, out.polities, ia, ib, g) > 0
+                                || trade_sea_volume_q(treaty_trade_ctx, ss.regions, out.polities, ib, ia, g) > 0;
+                        if (!open) continue;
+                        raise_contact(ia, ib, contact_kind::trade, pa.capital, y);
+                        ++out.contacts_met_by_sea;
+                    }
+                }
+            }
+            // BL-1142: the far penalty a pair reads is the sea's own where the
+            // pair MET across water -- the class its contact recorded at the
+            // meeting (`contact_event::across_water`), never the seats read
+            // again -- so formation and the break re-score read the same
+            // penalty however a capital moves after (`treaty_far_penalty_for`).
 
             // BL-1018 DIAGNOSTIC (trace only): the raw capability each side
             // of every living NEAR-HOME pair reads of the other this round,
@@ -4417,10 +4594,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
                 const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
                                                              out.trade_flows);
+                const bool met_across_water = c.first.across_water != 0; // BL-1142: recorded at the meeting
+                const int far_pen = treaty_far_penalty_for(params, met_across_water);
                 const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
-                                                    alarm_a, near_home, trade_ab);
+                                                    alarm_a, near_home, trade_ab, far_pen);
                 const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
-                                                    alarm_b, near_home, trade_ab);
+                                                    alarm_b, near_home, trade_ab, far_pen);
                 if (value_a < params.treaty_formation_threshold_q
                  || value_b < params.treaty_formation_threshold_q) continue;
 
@@ -4441,6 +4620,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         expires, static_cast<int32_t>(tc), lo, hi_});
                 note_event(lapse_event_kind::treaty_formed, pa.capital, a, b);
                 ++out.treaties_formed;
+                if (met_across_water)
+                {
+                    ++out.treaties_formed_across_water; // BL-1142
+                    if (!near_home) ++out.far_treaties_formed_across_water;
+                }
             }
 
             // ---- BL-933: BREAKING A TREATY, "legal and costly" ------------
@@ -4479,10 +4663,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
                     const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
                                                              out.trade_flows);
+                    // BL-1142 -- the class the pair's contact recorded, the
+                    // same fact formation read off the row it walked.
+                    const int far_pen = treaty_far_penalty_for(params, contact_met_across_water(out, a, b));
                     const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
-                                                        alarm_a, near_home, trade_ab);
+                                                        alarm_a, near_home, trade_ab, far_pen);
                     const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
-                                                        alarm_b, near_home, trade_ab);
+                                                        alarm_b, near_home, trade_ab, far_pen);
 
                     int defector = -1, wronged = -1;
                     if (value_a < break_bar && value_a <= value_b) { defector = a; wronged = b; }
@@ -4560,11 +4747,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int dist = region_distance(
                             ss.regions[static_cast<std::size_t>(arriving.capital)],
                             ss.regions[static_cast<std::size_t>(native.capital)], gw);
-                        // BL-1120: the reach is read across the leg the
-                        // purchase party or the binding would sail, arriving
-                        // seat to native seat, priced with its current.
-                        if (!sea_leg_distance_within(arriving.capital, native.capital,
-                                                     dist, params.subjection_reach_q)) continue;
+                        // Raw distance, never priced with the current: tribute
+                        // and its binding are standing traffic a current cannot
+                        // decide (EXPLORATION.md sec Currents, "Where currents
+                        // bite"; the sea-chain review).
+                        if (dist > params.subjection_reach_q) continue;
 
                         const int64_t arriving_treasury =
                             ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
@@ -4694,14 +4881,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     dist = region_distance(ss.regions[static_cast<std::size_t>(subj.capital)],
                                            ss.regions[static_cast<std::size_t>(lord.capital)], gw);
 
-                // BL-1120: the distance is read across the overlord's leg to
-                // its subject, lord seat to subject seat, priced with its
-                // current (INT32_MAX -- no seat -- is read raw, as before).
+                // Raw distance, never priced with the current (standing
+                // traffic; the sea-chain review).
                 const bool outrun = !reachable
-                                  || (dist == INT32_MAX
-                                          ? dist > params.subject_secession_distance_q
-                                          : !sea_leg_distance_within(lord.capital, subj.capital, dist,
-                                                                     params.subject_secession_distance_q))
+                                  || dist > params.subject_secession_distance_q
                                   || subj.cohesion_q <= params.subject_secession_cohesion_q;
                 if (outrun)
                 {
@@ -9968,6 +10151,19 @@ int64_t contact_first_year(const history_sim_state& s, int from, int to)
     return INT64_MAX;
 }
 
+bool contact_met_across_water(const history_sim_state& s, int from, int to)
+{
+    if (from < 0 || to < 0 || from > 0xFFFE || to > 0xFFFE) return false;
+    const uint16_t f = static_cast<uint16_t>(from), t = static_cast<uint16_t>(to);
+    const auto it = std::lower_bound(
+        s.contacts.begin(), s.contacts.end(), std::pair<uint16_t, uint16_t>{f, t},
+        [](const contact& c, const std::pair<uint16_t, uint16_t>& k) {
+            if (c.from != k.first) return c.from < k.first;
+            return c.to < k.second;
+        });
+    return it != s.contacts.end() && it->from == f && it->to == t && it->first.across_water != 0;
+}
+
 // ---------------------------------------------------------------------------
 // Treaty reads and scoring (BL-933)
 // ---------------------------------------------------------------------------
@@ -10000,7 +10196,7 @@ int treaty_value_q(const history_sim_params& p,
                     int grudge_against_other_q, int grudge_from_other_q,
                     int counterpart_treaties_broken, int decider_aggression_q,
                     int alarm_from_other_q, bool near_home,
-                    int trade_value_q)
+                    int trade_value_q, int far_penalty_q)
 {
     // BASE: a treaty is worth more the less either side already resents the
     // other -- a biting mutual history makes a promise of peace both less
@@ -10036,7 +10232,7 @@ int treaty_value_q(const history_sim_params& p,
         value += clampi(alarm_from_other_q, 0, 1000)
                * clampi(p.deterrence_alarm_weight_q, 0, 1000) / 1000;
     else
-        value -= clampi(p.treaty_far_penalty_q, 0, 1000);
+        value -= clampi(far_penalty_q >= 0 ? far_penalty_q : p.treaty_far_penalty_q, 0, 1000); // BL-1142
 
     // BL-954 -- TRADE, NEAR AND FAR ALIKE. The flow the pair's trade-access
     // clause would open (both directions, every good) is part of what the
@@ -10811,6 +11007,8 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
         if (static_cast<int>(c.first.kind) < 0
             || static_cast<int>(c.first.kind) >= contact_kind_count)
             return fail("a contact names an out-of-range contact_kind");
+        if (c.first.across_water > 1)
+            return fail("a contact's across-water class is neither 0 nor 1");
 
         // SYMMETRIC BY CONSTRUCTION: meeting is mutual, so the reverse pair
         // must exist too, with the same first-contact year (the fact of
@@ -10822,6 +11020,8 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
             found_reverse = true;
             if (r.first.year != c.first.year)
                 return fail("a contact pair disagrees on its first-contact year");
+            if (r.first.across_water != c.first.across_water) // BL-1142: one meeting, one class
+                return fail("a contact pair disagrees on whether it met across water");
             break;
         }
         if (!found_reverse) return fail("a contact is missing its reverse direction");
@@ -11339,7 +11539,7 @@ bool industrialisation_output_valid(const industrialisation_output& o, std::stri
                 return fail("the contact " + std::to_string(c.from) + " -> " + std::to_string(c.to)
                             + " the span resumed is gone, with both polities alive at the close");
             if (it->first.year != c.first.year || it->first.region != c.first.region
-             || it->first.kind != c.first.kind)
+             || it->first.kind != c.first.kind || it->first.across_water != c.first.across_water)
                 return fail("the contact " + std::to_string(c.from) + " -> " + std::to_string(c.to)
                             + " changed the event that first joined it");
         }

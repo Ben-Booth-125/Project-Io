@@ -318,6 +318,7 @@ void fold_contacts(uint64_t& h, const std::vector<contact>& cs)
         fold_i32(h, c.first.year);
         fold_u32(h, c.first.region);
         fold_i32(h, static_cast<int32_t>(c.first.kind));
+        fold_u32(h, c.first.across_water); // BL-1142: the class the meeting recorded
     }
 }
 
@@ -499,6 +500,7 @@ uint64_t cursor_state_digest(const generation_cursor& c)
     fold_timelapse(h, c.migration_lapse);
 
     fold_corridors(h, c.kepler_corridors);
+    fold_sea_legs(h, c.kepler_sea_legs); // BL-1098: the lane stamp's record, carried to the tail
     fold_grudges(h, c.kepler_grudges);
     fold_i32(h, c.kepler_grudge_cap);
     fold_ints(h, c.kepler_polity_treasuries);
