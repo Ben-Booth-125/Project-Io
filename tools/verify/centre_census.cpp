@@ -65,6 +65,20 @@
 //       battles / conquests / foundings; pooled below it. The header names the spacing the binary was
 //       built with (`generation_settle_spacing_tiles`), so a ladder is a set of
 //       runs of builds that differ in that one constant.
+//     * THE SPACING ITSELF (C10; BL-1132 review fix) — region pairs whose seats
+//       stand nearer than `generation_settle_spacing_tiles` (Chebyshev, columns
+//       wrapping: `region_distance`'s metric), where at least one of the pair
+//       was founded by the sim. The sim only appends to the region list, so the
+//       sim-founded regions are exactly its last F entries, F being the three
+//       spans' reported foundings (scheduled + Settle). The rule's own invariant,
+//       so a non-zero count FAILS the run, like the cap. Pairs among the
+//       settlement pass's own regions are printed beside it, not gated: that
+//       pass spaces by its own `sep` (>= 3 tiles), not by this constant. A
+//       SCHEDULED founding counts as sim-founded, and it too was placed by that
+//       pass's `sep`; so the check holds for it only while the spacing is at or
+//       under `sep` (the shipped 3 is). Measured: a spacing-10 build on seed 12
+//       (sep 7) counts 4 such pairs. Negative control: counting one tile wider
+//       than the spacing on a spacing-3 world fires (seeds 28/40: 672/1,291).
 //
 // A READING, NOT A GATE ON DENSITY. Nothing here asserts a centre count, a land
 // share or a scale mix: those are what the rule is ruled against, and a harness
@@ -184,6 +198,12 @@ struct seed_record
     double   build_s = 0.0;
     bool     ok = false;
     bool     cap_ok = true; ///< the sim record fits its final cells (BL-1130 review fix)
+    /// BL-1132 review fix: the spacing holds for every sim-founded region.
+    bool     spacing_ok = true;
+    int      sim_founded = 0;        ///< the last F regions: the three spans' foundings
+    int      close_pairs_sim = 0;    ///< seats nearer than the spacing, a sim-founded member
+    int      close_pairs_pass = 0;   ///< ...both from the settlement pass (not gated)
+    int      close_pairs_stacked = 0;///< of close_pairs_sim, two seats on ONE tile
 
     // The sim record.
     int     regions = 0, living = 0, standing = 0;
@@ -370,6 +390,48 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
     const int gw = bit->second.grid_width;
     const int gh = bit->second.grid_height;
     const settlement_state& ss = *w.gen_settlement;
+
+    // --- the spacing itself (BL-1132 review fix) ---------------------------
+    // Bucketed by anchor tile, so the pair scan is (2D - 1)^2 tiles a region
+    // rather than every pair: a pair nearer than D shares a D - 1 neighbourhood.
+    {
+        const int n = static_cast<int>(ss.regions.size());
+        const int64_t f = r.foundings[0] + r.foundings[1] + r.foundings[2];
+        const int first_sim = static_cast<int>(std::clamp<int64_t>(n - f, 0, n));
+        r.sim_founded = n - first_sim;
+        const int reach = std::max(1, generation_settle_spacing_tiles) - 1;
+        std::vector<std::vector<int>> at(static_cast<std::size_t>(std::max(0, gw * gh)));
+        const auto wrapc = [gw](int c) { return gw > 0 ? ((c % gw) + gw) % gw : c; };
+        for (int i = 0; i < n; ++i)
+        {
+            const region& a = ss.regions[static_cast<std::size_t>(i)];
+            for (int dr = -reach; dr <= reach; ++dr)
+            {
+                const int rr = a.row + dr;
+                if (rr < 0 || rr >= gh) continue;
+                for (int dc = -reach; dc <= reach; ++dc)
+                {
+                    const int cc = wrapc(a.col + dc);
+                    if (cc < 0 || cc >= gw) continue;
+                    for (const int j : at[static_cast<std::size_t>(rr * gw + cc)])
+                    {
+                        const bool sim = i >= first_sim || j >= first_sim;
+                        if (sim)
+                        {
+                            ++r.close_pairs_sim;
+                            if (dr == 0 && dc == 0) ++r.close_pairs_stacked;
+                        }
+                        else
+                            ++r.close_pairs_pass;
+                    }
+                }
+            }
+            const int ar = a.row, ac = wrapc(a.col);
+            if (ar >= 0 && ar < gh && ac >= 0 && ac < gw)
+                at[static_cast<std::size_t>(ar * gw + ac)].push_back(i);
+        }
+        r.spacing_ok = r.close_pairs_sim == 0;
+    }
 
     // --- the sim record -----------------------------------------------------
     r.regions = static_cast<int>(ss.regions.size());
@@ -882,6 +944,21 @@ int main(int argc, char** argv)
                 lr_centres, pct(lr_ctiles, lr_land), lr_provinces, lr_b[0], lr_c[0], lr_f[0], lr_b[1], lr_c[1],
                 lr_f[1], lr_b[2], lr_c[2], lr_f[2]);
 
+    std::printf("\n=== C10 the spacing itself (BL-1132; seats nearer than %d tiles) ===\n",
+                generation_settle_spacing_tiles);
+    std::printf("seed  regions  sim_founded | close pairs, a sim-founded member (of them stacked) | "
+                "close pairs within the settlement pass (not gated)\n");
+    int64_t cp_sim = 0, cp_stacked = 0, cp_pass = 0, cp_founded = 0;
+    for (const seed_record& r : recs)
+    {
+        std::printf("%4u  %7d  %11d | %39d (%d) | %d\n", r.seed, r.regions, r.sim_founded,
+                    r.close_pairs_sim, r.close_pairs_stacked, r.close_pairs_pass);
+        cp_sim += r.close_pairs_sim; cp_stacked += r.close_pairs_stacked;
+        cp_pass += r.close_pairs_pass; cp_founded += r.sim_founded;
+    }
+    std::printf("pool  %7s  %11" PRId64 " | %39" PRId64 " (%" PRId64 ") | %" PRId64 "\n", "",
+                cp_founded, cp_sim, cp_stacked, cp_pass);
+
     // Pooled.
     int64_t land = 0, centres = 0, ctiles = 0, spilled = 0, carved = 0, roads = 0, markets = 0;
     int64_t scales[5] = {};
@@ -893,6 +970,7 @@ int main(int argc, char** argv)
         for (int s = 0; s < 5; ++s) scales[s] += r.scale_count[s];
         if (!r.ok) ++fails;
         if (!r.cap_ok) ++fails;
+        if (!r.spacing_ok) ++fails;
     }
     // POPULATION.md § Generation: "a 1960 world aims at roughly 500 centres" --
     // an aim the forces are calibrated against, never a count any rule
@@ -923,8 +1001,16 @@ int main(int argc, char** argv)
             std::printf("FAIL  seed %u: %d living regions carry more centres than their cell's ground "
                         "holds, %d carry one on a cell with no standable ground\n",
                         r.seed, r.sim_over_cell, r.groundless_standing);
+        // BL-1132 review fix, the spacing asserted: no sim-founded region's
+        // seat stands nearer than the spacing to any other region's
+        // (CIVILISATION.md § The unit is the city state).
+        if (!r.spacing_ok)
+            std::printf("FAIL  seed %u: %d region pairs stand nearer than %d tiles with a "
+                        "sim-founded member (%d on one tile)\n",
+                        r.seed, r.close_pairs_sim, generation_settle_spacing_tiles,
+                        r.close_pairs_stacked);
     }
-    std::printf("\n%s\n", fails == 0 ? "centre_census: OK (the cap holds; no density is asserted)"
+    std::printf("\n%s\n", fails == 0 ? "centre_census: OK (the cap and the spacing hold; no density is asserted)"
                                      : "centre_census: FAIL (see the FAIL rows)");
     return fails == 0 ? 0 : 1;
 }
