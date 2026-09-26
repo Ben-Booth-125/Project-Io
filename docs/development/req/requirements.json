@@ -7257,23 +7257,23 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: sea_lane_stamp_harness realised-discount rows (straight and diagonal)"
      ],
      "requirement": "A laid lane discounts traversal x0.50 on every bearing, which the harness asserts and was shown to fail on the eight-way walker.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "sea chain review fixes 04a58f0c, merged e5be22bf: the walk is four-cardinal; S4 fails on the eight-way walker at 0.750 (37.50 vs 50.00) and passes at 0.500 (25.00); lanes earned 468 -> 493, laid 352 -> 371, unreachable 6 -> 6."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: ocean_currents_harness weight-0 vs weight-500 row"
      ],
      "requirement": "The current price moves the sim, asserted, not only printed.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "ocean_currents_harness W5: the weight-500 sea-leg record differs from still water; the campaign call site prices hub -> target (192 = 192)."
     },
     {
      "id": "R4",
@@ -7449,6 +7449,70 @@
       "decision: Ben, on the population, urban share and points readings"
      ],
      "requirement": "Ben reads the stream's consequences before the re-bless names it.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "far-pairs-across-water",
+   "title": "BL-1142 - Far realms across water meet by sea and bind in the Industrialisation span, and a leg against its current delivers less",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1142 - sprint 48 (Ben, the density-and-trade form 2026-09-26: \"intercontinental: both\")",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: ocean_currents_harness W9, C7-C10, F1-F5 on the 16 seeds"
+     ],
+     "requirement": "Realms on different landmasses meet when a trade by sea is open (the seller's navy, two ports, the sea line) and far pairs across water read their own penalty; the class is fixed at first contact.",
+     "notes": "",
+     "result_metric": "Lane 1a00072e + a5d20a1a: cross-water pairs bound 53 -> ~538 at 1960, far 518 at penalty 0; the seat-move break fixed; every new row fails when its line is broken."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: ocean_currents_harness C7, C8, W10"
+     ],
+     "requirement": "A leg against its current delivers less, only on the sea line; an out-of-range loss is rejected, never clamped.",
+     "notes": "",
+     "result_metric": "Loss 500: 0.86% of Industrialisation trade across water; the Exploration span loses none (its against-current trade has a road at least as wide)."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, history_sim_harness, exploration_sim_harness, world_cursor_equivalence on main"
+     ],
+     "requirement": "Deterministic on main; only the known failures.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review of the change, fix round included.",
+     "notes": "",
+     "result_metric": "2026-09-26: no crash or determinism break; the stale ladder, the seat-move break, loss on road-carried trade, meeting without the seller's navy, a clamp and vacuous rows -- all fixed in a5d20a1a."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "decision: NR-959"
+     ],
+     "requirement": "Ben sets the sea far-penalty and the loss weight from the re-run ladder.",
      "notes": "",
      "result_metric": ""
     }

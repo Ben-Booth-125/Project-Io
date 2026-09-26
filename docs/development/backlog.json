@@ -1306,6 +1306,30 @@
     "tools/verify/world_cursor_equivalence.cpp"
    ],
    "design": "SETTLED (Ben, 2026-09-26, the naval carry-over form), written into EXPLORATION.md § the stocks (superseding the 2026-09-11 \"the navy is new and starts at zero, everywhere\"). A polity accrues NAVAL POINTS through the Empires span from three deeds: coastal provinces held, counted per year held (a held region with a port window, the empire tree's coastal_holdings reading); sea crossings made (the sea legs it walks); and coastal sea techs taken (EM-RD-2b Deep-Hull Sail, EM-RD-3b Lateen & Long-Range Rig, EM-RD-4a Ocean-Rated Hulls). At the handoff its points become its opening navy_stock. THE POINTS PASS TO THE POLITY THAT EARNED THEM: a polity that lost its coast keeps its sailors; nothing is read off the regions held at the handoff. The fleet is then an ordinary stock: upkeep from the first round, decay when underfunded, staged from a port; port_q stays endowment and no port carries.\n\nEVIDENCE FOR IT (the sea lane, 2026-09-26): purchase-written lanes at 1960 are 0 of 444 on the 16 seeds (campaign 118, tribute 29, trade 297), consistent with a sea the Exploration age starts empty.\n\nTHE WORK, measure first: (1) today's first-crossing years, purchases and navy_stock by 1300 per seed; (2) the points ledger (the three deeds' shares per polity at 1200) and its conservation across the handoff (the cursor must carry it; world_cursor_equivalence folds it); (3) the conversion constant (points -> navy_stock) read on a ladder over the 16 seeds, reporting the opening fleets, the Exploration counters (crossings, purchases, subjections, battles, lanes by writer) at each rung; Ben picks the rung. Readings to name for Ben, not take silently: what a polity that dies before 1200 carries (nothing, as the ruling reads); how the three deeds are weighted against each other. A world-mover: a named cause in the re-bless. RUNS AFTER BL-1142 (far pairs across water) merges, in the sea lane."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-26",
+   "requires": [
+    "BL-1137"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1148",
+   "short_name": "MIGRATION_CARRIES_CULTURE",
+   "author": "Claude (sprint 48, the BL-1137 rebuild cold review, 2026-09-26)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "The urbanisation stream carries culture shares into the cities it fills, so a destination's provinces read who moved there",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "FOUND 2026-09-26 by the BL-1137 rebuild's cold review: INDUSTRIALISATION.md Beat 2 (PROPOSED) says \"a stream moves culture shares into its destination centre ... This is what produces property 4's checkered provinces\", and settle_urban_migrants moves people and capacity but no culture share. The Beat 2 paragraph is PROPOSED, not SETTLED, so this is design-then-build: Ben settles whether migrants carry their culture share, then the stream moves shares in proportion to the heads it moves, with the same largest-remainder rounding and conservation. Measure the checkered-province reading (property 4) before and after. Runs after BL-1137 (industrial urbanisation) merges."
   }
  ]
 }
