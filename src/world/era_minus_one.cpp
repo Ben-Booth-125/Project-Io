@@ -437,7 +437,8 @@ history_sim_params exploration_sim_params(const world_params& params)
     // BL-1147 -- THE FLEET THE EMPIRE AGE CARRIES: navy hulls per 1000 naval
     // points at this span's open. 0, TODAY'S WORLD, pending Ben's pick off the
     // measured ladder (BL-1147's report); a rung set here is the one change.
-    hp.naval_points_navy_per_1000 = 0;
+    hp.naval_points_navy_per_1000   = 0;
+    hp.naval_points_convert_at_open = true; // the open where the deeds become fleets
 
     return hp;
 }
@@ -529,8 +530,9 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // BL-1147: THE CONVERSION IS THE EXPLORATION OPEN'S ALONE. This span's
     // polities already sail the fleet 1200 carried (it crossed the 1660
     // handoff in `navy_stock`); converting their ledger again would pay the
-    // Empires age's deeds twice.
-    hp.naval_points_navy_per_1000 = 0;
+    // Empires age's deeds twice. The span flag is the guard, whatever rate
+    // this span inherits or a sweep sets.
+    hp.naval_points_convert_at_open = false;
 
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).

@@ -2312,7 +2312,8 @@ struct history_sim_params
     /// A LEG RUN AGAINST ITS CURRENT DELIVERS LESS (EXPLORATION.md sec
     /// Currents, "Where currents bite"; BL-1142). Per mille: a trade between
     /// realms on different landmasses WHOSE GOODS THE SEA CARRIES (its sea
-    /// line beats its land line -- a flow a road carries has no current)
+    /// line beats its land line, the best DRY corridor between them -- a flow
+    /// a road carries has no current)
     /// delivers
     ///     volume x (1000 - loss x max(0, -alignment) / 1000) / 1000
     /// of what was sized, alignment the current along the leg from the
@@ -2345,28 +2346,36 @@ struct history_sim_params
     /// held for a year, a sea crossing made, a coastal sea tech taken. How the
     /// deeds weigh against each other is a READING FOR BEN (BL-1147); these
     /// make each deed comparable in magnitude on the 16 curated seeds. MEASURED
-    /// (`ocean_currents_harness --naval`, 2026-09-26): the 1,665 polities
-    /// living at 1200 did 4,842,144 coastal province-years, 7,819 crossings and
-    /// took 230 coastal sea techs, so at 1 / 600 / 20000 the three pooled
-    /// shares are 4.84M / 4.69M / 4.60M points -- a third each. Per polity the
-    /// deeds spread very differently (coastal years: median 224, max 71,396;
-    /// crossings: 424 polities, median 4, max 333; techs: 134 polities, at
-    /// most 3), which is the reading. Domain [0, 100000] each.
+    /// (`ocean_currents_harness --naval`, 2026-09-26, coastal by the terrain):
+    /// the 1,665 polities living at 1200 did 2,212,520 coastal province-years,
+    /// 7,819 crossings and took 230 coastal sea techs, so at 1 / 280 / 9600 the
+    /// three pooled shares are 2.21M / 2.19M / 2.21M points -- a third each.
+    /// Per polity the deeds spread very differently (coastal years: 877
+    /// polities, median 200, max 61,744; crossings: 424 polities, median 4,
+    /// max 333; techs: 134 polities, at most 3), which is the reading.
+    /// Domain [0, 100000] each.
     int64_t naval_points_per_coastal_year = 1;
-    int64_t naval_points_per_crossing     = 600;
-    int64_t naval_points_per_sea_tech     = 20000;
+    int64_t naval_points_per_crossing     = 280;
+    int64_t naval_points_per_sea_tech     = 9600;
 
     /// THE CONVERSION, the one named constant: navy hulls per 1000 naval
     /// points, applied ONCE at a resumed span's open to every LIVING polity
-    /// (`naval_opening_fleet`), on top of the fleet it resumed with. The
-    /// Exploration open's alone (`exploration_sim_params`; the
-    /// Industrialisation span sets it back to 0, since its polities already
-    /// sail the fleet 1200 carried). 0 = no fleet carries, today's world
+    /// (`naval_opening_fleet`), on top of the fleet it resumed with -- only at
+    /// the open `naval_points_convert_at_open` marks (the Exploration open's
+    /// alone). 0 = no fleet carries, today's world
     /// byte for byte. Read on a measured ladder over the curated seeds; Ben
     /// picks the rung. Domain [0, 100000]: outside it, or with a weight
     /// outside its own, no fleet opens and the run says so
     /// (`history_sim_state::naval_points_params_rejected`), never clamped.
     int64_t naval_points_navy_per_1000 = 0;
+
+    /// THE SPAN FLAG: this span's open is where the Empires age's deeds become
+    /// fleets. The Exploration open's alone (`exploration_sim_params`;
+    /// `industrialisation_sim_params` clears it, since its polities already
+    /// sail the fleet 1200 carried). Off, a resumed open converts nothing
+    /// whatever `naval_points_navy_per_1000` reads -- the conversion rate is a
+    /// measured dial a sweep may set on any span, and this is not.
+    bool naval_points_convert_at_open = false;
 
     // --- BL-934: colonies ----------------------------------------------------
     // EXPLORATION.md sec A colony is a subject, and it wants things of its own.
@@ -2590,8 +2599,10 @@ struct trade_flow
     int32_t  volume_q = 0;
     /// 1 when the flow's CARRYING LINE is the sea one -- its sea line (the
     /// seller's navy, both seats' ports, priced with the current) beat its
-    /// land line when it was sized, the test the cargo loss reads; 0 where a
-    /// road carries it. Set by `compute_trade_flows`; what the fourth sea-leg
+    /// land line, the best DRY corridor joining the two realms (a corridor
+    /// walked across sea is none, `history_corridor::wet`), when it was sized;
+    /// a tie goes to the road. The test the cargo loss reads; 0 where a road
+    /// carries it. Set by `compute_trade_flows`; what the fourth sea-leg
     /// writer reads, so only trade that goes to sea earns a lane.
     uint8_t  by_sea   = 0;
 };
@@ -3051,8 +3062,10 @@ struct polity
     /// BL-1147 -- THE NAVAL LEDGER: what this polity did at sea in the Empires
     /// span, deed by deed, tallied where `history_sim_params::naval_points_accrue`
     /// is on and never after. `naval_coastal_years`: the coastal provinces it
-    /// held, counted per year held (a held region with a port window,
-    /// `region::port_q > 0`, per decision round times the round's years).
+    /// held, counted per year held -- a held region whose CELL TOUCHES THE SEA
+    /// (`coast_cells`, the terrain; never `port_q`, which a settled daughter
+    /// inherits at 70% wherever it lands, inland or not), per decision round
+    /// times the round's years.
     /// `naval_crossings`: the sea crossings it made (its wet campaigns
     /// launched, staging hub to target across water). `naval_sea_techs`: the
     /// coastal sea techs it took (EM-RD-2b Deep-Hull Sail, EM-RD-3b Lateen &
@@ -4481,10 +4494,13 @@ struct history_sim_state
     /// reading that says whether more trade runs with the water than against
     /// it. The split is counted whenever the field is built. Only flows that
     /// go to sea count (`trade_flow::by_sea`): a road between two realms on
-    /// different landmasses carries no volume across water.
+    /// different landmasses carries no volume across water -- that volume is
+    /// `cross_landmass_volume_by_road_q` below, so the two together are all
+    /// trade between realms seated on different landmasses.
     int64_t sea_trade_volume_q            = 0;
     int64_t sea_trade_volume_with_q       = 0;
     int64_t sea_trade_volume_against_q    = 0;
+    int64_t cross_landmass_volume_by_road_q = 0; ///< BL-1147 review: the same pairs' volume a dry corridor carried
     /// BL-1142: the cargo trades across water LOST running against their
     /// current (`sea_current_cargo_loss_q`), summed over the rounds; the pairs
     /// that met by sea (`contact_kind::trade`); the treaties formed between
@@ -5284,6 +5300,29 @@ int trade_sea_volume_q(const trade_context& ctx, const std::vector<region>& regi
 /// across water, the land's (`treaty_far_penalty_q`) otherwise. Formation and
 /// the break re-score both read it, off the same recorded class.
 int treaty_far_penalty_for(const history_sim_params& p, bool met_across_water);
+
+/// BL-1147 (review) -- WHICH REGIONS' CELLS TOUCH THE SEA, kept incrementally.
+/// A region's cell is the settlement partition's (the tiles nearest its
+/// anchor, Chebyshev with columns wrapping, ties to the lower region index --
+/// `update_urban_ground`'s rule); it touches the sea where one of its LAND
+/// tiles has a sea tile (`is_sea`; a lake is not sea) among its four cardinal
+/// neighbours. Only those shore tiles are kept, so appending a region costs one
+/// pass over the shore. Regions are only ever appended; a table that shrank,
+/// or another raster, is measured again from nothing. Pure bookkeeping: reads
+/// the anchors and the ground, writes nothing a region carries.
+struct coast_cells
+{
+    std::vector<int32_t> shore;       ///< raster indices of land tiles 4-adjacent to sea, ascending
+    std::vector<int32_t> owner, dist; ///< per shore tile: the region whose cell holds it, its distance
+    std::vector<int32_t> count;       ///< per region: shore tiles in its cell
+    std::size_t raster_size = 0, measured = 0;
+};
+void update_coast_cells(coast_cells& c, const std::vector<region>& regions,
+                        const std::vector<terrain_substrate>& substrate, int gw, int gh);
+inline bool cell_touches_sea(const coast_cells& c, std::size_t ri)
+{
+    return ri < c.count.size() && c.count[ri] > 0;
+}
 
 /// BL-1147 -- A POLITY'S NAVAL POINTS, deed by deed: its ledger
 /// (`polity::naval_coastal_years`, `naval_crossings`, `naval_sea_techs`) times

@@ -277,6 +277,7 @@ void fold_corridors(uint64_t& h, const std::vector<history_corridor>& cs)
         fold_u32(h, c.a);
         fold_u32(h, c.b);
         fold_u32(h, c.tier);
+        fold_u32(h, c.wet); // BL-1147 review: a corridor walked across sea
         fold_i64(h, static_cast<int64_t>(c.uses));
     }
 }
