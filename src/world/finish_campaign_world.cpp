@@ -86,6 +86,14 @@ landscape_search_params campaign_search_params(std::uint32_t world_seed, int cor
     sp.seed                    = world_seed ^ 0x8A21F00Du;
     sp.start.placement_seed    = sp.seed;
     sp.start.corporation_count = corporation_count;
+    // BL-1136 (Ben, 2026-09-26; GENERATION_STRATEGY.md § Phase 6, "The round
+    // count is kept at six"): a round's proposals are scored on two threads.
+    // A budget world proposes two per round (placement and road tier), so two
+    // threads halve the search's wall time; the winner, every scored term and
+    // the whole path are the serial walk's, bit for bit (the determinism
+    // clauses in landscape_search.hpp; landscape_search_harness --curve
+    // --check-threads 2 proves it on the curated seeds).
+    sp.thread_count            = k_campaign_search_threads;
     return sp;
 }
 
