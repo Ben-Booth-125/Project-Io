@@ -1334,6 +1334,29 @@
     "docs/economy/MARKETS.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-958",
+   "title": "DECISION TAKEN: a migrant carries its food with it, and a sack never lowers a region's ceiling (BL-1137 reverted and rebuilt)",
+   "raised": "2026-09-26",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1137 (industrial urbanisation) cold review, 2026-09-26; merged b591d1e9, reverted 8cbdbc9d",
+   "what": "The first build of the urbanisation stream raised each destination's carrying capacity by every migrant it took while the source kept its own, so every move created capacity and the emptied countryside regrew by births: population 6.08B -> 10.92B pooled, urban share ~15% -> 70-72%, and centres fell only 3% (carved 7%). A sack then cut a city's industrial heads, the ceiling fell with them, and the next year deleted about 40% of the city with no record. Both break the docs: the displacement row (the count is conserved), Beat 2 (the countryside empties, far fewer centres) and BL-835 (war does not consume people). I reverted it on main and took two readings for the rebuild: (1) a migrant carries its food with it -- whatever ceiling a destination gains, its source loses, so a move conserves the world's carrying capacity and an emptied village cannot regrow; (2) a sack never lowers a ceiling -- a sacked city's people scatter into its countryside. Also: a razing is counted in heads lost, uncapped (a sacked 10M city recorded none).",
+   "why_it_matters": "The alternative reading is that industry raises what the land can feed (a real historical effect), which would be a new mechanism with no doc and a population near double; the conserving reading is what makes the stream thin the map to your ~500 aim.",
+   "options": [
+    "A: keep as taken (the move conserves capacity; a sack moves no one out)",
+    "B: industry raises carrying capacity, designed and bounded in INDUSTRIALISATION.md as its own mechanism",
+    "C: other"
+   ],
+   "recommendation": "A: it is the doc as written; B only as its own designed beat.",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/history_sim.cpp",
+    "docs/generation/INDUSTRIALISATION.md",
+    "docs/economy/POPULATION.md"
+   ],
+   "resolution": null
   }
  ]
 }
