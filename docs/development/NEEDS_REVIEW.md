@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*57 entries — 2 open, 55 resolved.*
+*58 entries — 3 open, 55 resolved.*
 
 ---
 
@@ -59,6 +59,22 @@ The partition grew each centre by a budget of 7 tiles (village) to 12 (metropoli
 > **Recommendation:** A.
 
 *Files: `docs/generation/PROVINCES.md`, `src/world/province.cpp`*
+
+### NR-954 — CALL: three consequences of "a province is its centre's ground" (hemmed villages absorbed; anchors kept by the settled-ground lock; giant provinces)
+*question · raised 2026-09-26 · from BL-1133 as merged (5cab560b), 2026-09-26*
+
+Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, every province invariant green. Three consequences. (1) 21,457 seed centres (47%) end on their own tile, hemmed by a larger neighbour's reach, and singleton absorption (the 2026-08-21 ruling) folds each into its cheapest neighbour, so provinces = centres holds with that counted exception. (2) 3,753 of the 6,856 remaining anchor villages exist only because the settlement lock (BL-849) stops the fill crossing from settled into never-settled ground. (3) Provinces now reach 1,315 tiles (a lone village over lightly settled land); p90 stays 7-13.
+
+**Why it matters.** (2) is the remaining gap to a world without villages founded on empty ground; (3) decides whether a province can be a continent-sized conquest unit.
+
+- A: keep all three as built
+- B: let the fill cross the settled line (relaxes BL-849; removes most of (2))
+- C: bound a province's size again on sparsely settled land (a cap that splits a giant into anchored pieces)
+- D: other
+
+> **Recommendation:** A for (1); read (2) and (3) again after BL-1137 (industrial urbanisation) and BL-1132 (settle spacing) land, since both change what is settled and how many centres stand.
+
+*Files: `src/world/province.cpp`, `docs/generation/PROVINCES.md`*
 
 ---
 

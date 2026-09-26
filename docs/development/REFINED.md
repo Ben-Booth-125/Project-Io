@@ -231,7 +231,9 @@ slip to sprint 49 from the END of a chain, never the middle.
 - **Density (serial on `settlement.*` / `history_sim.cpp` / `population_generation.*`):**
   C2 BL-1130 round 2 (explain the history move; water regions carry no centre) -> merge ->
   BL-1137 (industrial urbanisation + abandonment; the ~500 lever) with BL-1132 (settle spacing)
-  and BL-1133 (anchors join a neighbour) -> BL-1125 (markets: twins, gravity, conquest,
+  and BL-1133 (anchors join a neighbour) [BL-1133 RE-RULED and MERGED 2026-09-26, 5cab560b: a
+  province is its centre's ground; provinces 45,199 -> 30,894, anchors 20,505 -> 6,856; NR-954
+  open. BL-1136 two threads MERGED fc884257. BL-1120 + BL-1140 MERGED; BL-1098 running] -> BL-1125 (markets: twins, gravity, conquest,
   calibrated on the thinned world) -> BL-1138 (roads pull to markets) -> NR-944's re-read ->
   BL-1107 (culture ground profile) -> BL-1139 (centres abandoned in play).
 - **Sea (`ocean_currents.*`, history_sim's sea-leg cost and trade record):** BL-1120 (ocean
