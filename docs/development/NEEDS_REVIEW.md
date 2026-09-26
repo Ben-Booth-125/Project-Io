@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*62 entries — 7 open, 55 resolved.*
+*63 entries — 8 open, 55 resolved.*
 
 ---
 
@@ -138,6 +138,22 @@ The first build of the urbanisation stream raised each destination's carrying ca
 > **Recommendation:** A: it is the doc as written; B only as its own designed beat.
 
 *Files: `src/world/settlement.cpp`, `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`, `docs/economy/POPULATION.md`*
+
+### NR-959 — CALL: far pairs across water bind almost wholesale (the sea far-penalty set to 0), and a leg against the current loses cargo at weight 500
+*question · raised 2026-09-26 · from BL-1142 (far pairs bind across water; cargo against the current), branch 1a00072e, 2026-09-26; not merged until its cold review returns*
+
+Found first: the far-pair force NR-888 ruled on was never built, so far realms across water never met (contact came only from campaigns within nine tiles) and none ever cleared the 700 far penalty. Built: realms on different landmasses meet when a trade across water is open between them (a good one holds and the other wants, a navy and two ports to carry it), and a far pair across water reads its own penalty. The penalty ladder: 0 far pairs bound at 700 and 500, 9 at 450, 166 at 400, then 489 / 484 / 479 at 350 / 300 / 0. The lane SET 0, the plateau: between 450 and 350 the dial would choose the count; below 350 the pair's own aggression, grudges and trade decide. Result at 1960, 16 seeds: cross-water pairs bound 53 -> 538 (485 far), trade-written lanes 27 -> 297, Industrialisation battles -4%; six seeds with no water between realms unchanged. Cargo loss: linear, no knee (0.9 / 1.5 / 2.9% of volume across water at 250 / 500 / 1000); SET 500, the current's own weight, so a leg against a full current loses half its cargo -- a choice, not a measurement.
+
+**Why it matters.** A far pair across water now binds more easily than a far pair on land (still 700). The sea was the faster medium, which supports it, but 0 removes distance from the sea treaty entirely.
+
+- A: keep both as set (sea penalty 0 at the plateau; loss 500)
+- B: a sea penalty inside the plateau but above 0 (e.g. 300), so distance still reads across water
+- C: tie the sea penalty to the land one by the speed ratio of the media
+- D: other
+
+> **Recommendation:** B at 300: inside the plateau (484 bound), so the dial still does not choose the count, and distance is not erased; the loss at 500 as set.
+
+*Files: `src/world/history_sim.cpp`, `src/world/history_sim.hpp`, `docs/generation/INDUSTRIALISATION.md`, `docs/generation/EXPLORATION.md`*
 
 ---
 
