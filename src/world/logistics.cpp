@@ -82,6 +82,16 @@ float road_traversal_multiplier(std::uint8_t road_level)
     return 1.0f / (1.0f + 0.5f * static_cast<float>(road_level));
 }
 
+static float sea_lane_traversal_multiplier(std::uint8_t lane_level)
+{
+    // THE LANE READS AS THE LAND STAMP READS THE SAME COUNT (LOGISTICS.md § 4b): a leg
+    // earns its lane at `sea_lane_tier1_uses` (4), and four uses is the count the ancient
+    // stamp turns into a ROAD (`kAncientRoadUses`, § 4a) -- so the lane's one rung is the
+    // road ladder's second rung on the water, road_traversal_multiplier(2) = x0.50. The sea
+    // leg's 2.5 becomes 1.25 along a lane: still dearer than plains, cheaper than a rift.
+    return lane_level > 0 ? road_traversal_multiplier(2) : 1.0f;
+}
+
 /// A tile's traversal cost: ocean = sea leg, land = landform cost, both scaled by the
 /// road discount. The per-node weight; an edge cost is the average of its two nodes
 /// (A* and body_reach_field's Dijkstra both do this — see their own comments).
@@ -96,8 +106,11 @@ float tile_traversal_cost(const tile_component& tc)
     const float base = is_water(tc.substrate) // BL-516: water of any kind is the sea-mode leg
                            ? sea_leg_cost
                            : landform_logistics_cost(tc.landform);
-    return base * road_traversal_multiplier(tc.road_level);
+    // BL-1098: a sea lane discounts the water it lies on (only ever stamped on sea tiles;
+    // a land tile's lane_level is always 0, so this factor is 1 there).
+    return base * road_traversal_multiplier(tc.road_level) * sea_lane_traversal_multiplier(tc.lane_level);
 }
+
 
 const std::vector<entity_id>& body_tile_grid(world& w, entity_id body)
 {

@@ -128,6 +128,12 @@ struct generation_cursor
     /// what crosses out of it is the record, not the run.
     std::vector<history_corridor> kepler_corridors;
 
+    /// BL-1098 — THE SEA-LEG RECORD, carried on the corridors' terms: its
+    /// consumer (`stamp_sea_lanes`) runs in the tail beside the road stamp.
+    /// The last span's close -- Industrialisation's 1960 table when it ran,
+    /// else Exploration's 1660 one; empty when neither ran.
+    std::vector<sea_leg> kepler_sea_legs;
+
     /// BL-898 — THE GRUDGE RECORD, carried for the same reason and on the same
     /// terms as the corridors: its consumer (`seed_grudge_sentiment`) runs
     /// after the political map exists. WHY IT IS CARRIED AT ALL: before BL-898

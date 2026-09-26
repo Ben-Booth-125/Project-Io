@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "hard_coded_world.hpp" // generation_progress -- the BL-1072 loading-bar tap
 #include "logistics.hpp"
+#include "ocean_currents.hpp" // BL-1098: the current field a lane's walk is priced with
 
 #include <algorithm>
 #include <array>
@@ -971,3 +972,249 @@ void stamp_history_roads(world& w, entity_id body,
     invalidate_logistics_caches(w);
 }
 
+
+// ---------------------------------------------------------------------------
+// Sea lanes, stamped from the lane record (BL-1098)
+// ---------------------------------------------------------------------------
+
+int sea_lane_port(const std::vector<std::uint8_t>& sea, int gw, int gh, int col, int row, int radius)
+{
+    if (gw <= 0 || gh <= 0 || sea.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return -1;
+    if (col < 0 || row < 0 || col >= gw || row >= gh)
+        return -1;
+    // Ring by ring outward, so the first ring holding any sea is the nearest; inside
+    // it the lowest raster index wins, which no scan order can change.
+    for (int r = 0; r <= radius; ++r)
+    {
+        int best = -1;
+        for (int dr = -r; dr <= r; ++dr)
+        {
+            const int rr = row + dr;
+            if (rr < 0 || rr >= gh)
+                continue;
+            for (int dc = -r; dc <= r; ++dc)
+            {
+                if (std::max(std::abs(dc), std::abs(dr)) != r)
+                    continue; // the ring's rim only
+                const int cc = ((col + dc) % gw + gw) % gw;
+                const int idx = rr * gw + cc;
+                if (sea[static_cast<std::size_t>(idx)] && (best < 0 || idx < best))
+                    best = idx;
+            }
+        }
+        if (best >= 0)
+            return best;
+    }
+    return -1;
+}
+
+std::vector<int> sea_lane_walk(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                               const ocean_current_field* currents, int weight_q,
+                               int from, int to)
+{
+    std::vector<int> path;
+    const int n = gw * gh;
+    if (gw <= 0 || gh <= 0 || sea.size() != static_cast<std::size_t>(n))
+        return path;
+    if (from < 0 || to < 0 || from >= n || to >= n || !sea[static_cast<std::size_t>(from)]
+        || !sea[static_cast<std::size_t>(to)])
+        return path;
+    if (from == to)
+    {
+        path.push_back(from);
+        return path;
+    }
+    const bool priced = currents != nullptr && !currents->empty() && weight_q > 0
+                     && currents->gw == gw && currents->gh == gh;
+
+    // Dijkstra on (cost, raster index): the pair is unique, so the frontier's order,
+    // and with it every tie between equal-cost routes, is a property of the integers.
+    constexpr int64_t kInf = std::numeric_limits<int64_t>::max();
+    std::vector<int64_t> dist(static_cast<std::size_t>(n), kInf);
+    std::vector<int>     prev(static_cast<std::size_t>(n), -1);
+    using node = std::pair<int64_t, int>;
+    std::priority_queue<node, std::vector<node>, std::greater<node>> frontier;
+    dist[static_cast<std::size_t>(from)] = 0;
+    frontier.push({0, from});
+    while (!frontier.empty())
+    {
+        const node top = frontier.top();
+        frontier.pop();
+        const int u = top.second;
+        if (top.first > dist[static_cast<std::size_t>(u)])
+            continue; // a superseded entry
+        if (u == to)
+            break;
+        const int uc = u % gw, ur = u / gw;
+        for (int dr = -1; dr <= 1; ++dr)
+        {
+            const int vr = ur + dr;
+            if (vr < 0 || vr >= gh)
+                continue; // rows do not wrap
+            for (int dc = -1; dc <= 1; ++dc)
+            {
+                if (dc == 0 && dr == 0)
+                    continue;
+                const int vc = ((uc + dc) % gw + gw) % gw;
+                const int v = vr * gw + vc;
+                if (!sea[static_cast<std::size_t>(v)])
+                    continue; // water only
+                if (dc != 0 && dr != 0)
+                {
+                    // Never through a land corner: one orthogonal neighbour must be sea.
+                    const int side_a = ur * gw + vc;
+                    const int side_b = vr * gw + uc;
+                    if (!sea[static_cast<std::size_t>(side_a)] && !sea[static_cast<std::size_t>(side_b)])
+                        continue;
+                }
+                const int64_t len = (dc != 0 && dr != 0) ? 1414 : 1000;
+                int64_t step = len;
+                if (priced)
+                {
+                    // The step's direction (east = dc, north = -dr) against the entered
+                    // tile's ocean-region current, per mille of a full current along it.
+                    const std::size_t k = static_cast<std::size_t>(currents->region_of(vc, vr));
+                    const int64_t dot = static_cast<int64_t>(currents->east_q[k]) * dc
+                                      + static_cast<int64_t>(currents->north_q[k]) * (-dr);
+                    const int align = static_cast<int>(std::clamp<int64_t>((dot * 1000) / len, -1000, 1000));
+                    step = (len * ocean_current_leg_cost_q(weight_q, align)) / 1000;
+                    if (step < 1)
+                        step = 1; // no step is ever free
+                }
+                const int64_t cand = dist[static_cast<std::size_t>(u)] + step;
+                if (cand < dist[static_cast<std::size_t>(v)])
+                {
+                    dist[static_cast<std::size_t>(v)] = cand;
+                    prev[static_cast<std::size_t>(v)] = u;
+                    frontier.push({cand, v});
+                }
+            }
+        }
+    }
+    if (dist[static_cast<std::size_t>(to)] == kInf)
+        return path;
+    for (int t = to; t >= 0; t = prev[static_cast<std::size_t>(t)])
+    {
+        path.push_back(t);
+        if (t == from)
+            break;
+    }
+    std::reverse(path.begin(), path.end());
+    return path;
+}
+
+void stamp_sea_lanes(world& w, entity_id body,
+                     const std::vector<history_road_node>& nodes,
+                     const std::vector<sea_leg>&           legs,
+                     int lane_tier_uses, int current_weight_q, int rotation_sense,
+                     sea_lane_stats* stats, sea_lane_trace* trace)
+{
+    sea_lane_stats st{};
+    if (legs.empty() || nodes.empty())
+        return; // no span ran: the whole call is a no-op
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return;
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+    if (gw <= 0 || gh <= 0)
+        return;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (static_cast<int>(grid.size()) < gw * gh)
+        return;
+
+    // The body's substrate raster, the one input the sea mask and the current field
+    // both read -- the same ground the spans built their field from.
+    std::vector<terrain_substrate> substrate(static_cast<std::size_t>(gw) * gh, terrain_substrate::sedimentary);
+    std::vector<std::uint8_t>      sea(static_cast<std::size_t>(gw) * gh, 0);
+    for (int i = 0; i < gw * gh; ++i)
+    {
+        const auto it = w.tiles.find(grid[static_cast<std::size_t>(i)]);
+        if (it == w.tiles.end())
+            continue;
+        substrate[static_cast<std::size_t>(i)] = it->second.substrate;
+        sea[static_cast<std::size_t>(i)] = is_sea(it->second.substrate) ? 1 : 0;
+    }
+    const ocean_current_field currents =
+        (ocean_current_weight_valid(current_weight_q) && current_weight_q > 0)
+            ? build_ocean_currents(substrate, gw, gh, rotation_sense)
+            : ocean_current_field{};
+
+    // The earned lanes, both seats on the body, and how many of them touch each seat
+    // (the busier-end direction rule). `legs` arrives sorted by (a, b).
+    std::vector<const sea_leg*> earned;
+    std::map<int, int> degree;
+    for (const sea_leg& l : legs)
+    {
+        if (l.uses < lane_tier_uses || l.a == l.b)
+            continue;
+        if (l.a >= nodes.size() || l.b >= nodes.size())
+            continue;
+        const history_road_node& na = nodes[l.a];
+        const history_road_node& nb = nodes[l.b];
+        if (na.col < 0 || na.row < 0 || na.col >= gw || na.row >= gh
+         || nb.col < 0 || nb.row < 0 || nb.col >= gw || nb.row >= gh)
+            continue;
+        earned.push_back(&l);
+        ++degree[l.a];
+        ++degree[l.b];
+    }
+    st.earned = static_cast<int>(earned.size());
+
+    for (const sea_leg* lp : earned)
+    {
+        const sea_leg& l = *lp;
+        const bool toward_a = degree[l.a] > degree[l.b];
+        const int from_region = toward_a ? l.b : l.a;
+        const int to_region   = toward_a ? l.a : l.b;
+        const history_road_node& nf = nodes[static_cast<std::size_t>(from_region)];
+        const history_road_node& nt = nodes[static_cast<std::size_t>(to_region)];
+        const int from_port = sea_lane_port(sea, gw, gh, nf.col, nf.row, kSeaLanePortRadius);
+        const int to_port   = sea_lane_port(sea, gw, gh, nt.col, nt.row, kSeaLanePortRadius);
+        if (from_port < 0 || to_port < 0)
+        {
+            ++st.no_port;
+            continue;
+        }
+        std::vector<int> path = sea_lane_walk(sea, gw, gh, currents.empty() ? nullptr : &currents,
+                                              current_weight_q, from_port, to_port);
+        if (path.empty())
+        {
+            ++st.unreachable;
+            continue;
+        }
+        for (const int idx : path)
+        {
+            const auto it = w.tiles.find(grid[static_cast<std::size_t>(idx)]);
+            if (it == w.tiles.end() || !is_sea(it->second.substrate))
+                continue; // the walk is water-only; belt and braces
+            it->second.lane_level = std::max<std::uint8_t>(it->second.lane_level, 1);
+        }
+        ++st.laid;
+        st.path_tiles += static_cast<long long>(path.size());
+        if (trace != nullptr)
+        {
+            sea_lane_trace::lane tl;
+            tl.a = l.a;
+            tl.b = l.b;
+            tl.uses = l.uses;
+            tl.from_port = from_port;
+            tl.to_port = to_port;
+            tl.path = std::move(path);
+            trace->lanes.push_back(std::move(tl));
+        }
+    }
+    for (int i = 0; i < gw * gh; ++i)
+    {
+        const auto it = w.tiles.find(grid[static_cast<std::size_t>(i)]);
+        if (it != w.tiles.end() && it->second.lane_level > 0)
+            ++st.lane_tiles;
+    }
+    if (stats != nullptr)
+        *stats = st;
+
+    // lane_level moved traversal cost on the water: every cache keyed on it is stale.
+    if (st.laid > 0)
+        invalidate_logistics_caches(w);
+}

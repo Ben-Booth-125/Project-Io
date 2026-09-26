@@ -102,6 +102,8 @@ world_metrics measure(const world& w)
 //
 //   - seeded sentiment   `world::sentiment` (every row, both dimensions);
 //   - road tiers         `tile_component::road_level`, per tile;
+//   - sea lanes          `tile_component::lane_level`, per tile (BL-1098; folded
+//                        only where a lane exists);
 //   - region stocks      `world::gen_settlement->regions`: `treasury`,
 //                        `port_stock_q`, `standing_army` and its owner;
 //   - the stockpile      (BL-1042) every region's `industry_points`, and the
@@ -270,6 +272,29 @@ uint64_t deep_digest(const world& w, const era_minus_one_fixture& fx)
         {
             fold_u32(h, tid);
             fold_u32(h, w.tiles.at(tid).road_level);
+        }
+    }
+
+    // BL-1098: sea-lane tier per tile, beside the roads and on their sparse
+    // terms: (tile, tier) for every tile carrying a lane, ascending tile id.
+    // FOLDED ONLY WHEN SOME TILE CARRIES A LANE (the stockpile's precedent), so
+    // a world no span ran hashes exactly as it did before the fold existed;
+    // complete as a detector all the same -- two worlds differing on any tile's
+    // lane have a lane on at least one side, so at least one folds.
+    {
+        std::vector<entity_id> lanes;
+        for (const auto& [tid, tc] : w.tiles)
+            if (tc.lane_level != 0) lanes.push_back(tid);
+        if (!lanes.empty())
+        {
+            std::sort(lanes.begin(), lanes.end());
+            fold_u32(h, 0x4C414E45u); // "LANE": the section's tag
+            fold_u32(h, static_cast<uint32_t>(lanes.size()));
+            for (const entity_id tid : lanes)
+            {
+                fold_u32(h, tid);
+                fold_u32(h, w.tiles.at(tid).lane_level);
+            }
         }
     }
 

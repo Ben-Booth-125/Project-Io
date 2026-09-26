@@ -280,7 +280,14 @@ inline constexpr uint32_t world_save_magic =
 /// whole on the strict-equality contract, no migration (a pre-bump world's
 /// firms had no origin to carry). Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 27;
+/// Bumped to 28 by BL-1098 (the sea-lane tier stamped): the tile record gains one
+/// byte at its tail, after `height` -- `tile_component::lane_level`, the lane the
+/// history's sea legs earned on each sea tile their water-only path crosses, which
+/// traversal cost reads (LOGISTICS.md sec 4b). A v27 stream is one byte short per
+/// tile, so its second tile misreads; refused whole on the strict-equality contract,
+/// no migration (a pre-bump world stamped no lanes). Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 28;
 
 /// Write @p w as a complete world snapshot.
 ///

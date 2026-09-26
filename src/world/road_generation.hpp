@@ -255,3 +255,101 @@ void stamp_history_roads(world& w, entity_id body,
                          const std::vector<history_corridor>&  corridors,
                          generation_progress* progress = nullptr, // BL-1072: per corridor
                          history_road_stats* stats = nullptr);    // BL-1119 round 4, write-only
+
+// ---------------------------------------------------------------------------
+// Sea lanes, STAMPED FROM the lane record (BL-1098)
+// ---------------------------------------------------------------------------
+//
+// The water analogue of `stamp_history_roads` (LOGISTICS.md § 4b; EXPLORATION.md
+// § The colonial tie is a sea lane). The history spans record every sea leg they
+// crossed -- a wet campaign, a purchase party, a metropole's standing traffic and
+// trade across water (the four writers) -- as one row per pair of seats with a use
+// count (`sea_leg`). A leg at or over `history_sim_params::sea_lane_tier1_uses` has
+// earned its lane, and this pass lays it onto the water as `tile_component::lane_level`
+// on every sea tile the lane's path crosses; traversal cost then reads it
+// (`tile_traversal_cost`), so the lane discounts the sea for every consumer.
+//
+// THE PATH IS A WATER-ONLY WALK, never a straight raster: a straight line between two
+// shores crosses land on any concave coast, and the road stamp's strait rule refuses
+// open ocean outright. The walker is a Dijkstra over the body's SEA tiles (`is_sea`:
+// ocean and coast; a lake is not the ocean), eight-connected with columns wrapping,
+// that never cuts a land corner (a diagonal step needs one of its two orthogonal
+// neighbours to be sea -- the same eight-connectivity that makes corner-touching ground
+// one landmass). Each step is PRICED WITH THE CURRENT (EXPLORATION.md § Currents,
+// "Where currents bite"): its length (1000 straight, 1414 diagonal) times the leg cost
+// `ocean_current_leg_cost_q` of the step's direction against the entered tile's ocean
+// region current, at the spans' own weight -- so a lane bends along the water that
+// carries it rather than hugging the straight line.
+//
+// ENDPOINTS: each seat's PORT is its nearest sea tile within `kSeaLanePortRadius`
+// (Chebyshev, ties to the lower raster index). A seat with no sea that near cannot
+// carry a lane, and the leg is counted rather than stamped.
+//
+// DIRECTION: the record carries no direction (`sea_leg` is `a < b`), so the walk is
+// priced TOWARD THE BUSIER END -- the seat more earned lanes touch -- as the ancient
+// road stamp prices its corridors; a tie walks from `a` to `b`. Lanes radiate from
+// metropoles and entrepots, and what a lane carries (tribute, trade) flows to them,
+// so the walk runs the way the cargo does.
+//
+// Deterministic: the legs arrive sorted, the Dijkstra orders its frontier on the pair
+// (cost, raster index), which is unique, and the stamp takes the max per tile, so
+// neither walk order nor overlap order can vary the field. Purely additive and purely
+// water: no land tile, and no road, is touched.
+
+struct ocean_current_field; // ocean_currents.hpp
+
+/// How far from its seat a lane may find its port, in tiles (the Era -1 sim's own
+/// neighbour radius, `history_sim_params::neighbour_radius` = 9: a seat's region
+/// reaches that far).
+inline constexpr int kSeaLanePortRadius = 9;
+
+/// What one `stamp_sea_lanes` call did. WRITE-ONLY.
+struct sea_lane_stats
+{
+    int       earned      = 0; ///< legs at or over the lane tier, both seats on the body
+    int       laid        = 0; ///< of them, walked and stamped
+    int       no_port     = 0; ///< a seat with no sea within kSeaLanePortRadius
+    int       unreachable = 0; ///< both ports found, but no water joins them
+    long long path_tiles  = 0; ///< tiles over every laid path (a shared tile counts per lane)
+    int       lane_tiles  = 0; ///< distinct tiles carrying a lane after the call
+};
+
+/// Every lane one call laid, whole, for a harness (the bend reading, the picture).
+/// WRITE-ONLY like the stats.
+struct sea_lane_trace
+{
+    struct lane
+    {
+        int              a = 0, b = 0;   ///< the leg's region indices (a < b)
+        int              uses = 0;       ///< the leg's recorded uses
+        int              from_port = -1; ///< raster index the walk started at
+        int              to_port   = -1; ///< raster index it ended at
+        std::vector<int> path;           ///< raster indices, from_port -> to_port
+    };
+    std::vector<lane> lanes;
+};
+
+/// A seat's port: the nearest sea tile to (@p col, @p row) within @p radius
+/// (Chebyshev, columns wrapping), ties to the lower raster index; -1 if none.
+/// @p sea is one byte per tile, raster order, 1 on sea.
+int sea_lane_port(const std::vector<std::uint8_t>& sea, int gw, int gh, int col, int row, int radius);
+
+/// The water-only walk from raster index @p from to @p to, both sea tiles, priced
+/// with @p currents at @p weight_q (null or 0 = still water). The path in walk
+/// order, both ends included; empty when no water joins them.
+std::vector<int> sea_lane_walk(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                               const ocean_current_field* currents, int weight_q,
+                               int from, int to);
+
+/// Stamp every earned lane in @p legs onto @p body's sea tiles. @p nodes is indexed by
+/// region (where each seat stood), as `stamp_history_roads` takes it. @p lane_tier_uses
+/// is the record's own threshold; @p current_weight_q and @p rotation_sense are the
+/// spans' current params (`history_sim_params::sea_current_*`) -- the field is rebuilt
+/// here from the body's tiles, the pure function the spans built it with. Empty @p legs
+/// (no span ran) makes the call a no-op.
+void stamp_sea_lanes(world& w, entity_id body,
+                     const std::vector<history_road_node>& nodes,
+                     const std::vector<sea_leg>&           legs,
+                     int lane_tier_uses, int current_weight_q, int rotation_sense,
+                     sea_lane_stats* stats = nullptr,
+                     sea_lane_trace* trace = nullptr);
