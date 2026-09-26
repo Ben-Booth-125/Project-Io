@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -139,9 +140,13 @@ std::vector<entity_id> generate_corporations(
 /// the regenerated roster then draws — is the same on every standard library.
 /// Invalidates the logistics caches: a removed port or hub was a supply anchor.
 ///
-/// What it does NOT undo: the market carving already read where the world-gen
-/// roster clustered (`corps_in_nation`), and markets are settled by the end of
-/// phase 4 — the search moves rosters over fixed markets by design.
+/// What it does NOT undo: on a world with no charter budget the market carving
+/// already read where the world-gen roster clustered (`corps_in_nation`), and
+/// markets are settled by the end of phase 4 — the search moves rosters over
+/// fixed markets by design. ON A BUDGET WORLD THERE IS NOTHING TO REMOVE
+/// (BL-1086): generation lays no world-gen roster there, and the carve counts
+/// the budget's planned charters (`plan_charters_by_nation`) instead, so this
+/// removes nothing and the budget's web is the only roster the world carries.
 ///
 /// @return The number of corporations removed.
 int remove_specialist_roster(world& w);
@@ -273,6 +278,37 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
 /// no_specialists` with neither `refused` nor `fell_back`).
 bool charter_budget_affords_specialist(const world& w, const charter_budget& budget,
                                        const charter_spend_params& spend);
+
+/// BL-1086 — THE BUDGET'S PLANNED CHARTERS, per nation (Ben, 2026-09-26, option
+/// A; MARKETS.md § Market centres and seeding): the corporations each nation's
+/// centres can AFFORD, which is what the market carve counts as a nation's
+/// competitors on a world whose firms come from the charter budget.
+///
+/// Per budgeted centre, on the walk's own resolution (the centre's tile, and the
+/// nation owning it; a centre without one plans nothing): one SPECIALIST when its
+/// points cover `spend.specialist_price_points()`, and then as many FIRMS as the
+/// points left buy whole (`charter_centre_firm_points / firm_price_points`) —
+/// exactly the split the walk sets aside before it places anything.
+///
+/// AFFORDING, NOT PLACING, as `charter_budget_affords_specialist` is: nothing is
+/// placed, so no cap the walk meets on the ground (the windows, the province cap,
+/// the per-good cap, the density ceiling) is read, and the count is known before
+/// the carve — the reason the carve can read it at all, since the walk itself
+/// needs the carve's markets. A pooled remainder (NR-913's `charter_pool`, a
+/// measurement; the shipped spend pools nothing) is not counted.
+///
+/// READ-ONLY and pure: centre tiles, their ownership and the nations.
+struct charter_nation_plan
+{
+    std::int64_t specialists = 0; ///< centres that afford a specialist
+    std::int64_t firms       = 0; ///< background firms the rest of their points buy
+    std::int64_t total() const { return specialists + firms; }
+};
+
+/// Keyed by nation id, ascending; a nation none of whose centres affords a
+/// charter is absent. Empty for an empty budget or a firm price <= 0.
+std::map<entity_id, charter_nation_plan> plan_charters_by_nation(
+    const world& w, const charter_budget& budget, const charter_spend_params& spend);
 
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631)

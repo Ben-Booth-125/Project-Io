@@ -416,6 +416,14 @@ struct seed_curve
     double mem_check_ws = 0, mem_check_private = 0;  ///< peak during P1's walk (--check-threads)
     double mem_copy_private = 0;                     ///< one `world` copy of the base, private bytes
     double mem_process_peak_ws = 0;                  ///< the process's lifetime peak, after the seed
+    // The carve ledger (BL-1086), read off the build's report.
+    bool   ledger_from_budget = false;   ///< the carve counted the budget's planned charters
+    int    ledger_nations = 0;           ///< nations the carve counted a competitor in
+    long long ledger_competitors = 0;    ///< the competitors it counted, summed
+    long long ledger_specialists = 0, ledger_firms = 0;
+    int    base_corporations = 0;        ///< corporations on the base world, before the search
+    bool   l1 = true;                    ///< the ledger IS the plan on the finished world's budget
+    bool   l2 = true;                    ///< a budget world lays no roster before the search
 };
 
 const char* short_axis(int a)
@@ -486,6 +494,49 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
     sc.markets      = walk.seed_score.market_count;
     sc.ms_eval_walk  = ms_walk / std::max(1, walk.evaluations);
     sc.cpu_eval_walk = cpu_walk / std::max(1, walk.evaluations);
+
+    // --- THE CARVE LEDGER (BL-1086) ----------------------------------------
+    // L1: on a budget world the carve's planned charters, counted at bump 11
+    //     from the budget generation built there, are the plan re-derived from
+    //     the budget THIS world's finish builds (`sb`, off world::gen_settlement)
+    //     — nation for nation, specialists and firms. It is what proves the two
+    //     budgets are one budget, so the carve read the roster the search's
+    //     budget buys.
+    // L2: a budget world carries no corporation before the search: no roster
+    //     was laid to be discarded.
+    {
+        const generation_report& rep = out->report;
+        sc.ledger_from_budget = rep.carve_competitors_from_budget;
+        sc.ledger_nations     = static_cast<int>(rep.carve_competitors.size());
+        for (const generation_report::carve_competitor_row& r : rep.carve_competitors)
+        {
+            sc.ledger_competitors += r.competitors;
+            sc.ledger_specialists += r.planned_specialists;
+            sc.ledger_firms       += r.planned_firms;
+        }
+        sc.base_corporations = static_cast<int>(base.corporations.size());
+        if (sc.budget_world)
+        {
+            const std::map<entity_id, charter_nation_plan> plan =
+                plan_charters_by_nation(base, sb.budget, spend);
+            sc.l1 = rep.carve_competitors_from_budget && plan.size() == rep.carve_competitors.size();
+            std::size_t i = 0;
+            for (const auto& [nid, pl] : plan)
+            {
+                if (!sc.l1) break;
+                const generation_report::carve_competitor_row& r = rep.carve_competitors[i++];
+                sc.l1 = r.nation == nid && r.planned_specialists == pl.specialists
+                     && r.planned_firms == pl.firms && r.competitors == pl.total();
+            }
+            sc.l2 = sc.base_corporations == 0;
+        }
+        else
+        {
+            sc.l1 = !rep.carve_competitors_from_budget;   // a roster world's carve read the roster
+        }
+        if (!sc.l1) ++failures;
+        if (!sc.l2) ++failures;
+    }
 
     // --- P1: a GENUINE k-round search is the prefix, bit for bit ---------
     if (check_k >= 0 && check_k <= rounds)
@@ -623,6 +674,11 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
     std::printf("\n  one evaluation, split (V5's %d re-lays, mean): copy %.0f ms, apply %.0f ms, score %.0f ms\n",
                 sc.relays, sc.relay_copy, sc.relay_apply, sc.relay_score);
     sc.mem_process_peak_ws = read_mem().peak_ws_mb;
+    std::printf("  carve ledger: %s, %d nations, %lld competitors (%lld specialists + %lld firms planned); "
+                "%d corporations on the base before the search  |  L1 %s  L2 %s\n",
+                sc.ledger_from_budget ? "the BUDGET'S PLANNED CHARTERS" : "the laid roster",
+                sc.ledger_nations, sc.ledger_competitors, sc.ledger_specialists, sc.ledger_firms,
+                sc.base_corporations, sc.l1 ? "PASS" : "FAIL", sc.l2 ? "PASS" : "FAIL");
     std::printf("  memory, MB (working set / private): base held %.0f / %.0f; serial walk peak %.0f / %.0f; "
                 "P1 walk on %d thread(s) peak %.0f / %.0f; one world copy %.0f private; "
                 "process lifetime peak working set %.0f\n",
@@ -633,11 +689,15 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
     std::printf("CURVE seed=%u live=%d markets=%d ms_eval_walk=%.1f ms_eval_check=%.1f "
                 "cpu_eval_walk=%.1f cpu_eval_check=%.1f check_threads=%d check_s=%.2f "
                 "walk_first_k_s=%.2f mem_base=%.0f mem_walk=%.0f mem_check=%.0f mem_copy=%.0f "
-                "mem_peak=%.0f p1=%d composite",
+                "mem_peak=%.0f ledger_budget=%d ledger_competitors=%lld base_corps=%d l1=%d l2=%d "
+                "winner_placement=%08X winner_tier=%u p1=%d composite",
                 seed, sc.live_axes, sc.markets, sc.ms_eval_walk, sc.ms_eval_check,
                 sc.cpu_eval_walk, sc.cpu_eval_check, sc.check_threads, sc.ms_check_s,
                 sc.ms_walk_first_k_s, sc.mem_base_private, sc.mem_walk_private,
-                sc.mem_check_private, sc.mem_copy_private, sc.mem_process_peak_ws, sc.p1 ? 1 : 0);
+                sc.mem_check_private, sc.mem_copy_private, sc.mem_process_peak_ws,
+                sc.ledger_from_budget ? 1 : 0, sc.ledger_competitors, sc.base_corporations,
+                sc.l1 ? 1 : 0, sc.l2 ? 1 : 0, walk.winner.placement_seed,
+                static_cast<unsigned>(walk.winner.road_tier), sc.p1 ? 1 : 0);
     for (const row& w : sc.rows) std::printf(" %.12g", w.score.composite);
     std::printf(" moved");
     for (const row& w : sc.rows) std::printf(" %d", w.moved_axis);
