@@ -7183,7 +7183,7 @@
       "headless: charter_refusal_probe or stockpile_budget_check, before -> after"
      ],
      "requirement": "The readers sized for the old province (the two-firm cap above all) are re-read on the grown provinces (BL-1146).",
-     "notes": "",
+     "notes": "Measured 2026-09-26 on main 29a9a8e0: province_cap 1.0% of the pooled budget (4.7% before BL-1133, 5.6% with it alone); re-read after BL-1141.",
      "result_metric": ""
     },
     {
@@ -7284,6 +7284,72 @@
      "requirement": "A cold review of the merged chain.",
      "notes": "",
      "result_metric": "2026-09-26: the walk eight-way against four-way readers (x0.75 on diagonals), the landmass labels likewise, harnesses that pass with zero lanes, two priced gates that cannot bind, the cursor digest missing kepler_sea_legs. Fixes queued in the sea lane after BL-1142; BL-1143 and BL-1144 filed; NR-955 amended."
+    }
+   ]
+  },
+  {
+   "brief": "carve-counts-planned-firms",
+   "title": "BL-1086 - On a budget world the carve counts the budget's planned firms; no roster is laid to be discarded",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1086 - sprint 48 (Ben, the density-and-trade form 2026-09-26: the carve reads the budget's planned firms)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: landscape_search_harness --curve (L1, L2) on the 16 seeds"
+     ],
+     "requirement": "On a budget world no roster is laid before the search, and the carve's planned charters equal the plan re-derived from the finished world's budget, nation for nation.",
+     "notes": "",
+     "result_metric": "Lane 02110de1: L1 and L2 pass 16/16; markets 5,784 -> 5,800 (+0.3%, every seed within 3%) on the spaced world; winner kept on 13 of 16 (28, 12, 9 change); search cost +0.8%."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --digest --arc legacy",
+      "headless: stop_path_digests 0 28",
+      "headless: world_cursor_equivalence"
+     ],
+     "requirement": "The legacy arc and the four stop paths are byte-identical; only the full build moves.",
+     "notes": "",
+     "result_metric": "Lane: legacy digests identical, the migration/ancient/exploration/industrialisation stops identical, cursor equivalence passes (seeds 0, 28). Main re-gate running."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change, fix round included.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "visual: live click on the loading screen's charter list on a budget world"
+     ],
+     "requirement": "The loading screen's charter list (app::draw_building_carve) still shows what the carve counts on a budget world, not an empty list.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "decision: NR-957"
+     ],
+     "requirement": "What the carve counts as a competitor (planned firms, specialists, or both) matches the doc Ben rules.",
+     "notes": "",
+     "result_metric": ""
     }
    ]
   }
