@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*63 entries — 8 open, 55 resolved.*
+*64 entries — 9 open, 55 resolved.*
 
 ---
 
@@ -111,7 +111,7 @@ The review found the three-tile rule bound only Settle. A founding the migration
 ### NR-957 — CALL: what the carve counts as a competitor on a budget world (planned firms, specialists, or both), and at what scale
 *question · raised 2026-09-26 · from BL-1086 (the carve counts the budget's planned firms), merged 15da1bd2, 2026-09-26*
 
-You ruled the carve reads the budget's planned firms (MARKETS.md). As built, it counts each centre's specialist as well as its whole firms, since both are corporations the budget buys, so the doc and code disagree. The scale changed too: the carve used to count at most 8 laid corporations a world; it now counts 147-313 planned charters (specialists alone would be 22-88), under the same gain (0.15). On the spaced world (after BL-1132) this moves markets 5,784 -> 5,800 (+0.3%, every seed within 3%); before the spacing, the same change swung seeds +62% (seed 28) to -35% (seed 40). The winner keeps its candidate on 13 of 16 seeds. COLD REVIEW (2026-09-26): the plan also counts firms above the walk's ceiling (120 a body, spent richest first), so on a world planning more than 120 on a body the carve counts firms never chartered, and inflates exactly the poorer nations the walk starves. The lane is making the plan honour the ceiling and will report planned against chartered per nation; read that before ruling.
+You ruled the carve reads the budget's planned firms (MARKETS.md). As built, it counts each centre's specialist as well as its whole firms, since both are corporations the budget buys, so the doc and code disagree. The scale changed too: the carve used to count at most 8 laid corporations a world; it now counts 147-313 planned charters (specialists alone would be 22-88), under the same gain (0.15). On the spaced world (after BL-1132) this moves markets 5,784 -> 5,800 (+0.3%, every seed within 3%); before the spacing, the same change swung seeds +62% (seed 28) to -35% (seed 40). The winner keeps its candidate on 13 of 16 seeds. COLD REVIEW (2026-09-26): the plan also counts firms above the walk's ceiling (120 a body, spent richest first), so on a world planning more than 120 on a body the carve counts firms never chartered, and inflates exactly the poorer nations the walk starves. The lane is making the plan honour the ceiling and will report planned against chartered per nation; read that before ruling. THE PLAN NOW HONOURS THE CEILING (fix round, merged b92165e4): all 16 seeds plan exactly 120 firms a body; chartered 806 specialists + 1,721 firms against planned 861 + 1,920 (shortfall is placements that find no ground; seed 28 places 59 of 84 planned specialists). Markets 5,800 -> 5,803. So option A (firms only) counts 120 a world, B (both) 142-208.
 
 **Why it matters.** The market folds (BL-1125) are calibrated next on this carve; its input should be settled first. The small move now may be luck of the spaced world, given the swings before it.
 
@@ -154,6 +154,22 @@ Found first: the far-pair force NR-888 ruled on was never built, so far realms a
 > **Recommendation:** Held until the re-run ladder. The shape of the recommendation stands: a sea penalty inside the plateau but above 0, so the dial does not choose the count and distance is not erased; the loss at 500.
 
 *Files: `src/world/history_sim.cpp`, `src/world/history_sim.hpp`, `docs/generation/INDUSTRIALISATION.md`, `docs/generation/EXPLORATION.md`*
+
+### NR-960 — CALL: the two-firms-per-province cap on provinces that are now a centre's whole ground
+*question · raised 2026-09-26 · from BL-1146 (the firm cap on grown provinces), re-read after BL-1141 (one centre a region), 2026-09-26*
+
+You set two firms a province (NR-910) when provinces were at most ~20 tiles. A province is now its centre's ground (BL-1133) and a region stands one centre (BL-1141), so a city's province holds the whole city. Re-read on main: the cap refuses 5.2% of the pooled charter budget (1.0% before BL-1141, 4.7% before BL-1133), binds on 16 of 16 worlds, and takes 29.5% of seed 28's budget. The total barely moves: budget firms reach the 120-per-body ceiling on 15 of 16 worlds (1,909 of 1,920). So the cap decides WHERE firms stand -- away from the big cities, into smaller centres -- not how many.
+
+**Why it matters.** Industry that gathers where people gather (Beat 2) is pushed out of the cities by a cap sized for a different province.
+
+- A: keep two a province
+- B: the cap scales with the province's centre (e.g. two per rung: a village 2, a city 6)
+- C: retire the province cap; the 120-per-body ceiling bounds the total
+- D: other
+
+> **Recommendation:** B: it keeps the spread NR-910 wanted on small ground and lets a city's province hold a city's industry; read it on the census before it is set.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/stockpile_budget.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
 
 ---
 
