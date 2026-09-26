@@ -529,7 +529,12 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
         // evaluations (a budget world skips the roster axis); the twelve-tick
         // settle 113,922 / 68,832 ms -- of which ONE tick is 50-90 s and the
         // rest ~1.5 s each (the `[finish_campaign_world]` line names it).
-        20000, // 16 Searching the landscape (build_stockpile_budget .. apply)
+        // RE-MEASURED 2026-09-26 (the BL-1136 review; Release, indicative on a
+        // loaded machine) after the search went to two threads (BL-1136) and the
+        // carve to the budget's planned firms (BL-1086): the search 8,208 /
+        // 4,007 ms on seeds 0 / 28 (20000 before, measured serially), so the bar
+        // no longer spends a third of itself on eight seconds of work.
+        6000,  // 16 Searching the landscape (build_stockpile_budget .. apply)
         18000, // 17 Proving the field (run_settle, twelve ticks; 90000 before BL-1117)
     };
     if (label_index < 0 || label_index >= generation_stage_label_count) return 0;
