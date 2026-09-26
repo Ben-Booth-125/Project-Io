@@ -1133,6 +1133,34 @@ struct history_sim_params
     /// phase's premise (`CIVILISATION.md` § The arc the phase must produce).
     bool settle_requires_razed_ground = false;
 
+    /// BL-1132 — SETTLE SPACING: THE MINIMUM DISTANCE, IN TILES, BETWEEN A
+    /// REGION THE SETTLE VERB FOUNDS AND THE ANCHOR OF EVERY REGION ALREADY ON
+    /// THE MAP (`CIVILISATION.md` § The unit is the city state, "A new region
+    /// founds at a distance, not on the nearest free tile"; Ben, 2026-09-25).
+    ///
+    /// TILES, CHEBYSHEV, COLUMNS WRAPPING — `region_distance`'s own metric, and
+    /// that is the reason it is tiles rather than traversal cost. What the
+    /// finding measured is a CELL: a region's ground is the tiles nearer its
+    /// anchor than any other's by exactly this metric (`nearest_region`, which
+    /// the carve, city naming and the census all partition by). A spacing of D
+    /// guarantees every region the Settle verb founds a cell reaching at least
+    /// (D - 1) / 2 tiles in each direction from its anchor, so the parameter
+    /// controls the quantity the finding is about directly. A traversal-cost
+    /// spacing would space founding parties by how hard the walk is, which is a
+    /// different claim (a hinterland over a mountain is still a hinterland on
+    /// the partition) and would leave the cell size uncontrolled wherever the
+    /// ground is cheap — which is where the cores are. The settlement pass's own
+    /// separation rule (`run_settlement`, `sep`) is the same metric.
+    ///
+    /// EVERY REGION COUNTS, living or not, because every region anchors a cell.
+    ///
+    /// 1 IS THE OLD RULE, byte for byte: "any tile no region stands on", the
+    /// nearest ring first. The struct default keeps it, so every synthetic
+    /// fixture that exercises Settle keeps the rule it was written against;
+    /// generation's three spans set their value in `era_minus_one.cpp` (the
+    /// same idiom as `settle_requires_razed_ground` above).
+    int settle_min_spacing_tiles = 1;
+
     // --- BL-920: the opening seeds culture ground, not polities -----------
     //
     // CIVILISATION.md sec "A city state spawns where a region's population

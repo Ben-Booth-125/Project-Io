@@ -47,6 +47,11 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // keeps the rule it was written against.
     hp.settle_requires_razed_ground = true;
 
+    // BL-1132: a re-settlement founds at a distance from the regions standing
+    // (history_sim.hpp `settle_min_spacing_tiles`; one value for all three
+    // spans, era_minus_one.hpp `generation_settle_spacing_tiles`).
+    hp.settle_min_spacing_tiles = generation_settle_spacing_tiles;
+
     // BL-920: generation's own round opens on culture ground, growing city
     // states by ORGANISE and by the population-threshold rise check, rather
     // than one polity per founding culture holding everything (BL-826). See
@@ -369,6 +374,9 @@ history_sim_params exploration_sim_params(const world_params& params)
     // set, not of the span) still resolves as unorganised culture ground.
     hp.city_states_by_population_threshold = true;
     hp.settle_requires_razed_ground         = true;
+    // BL-1132: the same spacing as the Empires round; Industrialisation
+    // inherits it with these params.
+    hp.settle_min_spacing_tiles             = generation_settle_spacing_tiles;
 
     // BL-1037 — a resumed corridor reopens at the rung it was bought to. This
     // span resumes the Empires round's record at 1200, and the Industrialisation

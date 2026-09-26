@@ -97,6 +97,22 @@ bool era_minus_one_enabled(const world_params& params);
 /// the span and the clock were ever overridden.
 history_sim_params era_minus_one_sim_params(const world_params& params);
 
+/// BL-1132 — THE SETTLE SPACING generation's spans found at, in tiles: the
+/// value `era_minus_one_sim_params` and `exploration_sim_params` write into
+/// `history_sim_params::settle_min_spacing_tiles` (which says why tiles), and
+/// so the Industrialisation span too, which is built on Exploration's params.
+/// ONE value for all three, so a re-settlement is spaced alike in every span.
+///
+/// PROVISIONAL AT 3: measured as a candidate ladder (1, 2, 3, 4, 5, 7, 10) on
+/// the sixteen curated seeds (tools/verify/centre_census.cpp, its C7 row), and
+/// Ben fixes it from that ladder. 3 is the smallest spacing that guarantees a
+/// Settle region a cell of its own beyond its anchor tile (every tile one step
+/// from the anchor is strictly nearer it than any other), and the ladder's knee:
+/// one-tile cells 26,232 -> 231 pooled, where 4 and above only trade regions
+/// and carved centres for the province anchors' backfill. 1 is the old rule
+/// (any tile no region stands on), byte for byte.
+inline constexpr int generation_settle_spacing_tiles = 3;
+
 /// The seed generation hands the era. A per-pass fold off the master seed, in
 /// the same shape as every other pass in `make_hard_coded_world`.
 uint32_t era_minus_one_sim_seed(const world_params& params);
