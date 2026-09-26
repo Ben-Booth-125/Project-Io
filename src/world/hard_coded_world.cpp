@@ -1761,6 +1761,7 @@ void run_exploration(generation_cursor& c)
         }
 
         kepler_corridors  = kepler_exploration.surviving_corridors;
+        c.kepler_sea_legs = kepler_exploration.sea_legs; // BL-1098: the lane stamp's record
         kepler_grudges    = kepler_exploration.grudges;
         kepler_grudge_cap = static_cast<int32_t>(ep.grudge_cap);
 
@@ -2026,6 +2027,7 @@ void run_industrialisation(generation_cursor& c)
         //     1960, so a polity founded after 1660 is credited its
         //     chest and one conquered after 1660 is credited none.
         kepler_corridors         = kepler_industrialisation.surviving_corridors;
+        c.kepler_sea_legs        = kepler_industrialisation.sea_legs; // BL-1098: 1960's lanes
         kepler_grudges           = kepler_industrialisation.grudges;
         kepler_grudge_cap        = static_cast<int32_t>(dp.grudge_cap);
         kepler_polity_treasuries = polity_treasuries_at_close(kepler_industrialisation.regions);
@@ -2479,6 +2481,23 @@ void run_tail(generation_cursor& c)
             road_nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
         enter_step(c, 15); // BL-1072: a step of its own, 4-7 s in Release
         stamp_history_roads(w, kepler, road_nodes, kepler_corridors, progress);
+    }
+
+    // SEA LANES, STAMPED FROM THE LANE RECORD (BL-1098; LOGISTICS.md § 4b). Every
+    // leg the spans' four writers earned a lane on is laid onto the water along a
+    // water-only walk priced with the current, at the spans' own weight and lane
+    // tier (`exploration_sim_params`, which the Industrialisation span inherits).
+    // Purely water, so its order against the road stamps cannot matter; no-op when
+    // no span ran (the record is empty).
+    if (!c.kepler_sea_legs.empty())
+    {
+        std::vector<history_road_node> lane_nodes;
+        lane_nodes.reserve(kepler_settlement.regions.size());
+        for (const region& p : kepler_settlement.regions)
+            lane_nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
+        const history_sim_params lp = exploration_sim_params(params);
+        stamp_sea_lanes(w, kepler, lane_nodes, c.kepler_sea_legs, lp.sea_lane_tier1_uses,
+                        lp.sea_current_weight_q, lp.sea_current_rotation_sense);
     }
 
     // Attach installations to the first two land tiles found in raster order.

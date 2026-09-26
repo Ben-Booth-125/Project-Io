@@ -782,6 +782,15 @@ struct tile_component
     ///
     /// 0.0 on any tile not produced by `generate_body_tiles` (hand-built harness fixtures).
     float height = 0.0f;
+
+    /// Sea-lane tier on this tile (BL-1098; LOGISTICS.md § 4b, EXPLORATION.md § The colonial
+    /// tie is a sea lane). 0 = no lane; 1 = a lane -- the ONE rung a sea leg earns by traffic
+    /// (`history_sim_params::sea_lane_tier1_uses`), never bought. Only ever set on SEA tiles
+    /// (ocean or coast; a lake is not part of the ocean), by `stamp_sea_lanes` after the
+    /// history spans, along the water-only path each earned lane takes. Read by exactly one
+    /// line in `tile_traversal_cost` (`sea_lane_traversal_multiplier`), so a lane discounts
+    /// the sea leg for every consumer of traversal cost. 0 everywhere a world ran no spans.
+    std::uint8_t lane_level = 0;
 };
 
 /// Survey lifecycle of a body (BL-067, docs/ui/SOLAR.md § Survey badge).
