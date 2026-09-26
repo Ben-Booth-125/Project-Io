@@ -300,6 +300,12 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // `terrain_reach_cost_q` currency alone, and its 4000 was measured on THIS
     // round (history_sweep --epoch 0, the BL-922 block), so the struct default
     // is the calibrated value and is not restated here.
+
+    // BL-1147 -- THE NAVAL LEDGER IS THIS ROUND'S (EXPLORATION.md sec Force
+    // persists now: "a polity accrues naval points through the Empires span").
+    // A tally of deeds read by nothing in this round, so switching it on moves
+    // nothing here; the Exploration open converts it (`exploration_sim_params`).
+    hp.naval_points_accrue = true;
     return hp;
 }
 
@@ -428,6 +434,11 @@ history_sim_params exploration_sim_params(const world_params& params)
     // the weight's own.
     hp.sea_current_cargo_loss_q = 500;
 
+    // BL-1147 -- THE FLEET THE EMPIRE AGE CARRIES: navy hulls per 1000 naval
+    // points at this span's open. 0, TODAY'S WORLD, pending Ben's pick off the
+    // measured ladder (BL-1147's report); a rung set here is the one change.
+    hp.naval_points_navy_per_1000 = 0;
+
     return hp;
 }
 
@@ -514,6 +525,12 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // 700, no loss) no far pair across water binds.
     hp.far_pairs_meet_by_sea    = true;
     hp.treaty_far_sea_penalty_q = 0;
+
+    // BL-1147: THE CONVERSION IS THE EXPLORATION OPEN'S ALONE. This span's
+    // polities already sail the fleet 1200 carried (it crossed the 1660
+    // handoff in `navy_stock`); converting their ledger again would pay the
+    // Empires age's deeds twice.
+    hp.naval_points_navy_per_1000 = 0;
 
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).
