@@ -1829,12 +1829,37 @@ int main()
         check(outpost_near.network_supply_q > params.sustainable_settlement_floor_q,
               "BL872a1 the near case actually lands above the settlement floor (not vacuous)");
 
-        check(outpost_near.centres > 1,
-              "BL872a2 well-supplied ground grows PAST its opening seed as population arrives");
+        // BL-1141 (Ben, 2026-09-26: a region deepens into one place) SUPERSEDES
+        // the reading these two rows were written to: growth now makes the one
+        // place bigger, never more numerous, so "grows past its opening seed"
+        // is read in HEADS and the network gate is read where it still bites —
+        // whether a settlement STANDS on ground that holds none (a4, below).
+        check(outpost_near.centres == 1 && outpost_near.urban_population > region_centre_heads,
+              "BL872a2 well-supplied ground grows PAST its opening seed in people, and stays ONE place");
         check(outpost_far.centres == 1,
               "BL872a3 CUT OFF ground stops growing centres — it keeps its opening seed, no more");
-        check(outpost_near.centres > outpost_far.centres,
-              "BL872a4 the SAME ground grows strictly more centres well-supplied than cut off");
+        {
+            // The same two runs with each outpost's seed razed before the run
+            // began: supplied ground stands its settlement again once its heads
+            // reach a village's worth; cut-off ground stands none.
+            settlement_state z_near = one_polity_two_regions(5);
+            settlement_state z_far  = one_polity_two_regions(5);
+            for (settlement_state* w : {&z_near, &z_far})
+            {
+                for (region& r : w->regions)
+                    draw_region_urban(r);
+                w->regions[1].centres = 0;
+            }
+            run_history_sim(z_near, nullptr, no_terrain, syn_gw, syn_gh, near, 812u);
+            run_history_sim(z_far,  nullptr, no_terrain, syn_gw, syn_gh, far,  812u);
+            std::printf("      razed seed: near centres=%d urban=%lld | far centres=%d urban=%lld\n",
+                        z_near.regions[1].centres,
+                        static_cast<long long>(z_near.regions[1].urban_population),
+                        z_far.regions[1].centres,
+                        static_cast<long long>(z_far.regions[1].urban_population));
+            check(z_near.regions[1].centres == 1 && z_far.regions[1].centres == 0,
+                  "BL872a4 the SAME ground stands a settlement again well-supplied, and none cut off");
+        }
 
         // FREEZE, NOT RAZE (this item's other open question). The cut-off
         // Outpost's `centres_razed` must stay zero — nobody sacked these

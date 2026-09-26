@@ -24,6 +24,11 @@
 //   --check-threads N scores P1's genuine walk on N threads: P1 is then also
 //   thread invariance on the shipped budget world, and its wall time is what
 //   that thread count saves.
+//   THE CAMPAIGN'S PROOF IS `--curve --check-k 6 --check-threads 2`: the whole
+//   six-round walk on the campaign's two threads. --check-k defaults to 3,
+//   which compares only the first half of the walk. P1's two negative controls
+//   (one proposal's composite +1 ulp, one proposal's placement seed ^1) run
+//   wherever P1 does and must each be reported.
 //   Run from the repo root (it loads scripts/*.lua and the library by path).
 // ---------------------------------------------------------------------------
 
@@ -40,10 +45,12 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>   // std::nextafter (P1's negative control)
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -348,6 +355,20 @@ bool same_path(const std::vector<landscape_search_step>& a,
     return true;
 }
 
+/// P1's comparison: a search result equals the walk's k-round prefix — the
+/// winner, every scored term of the winner and the seed, the counts, and every
+/// path step. One function, so the negative controls below exercise exactly the
+/// comparison P1 makes.
+bool same_result(const landscape_search_result& a, const landscape_search_result& b)
+{
+    return same_candidate(a.winner, b.winner)
+        && same_full_score(a.winner_score, b.winner_score)
+        && same_full_score(a.seed_score, b.seed_score)
+        && a.evaluations == b.evaluations
+        && a.accepted    == b.accepted
+        && same_path(a.path, b.path);
+}
+
 /// The k-round result, read off the R-round walk: the seed, then every path
 /// step of rounds 0..k-1, the incumbent replaced exactly where the walk
 /// replaced it. P1 checks this against a genuine k-round search.
@@ -407,6 +428,7 @@ struct seed_curve
     double ms_check_s = 0;              ///< P1's genuine walk, wall seconds
     double ms_walk_first_k_s = 0;       ///< the serial walk's seed + first k rounds, wall seconds
     bool   p1 = false;
+    bool   nc_ran = false, nc_score = false, nc_candidate = false; ///< P1's negative controls
     double relay_copy = 0, relay_apply = 0, relay_score = 0; ///< V5's split, mean ms
     int    relays = 0;
     double t_gen_s = 0;
@@ -414,8 +436,18 @@ struct seed_curve
     double mem_base_ws = 0, mem_base_private = 0;    ///< before the walk: the base world held
     double mem_walk_ws = 0, mem_walk_private = 0;    ///< peak during the serial walk
     double mem_check_ws = 0, mem_check_private = 0;  ///< peak during P1's walk (--check-threads)
-    double mem_copy_private = 0;                     ///< one `world` copy of the base, private bytes
+    double mem_copy_private = 0;                     ///< one `world` copy of the base, private bytes,
+                                                     ///< taken before any walk (see run_seed)
+    bool   mem_copy_first_seed = false;              ///< true reading; false: a lower bound
     double mem_process_peak_ws = 0;                  ///< the process's lifetime peak, after the seed
+    // The carve ledger (BL-1086), read off the build's report.
+    bool   ledger_from_budget = false;   ///< the carve counted the budget's planned charters
+    int    ledger_nations = 0;           ///< nations the carve counted a competitor in
+    long long ledger_competitors = 0;    ///< the competitors it counted, summed
+    long long ledger_specialists = 0, ledger_firms = 0;
+    int    base_corporations = 0;        ///< corporations on the base world, before the search
+    bool   l1 = true;                    ///< the ledger IS the plan on the finished world's budget
+    bool   l2 = true;                    ///< a budget world lays no roster before the search
 };
 
 const char* short_axis(int a)
@@ -435,7 +467,8 @@ double share(double ck, double c0, double cr)
 }
 
 seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
-                    int check_threads, bool print_check, int& failures)
+                    int check_threads, bool print_check, bool first_seed_in_process,
+                    int& failures)
 {
     seed_curve sc;
     sc.seed = seed;
@@ -470,6 +503,21 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
         sc.mem_base_ws      = m.ws_mb;
         sc.mem_base_private = m.private_mb;
     }
+    // ONE WORLD COPY'S COST, taken HERE, before any walk (the BL-1136 review):
+    // once the walks have run, their freed copies' pages sit in the heap and a
+    // fresh copy reuses them, so a copy measured after them reads near zero.
+    // This one is the first copy of the base this seed makes. On the first
+    // seed of a process it is a true reading; on a later seed the heap may
+    // still hold a previous seed's pages, so it is a LOWER BOUND there (the
+    // row says which).
+    {
+        const double private_before = read_mem().private_mb;
+        {
+            world probe = base;
+            sc.mem_copy_private = read_mem().private_mb - private_before;
+        }
+        sc.mem_copy_first_seed = first_seed_in_process;
+    }
     t0 = clk::now();
     double cpu0 = thread_cpu_ms();
     mem_sampler walk_mem;
@@ -486,6 +534,49 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
     sc.markets      = walk.seed_score.market_count;
     sc.ms_eval_walk  = ms_walk / std::max(1, walk.evaluations);
     sc.cpu_eval_walk = cpu_walk / std::max(1, walk.evaluations);
+
+    // --- THE CARVE LEDGER (BL-1086) ----------------------------------------
+    // L1: on a budget world the carve's planned charters, counted at bump 11
+    //     from the budget generation built there, are the plan re-derived from
+    //     the budget THIS world's finish builds (`sb`, off world::gen_settlement)
+    //     — nation for nation, specialists and firms. It is what proves the two
+    //     budgets are one budget, so the carve read the roster the search's
+    //     budget buys.
+    // L2: a budget world carries no corporation before the search: no roster
+    //     was laid to be discarded.
+    {
+        const generation_report& rep = out->report;
+        sc.ledger_from_budget = rep.carve_competitors_from_budget;
+        sc.ledger_nations     = static_cast<int>(rep.carve_competitors.size());
+        for (const generation_report::carve_competitor_row& r : rep.carve_competitors)
+        {
+            sc.ledger_competitors += r.competitors;
+            sc.ledger_specialists += r.planned_specialists;
+            sc.ledger_firms       += r.planned_firms;
+        }
+        sc.base_corporations = static_cast<int>(base.corporations.size());
+        if (sc.budget_world)
+        {
+            const std::map<entity_id, charter_nation_plan> plan =
+                plan_charters_by_nation(base, sb.budget, spend);
+            sc.l1 = rep.carve_competitors_from_budget && plan.size() == rep.carve_competitors.size();
+            std::size_t i = 0;
+            for (const auto& [nid, pl] : plan)
+            {
+                if (!sc.l1) break;
+                const generation_report::carve_competitor_row& r = rep.carve_competitors[i++];
+                sc.l1 = r.nation == nid && r.planned_specialists == pl.specialists
+                     && r.planned_firms == pl.firms && r.competitors == pl.total();
+            }
+            sc.l2 = sc.base_corporations == 0;
+        }
+        else
+        {
+            sc.l1 = !rep.carve_competitors_from_budget;   // a roster world's carve read the roster
+        }
+        if (!sc.l1) ++failures;
+        if (!sc.l2) ++failures;
+    }
 
     // --- P1: a GENUINE k-round search is the prefix, bit for bit ---------
     if (check_k >= 0 && check_k <= rounds)
@@ -516,13 +607,29 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
         sc.ms_check_s    = ms_check / 1000.0;
         for (int i = 0; i <= check_k && i < static_cast<int>(walk.round_ms.size()); ++i)
             sc.ms_walk_first_k_s += walk.round_ms[static_cast<std::size_t>(i)] / 1000.0;
-        sc.p1 = same_candidate(genuine.winner, pre.winner)
-             && same_full_score(genuine.winner_score, pre.winner_score)
-             && same_full_score(genuine.seed_score, pre.seed_score)
-             && genuine.evaluations == pre.evaluations
-             && genuine.accepted    == pre.accepted
-             && same_path(genuine.path, pre.path);
+        sc.p1 = same_result(genuine, pre);
         if (!sc.p1) ++failures;
+
+        // NEGATIVE CONTROLS (the BL-1136 review): P1 must be ABLE to fail. The
+        // threaded side is perturbed by the smallest amounts that are still a
+        // different walk -- one proposal's composite moved by ONE ULP, and one
+        // proposal's placement seed by one bit -- and the same comparison has
+        // to report each. A comparator that could not see these would pass a
+        // thread count that changed the walk.
+        if (!genuine.path.empty())
+        {
+            const std::size_t mid = genuine.path.size() / 2;
+            landscape_search_result nc = genuine;
+            nc.path[mid].score.composite =
+                std::nextafter(nc.path[mid].score.composite, std::numeric_limits<double>::infinity());
+            sc.nc_score = !same_result(nc, pre);
+            nc = genuine;
+            nc.path.back().proposal.placement_seed ^= 1u;
+            sc.nc_candidate = !same_result(nc, pre);
+            sc.nc_ran = true;
+            if (!sc.nc_score) ++failures;
+            if (!sc.nc_candidate) ++failures;
+        }
     }
 
     // --- the curve: k = 0..R off the walk's prefixes ---------------------
@@ -534,11 +641,8 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
         for (const relay_memo& m : memo)
             if (same_candidate(m.c, c)) return m.ok;
         clk::time_point a = clk::now();
-        const double private_before = read_mem().private_mb;
         world relay = base;
         sc.relay_copy += ms_since(a);
-        if (sc.relays == 0)
-            sc.mem_copy_private = read_mem().private_mb - private_before;
         a = clk::now();
         apply_landscape_candidate(relay, out->reg, c, /*regenerate_specialists=*/true,
                                   &sb.budget, spend, /*report=*/nullptr);
@@ -619,25 +723,41 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
                     sc.check_k, sc.check_threads, sc.ms_eval_check, sc.ms_check_s, sc.check_k,
                     sc.ms_walk_first_k_s,
                     sc.p1 ? "PASS (prefix == genuine, bit for bit)" : "FAIL");
+    if (sc.nc_ran)
+        std::printf("\n  P1 negative controls: one proposal's composite +1 ulp %s; one proposal's "
+                    "placement seed ^1 %s",
+                    sc.nc_score ? "DETECTED" : "MISSED (FAIL)",
+                    sc.nc_candidate ? "DETECTED" : "MISSED (FAIL)");
     std::printf("\n  CPU ms/eval: walk %.0f  |  P1 %.0f", sc.cpu_eval_walk, sc.cpu_eval_check);
     std::printf("\n  one evaluation, split (V5's %d re-lays, mean): copy %.0f ms, apply %.0f ms, score %.0f ms\n",
                 sc.relays, sc.relay_copy, sc.relay_apply, sc.relay_score);
     sc.mem_process_peak_ws = read_mem().peak_ws_mb;
+    std::printf("  carve ledger: %s, %d nations, %lld competitors (%lld specialists + %lld firms planned); "
+                "%d corporations on the base before the search  |  L1 %s  L2 %s\n",
+                sc.ledger_from_budget ? "the BUDGET'S PLANNED CHARTERS" : "the laid roster",
+                sc.ledger_nations, sc.ledger_competitors, sc.ledger_specialists, sc.ledger_firms,
+                sc.base_corporations, sc.l1 ? "PASS" : "FAIL", sc.l2 ? "PASS" : "FAIL");
     std::printf("  memory, MB (working set / private): base held %.0f / %.0f; serial walk peak %.0f / %.0f; "
-                "P1 walk on %d thread(s) peak %.0f / %.0f; one world copy %.0f private; "
+                "P1 walk on %d thread(s) peak %.0f / %.0f; one world copy %.0f private (%s); "
                 "process lifetime peak working set %.0f\n",
                 sc.mem_base_ws, sc.mem_base_private, sc.mem_walk_ws, sc.mem_walk_private,
                 sc.check_threads, sc.mem_check_ws, sc.mem_check_private, sc.mem_copy_private,
+                sc.mem_copy_first_seed ? "before any walk, first seed: a true reading"
+                                       : "before any walk, a later seed: a LOWER BOUND",
                 sc.mem_process_peak_ws);
     // One machine-readable line per seed, for a sweep to collect.
     std::printf("CURVE seed=%u live=%d markets=%d ms_eval_walk=%.1f ms_eval_check=%.1f "
                 "cpu_eval_walk=%.1f cpu_eval_check=%.1f check_threads=%d check_s=%.2f "
                 "walk_first_k_s=%.2f mem_base=%.0f mem_walk=%.0f mem_check=%.0f mem_copy=%.0f "
-                "mem_peak=%.0f p1=%d composite",
+                "mem_peak=%.0f ledger_budget=%d ledger_competitors=%lld base_corps=%d l1=%d l2=%d "
+                "winner_placement=%08X winner_tier=%u p1=%d composite",
                 seed, sc.live_axes, sc.markets, sc.ms_eval_walk, sc.ms_eval_check,
                 sc.cpu_eval_walk, sc.cpu_eval_check, sc.check_threads, sc.ms_check_s,
                 sc.ms_walk_first_k_s, sc.mem_base_private, sc.mem_walk_private,
-                sc.mem_check_private, sc.mem_copy_private, sc.mem_process_peak_ws, sc.p1 ? 1 : 0);
+                sc.mem_check_private, sc.mem_copy_private, sc.mem_process_peak_ws,
+                sc.ledger_from_budget ? 1 : 0, sc.ledger_competitors, sc.base_corporations,
+                sc.l1 ? 1 : 0, sc.l2 ? 1 : 0, walk.winner.placement_seed,
+                static_cast<unsigned>(walk.winner.road_tier), sc.p1 ? 1 : 0);
     for (const row& w : sc.rows) std::printf(" %.12g", w.score.composite);
     std::printf(" moved");
     for (const row& w : sc.rows) std::printf(" %d", w.moved_axis);
@@ -684,7 +804,8 @@ int run(int argc, char** argv)
     int failures = 0;
     std::vector<seed_curve> all;
     for (const std::uint32_t s : seeds)
-        all.push_back(run_seed(lua, s, rounds, check_k, check_threads, print_check, failures));
+        all.push_back(run_seed(lua, s, rounds, check_k, check_threads, print_check,
+                               /*first_seed_in_process=*/all.empty(), failures));
 
     // --- pooled -----------------------------------------------------------------
     std::printf("\n=== POOLED over %zu seeds ============================================\n",
@@ -1044,6 +1165,61 @@ int main(int argc, char** argv)
                         "      field does not flip. One of the two has to change before\n"
                         "      this axis earns its third of every round.\n",
                         base_hist[1] + base_hist[2] + base_hist[3]);
+    }
+
+    // ------------------------------------------------------------------
+    // R6 — THREAD-COUNT INVARIANCE ON A BUDGET WORLD (the BL-1136 review).
+    //      R2 runs on a world with no budget, so it never reaches the path the
+    //      campaign actually threads: `apply_landscape_candidate`'s budget
+    //      overload, `remove_specialist_roster` and `charter_web_from_budget`.
+    //      Here the same base carries the harness's SYNTHETIC charter budget
+    //      (harness_params.hpp: seeded draws, never a density claim), so every
+    //      evaluation charters its web from a budget, serial against 2 and 4
+    //      threads. Non-vacuity: the budget branch ran (no refusal, no
+    //      fallback, the roster axis skipped) and the winner's apply chartered
+    //      a web (points spent, specialists and firms laid).
+    // ------------------------------------------------------------------
+    std::printf("\nR6. thread-count invariance on a BUDGET world (charter_web_from_budget)\n");
+    {
+        const charter_budget       synth = synthetic_charter_budget(base, wp.seed, 60, 1.0);
+        const charter_spend_params spend = synthetic_charter_spend();
+        landscape_search_params bp = sp;
+        bp.rounds       = 2;
+        bp.budget       = &synth;
+        bp.spend        = spend;
+        bp.print_rounds = false;
+        bp.thread_count = 1;
+        const landscape_search_result b1 = search_landscape(base, reg, bp);
+        print_result("budget serial", b1, 0.0);
+
+        const bool budget_branch = !synth.empty() && !b1.charter_refused && !b1.charter_fell_back
+                                && b1.evaluations == 1 + bp.rounds * (landscape_axis_count - 1);
+        check(budget_branch, "R6.0",
+              "the search took the BUDGET branch - not refused, not fallen back, the roster "
+              "axis skipped (1 + 2 x rounds evaluations)");
+        {
+            world laid = base;
+            charter_spend_report rep;
+            apply_landscape_candidate(laid, reg, b1.winner, /*regenerate_specialists=*/true,
+                                      &synth, spend, &rep);
+            check(rep.points_spent > 0 && !rep.specialists.empty() && !rep.firms.empty(), "R6.1",
+                  "the winner's apply CHARTERED a web from the budget (points spent, specialists "
+                  "and firms laid) - so the threads below scored charter_web_from_budget");
+        }
+        for (const int threads : { 2, 4 })
+        {
+            landscape_search_params tp = bp;
+            tp.thread_count = threads;
+            const landscape_search_result r = search_landscape(base, reg, tp);
+            const bool path_same = curve::same_path(r.path, b1.path);   // every scored term
+            char id[16];
+            std::snprintf(id, sizeof id, "R6.%d", threads);
+            check(path_same && same_candidate(r.winner, b1.winner)
+                      && curve::same_full_score(r.winner_score, b1.winner_score)
+                      && r.evaluations == b1.evaluations,
+                  id, std::string("on a budget world, ") + std::to_string(threads)
+                          + " threads give the serial walk's winner, scores and whole path");
+        }
     }
 
     print_path(serial);

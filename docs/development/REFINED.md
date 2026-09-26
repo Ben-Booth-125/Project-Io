@@ -244,6 +244,13 @@ slip to sprint 49 from the END of a chain, never the middle.
   main before measuring] -> BL-1125 (markets: twins, gravity, conquest,
   calibrated on the thinned world) -> BL-1138 (roads pull to markets) -> NR-944's re-read ->
   BL-1107 (culture ground profile) -> BL-1139 (centres abandoned in play).
+  From the 2026-09-26 cold reviews: BL-1146 (the two-firm cap on the grown provinces) is being
+  MEASURED now (before BL-1133 -> main; re-read after BL-1141), then Ben's call on the cap;
+  BL-1145 (readers of a province's lowest-id tile take its centre's; the census gate) runs after
+  BL-1141 lands. Review fix rounds queued in their lanes: spacing (pending ground, a too-close
+  count, the cost), search (the six-round proof, sweep labels, the bar weight), sea (a four-way
+  lane walk, harness gates, unpriced colonial gates, the cursor digest). Filed for later sprints:
+  BL-1143 (the asymmetric hex table) and BL-1144 (the colonial distance gates never bind).
 - **Sea (`ocean_currents.*`, history_sim's sea-leg cost and trade record):** BL-1120 (ocean
   currents) -> BL-1140 (sea lanes from trade) -> BL-1098 (the lane tier stamped).
   BL-1120 stage 1 MERGED 2026-09-26 (b80a5b5d): the field, weight 500, wet crossings priced;
@@ -253,7 +260,13 @@ slip to sprint 49 from the END of a chain, never the middle.
 - **UI (`history_lapse.*`, text in `startup_screens.cpp`):** U3 (the bowed arc only), BL-1134
   (roads carried across rounds), BL-1135 (the Culture round worded as the record).
 - **Search (`landscape_search.*`):** BL-1136's curve -> Ben picks the round count -> BL-1086
-  (search inside generation).
+  (search inside generation). BL-1086 and the BL-1136 review fixes MERGED 2026-09-26
+  (15da1bd2; group `carve-counts-planned-firms`): markets +0.3% on the spaced world, the six-round
+  proof 16/16 with two negative controls, the search bar weight 20000 -> 6000 ms. Open: NR-957
+  (firms, specialists or both), the loading screen's charter list now empty on a budget world
+  (R4, a UI fix after the cold review). THE SETTLE WEIGHT IS STALE: gen_step_costs read settle
+  49.6 s on seed 0 and 10.9 s on seed 28 under load, against ~18 s after BL-1117 -- a quiet
+  re-read is owed with BL-1119 R5 (the 35 s tail) before anything is concluded.
 
 Then the one re-bless, each cause named with its own before/after (split it before any cause
 goes unmeasured).

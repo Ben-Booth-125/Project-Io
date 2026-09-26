@@ -91,8 +91,10 @@ landscape_search_params campaign_search_params(std::uint32_t world_seed, int cor
     // A budget world proposes two per round (placement and road tier), so two
     // threads halve the search's wall time; the winner, every scored term and
     // the whole path are the serial walk's, bit for bit (the determinism
-    // clauses in landscape_search.hpp; landscape_search_harness --curve
-    // --check-threads 2 proves it on the curated seeds).
+    // clauses in landscape_search.hpp; `landscape_search_harness --curve
+    // --check-k 6 --check-threads 2` proves it on the curated seeds, all six
+    // rounds -- --check-k defaults to 3, which compares only half the walk --
+    // and the harness's default run holds a threaded budget-world row, R6).
     sp.thread_count            = k_campaign_search_threads;
     return sp;
 }

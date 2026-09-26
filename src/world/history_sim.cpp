@@ -2134,16 +2134,53 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // late in a year is measured before any later reader and no span closes on
     // a cell a founding cut. Cheap when nothing was founded: the guard is one
     // size compare.
+    // BL-1141 — POINTS GO WITH THEIR PEOPLE (Ben, 2026-09-26; POPULATION.md
+    // § Generation). A region that loses its settlement WITHOUT a sack — its
+    // cell's ground taken by a newer founding, or its people gone — hands the
+    // industry points it earned to the NEAREST centre of the same realm
+    // (`region_distance`, ties to the lower region index), so none vanish. A
+    // sack keeps its points on the ruin: NR-901, "the works went with the
+    // towns", stays the budget's razed reason. Nothing moves where the region
+    // is held by no realm, where the realm stands no other centre, or where the
+    // receiving stock would pass `industry_points_ceiling` (refused, never
+    // clamped) — each of those stays on the region, and the close's budget
+    // counts it unspent under its own reason. The treasury-paid tally
+    // (report-only) moves with its points, so the world's paid-in share holds.
+    const auto rehome_points = [&](std::size_t i) {
+        region& from = ss.regions[i];
+        if (from.industry_points <= 0 || from.centres > 0) return;
+        const int q = (i < owner.size()) ? owner[i] : -1;
+        if (q < 0) return;
+        int best = -1, best_d = 1 << 30;
+        for (std::size_t j = 0; j < ss.regions.size() && j < owner.size(); ++j)
+        {
+            if (j == i || owner[j] != q) continue;
+            const region& to = ss.regions[j];
+            if (to.centres <= 0 || to.population <= 0) continue;
+            const int d = region_distance(from, to, gw);
+            if (d < best_d) { best_d = d; best = static_cast<int>(j); }
+        }
+        if (best < 0) return;
+        region& to = ss.regions[static_cast<std::size_t>(best)];
+        if (to.industry_points > industry_points_ceiling - from.industry_points) return;
+        to.industry_points += from.industry_points;
+        to.industry_points_from_treasury += from.industry_points_from_treasury;
+        from.industry_points = 0;
+        from.industry_points_from_treasury = 0;
+    };
+
     const auto hold_to_ground = [&](bool only_after_founding) {
         if (terrain.substrate == nullptr) return;
         if (only_after_founding && ss.regions.size() == urban_ground.measured) return;
         if (!update_urban_ground(ss, urban_ground, *terrain.substrate, terrain.standable, gw, gh))
             return;
-        for (region& r : ss.regions)
+        for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
         {
+            region& r = ss.regions[ri];
             const int rebate_before = relay_rebate_of(r);
-            if (hold_region_to_ground(r) && relay_rebate_of(r) != rebate_before)
-                ++centres_version;
+            if (!hold_region_to_ground(r)) continue;
+            if (relay_rebate_of(r) != rebate_before) ++centres_version;
+            if (r.centres == 0) rehome_points(ri); // BL-1141: its ground was taken
         }
     };
 
@@ -2876,6 +2913,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // nearer than `settle_min_spacing_tiles` (Chebyshev, columns
     // wrapping — the partition's own metric; history_sim.hpp says
     // why tiles). At 1 that is exactly the old occupancy test.
+    // EVERY REGION COUNTS, HELD OR NOT, living or not — another realm's,
+    // unorganised ground, an emptied region — because every anchor owns a
+    // cell of the partition, whoever holds it.
+    //
+    // AND EVERY SCHEDULED FOUNDING STILL TO COME (BL-1132 review fix).
+    // `pending_foundings` are the migration's regions dated after the sim
+    // opens; their anchors are already fixed, at least the settlement
+    // pass's own `sep` from each other and from its placed regions. Settle
+    // runs in the same years, so a daughter that saw only the standing
+    // regions could land on, or beside, ground the schedule is about to
+    // found — a stacked pair, or a cell under the spacing's guarantee. The
+    // pending anchors are refused like standing ones, so every founding
+    // arrives clear, and the schedule itself is never dropped or deferred.
     //
     // THE SEARCH KEEPS ITS SIX RINGS, STARTING AT THE SPACING.
     // Every probe of a ring nearer than the spacing lies within it
@@ -2886,19 +2936,29 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // hash reads only the year and the probe index, so skipping a
     // ring moves no later probe.
     //
-    // THE NEAR LIST is an exact filter, not a heuristic: a region
+    // THE NEAR LIST is an exact filter, not a heuristic: an anchor
     // further than (last ring + spacing - 1) from the parent can
     // never stand within the spacing of any probe, so only the
-    // regions inside that radius are tested, once per probe.
+    // anchors inside that radius are tested, once per probe. The list
+    // is one buffer reused across calls, so a call allocates nothing
+    // once it has grown.
+    //
+    // THE RINGS ARE SAMPLED, NOT SWEPT: each ring draws (2r + 1)^2 hashed
+    // probes, with repeats, so a free tile can go unprobed. "No room" means
+    // no site was FOUND this year from this parent, not that none exists;
+    // next year's probes are drawn afresh.
     //
     // ONE SITE RULE, a pure function of (parent, polity salt, year, the region
-    // list): writes the chosen tile to (nc, nr), or -1/-1 when the six rings
-    // hold no ground far enough from every standing region.
+    // list, the pending schedule): writes the chosen tile to (nc, nr), or -1/-1
+    // when the six rings yield no probe far enough from every standing region
+    // and every scheduled one.
     //
     // TWO READERS, ONE ANSWER: the Settle scorer asks it whether a source has
     // room (a realm settles only where there is room; Ben, 2026-09-26) and the
     // verb asks it where to found. Nothing between the two touches the region
-    // list, so the site the scorer saw is the site the verb founds on.
+    // list or the schedule, so the site the scorer saw is the site the verb
+    // founds on.
+    std::vector<std::pair<int, int>> settle_near; // the near list's one buffer
     const auto find_settle_site = [&](const region& src, uint32_t qs, int64_t y,
                                       int& nc, int& nr) {
         const int spacing    = std::max(1, params.settle_min_spacing_tiles);
@@ -2912,11 +2972,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
             if (dr < 0) dr = -dr;
             return dc > dr ? dc : dr;
         };
-        std::vector<int> near_regions;
-        for (std::size_t ei = 0; ei < ss.regions.size(); ++ei)
-            if (tile_gap(ss.regions[ei].col, ss.regions[ei].row, src.col, src.row)
-                <= ring_last + spacing - 1)
-                near_regions.push_back(static_cast<int>(ei));
+        const int near_radius = ring_last + spacing - 1;
+        settle_near.clear();
+        for (const region& e : ss.regions)
+            if (tile_gap(e.col, e.row, src.col, src.row) <= near_radius)
+                settle_near.emplace_back(e.col, e.row);
+        for (const region& e : ss.pending_foundings)
+            if (tile_gap(e.col, e.row, src.col, src.row) <= near_radius)
+                settle_near.emplace_back(e.col, e.row);
 
         nc = -1; nr = -1;
         for (int ring = ring_first; ring <= ring_last && nc < 0; ++ring)
@@ -2964,11 +3027,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // square without walking the list.
                 if (tile_gap(cc, rr, src.col, src.row) < spacing) continue;
                 bool taken = false;
-                for (const int ei : near_regions)
-                {
-                    const region& e = ss.regions[static_cast<std::size_t>(ei)];
-                    if (tile_gap(cc, rr, e.col, e.row) < spacing) { taken = true; break; }
-                }
+                for (const std::pair<int, int>& e : settle_near)
+                    if (tile_gap(cc, rr, e.first, e.second) < spacing) { taken = true; break; }
                 if (!taken) { nc = cc; nr = rr; break; }
             }
         }
@@ -3824,10 +3884,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // both ways with the heads, where the old count only ratcheted up.
             // BL-1130 (review fix): the cache watches the rebate the size buys.
             const int rebate_before = relay_rebate_of(ss.regions[i]);
+            const int had_centres   = ss.regions[i].centres;
             advance_region_urban(ss.regions[i],
                 ss.regions[i].network_supply_q > params.sustainable_settlement_floor_q);
             if (relay_rebate_of(ss.regions[i]) != rebate_before)
                 ++centres_version;
+            // BL-1141: a settlement that ended without a sack (its people gone)
+            // hands its points to the realm's nearest centre.
+            if (had_centres > 0 && ss.regions[i].centres == 0)
+                rehome_points(i);
             // BL-835 — ONE YEAR OF THE MUSTER, for every region whether or not
             // anyone is fighting over it. This is what makes an undefended
             // region a TEMPORARY state: a region stripped by a march away, or
@@ -4125,6 +4190,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
             else
             {
                 const scoped_ns prof_points(prof.ns_industry_points); // report-only
+                // BL-1137: the stock before this round's accrual, so the
+                // urbanisation stream below can read each town's OUTPUT this
+                // round (its pull) as the accrual's own credit.
+                std::vector<int64_t> urb_points_before(ss.regions.size(), 0);
+                for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
+                    urb_points_before[ri] = ss.regions[ri].industry_points;
                 const industry_points_round pr =
                     accrue_industry_points(ss.regions, out.polities, params, step_years);
                 out.industry_points_from_scale += pr.credited;
@@ -4215,6 +4286,121 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                     ++k;
                                 }
                             }
+                        }
+                    }
+                }
+
+                // ---- BL-1137: THE URBANISATION STREAM -----------------------
+                //
+                // INDUSTRIALISATION.md sec Beat 2 (SET, Ben 2026-09-25: this span
+                // encourages more migration, and migration is how the map thins).
+                // "A region's countryside -> a centre in the same polity; pull:
+                // industry-point output at the centre; push: depleted or strained
+                // ground; line: held corridors." Once a decision round, off this
+                // round's accrual, behind the same switch and open year as the
+                // points themselves, so every other span is untouched.
+                //
+                //   THE LINE. Each polity's held ground splits into the pieces its
+                //   own network joins (`supply_neighbours` over regions it holds —
+                //   the graph its reach is priced over); people move only inside
+                //   one piece, so a realm's colony across the water is not its
+                //   home towns' countryside.
+                //   THE DESTINATIONS. The towns and cities that industrialise: the
+                //   piece's regions of at least a town's people
+                //   (`region_stands_a_town`) that built industry points this round.
+                //   THE PUSH. Every region of the piece sends its countryside at
+                //   `urbanisation_outflow` — the countryside x the rate x the strain
+                //   on its ground (settlement.cpp states the rate and why).
+                //   THE PULL. The piece's pooled migrants are shared over its
+                //   destinations in proportion to this round's industry-point
+                //   output there (largest remainder, exact, ties to the lower region
+                //   index), and land in each destination's centres as industrial
+                //   heads (`settle_urban_migrants`).
+                //
+                // A piece with no industrialising town sends nobody. People are
+                // conserved (taken whole from the countryside, landed whole in the
+                // towns). The villages empty as a CONSEQUENCE: a region whose
+                // countryside leaves has a smaller urban target, its heads shrink
+                // toward it, and a centre whose share falls below a village's
+                // worth is abandoned (`advance_region_urban`, both ways).
+                {
+                    const std::size_t n = ss.regions.size();
+                    std::vector<int> piece(n, -1);
+                    std::vector<int> members, dests;
+                    std::vector<int64_t> pull;
+                    for (std::size_t start = 0; start < n; ++start)
+                    {
+                        const int q = (start < owner.size()) ? owner[start] : -1;
+                        if (q < 0 || piece[start] >= 0) continue;
+                        members.clear();
+                        piece[start] = static_cast<int>(start);
+                        members.push_back(static_cast<int>(start));
+                        for (std::size_t f = 0; f < members.size(); ++f)
+                        {
+                            const std::size_t at = static_cast<std::size_t>(members[f]);
+                            for (int nb : supply_neighbours[at])
+                            {
+                                if (nb < 0 || static_cast<std::size_t>(nb) >= n) continue;
+                                const std::size_t ni = static_cast<std::size_t>(nb);
+                                if (piece[ni] >= 0 || ni >= owner.size() || owner[ni] != q) continue;
+                                piece[ni] = static_cast<int>(start);
+                                members.push_back(nb);
+                            }
+                        }
+                        std::sort(members.begin(), members.end()); // ascending: a total order
+
+                        dests.clear();
+                        pull.clear();
+                        int64_t pull_total = 0;
+                        for (int m : members)
+                        {
+                            const region& r = ss.regions[static_cast<std::size_t>(m)];
+                            if (r.population <= 0 || !region_stands_a_town(r)) continue;
+                            const int64_t credit =
+                                r.industry_points - urb_points_before[static_cast<std::size_t>(m)];
+                            if (credit <= 0) continue;
+                            dests.push_back(m);
+                            pull.push_back(credit);
+                            pull_total += credit;
+                        }
+                        if (dests.empty() || pull_total <= 0) continue;
+
+                        int64_t pool = 0;
+                        for (int m : members)
+                        {
+                            region& r = ss.regions[static_cast<std::size_t>(m)];
+                            pool += take_countryside(r, urbanisation_outflow(r, step_years));
+                        }
+                        if (pool <= 0) continue;
+
+                        // Largest remainder, exact: pool = sum of shares.
+                        const int64_t whole = pool / pull_total, part = pool % pull_total;
+                        std::vector<int64_t> share(dests.size(), 0), rem(dests.size(), 0);
+                        int64_t given = 0;
+                        for (std::size_t k = 0; k < dests.size(); ++k)
+                        {
+                            const int64_t num = part * pull[k];
+                            share[k] = whole * pull[k] + num / pull_total;
+                            rem[k]   = num % pull_total;
+                            given   += share[k];
+                        }
+                        int64_t left = pool - given; // 0 <= left < dests.size()
+                        if (left > 0)
+                        {
+                            std::vector<std::size_t> order(dests.size());
+                            for (std::size_t k = 0; k < order.size(); ++k) order[k] = k;
+                            std::stable_sort(order.begin(), order.end(),
+                                             [&rem](std::size_t a, std::size_t b) { return rem[a] > rem[b]; });
+                            for (std::size_t k = 0; k < order.size() && left > 0; ++k, --left)
+                                ++share[order[k]];
+                        }
+                        for (std::size_t k = 0; k < dests.size(); ++k)
+                        {
+                            region& d = ss.regions[static_cast<std::size_t>(dests[k])];
+                            const int rebate_before = relay_rebate_of(d);
+                            settle_urban_migrants(d, share[k]);
+                            // The reach cache watches the rebate (BL-1130 review fix).
+                            if (relay_rebate_of(d) != rebate_before) ++centres_version;
                         }
                     }
                 }
@@ -6022,9 +6208,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // region before the stop year and leaves none after it, so
             // without this verb a 2000-year run has a frozen region count.
             {
+                // A polity fighting for its life does not colonise (BL-308).
+                // Letting it was the main reason losers regrew faster than they
+                // were conquered, and why elimination never happened.
+                //
+                // READ BEFORE THE SOURCE LOOP (BL-1132 review fix), not after
+                // it: the loop runs the site search for every eligible held
+                // region, and a polity the gate refuses can never pick Settle,
+                // so its search was pure cost. The gate reads only cohesion,
+                // which nothing in the loop writes, so the choice is unchanged.
+                const bool may_settle = q.cohesion_q >= params.settle_cohesion_gate_q;
                 int pressure_best = -1, pressure_src = -1;
                 for (int hi : held)
                 {
+                    if (!may_settle) break;
                     const region& p = ss.regions[static_cast<std::size_t>(hi)];
                     // The works-aware ceiling (BL-321), matching what
                     // `advance_region_demography` actually grows toward. The
@@ -6052,21 +6249,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // founds with, so a chosen Settle always founds. Without it
                     // the scorer picked the most crowded razed region whether or
                     // not its neighbourhood was full, and the round was spent on
-                    // a founding that could not happen (main wasted 634 / 1,977 /
-                    // 2,911 Settle rounds across the three spans on the curated
-                    // seeds; spacing 3 made it 85% of the Empires span's). A
-                    // region below the pressure gate is skipped outright: it
-                    // could only ever fail the gate below, so it needs no site.
+                    // a founding that could not happen (main before BL-1132
+                    // wasted 624 / 2,161 / 3,274 Settle rounds in the Empires /
+                    // Exploration / Industrialisation spans on the curated
+                    // seeds; spacing 3 made it 85% of the Empires span's). The
+                    // search samples its rings (see `find_settle_site`), so a
+                    // source skipped here found no site THIS year and may find
+                    // one the next. A region below the pressure gate is skipped
+                    // outright: it could only ever fail the gate below, so it
+                    // needs no site.
                     if (pressure < params.settle_pressure_q) continue;
                     int site_c = -1, site_r = -1;
                     find_settle_site(p, qs, y, site_c, site_r);
                     if (site_c < 0) continue;
                     pressure_best = pressure; pressure_src = hi;
                 }
-                // A polity fighting for its life does not colonise (BL-308).
-                // Letting it was the main reason losers regrew faster than they
-                // were conquered, and why elimination never happened.
-                const bool may_settle = q.cohesion_q >= params.settle_cohesion_gate_q;
                 if (may_settle && pressure_src >= 0 && pressure_best >= params.settle_pressure_q)
                 {
                     const region& sp = ss.regions[static_cast<std::size_t>(pressure_src)];

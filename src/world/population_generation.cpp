@@ -72,9 +72,10 @@ static_assert(k_demography_heads_per_centre == region_centre_heads,
               "BL-766: the sim-grain centre rung and the campaign-era carve rung "
               "must be the same headcount");
 
-/// Scale banding: `scale_for_heads` (population_generation.hpp), the nearest
-/// `k_population_for_scale` rung in log space. Moved to the header for BL-1130
-/// so the Era -1 sim's ground fit bands on the same rungs.
+/// Scale banding for the FIXTURE fallback's rank-size share-out below:
+/// `scale_for_heads` (population_generation.hpp), the nearest
+/// `k_population_for_scale` rung in log space. The campaign path reads
+/// `scale_reached` instead (BL-1141, a region deepens into one place).
 int scale_for_share(int64_t share_heads) { return scale_for_heads(share_heads); }
 
 /// One carved centre: WHICH REGION grew it, and how large it stands.
@@ -102,32 +103,24 @@ struct carved_centre
 /// Carve a body's Era -1 demography into centre scales (BL-610), each BOUND to
 /// the region that grew it (BL-783).
 ///
-/// COUNT is per region: the centres the region's history stood up
-/// (`region::centres` — since BL-1130 a hierarchy of its urban heads held to
-/// its ground, not one per `k_demography_heads_per_centre`); a razed region
-/// (population 0) contributes nothing. Summing per region rather than carving
-/// the body total is what makes the count the DISTRIBUTION's consequence: a
-/// world of many thin regions towns differently from one of few fat ones.
+/// A REGION DEEPENS INTO ONE PLACE (Ben, 2026-09-26; POPULATION.md § Generation;
+/// BL-1141, superseding BL-1130's in-region hierarchy and the body-wide rank-size
+/// share-out). Every living region that stands a settlement carves exactly ONE
+/// centre, and its SCALE is the `k_population_for_scale` rung its own urban
+/// heads have reached (`scale_reached`): a few cities over many towns over a
+/// train of villages because regions differ in how many people they hold, never
+/// because a ranking was imposed on them. A razed or emptied region (population
+/// 0, or no centre standing) carves nothing.
 ///
-/// SCALES are rank-size over the whole body's urban headcount: rank i of n
-/// receives U/(i*H_n), H_n the harmonic number — one hierarchy of a few
-/// cities over many towns over a train of villages, the concentration real
-/// settlement systems show (a MECHANISM, never a name — the standing rule).
-///
-/// WHICH REGION TAKES WHICH RANK (BL-783). The body-wide rank-size share-out is
-/// unchanged — same n, same harmonic, same scale multiset — but the ranks are
-/// no longer handed out in an arbitrary order. Every region enters its own
-/// centres as SLOTS keyed `urban_population / k` for k = 1..centres: the
-/// region's internal rank-size read, so a region's first city competes on its
-/// whole urban headcount and its fifth on a fifth of it. Sorting those slots
-/// descending IS the body-wide rank order, and it is causal in both directions:
-/// a heavily sacked region carries a small `urban_population`, so its slots
-/// sort late and it materialises fewer AND smaller cities than an untouched
-/// neighbour of the same farming ground. That is the whole of R2.
-///
-/// All integer (harmonic sum in millionths), no RNG: a pure function of the
-/// region populations, so count, scale and binding are the demography's
+/// The slot each centre carries (BL-1042) is `urban_population`, rank 1 — the
+/// region's whole stock reaches its one centre. The carve comes back descending
+/// by that key (region index breaking ties), so the largest places are placed
+/// first. All integer, no RNG: count, scale and binding are the demography's
 /// consequence and nothing else's.
+///
+/// THE FIXTURE FALLBACK (`urban_map_drawn` false, reachable only from a
+/// hand-built record) keeps the pre-BL-766 carve and its rank-size share-out
+/// unchanged: a fallback for fixtures, not a second model to keep in step.
 ///
 /// THE GROUND HOLDS THE COUNT (BL-1130, POPULATION.md "Growth consolidates").
 /// With @p cell_ground (per region: the tiles of its cell a centre can stand
@@ -169,22 +162,26 @@ std::vector<carved_centre> carve_demography_centres(const settlement_state& sett
     int64_t count       = 0;
     if (settlement.urban_map_drawn)
     {
+        // BL-1141: one centre per settled region, its scale its heads' rung.
         for (std::size_t ri = 0; ri < settlement.regions.size(); ++ri)
         {
             const region& p = settlement.regions[ri];
             if (p.population <= 0 || p.centres <= 0)
                 continue; // A razed or emptied region towns nobody.
-            int stands = p.centres;
+            int stands = std::min(p.centres, 1);
             if (cell_ground != nullptr && ri < cell_ground->size())
-                stands = std::min(region_centres_fit(p.urban_population, stands, (*cell_ground)[ri]),
-                                  (*cell_ground)[ri]);
+                stands = region_centres_fit(stands, (*cell_ground)[ri]);
             if (stands <= 0)
                 continue; // No ground to stand a centre on: its heads town nobody here.
-            urban_total += p.urban_population;
-            count       += stands;
-            for (int k = 1; k <= stands; ++k)
-                slots.push_back({ p.urban_population / k, static_cast<int>(ri), k });
+            out.push_back({ static_cast<int>(ri), scale_reached(p.urban_population),
+                            p.urban_population, 1 });
         }
+        std::stable_sort(out.begin(), out.end(),
+                         [](const carved_centre& a, const carved_centre& b) {
+                             if (a.key != b.key) return a.key > b.key;
+                             return a.region < b.region;
+                         });
+        return out;
     }
     else
     {

@@ -1135,8 +1135,9 @@ struct history_sim_params
 
     /// BL-1132 — SETTLE SPACING: THE MINIMUM DISTANCE, IN TILES, BETWEEN A
     /// REGION THE SETTLE VERB FOUNDS AND THE ANCHOR OF EVERY REGION ALREADY ON
-    /// THE MAP (`CIVILISATION.md` § The unit is the city state, "A new region
-    /// founds at a distance, not on the nearest free tile"; Ben, 2026-09-25).
+    /// THE MAP OR STILL TO BE FOUNDED BY THE SCHEDULE (`CIVILISATION.md` § The
+    /// unit is the city state, "A new region founds at a distance, not on the
+    /// nearest free tile"; Ben, 2026-09-25, fixed at 3 on 2026-09-26).
     ///
     /// TILES, CHEBYSHEV, COLUMNS WRAPPING — `region_distance`'s own metric, and
     /// that is the reason it is tiles rather than traversal cost. What the
@@ -1152,13 +1153,22 @@ struct history_sim_params
     /// ground is cheap — which is where the cores are. The settlement pass's own
     /// separation rule (`run_settlement`, `sep`) is the same metric.
     ///
-    /// EVERY REGION COUNTS, living or not, because every region anchors a cell.
+    /// EVERY REGION COUNTS, HELD OR NOT (the reading CIVILISATION.md names):
+    /// another realm's ground, unorganised ground, an emptied region and a
+    /// scheduled founding not yet arrived all refuse a site alike, because each
+    /// anchors a cell of the partition whoever holds it.
     ///
-    /// 1 IS THE OLD RULE, byte for byte: "any tile no region stands on", the
-    /// nearest ring first. The struct default keeps it, so every synthetic
-    /// fixture that exercises Settle keeps the rule it was written against;
-    /// generation's three spans set their value in `era_minus_one.cpp` (the
-    /// same idiom as `settle_requires_razed_ground` above).
+    /// A FIELD, PER PARAMS. Generation's three spans set theirs from
+    /// `generation_settle_spacing_tiles` (era_minus_one.hpp) in
+    /// `era_minus_one_sim_params` / `exploration_sim_params` (the same idiom as
+    /// `settle_requires_razed_ground` above); a harness that hand-builds a
+    /// span's params copies it from there. The struct default 1 keeps the old
+    /// SITE rule for the synthetic fixtures — "any tile no region stands on",
+    /// the nearest ring first. It does not keep the old WORLD: the Settle
+    /// scorer's room check (a realm settles only where there is room; Ben,
+    /// 2026-09-26) is unconditional, so a spacing-1 run no longer spends a round
+    /// on a Settle that finds no site, and moves slightly for it — under 2%
+    /// pooled on every structural column of the curated seeds.
     int settle_min_spacing_tiles = 1;
 
     // --- BL-920: the opening seeds culture ground, not polities -----------

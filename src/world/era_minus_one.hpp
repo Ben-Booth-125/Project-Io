@@ -103,14 +103,17 @@ history_sim_params era_minus_one_sim_params(const world_params& params);
 /// so the Industrialisation span too, which is built on Exploration's params.
 /// ONE value for all three, so a re-settlement is spaced alike in every span.
 ///
-/// PROVISIONAL AT 3: measured as a candidate ladder (1, 2, 3, 4, 5, 7, 10) on
-/// the sixteen curated seeds (tools/verify/centre_census.cpp, its C7 row), and
-/// Ben fixes it from that ladder. 3 is the smallest spacing that guarantees a
+/// FIXED AT 3 (Ben, 2026-09-26; CIVILISATION.md § The unit is the city state),
+/// from a candidate ladder (1, 2, 3, 4, 5, 7, 10) measured on the sixteen
+/// curated seeds (tools/verify/centre_census.cpp, its C9 row; C10 checks the
+/// spacing itself holds). 3 is the smallest spacing that guarantees a
 /// Settle region a cell of its own beyond its anchor tile (every tile one step
 /// from the anchor is strictly nearer it than any other), and the ladder's knee:
 /// one-tile cells 26,232 -> 231 pooled, where 4 and above only trade regions
-/// and carved centres for the province anchors' backfill. 1 is the old rule
-/// (any tile no region stands on), byte for byte.
+/// and carved centres for the province anchors' backfill. 1 is the old SITE
+/// rule (any tile no region stands on); the room check in the Settle scorer is
+/// unconditional, so a spacing-1 world is not the pre-BL-1132 one
+/// (history_sim.hpp `settle_min_spacing_tiles`).
 inline constexpr int generation_settle_spacing_tiles = 3;
 
 /// The seed generation hands the era. A per-pass fold off the master seed, in

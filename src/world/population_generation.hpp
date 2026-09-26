@@ -28,9 +28,9 @@ inline constexpr int k_population_for_scale[5] = { 10, 50, 200, 1000, 5000 };
 
 /// URBAN heads per population centre on the CAMPAIGN path (BL-610, centres
 /// from demography): the village rung. Since BL-1130 (centres consolidate) it
-/// is the SMALLEST centre a region's hierarchy may stand, not the size of every
-/// one: a region's urban heads stand up as many centres as keep the last of a
-/// rank-size hierarchy at this rung (`region_centres_wanted`, settlement.hpp),
+/// is the heads a region needs to STAND its one centre (BL-1141, a region
+/// deepens into one place: `region_centres_wanted`, settlement.hpp), not the
+/// size of the centre — its scale is the rung its heads reached (`scale_reached`),
 /// held to what its cell's land holds — density is history's consequence, not
 /// a land-area divisor.
 ///
@@ -48,9 +48,8 @@ inline constexpr int k_demography_heads_per_centre = 10000;
 /// on the NEAREST rung in log space rather than always rounding down.
 /// sqrt(10k*50k)=22,360; sqrt(50k*200k)=100,000; sqrt(200k*1M)=447,213;
 /// sqrt(1M*5M)=2,236,067. Constants, so no float sqrt runs in a gate path.
-/// Exported (was file-local to the carve) for BL-1130: the Era -1 sim's
-/// ground fit bands a region's own hierarchy on the SAME rungs the carve
-/// bands the body's, so the two cannot disagree about what a share paves.
+/// Read only by the FIXTURE fallback's rank-size share-out now; the campaign
+/// carve reads `scale_reached` (BL-1141).
 inline constexpr int64_t k_scale_band_heads[4] = { 22360, 100000, 447213, 2236067 };
 
 /// The scale (1-5) a share of @p share_heads raw heads bands to.
@@ -60,6 +59,22 @@ inline constexpr int scale_for_heads(int64_t share_heads)
     for (int i = 0; i < 4; ++i)
         if (share_heads >= k_scale_band_heads[i])
             s = i + 2;
+    return s;
+}
+
+/// A REGION DEEPENS INTO ONE PLACE (Ben, 2026-09-26; POPULATION.md § Generation,
+/// BL-1141): the scale (1-5) of a region's one centre is the
+/// `k_population_for_scale` rung its @p urban_heads have REACHED — village below
+/// a town's 50,000, town from 50,000, city from 200,000, metropolis from
+/// 1,000,000, megacity from 5,000,000. "Reached" is read as crossed (the rung's
+/// own headcount, never the log-space midpoint the fixture banding uses): a
+/// place is a town once it holds a town's people (delegated reading, reported).
+inline constexpr int scale_reached(int64_t urban_heads)
+{
+    int s = 1;
+    for (int i = 1; i < 5; ++i)
+        if (urban_heads >= static_cast<int64_t>(k_population_for_scale[i]) * 1000)
+            s = i + 1;
     return s;
 }
 
@@ -135,7 +150,7 @@ inline constexpr int k_urban_footprint_tiles[5] = { 1, 1, 2, 4, 7 };
 /// CENTRE'S OWN CELL of the settlement partition (`nearest_region`), exactly as
 /// it stops at the coast — POPULATION.md "their urban footprints fit inside the
 /// region's own cell". The carve's body-wide rank-size can give a large region's
-/// centres scales whose footprints its own hierarchy never sized, and without
+/// centres scales whose footprints its own ground never sized, and without
 /// the cut they paved into a neighbour's cell. Scales are unchanged; only the
 /// paving is cut short. Null keeps the coast-only rule (a caller with no
 /// settlement record).

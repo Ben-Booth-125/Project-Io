@@ -561,6 +561,10 @@ int main()
             ep.exploration_upkeep_enabled          = true;
             ep.city_states_by_population_threshold = true;
             ep.settle_requires_razed_ground         = true;
+            // BL-1132 (review fix): the settle spacing as generation sets it,
+            // copied from exploration_sim_params rather than left at the
+            // struct default of 1, so these checks run generation's site rule.
+            ep.settle_min_spacing_tiles = exploration_sim_params(world_params{}).settle_min_spacing_tiles;
             ep.w_want_q                             = w_want_q; // BL-953; 0 = the pre-change span
             // BL-1044 (cold review, finding 2): the corridor tier as generation
             // sets it — on since BL-1044 — named here rather than taken from the

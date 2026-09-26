@@ -1251,7 +1251,7 @@
    "kind": "question",
    "status": "open",
    "source": "BL-1133 as merged (5cab560b), 2026-09-26",
-   "what": "Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, every province invariant green. Three consequences. (1) 21,457 seed centres (47%) end on their own tile, hemmed by a larger neighbour's reach, and singleton absorption (the 2026-08-21 ruling) folds each into its cheapest neighbour, so provinces = centres holds with that counted exception. (2) 3,753 of the 6,856 remaining anchor villages exist only because the settlement lock (BL-849) stops the fill crossing from settled into never-settled ground. (3) Provinces now reach 1,315 tiles (a lone village over lightly settled land); p90 stays 7-13.",
+   "what": "Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, every province invariant green. Three consequences. (1) 21,457 seed centres (47%) end on their own tile, hemmed by a larger neighbour's reach, and singleton absorption (the 2026-08-21 ruling) folds each into its cheapest neighbour, so provinces = centres holds with that counted exception. (2) 3,753 of the 6,856 remaining anchor villages exist only because the settlement lock (BL-849) stops the fill crossing from settled into never-settled ground. (3) Provinces now reach 1,315 tiles (a lone village over lightly settled land); p90 stays 7-13. COLD REVIEW CAUTION (2026-09-26): centre_census C8 buckets anchor-only provinces (the uncentred leftovers) as villages, so (3)'s 1,315-tile 'lone village' may be leftover ground, not a village's draw; read C7b's anchor-only maximum before ruling on option C (the fix is BL-1145). PROVINCES.md now says a world has at most as many provinces as centres, with the hemmed ones counted.",
    "why_it_matters": "(2) is the remaining gap to a world without villages founded on empty ground; (3) decides whether a province can be a continent-sized conquest unit.",
    "options": [
     "A: keep all three as built",
@@ -1273,15 +1273,16 @@
    "kind": "decision",
    "status": "open",
    "source": "BL-1098 (the sea-lane tier stamped), merged 7238f8ef, 2026-09-26",
-   "what": "Taken on your behalf by the lane: a seat's port is its nearest sea tile within nine tiles (the sim's neighbour radius); the walk runs toward the busier end (the lane record carries no direction), as the old-road stamp does; a laned sea tile costs x0.50. Two consequences: (1) 41 of 137 earned lanes (30%) are not laid because a seat has no sea within nine tiles; (2) a laned sea tile (2.5 -> 1.25) is still dearer than plains (1.0) or a road (0.5-0.67), so a lane carries traffic only between landmasses, never along a coast a road already serves. The market junction degree was not extended with lanes (it would add markets at lane ports). LOGISTICS.md § 4b states the rules.",
+   "what": "Taken on your behalf by the lane: a seat's port is its nearest sea tile within nine tiles (the sim's neighbour radius); the walk runs toward the busier end (the lane record carries no direction), as the old-road stamp does; a laned sea tile costs x0.50. Two consequences: (1) 41 of 137 earned lanes (30%) are not laid because a seat has no sea within nine tiles; (2) a laned sea tile (2.5 -> 1.25) is still dearer than plains (1.0) or a road (0.5-0.67), so a lane carries traffic only between landmasses, never along a coast a road already serves. The market junction degree was not extended with lanes (it would add markets at lane ports). LOGISTICS.md § 4b states the rules. COLD REVIEW (2026-09-26): the walk was eight-way while every traversal reader is four-way, so a diagonal lane had no two laned tiles side by side and realised about x0.75 (a leg (10,10) -> (20,20): 37.5 against 50 unlaned), not x0.50. The walk is being made four-way in the sea lane, and LOGISTICS.md § 4b says so; after it, part (2)'s 1.25 a tile holds on every bearing. ALSO FOUND: a seat's port is picked north-then-west, never toward its partner, so a seat on an isthmus can send its lane through the wrong ocean (option E); B alone does not fix it.",
    "why_it_matters": "Your vision is lanes as the routes of inter-continental trade; (1) drops a third of them and (2) decides whether the sea ever beats the road.",
    "options": [
     "A: keep all as built",
     "B: a realm's port is its nearest coastal region's seat (lays the lost 30%)",
     "C: B, and a deeper lane discount so a lane can beat a coastal road (sea was the faster medium: ~130 km/day against ~25)",
+    "E: a seat's port is its sea tile nearest its partner's (combines with B or C)",
     "D: other"
    ],
-   "recommendation": "B now; C read against the haulage baseline before it is set.",
+   "recommendation": "B and E now; C read against the haulage baseline before it is set.",
    "files": [
     "src/world/road_generation.cpp",
     "src/world/logistics.cpp",
@@ -1308,6 +1309,29 @@
     "src/world/history_sim.cpp",
     "docs/generation/CIVILISATION.md",
     "tools/verify/centre_census.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-957",
+   "title": "CALL: what the carve counts as a competitor on a budget world (planned firms, specialists, or both), and at what scale",
+   "raised": "2026-09-26",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1086 (the carve counts the budget's planned firms), merged 15da1bd2, 2026-09-26",
+   "what": "You ruled the carve reads the budget's planned firms (MARKETS.md). As built, it counts each centre's specialist as well as its whole firms, since both are corporations the budget buys, so the doc and code disagree. The scale changed too: the carve used to count at most 8 laid corporations a world; it now counts 147-313 planned charters (specialists alone would be 22-88), under the same gain (0.15). On the spaced world (after BL-1132) this moves markets 5,784 -> 5,800 (+0.3%, every seed within 3%); before the spacing, the same change swung seeds +62% (seed 28) to -35% (seed 40). The winner keeps its candidate on 13 of 16 seeds. COLD REVIEW (2026-09-26): the plan also counts firms above the walk's ceiling (120 a body, spent richest first), so on a world planning more than 120 on a body the carve counts firms never chartered, and inflates exactly the poorer nations the walk starves. The lane is making the plan honour the ceiling and will report planned against chartered per nation; read that before ruling.",
+   "why_it_matters": "The market folds (BL-1125) are calibrated next on this carve; its input should be settled first. The small move now may be luck of the spaced world, given the swings before it.",
+   "options": [
+    "A: planned firms only, as the doc says; the gain unchanged",
+    "B: firms and specialists, as built; the doc widened to say so",
+    "C: specialists only (22-88 a world, nearest the old scale)",
+    "D: re-tune the gain for the new scale (measured, never to a count)"
+   ],
+   "recommendation": "A: the doc as ruled, gain unchanged until the folds are calibrated; D only if the folds' reading shows the count dominating.",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "src/world/hard_coded_world.cpp",
+    "docs/economy/MARKETS.md"
    ],
    "resolution": null
   }
