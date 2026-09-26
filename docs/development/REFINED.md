@@ -261,7 +261,12 @@ slip to sprint 49 from the END of a chain, never the middle.
   currents) -> BL-1140 (sea lanes from trade) -> BL-1098 (the lane tier stamped).
   BL-1120 stage 1 MERGED 2026-09-26 (b80a5b5d): the field, weight 500, wet crossings priced;
   lanes barely move because tribute writes ~90% of uses -- currents bite through trade (BL-1140,
-  running) and the stamp's walker (BL-1098). realm_identity's ratchet expect failed after
+  running) and the stamp's walker (BL-1098). BL-1142 (far pairs across water, cargo against the
+  current) and the sea review fixes (a four-way lane walk) BUILT on the lane branch, NOT MERGED:
+  cross-water pairs bound 53 -> 538, trade lanes 27 -> 297; its cold review found the ladder
+  stale after the landmass change and a seat move that breaks a bound pair -- fix round running
+  (NR-959 waits on its ladder). THEN BL-1147 (naval points carry over; Ben 2026-09-26: the
+  navy carries, superseding "starts at zero") in the same lane. realm_identity's ratchet expect failed after
   BL-1130 moved the history -> the UI lane is finding whether script or ratchet.
 - **UI (`history_lapse.*`, text in `startup_screens.cpp`):** U3 (the bowed arc only), BL-1134
   (roads carried across rounds), BL-1135 (the Culture round worded as the record).
