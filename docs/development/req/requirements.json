@@ -7111,7 +7111,7 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice on main",
       "headless: history_sim_harness on main (only R3a2/R3a3, pre-existing)",
@@ -7119,7 +7119,7 @@
      ],
      "requirement": "The merged change is deterministic run to run and moves no gate beyond the known pre-existing failures.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Main at 89d3bb4b, 2026-09-26: world_determinism ALL PASS twice, seedA/on C811B1C4BD1C44F1 both runs (seedA/off 6A3141DE4AE18B4D unchanged); save_roundtrip OK; province_partition_harness only D A1 (pre-existing); history_sim_harness only R3a2/R3a3 (pre-existing); centre_census OK, pooled centres 42,251 (18.0% of land), road tiles 86,631, markets 5,784."
     },
     {
      "id": "R4",
@@ -7128,6 +7128,16 @@
       "review: code-reviewer agent (cold, author != reviewer)"
      ],
      "requirement": "A cold review of the merged change, fix round included, before the item closes.",
+     "notes": "Cold review 2026-09-26: claims 2, 3, 5 hold; claim 1 failed (scheduled foundings bypass the spacing) and claim 4 failed (the spacing is a per-params field and exploration_sim_harness ran 1). Fix round sent to the spacing lane: pending anchors reserved (NR-956), a too-close pair count in the census, the cohesion gate hoisted, the cost measured, comments. Re-gate after it.",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: centre_census too-close pair count on the 16 seeds"
+     ],
+     "requirement": "No two region seats stand closer than the spacing where either was founded by the sim; the count reads 0.",
      "notes": "",
      "result_metric": ""
     }
