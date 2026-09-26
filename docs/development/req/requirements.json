@@ -7319,7 +7319,7 @@
      ],
      "requirement": "The legacy arc and the four stop paths are byte-identical; only the full build moves.",
      "notes": "",
-     "result_metric": "Lane: legacy digests identical, the migration/ancient/exploration/industrialisation stops identical, cursor equivalence passes (seeds 0, 28). Main re-gate running."
+     "result_metric": "Lane: legacy digests identical, the migration/ancient/exploration/industrialisation stops identical, cursor equivalence passes (seeds 0, 28). Main re-gate running. Main 15da1bd2: world_determinism ALL PASS twice (seedA/on 7F94AFDA0A85E26E, seedB/on 85E60658180461EC, seedA/off 6A3141DE4AE18B4D); legacy digests identical to the lane's (seed 0 236E66CB/820A7B33/C3701FFD/92D9D0D9); cursor equivalence ALL PASS; landscape_search_harness PASS incl. R6 budget-world threads; save_roundtrip OK; history_sim_harness R3a2/R3a3 plus R7 (the runtime budget, 5,486 ms under load against 825 ms; the change does not touch the history)."
     },
     {
      "id": "R3",
@@ -7328,7 +7328,7 @@
       "review: code-reviewer agent (cold, author != reviewer)"
      ],
      "requirement": "A cold review of the merged change, fix round included.",
-     "notes": "",
+     "notes": "Cold review 2026-09-26: one budget, the same nation resolution, deterministic. Findings: probes that skip the spend now see no corporations (spawn_solvency red on budget seeds); the plan ignores the walk's 120-firm body ceiling; the budget-world test written three times; L1/L2 can pass with no budget world. Fix round sent to the search lane with R4 (the loading screen's list).",
      "result_metric": ""
     },
     {
