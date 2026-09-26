@@ -7352,6 +7352,107 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "centres-deepen",
+   "title": "BL-1141 - A region deepens into one centre whose scale is the rung its heads reach; stranded points go to the realm's nearest centre",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1141 - sprint 48 (Ben, the density-and-trade form 2026-09-26)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: centre_census on the 16 seeds (the cap, one centre a region)"
+     ],
+     "requirement": "A region stands exactly one centre once its urban heads reach a village's worth, none below and none where its cell has no standable ground; its scale is the rung its heads crossed.",
+     "notes": "",
+     "result_metric": "Lane e82feae5 on the spaced main: centres 42,251 -> 22,521 pooled; land under centres 18.0% -> 9.6%; scales 37,755/3,487/795/178/36 -> 15,624/6,749/148/0/0; the history identical on all 16 seeds; stockpile no_carved_centre 0 on every seed."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice on main",
+      "headless: history_sim_harness, province_partition_harness, save_roundtrip on main"
+     ],
+     "requirement": "Deterministic run to run; no gate moves beyond the known failures.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review, including the two rewritten history_sim_harness rows (BL872a2, BL872a4) and the conservation of stranded points.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "industrial-urbanisation",
+   "title": "BL-1137 - Villages empty into the towns that industrialise, and a centre whose heads fall below a village's worth is abandoned",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1137 - sprint 48 (Ben at the live app 2026-09-25: more migration in the Industrialisation span; rebuilt on the deepen rule 2026-09-26)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: centre_census old -> new",
+      "headless: industrialisation_sim_harness"
+     ],
+     "requirement": "The stream runs at the demography's own growth rate and centres follow heads both ways; centres per seed recorded against the ~500 aim.",
+     "notes": "",
+     "result_metric": "Lane fef61886: centres 22,521 -> 21,860 (600-1,879 a seed, 1.2x-3.8x the aim); regions' own centres 276-918 a seed; anchors and coverage about half of every world's centres (NR-954); population 6.08B -> 10.92B pooled; urban share ~15% -> 70-72%; points median 57M -> 131M, correlation with urban heads 0.598 -> 0.866; markets 6,826 -> 7,324."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice on main",
+      "headless: history_sim_harness (R7 the runtime budget)"
+     ],
+     "requirement": "Deterministic run to run; the Industrialisation span stays inside its runtime budget.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review: whether the population rise is the stream's consequence or a double count, and whether points have become headcount by another name (INDUSTRIALISATION.md § 1).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "decision: Ben, on the population, urban share and points readings"
+     ],
+     "requirement": "Ben reads the stream's consequences before the re-bless names it.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
