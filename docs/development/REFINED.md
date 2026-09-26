@@ -244,6 +244,12 @@ slip to sprint 49 from the END of a chain, never the middle.
   main before measuring] -> BL-1125 (markets: twins, gravity, conquest,
   calibrated on the thinned world) -> BL-1138 (roads pull to markets) -> NR-944's re-read ->
   BL-1107 (culture ground profile) -> BL-1139 (centres abandoned in play).
+  BL-1141 (centres deepen) MERGED b591d1e9 (group `centres-deepen`): centres 42,251 -> 22,521
+  pooled, land under centres 18.0% -> 9.6%, the history identical. BL-1137 (urbanisation) merged
+  with it and REVERTED on main 8cbdbc9d after its cold review (the stream created carrying
+  capacity: population 6.08B -> 10.92B; a sack deleted ~40% of a city silently). Rebuild in the
+  centres lane under NR-958 (a migrant carries its food; a sack never lowers a ceiling), with
+  BL-1141's fixes. BL-1125 (the market folds) waits for it: it calibrates on the thinned world.
   From the 2026-09-26 cold reviews: BL-1146 (the two-firm cap on the grown provinces) is being
   MEASURED now (before BL-1133 -> main; re-read after BL-1141), then Ben's call on the cap;
   BL-1145 (readers of a province's lowest-id tile take its centre's; the census gate) runs after

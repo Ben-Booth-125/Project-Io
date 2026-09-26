@@ -7393,7 +7393,7 @@
       "review: code-reviewer agent (cold, author != reviewer)"
      ],
      "requirement": "A cold review, including the two rewritten history_sim_harness rows (BL872a2, BL872a4) and the conservation of stranded points.",
-     "notes": "",
+     "notes": "Cold review 2026-09-26: the deepen rule sound and deterministic; centre_region_bind R2 fails by construction (selects >= 2 centres a region); history_sim_harness a2 no longer tells supplied from cut-off ground (relabel); the census one-centre check is true by construction. The two rewritten BL872 rows were not weakened to pass. Fixes in the centres lane.",
      "result_metric": ""
     }
    ]
@@ -7439,7 +7439,7 @@
       "review: code-reviewer agent (cold)"
      ],
      "requirement": "A cold review: whether the population rise is the stream's consequence or a double count, and whether points have become headcount by another name (INDUSTRIALISATION.md § 1).",
-     "notes": "",
+     "notes": "Cold review 2026-09-26: DO NOT MERGE as built. The stream adds each migrant to the destination ceiling (capacity created: the population rise); a sack clamps the ceiling and deletes ~40% of a sacked city silently; a razing above 320,000 heads is not recorded; the new rules asserted only in prose; points left behind never retried. It had been merged (b591d1e9) before the review returned; reverted on main (8cbdbc9d). Rebuild in the centres lane under NR-958.",
      "result_metric": ""
     },
     {

@@ -1334,6 +1334,53 @@
     "docs/economy/MARKETS.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-958",
+   "title": "DECISION TAKEN: a migrant carries its food with it, and a sack never lowers a region's ceiling (BL-1137 reverted and rebuilt)",
+   "raised": "2026-09-26",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1137 (industrial urbanisation) cold review, 2026-09-26; merged b591d1e9, reverted 8cbdbc9d",
+   "what": "The first build of the urbanisation stream raised each destination's carrying capacity by every migrant it took while the source kept its own, so every move created capacity and the emptied countryside regrew by births: population 6.08B -> 10.92B pooled, urban share ~15% -> 70-72%, and centres fell only 3% (carved 7%). A sack then cut a city's industrial heads, the ceiling fell with them, and the next year deleted about 40% of the city with no record. Both break the docs: the displacement row (the count is conserved), Beat 2 (the countryside empties, far fewer centres) and BL-835 (war does not consume people). I reverted it on main and took two readings for the rebuild: (1) a migrant carries its food with it -- whatever ceiling a destination gains, its source loses, so a move conserves the world's carrying capacity and an emptied village cannot regrow; (2) a sack never lowers a ceiling -- a sacked city's people scatter into its countryside. Also: a razing is counted in heads lost, uncapped (a sacked 10M city recorded none).",
+   "why_it_matters": "The alternative reading is that industry raises what the land can feed (a real historical effect), which would be a new mechanism with no doc and a population near double; the conserving reading is what makes the stream thin the map to your ~500 aim.",
+   "options": [
+    "A: keep as taken (the move conserves capacity; a sack moves no one out)",
+    "B: industry raises carrying capacity, designed and bounded in INDUSTRIALISATION.md as its own mechanism",
+    "C: other"
+   ],
+   "recommendation": "A: it is the doc as written; B only as its own designed beat.",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/history_sim.cpp",
+    "docs/generation/INDUSTRIALISATION.md",
+    "docs/economy/POPULATION.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-959",
+   "title": "CALL: far pairs across water bind almost wholesale (the sea far-penalty set to 0), and a leg against the current loses cargo at weight 500",
+   "raised": "2026-09-26",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1142 (far pairs bind across water; cargo against the current), branch 1a00072e, 2026-09-26; not merged until its cold review returns",
+   "what": "Found first: the far-pair force NR-888 ruled on was never built, so far realms across water never met (contact came only from campaigns within nine tiles) and none ever cleared the 700 far penalty. Built: realms on different landmasses meet when a trade across water is open between them (a good one holds and the other wants, a navy and two ports to carry it), and a far pair across water reads its own penalty. The penalty ladder: 0 far pairs bound at 700 and 500, 9 at 450, 166 at 400, then 489 / 484 / 479 at 350 / 300 / 0. The lane SET 0, the plateau: between 450 and 350 the dial would choose the count; below 350 the pair's own aggression, grudges and trade decide. Result at 1960, 16 seeds: cross-water pairs bound 53 -> 538 (485 far), trade-written lanes 27 -> 297, Industrialisation battles -4%; six seeds with no water between realms unchanged. Cargo loss: linear, no knee (0.9 / 1.5 / 2.9% of volume across water at 250 / 500 / 1000); SET 500, the current's own weight, so a leg against a full current loses half its cargo -- a choice, not a measurement.",
+   "why_it_matters": "A far pair across water now binds more easily than a far pair on land (still 700). The sea was the faster medium, which supports it, but 0 removes distance from the sea treaty entirely.",
+   "options": [
+    "A: keep both as set (sea penalty 0 at the plateau; loss 500)",
+    "B: a sea penalty inside the plateau but above 0 (e.g. 300), so distance still reads across water",
+    "C: tie the sea penalty to the land one by the speed ratio of the media",
+    "D: other"
+   ],
+   "recommendation": "B at 300: inside the plateau (484 bound), so the dial still does not choose the count, and distance is not erased; the loss at 500 as set.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "docs/generation/INDUSTRIALISATION.md",
+    "docs/generation/EXPLORATION.md"
+   ],
+   "resolution": null
   }
  ]
 }
