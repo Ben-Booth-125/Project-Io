@@ -7517,6 +7517,60 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "naval-points-carry-over",
+   "title": "BL-1147 - Empires earn naval points at sea, and carry them into the Exploration age as a starting fleet",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1147 - sprint 48 (Ben, the naval carry-over form 2026-09-26)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: ocean_currents_harness N1-N8 on the 16 seeds"
+     ],
+     "requirement": "A polity's ledger counts the three deeds in the Empires round only and opens its fleet from its own points; a lost coast keeps its sailors, a dead polity carries nothing.",
+     "notes": "",
+     "result_metric": "Lane 7fb62ee7: 1,665 living polities at 1200, 4.84M province-years / 7,819 crossings / 230 techs, weights 1 / 600 / 20,000 (about a third each)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism twice on main"
+     ],
+     "requirement": "At a conversion of 0 the world is byte-identical.",
+     "notes": "",
+     "result_metric": "Main 5f734c76: DE91F01AAAD0473E both runs, equal to the sea-trade commit alone; history_sim_harness R3a2/R3a3, exploration_sim_harness R3b/R3d.1 only; ocean_currents, sea_lane_stamp, world_cursor_equivalence ALL PASS."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review, fix round included.",
+     "notes": "",
+     "result_metric": "Review 2026-09-26: a wet campaign corridor reads as a road in the by_sea mark; the coastal deed counts inland daughters (inherited port_q); the census re-derives the mark; a second conversion is guarded only by params; rows by construction. Fix round in the sea lane."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "decision: NR-961"
+     ],
+     "requirement": "Ben rules whether a fleet gates crossings and sets the rung.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
