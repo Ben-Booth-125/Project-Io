@@ -272,11 +272,11 @@ void stamp_history_roads(world& w, entity_id body,
 // THE PATH IS A WATER-ONLY WALK, never a straight raster: a straight line between two
 // shores crosses land on any concave coast, and the road stamp's strait rule refuses
 // open ocean outright. The walker is a Dijkstra over the body's SEA tiles (`is_sea`:
-// ocean and coast; a lake is not the ocean), eight-connected with columns wrapping,
-// that never cuts a land corner (a diagonal step needs one of its two orthogonal
-// neighbours to be sea -- the same eight-connectivity that makes corner-touching ground
-// one landmass). Each step is PRICED WITH THE CURRENT (EXPLORATION.md § Currents,
-// "Where currents bite"): its length (1000 straight, 1414 diagonal) times the leg cost
+// ocean and coast; a lake is not the ocean) on FOUR CARDINAL STEPS with columns
+// wrapping -- the grid every traversal reader walks (logistics.cpp, LOGISTICS.md § 2),
+// so every step of a lane is a step a traveller can take and a lane is ridden at its
+// full discount on a diagonal as on a straight. Each step is PRICED WITH THE CURRENT
+// (EXPLORATION.md § Currents, "Where currents bite"): 1000 times the leg cost
 // `ocean_current_leg_cost_q` of the step's direction against the entered tile's ocean
 // region current, at the spans' own weight -- so a lane bends along the water that
 // carries it rather than hugging the straight line.

@@ -141,16 +141,16 @@ inline bool ocean_current_weight_valid(int weight_q)
 /// FNV-1a over the field's regions, for determinism rows and reports.
 uint64_t ocean_current_digest(const ocean_current_field& f);
 
-/// WHICH LANDMASS EACH TILE STANDS ON (BL-1140): the 8-connected components
+/// WHICH LANDMASS EACH TILE STANDS ON (BL-1140): the 4-connected components
 /// of everything that is NOT SEA (`is_sea`: ocean and coast), columns
 /// wrapping, rows not, numbered in raster order of their first tile; -1 on
-/// sea. A lake is part of the land it lies in, and ground touching at a
-/// corner is one landmass, because movement is eight-connected: two realms
-/// are on different landmasses exactly when the SEA lies between them, which
-/// is what a sea lane crosses. (`exploration_sweep`'s outward-want census
-/// reads a stricter mask -- 4-connected, lakes as water -- so a lake or a
-/// corner can split its landmasses where this does not.) Pure: the substrate
-/// raster alone decides it.
+/// sea. Four-way because every traversal reader walks the four cardinal
+/// steps (logistics.cpp): two realms are on one landmass exactly when a
+/// traveller can walk between them without crossing the sea, so ground that
+/// touches only at a corner is two landmasses. A lake is part of the land it
+/// lies in. (`exploration_sweep`'s outward-want census also reads 4-connected
+/// ground but treats lakes as water, so a lake can split its landmasses where
+/// this does not.) Pure: the substrate raster alone decides it.
 std::vector<int32_t> landmass_labels(const std::vector<terrain_substrate>& substrate, int gw, int gh);
 
 /// The landmass a place stands on, off @p labels (`landmass_labels`). A

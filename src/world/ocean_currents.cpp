@@ -241,18 +241,19 @@ std::vector<int32_t> landmass_labels(const std::vector<terrain_substrate>& subst
             const int idx = stack.back();
             stack.pop_back();
             const int c = idx % gw, r = idx / gw;
-            for (int dr = -1; dr <= 1; ++dr)
-                for (int dc = -1; dc <= 1; ++dc)
-                {
-                    if (dr == 0 && dc == 0) continue;
-                    const int rr = r + dr;
-                    if (rr < 0 || rr >= gh) continue;
-                    const int ni = rr * gw + ((c + dc + gw) % gw);
-                    if (mass[static_cast<std::size_t>(ni)] >= 0 || is_sea(substrate[static_cast<std::size_t>(ni)]))
-                        continue;
-                    mass[static_cast<std::size_t>(ni)] = next;
-                    stack.push_back(ni);
-                }
+            // Four cardinal neighbours, columns wrapping: the grid every traversal
+            // reader walks (logistics.cpp), so two landmasses are two exactly when
+            // no four-way walk over ground joins them.
+            const int nb[4][2] = { {(c + 1) % gw, r}, {(c + gw - 1) % gw, r}, {c, r + 1}, {c, r - 1} };
+            for (const auto& n : nb)
+            {
+                if (n[1] < 0 || n[1] >= gh) continue;
+                const int ni = n[1] * gw + n[0];
+                if (mass[static_cast<std::size_t>(ni)] >= 0 || is_sea(substrate[static_cast<std::size_t>(ni)]))
+                    continue;
+                mass[static_cast<std::size_t>(ni)] = next;
+                stack.push_back(ni);
+            }
         }
         ++next;
     }

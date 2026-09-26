@@ -310,8 +310,9 @@ void synthetic_rows()
 
     // C6 (BL-1140): landmasses are what the SEA separates. The two-continent
     // body has two; a lake inside one continent does not split it, ground
-    // touching at a corner is one landmass, and a seat on the shoreline reads
-    // the landmass it borders.
+    // touching only at a corner is TWO landmasses (every traveller walks the
+    // four cardinal steps), and a seat on the shoreline reads the landmass it
+    // borders.
     {
         std::vector<terrain_substrate> body = two;
         body[static_cast<std::size_t>(30) * ww + 3] = terrain_substrate::lake;   // a lake in the west
@@ -329,7 +330,8 @@ void synthetic_rows()
         corner[static_cast<std::size_t>(4) * 10 + 4] = terrain_substrate::sedimentary;
         corner[static_cast<std::size_t>(5) * 10 + 5] = terrain_substrate::sedimentary;
         const std::vector<int32_t> mc = landmass_labels(corner, 10, 10);
-        check(mc[44] == 0 && mc[55] == 0, "C6  ground touching at a corner is one landmass (movement is eight-connected)");
+        check(mc[44] >= 0 && mc[55] >= 0 && mc[44] != mc[55],
+              "C6  ground touching only at a corner is two landmasses (traversal is four-cardinal)");
     }
 
     // C7 (BL-1142): a leg run against its current delivers less. Basin A again:
@@ -757,6 +759,46 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
           "W5  a span priced with its currents is deterministic: same seed, same fixture, twice");
     check(weighted_a.sea_current_field_digest == ocean_current_digest(f),
           "W5  the sim priced its legs with the very field the body builds");
+    // The price MOVES the sim: the history's sea-leg record at the weight is
+    // not the record in still water (a price the sim ignored would pass every
+    // row above).
+    check(!same_legs(weighted_a.sea_legs, still.sea_legs)
+          || weighted_a.sea_legs_noted_campaign != still.sea_legs_noted_campaign,
+          "W5  the price moves the sim: the weighted run's sea-leg record differs from still water's");
+
+    // DIRECTION AT THE CALL SITE, not only the primitive: every wet campaign is
+    // priced hub -> target. A traced re-run at the weight: the alignment the sim
+    // summed at launch must equal the alignment read off its own battle traces,
+    // staging hub to target region, launch by launch -- a call site that priced
+    // target -> hub would read the negation.
+    {
+        history_sim_params ep = exploration_rerun_params(fx, wq, /*trace=*/true);
+        settlement_state ss = fx.pre_exploration_settlement;
+        creed_state      cs = fx.pre_exploration_creeds;
+        const history_sim_state traced = run_history_sim(ss, &cs, fx.terrain.view(), fx.gw, fx.gh, ep,
+                                                         fx.exploration_seed, nullptr, fx.works, nullptr);
+        int64_t sum = 0, with = 0, against = 0, wet = 0;
+        for (const battle_trace& bt : traced.battle_traces)
+        {
+            if (bt.exec_dry || bt.exec_hub < 0) continue;
+            if (static_cast<std::size_t>(bt.exec_hub) >= ss.regions.size() || bt.region >= ss.regions.size()) continue;
+            const region& h = ss.regions[static_cast<std::size_t>(bt.exec_hub)];
+            const region& t = ss.regions[bt.region];
+            const int a = ocean_current_alignment_q(f, h.col, h.row, t.col, t.row);
+            sum += a; ++wet;
+            if (a > 0) ++with; else if (a < 0) ++against;
+        }
+        std::printf("      wet campaigns traced %lld: alignment summed off the traces (hub -> target) %lld,"
+                    " by the sim at launch %lld; with/against %lld/%lld vs %lld/%lld\n",
+                    static_cast<long long>(wet), static_cast<long long>(sum),
+                    static_cast<long long>(traced.sea_campaign_alignment_sum_q),
+                    static_cast<long long>(with), static_cast<long long>(against),
+                    static_cast<long long>(traced.sea_campaigns_with_current),
+                    static_cast<long long>(traced.sea_campaigns_against_current));
+        check(wet > 0 && sum == traced.sea_campaign_alignment_sum_q
+              && with == traced.sea_campaigns_with_current && against == traced.sea_campaigns_against_current,
+              "W5  the campaign call site prices hub -> target: the sim's launch reading equals the traces'");
+    }
 
     rerun(1000, 1, rejected);
     check(rejected.sea_current_params_rejected && rejected.sea_current_field_digest == 0

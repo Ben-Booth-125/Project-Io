@@ -90,8 +90,8 @@ int cheb(int a, int b, int gw)
     return std::max(dc, std::abs(ar - br));
 }
 
-/// True iff consecutive tiles are eight-neighbours, all are sea, and no diagonal
-/// step cuts a land corner.
+/// True iff consecutive tiles are four-cardinal neighbours (columns wrapping)
+/// and every tile is sea -- the grid the pathfinder walks (logistics.cpp).
 bool walk_is_honest(const std::vector<int>& path, const std::vector<uint8_t>& sea, int gw)
 {
     for (std::size_t i = 0; i < path.size(); ++i)
@@ -101,11 +101,7 @@ bool walk_is_honest(const std::vector<int>& path, const std::vector<uint8_t>& se
         const int a = path[i - 1], b = path[i];
         if (cheb(a, b, gw) != 1) return false;
         const int ac = a % gw, ar = a / gw, bc = b % gw, br = b / gw;
-        if (ac != bc && ar != br)
-        {
-            const int side_a = ar * gw + bc, side_b = br * gw + ac;
-            if (!sea[static_cast<std::size_t>(side_a)] && !sea[static_cast<std::size_t>(side_b)]) return false;
-        }
+        if (ac != bc && ar != br) return false; // a diagonal step: not on the pathfinder's grid
     }
     return true;
 }
@@ -239,10 +235,77 @@ void synthetic_rows()
                     mean_separation(back, priced, bw));
         check(!priced.empty() && walk_is_honest(priced, bsea, bw) && priced == again,
               "S2  the priced walk is water-only and deterministic");
-        check(sep > 0.5 && al_priced > al_still,
+        // On a four-way grid many still-water walks tie at the Manhattan length,
+        // and the tie-break can land on the very route the current favours (the
+        // outbound here). So the bend is read BOTH ways: the priced walk never
+        // runs with less current than the still-water one, and in at least one
+        // direction the current takes it off the still-water line.
+        const std::vector<int> still_back = sea_lane_walk(bsea, bw, bh, nullptr, 0, b, a);
+        const double sep_back = mean_separation(back, still_back, bw);
+        const double al_still_back = mean_step_alignment(still_back, f, bw), al_back = mean_step_alignment(back, f, bw);
+        std::printf("      basin A, the return east shore -> west shore: still %zu tiles, priced %zu; separation %.2f tiles;"
+                    " mean current along the steps %.0f still, %.0f priced\n",
+                    still_back.size(), back.size(), sep_back, al_still_back, al_back);
+        check(al_priced >= al_still && al_back >= al_still_back && std::max(sep, sep_back) > 0.5
+              && (sep > 0.5 ? al_priced > al_still : al_back > al_still_back),
               "S2  the current bends the walk: it leaves the still-water line for water that runs with it");
         check(!back.empty() && mean_separation(back, priced, bw) > 0.5,
               "S2  a basin circulates: the return walk takes other water than the outbound");
+    }
+
+    // S4: THE REALISED DISCOUNT. A lane stamped between two ports on an
+    // all-ocean body, then the traversal cost between the same ports with the
+    // lane and without: along a laid lane the pathfinder must ride it at the
+    // full x0.50 -- on a straight lane and on a DIAGONAL one. The pathfinder is
+    // four-cardinal (logistics.cpp), so a lane walked eight ways leaves no two
+    // laned tiles side by side on a diagonal and is ridden at about x0.75: this
+    // row is the one that catches it. Still water (weight 0), so the walk is a
+    // shortest path and the laned route is the cheapest there is.
+    {
+        struct fixture_case { const char* name; int ac, ar, bc, br; };
+        const fixture_case cases[2] = { {"straight", 4, 15, 26, 15}, {"diagonal", 10, 10, 20, 20} };
+        for (const fixture_case& fc : cases)
+        {
+            constexpr int fgw = 30, fgh = 30;
+            world fw;
+            const entity_id fbody = fw.create_entity();
+            body_component bc{};
+            bc.grid_width = fgw;
+            bc.grid_height = fgh;
+            fw.bodies[fbody] = bc;
+            for (int r = 0; r < fgh; ++r)
+                for (int c = 0; c < fgw; ++c)
+                {
+                    const entity_id id = fw.create_entity();
+                    tile_component t{};
+                    t.body = fbody; t.grid_x = c; t.grid_y = r;
+                    t.substrate = terrain_substrate::ocean;
+                    t.landform = terrain_landform::plains;
+                    t.habitability = 0.0f;
+                    fw.tiles.emplace(id, t);
+                }
+            const std::vector<entity_id> fgrid = body_tile_grid(fw, fbody);
+            const std::vector<history_road_node> nodes = {
+                history_road_node{fc.ac, fc.ar, 0}, history_road_node{fc.bc, fc.br, 0} };
+            const std::vector<sea_leg> legs = { sea_leg{0, 1, 10} };
+            sea_lane_stats fst;
+            stamp_sea_lanes(fw, fbody, nodes, legs, 4, /*weight=*/0, 1, &fst);
+            const entity_id ta = fgrid[static_cast<std::size_t>(fc.ar) * fgw + fc.ac];
+            const entity_id tb = fgrid[static_cast<std::size_t>(fc.br) * fgw + fc.bc];
+            invalidate_logistics_caches(fw);
+            const float with_lane = intra_body_path(fw, fbody, ta, tb).cost;
+            for (auto& kv : fw.tiles) kv.second.lane_level = 0;
+            invalidate_logistics_caches(fw);
+            const float without = intra_body_path(fw, fbody, ta, tb).cost;
+            const double ratio = without > 0.0f ? static_cast<double>(with_lane) / without : 0.0;
+            std::printf("      %s lane (%d,%d)->(%d,%d): %d lane tiles; path cost %.2f with the lane, %.2f without,"
+                        " ratio %.3f\n", fc.name, fc.ac, fc.ar, fc.bc, fc.br, fst.lane_tiles,
+                        with_lane, without, ratio);
+            check(fst.laid == 1 && std::fabs(ratio - 0.5) <= 0.01,
+                  fc.name[0] == 's'
+                      ? "S4  a straight lane is ridden at the full x0.50 of the unlaned water"
+                      : "S4  a DIAGONAL lane is ridden at the full x0.50 too (the walk shares the pathfinder's grid)");
+        }
     }
 
     // S3: ports.
@@ -389,6 +452,19 @@ void world_rows(shipped_inputs& shipped, uint32_t seed)
     // stamps none; one that laid any carries lane tiles on its 1960 map.
     check((lane_tiles > 0) == (st.laid > 0),
           "W1  lanes are stamped on the 1960 world exactly where the record earned one with ports at both ends");
+    // The seeds this harness runs (32 and 46 by default) are chosen because they
+    // earn lanes; a run that lays none measured nothing, so that is a failure.
+    check(st.laid > 0, "W1  the stamp lays at least one lane on this seed");
+    // `no_port` and `unreachable` are PRINTED, NOT BOUNDED, and the reason is
+    // what each measures. `no_port` is where a seat stands (an inland capital
+    // more than kSeaLanePortRadius from the sea) -- a fact of the settlement map
+    // the stamp does not choose, and the port rule itself is with Ben (NR-955).
+    // `unreachable` is the sea's topology (two ports on water no path joins).
+    // Neither has a correct bound this stamp could promise, so the harness
+    // binds the one thing that must hold -- every earned lane is laid or
+    // accounted for, never dropped silently -- and prints the split.
+    check(st.laid + st.no_port + st.unreachable == st.earned,
+          "W1  every earned lane is laid, or counted as having no port or no water between its ports");
     bool honest = true;
     for (const sea_lane_trace::lane& ln : tr.lanes) if (!walk_is_honest(ln.path, L.sea, L.gw)) honest = false;
     check(honest && st.laid == static_cast<int>(tr.lanes.size()), "W2  every laid lane is a water-only walk");

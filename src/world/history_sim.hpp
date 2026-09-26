@@ -1304,16 +1304,17 @@ struct history_sim_params
     /// builds once from the terrain it runs on (`build_ocean_currents`:
     /// latitude band, the body's rotation sense below, the land mask).
     ///
-    /// WHAT IT PRICES, AND IN WHICH CURRENCY. Every place a sea leg is costed:
+    /// WHAT IT PRICES, AND IN WHICH CURRENCY. The legs a current can decide:
     /// a wet campaign's last hop onto its target, which is the step
     /// `campaign_supply` adds to the hub's reach (so the scorer and execute
-    /// ask the identical question, the file's standing thesis), and the two
-    /// distance gates a colonial link is read against -- subjection's reach
-    /// from the arriving seat and a subject's secession distance from its
-    /// overlord's -- each read as the Chebyshev distance scaled by the leg's
-    /// cost. A leg is "wet" by the record's own test (`line_crosses_sea`),
-    /// and a leg with no sea along its line reads no current and pays
-    /// still-water price.
+    /// ask the identical question, the file's standing thesis), and a trade's
+    /// sea line (`trade_context::currents`, BL-1140). A leg is "wet" by the
+    /// record's own test (`line_crosses_sea`), and a leg with no sea along
+    /// its line reads no current and pays still-water price. The colonial
+    /// distance gates (subjection's reach, a subject's secession distance)
+    /// read the RAW distance: tribute and its binding are standing traffic a
+    /// current cannot decide (EXPLORATION.md sec Currents, "Where currents
+    /// bite").
     ///
     /// Zero by default -- still water, no field built, every fixture
     /// unchanged. Domain [0, 999]: outside it the run prices nothing and says

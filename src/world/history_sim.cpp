@@ -1663,11 +1663,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (!currents_on) return 1000;
         return ocean_current_leg_cost_q(params.sea_current_weight_q, sea_leg_alignment_q(from, to));
     };
-    // A DISTANCE GATE READ ACROSS A LEG, priced with the leg's current: the
-    // Chebyshev distance scaled by the leg's cost. Asked only where the price
-    // could decide -- a raw distance that clears the gate even at the dearest
-    // cost the weight allows (or fails it even at the cheapest) is answered
-    // without sampling the line, which is exact, not an approximation.
     // BL-1140 -- WHICH LANDMASS EACH TILE STANDS ON, once per span, for the
     // fourth writer's test (trade between realms on different landmasses).
     // Only the spans that keep the lane record need it.
@@ -1682,14 +1677,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const region& r = ss.regions[static_cast<std::size_t>(ri)];
         if (r.col < 0 || r.row < 0 || r.col >= gw || r.row >= gh) return -1;
         return landmass_at(landmass, gw, gh, r.col, r.row);
-    };
-    const auto sea_leg_distance_within = [&](int from, int to, int raw_dist, int gate) -> bool {
-        if (!currents_on) return raw_dist <= gate;
-        const int64_t w = params.sea_current_weight_q;
-        if (static_cast<int64_t>(raw_dist) * (1000 + w) <= static_cast<int64_t>(gate) * 1000) return true;
-        if (static_cast<int64_t>(raw_dist) * (1000 - w) >  static_cast<int64_t>(gate) * 1000) return false;
-        return static_cast<int64_t>(raw_dist) * sea_leg_cost_q(from, to)
-            <= static_cast<int64_t>(gate) * 1000;
     };
 
     // BL-914: seed the tap's geometry mirror with the regions this call
@@ -4799,11 +4786,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int dist = region_distance(
                             ss.regions[static_cast<std::size_t>(arriving.capital)],
                             ss.regions[static_cast<std::size_t>(native.capital)], gw);
-                        // BL-1120: the reach is read across the leg the
-                        // purchase party or the binding would sail, arriving
-                        // seat to native seat, priced with its current.
-                        if (!sea_leg_distance_within(arriving.capital, native.capital,
-                                                     dist, params.subjection_reach_q)) continue;
+                        // Raw distance, never priced with the current: tribute
+                        // and its binding are standing traffic a current cannot
+                        // decide (EXPLORATION.md sec Currents, "Where currents
+                        // bite"; the sea-chain review).
+                        if (dist > params.subjection_reach_q) continue;
 
                         const int64_t arriving_treasury =
                             ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
@@ -4933,14 +4920,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     dist = region_distance(ss.regions[static_cast<std::size_t>(subj.capital)],
                                            ss.regions[static_cast<std::size_t>(lord.capital)], gw);
 
-                // BL-1120: the distance is read across the overlord's leg to
-                // its subject, lord seat to subject seat, priced with its
-                // current (INT32_MAX -- no seat -- is read raw, as before).
+                // Raw distance, never priced with the current (standing
+                // traffic; the sea-chain review).
                 const bool outrun = !reachable
-                                  || (dist == INT32_MAX
-                                          ? dist > params.subject_secession_distance_q
-                                          : !sea_leg_distance_within(lord.capital, subj.capital, dist,
-                                                                     params.subject_secession_distance_q))
+                                  || dist > params.subject_secession_distance_q
                                   || subj.cohesion_q <= params.subject_secession_cohesion_q;
                 if (outrun)
                 {
