@@ -260,7 +260,13 @@ slip to sprint 49 from the END of a chain, never the middle.
 - **UI (`history_lapse.*`, text in `startup_screens.cpp`):** U3 (the bowed arc only), BL-1134
   (roads carried across rounds), BL-1135 (the Culture round worded as the record).
 - **Search (`landscape_search.*`):** BL-1136's curve -> Ben picks the round count -> BL-1086
-  (search inside generation).
+  (search inside generation). BL-1086 and the BL-1136 review fixes MERGED 2026-09-26
+  (15da1bd2; group `carve-counts-planned-firms`): markets +0.3% on the spaced world, the six-round
+  proof 16/16 with two negative controls, the search bar weight 20000 -> 6000 ms. Open: NR-957
+  (firms, specialists or both), the loading screen's charter list now empty on a budget world
+  (R4, a UI fix after the cold review). THE SETTLE WEIGHT IS STALE: gen_step_costs read settle
+  49.6 s on seed 0 and 10.9 s on seed 28 under load, against ~18 s after BL-1117 -- a quiet
+  re-read is owed with BL-1119 R5 (the 35 s tail) before anything is concluded.
 
 Then the one re-bless, each cause named with its own before/after (split it before any cause
 goes unmeasured).
