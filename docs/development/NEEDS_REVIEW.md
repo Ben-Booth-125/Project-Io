@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*60 entries — 5 open, 55 resolved.*
+*61 entries — 6 open, 55 resolved.*
 
 ---
 
@@ -107,6 +107,22 @@ The review found the three-tile rule bound only Settle. A founding the migration
 > **Recommendation:** A: it honours the rule without changing the migration playback.
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/CIVILISATION.md`, `tools/verify/centre_census.cpp`*
+
+### NR-957 — CALL: what the carve counts as a competitor on a budget world (planned firms, specialists, or both), and at what scale
+*question · raised 2026-09-26 · from BL-1086 (the carve counts the budget's planned firms), merged 15da1bd2, 2026-09-26*
+
+You ruled the carve reads the budget's planned firms (MARKETS.md). As built, it counts each centre's specialist as well as its whole firms, since both are corporations the budget buys, so the doc and code disagree. The scale changed too: the carve used to count at most 8 laid corporations a world; it now counts 147-313 planned charters (specialists alone would be 22-88), under the same gain (0.15). On the spaced world (after BL-1132) this moves markets 5,784 -> 5,800 (+0.3%, every seed within 3%); before the spacing, the same change swung seeds +62% (seed 28) to -35% (seed 40). The winner keeps its candidate on 13 of 16 seeds.
+
+**Why it matters.** The market folds (BL-1125) are calibrated next on this carve; its input should be settled first. The small move now may be luck of the spaced world, given the swings before it.
+
+- A: planned firms only, as the doc says; the gain unchanged
+- B: firms and specialists, as built; the doc widened to say so
+- C: specialists only (22-88 a world, nearest the old scale)
+- D: re-tune the gain for the new scale (measured, never to a count)
+
+> **Recommendation:** A: the doc as ruled, gain unchanged until the folds are calibrated; D only if the folds' reading shows the count dominating.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/hard_coded_world.cpp`, `docs/economy/MARKETS.md`*
 
 ---
 
