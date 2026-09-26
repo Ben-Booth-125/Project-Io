@@ -403,8 +403,10 @@ additive; land tiles are untouched.
 **A lane is a route of the ocean's currents and of trade between continents, not only a coastal
 hop (Ben, 2026-09-25; BL-1140, sea lanes from trade).** A **fourth writer** of a sea-leg use:
 trade between realms whose goods cross water — the span's trade links between realms on different
-landmasses whose goods go to sea, carried by the seller's fleet between the two seats' ports rather
-than by a road where the two realms' ground meets — writes one use per decision round it runs, so a world's lanes follow where its trade
+landmasses whose goods go to sea: the seller's fleet between the two seats' ports carries them
+further than any dry road joining the two realms (a road is a corridor walked over land; one
+walked across a strait is a crossing, not a road), and on a tie the road carries them — writes
+one use per decision round it runs, so a world's lanes follow where its trade
 goes, not only where its tribute flows. And every sea leg is priced with its current (§ Currents
 are a force, not a picture), so a lane bends along the currents the planet generates rather than
 hugging the shortest line between two shores.

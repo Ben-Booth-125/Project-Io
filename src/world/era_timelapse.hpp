@@ -610,6 +610,13 @@ struct history_corridor
     /// promotion holds the live count one short of a walk the record still
     /// counts. So the rung is read HERE, and `uses` stays throughput.
     uint8_t  tier = 0;
+    /// 1 when a walk along the corridor crossed SEA: a wet campaign's hub to
+    /// target, or a line whose anchor-to-anchor straight line crosses sea
+    /// (`line_crosses_sea`, the test a wet campaign is itself told by), read
+    /// when the walk is noted and kept once set. A corridor across a strait is
+    /// a crossing, not a road: it offers no LAND line to trade
+    /// (`build_trade_context`). NOT SERIALISED, same footing as `tier`.
+    uint8_t  wet = 0;
 };
 
 /// ONE SEA LEG THE HISTORY ACTUALLY CROSSED, and how often (BL-1097;

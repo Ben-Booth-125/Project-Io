@@ -10,6 +10,8 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
+#include <limits>
 #include <queue>
 #include <unordered_map>
 
@@ -1314,6 +1316,11 @@ trade_context build_trade_context(const std::vector<region>&           regions,
     // the best line per pair -- the result is a property of the integers.
     for (const history_corridor& c : corridors)
     {
+        // BL-1147 review: A CORRIDOR WALKED ACROSS SEA IS NO ROAD. A wet
+        // campaign or a line over a strait records a corridor as every walk
+        // does, but the goods it could carry go by sea -- so it offers no land
+        // line, and a pair joined only across water trades by sea or not at all.
+        if (c.wet) continue;
         if (static_cast<std::size_t>(c.a) >= regions.size()
          || static_cast<std::size_t>(c.b) >= regions.size()) continue;
         const region& ra = regions[c.a];
@@ -1451,6 +1458,59 @@ static uint64_t coastal_sea_tech_mask()
         return m;
     }();
     return mask;
+}
+
+void update_coast_cells(coast_cells& c, const std::vector<region>& regions,
+                        const std::vector<terrain_substrate>& substrate, int gw, int gh)
+{
+    if (gw <= 0 || gh <= 0
+     || substrate.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return;
+    const std::size_t n = regions.size();
+    if (c.raster_size != substrate.size() || c.measured > n)
+    {
+        c.shore.clear();
+        for (int t = 0; t < gw * gh; ++t)
+        {
+            if (is_water(substrate[static_cast<std::size_t>(t)])) continue;
+            const int col = t % gw, row = t / gw;
+            const int nc[4] = { col, col, (col + gw - 1) % gw, (col + 1) % gw };
+            const int nr[4] = { row - 1, row + 1, row, row };
+            bool shore = false;
+            for (int k = 0; k < 4 && !shore; ++k)
+                if (nr[k] >= 0 && nr[k] < gh
+                 && is_sea(substrate[static_cast<std::size_t>(nr[k]) * static_cast<std::size_t>(gw)
+                                     + static_cast<std::size_t>(nc[k])]))
+                    shore = true;
+            if (shore) c.shore.push_back(t);
+        }
+        c.owner.assign(c.shore.size(), -1);
+        c.dist.assign(c.shore.size(), std::numeric_limits<int32_t>::max());
+        c.count.clear();
+        c.raster_size = substrate.size();
+        c.measured    = 0;
+    }
+    if (c.measured >= n) return;
+    c.count.resize(n, 0);
+    // Adding the regions one at a time in index order with a strict `<` is the
+    // partition's argmin with its lowest-index tie-break.
+    for (std::size_t ri = c.measured; ri < n; ++ri)
+    {
+        const region& p = regions[ri];
+        for (std::size_t li = 0; li < c.shore.size(); ++li)
+        {
+            const int t = c.shore[li];
+            int dc = std::abs(t % gw - p.col);
+            if (dc > gw / 2) dc = gw - dc;
+            const int d = std::max(dc, std::abs(t / gw - p.row));
+            if (d >= c.dist[li]) continue;
+            if (c.owner[li] >= 0) --c.count[static_cast<std::size_t>(c.owner[li])];
+            c.owner[li] = static_cast<int32_t>(ri);
+            c.dist[li]  = d;
+            ++c.count[ri];
+        }
+    }
+    c.measured = n;
 }
 
 naval_points_split naval_points_of(const polity& q, const history_sim_params& p)
@@ -1779,6 +1839,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // (`contact_event::across_water`) -- so every span that runs on terrain
     // keeps it, the Empires round included: a pair it joins carries its
     // class into the spans that read it.
+    // BL-1147 review: whose cells touch the sea, for the coastal-years deed.
+    coast_cells coast;
     const std::vector<int32_t> landmass =
         (terrain.substrate != nullptr)
             ? landmass_labels(*terrain.substrate, gw, gh)
@@ -1884,8 +1946,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // polity's own ledger, never the regions it holds now -- a polity that
         // lost its coast keeps its sailors -- and a polity already dead
         // carries nothing. Judged once, here: constants out of domain open no
-        // fleet and say so. At a conversion of 0 nothing moves.
-        if (params.naval_points_navy_per_1000 != 0)
+        // fleet and say so. At a conversion of 0 nothing moves. ONLY AT THE
+        // OPEN THE SPAN FLAG MARKS (`naval_points_convert_at_open`, the
+        // Exploration open's alone): a later resumed span converts nothing,
+        // whatever the rate a sweep sets on it.
+        if (params.naval_points_convert_at_open && params.naval_points_navy_per_1000 != 0)
         {
             out.naval_points_params_rejected = !naval_points_params_valid(params);
             if (!out.naval_points_params_rejected)
@@ -2185,6 +2250,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // city-states, forms empires"). `battle_trace` still holds the
     // pure-observation contract; this record no longer does.
     std::vector<std::pair<uint16_t, uint16_t>> corridor_uses;
+    // BL-1147 review: the (lo, hi) of every walk that crossed sea, folded onto
+    // the record's `history_corridor::wet` at the close.
+    std::vector<std::pair<uint16_t, uint16_t>> corridor_wet;
 
     // Canonical (lo, hi) edge key -> live use count, read by `rebuild_reach`
     // and gated by `road_tier1_uses`/`road_tier2_uses` below. A plain
@@ -2554,13 +2622,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // RECORD still counts the refused walk, so its `uses` can stand on a rung
     // the live count never paid for; a resumed span that seeds from `tier`
     // (BL-1037, `resume_seeds_corridor_tier`) reopens it one short, as here.
-    const auto note_corridor = [&](int a, int b, int payer_seat) {
+    // BL-1147 review: does a corridor's anchor-to-anchor line cross sea? The
+    // test a wet campaign is itself told by (`dry_contact`), asked of every
+    // walk the record notes, so a corridor across a strait is marked whatever
+    // noted it. Asked BOTH WAYS: the sampler's integer steps are not symmetric,
+    // and the record's row is an edge (lo, hi), not a direction.
+    const auto corridor_line_wet = [&](int a, int b) -> bool {
+        if (a < 0 || b < 0 || static_cast<std::size_t>(a) >= ss.regions.size()
+         || static_cast<std::size_t>(b) >= ss.regions.size()) return false;
+        const region& ra = ss.regions[static_cast<std::size_t>(a)];
+        const region& rb = ss.regions[static_cast<std::size_t>(b)];
+        return line_crosses_sea(ra, rb, terrain, gw, gh, params.neighbour_radius)
+            || line_crosses_sea(rb, ra, terrain, gw, gh, params.neighbour_radius);
+    };
+    const auto note_corridor = [&](int a, int b, int payer_seat, bool wet_walk) {
         if (a < 0 || b < 0 || a == b) return;
         if (a >= static_cast<int>(owner_index_limit)
          || b >= static_cast<int>(owner_index_limit)) return;
         const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
         const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
         corridor_uses.push_back({lo, hi});
+        if (wet_walk || corridor_line_wet(a, b)) corridor_wet.push_back({lo, hi});
 
         int& uses = road_uses_live[edge_key(a, b)];
         const int before = road_tier_for_uses(uses);
@@ -2641,8 +2723,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
         for (const trade_flow& f : out.trade_flows)
         {
             if (f.volume_q <= 0 || f.seller == f.buyer) continue;
-            if (!f.by_sea) continue; // carried by road: not trade across water
             if (f.seller >= out.polities.size() || f.buyer >= out.polities.size()) continue;
+            if (!f.by_sea)
+            {
+                // Carried by road: not trade across water. Counted where the
+                // seats stand on different landmasses, so the two readings
+                // together are all trade between such realms.
+                const int32_t ms = seat_landmass_of(f.seller), mb = seat_landmass_of(f.buyer);
+                if (ms >= 0 && mb >= 0 && ms != mb) out.cross_landmass_volume_by_road_q += f.volume_q;
+                continue;
+            }
             const int lo = std::min<int>(f.seller, f.buyer), hi = std::max<int>(f.seller, f.buyer);
             pairs.push_back({lo, hi, f.seller == lo ? f.volume_q : 0, f.seller == lo ? 0 : f.volume_q});
         }
@@ -2731,6 +2821,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // end of the run (line ~4350 below) — a bought corridor has to
         // appear there or it renders as if it had never been walked at all.
         corridor_uses.push_back({lo, hi});
+        if (corridor_line_wet(a, b)) corridor_wet.push_back({lo, hi}); // BL-1147 review
         note_event(lapse_event_kind::road_promoted, lo, road_tier_for_uses(need), hi);
         return true;
     };
@@ -2764,6 +2855,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
         const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
         corridor_uses.push_back({lo, hi}); // same reasoning as try_upgrade_corridor's own push.
+        if (corridor_line_wet(a, b)) corridor_wet.push_back({lo, hi}); // BL-1147 review
         note_event(lapse_event_kind::road_promoted, lo, 3, hi);
         return true;
     };
@@ -4314,18 +4406,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
         next_decision = y + step_years;
 
         // ---- BL-1147: THE COASTAL PROVINCES HELD, per year held -----------
-        // Every region with a port window (`port_q > 0`) counts the years this
-        // round covers to the polity holding it, off the round's OPENING map.
-        // A tally of deeds (`polity::naval_coastal_years`), read by nothing in
-        // the sim; the Empires round's alone (`naval_points_accrue`).
-        if (params.naval_points_accrue)
+        // Every region whose CELL TOUCHES THE SEA (`coast_cells`, the terrain
+        // -- never `port_q`, which a settled daughter inherits at 70% wherever
+        // it lands) counts the years this round covers to the polity holding
+        // it, off the round's OPENING map. A tally of deeds
+        // (`polity::naval_coastal_years`), read by nothing in the sim; the
+        // Empires round's alone (`naval_points_accrue`).
+        if (params.naval_points_accrue && terrain.substrate != nullptr)
         {
+            update_coast_cells(coast, ss.regions, *terrain.substrate, gw, gh);
             const int64_t years = std::max<int64_t>(0, std::min<int64_t>(step_years, params.stop_year - y));
             for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
             {
                 const int o = owner[i];
                 if (o < 0 || static_cast<std::size_t>(o) >= out.polities.size()) continue;
-                if (ss.regions[i].port_q <= 0) continue;
+                if (!cell_touches_sea(coast, i)) continue;
                 out.polities[static_cast<std::size_t>(o)].naval_coastal_years += years;
             }
         }
@@ -6822,7 +6917,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // whether or not the battle was won, and a network that only
                 // remembered the winners would be a map of conquests rather
                 // than a map of routes.
-                note_corridor(src, static_cast<int>(ti), q.capital);
+                note_corridor(src, static_cast<int>(ti), q.capital, /*wet_walk=*/!exec_dry);
                 // BL-1097 -- A WET CAMPAIGN'S CROSSING is a sea leg too, noted
                 // BESIDE the land note above (never instead of it, so the road
                 // record is byte for byte what it was): staging hub to target,
@@ -7443,7 +7538,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // the commoner of the two corridor sources: a polity settles far
                 // more often than it campaigns, which is what gives a peaceful
                 // history a road network at all.
-                note_corridor(best_target, static_cast<int>(ss.regions.size()) - 1, q.capital);
+                note_corridor(best_target, static_cast<int>(ss.regions.size()) - 1, q.capital, /*wet_walk=*/false);
                 out.owner_changes.push_back(owner_change{
                     static_cast<int32_t>(y),
                     static_cast<uint16_t>(ss.regions.size() - 1),
@@ -8872,6 +8967,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // ancient tier rule reads, so the count has to survive the fold.
     {
         std::sort(corridor_uses.begin(), corridor_uses.end());
+        std::sort(corridor_wet.begin(), corridor_wet.end());
+        corridor_wet.erase(std::unique(corridor_wet.begin(), corridor_wet.end()), corridor_wet.end());
         std::vector<history_corridor> fresh;
         fresh.reserve(corridor_uses.size());
         for (const auto& e : corridor_uses)
@@ -8881,7 +8978,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 ++fresh.back().uses;
                 continue;
             }
-            fresh.push_back(history_corridor{e.first, e.second, 1});
+            history_corridor row{e.first, e.second, 1};
+            // BL-1147 review: a corridor any walk crossed sea on is wet, for good.
+            row.wet = std::binary_search(corridor_wet.begin(), corridor_wet.end(), e) ? 1 : 0;
+            fresh.push_back(row);
         }
 
         // BL-956: A RESUMED RUN ALREADY HOLDS A RECORD (`resume_corridors`),
@@ -8907,7 +9007,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (!out.supply_corridors.empty()
                     && out.supply_corridors.back().a == c.a
                     && out.supply_corridors.back().b == c.b)
+                {
                     out.supply_corridors.back().uses += c.uses;
+                    out.supply_corridors.back().wet = static_cast<uint8_t>(
+                        out.supply_corridors.back().wet | c.wet); // wet once, wet for good
+                }
                 else
                     out.supply_corridors.push_back(c);
             };
