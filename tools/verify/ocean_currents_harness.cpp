@@ -25,6 +25,14 @@
 //   C6  BL-1140: landmasses are what the sea separates (a lake does not
 //       split one, a corner joins one) and a shore seat reads the landmass it
 //       borders
+//   C7-C10 BL-1142: a leg against its current delivers less, after sizing,
+//       and only where the SEA line carries the goods; a binding is worth what
+//       arrives; meeting by sea reads the sea line and the seller's navy alone
+//   F1-F5 BL-1142, a resumed two-island span: the far penalty a pair reads is
+//       the class its contact recorded at the meeting -- formation and the
+//       break agree, a seat that moves across the water changes nothing, a far
+//       pair on one landmass still reads the land's 700 -- and an out-of-range
+//       cargo loss is rejected, never clamped
 //   W8  BL-1140: on the real body, trade between realms on different
 //       landmasses writes sea-leg uses, only such trade does, and each use is
 //       read against the current
@@ -33,6 +41,11 @@
 //       generation's Exploration span, weight 0 builds no field, a weighted
 //       span is deterministic, a rejected weight prices nothing and says so,
 //       the writer record sums to the leg table.
+//   W9  BL-1142: generation's Industrialisation span meets and binds realms
+//       across water and loses cargo against the current (the Exploration
+//       span's loss printed beside it, on its own)
+//   W10 BL-1142: on the Industrialisation span resumed from generation's 1660
+//       handoff, a cargo loss outside [0, 1000] is rejected, never clamped
 //
 // --sweep — the measurement (reports, never gates):
 //   Per seed of the curated library (or --seeds a,b,c), ONE generation to the
@@ -57,6 +70,8 @@
 //
 // --picture — a headless map of the field: --picture writes the body's ground
 //   and one arrow per ocean region to --png path (default ocean_currents.png).
+//
+// --synthetic — the C and F rows alone (no real body, no data layer).
 //
 // Build (needs the shipped data layer, so a live Lua state):
 //   bash tools/verify/build_lua_harness.sh ocean_currents_harness
@@ -355,7 +370,9 @@ void synthetic_rows()
         ctx.currents = &fb; ctx.current_weight_q = 500;
         const std::vector<trade_flow> sized = compute_trade_flows(ctx, rg, qs, treaties);
         int64_t lost = 0;
-        ctx.landmass = &mass; ctx.grid_w = ww; ctx.grid_h = wh; ctx.cargo_loss_q = 500; ctx.cargo_lost = &lost;
+        // Each polity's seat landmass, as the sim reads it once per round.
+        const std::vector<int32_t> seats = { landmass_at(mass, ww, wh, 6, 25), landmass_at(mass, ww, wh, 42, 25) };
+        ctx.seat_landmass = &seats; ctx.cargo_loss_q = 500; ctx.cargo_lost = &lost;
         const std::vector<trade_flow> delivered = compute_trade_flows(ctx, rg, qs, treaties);
         const auto vol = [](const std::vector<trade_flow>& f, int s, int b) {
             for (const trade_flow& x : f) if (x.seller == s && x.buyer == b) return x.volume_q;
@@ -379,7 +396,225 @@ void synthetic_rows()
         check(compute_trade_flows(ctx, rg, qs, treaties).size() == sized.size()
               && vol(compute_trade_flows(ctx, rg, qs, treaties), 0, 1) == east_sized,
               "C7  a loss of 0 delivers every flow as sized");
+
+        // C8 (BL-1142 review): THE LOSS RIDES THE SEA LINE ONLY. The same pair
+        // with a land corridor of 800 -- wider than either priced sea line --
+        // moves its goods by road, and a road has no current: nothing is lost.
+        // With a corridor of 100 the sea still carries them and the loss is
+        // C7's exactly.
+        {
+            trade_context wide = ctx;
+            wide.land_lines = { trade_context::land_line{0, 1, 800} };
+            wide.cargo_loss_q = 0;
+            const std::vector<trade_flow> by_road_sized = compute_trade_flows(wide, rg, qs, treaties);
+            int64_t lost_road = 0;
+            wide.cargo_loss_q = 500; wide.cargo_lost = &lost_road;
+            const std::vector<trade_flow> by_road = compute_trade_flows(wide, rg, qs, treaties);
+            trade_context narrow = ctx;
+            narrow.land_lines = { trade_context::land_line{0, 1, 100} };
+            int64_t lost_narrow = 0;
+            narrow.cargo_loss_q = 500; narrow.cargo_lost = &lost_narrow;
+            const std::vector<trade_flow> by_sea = compute_trade_flows(narrow, rg, qs, treaties);
+            std::printf("      a road of 800 beside the sea: east sized %d delivered %d, lost %lld;"
+                        " a road of 100: east delivered %d (C7 %d), lost %lld\n",
+                        vol(by_road_sized, 0, 1), vol(by_road, 0, 1), static_cast<long long>(lost_road),
+                        vol(by_sea, 0, 1), east_got, static_cast<long long>(lost_narrow));
+            check(vol(by_road_sized, 0, 1) == 800 && vol(by_road, 0, 1) == 800 && lost_road == 0,
+                  "C8  a flow a road carries loses nothing to the current, though its seats stand across water");
+            check(vol(by_sea, 0, 1) == east_got && lost_narrow == lost,
+                  "C8  a flow the sea still carries past a narrower road loses what C7's does");
+        }
+
+        // C9 (BL-1142 review): A BINDING IS WORTH WHAT ARRIVES. The pair's
+        // trade value at loss 500 is the eastward volume's delivered share
+        // plus the whole westward volume (which runs with the current);
+        // at loss 0 it is both volumes whole.
+        {
+            trade_context v = ctx;
+            v.cargo_lost = nullptr;
+            v.cargo_loss_q = 0;
+            const int value_whole = pair_trade_value_q(v, rg, qs, 0, 1, {});
+            v.cargo_loss_q = 500;
+            const int value_arrives = pair_trade_value_q(v, rg, qs, 0, 1, {});
+            const int east_v = trade_flow_volume_q(v, rg, qs, 0, 1, 0);
+            const int west_v = trade_flow_volume_q(v, rg, qs, 1, 0, 1);
+            const int east_share = 1000 - (500 * (align_east < 0 ? -align_east : 0)) / 1000;
+            const int expect = static_cast<int>((static_cast<int64_t>(east_v) * east_share) / 1000) + west_v;
+            std::printf("      pair trade value: whole %d, at loss 500 %d (expected %d = %d x %d/1000 + %d)\n",
+                        value_whole, value_arrives, expect, east_v, east_share, west_v);
+            check(value_whole == east_v + west_v && value_arrives == expect && value_arrives < value_whole,
+                  "C9  pair_trade_value_q reads the delivered share: the leg against the current is worth what arrives");
+        }
+
+        // C10 (BL-1142 review): MEETING BY SEA READS THE SEA LINE ALONE.
+        // `trade_sea_volume_q` is what the meeting walk asks: a road of 800
+        // opens a trade (`trade_flow_volume_q`) but never a meeting; a seller
+        // with no navy meets no one, whatever the buyer's fleet; a seat with
+        // no port meets no one.
+        {
+            trade_context m = build_trade_context(rg, qs, {});
+            m.land_lines = { trade_context::land_line{0, 1, 800} };
+            std::vector<polity> no_fleet_west = qs;
+            no_fleet_west[0].navy_stock = 0;
+            std::vector<region> no_port_east = rg;
+            no_port_east[1].port_stock_q = 0;
+            const int road   = trade_flow_volume_q(m, rg, no_fleet_west, 0, 1, 0);
+            const int sea_w  = trade_sea_volume_q(m, rg, no_fleet_west, 0, 1, 0);
+            const int sea_e  = trade_sea_volume_q(m, rg, no_fleet_west, 1, 0, 1);
+            const int sea_np = trade_sea_volume_q(m, no_port_east, qs, 0, 1, 0);
+            std::printf("      meeting reads: road %d; sea, west selling without a fleet %d; east selling with one %d;"
+                        " to a seat with no port %d\n", road, sea_w, sea_e, sea_np);
+            check(road == 800 && sea_w == 0 && sea_e == 400 && sea_np == 0
+                  && trade_flow_volume_q(m, no_port_east, qs, 0, 1, 0) == 800,
+                  "C10 meeting by sea needs the SELLER's navy and both seats' ports: a road's volume never opens it");
+        }
     }
+}
+
+// ---------------------------------------------------------------------------
+// F1-F5 (BL-1142 review): the far penalty is the class the meeting recorded
+// ---------------------------------------------------------------------------
+
+/// Two islands on open ocean, 64 x 21: West spans columns 2-21 and East
+/// 34-53, both rows 5-15. Every seat stands inland on row 10, so its
+/// landmass is its own tile's.
+struct far_world
+{
+    static constexpr int gw = 64, gh = 21;
+    std::vector<terrain_substrate> ground;
+    settlement_state               ss;
+    std::vector<polity>            polities;
+    std::vector<contact>           contacts;
+    std::vector<dated_object>      objects;
+};
+
+/// Polity 0 seated at column 4 (West); polity 1 seated at @p seat1_col (West
+/// below 22, East from 34) and, when @p old_seat_col >= 0, holding the ground
+/// there too -- the seat it moved from. Both lean 600 on aggression, so a
+/// binding is worth 1000 - 150 = 850 before the far penalty: 850 at the sea's
+/// 0, 150 at the land's 700 -- over the formation bar (400) at the first,
+/// under the break bar (200) at the second. No ports, fleets or corridors:
+/// no trade, so nothing else moves the value. They met in 1300 -- a FAR pair
+/// (the near-home cutoff is 1200) -- with @p across_water as the meeting
+/// recorded it; when @p bound they hold the four mutual clauses to 1800.
+far_world make_far_world(int seat1_col, int old_seat_col, bool across_water, bool bound)
+{
+    far_world w;
+    w.ground = make_body(far_world::gw, far_world::gh, [](int c, int r) {
+        return r >= 5 && r <= 15 && ((c >= 2 && c <= 21) || (c >= 34 && c <= 53));
+    });
+    const auto add_region = [&](int col, int culture, int nation, bool seat, int seat_region) {
+        region r;
+        r.col = col; r.row = 10; r.anchor = 10 * far_world::gw + col;
+        r.culture = culture_shares::pure(culture); r.founding_culture = culture;
+        r.farm_q = 600; r.ore_q = 300; r.energy_q = 200; r.port_q = 0;
+        r.settle_score_q = 800; r.population = 120000;
+        r.nation = nation; r.is_seat = seat; r.seat_region = seat_region; r.has_market = seat;
+        r.name = "Isle " + std::to_string(w.ss.regions.size());
+        w.ss.regions.push_back(r);
+    };
+    add_region(4, 0, 0, true, 0);                                     // region 0: polity 0's seat
+    add_region(seat1_col, 1, 1, true, 1);                             // region 1: polity 1's seat
+    if (old_seat_col >= 0) add_region(old_seat_col, 1, 1, false, 1);  // region 2: the ground it left
+    for (int k = 0; k < 2; ++k)
+    {
+        polity q;
+        q.id = k; q.culture = k; q.capital = k; q.aggression_q = 600; q.alive = true;
+        w.polities.push_back(q);
+    }
+    contact_event e;
+    e.year = 1300; e.region = 0; e.kind = contact_kind::campaign;
+    e.across_water = across_water ? 1 : 0;
+    contact c01; c01.from = 0; c01.to = 1; c01.first = e;
+    contact c10; c10.from = 1; c10.to = 0; c10.first = e;
+    w.contacts = { c01, c10 };
+    if (bound)
+        for (treaty_clause tc : { treaty_clause::non_aggression, treaty_clause::trade_access,
+                                  treaty_clause::sphere_of_claim, treaty_clause::mutual_defence })
+            w.objects.push_back(dated_object{ 1800, static_cast<int32_t>(tc), 0, 1 });
+    return w;
+}
+
+/// One decision round (1700) of Exploration's params resumed on @p w, at the
+/// given land and sea far penalties and cargo loss.
+history_sim_state run_far(const far_world& w, int land_pen, int sea_pen, int loss = 0)
+{
+    history_sim_params p = exploration_sim_params(world_params{});
+    p.start_year = 1700;
+    p.stop_year  = 1704;
+    p.tick_bands[0]   = { p.stop_year, 4 };
+    p.tick_band_count = 1;
+    p.trace_battles   = false;
+    p.treaty_far_penalty_q     = land_pen;
+    p.treaty_far_sea_penalty_q = sea_pen;
+    p.far_pairs_meet_by_sea    = true;
+    p.sea_current_cargo_loss_q = loss;
+    p.resume_polities      = &w.polities;
+    p.resume_contacts      = &w.contacts;
+    p.resume_dated_objects = &w.objects;
+    settlement_state ss = w.ss;
+    sim_terrain_view view;
+    view.substrate = &w.ground;
+    return run_history_sim(ss, nullptr, view, far_world::gw, far_world::gh, p, 4242u);
+}
+
+void far_pair_rows()
+{
+    std::printf("\n--- F1-F5: the far penalty is the class the meeting recorded ---\n");
+    const auto bound = [](const history_sim_state& hs) {
+        return has_treaty_clause(hs, 0, 1, treaty_clause::non_aggression);
+    };
+    const auto say = [&](const char* what, const history_sim_state& hs) {
+        std::printf("      %-58s formed %lld (across water %lld, far %lld), broken %lld, bound at the close %d\n",
+                    what, static_cast<long long>(hs.treaties_formed),
+                    static_cast<long long>(hs.treaties_formed_across_water),
+                    static_cast<long long>(hs.far_treaties_formed_across_water),
+                    static_cast<long long>(hs.treaties_broken), bound(hs) ? 1 : 0);
+    };
+
+    // F1: formation against the break.
+    const history_sim_state f1 = run_far(make_far_world(36, -1, true, false), 700, 0);
+    say("F1 met across water, seats across water, unbound:", f1);
+    check(f1.treaties_formed == 1 && f1.far_treaties_formed_across_water == 1
+          && f1.treaties_broken == 0 && bound(f1),
+          "F1  a far pair met across water binds on the sea's penalty, and the break re-score reads the same: it holds");
+
+    // F2: the seat moves.
+    const history_sim_state f2 = run_far(make_far_world(19, 36, true, true), 700, 0);
+    const history_sim_state f2_land = run_far(make_far_world(19, 36, false, true), 700, 0);
+    say("F2 bound across water, polity 1's seat now on West:", f2);
+    say("F2 control -- the same pair recorded as met on land:", f2_land);
+    bool kept_class = false;
+    for (const contact& c : f2.contacts)
+        if (c.from == 0 && c.to == 1) kept_class = c.first.across_water == 1;
+    check(f2.treaties_broken == 0 && bound(f2) && kept_class,
+          "F2  a pair bound across water whose seat moves onto the other landmass does not break for that");
+    check(f2_land.treaties_broken == 1 && !bound(f2_land),
+          "F2  ... where the same pair recorded as met on land breaks on the land's penalty (the row can fail)");
+
+    // F3: a far pair on one landmass.
+    const history_sim_state f3 = run_far(make_far_world(19, -1, false, false), 700, 0);
+    const history_sim_state f3_free = run_far(make_far_world(19, -1, false, false), 0, 0);
+    say("F3 met on land, both seats on West, land penalty 700:", f3);
+    say("F3 control -- the land penalty at 0:", f3_free);
+    check(f3.treaties_formed == 0 && !bound(f3) && f3_free.treaties_formed == 1 && bound(f3_free),
+          "F3  a far pair on the SAME landmass still reads 700: it does not bind, where a penalty of 0 would bind it");
+
+    // F4: the mirror of F2 at formation.
+    const history_sim_state f4 = run_far(make_far_world(36, -1, false, false), 700, 0);
+    say("F4 met on land, polity 1's seat since moved to East:", f4);
+    check(f4.treaties_formed == 0 && f4.treaties_formed_across_water == 0,
+          "F4  a pair that met on one landmass keeps the land's penalty after a seat crosses the water");
+
+    // F5: the cargo loss's domain.
+    const far_world w5 = make_far_world(36, -1, true, false);
+    const history_sim_state over  = run_far(w5, 700, 0, 1001);
+    const history_sim_state under = run_far(w5, 700, 0, -1);
+    const history_sim_state top   = run_far(w5, 700, 0, 1000);
+    const history_sim_state none  = run_far(w5, 700, 0, 0);
+    check(over.sea_cargo_loss_rejected && under.sea_cargo_loss_rejected
+          && !top.sea_cargo_loss_rejected && !none.sea_cargo_loss_rejected,
+          "F5  a cargo loss outside [0, 1000] is rejected at the open and says so; 0 and 1000 are in its domain");
 }
 
 // ---------------------------------------------------------------------------
@@ -611,7 +846,7 @@ lane_writers attribute_lanes(const std::vector<sea_leg>& table,
 
 void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
 {
-    std::printf("\n--- W1-W9: the field and the sim on seed %u (weight %d) ---\n", seed, weight);
+    std::printf("\n--- W1-W10: the field and the sim on seed %u (weight %d) ---\n", seed, weight);
     const auto t0 = std::chrono::steady_clock::now();
     world_params wp;
     wp.seed = seed;
@@ -620,7 +855,6 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
     world_gen_config cfg = shipped.cfg;
     cfg.stop_after_industrialisation = true; // W9 reads generation's own 1660-1960 span
     const world w = make_hard_coded_world(wp, &rep, cfg, nullptr, &shipped.works, &fx);
-    (void)w;
     std::printf("      generated to the Industrialisation close in %.1f s\n", seconds_since(t0));
     if (!fx.ran || !fx.exploration_ran || fx.terrain.substrate.empty())
     {
@@ -882,11 +1116,12 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
         const history_sim_params& dp = fx.industrialisation_params;
         const std::vector<region>& R = fx.industrialisation_handoff.regions;
         const std::vector<int32_t> mass = landmass_labels(sub, fx.gw, fx.gh);
-        int by_sea = 0, by_sea_same_mass = 0;
+        int by_sea = 0, by_sea_same_mass = 0, by_sea_unrecorded = 0;
         for (const contact& k : hi.contacts)
         {
             if (k.from >= k.to || k.first.kind != contact_kind::trade) continue;
             ++by_sea;
+            if (k.first.across_water != 1) ++by_sea_unrecorded;
             const auto m = [&](int pid) -> int32_t {
                 const int cap = hi.polities[static_cast<std::size_t>(pid)].capital;
                 if (cap < 0 || static_cast<std::size_t>(cap) >= R.size()) return -2;
@@ -898,22 +1133,88 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
             if (m(k.from) == m(k.to)) ++by_sea_same_mass;
         }
         std::printf("      Industrialisation: met by sea %lld (in the table at 1960: %d, %d of them now on one landmass);"
-                    " treaties formed across water %lld (far %lld); cargo lost against the current %lld\n",
+                    " treaties formed across water %lld (far %lld); cargo lost against the current %lld"
+                    " of %lld moved across water\n",
                     static_cast<long long>(hi.contacts_met_by_sea), by_sea, by_sea_same_mass,
                     static_cast<long long>(hi.treaties_formed_across_water),
                     static_cast<long long>(hi.far_treaties_formed_across_water),
-                    static_cast<long long>(hi.sea_trade_cargo_lost_q + fx.exploration_state.sea_trade_cargo_lost_q));
+                    static_cast<long long>(hi.sea_trade_cargo_lost_q),
+                    static_cast<long long>(hi.sea_trade_volume_q));
+        std::printf("      Exploration (its own span, 1200 -> 1660): cargo lost against the current %lld"
+                    " of %lld moved across water; treaties formed across water %lld (far %lld)\n",
+                    static_cast<long long>(fx.exploration_state.sea_trade_cargo_lost_q),
+                    static_cast<long long>(fx.exploration_state.sea_trade_volume_q),
+                    static_cast<long long>(fx.exploration_state.treaties_formed_across_water),
+                    static_cast<long long>(fx.exploration_state.far_treaties_formed_across_water));
         check(!dp.far_pairs_meet_by_sea || hi.contacts_met_by_sea > 0,
               "W9  with meeting by sea on, realms across water meet in the Industrialisation span");
+        check(by_sea_unrecorded == 0,
+              "W9  every pair that met by sea recorded, at the meeting, that it met across water");
         check(dp.treaty_far_sea_penalty_q >= dp.treaty_far_penalty_q || !dp.far_pairs_meet_by_sea
               || hi.far_treaties_formed_across_water > 0,
               "W9  and far pairs across water bind");
         check(fx.exploration_params.far_pairs_meet_by_sea == false
               && fx.exploration_state.contacts_met_by_sea == 0,
               "W9  meeting by sea is the Industrialisation span's alone: Exploration meets no one by sea");
-        check(dp.sea_current_cargo_loss_q <= 0
-              || (hi.sea_trade_cargo_lost_q + fx.exploration_state.sea_trade_cargo_lost_q) > 0,
-              "W9  with a loss set, trades across water run against their current lose cargo");
+        check(dp.sea_current_cargo_loss_q <= 0 || hi.sea_trade_cargo_lost_q > 0,
+              "W9  with a loss set, the Industrialisation span's trades across water lose cargo against the current");
+        // The Exploration span's loss is PRINTED above, not bound: it is lost
+        // only on flows the SEA carries (C8), and a span whose trade across
+        // water crosses at a shared border -- a colony beside the other realm,
+        // a road between them -- loses none, which is a fact of its map.
+    }
+
+    // W10 (BL-1142 review): a cargo loss outside its domain is REJECTED on the
+    // real body, never clamped. Read on the Industrialisation span resumed
+    // from generation's own 1660 handoff (opened as generation opens it, the
+    // sweep's own resume): that is the span whose trade across water the SEA
+    // carries, so generation's loss of 500 loses cargo there -- the Exploration
+    // span's on this seed crosses at shared borders and loses none (W9), where
+    // a rejected run and a clamped one would read alike. A clamp to 1000 would
+    // lose more than 500 does; the rejected run loses none and runs exactly as
+    // a loss of 0 does.
+    if (fx.industrialisation_ran)
+    {
+        const exploration_output& eo = fx.exploration_handoff;
+        const std::vector<entity_id> ids = body_tile_ids(w, fx.body, fx.gw, fx.gh);
+        const auto run_loss = [&](int loss) {
+            history_sim_params dp = fx.industrialisation_params;
+            dp.trace_battles           = false;
+            dp.resume_polities         = &eo.polities;
+            dp.resume_grudges          = &eo.grudges;
+            dp.resume_contacts         = &eo.contacts;
+            dp.resume_corridors        = &eo.surviving_corridors;
+            dp.resume_sea_legs         = &eo.sea_legs;
+            dp.resume_dated_objects    = &eo.dated_objects;
+            dp.resume_civilisations    = &eo.civilisations;
+            dp.resume_universal_creeds = &eo.universal_creeds;
+            dp.sea_current_cargo_loss_q = loss;
+            settlement_state ss;
+            ss.regions = eo.regions;
+            survey_regions_at_span_open(w, ids, fx.gw, fx.gh, ss.regions);
+            creed_state cs;
+            cs.cultures = eo.cultures; // the sim reads nothing else of it
+            return run_history_sim(ss, &cs, fx.terrain.view(), fx.gw, fx.gh, dp, fx.industrialisation_seed,
+                                   nullptr, fx.works, nullptr);
+        };
+        const int gen_loss = fx.industrialisation_params.sea_current_cargo_loss_q;
+        const history_sim_state gen = run_loss(gen_loss), over = run_loss(1001), zero = run_loss(0);
+        std::printf("      Industrialisation resumed from the 1660 handoff: at generation's %d cargo lost %lld"
+                    " (generation's own span %lld), battles %lld (%lld); at 1001 rejected %d, lost %lld,"
+                    " volume across water %lld; at 0 volume %lld\n",
+                    gen_loss, static_cast<long long>(gen.sea_trade_cargo_lost_q),
+                    static_cast<long long>(fx.industrialisation_state.sea_trade_cargo_lost_q),
+                    static_cast<long long>(gen.battles), static_cast<long long>(fx.industrialisation_state.battles),
+                    over.sea_cargo_loss_rejected ? 1 : 0, static_cast<long long>(over.sea_trade_cargo_lost_q),
+                    static_cast<long long>(over.sea_trade_volume_q), static_cast<long long>(zero.sea_trade_volume_q));
+        check(same_run(gen, fx.industrialisation_state)
+              && gen.sea_trade_cargo_lost_q == fx.industrialisation_state.sea_trade_cargo_lost_q,
+              "W10 a resume from generation's 1660 handoff reproduces generation's Industrialisation span");
+        check(over.sea_cargo_loss_rejected && !zero.sea_cargo_loss_rejected && !gen.sea_cargo_loss_rejected
+              && gen.sea_trade_cargo_lost_q > 0 && over.sea_trade_cargo_lost_q == 0 && same_run(over, zero)
+              && over.sea_trade_volume_q == zero.sea_trade_volume_q,
+              "W10 a cargo loss outside [0, 1000] is rejected whole: where 500 loses cargo, the run loses none,"
+              " runs as a loss of 0 does, and says so");
     }
     (void)known; (void)lane_tier;
 }
@@ -1529,7 +1830,7 @@ std::vector<int> parse_ints(const char* s)
 
 int main(int argc, char** argv)
 {
-    bool sweep = false, picture = false, pairs = false, explicit_weights = false;
+    bool sweep = false, picture = false, pairs = false, explicit_weights = false, synthetic_only = false;
     std::vector<uint32_t> seeds(std::begin(k_library), std::end(k_library));
     std::vector<int> weights = {0, 150, 300, 500, 700, 900};
     std::string out_path, png_path = "ocean_currents.png";
@@ -1539,6 +1840,7 @@ int main(int argc, char** argv)
         const std::string a = argv[i];
         if (a == "--sweep") sweep = true;
         else if (a == "--pairs") pairs = true;
+        else if (a == "--synthetic") synthetic_only = true;
         else if (a == "--picture") picture = true;
         else if (a == "--seeds" && i + 1 < argc)
         {
@@ -1567,6 +1869,14 @@ int main(int argc, char** argv)
         else { std::printf("unknown argument %s\n", a.c_str()); return 2; }
     }
 
+    if (synthetic_only)
+    {
+        synthetic_rows();
+        far_pair_rows();
+        std::printf("\n%s: %d failure(s)\n", g_failures == 0 ? "ALL PASS" : "FAILED", g_failures);
+        return g_failures == 0 ? 0 : 1;
+    }
+
     shipped_inputs shipped;
     load_shipped_inputs(shipped); // every mode generates at least one real world
 
@@ -1593,6 +1903,7 @@ int main(int argc, char** argv)
     }
 
     synthetic_rows();
+    far_pair_rows();
     const int shipped_weight = exploration_sim_params(world_params{}).sea_current_weight_q;
     real_body_rows(shipped, seed, shipped_weight > 0 ? shipped_weight : 300);
     std::printf("\n%s: %d failure(s)\n", g_failures == 0 ? "ALL PASS" : "FAILED", g_failures);

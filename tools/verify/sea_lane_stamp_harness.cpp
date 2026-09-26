@@ -10,13 +10,16 @@
 //   S1  the walker is water-only: round a concave coast the straight line
 //       crosses land and the walk does not; every step is to an adjacent sea
 //       tile and no step cuts a land corner
-//   S2  the walker prices its steps with the current: across a basin the
-//       priced walk leaves the still-water one, and the water it crosses runs
-//       more with it; the walk is deterministic
+//   S2  the walker prices its steps with the current: sailing east against
+//       the trades, the priced walk leaves the one still-water line for water
+//       that runs with it; across a basin the return takes other water than
+//       the outbound; the walk is deterministic
 //   S3  a seat's port is its nearest sea tile within the radius, ties low;
 //       an inland seat beyond it has none
 //   W1  on a generated 1960 world lanes are stamped (count reported), only on
-//       sea tiles, and no road lies on water (the road lens has none to draw)
+//       sea tiles, and no road lies on water (the road lens has none to draw);
+//       the stamp's earned / laid / no-port / unreachable split matches the
+//       harness's own count off the record, the ports and the sea's components
 //   W2  re-stamping the world's own lane record reproduces its lane field
 //       exactly (the stamp is a pure function of the record and the ground)
 //   W3  the A* cost between two lane-joined ports falls below the unlaned cost
@@ -235,20 +238,34 @@ void synthetic_rows()
                     mean_separation(back, priced, bw));
         check(!priced.empty() && walk_is_honest(priced, bsea, bw) && priced == again,
               "S2  the priced walk is water-only and deterministic");
-        // On a four-way grid many still-water walks tie at the Manhattan length,
-        // and the tie-break can land on the very route the current favours (the
-        // outbound here). So the bend is read BOTH ways: the priced walk never
-        // runs with less current than the still-water one, and in at least one
-        // direction the current takes it off the still-water line.
-        const std::vector<int> still_back = sea_lane_walk(bsea, bw, bh, nullptr, 0, b, a);
-        const double sep_back = mean_separation(back, still_back, bw);
-        const double al_still_back = mean_step_alignment(still_back, f, bw), al_back = mean_step_alignment(back, f, bw);
-        std::printf("      basin A, the return east shore -> west shore: still %zu tiles, priced %zu; separation %.2f tiles;"
-                    " mean current along the steps %.0f still, %.0f priced\n",
-                    still_back.size(), back.size(), sep_back, al_still_back, al_back);
-        check(al_priced >= al_still && al_back >= al_still_back && std::max(sep, sep_back) > 0.5
-              && (sep > 0.5 ? al_priced > al_still : al_back > al_still_back),
-              "S2  the current bends the walk: it leaves the still-water line for water that runs with it");
+        // THE BEND, ONE DIRECTION, ON A LEG WITH ONE STILL-WATER LINE. The
+        // diagonal leg above cannot carry it on a four-way grid: every walk of
+        // its Manhattan length ties in still water, and the tie-break lands on
+        // the very staircase the current favours (priced == still there), so
+        // the eight-way walker's one-directional reading could only have been
+        // kept by reading both directions. A leg along ONE ROW has exactly one
+        // shortest still-water walk -- the row itself -- so a priced walk off
+        // that row is the current's doing and nothing else's. East along the
+        // trades' row (the trades run west): the priced walk must leave the row
+        // for water running more with it.
+        {
+            const int ea = 24 * bw + 7, eb = 24 * bw + 41;
+            const std::vector<int> row_still  = sea_lane_walk(bsea, bw, bh, nullptr, 0, ea, eb);
+            const std::vector<int> row_priced = sea_lane_walk(bsea, bw, bh, &f, 500, ea, eb);
+            bool still_is_row = !row_still.empty();
+            for (const int t : row_still) if (t / bw != 24) still_is_row = false;
+            const double row_sep = mean_separation(row_priced, row_still, bw);
+            const double al_row_still = mean_step_alignment(row_still, f, bw);
+            const double al_row_priced = mean_step_alignment(row_priced, f, bw);
+            std::printf("      east along the trades (7,24) -> (41,24): still %zu tiles (on the row: %s), priced %zu;"
+                        " separation %.2f tiles; mean current along the steps %.0f still, %.0f priced\n",
+                        row_still.size(), still_is_row ? "yes" : "no", row_priced.size(), row_sep,
+                        al_row_still, al_row_priced);
+            check(still_is_row && walk_is_honest(row_priced, bsea, bw) && row_sep > 0.5
+                  && al_row_priced > al_row_still,
+                  "S2  the current bends the walk: sailing east against the trades it leaves the one still-water line"
+                  " for water that runs with it");
+        }
         check(!back.empty() && mean_separation(back, priced, bw) > 0.5,
               "S2  a basin circulates: the return walk takes other water than the outbound");
     }
@@ -455,16 +472,63 @@ void world_rows(shipped_inputs& shipped, uint32_t seed)
     // The seeds this harness runs (32 and 46 by default) are chosen because they
     // earn lanes; a run that lays none measured nothing, so that is a failure.
     check(st.laid > 0, "W1  the stamp lays at least one lane on this seed");
-    // `no_port` and `unreachable` are PRINTED, NOT BOUNDED, and the reason is
-    // what each measures. `no_port` is where a seat stands (an inland capital
-    // more than kSeaLanePortRadius from the sea) -- a fact of the settlement map
-    // the stamp does not choose, and the port rule itself is with Ben (NR-955).
-    // `unreachable` is the sea's topology (two ports on water no path joins).
-    // Neither has a correct bound this stamp could promise, so the harness
-    // binds the one thing that must hold -- every earned lane is laid or
-    // accounted for, never dropped silently -- and prints the split.
-    check(st.laid + st.no_port + st.unreachable == st.earned,
-          "W1  every earned lane is laid, or counted as having no port or no water between its ports");
+    // THE SPLIT, COUNTED AGAIN BY THE HARNESS off the record, the settlement
+    // nodes and the sea -- not the stamp's own sum (laid + no_port +
+    // unreachable == earned holds by construction inside the stamp, so it
+    // could never fail). Earned: legs at the tier between two on-grid nodes.
+    // No port: either seat's nearest sea tile lies beyond kSeaLanePortRadius
+    // (`sea_lane_port`, the port rule itself being with Ben, NR-955).
+    // Unreachable: the two ports lie on different WATER COMPONENTS -- the
+    // harness's own flood of the sea mask on the four cardinal steps, columns
+    // wrapping, never the walker's search. Laid is what remains. `no_port` and
+    // `unreachable` are facts of the settlement map and the sea's topology,
+    // printed, not bounded; what is bound is that the stamp's split is this one.
+    {
+        std::vector<int> water_comp(L.sea.size(), -1);
+        int comps = 0;
+        for (int i = 0; i < L.gw * L.gh; ++i)
+        {
+            if (!L.sea[static_cast<std::size_t>(i)] || water_comp[static_cast<std::size_t>(i)] >= 0) continue;
+            std::vector<int> stack{ i };
+            water_comp[static_cast<std::size_t>(i)] = comps;
+            while (!stack.empty())
+            {
+                const int u = stack.back();
+                stack.pop_back();
+                const int uc = u % L.gw, ur = u / L.gw;
+                const int nb[4][2] = { {uc, ur - 1}, {uc, ur + 1}, {(uc + L.gw - 1) % L.gw, ur}, {(uc + 1) % L.gw, ur} };
+                for (const auto& q : nb)
+                {
+                    if (q[1] < 0 || q[1] >= L.gh) continue;
+                    const int v = q[1] * L.gw + q[0];
+                    if (!L.sea[static_cast<std::size_t>(v)] || water_comp[static_cast<std::size_t>(v)] >= 0) continue;
+                    water_comp[static_cast<std::size_t>(v)] = comps;
+                    stack.push_back(v);
+                }
+            }
+            ++comps;
+        }
+        int h_earned = 0, h_no_port = 0, h_unreachable = 0, h_laid = 0;
+        for (const sea_leg& l : L.legs)
+        {
+            if (l.uses < lp.sea_lane_tier1_uses || l.a == l.b) continue;
+            if (l.a >= L.nodes.size() || l.b >= L.nodes.size()) continue;
+            const history_road_node& na = L.nodes[l.a];
+            const history_road_node& nb = L.nodes[l.b];
+            if (na.col < 0 || na.row < 0 || na.col >= L.gw || na.row >= L.gh
+             || nb.col < 0 || nb.row < 0 || nb.col >= L.gw || nb.row >= L.gh) continue;
+            ++h_earned;
+            const int pa = sea_lane_port(L.sea, L.gw, L.gh, na.col, na.row, kSeaLanePortRadius);
+            const int pb = sea_lane_port(L.sea, L.gw, L.gh, nb.col, nb.row, kSeaLanePortRadius);
+            if (pa < 0 || pb < 0) { ++h_no_port; continue; }
+            if (water_comp[static_cast<std::size_t>(pa)] != water_comp[static_cast<std::size_t>(pb)]) { ++h_unreachable; continue; }
+            ++h_laid;
+        }
+        std::printf("      the harness's own count: earned %d, laid %d, no port %d, unreachable %d (%d water components)\n",
+                    h_earned, h_laid, h_no_port, h_unreachable, comps);
+        check(h_earned == st.earned && h_laid == st.laid && h_no_port == st.no_port && h_unreachable == st.unreachable,
+              "W1  the stamp's split matches the harness's own count off the record, the ports and the sea's components");
+    }
     bool honest = true;
     for (const sea_lane_trace::lane& ln : tr.lanes) if (!walk_is_honest(ln.path, L.sea, L.gw)) honest = false;
     check(honest && st.laid == static_cast<int>(tr.lanes.size()), "W2  every laid lane is a water-only walk");

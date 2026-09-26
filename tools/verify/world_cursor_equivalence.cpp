@@ -318,6 +318,7 @@ void fold_contacts(uint64_t& h, const std::vector<contact>& cs)
         fold_i32(h, c.first.year);
         fold_u32(h, c.first.region);
         fold_i32(h, static_cast<int32_t>(c.first.kind));
+        fold_u32(h, c.first.across_water); // BL-1142: the class the meeting recorded
     }
 }
 

@@ -409,16 +409,23 @@ history_sim_params exploration_sim_params(const world_params& params)
     hp.sea_current_rotation_sense = 1; // the data model records no spin; prograde
 
     // BL-1142 -- A LEG RUN AGAINST ITS CURRENT DELIVERS LESS (EXPLORATION.md sec
-    // Currents, "Where currents bite"), in this span and Industrialisation's.
+    // Currents, "Where currents bite"), in this span and Industrialisation's,
+    // on the flows the SEA carries: a trade whose road beats its sea line has
+    // no current to lose cargo to.
     // 500, THE CURRENT'S OWN WEIGHT: a trade leg against a full current costs
     // half as much again (`sea_current_weight_q` above) and loses half its
     // cargo, so the extra cost and the cargo lost read on one scale.
     // MEASURED, `ocean_currents_harness --sweep --rung` on the 16 curated seeds
-    // on the spaced world (2026-09-26): the loss is linear with no knee --
-    // cargo lost 0.9% / 1.5% / 2.9% of the volume across water at 250 / 500 /
-    // 1000 (far pairs binding at 400), 1.3% at 500 on the world before they
-    // bind -- because real legs read little current against them; nothing
-    // in the ladder argued for a value off the weight's own.
+    // (2026-09-26, four-way landmasses, the loss on sea-carried flows only):
+    // the Industrialisation span loses 0.53% / 0.86% / 1.55% of its volume
+    // across water at 250 / 500 / 1000 -- no knee -- and its far pairs bound
+    // at 1960 (525 / 518 / 519), battles (8,509 / 8,520 / 8,517) and
+    // subjections (56 at each) do not move with it. THIS SPAN LOSES NONE AT ANY
+    // RUNG, on any of the 16: every trade in it between realms seated on
+    // different landmasses that runs against its current has a road at least
+    // as wide as its sea line -- the two realms' ground meets -- so here the
+    // setting changes nothing. Nothing in the ladder argued for a value off
+    // the weight's own.
     hp.sea_current_cargo_loss_q = 500;
 
     return hp;
@@ -486,20 +493,25 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // BL-1142 -- FAR REALMS ACROSS WATER MEET AND BIND (INDUSTRIALISATION.md sec
     // Far pairs meet and bind, and this phase makes them: "far pairs bind across
     // water, not only across a border"). This span's own force, never
-    // Exploration's: realms on different landmasses meet when a trade across
-    // water is open between them, and a far pair across water binds without the
-    // stranger's penalty -- its doctrine, grudges, broken promises and trade
-    // decide, as they decide a near pair's without the alarm.
+    // Exploration's: realms on different landmasses meet when a trade BY SEA is
+    // open between them (the seller's navy and both seats' ports carry it), and
+    // a far pair that met across water binds without the stranger's penalty --
+    // its doctrine, grudges, broken promises and trade decide, as they decide a
+    // near pair's without the alarm. "Met across water" is the class the
+    // pair's contact recorded at the meeting, never its seats read again.
     //
     // 0, AND THAT IS THE PLATEAU, NOT A TARGET. MEASURED on the 16 curated seeds
-    // on the spaced world (2026-09-26), meeting by sea on (472 new cross-water
-    // contacts): far cross-water pairs bound at 1960 read 0 at 700 and 500, 9 at
-    // 450, 166 at 400, then 489 / 484 / 479 at 350 / 300 / 0. Above 450 the
-    // penalty forbids every such binding; at or below 350 it decides none of
-    // them and the pair's own facts do. A value inside the 450-350 band would
-    // be the dial choosing the count; 0 is the reading where it chooses
-    // nothing. Without meeting by sea the same 0 binds 17 far pairs -- the
-    // meeting is what the binding needed.
+    // (2026-09-26, four-way landmasses, meeting on the sea line alone, the
+    // penalty read off the recorded class): far cross-water pairs bound at 1960
+    // read 0 at 700 and 500, 10 at 450, 191 at 400, then 530 / 526 / 518 at
+    // 350 / 300 / 0, with 492-523 pairs met by sea at every rung; down the
+    // same ladder the span's subjections read 96 / 96 / 95 / 62 / 56 / 43 / 56
+    // and its battles 9,266 / 9,266 / 9,215 / 8,920 / 8,670 / 8,657 / 8,520.
+    // Above 450 the penalty forbids every such binding; at or below 350 it
+    // decides none of them and the pair's own facts do. A value inside the
+    // 450-350 band would be the dial choosing the count; 0 is the reading
+    // where it chooses nothing. Without BL-1142 at all (no meeting, the land's
+    // 700, no loss) no far pair across water binds.
     hp.far_pairs_meet_by_sea    = true;
     hp.treaty_far_sea_penalty_q = 0;
 
