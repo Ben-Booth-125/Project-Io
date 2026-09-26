@@ -233,7 +233,15 @@ slip to sprint 49 from the END of a chain, never the middle.
   BL-1137 (industrial urbanisation + abandonment; the ~500 lever) with BL-1132 (settle spacing)
   and BL-1133 (anchors join a neighbour) [BL-1133 RE-RULED and MERGED 2026-09-26, 5cab560b: a
   province is its centre's ground; provinces 45,199 -> 30,894, anchors 20,505 -> 6,856; NR-954
-  open. BL-1136 two threads MERGED fc884257. BL-1120 + BL-1140 MERGED; BL-1098 running] -> BL-1125 (markets: twins, gravity, conquest,
+  open. BL-1136 two threads MERGED fc884257. BL-1120 + BL-1140 MERGED; BL-1098 MERGED 7238f8ef.
+  BL-1132 MERGED 2026-09-26 (89d3bb4b; group `settle-spacing`): spacing 3 tiles and Settle
+  scored only where there is room. Pooled: regions 43,130 -> 15,194, one-tile cells 26,290 ->
+  371, centres 52,552 -> 42,251, land under centres 22.4% -> 18.0%, land provinces 31,029 ->
+  33,749; Settle picks with no room 624/2,161/3,274 -> 0/0/0. War rises (Empires battles
+  155,226 -> 247,547, conquests +66%, foundings -65%; Exploration and Industrialisation battles
+  about double): a consequence of the freed Settle rounds, a named cause in the re-bless. Main's
+  gates and the cold review running. BL-1141 (deepen) and BL-1142 (far pairs) told to merge
+  main before measuring] -> BL-1125 (markets: twins, gravity, conquest,
   calibrated on the thinned world) -> BL-1138 (roads pull to markets) -> NR-944's re-read ->
   BL-1107 (culture ground profile) -> BL-1139 (centres abandoned in play).
 - **Sea (`ocean_currents.*`, history_sim's sea-leg cost and trade record):** BL-1120 (ocean

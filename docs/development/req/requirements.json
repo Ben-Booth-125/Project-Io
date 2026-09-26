@@ -7076,6 +7076,62 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "settle-spacing",
+   "title": "BL-1132 - A new region founds three tiles from any standing seat, and a realm settles only where there is room",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1132 - sprint 48 (Ben, the open-calls form 2026-09-25; spacing and room ruled in the density-and-trade form 2026-09-26)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: centre_census C9 on the 16 curated seeds"
+     ],
+     "requirement": "A spacing ladder is read on the 16 seeds (regions, one-tile cells, centres, land under centres, the history's battles/conquests/foundings) before the spacing is fixed.",
+     "notes": "",
+     "result_metric": "Ladder read in round 1; Ben fixed 3 tiles (2026-09-26). Pooled main -> this: regions 43,130 -> 15,194; one-tile cells 26,290 -> 371; centres 52,552 -> 42,251; land under centres 22.4% -> 18.0%; land provinces 31,029 -> 33,749."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: centre_census with the lane's temporary pick counters (stripped)"
+     ],
+     "requirement": "A realm scores Settle only where find_settle_site finds a site that passes the spacing, so a chosen Settle always founds.",
+     "notes": "",
+     "result_metric": "Settle picks with no room: main 624 / 2,161 / 3,274 (Empires / Exploration / Industrialisation) -> 0 / 0 / 0. The room check alone at spacing 1 moves pooled structure under 2% (seed 31 most)."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice on main",
+      "headless: history_sim_harness on main (only R3a2/R3a3, pre-existing)",
+      "headless: save_roundtrip, province_partition_harness, centre_census on main"
+     ],
+     "requirement": "The merged change is deterministic run to run and moves no gate beyond the known pre-existing failures.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change, fix round included, before the item closes.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
