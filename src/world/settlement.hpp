@@ -619,7 +619,7 @@ struct region
     // cities in it.
 
     /// Population centres standing in this region. Promoted as
-    /// `urban_population` grows the region's hierarchy
+    /// `urban_population` reaches a village's worth — ONE while settled (BL-1141)
     /// (`region_centres_wanted`), held to what its cell's land holds
     /// (`region_centres_fit`, BL-1130), cut by a sack.
     int centres = 0;
@@ -1240,23 +1240,17 @@ inline constexpr int64_t region_centre_heads = 10000;
 /// should hit a named bound rather than eat that budget silently.
 inline constexpr int region_centre_limit = 32;
 
-// --- Growth consolidates (BL-1130; POPULATION.md § Generation) --------------
-// A region's centres are a HIERARCHY of its own urban heads, not a count of
-// village-sized lumps: centre k of n stands U / (k * H_n) heads (H_n the
-// harmonic number — the rank-size share the body-wide carve already reads,
-// read here inside one region). So growth DEEPENS a place before it widens it:
-// the heads go into the centres standing, their villages merge into a town,
-// and a new centre is founded beside them only once the smallest of the
-// hierarchy would still be a village's worth (`region_centre_heads`). And the
-// hierarchy fits the region's own ground: the urban footprints its centres
-// would stamp (`k_urban_footprint_tiles`, by the rung each share bands to)
-// never add up to more than the land of its cell (`region::urban_ground`). A
-// region whose cell is built out holds the centres it has and the heads go on
-// deepening them, instead of a new centre spilling into a neighbour's cell.
+// --- A region deepens into one place (BL-1141; POPULATION.md § Generation) ---
+// Ben, 2026-09-26, superseding BL-1130's in-region hierarchy: a region stands
+// ONE centre while it is settled and none once it is abandoned, and growth makes
+// that one place bigger, never more numerous — its scale is the rung its urban
+// heads have reached (`scale_reached`, population_generation.hpp), read by the
+// carve. Pouring people into a city widened it into as many as thirty-two
+// centres under the hierarchy; under this rule it becomes one larger city.
+// Readers that ask how BIG a place is read its heads (`region_settlement_size`,
+// below), never the count, so the count's collapse to 0/1 moves none of them.
 //
 // PURE INTEGER FUNCTIONS of the region record: no RNG, no floats, no world.
-// No new tuning constant either — the village rung, the rank-size share, the
-// scale bands and the footprint table are all the doc's existing quantities.
 
 /// A PLACE'S SIZE IS ITS PEOPLE (Ben, 2026-09-25; POPULATION.md § Generation,
 /// BL-1130 round 3). The size a history reader values a region by — the
@@ -1265,7 +1259,7 @@ inline constexpr int region_centre_limit = 32;
 /// pre-consolidation promotion rung read backwards (that rule stood exactly
 /// this many centres on these heads), so a reader calibrated per centre keeps
 /// its constants and gives the same heads the same value it always did,
-/// however the hierarchy now divides them into villages and towns.
+/// however the places they live in are counted.
 /// Pure: heads in, count out; never reads `region::centres`.
 inline int region_centre_equivalents(int64_t urban_heads)
 {
@@ -1287,31 +1281,20 @@ inline int region_settlement_size(const region& p)
     return (eq < 1 && p.centres > 0) ? 1 : eq;
 }
 
-/// How many centres a region's urban heads stand up as a rank-size hierarchy:
-/// the largest n (<= `region_centre_limit`) whose SMALLEST centre, U/(n*H_n),
-/// is still at least `region_centre_heads`. 0 below one village's heads.
-/// Non-decreasing in @p urban_heads, so growth only ever adds a centre.
+/// How many centres a region's urban heads stand up: ONE once they reach a
+/// village's worth (`region_centre_heads`), none below it (BL-1141, a region
+/// deepens into one place). Non-decreasing in @p urban_heads.
 int region_centres_wanted(int64_t urban_heads);
 
-/// The land tiles @p n centres over @p urban_heads would pave: the sum over
-/// k = 1..n of `k_urban_footprint_tiles` at the rung U/(k*H_n) bands to (the
-/// carve's own banding, `scale_for_heads`). 0 for n <= 0.
-int region_centre_footprint(int64_t urban_heads, int n);
-
-/// The most centres, at most @p want, a region's ground holds at
-/// @p urban_heads: the first m descending from @p want whose hierarchy's
-/// footprint (`region_centre_footprint`) fits @p ground land tiles.
-///   * @p ground == 0 — a cell that holds NO land — holds no centre at all
-///     (Ben, 2026-09-25): there is no ground to stand one on, so nothing
-///     spills into a neighbour's cell.
-///   * @p ground > 0 never goes below 1 when @p want >= 1 — a region with land
-///     keeps the one centre it stands even where that centre's footprint
-///     outruns its ground, as a coastline cuts a footprint short rather than
-///     unbuilding the town.
-///   * @p ground < 0 is unmeasured and returns @p want (caps nothing).
-/// @p want is clamped to [0, `region_centre_limit`]. The ONE ground rule:
-/// growth, the sack and the campaign-era carve all read it.
-int region_centres_fit(int64_t urban_heads, int want, int ground);
+/// The centres, at most @p want (clamped to [0, 1]), a region's ground holds:
+///   * @p ground == 0 — a cell with no ground a centre can stand on — holds
+///     none (Ben, 2026-09-25): nothing spills into a neighbour's cell;
+///   * @p ground > 0 holds the one centre — its footprint the coast or the
+///     cell's edge cuts short stays short (`stamp_urban_land_use`), it never
+///     unbuilds the town;
+///   * @p ground < 0 is unmeasured and caps nothing.
+/// The ONE ground rule: growth, the sack and the campaign-era carve read it.
+int region_centres_fit(int want, int ground);
 
 /// THE CELL LAND OF EVERY REGION, maintained incrementally (BL-1130). The
 /// settlement partition is the Voronoi `nearest_region` reads (Chebyshev,
@@ -1400,7 +1383,7 @@ void draw_urban_map(settlement_state& s);
 /// `sack_region_urban` alone, a deliberate act of history.
 ///
 /// GROWTH CONSOLIDATES (BL-1130). What the heads stand up is
-/// `region_centres_wanted` — a hierarchy, not one centre per village's worth —
+/// `region_centres_wanted` — one centre once the heads reach a village's worth —
 /// and the count never exceeds `region_centres_fit` for the region's
 /// cell. That ceiling applies whether or not the network holds: it is a MERGE
 /// (a newer neighbour's founding cut the cell, and the centres standing fold

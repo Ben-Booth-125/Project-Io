@@ -1956,94 +1956,46 @@ int region_urban_share_q(int farm_q)
 }
 
 // ---------------------------------------------------------------------------
-// Growth consolidates (BL-1130) — a region's centres are a hierarchy that fits
-// its own ground
+// A region deepens into one place (BL-1141) — one centre while settled, held to
+// its own ground (BL-1130)
 // ---------------------------------------------------------------------------
 
 namespace {
-
-/// H_n in millionths — the carve's own integer harmonic
-/// (population_generation.cpp `carve_demography_centres`), so the region's
-/// hierarchy and the body's are the same arithmetic.
-int64_t harmonic_millionths(int n)
-{
-    int64_t h = 0;
-    for (int i = 1; i <= n; ++i) h += 1000000 / i;
-    return h;
-}
-
-/// The urban-heads domain every function below works in: 2^40, the same
-/// ceiling `advance_region_urban` clamps `urban_population` to, so a product
-/// with 10^6 stays below 2^60.
-constexpr int64_t urban_heads_domain = int64_t{1} << 40;
 
 /// Promote `centres` to whatever `urban_population` now stands up, never
 /// demote on growth. POPULATION.md's asymmetry: passive failure shrinks a
 /// centre and never destroys one, so only `sack_region_urban` razes one.
 ///
-/// BL-1130 — what the heads stand up is a HIERARCHY (`region_centres_wanted`),
-/// not one centre per village's worth, so growth deepens the centres standing
-/// before it founds another; and the count is held to what the cell's land
-/// holds (`region_centres_fit`). The hold is a MERGE, not a loss: when a newer
-/// neighbour's founding cuts the cell, the centres standing fold together and
-/// the heads stay, so `centres_razed` is not touched.
+/// BL-1141 — A REGION DEEPENS INTO ONE PLACE: what the heads stand up is one
+/// centre once they reach a village's worth (`region_centres_wanted`), held to
+/// what the cell's ground holds (`region_centres_fit`: none on a cell with no
+/// ground). Growth past that makes the one place bigger — its scale is read
+/// off the heads at the carve — never more numerous.
 ///
 /// BL-872 — `network_ok` false FREEZES growth: the ground the network can no
 /// longer feed or govern stands up no NEW centre. The ground hold still
-/// applies — a cell that shrank holds fewer whether or not the seat reaches it
-/// — and `sack_region_urban` stays the only place a centre is destroyed.
+/// applies — a cell that lost its ground holds none whether or not the seat
+/// reaches it — and `sack_region_urban` stays the only place a centre is razed.
 void promote_centres(region& p, bool network_ok)
 {
     int c = p.centres;
     if (network_ok)
         c = std::max(c, region_centres_wanted(p.urban_population));
-    p.centres = region_centres_fit(p.urban_population, c, p.urban_ground);
+    p.centres = region_centres_fit(c, p.urban_ground);
 }
 
 } // namespace
 
 int region_centres_wanted(int64_t urban_heads)
 {
-    if (urban_heads < region_centre_heads) return 0;
-    const int64_t u = std::min(urban_heads, urban_heads_domain);
-    int     n = 0;
-    int64_t h = 0;
-    for (int k = 1; k <= region_centre_limit; ++k)
-    {
-        h += 1000000 / k;
-        // The k-th and smallest centre of a k-hierarchy stands u / (k * H_k)
-        // heads; it must still be a village's worth. Cross-multiplied in
-        // millionths. k * H_k only rises with k, so the first miss ends it.
-        if (u * 1000000 < region_centre_heads * static_cast<int64_t>(k) * h) break;
-        n = k;
-    }
-    return n;
+    return urban_heads >= region_centre_heads ? 1 : 0;
 }
 
-int region_centre_footprint(int64_t urban_heads, int n)
+int region_centres_fit(int want, int ground)
 {
-    if (n <= 0) return 0;
-    n = std::min(n, region_centre_limit);
-    const int64_t u = clampi64(urban_heads, 0, urban_heads_domain);
-    const int64_t h = harmonic_millionths(n);
-    int tiles = 0;
-    for (int k = 1; k <= n; ++k)
-    {
-        const int64_t share = (u * 1000000) / (static_cast<int64_t>(k) * h);
-        tiles += k_urban_footprint_tiles[scale_for_heads(share) - 1];
-    }
-    return tiles;
-}
-
-int region_centres_fit(int64_t urban_heads, int want, int ground)
-{
-    // Descending from what the heads want, so a region its ground does not
-    // bind pays one footprint sum and no more. A cell with no land holds none;
-    // a cell with land keeps at least the one centre it stands.
-    int m = clampi(want, 0, region_centre_limit);
+    const int m = clampi(want, 0, 1);
     if (ground < 0) return m;
     if (ground == 0) return 0;
-    while (m > 1 && region_centre_footprint(urban_heads, m) > ground) --m;
     return m;
 }
 
@@ -2112,7 +2064,7 @@ bool update_urban_ground(settlement_state& ss, urban_ground_field& f,
 bool hold_region_to_ground(region& p)
 {
     if (p.centres <= 0) return false;
-    const int held = region_centres_fit(p.urban_population, p.centres, p.urban_ground);
+    const int held = region_centres_fit(p.centres, p.urban_ground);
     if (held == p.centres) return false;
     p.centres = held;
     return true;
@@ -2212,10 +2164,9 @@ void sack_region_urban(region& p, int population_loss_q)
         p.urban_population - (p.urban_population * loss_q) / 1000, 0, 1LL << 40);
 
     // What the survivors can still stand up. BL-1130: "stand up" is the same
-    // hierarchy growth builds, on the same ground, so a sack and a promotion
+    // rule growth builds by (one centre, BL-1141), on the same ground, so a sack and a promotion
     // read one rule in both directions.
-    const int stands = region_centres_fit(p.urban_population,
-                                          region_centres_wanted(p.urban_population),
+    const int stands = region_centres_fit(region_centres_wanted(p.urban_population),
                                           p.urban_ground);
     if (stands < p.centres)
         p.centres = stands;
@@ -2224,7 +2175,7 @@ void sack_region_urban(region& p, int population_loss_q)
     // says it was razed, which is the only way the epoch map can read as
     // historied. BL-1130 round 4: it is COUNTED IN PEOPLE, a village's worth of
     // urban heads per razing, whether or not the centre count steps down, so
-    // the hierarchy's coarse steps (one town standing for 20,000-40,000 heads)
+    // the centre count's coarse steps (one place standing for any number of heads)
     // do not hide a sack. The unit is `region_settlement_size`, the size the
     // prize reads: heads over the village rung, and the last settlement's one
     // when it falls — so a sack records exactly the centres the one-centre-per-
