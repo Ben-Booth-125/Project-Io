@@ -430,9 +430,22 @@ landscape search. Whether a lane *decays* once its traffic stops is this doc's o
 
 The reading is structural rather than a tuning miss, and the figures say so: at a tenth of the rate the median still ends at 181k, because a cap-sized army over 115 rounds costs about one median hoard. **The caps were hiding a 600x treasury spread** — so what looks like a new failure is an old one becoming visible, which is the whole point of putting the cost in the world. The visible consequence to watch is displacement: its median fell to 0.85 on this arm while the pooled figure held at 1.64. If a later reading shows the spent purse suppressing displacement rather than differentiating realms, that is the evidence that reopens this call.
 
-**SETTLED (Ben, 2026-09-11): `army_stock` CARRIES across the handoff; the navy is NEW and starts
-at zero, everywhere.** No polity inherits a fleet, which means the first ocean-capable power in a
-world built its fleet inside this phase and the sweep can see when.
+**SETTLED (Ben, 2026-09-11): `army_stock` CARRIES across the handoff.**
+
+**SETTLED (Ben, 2026-09-26, superseding "the navy is new and starts at zero, everywhere" of
+2026-09-11): the navy CARRIES too, as a starting fleet earned at sea in the Empires age.** A
+polity accrues **naval points** through the Empires span from three deeds: the coastal provinces
+it holds, counted per year held; the sea crossings it makes, the sea legs it walks; and the
+coastal sea techs it takes (Deep-Hull Sail and on, `trees/EMPIRE_TREE.md`). At the handoff its
+points become its opening `navy_stock`, so the coastal empires open the age already at sea and
+the Exploration age's first crossings, purchases and lanes follow who held the sea before it.
+**The points pass to the polity that earned them:** a polity that lost its coast keeps its
+sailors, and they are never read off the regions it holds at the handoff. The fleet is then a
+stock like any other (the table below): upkeep from the first round, decay when underfunded,
+staged from a port. The conversion from points to fleet is one named constant, read on a
+measured ladder over the curated seeds, never set to hit a count. `port_q` stays endowment and
+no port carries (§ `port_q` is endowment, not a port): a fleet is earned by deeds, a harbour is
+still built in this age. BL-1147 (naval points carry over) owns the build.
 
 **Ben, 2026-09-11:** *"Spending capital on ports within the Exploration round enables cheaper
 overseas skirmishes. So building a navy and standing army that persists is important — these
@@ -443,7 +456,7 @@ Three objects, and each is a stock the treasury maintains:
 | Stock | Built from | What it buys | If underfunded |
 |---|---|---|---|
 | **Port** | Capital, on a region with a port window | Lowers the cost of every crossing staged from it | Silts: its discount decays toward nothing |
-| **Navy** | Capital, staged from a port | Crossing capacity, and contest of a crossing | Decays; a fleet is a running cost, not a purchase |
+| **Navy** | Capital, staged from a port, on top of the fleet its naval points carried | Crossing capacity, and contest of a crossing | Decays; a fleet is a running cost, not a purchase |
 | **Standing army** | Capital, on top of inherited `army_stock` | Force that is *already raised* when a skirmish opens | Falls back toward what muster alone provides |
 
 **Decay is what makes the choice a choice.** A purchase the treasury never revisits is a one-time

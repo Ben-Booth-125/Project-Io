@@ -139,6 +139,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -442,8 +443,7 @@ double median_of(std::vector<double> v)
     return v[v.size() / 2];
 }
 
-seed_result run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
-                    const world_gen_config& gen_cfg)
+seed_result run_seed(uint32_t seed, lua_state& lua, bool prehistory)
 {
     seed_result out;
     out.seed = seed;
@@ -453,8 +453,21 @@ seed_result run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
     if (!prehistory)
         p = no_prehistory(p);
 
-    // app::setup_world -> load_economy -> generate_background_firms ->
-    // assign_default_recipes, in that order (app.cpp § start_new_game_prelude).
+    // THE SHIPPED START (BL-1086 review, 2026-09-26): `build_app_start_world`,
+    // harness_params.hpp's app-order mirror — generation with the parsed config
+    // and the works table, the genesis bridge and survey states, the banded
+    // registry and its recipe pass, then the landscape SEARCH and its winner
+    // applied with the world's own charter budget, then the second recipe pass.
+    // It replaced a bare make_hard_coded_world + generate_background_firms: on a
+    // budget world generation lays no roster any more (BL-1086), so that path
+    // handed this harness no seated corporation at all, and even before it the
+    // bare path measured a world-gen roster beside Pass 6 firms, which is not the
+    // web the player is handed. The corporation probed is `w.player_entity` as
+    // the winner's apply leaves it — the charter web's seeded pick among its
+    // specialists on a budget world, generate_corporations' player otherwise.
+    // (The app then settles in spectate and re-draws the seat at Begin,
+    // `seat_player_corporation`; this harness settles with that corporation
+    // seated, as it always has.)
     //
     // THE GENERATION CONFIG MUST BE PARSED AND PASSED (fixed 2026-08-26, found by
     // material_floor.cpp). Omitting it does not fall back to something close: the
@@ -468,15 +481,21 @@ seed_result run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
     // made exactly that mistake: the 2026-08-26 loader fix added the load and not
     // the parse, so the numbers it produced afterwards were still of the wrong
     // world. app.cpp:488-490 loads AND parses AND passes; a harness must do all
-    // three or it is not measuring the shipped spawn.
-    world w = make_hard_coded_world(p, nullptr, gen_cfg);
+    // three or it is not measuring the shipped spawn. `build_app_start_world`
+    // does all three (load_app_generation_inputs).
+    auto start = std::make_unique<app_start_world>();
+    build_app_start_world(lua, p, *start);
+    world&           w   = start->w;
+    recipe_registry& reg = start->reg;
     // BL-1101: the band is the world's own, applied after generation as
-    // app::load_economy applies it — never a probe descriptor's epoch.
-    std::printf("  band: %s (the world's own, derived at the 1960 fold)\n",
-                era_band_name(band_registry_from_world(reg, w)));
-    assign_default_recipes(w, reg);
-    generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
-    assign_default_recipes(w, reg);
+    // app::load_economy applies it (inside the mirror) — never a probe
+    // descriptor's epoch.
+    std::printf("  band: %s (the world's own, derived at the 1960 fold); %s; seated corp %u\n",
+                era_band_name(w.campaign_band),
+                start->land.stockpile_path && !start->land.stockpile.budget.empty()
+                    ? "a BUDGET world (the winner's charter web)"
+                    : "no charter budget (the searched roster)",
+                static_cast<unsigned>(w.player_entity));
 
     for (const auto& kv : w.corporations)
         out.field_holdings_open += static_cast<int>(kv.second.assets.size());
@@ -641,11 +660,10 @@ int main(int argc, char** argv)
     recipe_registry reg;
     reg.load_from_lua(lua);
 
-    // Parsed, not merely loaded — see the note in run_seed. This one line is the
-    // difference between measuring the shipped spawn and measuring a world where
-    // most of the ancient roster cannot be sold at all.
-    world_gen_config gen_cfg{};
-    gen_cfg.load_from_lua(lua);
+    // Parsed, not merely loaded — see the note in run_seed: each seed's world is
+    // built by `build_app_start_world`, which parses and passes world_gen.lua's
+    // config itself (load_app_generation_inputs), so the registry here is only
+    // the vacuity guard's.
 
     // The band is set per world inside run_seed (BL-1101), not here from a
     // probe descriptor: it is the world's own verdict.
@@ -669,7 +687,7 @@ int main(int argc, char** argv)
     rows.reserve(static_cast<std::size_t>(seed_count));
     for (int i = 0; i < seed_count; ++i)
     {
-        rows.push_back(run_seed(seed0 + static_cast<uint32_t>(i), reg, prehistory, gen_cfg));
+        rows.push_back(run_seed(seed0 + static_cast<uint32_t>(i), lua, prehistory));
         std::printf("  ... seed %u done\n", rows.back().seed);
         std::fflush(stdout);
     }

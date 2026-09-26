@@ -7323,13 +7323,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold, author != reviewer)"
      ],
      "requirement": "A cold review of the merged change, fix round included.",
      "notes": "Cold review 2026-09-26: one budget, the same nation resolution, deterministic. Findings: probes that skip the spend now see no corporations (spawn_solvency red on budget seeds); the plan ignores the walk's 120-firm body ceiling; the budget-world test written three times; L1/L2 can pass with no budget world. Fix round sent to the search lane with R4 (the loading screen's list).",
-     "result_metric": ""
+     "result_metric": "Fix round 7a17afda, merged b92165e4: probes built on the shipped start (spawn_solvency ALL PASS 12/12, seated net +305.4 cr/qtr); the plan honours the 120 body ceiling (all 16 seeds plan exactly 120 firms; chartered 806 + 1,721 of planned 861 + 1,920); one is_budget_world predicate; L0/L1/L1b/L2 16/16; P1 16/16 with both negative controls; legacy digests byte-identical; markets 5,800 -> 5,803."
     },
     {
      "id": "R4",
@@ -7338,7 +7338,7 @@
       "visual: live click on the loading screen's charter list on a budget world"
      ],
      "requirement": "The loading screen's charter list (app::draw_building_carve) still shows what the carve counts on a budget world, not an empty list.",
-     "notes": "",
+     "notes": "publish_charter_web now publishes the winner's specialists to the carve panel (cold path: --autostart, seed 0 should show 54 rows after \"Proving the field\"; the wizard's round 6 draws from another sink). Screen access declined 2026-09-26; the live click moves to the walk.",
      "result_metric": ""
     },
     {
@@ -7377,14 +7377,14 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice on main",
       "headless: history_sim_harness, province_partition_harness, save_roundtrip on main"
      ],
      "requirement": "Deterministic run to run; no gate moves beyond the known failures.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Main 8cbdbc9d (BL-1141 alone, BL-1137 reverted): world_determinism ALL PASS twice at D93FFC43226A89BE; save_roundtrip OK; province_partition_harness ALL PASS (0 failures: the pre-existing D A1 now passes); history_sim_harness only R3a2/R3a3; industrialisation_sim_harness exit 0 (report only); centre_census OK -- centres 22,521 on 9.6% of land, scales 15,624/6,749/148/0/0, road tiles 80,706, markets 7,002 (the lane's 6,826 before BL-1086), C10 0 pairs. The first gate run at 13:19 was discarded: an orphaned earlier script wrote pre-revert results into its folder."
     },
     {
      "id": "R3",

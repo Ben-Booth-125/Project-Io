@@ -43,6 +43,13 @@
 // and stops short of the warm start — those are the GENERATED conditions, the
 // ground the player is handed, before any tick has moved anything.
 //
+// SINCE BL-770 AND BL-1042 THAT ORDERING IS THE LANDSCAPE SEARCH, and since
+// BL-1086 the old one no longer holds at all: the start searches the landscape
+// and applies its winner, whose web a budget world charters from the world's
+// own stockpile, and generation lays no roster on such a world. The mirror is
+// `build_app_start_world` (harness_params.hpp); the list above is the history of
+// why the census reads the world after its industry, not the code path.
+//
 // LIVE LUA, NOT A HAND-BUILT REGISTRY, and this is load-bearing rather than
 // tidiness. `generate_background_firms`'s stop condition is measured against
 // `population_demand` + `background_demand`, whose baskets are authored in
@@ -67,6 +74,7 @@
 // Usage:  substrate_census [seed_count]      (default 3)
 // ---------------------------------------------------------------------------
 
+#include "harness_params.hpp"      // build_app_start_world: the shipped start (BL-1086 review)
 #include "scripting/lua_state.hpp"
 #include "world/components.hpp"
 #include "world/corporation_generation.hpp"
@@ -83,6 +91,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -559,14 +568,18 @@ int main(int argc, char** argv)
 
         world_params p;                       // prehistory_years stays at its default (400)
         p.seed = static_cast<uint32_t>(i);
-        world w = make_hard_coded_world(p, nullptr, gen_cfg, nullptr, &works);
 
-        // The shipped ordering, mirrored — see the header. Both
-        // assign_default_recipes calls are the live ones from app::start_new_game;
-        // dropping the second leaves every background processor recipe-less.
-        assign_default_recipes(w, reg);
-        generate_background_firms(w, reg, p.seed ^ 0x8A21F00Du);
-        assign_default_recipes(w, reg);
+        // THE SHIPPED START (BL-1086 review, 2026-09-26): `build_app_start_world`,
+        // harness_params.hpp's app-order mirror — the world as the landscape
+        // search's winner leaves it, with the world's own charter budget and both
+        // recipe passes. It replaced make_hard_coded_world + generate_background_
+        // firms, which on a budget world now carries no specialist at all (no
+        // roster is laid in generation, BL-1086) and before that measured Pass 6
+        // firms beside a roster the search discards — neither is the world the
+        // player first sees, which is this census's subject (see the header).
+        auto start = std::make_unique<app_start_world>();
+        build_app_start_world(lua, p, *start);
+        const world& w = start->w;
 
         census_row r = measure(w, p.seed);
         const auto t1 = std::chrono::steady_clock::now();

@@ -233,7 +233,12 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     // type drops entries <= 0), is TODAY'S WORLD: the legacy overload, called
     // verbatim, with nothing before it and nothing after it. Nothing below this
     // line runs for such a world, and no spend param or price is read.
-    if (budget == nullptr || budget->empty())
+    //
+    // THE ONE PREDICATE (BL-1086 review): `read_budget_world` decides it, in
+    // the order this function always read it, on `w` as it arrives and before
+    // any mutation — the same test the search and generation's bump 11 ask.
+    const budget_world_reading bw = read_budget_world(w, budget, spend, &reg);
+    if (bw.kind == budget_world_kind::no_budget)
     {
         apply_landscape_candidate(w, reg, c, regenerate_specialists);
         return;
@@ -246,14 +251,11 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     // BL-1060: the params' refusal, then the one only the world can decide (a
     // ceiling too small for a body's turn and yards), both read on `w` as it
     // arrives.
-    const char* why = charter_spend_refusal(*budget, spend);
-    if (why == nullptr)
-        why = charter_spend_world_refusal(w, reg, *budget, spend);
-    if (why != nullptr)
+    if (bw.kind == budget_world_kind::refused)
     {
         apply_landscape_candidate(w, reg, c, regenerate_specialists);
         if (report != nullptr)
-            *report = charter_refused_report(*budget, why);
+            *report = charter_refused_report(*budget, bw.refusal);
         return;
     }
 
@@ -262,7 +264,7 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     // chartered, and laid as the legacy overload verbatim — so the player is
     // seated from the no-budget world's own roster. Not a refusal: the report
     // says it fell back, every point unspent as `no_specialist`.
-    if (!charter_budget_affords_specialist(w, *budget, spend))
+    if (bw.kind == budget_world_kind::no_specialist)
     {
         apply_landscape_candidate(w, reg, c, regenerate_specialists);
         if (report != nullptr)
@@ -317,10 +319,11 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     // `p` is that copy on a refusal and `p_in` itself otherwise.
     // BL-1060: then the refusal only the world can decide, on the base world
     // every candidate is applied to (`charter_spend_world_refusal`).
-    const char* refusal = (p_in.budget != nullptr)
-        ? charter_spend_refusal(*p_in.budget, p_in.spend) : nullptr;
-    if (refusal == nullptr && p_in.budget != nullptr)
-        refusal = charter_spend_world_refusal(base, reg, *p_in.budget, p_in.spend);
+    //
+    // THE ONE PREDICATE (BL-1086 review): `read_budget_world`, the test the
+    // apply and generation's bump 11 ask, read once here on the base world.
+    const budget_world_reading bw = read_budget_world(base, p_in.budget, p_in.spend, &reg);
+    const char* refusal = bw.kind == budget_world_kind::refused ? bw.refusal : nullptr;
     landscape_search_params refused_params;
     if (refusal != nullptr)
     {
@@ -339,8 +342,7 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     // which no centre a nation owns affords a specialist runs the no-budget
     // search, decided on the base world before any candidate charters, exactly
     // as the apply decides it (`apply_landscape_candidate`'s budget overload).
-    const bool fell_back = refusal == nullptr && p_in.budget != nullptr && !p_in.budget->empty()
-                        && !charter_budget_affords_specialist(base, *p_in.budget, p_in.spend);
+    const bool fell_back = bw.kind == budget_world_kind::no_specialist;
     if (fell_back)
     {
         refused_params         = p_in;
@@ -358,7 +360,7 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     // BL-1032. A BUDGET WORLD skips the roster axis (the budget decides the
     // roster). A null, empty or refused budget is not a budget world, and
     // everything below runs exactly as it did before the seam.
-    const bool budget_world = p.budget != nullptr && !p.budget->empty();
+    const bool budget_world = bw.budget_world();
     if (budget_world && p.print_rounds)
         std::printf("[landscape_search] charter budget: %zu centres, %lld points; roster axis "
                     "SKIPPED (the budget decides the roster)\n",

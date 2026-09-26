@@ -3317,6 +3317,40 @@ bool charter_budget_affords_specialist(const world& w, const charter_budget& bud
     return false;
 }
 
+budget_world_reading read_budget_world(const world& w, const charter_budget* budget,
+                                       const charter_spend_params& spend,
+                                       const recipe_registry* reg)
+{
+    budget_world_reading r;
+    // 1. No budget, or an empty one: today's world, nothing else read.
+    if (budget == nullptr || budget->empty())
+        return r;
+    // 2 and 3. The params' refusal, then the world's — the latter only with a
+    // registry (bump 11 has none; see the header for why that cannot mislead it).
+    r.refusal = charter_spend_refusal(*budget, spend);
+    if (r.refusal == nullptr && reg != nullptr)
+        r.refusal = charter_spend_world_refusal(w, *reg, *budget, spend);
+    if (r.refusal != nullptr)
+    {
+        r.kind = budget_world_kind::refused;
+        return r;
+    }
+    // 4. The no-specialist world (NR-910).
+    if (!charter_budget_affords_specialist(w, *budget, spend))
+    {
+        r.kind = budget_world_kind::no_specialist;
+        return r;
+    }
+    r.kind = budget_world_kind::budget;
+    return r;
+}
+
+bool is_budget_world(const world& w, const charter_budget* budget,
+                     const charter_spend_params& spend, const recipe_registry* reg)
+{
+    return read_budget_world(w, budget, spend, reg).budget_world();
+}
+
 std::map<entity_id, charter_nation_plan> plan_charters_by_nation(
     const world& w, const charter_budget& budget, const charter_spend_params& spend)
 {
@@ -3325,28 +3359,107 @@ std::map<entity_id, charter_nation_plan> plan_charters_by_nation(
     if (budget.empty() || fp <= 0)
         return out;
     const int64_t specialist_price = spend.specialist_price_points();
+
+    // The walk's resolution of every budgeted centre: its tile, its body and the
+    // nation owning the tile. A centre without one charters nothing.
+    struct planned_centre
+    {
+        entity_id centre = null_entity;
+        int32_t   points = 0;
+        entity_id body   = null_entity;
+        entity_id nation = null_entity;
+    };
+    std::vector<planned_centre> centres;
+    centres.reserve(budget.points().size());
     for (const auto& [centre_id, pts] : budget.points())
     {
-        // The walk's own resolution: the centre's tile, and the nation owning it
-        // (a centre without one charters nothing).
         const auto tile_it = w.population_centre_tile.find(centre_id);
-        if (tile_it == w.population_centre_tile.end() || w.tiles.count(tile_it->second) == 0)
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const auto t = w.tiles.find(tile_it->second);
+        if (t == w.tiles.end())
             continue;
         const auto own = w.tile_to_nation.find(tile_it->second);
         if (own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
             continue;
-        const int64_t specialists =
-            (specialist_price > 0 && static_cast<int64_t>(pts) >= specialist_price) ? 1 : 0;
-        // charter_centre_firm_points is already net of the specialist's price
-        // and whole firm charters, so the division is exact.
-        const int64_t firms = charter_centre_firm_points(pts, spend) / fp;
+        centres.push_back({ centre_id, pts, t->second.body, own->second });
+    }
+
+    // The walk's spend order: budget DESCENDING, ties to the lower centre id.
+    std::sort(centres.begin(), centres.end(), [](const planned_centre& a, const planned_centre& b) {
+        if (a.points != b.points)
+            return a.points > b.points;
+        return a.centre < b.centre;
+    });
+
+    // The walk's stop per body: the runaway guard, and under `sqrt_capital` the
+    // density ceiling below it (`charter_fix_body_rules` sets the ceiling only
+    // there). A body at its stop charters no further firm.
+    int64_t body_stop = spend.max_firms_per_body;
+    if (spend.resource_cap_rule == charter_cap_rule::sqrt_capital && spend.density_ceiling > 0)
+        body_stop = std::min<int64_t>(body_stop, spend.density_ceiling);
+    body_stop = std::max<int64_t>(0, body_stop);
+
+    // NR-913: the walk's own pooled-remainder plan (empty under `none`).
+    const charter_pool_plan pool = plan_charter_pool(w, budget, spend);
+
+    std::map<entity_id, int64_t> firms_on_body;   // planned so far, per body
+    for (const planned_centre& pc : centres)
+    {
+        int64_t after_specialist = pc.points;
+        int64_t specialists      = 0;
+        if (static_cast<int64_t>(pc.points) >= specialist_price)
+        {
+            specialists       = 1;
+            after_specialist -= specialist_price;
+        }
+        int64_t firm_budget = after_specialist;
+        if (const auto o = pool.out.find(pc.centre); o != pool.out.end())
+            firm_budget -= o->second;
+        if (const auto i = pool.in.find(pc.centre); i != pool.in.end())
+            firm_budget += i->second;
+        int64_t firms = firm_budget > 0 ? firm_budget / fp : 0;
+        int64_t& on_body = firms_on_body[pc.body];
+        firms = std::clamp<int64_t>(firms, 0, std::max<int64_t>(0, body_stop - on_body));
+        on_body += firms;
         if (specialists == 0 && firms == 0)
             continue;
-        charter_nation_plan& p = out[own->second];
+        charter_nation_plan& p = out[pc.nation];
         p.specialists += specialists;
         p.firms       += firms;
     }
     return out;
+}
+
+void publish_charter_web(generation_progress* progress, const world& w,
+                         const charter_spend_report& rep)
+{
+    if (progress == nullptr)
+        return;
+    // `rep.charters` is sorted by corporation id, and the walk hands ids out
+    // monotonically, richest centre first — so this is charter order.
+    int slot = 0;
+    for (const charter_record& cr : rep.charters)
+    {
+        if (!cr.specialist)
+            continue;
+        if (slot >= generation_progress::max_corp_slots)
+            break;   // overflow dropped, as the tap's own bound says
+        const auto cit = w.corporations.find(cr.corp);
+        if (cit == w.corporations.end())
+            continue;
+        for (const entity_id tile : cr.holdings)
+        {
+            const auto tit = w.tiles.find(tile);
+            if (tit == w.tiles.end() || tit->second.body != w.home_body)
+                continue;   // the carve is published over the home body's grid
+            progress->mark_asset(tit->second.grid_x, tit->second.grid_y, slot);
+        }
+        progress->add_corp_row(slot, static_cast<int>(cit->second.focus),
+                               static_cast<int>(cr.holdings.size()),
+                               cit->second.starting_capital);
+        ++slot;
+    }
 }
 
 std::vector<entity_id> charter_web_from_budget(world& w,
