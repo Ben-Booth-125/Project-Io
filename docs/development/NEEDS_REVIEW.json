@@ -1288,6 +1288,28 @@
     "docs/economy/LOGISTICS.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-956",
+   "title": "DECISION TAKEN: a scheduled founding keeps its ground, and every region counts for the spacing",
+   "raised": "2026-09-26",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1132 (settle spacing) cold review, 2026-09-26; merged 89d3bb4b",
+   "what": "The review found the three-tile rule bound only Settle. A founding the migration stream schedules (pending, dated -400 to 0 CE) could arrive 0-1 tiles from a Settle daughter founded in the same years. Taken on your behalf: a pending founding keeps its ground, so Settle refuses any tile within three tiles of it (option a). The other option was to test the spacing when a scheduled founding arrives and drop or defer it (option b), which changes the migration playback. Also taken: the spacing counts every region, held or not, because each still anchors a cell (the doc said \"standing\"). CIVILISATION.md states both. The fix is in the spacing lane, with a census count of too-close pairs that must read 0.",
+   "why_it_matters": "Option a reserves ground for the migration stream over the realms; option b lets realms take it first and thins the stream.",
+   "options": [
+    "A: keep as taken (pending ground reserved; every region counts)",
+    "B: test at arrival and drop or defer a blocked scheduled founding",
+    "C: other"
+   ],
+   "recommendation": "A: it honours the rule without changing the migration playback.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/CIVILISATION.md",
+    "tools/verify/centre_census.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

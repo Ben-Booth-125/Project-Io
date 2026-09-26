@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*59 entries — 4 open, 55 resolved.*
+*60 entries — 5 open, 55 resolved.*
 
 ---
 
@@ -91,6 +91,21 @@ Taken on your behalf by the lane: a seat's port is its nearest sea tile within n
 > **Recommendation:** B now; C read against the haulage baseline before it is set.
 
 *Files: `src/world/road_generation.cpp`, `src/world/logistics.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-956 — DECISION TAKEN: a scheduled founding keeps its ground, and every region counts for the spacing
+*decision · raised 2026-09-26 · from BL-1132 (settle spacing) cold review, 2026-09-26; merged 89d3bb4b*
+
+The review found the three-tile rule bound only Settle. A founding the migration stream schedules (pending, dated -400 to 0 CE) could arrive 0-1 tiles from a Settle daughter founded in the same years. Taken on your behalf: a pending founding keeps its ground, so Settle refuses any tile within three tiles of it (option a). The other option was to test the spacing when a scheduled founding arrives and drop or defer it (option b), which changes the migration playback. Also taken: the spacing counts every region, held or not, because each still anchors a cell (the doc said "standing"). CIVILISATION.md states both. The fix is in the spacing lane, with a census count of too-close pairs that must read 0.
+
+**Why it matters.** Option a reserves ground for the migration stream over the realms; option b lets realms take it first and thins the stream.
+
+- A: keep as taken (pending ground reserved; every region counts)
+- B: test at arrival and drop or defer a blocked scheduled founding
+- C: other
+
+> **Recommendation:** A: it honours the rule without changing the migration playback.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/CIVILISATION.md`, `tools/verify/centre_census.cpp`*
 
 ---
 
