@@ -2829,6 +2829,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // nearer than `settle_min_spacing_tiles` (Chebyshev, columns
     // wrapping — the partition's own metric; history_sim.hpp says
     // why tiles). At 1 that is exactly the old occupancy test.
+    // EVERY REGION COUNTS, HELD OR NOT, living or not — another realm's,
+    // unorganised ground, an emptied region — because every anchor owns a
+    // cell of the partition, whoever holds it.
+    //
+    // AND EVERY SCHEDULED FOUNDING STILL TO COME (BL-1132 review fix).
+    // `pending_foundings` are the migration's regions dated after the sim
+    // opens; their anchors are already fixed, at least the settlement
+    // pass's own `sep` from each other and from its placed regions. Settle
+    // runs in the same years, so a daughter that saw only the standing
+    // regions could land on, or beside, ground the schedule is about to
+    // found — a stacked pair, or a cell under the spacing's guarantee. The
+    // pending anchors are refused like standing ones, so every founding
+    // arrives clear, and the schedule itself is never dropped or deferred.
     //
     // THE SEARCH KEEPS ITS SIX RINGS, STARTING AT THE SPACING.
     // Every probe of a ring nearer than the spacing lies within it
@@ -2839,19 +2852,29 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // hash reads only the year and the probe index, so skipping a
     // ring moves no later probe.
     //
-    // THE NEAR LIST is an exact filter, not a heuristic: a region
+    // THE NEAR LIST is an exact filter, not a heuristic: an anchor
     // further than (last ring + spacing - 1) from the parent can
     // never stand within the spacing of any probe, so only the
-    // regions inside that radius are tested, once per probe.
+    // anchors inside that radius are tested, once per probe. The list
+    // is one buffer reused across calls, so a call allocates nothing
+    // once it has grown.
+    //
+    // THE RINGS ARE SAMPLED, NOT SWEPT: each ring draws (2r + 1)^2 hashed
+    // probes, with repeats, so a free tile can go unprobed. "No room" means
+    // no site was FOUND this year from this parent, not that none exists;
+    // next year's probes are drawn afresh.
     //
     // ONE SITE RULE, a pure function of (parent, polity salt, year, the region
-    // list): writes the chosen tile to (nc, nr), or -1/-1 when the six rings
-    // hold no ground far enough from every standing region.
+    // list, the pending schedule): writes the chosen tile to (nc, nr), or -1/-1
+    // when the six rings yield no probe far enough from every standing region
+    // and every scheduled one.
     //
     // TWO READERS, ONE ANSWER: the Settle scorer asks it whether a source has
     // room (a realm settles only where there is room; Ben, 2026-09-26) and the
     // verb asks it where to found. Nothing between the two touches the region
-    // list, so the site the scorer saw is the site the verb founds on.
+    // list or the schedule, so the site the scorer saw is the site the verb
+    // founds on.
+    std::vector<std::pair<int, int>> settle_near; // the near list's one buffer
     const auto find_settle_site = [&](const region& src, uint32_t qs, int64_t y,
                                       int& nc, int& nr) {
         const int spacing    = std::max(1, params.settle_min_spacing_tiles);
@@ -2865,11 +2888,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
             if (dr < 0) dr = -dr;
             return dc > dr ? dc : dr;
         };
-        std::vector<int> near_regions;
-        for (std::size_t ei = 0; ei < ss.regions.size(); ++ei)
-            if (tile_gap(ss.regions[ei].col, ss.regions[ei].row, src.col, src.row)
-                <= ring_last + spacing - 1)
-                near_regions.push_back(static_cast<int>(ei));
+        const int near_radius = ring_last + spacing - 1;
+        settle_near.clear();
+        for (const region& e : ss.regions)
+            if (tile_gap(e.col, e.row, src.col, src.row) <= near_radius)
+                settle_near.emplace_back(e.col, e.row);
+        for (const region& e : ss.pending_foundings)
+            if (tile_gap(e.col, e.row, src.col, src.row) <= near_radius)
+                settle_near.emplace_back(e.col, e.row);
 
         nc = -1; nr = -1;
         for (int ring = ring_first; ring <= ring_last && nc < 0; ++ring)
@@ -2917,11 +2943,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // square without walking the list.
                 if (tile_gap(cc, rr, src.col, src.row) < spacing) continue;
                 bool taken = false;
-                for (const int ei : near_regions)
-                {
-                    const region& e = ss.regions[static_cast<std::size_t>(ei)];
-                    if (tile_gap(cc, rr, e.col, e.row) < spacing) { taken = true; break; }
-                }
+                for (const std::pair<int, int>& e : settle_near)
+                    if (tile_gap(cc, rr, e.first, e.second) < spacing) { taken = true; break; }
                 if (!taken) { nc = cc; nr = rr; break; }
             }
         }
@@ -5904,9 +5927,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // region before the stop year and leaves none after it, so
             // without this verb a 2000-year run has a frozen region count.
             {
+                // A polity fighting for its life does not colonise (BL-308).
+                // Letting it was the main reason losers regrew faster than they
+                // were conquered, and why elimination never happened.
+                //
+                // READ BEFORE THE SOURCE LOOP (BL-1132 review fix), not after
+                // it: the loop runs the site search for every eligible held
+                // region, and a polity the gate refuses can never pick Settle,
+                // so its search was pure cost. The gate reads only cohesion,
+                // which nothing in the loop writes, so the choice is unchanged.
+                const bool may_settle = q.cohesion_q >= params.settle_cohesion_gate_q;
                 int pressure_best = -1, pressure_src = -1;
                 for (int hi : held)
                 {
+                    if (!may_settle) break;
                     const region& p = ss.regions[static_cast<std::size_t>(hi)];
                     // The works-aware ceiling (BL-321), matching what
                     // `advance_region_demography` actually grows toward. The
@@ -5934,21 +5968,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // founds with, so a chosen Settle always founds. Without it
                     // the scorer picked the most crowded razed region whether or
                     // not its neighbourhood was full, and the round was spent on
-                    // a founding that could not happen (main wasted 634 / 1,977 /
-                    // 2,911 Settle rounds across the three spans on the curated
-                    // seeds; spacing 3 made it 85% of the Empires span's). A
-                    // region below the pressure gate is skipped outright: it
-                    // could only ever fail the gate below, so it needs no site.
+                    // a founding that could not happen (main before BL-1132
+                    // wasted 624 / 2,161 / 3,274 Settle rounds in the Empires /
+                    // Exploration / Industrialisation spans on the curated
+                    // seeds; spacing 3 made it 85% of the Empires span's). The
+                    // search samples its rings (see `find_settle_site`), so a
+                    // source skipped here found no site THIS year and may find
+                    // one the next. A region below the pressure gate is skipped
+                    // outright: it could only ever fail the gate below, so it
+                    // needs no site.
                     if (pressure < params.settle_pressure_q) continue;
                     int site_c = -1, site_r = -1;
                     find_settle_site(p, qs, y, site_c, site_r);
                     if (site_c < 0) continue;
                     pressure_best = pressure; pressure_src = hi;
                 }
-                // A polity fighting for its life does not colonise (BL-308).
-                // Letting it was the main reason losers regrew faster than they
-                // were conquered, and why elimination never happened.
-                const bool may_settle = q.cohesion_q >= params.settle_cohesion_gate_q;
                 if (may_settle && pressure_src >= 0 && pressure_best >= params.settle_pressure_q)
                 {
                     const region& sp = ss.regions[static_cast<std::size_t>(pressure_src)];
