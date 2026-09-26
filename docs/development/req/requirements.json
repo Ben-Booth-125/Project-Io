@@ -7552,13 +7552,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold)"
      ],
      "requirement": "A cold review, fix round included.",
      "notes": "",
-     "result_metric": "Review 2026-09-26: a wet campaign corridor reads as a road in the by_sea mark; the coastal deed counts inland daughters (inherited port_q); the census re-derives the mark; a second conversion is guarded only by params; rows by construction. Fix round in the sea lane."
+     "result_metric": "Fix round 99b86768, merged 572a0afb: wet corridors are not roads (history_corridor::wet), the coastal deed reads the terrain (weights 1/280/9,600), the conversion guarded by a span flag (N9), the census reads by_sea, construction rows labelled. Main: world_determinism ALL PASS twice at 0C8A42270888B95C; ocean_currents, sea_lane_stamp, world_cursor_equivalence ALL PASS; only the known four failures."
     },
     {
      "id": "R4",
