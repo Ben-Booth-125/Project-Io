@@ -1265,6 +1265,29 @@
     "docs/generation/PROVINCES.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-955",
+   "title": "DECISION TAKEN + CALL: how a sea lane is laid (ports, direction), and whether a lane should compete with land",
+   "raised": "2026-09-26",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1098 (the sea-lane tier stamped), merged 7238f8ef, 2026-09-26",
+   "what": "Taken on your behalf by the lane: a seat's port is its nearest sea tile within nine tiles (the sim's neighbour radius); the walk runs toward the busier end (the lane record carries no direction), as the old-road stamp does; a laned sea tile costs x0.50. Two consequences: (1) 41 of 137 earned lanes (30%) are not laid because a seat has no sea within nine tiles; (2) a laned sea tile (2.5 -> 1.25) is still dearer than plains (1.0) or a road (0.5-0.67), so a lane carries traffic only between landmasses, never along a coast a road already serves. The market junction degree was not extended with lanes (it would add markets at lane ports). LOGISTICS.md § 4b states the rules.",
+   "why_it_matters": "Your vision is lanes as the routes of inter-continental trade; (1) drops a third of them and (2) decides whether the sea ever beats the road.",
+   "options": [
+    "A: keep all as built",
+    "B: a realm's port is its nearest coastal region's seat (lays the lost 30%)",
+    "C: B, and a deeper lane discount so a lane can beat a coastal road (sea was the faster medium: ~130 km/day against ~25)",
+    "D: other"
+   ],
+   "recommendation": "B now; C read against the haulage baseline before it is set.",
+   "files": [
+    "src/world/road_generation.cpp",
+    "src/world/logistics.cpp",
+    "docs/economy/LOGISTICS.md"
+   ],
+   "resolution": null
   }
  ]
 }

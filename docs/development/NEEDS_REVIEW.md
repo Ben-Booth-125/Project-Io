@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*58 entries — 3 open, 55 resolved.*
+*59 entries — 4 open, 55 resolved.*
 
 ---
 
@@ -75,6 +75,22 @@ Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, eve
 > **Recommendation:** A for (1); read (2) and (3) again after BL-1137 (industrial urbanisation) and BL-1132 (settle spacing) land, since both change what is settled and how many centres stand.
 
 *Files: `src/world/province.cpp`, `docs/generation/PROVINCES.md`*
+
+### NR-955 — DECISION TAKEN + CALL: how a sea lane is laid (ports, direction), and whether a lane should compete with land
+*decision · raised 2026-09-26 · from BL-1098 (the sea-lane tier stamped), merged 7238f8ef, 2026-09-26*
+
+Taken on your behalf by the lane: a seat's port is its nearest sea tile within nine tiles (the sim's neighbour radius); the walk runs toward the busier end (the lane record carries no direction), as the old-road stamp does; a laned sea tile costs x0.50. Two consequences: (1) 41 of 137 earned lanes (30%) are not laid because a seat has no sea within nine tiles; (2) a laned sea tile (2.5 -> 1.25) is still dearer than plains (1.0) or a road (0.5-0.67), so a lane carries traffic only between landmasses, never along a coast a road already serves. The market junction degree was not extended with lanes (it would add markets at lane ports). LOGISTICS.md § 4b states the rules.
+
+**Why it matters.** Your vision is lanes as the routes of inter-continental trade; (1) drops a third of them and (2) decides whether the sea ever beats the road.
+
+- A: keep all as built
+- B: a realm's port is its nearest coastal region's seat (lays the lost 30%)
+- C: B, and a deeper lane discount so a lane can beat a coastal road (sea was the faster medium: ~130 km/day against ~25)
+- D: other
+
+> **Recommendation:** B now; C read against the haulage baseline before it is set.
+
+*Files: `src/world/road_generation.cpp`, `src/world/logistics.cpp`, `docs/economy/LOGISTICS.md`*
 
 ---
 
