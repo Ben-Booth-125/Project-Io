@@ -130,20 +130,18 @@ struct carved_centre
 /// consequence and nothing else's.
 ///
 /// THE GROUND HOLDS THE COUNT (BL-1130, POPULATION.md "Growth consolidates").
-/// With @p cell_land and @p cell_place (per region: its cell's land tiles, and
-/// the tiles in it that pass the placement gate), a region enters no more slots
-/// than its ground holds: `region_centres_fit` on the FINAL partition — the
-/// sim's own rule, re-read here because a founding in the sim's last round
-/// cut a neighbour's cell after that neighbour's last urban step — and never
-/// more than its cell can place, so every one of them stands in its own cell.
-/// A region whose cell holds no land, or no tile the placement gate passes,
-/// carries no centre at all (Ben, 2026-09-25: it has no ground to stand one
-/// on), so no centre spills. Null keeps the sim's count as it stands (a
-/// caller with no grid).
+/// With @p cell_ground (per region: the tiles of its cell a centre can stand
+/// on — the placement gate, the SAME ground the sim measures, `region::
+/// urban_ground`), a region enters no more slots than its ground holds:
+/// `region_centres_fit` on the FINAL partition. The sim already holds its
+/// record to this at every founding and at its close (BL-1130 review fix), so
+/// this is the carve re-reading the rule it materialises, not a second rule.
+/// A region whose cell holds no standable ground carries no centre at all
+/// (Ben, 2026-09-25: it has no ground to stand one on), so no centre spills.
+/// Null keeps the sim's count as it stands (a caller with no grid).
 std::vector<carved_centre> carve_demography_centres(const settlement_state& settlement,
                                                     int heads_per_centre,
-                                                    const std::vector<int>* cell_land = nullptr,
-                                                    const std::vector<int>* cell_place = nullptr)
+                                                    const std::vector<int>* cell_ground = nullptr)
 {
     std::vector<carved_centre> out;
     if (heads_per_centre <= 0)
@@ -177,10 +175,9 @@ std::vector<carved_centre> carve_demography_centres(const settlement_state& sett
             if (p.population <= 0 || p.centres <= 0)
                 continue; // A razed or emptied region towns nobody.
             int stands = p.centres;
-            if (cell_land != nullptr && ri < cell_land->size())
-                stands = region_centres_fit(p.urban_population, stands, (*cell_land)[ri]);
-            if (cell_place != nullptr && ri < cell_place->size())
-                stands = std::min(stands, (*cell_place)[ri]);
+            if (cell_ground != nullptr && ri < cell_ground->size())
+                stands = std::min(region_centres_fit(p.urban_population, stands, (*cell_ground)[ri]),
+                                  (*cell_ground)[ri]);
             if (stands <= 0)
                 continue; // No ground to stand a centre on: its heads town nobody here.
             urban_total += p.urban_population;
@@ -410,12 +407,12 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
     // `nearest_region` is the canonical read of it (city_names.cpp names a
     // centre in its nearest region's tongue, and the sim's
     // `update_urban_ground` measures the same cells). Per region: its cell's
-    // LAND (what its footprints must fit) and its PLACEABLE tiles (what the
-    // placement gate lets a centre stand on), and the placeable tiles
+    // PLACEABLE tiles (what the placement gate lets a centre stand on — the
+    // ground the sim measures too, BL-1130 review fix), and those tiles
     // themselves, ascending, for the placement below.
     const bool have_regions = settlement != nullptr && !settlement->regions.empty();
     const std::size_t region_count = have_regions ? settlement->regions.size() : 0;
-    std::vector<int> cell_land(region_count, 0), cell_place(region_count, 0);
+    std::vector<int> cell_place(region_count, 0);
     std::vector<std::vector<int>> region_candidates(region_count);
     if (have_regions)
     {
@@ -433,7 +430,6 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
             const int ri = nearest_region(*settlement, i % gw, i / gw, gw);
             if (ri < 0 || ri >= static_cast<int>(region_count))
                 continue;
-            ++cell_land[static_cast<std::size_t>(ri)];
             if (is_candidate[static_cast<std::size_t>(i)])
             {
                 ++cell_place[static_cast<std::size_t>(ri)];
@@ -446,7 +442,6 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
     if (settlement != nullptr)
         demography_centres = carve_demography_centres(*settlement,
                                                       k_demography_heads_per_centre,
-                                                      have_regions ? &cell_land : nullptr,
                                                       have_regions ? &cell_place : nullptr);
     const bool from_demography = !demography_centres.empty();
 
@@ -776,7 +771,7 @@ int ensure_province_anchor_centres(world& w, entity_id body_id, int* gate_relaxe
 // Urban footprints (BL-612) — generation stamps the ground cities stand on
 // ---------------------------------------------------------------------------
 
-int stamp_urban_land_use(world& w, entity_id body_id)
+int stamp_urban_land_use(world& w, entity_id body_id, const settlement_state* settlement)
 {
     const auto body_it = w.bodies.find(body_id);
     if (body_it == w.bodies.end())
@@ -819,6 +814,18 @@ int stamp_urban_land_use(world& w, entity_id body_id)
         }
     };
 
+    // BL-1130 (review fix): each tile's cell of the settlement partition, read
+    // lazily (only the centres' tiles and their rings ever need one). -2 is
+    // unread; -1 is no region. Memoised in raster order, so the walk's cost is
+    // one `nearest_region` per tile touched rather than per touch.
+    const bool cut_at_cell = settlement != nullptr && !settlement->regions.empty();
+    std::vector<int> cell_of(cut_at_cell ? static_cast<std::size_t>(gw) * gh : 0, -2);
+    const auto cell_at = [&](int col, int row) -> int {
+        int& c = cell_of[static_cast<std::size_t>(row) * gw + col];
+        if (c == -2) c = nearest_region(*settlement, col, row, gw);
+        return c;
+    };
+
     for (const auto& [cid, tid] : centres)
     {
         const auto pit = w.population_centres.find(cid);
@@ -834,10 +841,13 @@ int stamp_urban_land_use(world& w, entity_id body_id)
 
         // Rank the six hex neighbours (habitability desc, tile id asc) and
         // pave the best `want - 1` land tiles among them. The coast can cut a
-        // footprint short, and that is kept rather than compensated.
+        // footprint short, and that is kept rather than compensated — and so
+        // can the edge of the centre's own cell (BL-1130: the footprint fits
+        // inside the region's cell).
         const auto tit = w.tiles.find(tid);
         if (tit == w.tiles.end())
             continue;
+        const int own_cell = cut_at_cell ? cell_at(tit->second.grid_x, tit->second.grid_y) : -1;
         struct cand { float hab; entity_id tile; };
         std::vector<cand> ring;
         ring.reserve(6);
@@ -854,6 +864,8 @@ int stamp_urban_land_use(world& w, entity_id body_id)
             const auto nit = w.tiles.find(n);
             if (nit == w.tiles.end() || is_water(nit->second.substrate))
                 continue; // urban ground is a land feature
+            if (cut_at_cell && cell_at(nx, ny) != own_cell)
+                continue; // BL-1130: the cell's edge cuts it short, as the coast does
             ring.push_back({ nit->second.habitability, n });
         }
         std::sort(ring.begin(), ring.end(), [](const cand& a, const cand& b) {

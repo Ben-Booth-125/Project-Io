@@ -2380,7 +2380,7 @@ void run_tail(generation_cursor& c)
     // from turn one. RNG-free; perturbs no stream. Runs before
     // generate_corporations so starting assets land on a world whose ground
     // already says where the cities are.
-    stamp_urban_land_use(w, kepler);
+    stamp_urban_land_use(w, kepler, &kepler_settlement); // BL-1130: footprints stop at the cell
 
     // The creed lines merge into Kepler's biography — the same ladder history
     // the History ledger reads. No pass here pre-computes the story between
@@ -2444,7 +2444,7 @@ void run_tail(generation_cursor& c)
     ensure_province_anchor_centres(w, kepler);
     name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
                             /*seed=*/params.seed ^ 0xC17910E6u);
-    stamp_urban_land_use(w, kepler);
+    stamp_urban_land_use(w, kepler, &kepler_settlement); // BL-1130: footprints stop at the cell
 
     // Road network (BL-146): stamp each nation's road lattice onto tile.road_level,
     // after nations + population centres exist — anchor foundings included

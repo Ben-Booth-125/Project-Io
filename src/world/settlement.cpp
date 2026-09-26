@@ -2048,10 +2048,12 @@ int region_centres_fit(int64_t urban_heads, int want, int ground)
 }
 
 bool update_urban_ground(settlement_state& ss, urban_ground_field& f,
-                         const std::vector<terrain_substrate>& substrate, int gw, int gh)
+                         const std::vector<terrain_substrate>& substrate,
+                         const std::vector<std::uint8_t>* standable, int gw, int gh)
 {
     if (gw <= 0 || gh <= 0
-     || substrate.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+     || substrate.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh)
+     || (standable != nullptr && standable->size() != substrate.size()))
         return false;
     const std::size_t n = ss.regions.size();
 
@@ -2061,9 +2063,16 @@ bool update_urban_ground(settlement_state& ss, urban_ground_field& f,
     // strict `<` IS `nearest_region`'s argmin with its lowest-index tie-break.
     if (f.raster_size != substrate.size() || f.measured > n)
     {
+        // THE GROUND (BL-1130 review fix): the tiles a centre can stand on,
+        // by the carve's own placement gate where the caller has it, so the
+        // sim and the carve agree which cells hold none.
         f.land_tiles.clear();
         for (std::size_t t = 0; t < substrate.size(); ++t)
-            if (!is_water(substrate[t])) f.land_tiles.push_back(static_cast<int32_t>(t));
+        {
+            const bool ground = (standable != nullptr) ? ((*standable)[t] != 0)
+                                                       : !is_water(substrate[t]);
+            if (ground) f.land_tiles.push_back(static_cast<int32_t>(t));
+        }
         f.owner.assign(f.land_tiles.size(), -1);
         f.owner_dist.assign(f.land_tiles.size(), std::numeric_limits<int32_t>::max());
         f.land.clear();
@@ -2098,6 +2107,15 @@ bool update_urban_ground(settlement_state& ss, urban_ground_field& f,
         changed = true;
     }
     return changed;
+}
+
+bool hold_region_to_ground(region& p)
+{
+    if (p.centres <= 0) return false;
+    const int held = region_centres_fit(p.urban_population, p.centres, p.urban_ground);
+    if (held == p.centres) return false;
+    p.centres = held;
+    return true;
 }
 
 // ---------------------------------------------------------------------------

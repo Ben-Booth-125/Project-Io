@@ -636,17 +636,23 @@ struct region
     /// quantity the campaign-era centre count and scale carve reads.
     int64_t urban_population = 0;
 
-    /// BL-1130 (POPULATION.md § Generation, "Growth consolidates") — the LAND
-    /// tiles of this region's own cell of the settlement partition: the tiles
-    /// `nearest_region` gives this region, water excluded. The ground its
-    /// centres' urban footprints must fit inside, so `centres` never exceeds
-    /// what it holds (`region_centres_fit`). -1 is UNMEASURED — the
-    /// opening draw runs before any partition is read, and a synthetic fixture
-    /// with no terrain never measures one — and caps nothing.
+    /// BL-1130 (POPULATION.md § Generation, "Growth consolidates") — the
+    /// GROUND of this region's own cell of the settlement partition: the tiles
+    /// `nearest_region` gives this region on which a centre can stand (the
+    /// carve's own placement gate, `sim_terrain_view::standable`; every
+    /// non-water tile when a caller has no gate). The ground its centres' urban
+    /// footprints must fit inside, so `centres` never exceeds what it holds
+    /// (`region_centres_fit`), and a region whose cell holds none carries no
+    /// centre — and so earns no industry point — exactly as the carve gives it
+    /// none. -1 is UNMEASURED — the opening draw runs before any partition is
+    /// read, and a synthetic fixture with no terrain never measures one — and
+    /// caps nothing.
     ///
     /// Written by `update_urban_ground`, which `run_history_sim` calls once a
-    /// year before the urban step, so a cell a newer neighbour's founding cut
-    /// into is re-read the year it shrank. GENERATION SCRATCH, NOT SAVED, on
+    /// year before the urban step, at every polity's turn after a founding, at
+    /// the round's end and at the span's close, holding every region's centres
+    /// to it each time the partition changed — so no read, and no close, sees a
+    /// cell a founding cut and the record never outlives it. GENERATION SCRATCH, NOT SAVED, on
     /// `network_supply_q`'s precedent below: a fact the Era -1 sim maintains
     /// about ground it is simulating, not one the campaign era reads — the
     /// carve re-reads the final partition itself.
@@ -1313,25 +1319,36 @@ int region_centres_fit(int64_t urban_heads, int want, int ground);
 /// APPENDED, so a new region takes exactly the tiles strictly nearer its
 /// anchor than their current owner's, and every earlier cell can only shrink.
 /// This keeps the owner raster and each tile's distance to it, so a founding
-/// costs one pass over the land rather than a rebuild of the whole partition.
+/// costs one pass over the ground rather than a rebuild of the whole partition.
+/// The GROUND is the tiles a centre can stand on (BL-1130 review fix: the
+/// carve's placement gate), so a cell of land no centre can stand on counts 0.
 struct urban_ground_field
 {
-    std::vector<int32_t> land_tiles; ///< Raster indices of the body's land, ascending.
-    std::vector<int32_t> owner;      ///< Per land tile: the region whose cell holds it, -1 none.
-    std::vector<int32_t> owner_dist; ///< Per land tile: Chebyshev distance to that region's anchor.
-    std::vector<int32_t> land;       ///< Per region: land tiles in its cell.
-    std::size_t          raster_size = 0; ///< gw*gh the land list was taken on.
+    std::vector<int32_t> land_tiles; ///< Raster indices of the body's ground tiles, ascending.
+    std::vector<int32_t> owner;      ///< Per ground tile: the region whose cell holds it, -1 none.
+    std::vector<int32_t> owner_dist; ///< Per ground tile: Chebyshev distance to that region's anchor.
+    std::vector<int32_t> land;       ///< Per region: ground tiles in its cell.
+    std::size_t          raster_size = 0; ///< gw*gh the ground list was taken on.
     std::size_t          measured = 0;    ///< Regions [0, measured) are in the partition.
 };
 
 /// Bring @p f up to date with @p ss (every region appended since the last call
 /// claims its cell) and write each region's `urban_ground`. @p substrate is the
-/// body's substrate in raster order (`is_water` tiles are not ground); its size
-/// must be gw*gh, otherwise nothing is measured and every region stays
-/// unmeasured. The result equals a fresh `nearest_region` pass over the land,
-/// tile for tile. Returns true when any region's `urban_ground` changed.
+/// body's substrate in raster order and @p standable (may be null) its
+/// placement gate, both gw*gh: a tile is GROUND when `standable` marks it, or,
+/// with no gate, when it is not water. A size mismatch measures nothing and
+/// leaves every region unmeasured. The result equals a fresh `nearest_region`
+/// pass over the ground, tile for tile. Returns true when any region's
+/// `urban_ground` changed.
 bool update_urban_ground(settlement_state& ss, urban_ground_field& f,
-                         const std::vector<terrain_substrate>& substrate, int gw, int gh);
+                         const std::vector<terrain_substrate>& substrate,
+                         const std::vector<std::uint8_t>* standable, int gw, int gh);
+
+/// Hold region @p p's `centres` to what its measured ground holds
+/// (`region_centres_fit`, never promoting): the merge a newer neighbour's
+/// founding forces, or none at all where the cell kept no ground. Not a
+/// razing — `centres_razed` is untouched. Returns true when the count moved.
+bool hold_region_to_ground(region& p);
 
 /// The headcount `run_history_sim` seeds an unpopulated region with, and the
 /// figure `draw_urban_map` sizes its seed cities against. ONE derivation, read
