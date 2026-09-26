@@ -93,14 +93,14 @@ provinces rather than of thousands of villages founded on empty ground.
 **The five rulings the algorithm implements:**
 
 1. **Provinces grow from population centres**, and seed strength scales with the centre's scale
-   (1–5): *a metropolis draws a larger province than a village does* — a growth budget of 7
-   tiles at scale 1 up to 12 at scale 5, with every centre growing simultaneously as one
-   multi-source fill. **The budget is what scales; the finished size need not.** Because the fill
-   is simultaneous, and a large centre stands in a denser neighbourhood than a village does,
-   competition can take back what the budget granted. The harness measures the mean province size
-   by seed scale and **asserts the ordering** (`P9c`, over the seed set only — an anchor founding
-   under ruling 3 is not a seed), so any divergence between the ruling's wording and what the fill
-   produces is loud rather than reported away.
+   (1–5): *a metropolis draws a larger province than a village does.* On settled land the
+   strength is a **weight on reach**, not a budget (NR-953): a centre's step costs are multiplied
+   by 60 ÷ its scale (60 / 30 / 20 / 15 / 12), every centre growing simultaneously as one
+   multi-source fill until the land is covered. Competition decides the border, so a village
+   hemmed by a larger neighbour's reach can end on its own tile and is absorbed (the counted
+   exception to provinces = centres). The harness **asserts the ordering** of mean province size
+   by the anchor's scale (`P9c`, each province read once, by its anchor), so a divergence between
+   the ruling's wording and what the fill produces is loud.
 2. **Boundaries are rivers and elevation difference.** *Superseded half (Ben, 2026-08-25;
    BL-623, provinces before roads): roads were a binding input — tiles a road links tended to
    share a province, never divide one. Overturned with the ordering: the partition now runs
@@ -114,8 +114,10 @@ provinces rather than of thousands of villages founded on empty ground.
    under BL-567 (province is the conquest unit) taking the centre takes the province, making
    every anchor a strategic objective. *Superseded original ruling, kept for the record:*
    country no centre reaches became hinterland, seeded from the least-accessible tile.
-4. **Size is a growth budget, not a clamp.** *"Don't reject tiny provinces"* — nothing is merged
-   away to satisfy a floor, and **boundaries win ties.**
+4. **Size is not clamped.** *"Don't reject tiny provinces"* — nothing is merged away to satisfy a
+   floor, **boundaries win ties**, and on settled land nothing stops the fill before the land is
+   covered (a province is its centre's ground). The band below still draws the water domains and
+   an unsettled body's hinterland.
 5. **A national border is a hard edge.** Seeds are placed per nation and the terrain cost function
    operates only *within* a nation's territory, so a region's frontier is the border wherever it
    reaches one (Ben, 2026-08-22; BL-563, province respects nation). Regions grown to fit the border
@@ -136,9 +138,10 @@ land — and it is the spacing, not the budget, that sets hinterland size.
 **nation-locked**: a region — centre-seeded or leftover — claims only tiles of its seed's
 nation, and singleton absorption honours the same lock, so a land province is single-nation by
 construction and its anchor's nation *is* its tile-derived nation. On a settled body the spaced
-hinterland seeding is retired; ground no centre's budget reaches (ice caps, deep desert, the far
-side of a border no centre stands behind) is mopped up by the leftover pass, and every leftover
-province then receives a **scale-1 anchor founding** on its best ground
+hinterland seeding is retired; the fill covers the land, so the only ground left over is an
+**uncentred island** — land no centre of its nation can reach under the nation and settlement
+locks — which grows whole into one province and receives a **scale-1 anchor founding** on its best
+ground
 (`ensure_province_anchor_centres`, `population_generation.cpp`) before the holder is derived —
 a pure-ice province gets its anchor on its least-bad tile, counted rather than hidden. The
 **anchor** is derived, never stored: the highest summed centre scale in the province, ties to
@@ -166,7 +169,7 @@ the land is covered, so the band below no longer binds; kept for the record of w
 |---|---|---|
 | `k_province_min_tiles` | **7** | Soft floor. Past it, a region annexes only ground **no harder to reach than the ground it already holds** — the mean of its own step costs. |
 | `k_province_max_tiles` | **12** | *Preferred* ceiling; the clamp **growth** obeys. Not what a finished province is guaranteed to satisfy, because singleton absorption can push past it. |
-| `k_province_hard_cap_tiles` | **20** | The bound that really is absolute, and **the only size claim the harness asserts.** |
+| `k_province_hard_cap_tiles` | **20** | The bound that really is absolute where the band still draws (water, an unsettled body's hinterland); the harness asserts it there only. |
 
 A fourth constant, `k_province_hard_min_tiles` = **3**, is the hard-target floor: a region takes
 its first three tiles whatever they cost. It can still be missed — an island of two tiles ships at
