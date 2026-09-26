@@ -7142,6 +7142,150 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "province-is-its-centres-ground",
+   "title": "BL-1133 - A province is its centre's ground: the fill covers the land, so no province is left without a centre",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1133 - sprint 48 (group recorded after the merge, from the cold review, 2026-09-26)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: province_partition_harness",
+      "headless: centre_census C7/C8"
+     ],
+     "requirement": "Every land tile ends in exactly one province, and every province on settled land holds a centre.",
+     "notes": "",
+     "result_metric": "Merged 5cab560b: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856; cold review found exactly-one-province, nation locks and the reach weight sound."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: centre_census C7 unanchored as a gate on the 16 seeds"
+     ],
+     "requirement": "The centre invariant is a gate over the 16 curated seeds, not a reading on the default world (BL-1145).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: charter_refusal_probe or stockpile_budget_check, before -> after"
+     ],
+     "requirement": "The readers sized for the old province (the two-firm cap above all) are re-read on the grown provinces (BL-1146).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change.",
+     "notes": "",
+     "result_metric": "2026-09-26: no partition bug; findings filed as BL-1145 (front-tile readers, census gate) and BL-1146 (firm cap); PROVINCES.md corrected to \"at most as many provinces as centres\"."
+    }
+   ]
+  },
+  {
+   "brief": "search-on-two-threads",
+   "title": "BL-1136 - The landscape search scores a round's proposals on two threads, six rounds kept",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1136 - sprint 48 (group recorded after the merge, from the cold review, 2026-09-26)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: landscape_search_harness --curve --check-k 6 --check-threads 2 on the 16 seeds, with a negative control"
+     ],
+     "requirement": "The two-thread six-round search is byte-identical to the serial one on every curated seed, and the check is shown able to fail.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change.",
+     "notes": "",
+     "result_metric": "2026-09-26: no shared mutable state, results gathered by proposal index, tie-break unchanged, thread count fixed at 2; the cited proof covered only 3 rounds; the sweep labels and the loading-bar weight are stale. Fixes queued in the search lane after BL-1086."
+    }
+   ]
+  },
+  {
+   "brief": "sea-chain-currents-trade-lanes",
+   "title": "BL-1120 / BL-1140 / BL-1098 - Ocean currents price sea legs, trade across water earns lanes, and lanes are stamped on the water",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1120, BL-1140, BL-1098 - sprint 48 (group recorded after the merge, from the cold review, 2026-09-26)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "headless: save_roundtrip (world save v28)"
+     ],
+     "requirement": "Deterministic; the save carries lane_level and the deep digest folds it.",
+     "notes": "",
+     "result_metric": "Merged b80a5b5d, 83dd57bd, 7238f8ef; cold review found the save, direction and integer maths sound."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: sea_lane_stamp_harness realised-discount rows (straight and diagonal)"
+     ],
+     "requirement": "A laid lane discounts traversal x0.50 on every bearing, which the harness asserts and was shown to fail on the eight-way walker.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: ocean_currents_harness weight-0 vs weight-500 row"
+     ],
+     "requirement": "The current price moves the sim, asserted, not only printed.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged chain.",
+     "notes": "",
+     "result_metric": "2026-09-26: the walk eight-way against four-way readers (x0.75 on diagonals), the landmass labels likewise, harnesses that pass with zero lanes, two priced gates that cannot bind, the cursor digest missing kepler_sea_legs. Fixes queued in the sea lane after BL-1142; BL-1143 and BL-1144 filed; NR-955 amended."
+    }
+   ]
   }
  ]
 }

@@ -63,7 +63,7 @@ The partition grew each centre by a budget of 7 tiles (village) to 12 (metropoli
 ### NR-954 — CALL: three consequences of "a province is its centre's ground" (hemmed villages absorbed; anchors kept by the settled-ground lock; giant provinces)
 *question · raised 2026-09-26 · from BL-1133 as merged (5cab560b), 2026-09-26*
 
-Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, every province invariant green. Three consequences. (1) 21,457 seed centres (47%) end on their own tile, hemmed by a larger neighbour's reach, and singleton absorption (the 2026-08-21 ruling) folds each into its cheapest neighbour, so provinces = centres holds with that counted exception. (2) 3,753 of the 6,856 remaining anchor villages exist only because the settlement lock (BL-849) stops the fill crossing from settled into never-settled ground. (3) Provinces now reach 1,315 tiles (a lone village over lightly settled land); p90 stays 7-13.
+Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, every province invariant green. Three consequences. (1) 21,457 seed centres (47%) end on their own tile, hemmed by a larger neighbour's reach, and singleton absorption (the 2026-08-21 ruling) folds each into its cheapest neighbour, so provinces = centres holds with that counted exception. (2) 3,753 of the 6,856 remaining anchor villages exist only because the settlement lock (BL-849) stops the fill crossing from settled into never-settled ground. (3) Provinces now reach 1,315 tiles (a lone village over lightly settled land); p90 stays 7-13. COLD REVIEW CAUTION (2026-09-26): centre_census C8 buckets anchor-only provinces (the uncentred leftovers) as villages, so (3)'s 1,315-tile 'lone village' may be leftover ground, not a village's draw; read C7b's anchor-only maximum before ruling on option C (the fix is BL-1145). PROVINCES.md now says a world has at most as many provinces as centres, with the hemmed ones counted.
 
 **Why it matters.** (2) is the remaining gap to a world without villages founded on empty ground; (3) decides whether a province can be a continent-sized conquest unit.
 
@@ -79,16 +79,17 @@ Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, eve
 ### NR-955 — DECISION TAKEN + CALL: how a sea lane is laid (ports, direction), and whether a lane should compete with land
 *decision · raised 2026-09-26 · from BL-1098 (the sea-lane tier stamped), merged 7238f8ef, 2026-09-26*
 
-Taken on your behalf by the lane: a seat's port is its nearest sea tile within nine tiles (the sim's neighbour radius); the walk runs toward the busier end (the lane record carries no direction), as the old-road stamp does; a laned sea tile costs x0.50. Two consequences: (1) 41 of 137 earned lanes (30%) are not laid because a seat has no sea within nine tiles; (2) a laned sea tile (2.5 -> 1.25) is still dearer than plains (1.0) or a road (0.5-0.67), so a lane carries traffic only between landmasses, never along a coast a road already serves. The market junction degree was not extended with lanes (it would add markets at lane ports). LOGISTICS.md § 4b states the rules.
+Taken on your behalf by the lane: a seat's port is its nearest sea tile within nine tiles (the sim's neighbour radius); the walk runs toward the busier end (the lane record carries no direction), as the old-road stamp does; a laned sea tile costs x0.50. Two consequences: (1) 41 of 137 earned lanes (30%) are not laid because a seat has no sea within nine tiles; (2) a laned sea tile (2.5 -> 1.25) is still dearer than plains (1.0) or a road (0.5-0.67), so a lane carries traffic only between landmasses, never along a coast a road already serves. The market junction degree was not extended with lanes (it would add markets at lane ports). LOGISTICS.md § 4b states the rules. COLD REVIEW (2026-09-26): the walk was eight-way while every traversal reader is four-way, so a diagonal lane had no two laned tiles side by side and realised about x0.75 (a leg (10,10) -> (20,20): 37.5 against 50 unlaned), not x0.50. The walk is being made four-way in the sea lane, and LOGISTICS.md § 4b says so; after it, part (2)'s 1.25 a tile holds on every bearing. ALSO FOUND: a seat's port is picked north-then-west, never toward its partner, so a seat on an isthmus can send its lane through the wrong ocean (option E); B alone does not fix it.
 
 **Why it matters.** Your vision is lanes as the routes of inter-continental trade; (1) drops a third of them and (2) decides whether the sea ever beats the road.
 
 - A: keep all as built
 - B: a realm's port is its nearest coastal region's seat (lays the lost 30%)
 - C: B, and a deeper lane discount so a lane can beat a coastal road (sea was the faster medium: ~130 km/day against ~25)
+- E: a seat's port is its sea tile nearest its partner's (combines with B or C)
 - D: other
 
-> **Recommendation:** B now; C read against the haulage baseline before it is set.
+> **Recommendation:** B and E now; C read against the haulage baseline before it is set.
 
 *Files: `src/world/road_generation.cpp`, `src/world/logistics.cpp`, `docs/economy/LOGISTICS.md`*
 

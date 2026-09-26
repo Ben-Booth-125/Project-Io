@@ -312,8 +312,10 @@ corridor crossing open ocean is not stamped as road is unchanged — the crossin
 instead. Trade across water is the fourth writer of a use (`EXPLORATION.md`).
 
 **How a lane is laid (BL-1098).** A lane's path is walked over the sea only — ocean and coast, never
-a lake, eight-connected with the columns wrapping, and never cutting a corner between two land
-tiles — so a lane goes round a headland rather than across it. Each step is priced by its length
+a lake — on **the same grid every traversal reader walks**: the four cardinal steps of § 2, with
+the columns wrapping. A lane is laid only where a convoy can follow it tile to tile, so its discount
+is the same whatever its bearing; a diagonal walk would leave every other step on open water and
+the pathfinder could not ride it. A lane goes round a headland rather than across it. Each step is priced by its length
 and by the current it runs with or against (`EXPLORATION.md` § Currents), so a lane bends along the
 current. A seat's port is its nearest sea tile within the sim's neighbour radius (nine tiles). The
 lane record carries no direction, so the walk runs toward the busier end — the seat more lanes

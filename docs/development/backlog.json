@@ -1185,6 +1185,99 @@
     "tools/verify/industrialisation_sim_harness.cpp"
    ],
    "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form). INDUSTRIALISATION.md § Far pairs meet and bind (far pairs bind across water, not only a border) and EXPLORATION.md § Currents (\"A leg run against its current delivers less\") state it. FOUND by BL-1140: inter-continental trade was 7 realm pairs on 6 of 16 worlds, limited by the seller's stock or the buyer's want, never the sea, so pricing the sea line was nearly inert. THE WORK, measure first: extend the span's far-pair binding to realms on other landmasses; apply a cargo loss after the flow is sized, in proportion to running against the current, one named weight on a ladder. Report cross-water pairs, flows and volume, trade-written lanes, with/against shares. A sim beat and a world-mover."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "written": "2026-09-26",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "sprint": null,
+   "id": "BL-1143",
+   "short_name": "HEX_NEIGHBOURS_ASYMMETRIC",
+   "author": "Claude (sprint 48, the sea-chain cold review, 2026-09-26)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "tile_generation's hex neighbour table differs from the canonical odd-r table on odd rows, so water classification and one other pass read a wrong neighbour",
+   "authority_doc": "docs/generation/TILE_GENERATION.md",
+   "files": [
+    "src/world/tile_generation.cpp",
+    "src/world/hex_neighbors.hpp"
+   ],
+   "design": "FOUND 2026-09-26 by the sea-chain cold review (BL-1098), confirmed by reading. `hex_neighbours` in tile_generation.cpp (~180-190) lists (c-1, r+1) for odd rows where the canonical table in hex_neighbors.hpp (BL-363) has (c+1, r+1): the relation is asymmetric, so a tile can count a neighbour that does not count it back. Its readers are classify_water_kinds (~260, ~297: which water is sea and which a lake) and the pass at ~843. Predates sprint 48.\n\nA WIDER QUESTION FOUND WITH IT: tile generation walks odd-r hexes, while every traversal reader (A*, the floods, the reach field; logistics.cpp ~147-149) walks a four-cardinal square grid. Which grid the game is on is a design fact the docs should own in one place (TILE_GENERATION.md / LOGISTICS.md § 2); read both before fixing.\n\nTHE WORK: replace the local table with hex_neighbors.hpp, measure what moves (sea vs lake tiles, the settled cells, lanes) on the 16 curated seeds, and name it a cause in the re-bless it lands in. A world-mover. DONE WHEN tile_generation has one neighbour table and the before/after is recorded."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "written": "2026-09-26",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "sprint": null,
+   "id": "BL-1144",
+   "short_name": "COLONIAL_DISTANCE_GATES_INERT",
+   "author": "Claude (sprint 48, the sea-chain cold review, 2026-09-26)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "The Exploration span's subjection-reach and secession-distance gates can never bind on the homeworld's map",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp"
+   ],
+   "design": "FOUND 2026-09-26 by the sea-chain cold review. The subjection reach (history_sim.cpp ~4502, 400) and the secession distance (~4635-4640, 500; history_sim.hpp ~2285, ~2331) are compared with a sea-leg distance, but the largest wrapped Chebyshev distance on the 261x121 map is 130, so both gates always pass. They were inert before the currents priced them. The secession gate is what erases a tribute clause, so as set, distance never causes a colony to secede.\n\nTHE WORK, measure first (Rule 0b): read the distribution of the distances the two gates see on the 16 curated seeds, and report what EXPLORATION.md says the gates are for. Then Ben rules: set them where they bind, or retire them. Never tune a threshold to hit a count. DONE WHEN each gate either binds on real distances or is gone, and EXPLORATION.md says which."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "written": "2026-09-26",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "sprint": 48,
+   "id": "BL-1145",
+   "short_name": "PROVINCE_FRONT_TILE_READERS",
+   "author": "Claude (sprint 48, the BL-1133 cold review, 2026-09-26)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "Code that stands for a province by its lowest-id tile reads its centre's tile instead, now that a province can span a thousand tiles",
+   "authority_doc": "docs/generation/PROVINCES.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/world/nation_generation.cpp",
+    "tools/verify/centre_census.cpp",
+    "src/world/province.hpp"
+   ],
+   "design": "FOUND 2026-09-26 by the BL-1133 cold review. Provinces now reach 1,315 tiles, and several readers still stand for a province by `tiles.front()`, its lowest-id tile: unit markers and the battle glyph draw only on that tile (body_surface_canvas.cpp ~3791, ~3817), so an army on screen can show no marker; garrisons are placed there (nation_generation.cpp ~1481) rather than at the capital; the battle card frames its neighbourhood round it (selection_panel.cpp ~2423). Battles resolve per province, so outcomes are unmoved, except where the garrison's tile is read.\n\nTHE WORK: (1) each reader takes the province's centre tile (its seed), or the unit's own tile where one exists; (2) centre_census C8 stops bucketing anchor-only provinces as villages, and C7's `unanchored` becomes a gate over the 16 seeds (every settled-land province holds a centre); (3) the stale comments on k_province_buildings_per_sustain_unit and province_section_max_tiles (province.hpp ~650-682, ~846-851) are re-read against the grown provinces. Runs after BL-1141 (centres deepen) lands, because the provinces change again. A UI requirement: a live click that a marker shows on an army in a large province."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "written": "2026-09-26",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "sprint": 48,
+   "id": "BL-1146",
+   "short_name": "FIRM_CAP_ON_GROWN_PROVINCES",
+   "author": "Claude (sprint 48, the BL-1133 cold review, 2026-09-26)",
+   "category": "Economy",
+   "priority": "S",
+   "difficulty": 2,
+   "title": "The two-firms-per-province cap is re-read on the grown provinces, where one province now holds a whole large centre",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "src/world/stockpile_budget.cpp",
+    "tools/verify/charter_refusal_probe.cpp",
+    "tools/verify/stockpile_budget_check.cpp"
+   ],
+   "design": "FOUND 2026-09-26 by the BL-1133 cold review. The per-province firm cap of 2 (corporation_generation.cpp ~2218, Pass 6; ~2634, the charter budget; applied ~2440, ~2769-2787) was ruled by Ben on NR-910 against provinces of <= 20 tiles, where it bound on 7 of 16 worlds. The charter spend's window is ~49 tiles round each centre (stockpile_budget.cpp ~266-267): a large centre's window used to span 4-6 provinces (8-12 firms); now it sits inside one province, so after 2 firms every window tile is refused and the rest is booked unspent[province_cap] or never placed. The merge measured provinces, not firms. The same pattern as the readers of region::centres sized for the old count.\n\nTHE WORK, measure only: firms placed and unspent by reason (province_cap above all) per seed on the 16 curated seeds, at 5cab560b^1 (before BL-1133) and at main; re-read after BL-1141. Then Ben rules on the cap (NR-910 was his). A named cause in the re-bless if it moves."
   }
  ]
 }
