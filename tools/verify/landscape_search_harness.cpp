@@ -448,6 +448,14 @@ struct seed_curve
     int    base_corporations = 0;        ///< corporations on the base world, before the search
     bool   l1 = true;                    ///< the ledger IS the plan on the finished world's budget
     bool   l2 = true;                    ///< a budget world lays no roster before the search
+    // L1b — planned against chartered (the walk winner's own spend report).
+    bool      l1b = true;                ///< chartered <= planned: specialists per nation, firms in all
+    long long chartered_specialists = 0, chartered_firms = 0;
+    int       nations_over_plan = 0;     ///< nations that chartered more firms than planned
+    long long firms_over_plan = 0;       ///< and by how many, summed
+    long long nation_gap_abs = 0;        ///< sum over nations of |chartered - planned|
+    // The world refusal's margin, per body max (read_budget_world's header).
+    int       turn_plus_cap = 0, turn_plus_yards = 0, ceiling = 0;
 };
 
 const char* short_axis(int a)
@@ -536,14 +544,22 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
     sc.cpu_eval_walk = cpu_walk / std::max(1, walk.evaluations);
 
     // --- THE CARVE LEDGER (BL-1086) ----------------------------------------
-    // L1: on a budget world the carve's planned charters, counted at bump 11
-    //     from the budget generation built there, are the plan re-derived from
-    //     the budget THIS world's finish builds (`sb`, off world::gen_settlement)
-    //     — nation for nation, specialists and firms. It is what proves the two
-    //     budgets are one budget, so the carve read the roster the search's
-    //     budget buys.
-    // L2: a budget world carries no corporation before the search: no roster
-    //     was laid to be discarded.
+    // L1a: on a budget world the carve's planned charters, counted at bump 11
+    //      from the budget generation built there, are the plan re-derived from
+    //      the budget THIS world's finish builds (`sb`, off world::gen_settlement)
+    //      — nation for nation, specialists and firms. It proves the two budgets
+    //      are one budget and the plan one arithmetic: what the carve counted is
+    //      what the search's budget plans. It does NOT say what is chartered.
+    // L1b: PLANNED AGAINST CHARTERED (the review's fix round). The walk winner's
+    //      web, applied on a copy of the base with a spend report, counted per
+    //      nation on the walk's own resolution of each charter's centre. The
+    //      plan is the walk's arithmetic before placement, so the walk charters
+    //      at most what is planned in all (the body stop) and at most one
+    //      specialist per planned one per nation; a nation can charter a few
+    //      more FIRMS than planned where a richer centre's placements failed.
+    //      Asserted: the two bounds. Reported: the per-nation gap.
+    // L2:  a budget world carries no corporation before the search: no roster
+    //      was laid to be discarded.
     {
         const generation_report& rep = out->report;
         sc.ledger_from_budget = rep.carve_competitors_from_budget;
@@ -569,6 +585,59 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
                      && r.planned_firms == pl.firms && r.competitors == pl.total();
             }
             sc.l2 = sc.base_corporations == 0;
+
+            // L1b: the winner's web, chartered.
+            world laid = base;
+            charter_spend_report crep;
+            apply_landscape_candidate(laid, out->reg, walk.winner, /*regenerate_specialists=*/true,
+                                      &sb.budget, spend, &crep);
+            std::map<entity_id, charter_nation_plan> chartered;   // the plan's shape, as chartered
+            for (const charter_record& cr : crep.charters)
+            {
+                const auto tile_it = base.population_centre_tile.find(cr.centre);
+                if (tile_it == base.population_centre_tile.end()) continue;
+                const auto own = base.tile_to_nation.find(tile_it->second);
+                if (own == base.tile_to_nation.end()) continue;
+                charter_nation_plan& cn = chartered[own->second];
+                (cr.specialist ? cn.specialists : cn.firms) += 1;
+            }
+            bool spec_bound = true;
+            for (const auto& [nid, cn] : chartered)
+            {
+                const auto pit = plan.find(nid);
+                const charter_nation_plan pl = pit != plan.end() ? pit->second : charter_nation_plan{};
+                if (cn.specialists > pl.specialists) spec_bound = false;
+                sc.chartered_specialists += cn.specialists;
+                sc.chartered_firms       += cn.firms;
+                if (cn.firms > pl.firms)
+                {
+                    ++sc.nations_over_plan;
+                    sc.firms_over_plan += cn.firms - pl.firms;
+                }
+            }
+            for (const auto& [nid, pl] : plan)
+            {
+                const auto cit = chartered.find(nid);
+                const charter_nation_plan cn = cit != chartered.end() ? cit->second
+                                                                      : charter_nation_plan{};
+                sc.nation_gap_abs += std::llabs(cn.total() - pl.total());
+            }
+            sc.l1b = spec_bound && sc.chartered_firms <= sc.ledger_firms;
+            if (!sc.l1b) ++failures;
+
+            // THE WORLD REFUSAL'S MARGIN, measured (read_budget_world's header):
+            // per body, n_turn + the per-good cap, and + the yards' places, against
+            // the ceiling. The refusal needs n_turn + yard_places > the ceiling.
+            for (const charter_body_record& b : crep.bodies)
+            {
+                int n_turn = 0;
+                for (const std::uint16_t g : b.goods)
+                    if (g != static_cast<std::uint16_t>(resource_type::construction_capacity))
+                        ++n_turn;
+                sc.turn_plus_cap   = std::max(sc.turn_plus_cap, n_turn + b.per_good_cap);
+                sc.turn_plus_yards = std::max(sc.turn_plus_yards, n_turn + b.yard_places);
+                sc.ceiling         = std::max(sc.ceiling, b.density_ceiling);
+            }
         }
         else
         {
@@ -737,6 +806,15 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
                 sc.ledger_from_budget ? "the BUDGET'S PLANNED CHARTERS" : "the laid roster",
                 sc.ledger_nations, sc.ledger_competitors, sc.ledger_specialists, sc.ledger_firms,
                 sc.base_corporations, sc.l1 ? "PASS" : "FAIL", sc.l2 ? "PASS" : "FAIL");
+    if (sc.budget_world)
+        std::printf("  planned vs CHARTERED (the winner's web): specialists %lld -> %lld, firms %lld -> %lld; "
+                    "%d nations chartered more firms than planned (+%lld); sum |gap| over nations %lld  "
+                    "|  L1b %s\n"
+                    "  the world refusal's margin: max per body n_turn + cap %d, n_turn + yard places %d, "
+                    "against a ceiling of %d\n",
+                    sc.ledger_specialists, sc.chartered_specialists, sc.ledger_firms, sc.chartered_firms,
+                    sc.nations_over_plan, sc.firms_over_plan, sc.nation_gap_abs,
+                    sc.l1b ? "PASS" : "FAIL", sc.turn_plus_cap, sc.turn_plus_yards, sc.ceiling);
     std::printf("  memory, MB (working set / private): base held %.0f / %.0f; serial walk peak %.0f / %.0f; "
                 "P1 walk on %d thread(s) peak %.0f / %.0f; one world copy %.0f private (%s); "
                 "process lifetime peak working set %.0f\n",
@@ -750,13 +828,18 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
                 "cpu_eval_walk=%.1f cpu_eval_check=%.1f check_threads=%d check_s=%.2f "
                 "walk_first_k_s=%.2f mem_base=%.0f mem_walk=%.0f mem_check=%.0f mem_copy=%.0f "
                 "mem_peak=%.0f ledger_budget=%d ledger_competitors=%lld base_corps=%d l1=%d l2=%d "
+                "planned_spec=%lld planned_firms=%lld chartered_spec=%lld chartered_firms=%lld "
+                "nations_over=%d gap_abs=%lld l1b=%d turn_cap=%d turn_yards=%d "
                 "winner_placement=%08X winner_tier=%u p1=%d composite",
                 seed, sc.live_axes, sc.markets, sc.ms_eval_walk, sc.ms_eval_check,
                 sc.cpu_eval_walk, sc.cpu_eval_check, sc.check_threads, sc.ms_check_s,
                 sc.ms_walk_first_k_s, sc.mem_base_private, sc.mem_walk_private,
                 sc.mem_check_private, sc.mem_copy_private, sc.mem_process_peak_ws,
                 sc.ledger_from_budget ? 1 : 0, sc.ledger_competitors, sc.base_corporations,
-                sc.l1 ? 1 : 0, sc.l2 ? 1 : 0, walk.winner.placement_seed,
+                sc.l1 ? 1 : 0, sc.l2 ? 1 : 0, sc.ledger_specialists, sc.ledger_firms,
+                sc.chartered_specialists, sc.chartered_firms, sc.nations_over_plan,
+                sc.nation_gap_abs, sc.l1b ? 1 : 0, sc.turn_plus_cap, sc.turn_plus_yards,
+                walk.winner.placement_seed,
                 static_cast<unsigned>(walk.winner.road_tier), sc.p1 ? 1 : 0);
     for (const row& w : sc.rows) std::printf(" %.12g", w.score.composite);
     std::printf(" moved");
@@ -875,6 +958,16 @@ int run(int argc, char** argv)
         if (sc.check_k >= 0 && !sc.p1) ++p1_fail;
     std::printf("\n  P1 (a genuine k-round search IS the walk's prefix): %s\n",
                 p1_fail == 0 ? "PASS on every seed" : "FAIL on at least one seed");
+
+    // L0 (the BL-1086 review): L1 and L2 are read only on a budget world, so a
+    // run in which no seed took the budget branch would pass them having
+    // checked nothing. At least one must have.
+    int budget_seeds = 0;
+    for (const seed_curve& sc : all)
+        if (sc.budget_world) ++budget_seeds;
+    std::printf("  L0 (a seed took the budget branch, so L1/L2 are not vacuous): %d of %zu seeds  %s\n",
+                budget_seeds, all.size(), budget_seeds > 0 ? "PASS" : "FAIL");
+    if (budget_seeds == 0) ++failures;
     std::printf("\n%s — %d failure(s)\n", failures == 0 ? "PASS" : "FAIL", failures);
     return failures == 0 ? 0 : 1;
 }

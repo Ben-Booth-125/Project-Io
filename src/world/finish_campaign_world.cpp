@@ -164,6 +164,12 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     out.search    = search_landscape(w, reg, sp);
     apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true,
                               &out.stockpile.budget, out.spend, &out.charter);
+    // BL-1086 (the review's R4): a budget world laid no roster in generation,
+    // so the loading screen's charter ledger is published HERE, from the
+    // winner's web as it was just chartered. Write-only; a report the legacy
+    // branch left untouched holds no charter and publishes nothing, so a world
+    // with no budget keeps the rows generation published.
+    publish_charter_web(progress, w, out.charter);
     // BL-1099: THE CHARTERS ARE DATED against the Industrialisation record --
     // the cradle's own, the one body the span ran for (every other entry is
     // empty, and an empty record dates every firm at the epoch). Once, on the

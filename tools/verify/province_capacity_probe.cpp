@@ -30,6 +30,7 @@
 // measurement taken before the world's real industry exists is simply wrong.
 // ---------------------------------------------------------------------------
 
+#include "harness_params.hpp"      // build_app_start_world: the shipped start (BL-1086 review)
 #include "scripting/lua_state.hpp"
 #include "world/components.hpp"
 #include "world/corporation_generation.hpp"
@@ -45,6 +46,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -107,10 +109,18 @@ int main(int argc, char** argv)
     {
         world_params p;
         p.seed = static_cast<uint32_t>(i);
-        world w = make_hard_coded_world(p, nullptr, gen_cfg, nullptr, &works);
-        assign_default_recipes(w, reg);
-        generate_background_firms(w, reg, p.seed ^ 0x8A21F00Du);
-        assign_default_recipes(w, reg);
+        // THE SHIPPED START (BL-1086 review, 2026-09-26): `build_app_start_world`,
+        // the world as the landscape search's winner leaves it, charter budget
+        // and both recipe passes — the world the PLAYER first sees, which the
+        // header names as the subject. It replaced make_hard_coded_world +
+        // generate_background_firms, which on a budget world now carries no
+        // specialist (generation lays no roster there, BL-1086) and before that
+        // measured Pass 6 firms beside a roster the search discards. The
+        // registry read below is the start's own, banded to the world.
+        auto start = std::make_unique<app_start_world>();
+        build_app_start_world(lua, p, *start);
+        world& w = start->w;
+        const recipe_registry& start_reg = start->reg;
 
         // Buildings standing on each tile, split the way the cap splits them:
         // extraction sites are bounded by deposit richness, everything else by
@@ -207,7 +217,7 @@ int main(int argc, char** argv)
         // of permission, not out of work to do.
         std::map<entity_id, float> ratio_by_body;
         for (const auto& [bid, b] : w.bodies)
-            ratio_by_body[bid] = measure_production_ratio(w, reg, bid);
+            ratio_by_body[bid] = measure_production_ratio(w, start_reg, bid);
 
         int bodies_at_cap = 0, max_firms = 0;
         for (const auto& [bid, n] : firms_per_body)

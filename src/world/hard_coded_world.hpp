@@ -450,8 +450,13 @@ struct generation_progress
     /// one would make the map lie.
     static constexpr int max_asset_marks = 512;
 
-    /// Corporation ledger rows. `corporation_count` is 8; background firms
-    /// (BL-365) generate outside make_hard_coded_world and are not published.
+    /// Corporation ledger rows. On a world with no charter budget,
+    /// `generate_corporations` publishes its roster (`corporation_count` is 8);
+    /// background firms (BL-365) generate outside make_hard_coded_world and are
+    /// not published. On a budget world generation lays no roster (BL-1086), and
+    /// `finish_campaign_world` publishes the search winner's SPECIALISTS once
+    /// its web is applied (`publish_charter_web`) — 22-88 of them on the curated
+    /// seeds, so a world past 64 shows its first 64 (charter order, richest first).
     static constexpr int max_corp_slots = 64;
 
     std::atomic<int> grid_w{0}; ///< 0 until begin_carve; 0 also means "no carve to draw".
@@ -883,8 +888,10 @@ struct generation_report
     // The nation gate's competitor term (BL-132 change 3) reads, per nation, how
     // many corporations compete in its territory. On a world whose firms come
     // from the charter budget that is the budget's PLANNED charters — the
-    // specialists and firms each nation's centres can afford — because such a
-    // world lays no roster before the carve (Ben, 2026-09-26, option A); on any
+    // specialists and firms each nation's centres will charter, richest first
+    // under each body's density ceiling (`plan_charters_by_nation`), before any
+    // placement — because such a world lays no roster before the carve (Ben,
+    // 2026-09-26, option A); on any
     // other world it is the laid roster's distinct corporations. Recorded here
     // because the roster the carve read is otherwise unrecoverable once the
     // search has chartered its own (tools/verify/market_census.cpp said so).
@@ -897,7 +904,7 @@ struct generation_report
         entity_id nation              = null_entity;
         int64_t   competitors         = 0; ///< what the gate counted
         int64_t   planned_specialists = 0; ///< budget worlds: centres affording a specialist
-        int64_t   planned_firms       = 0; ///< budget worlds: firms the rest of their points buy
+        int64_t   planned_firms       = 0; ///< budget worlds: firms under each body's ceiling
     };
     /// True: the carve counted the budget's planned charters; false: the laid roster.
     bool                              carve_competitors_from_budget = false;

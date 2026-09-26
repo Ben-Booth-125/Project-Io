@@ -9,6 +9,8 @@
 #include <map>
 #include <vector>
 
+struct generation_progress; // hard_coded_world.hpp; the loading screen's write-only tap
+
 // ---------------------------------------------------------------------------
 // Procedural corporation generation
 //
@@ -279,36 +281,126 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
 bool charter_budget_affords_specialist(const world& w, const charter_budget& budget,
                                        const charter_spend_params& spend);
 
+/// BL-1086 (the review's fix round) — THE BUDGET-WORLD TEST, ONE PREDICATE. Is
+/// @p w, with @p budget charged at @p spend, a world whose whole web is chartered
+/// from the budget? Asked in three places that must agree — generation's bump 11
+/// (whether to lay a roster, and what the carve counts), `search_landscape`
+/// (whether the roster axis is skipped) and `apply_landscape_candidate`'s budget
+/// overload (which branch lays the candidate) — so it is written once, here, in
+/// the order all three always read it:
+///
+///   1. no budget, or an EMPTY one (the all-zero budget is the same state) ->
+///      `no_budget`: today's world, nothing else read;
+///   2. `charter_spend_refusal` (the params) -> `refused`;
+///   3. `charter_spend_world_refusal` (the world: a density ceiling too small for
+///      a body's turn and its yards, BL-1060) -> `refused` — ASKED ONLY WITH A
+///      REGISTRY (@p reg non-null);
+///   4. no centre a nation owns affords a specialist (NR-910) -> `no_specialist`;
+///   5. otherwise `budget`.
+///
+/// WHY BUMP 11 PASSES NO REGISTRY, AND WHY THAT CANNOT MISLEAD IT. Generation is
+/// Lua-free and takes no recipe registry — the caller loads one from Lua after
+/// the world exists (app::load_economy, `finish_campaign_world`) — and the world
+/// refusal needs one: it reads the yards' places off the registry's construction
+/// recipe and the body's demand off its baskets. So bump 11 skips step 3.
+/// Under the SHIPPED constants step 3 cannot fire. It refuses a body only when
+/// the ceiling binds AND (ceiling - yard_places) < n_turn, with yard_places <=
+/// the per-good cap (`charter_yard_places` takes the minimum with it). The cap is
+/// max(c, isqrt(c x F / |G|)) for F the body's whole firm charters; F < 2 x
+/// `k_stockpile_price_divisor` (the firm price is the stock / the divisor,
+/// rounded down, so the stock buys fewer than twice the divisor), so with
+/// c = 8 the cap is at most isqrt(8 x 1299 / |G|), and n_turn <= |G|. Over every
+/// |G| from 1 to `resource_count`, n_turn + cap stays at or under ~103 (at
+/// |G| = 1: 1 + 101) against `k_stockpile_density_ceiling` = 120, so no body's
+/// shares are ever uncuttable. A tune that lifted c, the divisor or |G| past that
+/// bound would reach a world bump 11 calls a budget world and the search does
+/// not — the carve would then have read planned firms and the search's no-budget
+/// branch would lay the roster itself (so the world still gets one); the harness
+/// row that names the gap is landscape_search_harness's L1.
+enum class budget_world_kind : std::uint8_t
+{
+    no_budget     = 0,
+    refused       = 1,
+    no_specialist = 2,
+    budget        = 3,
+};
+
+struct budget_world_reading
+{
+    budget_world_kind kind    = budget_world_kind::no_budget;
+    /// `refused`: why, from `charter_spend_refusal` or `charter_spend_world_refusal`.
+    const char*       refusal = nullptr;
+    bool budget_world() const { return kind == budget_world_kind::budget; }
+};
+
+/// The five steps above. @p reg null skips step 3 (bump 11 only).
+budget_world_reading read_budget_world(const world& w, const charter_budget* budget,
+                                       const charter_spend_params& spend,
+                                       const recipe_registry* reg);
+
+/// `read_budget_world(...).budget_world()`.
+bool is_budget_world(const world& w, const charter_budget* budget,
+                     const charter_spend_params& spend, const recipe_registry* reg);
+
 /// BL-1086 — THE BUDGET'S PLANNED CHARTERS, per nation (Ben, 2026-09-26, option
 /// A; MARKETS.md § Market centres and seeding): the corporations each nation's
-/// centres can AFFORD, which is what the market carve counts as a nation's
+/// centres will charter, which is what the market carve counts as a nation's
 /// competitors on a world whose firms come from the charter budget.
 ///
-/// Per budgeted centre, on the walk's own resolution (the centre's tile, and the
-/// nation owning it; a centre without one plans nothing): one SPECIALIST when its
-/// points cover `spend.specialist_price_points()`, and then as many FIRMS as the
-/// points left buy whole (`charter_centre_firm_points / firm_price_points`) —
-/// exactly the split the walk sets aside before it places anything.
+/// THE WALK'S OWN ARITHMETIC, IN THE WALK'S OWN ORDER (the review's fix round:
+/// the first cut counted every firm a centre could afford, past the ceiling the
+/// walk stops at). Per budgeted centre, on the walk's resolution (the centre's
+/// tile, its body, and the nation owning it; a centre without one plans
+/// nothing), spent BUDGET DESCENDING, TIES TO THE LOWER CENTRE ID:
+///   * one SPECIALIST when its points cover `spend.specialist_price_points()`;
+///   * then its FIRMS — the points left, less any pooled remainder it sends plus
+///     any it receives (NR-913, `plan_charter_pool`, the walk's own plan; zero
+///     under the shipped `charter_pool::none`), in whole firm charters — each
+///     firm counted only while its BODY is under the walk's stop: the runaway
+///     guard `max_firms_per_body`, and under `sqrt_capital` the lower
+///     `density_ceiling`. A richer centre's firms therefore take a body's room
+///     before a poorer centre's, exactly as the walk spends them.
 ///
-/// AFFORDING, NOT PLACING, as `charter_budget_affords_specialist` is: nothing is
-/// placed, so no cap the walk meets on the ground (the windows, the province cap,
-/// the per-good cap, the density ceiling) is read, and the count is known before
-/// the carve — the reason the carve can read it at all, since the walk itself
-/// needs the carve's markets. A pooled remainder (NR-913's `charter_pool`, a
-/// measurement; the shipped spend pools nothing) is not counted.
+/// WHAT IT STILL CANNOT SEE: whether ground is found. The walk places each
+/// charter, and a placement can fail (the windows, the province cap, the
+/// per-good cap and the turn's shares); a failed firm is not chartered and does
+/// not count toward the ceiling. So per BODY the walk charters AT MOST what this
+/// plans (an exact upper bound), while per NATION a poorer nation can charter a
+/// few more than planned where a richer centre's placements failed and left the
+/// ceiling room it would have taken. landscape_search_harness's L1 reads both.
+/// Placement is a function of the candidate's seed, which the carve cannot
+/// know: the search runs after the carve, on the carve's markets.
 ///
-/// READ-ONLY and pure: centre tiles, their ownership and the nations.
+/// READ-ONLY and pure: centre tiles, their ownership, the nations and (for a
+/// pooled spend only) the markets.
 struct charter_nation_plan
 {
     std::int64_t specialists = 0; ///< centres that afford a specialist
-    std::int64_t firms       = 0; ///< background firms the rest of their points buy
+    std::int64_t firms       = 0; ///< background firms, under each body's stop
     std::int64_t total() const { return specialists + firms; }
 };
 
-/// Keyed by nation id, ascending; a nation none of whose centres affords a
-/// charter is absent. Empty for an empty budget or a firm price <= 0.
+/// Keyed by nation id, ascending; a nation none of whose centres plans a charter
+/// is absent. Empty for an empty budget or a firm price <= 0.
 std::map<entity_id, charter_nation_plan> plan_charters_by_nation(
     const world& w, const charter_budget& budget, const charter_spend_params& spend);
+
+/// BL-1086 (the review's R4) — THE CHARTER LEDGER ON THE LOADING SCREEN for a
+/// budget world. Such a world lays no roster in generation, so
+/// `generate_corporations` publishes no rows; the web the screen should show is
+/// the search WINNER's, chartered after generation by `finish_campaign_world`.
+/// This publishes it from the winner's spend report @p rep, onto the rows and
+/// markers the screen already reads (`generation_progress::add_corp_row`,
+/// `mark_asset`): one row per SPECIALIST in charter order (richest centre
+/// first), its focus, holdings and starting capital, and a marker on each of its
+/// holdings on the home body — the same three numbers and the same markers a
+/// generated roster publishes, so the screen draws it unchanged. Background
+/// firms are not rows, as they never were. `max_corp_slots` and
+/// `max_asset_marks` drop the overflow, which is cosmetic. No row is marked as
+/// the player's: the seat is drawn at Begin (`seat_player_corporation`), not
+/// here. WRITE-ONLY, like every tap; null @p progress publishes nothing.
+void publish_charter_web(generation_progress* progress, const world& w,
+                         const charter_spend_report& rep);
 
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631)

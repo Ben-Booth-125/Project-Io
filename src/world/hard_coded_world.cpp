@@ -2548,19 +2548,23 @@ void run_tail(generation_cursor& c)
     // laid: the roster was generated to be discarded, and the carve below read
     // it. So on such a world this stage lays nothing, and the carve counts the
     // budget's PLANNED charters per nation (`plan_charters_by_nation`) as the
-    // competitors it reads — the firms each nation's centres can afford, which
-    // is the roster the budget will buy.
+    // competitors it reads — the specialists and firms each nation's centres
+    // will charter, spent richest centre first under each body's stop (the
+    // density ceiling), as the walk spends them. What the plan cannot see is
+    // whether each charter then finds ground: per body the walk charters at most
+    // the plan, per nation it can differ by the placements that fail (see
+    // `plan_charters_by_nation`).
     //
     // THE BUDGET IS THE ONE finish_campaign_world BUILDS: the same builder
     // (`build_stockpile_budget`) over the same three inputs — the settlement's
     // regions (copied into `world::gen_settlement` at the tail's end), the
     // population carve's founded and dropped slots — at the shipped divisor, and
     // the same spend (`stockpile_charter_spend`). A BUDGET WORLD is the search's
-    // own test, read the same way: a non-empty budget, spend params not refused,
-    // and a centre that affords a specialist (NR-910). The one refusal it cannot
-    // read here is `charter_spend_world_refusal`, which needs the recipe
-    // registry; on such a world the search runs its no-budget branch, which
-    // regenerates the specialist roster itself, so the world still gets one.
+    // own test, the ONE predicate (`read_budget_world`, which the search and the
+    // apply also ask), without its one registry-bound step: this stage has no
+    // recipe registry, so `charter_spend_world_refusal` is not asked here. Its
+    // header says why that step cannot fire under the shipped constants, and
+    // what happens if a tune ever lets it.
     //
     // EVERY OTHER WORLD IS TODAY'S, BYTE FOR BYTE: an empty budget (the legacy
     // arc, a no-prehistory fixture), a refused spend, or a budget that opens no
@@ -2571,9 +2575,7 @@ void run_tail(generation_cursor& c)
         build_stockpile_budget(&kepler_settlement.regions, w.gen_carve_centres, w.gen_carve_dropped);
     const charter_spend_params carve_spend = stockpile_charter_spend(carve_stockpile);
     const bool carve_budget_world =
-        !carve_stockpile.budget.empty()
-        && charter_spend_refusal(carve_stockpile.budget, carve_spend) == nullptr
-        && charter_budget_affords_specialist(w, carve_stockpile.budget, carve_spend);
+        is_budget_world(w, &carve_stockpile.budget, carve_spend, /*reg=*/nullptr);
     std::map<entity_id, charter_nation_plan> carve_planned;
     if (carve_budget_world)
     {
@@ -2642,9 +2644,12 @@ void run_tail(generation_cursor& c)
         //
         // BL-1086: ON A BUDGET WORLD THE COMPETITORS ARE THE BUDGET'S PLANNED
         // CHARTERS (Ben, 2026-09-26, option A) — the specialists and firms each
-        // nation's centres can afford, counted at bump 11 above — because that
-        // world lays no roster to count, and the roster the search will charter
-        // is the budget's. Every other world counts the laid roster, as always.
+        // nation's centres will charter under each body's ceiling, counted at
+        // bump 11 above — because that world lays no roster to count, and the
+        // roster the search will charter is the budget's. The count is the
+        // walk's own arithmetic before placement; what ground the search's
+        // winner then finds is not knowable here. Every other world counts the
+        // laid roster, as always.
         std::map<entity_id, int> corps_in_nation; // std::map → ascending id (deterministic)
         if (carve_budget_world)
         {
