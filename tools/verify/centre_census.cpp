@@ -563,10 +563,13 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
         // itself against the FINAL partition's standable ground, by the sim's
         // own rule -- no living region carries more centres than its cell
         // holds, and none on a cell with no ground carries one.
-        // BL-1141: a region deepens into one place, so a settled region carries
-        // exactly one centre; more than one is a breach too.
+        // BL-1141 (a region deepens into one place) is NOT re-asserted here:
+        // "at most one centre" is `region_centres_fit`'s own clamp, so a row
+        // counting regions over one is true by construction and proves nothing
+        // (the centres cold review, 2026-09-26). What this row does test is the
+        // sim's ground against the census's own re-measure of the final cells.
         if (p.population > 0 && p.centres > 0
-            && (p.centres > 1 || region_centres_fit(p.centres, cell_place[i]) < p.centres))
+            && region_centres_fit(p.centres, cell_place[i]) < p.centres)
             ++r.sim_over_cell;
         if (p.population > 0 && cell_place[i] == 0)
         {

@@ -4613,6 +4613,29 @@ history_sim_state run_history_sim(settlement_state&         ss,
 /// way would be testing its own arithmetic rather than the sim's.
 int region_distance(const region& a, const region& b, int gw);
 
+/// POINTS GO WITH THEIR PEOPLE (Ben, 2026-09-26; POPULATION.md § Generation;
+/// BL-1141). Region @p i of @p regions, standing no settlement, hands the
+/// industry points it earned — and their report-only treasury tally, so the
+/// world's paid-in share holds — to the NEAREST region of the same realm
+/// (`owner[i]`, by `region_distance`, ties to the lower region index) that
+/// stands a centre and has people. Nothing moves, and the call returns false,
+/// where the region has no points, still stands a centre, is held by no realm,
+/// where its realm stands no other centre, or where the receiving stock would
+/// pass `industry_points_ceiling` (refused, never clamped). Pure over the
+/// region table: the sim calls it for every settlement that ends without a
+/// sack, and once more for every point still stranded at the span's close.
+bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>& owner,
+                            std::size_t i, int gw);
+
+/// THE CLOSE'S RETRY (the centres cold review, 2026-09-26). Every region of
+/// @p regions still holding points on no settlement is offered once more to
+/// its realm's nearest centre (`rehome_stranded_points`), in region order, as
+/// the map stands at the span's close — the handoff made when a settlement
+/// ended can have found nothing then. A RAZED region (`centres_razed` > 0) is
+/// skipped: a sack's points stay on the ruin (NR-901), exactly as the budget
+/// reads its razed reason. Returns how many regions' points moved.
+int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner, int gw);
+
 /// Years between decision rounds at calendar year @p y, read from @p p's band
 /// table. Returns the first band whose `until_year` exceeds @p y, falling back
 /// to the last live band; never returns less than 1.

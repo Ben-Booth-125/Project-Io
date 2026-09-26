@@ -501,11 +501,18 @@ int main()
     // item actually asks for — same ground, same farming quality, same
     // everything except the war — and it does not depend on a seed happening to
     // raze anything.
+    //
+    // SELECTED ON SCALE, NOT COUNT (the centres cold review, 2026-09-26). A
+    // region deepens into one place (BL-1141), so no region materialises two
+    // centres and a `got >= 2` selection sacked nothing: the experiment failed
+    // by construction. A CITY-BEARING region is now one whose materialised top
+    // scale is a town or larger (`top >= 2`) — the size the heads a sack cuts
+    // decide — and its controls are chosen the same way.
     {
         settlement_state ss2 = ss;
         std::vector<int> sacked_idx;
         for (std::size_t i = 0; i < ss2.regions.size(); ++i)
-            if (got[i] >= 2)
+            if (top[i] >= 2)
             {
                 // Every OTHER eligible region, so the rest stay as controls.
                 if ((i % 2) != 0) continue;
@@ -526,31 +533,35 @@ int main()
                 top2[r] = std::max(top2[r], p.scale);
             }
 
-        int fell = 0, rose = 0, flat = 0, before = 0, after = 0;
+        int fell = 0, rose = 0, flat = 0, before = 0, after = 0, s_before = 0, s_after = 0;
         for (const int i : sacked_idx)
         {
             const std::size_t r = static_cast<std::size_t>(i);
             before += got[r];
             after  += got2[r];
+            s_before += top[r];
+            s_after  += top2[r];
             if (got2[r] < got[r] || top2[r] < top[r]) ++fell;
             else if (got2[r] > got[r] || top2[r] > top[r]) ++rose;
             else ++flat;
         }
         // The controls, so a body-wide collapse cannot masquerade as the effect.
-        int c_before = 0, c_after = 0, c_n = 0;
+        int c_before = 0, c_after = 0, c_n = 0, cs_before = 0, cs_after = 0;
         for (std::size_t i = 0; i < regions.size(); ++i)
         {
-            if (got[i] < 2 || (i % 2) == 0) continue;
+            if (top[i] < 2 || (i % 2) == 0) continue;
             ++c_n; c_before += got[i]; c_after += got2[i];
+            cs_before += top[i]; cs_after += top2[i];
         }
 
-        std::printf("\n-- R2 controlled: sack half the city-bearing regions, re-materialise --\n");
+        std::printf("\n-- R2 controlled: sack half the town-or-larger regions, re-materialise --\n");
         std::printf("   sacked %d regions at 600 per-mille countryside loss\n",
                     static_cast<int>(sacked_idx.size()));
-        std::printf("   sacked   centres %d -> %d   fewer-or-smaller %d, unchanged %d, larger %d\n",
-                    before, after, fell, flat, rose);
-        std::printf("   control  centres %d -> %d over %d untouched regions\n",
-                    c_before, c_after, c_n);
+        std::printf("   sacked   centres %d -> %d   top-scale sum %d -> %d   "
+                    "fewer-or-smaller %d, unchanged %d, larger %d\n",
+                    before, after, s_before, s_after, fell, flat, rose);
+        std::printf("   control  centres %d -> %d   top-scale sum %d -> %d over %d untouched regions\n",
+                    c_before, c_after, cs_before, cs_after, c_n);
         std::printf("   sacked lose %.1f%% of their cities; controls %.1f%%\n",
                     before ? 100.0 * (before - after) / before : 0.0,
                     c_before ? 100.0 * (c_before - c_after) / c_before : 0.0);

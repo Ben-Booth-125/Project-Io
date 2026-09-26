@@ -629,7 +629,7 @@ struct region
     /// which is what makes the ruin legible rather than merely absent.
     /// Counted IN PEOPLE (BL-1130 round 4): a village's worth of urban heads a
     /// sack destroys is one razing, whether or not the centre count stepped
-    /// down (`sack_region_urban`, `region_settlement_size`).
+    /// down, uncapped (`sack_region_urban`, `region_village_equivalents`).
     int centres_razed = 0;
 
     /// Heads living in this region's centres, a subset of `population`. The
@@ -1273,12 +1273,26 @@ inline int region_centre_equivalents(int64_t urban_heads)
 /// centre-equivalents of the region's urban heads, and never less than one
 /// while the region stands a settlement (`centres > 0`) — the opening draw
 /// stands a town on ground that farms before its heads reach a village's
-/// worth, and that town is a place. Also the unit a sack's razing is counted
-/// in (`sack_region_urban`): a razing is counted in people.
+/// worth, and that town is a place. CAPPED at `region_centre_limit`, because
+/// the readers it serves were calibrated per centre; a razing is counted in
+/// the uncapped reading below.
 inline int region_settlement_size(const region& p)
 {
     const int eq = region_centre_equivalents(p.urban_population);
     return (eq < 1 && p.centres > 0) ? 1 : eq;
+}
+
+/// A RAZING IS COUNTED IN PEOPLE, UNCAPPED (Ben, 2026-09-25; the centres cold
+/// review, 2026-09-26). The region's urban heads in VILLAGE EQUIVALENTS — one
+/// per `region_centre_heads`, never less than one while it stands a settlement
+/// — with no ceiling: the capped size above saturates at 320,000 heads, so a
+/// sack that cut a ten-million city in half recorded no razing at all. This is
+/// the unit `sack_region_urban` records `centres_razed` in; the prize and the
+/// relay keep the capped reading they were calibrated on.
+inline int64_t region_village_equivalents(const region& p)
+{
+    const int64_t n = (p.urban_population > 0) ? p.urban_population / region_centre_heads : 0;
+    return (n < 1 && p.centres > 0) ? 1 : n;
 }
 
 /// How many centres a region's urban heads stand up: ONE once they reach a
@@ -1394,9 +1408,9 @@ void advance_region_urban(region& p, bool network_ok);
 /// countryside lost; the city loses a multiple of it, because a sack falls on
 /// the walls and not the fields. Centres fall to what the surviving heads can
 /// stand, and the destruction is recorded in `centres_razed` COUNTED IN PEOPLE
-/// (Ben, 2026-09-25): the fall in `region_settlement_size` — a village's worth
-/// of urban heads per razing, plus the last settlement's one when it falls —
-/// whether or not the centre count stepped down.
+/// (Ben, 2026-09-25): the fall in `region_village_equivalents` — a village's
+/// worth of urban heads per razing, uncapped, plus the last settlement's one
+/// when it falls — whether or not the centre count stepped down.
 void sack_region_urban(region& p, int population_loss_q);
 
 /// The manpower ceiling a region's CURRENT population can support — a

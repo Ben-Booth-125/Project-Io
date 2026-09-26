@@ -402,6 +402,48 @@ int region_distance(const region& a, const region& b, int gw)
     return dc > dr ? dc : dr; // Chebyshev — movement is eight-connected.
 }
 
+bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>& owner,
+                            std::size_t i, int gw)
+{
+    if (i >= regions.size()) return false;
+    region& from = regions[i];
+    if (from.industry_points <= 0 || from.centres > 0) return false;
+    const int q = (i < owner.size()) ? owner[i] : -1;
+    if (q < 0) return false;
+    int best = -1, best_d = 1 << 30;
+    for (std::size_t j = 0; j < regions.size() && j < owner.size(); ++j)
+    {
+        if (j == i || owner[j] != q) continue;
+        const region& to = regions[j];
+        if (to.centres <= 0 || to.population <= 0) continue;
+        const int d = region_distance(from, to, gw);
+        if (d < best_d) { best_d = d; best = static_cast<int>(j); } // strict: ties to the lower index
+    }
+    if (best < 0) return false;
+    region& to = regions[static_cast<std::size_t>(best)];
+    if (to.industry_points > industry_points_ceiling - from.industry_points) return false;
+    to.industry_points += from.industry_points;
+    to.industry_points_from_treasury += from.industry_points_from_treasury;
+    from.industry_points = 0;
+    from.industry_points_from_treasury = 0;
+    return true;
+}
+
+int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner, int gw)
+{
+    // Region order: a receiver stands a centre, so no stranded region receives
+    // from another and the order decides nothing but distance ties.
+    int moved = 0;
+    for (std::size_t i = 0; i < regions.size(); ++i)
+    {
+        const region& r = regions[i];
+        if (r.industry_points > 0 && r.centres <= 0 && r.centres_razed <= 0
+            && rehome_stranded_points(regions, owner, i, gw))
+            ++moved;
+    }
+    return moved;
+}
+
 int step_for_year(const history_sim_params& p, int64_t y)
 {
     const int n = clampi(p.tick_band_count, 0, sim_tick_band_max);
@@ -2099,27 +2141,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // clamped) — each of those stays on the region, and the close's budget
     // counts it unspent under its own reason. The treasury-paid tally
     // (report-only) moves with its points, so the world's paid-in share holds.
+    // One rule, `rehome_stranded_points` (history_sim.hpp), which the span's
+    // close calls again for whatever this left behind.
     const auto rehome_points = [&](std::size_t i) {
-        region& from = ss.regions[i];
-        if (from.industry_points <= 0 || from.centres > 0) return;
-        const int q = (i < owner.size()) ? owner[i] : -1;
-        if (q < 0) return;
-        int best = -1, best_d = 1 << 30;
-        for (std::size_t j = 0; j < ss.regions.size() && j < owner.size(); ++j)
-        {
-            if (j == i || owner[j] != q) continue;
-            const region& to = ss.regions[j];
-            if (to.centres <= 0 || to.population <= 0) continue;
-            const int d = region_distance(from, to, gw);
-            if (d < best_d) { best_d = d; best = static_cast<int>(j); }
-        }
-        if (best < 0) return;
-        region& to = ss.regions[static_cast<std::size_t>(best)];
-        if (to.industry_points > industry_points_ceiling - from.industry_points) return;
-        to.industry_points += from.industry_points;
-        to.industry_points_from_treasury += from.industry_points_from_treasury;
-        from.industry_points = 0;
-        from.industry_points_from_treasury = 0;
+        rehome_stranded_points(ss.regions, owner, i, gw);
     };
 
     const auto hold_to_ground = [&](bool only_after_founding) {
@@ -8556,6 +8581,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
     // BL-1130 (review fix): the span closes on a measured record.
     hold_to_ground(/*only_after_founding=*/true);
+
+    // BL-1141 (the centres cold review, 2026-09-26) — POINTS LEFT BEHIND ARE
+    // RETRIED AT THE CLOSE. A settlement that ends without a sack hands its
+    // points on at the moment it ends, and that handoff can find nothing: its
+    // realm stood no other centre then, it was held by no realm, or the
+    // receiver was at the ceiling. Whatever is still stranded when the span
+    // closes is offered once more to its realm's nearest centre as the map now
+    // stands. A sack's points stay on the ruin (NR-901).
+    rehome_stranded_at_close(ss.regions, owner, gw);
 
     // THE CLOSING STEP, always taken, at the stop year. Without it the record's
     // last step is wherever the interval happened to land — up to one interval

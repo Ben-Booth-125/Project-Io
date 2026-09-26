@@ -2153,9 +2153,10 @@ void sack_region_urban(region& p, int population_loss_q)
         return;
 
     // BL-1130 round 4 (Ben, 2026-09-25: "a razing is counted in people"): the
-    // settlement's size before the walls fall, in the same unit the prize and
-    // the relay read.
-    const int size_before = region_settlement_size(p);
+    // settlement's size before the walls fall, in village equivalents, UNCAPPED
+    // (the centres cold review: the capped size the prize reads saturates at
+    // 320,000 heads, so a sacked metropolis recorded nothing).
+    const int64_t size_before = region_village_equivalents(p);
 
     const int64_t loss_q =
         clampi64((static_cast<int64_t>(clampi(population_loss_q, 0, 1000))
@@ -2176,13 +2177,15 @@ void sack_region_urban(region& p, int population_loss_q)
     // historied. BL-1130 round 4: it is COUNTED IN PEOPLE, a village's worth of
     // urban heads per razing, whether or not the centre count steps down, so
     // the centre count's coarse steps (one place standing for any number of heads)
-    // do not hide a sack. The unit is `region_settlement_size`, the size the
-    // prize reads: heads over the village rung, and the last settlement's one
-    // when it falls — so a sack records exactly the centres the one-centre-per-
-    // village rule it replaces would have razed, from the same heads.
-    const int size_after = region_settlement_size(p);
+    // do not hide a sack. The unit is `region_village_equivalents`: heads over
+    // the village rung, uncapped, and the last settlement's one when it falls —
+    // so a sack records the village-worths of heads it cost, however large the
+    // city. Saturates at the field's range rather than wrapping.
+    const int64_t size_after = region_village_equivalents(p);
     if (size_after < size_before)
-        p.centres_razed += size_before - size_after;
+        p.centres_razed = static_cast<int>(clampi64(
+            static_cast<int64_t>(p.centres_razed) + (size_before - size_after),
+            0, std::numeric_limits<int>::max()));
 }
 
 void advance_region_demography(region& p, int years, int war_pressure_q)

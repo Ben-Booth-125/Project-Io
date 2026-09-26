@@ -33,6 +33,7 @@
 
 #include "world/hard_coded_world.hpp"
 #include "world/history_sim.hpp"
+#include "world/population_generation.hpp"
 #include "world/sim_terrain_build.hpp"
 #include "world/unit_roster.hpp"
 #include "world/settlement.hpp"
@@ -1834,8 +1835,12 @@ int main()
         // place bigger, never more numerous, so "grows past its opening seed"
         // is read in HEADS and the network gate is read where it still bites —
         // whether a settlement STANDS on ground that holds none (a4, below).
+        // NOT A SUPPLY TEST (the centres cold review, 2026-09-26): cut-off
+        // ground grows its heads too (a6), so this row cannot tell supplied
+        // from cut-off ground and says only what it checks. a4 is the supply test.
         check(outpost_near.centres == 1 && outpost_near.urban_population > region_centre_heads,
-              "BL872a2 well-supplied ground grows PAST its opening seed in people, and stays ONE place");
+              "BL872a2 supplied ground grows past its opening seed in HEADS and stays ONE place "
+              "(not a supply test: a4 is)");
         check(outpost_far.centres == 1,
               "BL872a3 CUT OFF ground stops growing centres — it keeps its opening seed, no more");
         {
@@ -1876,6 +1881,101 @@ int main()
         check(outpost_far.population > 0 && outpost_far.urban_population > region_centre_heads,
               "BL872a6 population and urban share still grow on cut-off ground — only NEW "
               "centres are gated, not the demography the gate reads");
+    }
+
+    // ---------------------------------------------------------------------
+    // BL-1141 — a region deepens into one place, and its points go with its
+    // people (POPULATION.md § Generation). Pure fixtures on the region record
+    // and the two points rules the sim calls: no run, no terrain.
+    // ---------------------------------------------------------------------
+    {
+        // D1 THE RUNGS. A place's scale is the rung its heads reached, read off
+        // `k_population_for_scale` (thousands): one head short of a rung is the
+        // rung below, the rung's own count is the rung.
+        bool rungs = scale_reached(0) == 1;
+        for (int i = 1; i < 5; ++i)
+        {
+            const int64_t at = static_cast<int64_t>(k_population_for_scale[i]) * 1000;
+            rungs = rungs && scale_reached(at - 1) == i && scale_reached(at) == i + 1;
+        }
+        rungs = rungs && scale_reached(int64_t{1} << 40) == 5;
+        std::printf("      rungs at %d / %d / %d / %d thousand heads\n", k_population_for_scale[1],
+                    k_population_for_scale[2], k_population_for_scale[3], k_population_for_scale[4]);
+        check(rungs, "BL1141d1 scale_reached steps at each rung's own headcount, and not a head before");
+        check(region_centres_wanted(region_centre_heads - 1) == 0
+              && region_centres_wanted(region_centre_heads) == 1
+              && region_centres_wanted(int64_t{1} << 40) == 1,
+              "BL1141d2 a village's worth of heads stands ONE centre, and no number of heads stands two");
+
+        // D3 THE HANDOFF. Region 0 of realm 0 lost its settlement holding
+        // points. Its realm's centres stand at distance 10 (region 1), 3
+        // (region 2) and 3 (region 4); region 3, at distance 1, is another
+        // realm's. The points go to region 2: the nearest of its own realm, the
+        // tie with region 4 to the lower index.
+        const int tgw = 64;
+        std::vector<region> t(5);
+        const int cols[5] = { 10, 20, 13, 11, 7 };
+        for (int k = 0; k < 5; ++k)
+        {
+            t[static_cast<std::size_t>(k)].col = cols[k];
+            t[static_cast<std::size_t>(k)].row = 5;
+            t[static_cast<std::size_t>(k)].population = 50000;
+            t[static_cast<std::size_t>(k)].urban_population = 20000;
+            t[static_cast<std::size_t>(k)].centres = 1;
+        }
+        t[0].centres = 0;
+        t[0].industry_points = 700;
+        t[0].industry_points_from_treasury = 300;
+        const std::vector<int> owner = { 0, 0, 0, 1, 0 };
+        const bool moved = rehome_stranded_points(t, owner, 0, tgw);
+        std::printf("      handoff: points on 0..4 = %lld %lld %lld %lld %lld\n",
+                    static_cast<long long>(t[0].industry_points), static_cast<long long>(t[1].industry_points),
+                    static_cast<long long>(t[2].industry_points), static_cast<long long>(t[3].industry_points),
+                    static_cast<long long>(t[4].industry_points));
+        check(moved && t[2].industry_points == 700 && t[2].industry_points_from_treasury == 300
+              && t[0].industry_points == 0 && t[1].industry_points == 0 && t[3].industry_points == 0
+              && t[4].industry_points == 0,
+              "BL1141d3 a settlement's points pass whole to its realm's NEAREST centre "
+              "(never a nearer foreign one; a tie to the lower index)");
+        // ...and nowhere at all where the realm stands no other centre.
+        t[3].centres = 0;
+        t[3].industry_points = 400;
+        check(!rehome_stranded_points(t, owner, 3, tgw) && t[3].industry_points == 400,
+              "BL1141d4 a realm with no other centre keeps the points where they are (never dropped)");
+
+        // D5 THE CLOSE'S RETRY, AND A SACK KEEPS ITS POINTS. Region 3's realm
+        // stands a centre by the close (region 4 changes hands), so the retry
+        // hands region 3's points on. Region 1 is SACKED to nothing holding
+        // points: the sack moves none of them and the retry skips the ruin
+        // (NR-901: the works went with the towns).
+        t[1].industry_points = 900;
+        sack_region_urban(t[1], /*population_loss_q=*/1000);
+        const std::vector<int> owner_at_close = { 0, 0, 0, 1, 1 };
+        const int retried = rehome_stranded_at_close(t, owner_at_close, tgw);
+        std::printf("      close: retried %d; region 1 centres %d razed %d points %lld; "
+                    "region 3 points %lld; region 4 points %lld\n",
+                    retried, t[1].centres, t[1].centres_razed,
+                    static_cast<long long>(t[1].industry_points),
+                    static_cast<long long>(t[3].industry_points),
+                    static_cast<long long>(t[4].industry_points));
+        check(retried == 1 && t[3].industry_points == 0 && t[4].industry_points == 400,
+              "BL1141d5 points left behind are retried at the span's close, to the realm's centre as the map then stands");
+        check(t[1].centres == 0 && t[1].centres_razed > 0 && t[1].industry_points == 900,
+              "BL1141d6 a SACK keeps its points on the ruin: the sack moves none and the close skips it");
+
+        // D7 A RAZING IS COUNTED IN PEOPLE, UNCAPPED. A sack that halves a
+        // ten-million city costs it 500 village-worths of heads; the capped
+        // size the prize reads saturates at 32 and would have recorded none.
+        region big;
+        big.farm_q = 800;
+        big.population = 12000000;
+        big.urban_population = 10000000;
+        big.centres = 1;
+        sack_region_urban(big, /*population_loss_q=*/250); // the city loses twice that: 500 per mille
+        std::printf("      sacked metropolis: urban %lld, razed %d\n",
+                    static_cast<long long>(big.urban_population), big.centres_razed);
+        check(big.urban_population == 5000000 && big.centres_razed == 500,
+              "BL1141d7 a razing is counted in village-worths of heads lost, uncapped (a halved ten-million city: 500)");
     }
 
     // --- M1  over-muster starves industry (BL-867) --------------------------
