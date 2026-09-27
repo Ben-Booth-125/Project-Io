@@ -512,20 +512,24 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // near pair's without the alarm. "Met across water" is the class the
     // pair's contact recorded at the meeting, never its seats read again.
     //
-    // 0, AND THAT IS THE PLATEAU, NOT A TARGET. MEASURED on the 16 curated seeds
-    // (2026-09-26, four-way landmasses, meeting on the sea line alone, the
-    // penalty read off the recorded class): far cross-water pairs bound at 1960
-    // read 0 at 700 and 500, 10 at 450, 191 at 400, then 530 / 526 / 518 at
-    // 350 / 300 / 0, with 492-523 pairs met by sea at every rung; down the
-    // same ladder the span's subjections read 96 / 96 / 95 / 62 / 56 / 43 / 56
-    // and its battles 9,266 / 9,266 / 9,215 / 8,920 / 8,670 / 8,657 / 8,520.
-    // Above 450 the penalty forbids every such binding; at or below 350 it
-    // decides none of them and the pair's own facts do. A value inside the
-    // 450-350 band would be the dial choosing the count; 0 is the reading
-    // where it chooses nothing. Without BL-1142 at all (no meeting, the land's
-    // 700, no loss) no far pair across water binds.
+    // 300 (Ben, 2026-09-27, NR-959 B; INDUSTRIALISATION.md sec Far pairs bind
+    // across water): the far penalty a pair that met across water reads,
+    // against a land pair's 700 -- where the pair's own aggression, grudges and
+    // trade decide whether it binds, so the number does not choose the count,
+    // and distance still reads across water. The re-run ladder it was chosen
+    // from (16 curated seeds, 2026-09-26, four-way landmasses, meeting on the
+    // sea line alone, the penalty read off the recorded class; PRE-FIX-ROUND
+    // numbers, before the wet-corridor and coastal-deed fixes): far cross-water
+    // pairs bound at 1960 read 0 at 700 and 500, 10 at 450, 191 at 400, then
+    // 530 / 526 / 518 at 350 / 300 / 0 -- 526 bound at 300 against 518 at 0 --
+    // with 492-523 pairs met by sea at every rung; down the same ladder the
+    // span's subjections read 96 / 96 / 95 / 62 / 56 / 43 / 56 and its battles
+    // 9,266 / 9,266 / 9,215 / 8,920 / 8,670 / 8,657 / 8,520. Above 450 the
+    // penalty forbids every such binding; at or below 350 it decides none of
+    // them and the pair's own facts do. Without BL-1142 at all (no meeting,
+    // the land's 700, no loss) no far pair across water binds.
     hp.far_pairs_meet_by_sea    = true;
-    hp.treaty_far_sea_penalty_q = 0;
+    hp.treaty_far_sea_penalty_q = 300;
 
     // BL-1147: THE CONVERSION IS THE EXPLORATION OPEN'S ALONE. This span's
     // polities already sail the fleet 1200 carried (it crossed the 1660
