@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*68 entries — 3 open, 65 resolved.*
+*69 entries — 4 open, 65 resolved.*
 
 ---
 
@@ -76,6 +76,21 @@ NR-897 spreads a treasury's share of industry points over its realm's centre-hol
 > **Recommendation:** A: one rule for both halves of the points; read after BL-1155 (every centre a work candidate) raises the employed share.
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`*
+
+### NR-965 — CALL: the campaign scorer cannot see the fleet rule, so a realm with no fleet picks the same failing crossing every round
+*question · raised 2026-09-27 · from BL-1152 (fleets project power), lane checkpoint c4b5027e, 2026-09-27*
+
+With the fleet rule on, a crossing whose fleet cannot lift the army, or which the defenders out-project, never sails. But the campaign scorer does not read either test, so a realm without a fleet scores the same crossing best every round and fails it every round: at 1 man per hull, on 7 seeds, 4,161 such failures against 672 real crossings. Most crossings today launch from a hub with no built port (88-90%) and with no fleet (69-77%).
+
+**Why it matters.** A realm that wastes every round on a crossing it cannot make stops acting; the fleet rule would freeze overseas realms rather than make fleets matter.
+
+- A: the candidate list drops a crossing the rule would refuse (a legality filter, like the other gates on a verb, not a scorer term)
+- B: a refused crossing is remembered and not re-scored for a term (a cooldown)
+- C: other
+
+> **Recommendation:** A: the scorer already only scores legal verbs; the fleet test becomes part of legality. Check it against the grant register (AI_OPPONENT.md § 11) first.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
 
 ---
 

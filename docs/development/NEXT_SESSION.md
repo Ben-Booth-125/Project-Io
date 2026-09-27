@@ -30,7 +30,7 @@ is a build candidate · the stream rate is picked from a re-run ladder.
 | Provinces | `a810ef485bc200aef` | BL-1150 (adc45b16) | river fix round: C2a across 16 shipped seeds (may be red, leave it), river-cost-0 mutation | merge; NR-962 decides the river geometry |
 | Firm cap | `aee7aacb8b39cd83b` | BL-1146 (c6670be9) | fix round: Pass 6 back to a flat 2 (MY error — NR-960 is budget-only), one anchor helper, town row fixed | merge; re-read the firm census after BL-1150; spawn_solvency R4 red on it (NR-963) |
 | Lane ports | `af645cfdcf963a520` | BL-1153 (80381678) | fix round: skip same-port legs, busier end by the picked seat, realm snapshot bound, loud fallback, wrap row | merge |
-| Sea | `acc0cdbc7ceec74b6` | NR-959 (300), BL-1152 (fleets project power) | measuring / partial build, checkpointed | finish BL-1152, three ladders (men per hull, halving distance, the carry-over rung) for Ben |
+| Sea | `acc0cdbc7ceec74b6` | NR-959 (300, c83d459f), BL-1152 (fleets project power, c4b5027e) | built behind a switch, both constants 0 (digests unchanged); P0-P6 rows with mutations; NOT cold-reviewed | measured: 88-90% of wet crossings launch from a hub with no built port, 69-77% with no fleet; ~165 mutual-defence pairs a seed. Readings taken: embark at the hub's coast, defenders project from built ports else the seat's coast, a non-aggression partner stays out. Next: NR-965, the ladders (a 14-seed partial pass in scratchpad lane-sea), span-time cost, a cold review |
 
 Each lane's final report is in this session's transcript; every branch is cold-reviewed except
 BL-1152. Merge world-movers in this order: BL-1150, BL-1146, BL-1153, then BL-1137+1149 at Ben's
@@ -46,7 +46,7 @@ takes 22,550 -> 13,599 pooled (~850 a seed); re-read the ~500 aim with BL-1137.
 ## Open for Ben
 
 NR-962 (rivers divide banks?), NR-963 (rivals start armed?), NR-964 (the treasury spread by
-employed heads?). The rate rung after the re-run ladder. Recommendations in each entry.
+employed heads?), NR-965 (the campaign scorer cannot see the fleet rule). The rate rung after the re-run ladder. Recommendations in each entry.
 
 ## Hazards this sprint taught
 
