@@ -7700,7 +7700,7 @@
      ],
      "requirement": "A cold review.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Review 2026-09-27: the budget-world cap correct (no tile holds two centres; the reason path consistent). HIGH: Pass 6 (the no-budget legacy path) was changed outside NR-960 -- the main session's own brief extended it; seed 28's legacy pin moved -> reverted to a flat 2 in the fix round. Also: the town row passes by construction (cfg.c = 3 fix), the anchor rule in three copies (one helper), stale comments. R4's cause traced -> NR-963."
     },
     {
      "id": "R4",

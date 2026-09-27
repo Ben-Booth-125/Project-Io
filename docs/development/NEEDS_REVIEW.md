@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*66 entries — 1 open, 65 resolved.*
+*67 entries — 2 open, 65 resolved.*
 
 ---
 
@@ -45,6 +45,22 @@ Ruling 2 (PROVINCES.md): 'Boundaries are rivers and elevation difference.' After
 > **Recommendation:** B: it makes ruling 2 true as written; today's cost brakes travel along a river, the opposite of what a river does. A world-mover in the partition, measured before it is set, with a mutation row (river cost 0 must turn the river row red).
 
 *Files: `src/world/province.cpp`, `src/world/province.hpp`, `tools/verify/province_partition_harness.cpp`, `docs/generation/PROVINCES.md`*
+
+### NR-963 — CALL: the rival corporations open unarmed and cannot arm inside the settle -- should they start with a force?
+*question · raised 2026-09-27 · from BL-1154 (rivals field no force), traced by the BL-1146 cold review, 2026-09-27*
+
+spawn_solvency R4 ('the field still fields a standing force') reads 0 rival units over 12 seeds (baseline 15-20 a seed in 2026-08; 0 since the settle went from 80 ticks to 12). The chain, from the code: a hire needs a completed military base the corp owns (corp_ai.cpp ~1808-1832); the charter web never builds one; the opening force (seed_starting_military, BL-331/BL-476 'rivals start armed') has been OPT-IN since 2026-08-26 (corporation_params::seed_starting_force, default false), turned off when the seated corp's standing-force upkeep was 90% of its outgoings (BL-635); a base needs tech E0-ML-01, which needs two extraction sites and a Cr 2,000 balance, and rivals open at Cr 0 (budget firms) or at most Cr 644 (specialists); the settle is 12 ticks, a corp evaluates 3 times in it, and a base takes 4 ticks to build. So no rival can arm before play. MILITARY.md still says every non-background corp starts with a unit beside its base -- the doc and the code disagree either way.
+
+**Why it matters.** Every system should feed Trade or Conflict; a field that opens unarmed has no conflict until a rival earns Cr 2,000 and a tech, and the seat's rivals read as traders only.
+
+- A: rivals start armed again (BL-476 as MILITARY.md says); the seat keeps opening unarmed as BL-635 left it; measure rival solvency with the upkeep back
+- B: rivals earn their force in play -- the E0-ML-01 gate or the base's cost is re-read against what a rival holds at the start
+- C: accept an unarmed opening field; MILITARY.md corrected, and R4 retired as a requirement of the settle
+- D: other
+
+> **Recommendation:** A: it is the doc as written and restores conflict from the first tick; the seat's opt-out stays, so BL-635's cause does not return for the player. It costs rival solvency (upkeep was the dominant outgoing when armed) -- read that before it ships.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/corporation_generation.hpp`, `src/world/corp_ai.cpp`, `docs/military/MILITARY.md`, `tools/verify/spawn_solvency.cpp`*
 
 ---
 
