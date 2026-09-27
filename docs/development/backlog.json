@@ -1456,6 +1456,30 @@
     "tools/verify/sea_lane_stamp_harness.cpp"
    ],
    "design": "SETTLED (Ben, 2026-09-27, NR-955 B): LOGISTICS.md § 4b, 'A realm's port is its nearest coastal region's seat'. Today a seat's port is its nearest sea tile within nine tiles, and a seat with none lays no lane (about a quarter of earned lanes unlaid: 371 of 493 after the four-way walk). THE WORK: where a seat has no sea within nine tiles, its lane end moves to the nearest region of the same realm that has one (nearest by the same measure the sim uses; ties to the lower region), and starts at that seat's nearest sea tile. Report earned / laid / unlaid lanes before and after, and the walker's cost. E (a port facing the partner) was NOT taken. Find the port picker first (sea_lane_port; the file list is a guess)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-27",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1154",
+   "short_name": "RIVALS_FIELD_NO_FORCE",
+   "author": "Claude (sprint 48, the BL-1146 lane's spawn_solvency reading, 2026-09-27)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "On a budget world the rival corporations field almost no standing force, so the field cannot fight",
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/corporation_generation.cpp",
+    "tools/verify/spawn_solvency.cpp"
+   ],
+   "design": "FOUND 2026-09-27: spawn_solvency R4 'the field still fields a standing force' reads the rival field's units at the settle's close over 12 seeds. Baseline (BL-635, 2026-08-26): 15-20 units a seed. After BL-1008 (settle 12 ticks): 0 on 3 seeds. Budget arc: 3 units in all on 29b87817, 1 on 091401ad, 0 with BL-1146 (the scaled firm cap moved seed 1's last unit). The BL-1086 lane noted the charter web gives the seated corporation no standing force either (no upkeep). MILITARY.md: rivals hire through the same hire_unit verb at a military base (BL-324 grant). WORK: find the cause from the code (no base on the charter web? the rival scorer never chooses hire? the settle too short?) and fix whichever is the defect -- do not relax R4. If the cause is a design gap (the web never builds a base, and no doc says it should), report it for Ben rather than inventing a base. The BL-1146 cold review is asked for the cause first; read it before starting."
   }
  ]
 }

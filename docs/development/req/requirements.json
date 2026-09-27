@@ -7659,6 +7659,60 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "firm-cap-scales-with-centre",
+   "title": "BL-1146 - The per-province firm cap scales with the province's centre",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1146 - sprint 48 (Ben, NR-960 B, 2026-09-27)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: charter_refusal_probe (rule pin 2/4/6/8/10, the town case), stockpile_budget_check --firm-census on 16 seeds"
+     ],
+     "requirement": "Both caps read two firms per rung of the province's centre.",
+     "notes": "",
+     "result_metric": "Lane c6670be9: province_cap refused 6.0% -> 3.1% of the budget; budget firms 1,911 -> 1,914 of 1,920; the most in one province 2 -> 6 (a city); markets unchanged; the winner keeps its candidate on 5 of 16. Metropolis and megacity rungs unexercised on main (no such provinces before BL-1137)."
+    },
+    {
+     "id": "R2",
+     "status": "failed",
+     "verification": [
+      "headless: spawn_solvency default (12 seeds)"
+     ],
+     "requirement": "The seat and the field stay solvent and acting.",
+     "notes": "",
+     "result_metric": "R1-R3 pass; R4 \"the field still fields a standing force\" FAILS: rival units 1 -> 0 (seed 1's last unit). Not relaxed; the thinning predates this item (baseline ~17 a seed; 3 on 29b87817) -- filed as BL-1154 (rivals field no force)."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, landscape_search_harness, legacy digests on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
