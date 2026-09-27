@@ -85,10 +85,26 @@
 //
 // A READING, NOT A GATE ON DENSITY. Nothing here asserts a centre count, a land
 // share or a scale mix: those are what the rule is ruled against, and a harness
-// that pinned them would be making that call. Two rows FAIL the run (exit 1):
+// that pinned them would be making that call. Rows that FAIL the run (exit 1):
 // the instrument's own honesty check (a world with no settlement record, or no
-// carved centre, would make every fit row vacuous), and THE CAP (BL-1130 review
-// fix) — the rule's own invariant on the saved sim record, not a density.
+// carved centre, would make every fit row vacuous), THE CAP (BL-1130 review
+// fix) — the rule's own invariant on the saved sim record, not a density —
+// THE SPACING (C10), and THE COST MODEL ON THE SHIPPED WORLDS (C13).
+//
+//     * THE COST MODEL ON THE SHIPPED WORLDS (C13; BL-1150 review) —
+//       province_partition_harness C2a/C2b, per body and like for like, on the
+//       worlds the app ships rather than the harness's no-prehistory fixture:
+//       on every body with river edges a river edge is a province border more
+//       often than that body's plain ground (C2a, "rivers divide"), and on
+//       every body with steep edges likewise (C2b, "elevation divides").
+//       Edge classes are the harness's: a river edge carries either side's
+//       `river_edges` bit; steep is |dh| at or above the 90th percentile of
+//       this world's adjacent-land |dh| (the harness's nearest-rank index);
+//       plain is neither. Beside it, REPORTED: the share of home-body river
+//       and plain edges lying ON THE SETTLED LINE (one side in
+//       `w.tile_settled`, the other not) — the line BL-849's lock drew a border
+//       along. A C13 FAIL is Ben's call against the numbers (NR-962), not a
+//       tolerance to widen.
 //
 // READ-ONLY OVER src/world/*. It calls the world's own functions and nothing in
 // src/ changes for it.
@@ -136,6 +152,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cinttypes>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -289,6 +306,13 @@ struct seed_record
 
     int road_tiles = 0, street_tiles = 0;
     int markets = 0;
+
+    // C13, the cost model on this shipped world (BL-1150 review).
+    struct edge_class { int64_t n = 0, border = 0, on_line = 0; };
+    edge_class c13_river, c13_steep, c13_plain; ///< the HOME body's land edges
+    float c13_p90 = 0.0f;                       ///< this world's p90 of adjacent-land |dh|
+    int   c13_river_bodies = 0, c13_steep_bodies = 0; ///< bodies carrying each class
+    std::vector<std::string> c13_fail;          ///< one line per body failing C2a or C2b
 };
 
 /// The centre map: every centre by origin, so a reader can see what the density
@@ -745,6 +769,116 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
         build_province_partition(wc, w.provinces.seed, &r.part_stats);
     }
 
+    // --- C13 the cost model on the shipped world (BL-1150 review) ----------
+    // province_partition_harness C2a/C2b's classes, re-derived here from the
+    // tiles: every adjacent pair of land tiles on one body, once, from its
+    // lower id (the harness's collect_land_edges).
+    {
+        std::map<entity_id, std::pair<int, int>>    bdims;
+        std::map<entity_id, std::vector<entity_id>> rasters;
+        for (const auto& [bid, bc] : w.bodies)
+            if (bc.grid_width > 0 && bc.grid_height > 0)
+            {
+                bdims[bid] = { bc.grid_width, bc.grid_height };
+                rasters[bid].assign(static_cast<std::size_t>(bc.grid_width) * bc.grid_height,
+                                    null_entity);
+            }
+        for (const auto& [tid, tc] : w.tiles)
+        {
+            const auto rit = rasters.find(tc.body);
+            if (rit == rasters.end()) continue;
+            const auto& d = bdims.at(tc.body);
+            if (tc.grid_x < 0 || tc.grid_x >= d.first || tc.grid_y < 0 || tc.grid_y >= d.second)
+                continue;
+            rit->second[static_cast<std::size_t>(tc.grid_y) * d.first + tc.grid_x] = tid;
+        }
+        struct land_edge { entity_id body; float dh; bool river, border, on_line; };
+        std::vector<land_edge> edges;
+        for (const auto& [bid, raster] : rasters) // ascending body id
+        {
+            const int bw = bdims.at(bid).first, bh = bdims.at(bid).second;
+            for (const entity_id t : raster)
+            {
+                if (t == null_entity) continue;
+                const tile_component& tc = w.tiles.at(t);
+                if (is_water(tc.substrate)) continue;
+                for (int s = 0; s < 6; ++s)
+                {
+                    const auto [nx_raw, ny] = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, s);
+                    if (ny < 0 || ny >= bh) continue;
+                    const int nx = ((nx_raw % bw) + bw) % bw;
+                    const entity_id n = raster[static_cast<std::size_t>(ny) * bw + nx];
+                    if (n == null_entity || n <= t) continue;
+                    const tile_component& nt = w.tiles.at(n);
+                    if (is_water(nt.substrate)) continue;
+                    land_edge e;
+                    e.body    = bid;
+                    e.dh      = std::fabs(tc.height - nt.height);
+                    e.river   = ((tc.river_edges >> s) & 1u) != 0u
+                                || ((nt.river_edges >> ((s + 3) % 6)) & 1u) != 0u;
+                    e.border  = w.provinces.province_of(t) != w.provinces.province_of(n);
+                    e.on_line = (w.tile_settled.count(t) != 0) != (w.tile_settled.count(n) != 0);
+                    edges.push_back(e);
+                }
+            }
+        }
+        std::vector<float> dh;
+        dh.reserve(edges.size());
+        for (const land_edge& e : edges) dh.push_back(e.dh);
+        std::sort(dh.begin(), dh.end());
+        if (!dh.empty())
+            r.c13_p90 = dh[std::min(dh.size() - 1, static_cast<std::size_t>(0.9 * double(dh.size())))];
+
+        using ec = seed_record::edge_class;
+        struct classes { ec river, steep, plain; };
+        std::map<entity_id, classes> by_body;
+        for (const land_edge& e : edges)
+        {
+            classes& c = by_body[e.body];
+            const auto bump = [&](ec& k) { ++k.n; if (e.border) ++k.border; if (e.on_line) ++k.on_line; };
+            if (e.river) bump(c.river);
+            if (e.dh >= r.c13_p90) bump(c.steep);
+            if (!e.river && e.dh < r.c13_p90) bump(c.plain);
+        }
+        const auto share = [](const ec& k) { return k.n ? double(k.border) / double(k.n) : 0.0; };
+        for (const auto& [bid, c] : by_body)
+        {
+            if (bid == body)
+            {
+                r.c13_river = c.river;
+                r.c13_steep = c.steep;
+                r.c13_plain = c.plain;
+            }
+            char line[192];
+            if (c.river.n > 0)
+            {
+                ++r.c13_river_bodies;
+                if (!(share(c.river) > share(c.plain)))
+                {
+                    std::snprintf(line, sizeof line,
+                                  "C2a body %u%s: river %.2f%% (%" PRId64 ") <= plain %.2f%% (%" PRId64 ")",
+                                  bid, bid == body ? " (home)" : "", 100.0 * share(c.river),
+                                  c.river.n, 100.0 * share(c.plain), c.plain.n);
+                    r.c13_fail.emplace_back(line);
+                }
+            }
+            if (c.steep.n > 0)
+            {
+                ++r.c13_steep_bodies;
+                if (!(share(c.steep) > share(c.plain)))
+                {
+                    std::snprintf(line, sizeof line,
+                                  "C2b body %u%s: steep %.2f%% (%" PRId64 ") <= plain %.2f%% (%" PRId64 ")",
+                                  bid, bid == body ? " (home)" : "", 100.0 * share(c.steep),
+                                  c.steep.n, 100.0 * share(c.plain), c.plain.n);
+                    r.c13_fail.emplace_back(line);
+                }
+            }
+        }
+        if (r.c13_river_bodies == 0) r.c13_fail.emplace_back("C2a no body carries a river edge");
+        if (r.c13_steep_bodies == 0) r.c13_fail.emplace_back("C2b no body carries a steep edge");
+    }
+
     if (!map_dir.empty())
     {
         char name[64];
@@ -974,6 +1108,48 @@ int main(int argc, char** argv)
     }
     std::printf("\n");
 
+    std::printf("\n=== C13 the cost model on the shipped worlds (province_partition_harness C2a/C2b,"
+                " per body, like for like; BL-1150 review) ===\n");
+    std::printf("home body: border share of each edge class, ratio to plain; ON THE SETTLED LINE:"
+                " share of each class with one side settled and the other not\n");
+    std::printf("seed  p90|dh| | river%%    (n)  plain%%     (n)  r/p  | steep%%    (n)  s/p  |"
+                " on line: river%%  plain%%  r/p | bodies r/s | C2a  C2b\n");
+    seed_record::edge_class pr_river, pr_steep, pr_plain;
+    const auto shr = [](const seed_record::edge_class& k) {
+        return k.n ? 100.0 * double(k.border) / double(k.n) : 0.0;
+    };
+    const auto onl = [](const seed_record::edge_class& k) {
+        return k.n ? 100.0 * double(k.on_line) / double(k.n) : 0.0;
+    };
+    const auto ratio = [](double a, double b) { return b > 0.0 ? a / b : 0.0; };
+    const auto add = [](seed_record::edge_class& to, const seed_record::edge_class& k) {
+        to.n += k.n; to.border += k.border; to.on_line += k.on_line;
+    };
+    for (const seed_record& r : recs)
+    {
+        bool a_ok = true, b_ok = true;
+        for (const std::string& f : r.c13_fail)
+        {
+            if (f.rfind("C2a", 0) == 0) a_ok = false;
+            if (f.rfind("C2b", 0) == 0) b_ok = false;
+        }
+        std::printf("%4u  %.4f | %6.2f %6" PRId64 "  %6.2f %8" PRId64 "  %4.2f | %6.2f %6" PRId64
+                    "  %4.2f | %14.2f  %6.2f  %4.2f | %4d/%-4d | %-4s %-4s\n",
+                    r.seed, r.c13_p90, shr(r.c13_river), r.c13_river.n, shr(r.c13_plain),
+                    r.c13_plain.n, ratio(shr(r.c13_river), shr(r.c13_plain)), shr(r.c13_steep),
+                    r.c13_steep.n, ratio(shr(r.c13_steep), shr(r.c13_plain)), onl(r.c13_river),
+                    onl(r.c13_plain), ratio(onl(r.c13_river), onl(r.c13_plain)),
+                    r.c13_river_bodies, r.c13_steep_bodies, a_ok ? "ok" : "FAIL",
+                    b_ok ? "ok" : "FAIL");
+        add(pr_river, r.c13_river); add(pr_steep, r.c13_steep); add(pr_plain, r.c13_plain);
+    }
+    std::printf("pool          | %6.2f %6" PRId64 "  %6.2f %8" PRId64 "  %4.2f | %6.2f %6" PRId64
+                "  %4.2f | %14.2f  %6.2f  %4.2f |\n",
+                shr(pr_river), pr_river.n, shr(pr_plain), pr_plain.n,
+                ratio(shr(pr_river), shr(pr_plain)), shr(pr_steep), pr_steep.n,
+                ratio(shr(pr_steep), shr(pr_plain)), onl(pr_river), onl(pr_plain),
+                ratio(onl(pr_river), onl(pr_plain)));
+
     std::printf("\n=== C9 the settle-spacing ladder row (BL-1132; spacing %d tiles) ===\n",
                 generation_settle_spacing_tiles);
     std::printf("seed  regions  living | cells by land: 1  2-4  5-9  10-24  25+ | centres  land%%  provinces | "
@@ -1029,6 +1205,7 @@ int main(int argc, char** argv)
         if (!r.ok) ++fails;
         if (!r.cap_ok) ++fails;
         if (!r.spacing_ok) ++fails;
+        if (!r.c13_fail.empty()) ++fails;
     }
     // POPULATION.md § Generation: "a 1960 world aims at roughly 500 centres" --
     // an aim the forces are calibrated against, never a count any rule
@@ -1067,8 +1244,24 @@ int main(int argc, char** argv)
                         "sim-founded member (%d on one tile)\n",
                         r.seed, r.close_pairs_sim, generation_settle_spacing_tiles,
                         r.close_pairs_stacked);
+        // BL-1150 review, the partition's cost model on the shipped world
+        // (province_partition_harness C2a/C2b, per body): rivers and slopes
+        // divide. Ben's call against the numbers (NR-962), never a tolerance.
+        for (const std::string& f : r.c13_fail)
+            std::printf("FAIL  seed %u: C13 %s\n", r.seed, f.c_str());
     }
-    std::printf("\n%s\n", fails == 0 ? "centre_census: OK (the cap and the spacing hold; no density is asserted)"
-                                     : "centre_census: FAIL (see the FAIL rows)");
+    int c13_seeds = 0, other_fails = 0;
+    for (const seed_record& r : recs)
+    {
+        if (!r.c13_fail.empty()) ++c13_seeds;
+        if (!r.ok || !r.cap_ok || !r.spacing_ok) ++other_fails;
+    }
+    if (fails == 0)
+        std::printf("\ncentre_census: OK (the cap, the spacing and the cost model hold; no density is"
+                    " asserted)\n");
+    else
+        std::printf("\ncentre_census: FAIL (see the FAIL rows: %d seed(s) fail C13, the cost model;"
+                    " %d fail the honesty check, the cap or the spacing)\n",
+                    c13_seeds, other_fails);
     return fails == 0 ? 0 : 1;
 }

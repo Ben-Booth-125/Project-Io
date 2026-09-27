@@ -50,6 +50,7 @@
 #include "harness_params.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <map>
@@ -1260,6 +1261,31 @@ int main()
                 ++steep_bodies;
                 if (!(pctf(c.steep) > pctf(c.plain)))
                     slopes_divide = false;
+            }
+        }
+        // REPORTED (BL-1150 review): the share of each class lying ON THE
+        // SETTLED LINE (one side in `w.tile_settled`, the other not), per body
+        // that has any. The line BL-849's retired lock drew a border along, so
+        // a class that sits on it more often was bordered more often by the
+        // lock rather than by its own edge cost.
+        {
+            std::map<entity_id, std::array<std::size_t, 4>> on_line; // river n/on, plain n/on
+            for (const land_edge& e : edges)
+            {
+                const bool line = (w.tile_settled.count(e.a) != 0) != (w.tile_settled.count(e.b) != 0);
+                auto& row = on_line[w.tiles.at(e.a).body];
+                if (e.river) { ++row[0]; if (line) ++row[1]; }
+                if (!e.river && e.dh < p90_dh) { ++row[2]; if (line) ++row[3]; }
+            }
+            for (const auto& [bid, row] : on_line)
+            {
+                if (row[1] + row[3] == 0)
+                    continue;
+                const double rp = row[0] ? 100.0 * double(row[1]) / double(row[0]) : 0.0;
+                const double pp = row[2] ? 100.0 * double(row[3]) / double(row[2]) : 0.0;
+                std::printf("      body %u on the settled line (REPORTED): river %.2f%% (%zu of %zu)"
+                            "   plain %.2f%% (%zu of %zu)   ratio %.2f\n",
+                            bid, rp, row[1], row[0], pp, row[3], row[2], pp > 0.0 ? rp / pp : 0.0);
             }
         }
         check(river_bodies > 0 && rivers_divide,
