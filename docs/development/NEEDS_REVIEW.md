@@ -24,13 +24,27 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*65 entries — 0 open, 65 resolved.*
+*66 entries — 1 open, 65 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-962 — CALL: rivers divide provinces much less once the fill crosses the settled line, and the river cost never made a river divide its banks
+*question · raised 2026-09-27 · from BL-1150 (province fill crosses the settled line), lane adc45b16, cold review 2026-09-27*
+
+Ruling 2 (PROVINCES.md): 'Boundaries are rivers and elevation difference.' After BL-1150, on the home body a river edge is a province border 14.92% of the time against 12.13% for plain ground (1.23x), down from 44.52% vs 27.73% (1.61x); on 3 of 16 shipped seeds rivers divide no more than plain ground. Mechanism (review, from the code): the settled line used to be a 100% border, and river courses cross that line more than plain ground does (colonisation prices river tiles as corridors, and streams cross unfarmable ground), so removing the lock removed borders that happened to sit on rivers. DEEPER, PRE-EXISTING: the river cost (+40, k_province_river_edge_cost) is charged on the step ALONG a course, from a course tile to its downstream neighbour (river_generation.cpp ~223-230, province.cpp ~212-213). So the fill pays to travel along a river, and crossing from one bank to the other through a course tile over two plain edges costs nothing. A river never divided its banks; borders 'on river edges' cut the river across. The river row (C2a) likely passes even with the river cost at 0 -- the lane is running that mutation now.
+
+**Why it matters.** Rivers as borders is a named property of the map, and as built it holds only by accident of where centres and the settled line fall.
+
+- A: accept the weaker river borders as the cost of a centre holding its whole ground
+- B: make a river divide its banks -- the fill pays to CROSS a course (stepping onto or off it across the flow), not to travel along it; measured first
+- C: raise the river cost on today's geometry
+- D: other
+
+> **Recommendation:** B: it makes ruling 2 true as written; today's cost brakes travel along a river, the opposite of what a river does. A world-mover in the partition, measured before it is set, with a mutation row (river cost 0 must turn the river row red).
+
+*Files: `src/world/province.cpp`, `src/world/province.hpp`, `tools/verify/province_partition_harness.cpp`, `docs/generation/PROVINCES.md`*
 
 ---
 

@@ -516,13 +516,13 @@ generated with or without them is the same world. That is the test either must k
 | The **Culture round** (`../ui/STARTUP.md`) | The migration record: one dated change per founding and a second per re-culturing, the `cradle` and split moments (from which the kin arrows are drawn — § The route record), the cradle names and packages, and the census the board counts folded daughters from | Draws the record; the record is the round's whole input |
 | The **cultural preference for goods** (`EXPLORATION.md` § A good acquires a cultural preference) | Each culture's ground profile (§ The ground profile), inherited down the tree | Reads what a people's first ground held, at culture grain |
 | The **history round** (`run_history_sim`) | A filled, culturally uneven map — every habitable landmass carrying some culture | Starts from a world with a migration behind it rather than an even fill. A SEPARATE round with its own span (`../ui/STARTUP.md`), not a continuation of this one |
-| The province partition | **The settled cells and their anchors, as a hard input** | A new binding input; ordering and nation lock unchanged |
+| The province partition | **The centres the span leaves, as the fill's seeds** | The settled line does not bound the fill (Ben, 2026-09-27, NR-954); ordering and nation lock unchanged |
 | `../economy/POPULATION.md` | Regions whose `centres` record begins at a founding the span dates | Nothing — the urban record already works this way |
 
 **The province ruling, stated exactly (Ben, 2026-09-09).** Colonisation **seeds** the partition;
 the late pass still **draws** it. `PROVINCES.md` keeps its ordering — after the sim, before roads
-— and keeps its nation lock, and gains the settled cells as a hard input the way it already takes
-the national assignment. The stronger alternative was considered and not taken: colonisation
+— and keeps its nation lock. It took the settled cells as a hard input until Ben let a centre's
+fill cross the settled line (2026-09-27, NR-954, `PROVINCES.md` § Colonisation seeds the partition). The stronger alternative was considered and not taken: colonisation
 drawing the real partition, with the nation carve then assigning whole provinces rather than
 tiles. That would make single-nation provinces true by construction rather than by a check, and
 it reorders the generation chain — which is why it is recorded here as the road not taken, rather

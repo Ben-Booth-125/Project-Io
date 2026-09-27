@@ -1236,7 +1236,9 @@
    "status": "designed",
    "glyph": "✓",
    "written": "2026-09-26",
-   "requires": [],
+   "requires": [
+    "BL-1150"
+   ],
    "blocked_on": null,
    "parked": false,
    "sprint": 48,
@@ -1255,7 +1257,7 @@
     "tools/verify/centre_census.cpp",
     "src/world/province.hpp"
    ],
-   "design": "FOUND 2026-09-26 by the BL-1133 cold review. Provinces now reach 1,315 tiles, and several readers still stand for a province by `tiles.front()`, its lowest-id tile: unit markers and the battle glyph draw only on that tile (body_surface_canvas.cpp ~3791, ~3817), so an army on screen can show no marker; garrisons are placed there (nation_generation.cpp ~1481) rather than at the capital; the battle card frames its neighbourhood round it (selection_panel.cpp ~2423). Battles resolve per province, so outcomes are unmoved, except where the garrison's tile is read.\n\nTHE WORK: (1) each reader takes the province's centre tile (its seed), or the unit's own tile where one exists; (2) centre_census C8 stops bucketing anchor-only provinces as villages, and C7's `unanchored` becomes a gate over the 16 seeds (every settled-land province holds a centre); (3) the stale comments on k_province_buildings_per_sustain_unit and province_section_max_tiles (province.hpp ~650-682, ~846-851) are re-read against the grown provinces. Runs after BL-1141 (centres deepen) lands, because the provinces change again. A UI requirement: a live click that a marker shows on an army in a large province."
+   "design": "SEQUENCE AMENDED (2026-09-27, the BL-1150 cold review): runs after BL-1150 (province fill crosses the settled line) too -- a capital's province can now reach into never-settled wilderness, so a garrison on tiles.front() (nation_generation.cpp ~1466-1481) can land there; the sustain coefficient k_province_buildings_per_sustain_unit (province.hpp ~651-683) was pinned to a world total BL-1150 moves (an absorbed hinterland's population factor can reach 2.0 where the old anchor island had 1.2) -- re-read it.\n\nFOUND 2026-09-26 by the BL-1133 cold review. Provinces now reach 1,315 tiles, and several readers still stand for a province by `tiles.front()`, its lowest-id tile: unit markers and the battle glyph draw only on that tile (body_surface_canvas.cpp ~3791, ~3817), so an army on screen can show no marker; garrisons are placed there (nation_generation.cpp ~1481) rather than at the capital; the battle card frames its neighbourhood round it (selection_panel.cpp ~2423). Battles resolve per province, so outcomes are unmoved, except where the garrison's tile is read.\n\nTHE WORK: (1) each reader takes the province's centre tile (its seed), or the unit's own tile where one exists; (2) centre_census C8 stops bucketing anchor-only provinces as villages, and C7's `unanchored` becomes a gate over the 16 seeds (every settled-land province holds a centre); (3) the stale comments on k_province_buildings_per_sustain_unit and province_section_max_tiles (province.hpp ~650-682, ~846-851) are re-read against the grown provinces. Runs after BL-1141 (centres deepen) lands, because the provinces change again. A UI requirement: a live click that a marker shows on an army in a large province."
   },
   {
    "status": "designed",
