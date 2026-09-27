@@ -462,6 +462,14 @@ Three objects, and each is a stock the treasury maintains:
 | **Navy** | Capital, staged from a port, on top of the fleet its naval points carried | Crossing capacity, and contest of a crossing | Decays; a fleet is a running cost, not a purchase |
 | **Standing army** | Capital, on top of inherited `army_stock` | Force that is *already raised* when a skirmish opens | Falls back toward what muster alone provides |
 
+**SET (Ben, 2026-09-27):** *"Fleets should project power so allies with large fleets stop enemy
+fleets before they move."* A navy's contest of a crossing is **projected**: a fleet's power reaches
+out over the sea from the ports it stages from, and a crossing against a realm meets the power its
+allies project over that sea as well as its own. Where the defenders' projected power outweighs the
+attacker's fleet, the crossing is stopped before it sails. PROPOSED, and Ben's to settle (NR-961):
+who counts as a defender, how a fleet's power falls with distance from its ports, what a stopped
+crossing costs the attacker, and whether a fleet also bounds the army it carries.
+
 **Decay is what makes the choice a choice.** A purchase the treasury never revisits is a one-time
 score; a stock with upkeep means a polity that over-builds is poorer every round afterwards and a
 polity that under-builds arrives late. That is the pressure the phase wants, and it is a cost in
