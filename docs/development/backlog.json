@@ -1052,7 +1052,7 @@
     "tools/verify/centre_census.cpp",
     "tools/verify/industrialisation_sim_harness.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form): REBUILD on the deepen rule (BL-1141) and read again -- as built (997b8b52, not merged) it raised centres +8%, markets 5,269 -> 24,123 and industry points ~4x because the in-region hierarchy widened growing cities.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form): THE AIM IS ~500 CENTRES a 1960 world (POPULATION.md), about a dozen per market -- an aim the forces are calibrated against, never a count enforced. \"Dramatically fewer\" is read against it; report the per-seed count after the stream and stop for Ben if it is far from the aim.\n\nSET (Ben, 2026-09-25): INDUSTRIALISATION.md § Beat 2 (the urbanisation stream, now set) and POPULATION.md § Generation (\"Centres follow the heads both ways\": a centre below a village's worth is abandoned in the history; NR-947 holds the threshold reading and whether play follows). THE WORK: build Beat 2's URBANISATION stream (a region's countryside and villages -> a centre in the same polity, pulled by industry-point output at the centre, pushed by depleted or strained ground, along held corridors); let a centre's count follow its heads both ways so an emptied village is abandoned. Emigration (between polities) is Beat 2's other stream and is NOT in this item unless the reading shows urbanisation alone cannot thin the map. Measure first and after on the 16 seeds: centres per seed by scale, land under centres, the history's counters. Tune nothing to hit a count; report and stop for Ben if the stream leaves the map far from \"dramatically fewer\". A sim beat and a world-mover."
+   "design": "SETTLED (Ben, 2026-09-27, the density calls form): READ A RATE LADDER, THEN BEN PICKS AND IT MERGES. The rebuild (dccf7e05 + fixes d79e0c81, on the centres lane's branch) passed its cold review with no conservation bug; it thins centres 7.1%, not 'far fewer', at the chosen 12 per mille. Build BL-1149 (scale credit from the works) on the branch first, since the pull reads points; then read 6 / 9 / 12 / 18 per mille for urban share, centres (and carved), points per world, rho(points, heads), markets, battles and the C13 conservation ledger. Ben picks the rung; the branch merges at it. NR-958 ruled A (keep the conserving reading).\n\nSETTLED (Ben, 2026-09-26, the density-and-trade form): REBUILD on the deepen rule (BL-1141) and read again -- as built (997b8b52, not merged) it raised centres +8%, markets 5,269 -> 24,123 and industry points ~4x because the in-region hierarchy widened growing cities.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form): THE AIM IS ~500 CENTRES a 1960 world (POPULATION.md), about a dozen per market -- an aim the forces are calibrated against, never a count enforced. \"Dramatically fewer\" is read against it; report the per-seed count after the stream and stop for Ben if it is far from the aim.\n\nSET (Ben, 2026-09-25): INDUSTRIALISATION.md § Beat 2 (the urbanisation stream, now set) and POPULATION.md § Generation (\"Centres follow the heads both ways\": a centre below a village's worth is abandoned in the history; NR-947 holds the threshold reading and whether play follows). THE WORK: build Beat 2's URBANISATION stream (a region's countryside and villages -> a centre in the same polity, pulled by industry-point output at the centre, pushed by depleted or strained ground, along held corridors); let a centre's count follow its heads both ways so an emptied village is abandoned. Emigration (between polities) is Beat 2's other stream and is NOT in this item unless the reading shows urbanisation alone cannot thin the map. Measure first and after on the 16 seeds: centres per seed by scale, land under centres, the history's counters. Tune nothing to hit a count; report and stop for Ben if the stream leaves the map far from \"dramatically fewer\". A sim beat and a world-mover."
   },
   {
    "status": "designed",
@@ -1277,7 +1277,7 @@
     "tools/verify/charter_refusal_probe.cpp",
     "tools/verify/stockpile_budget_check.cpp"
    ],
-   "design": "RE-READ AFTER BL-1141 (2026-09-26, main 8cbdbc9d, stockpile_budget_check --firm-census): province_cap now binds on 16 of 16 worlds, 60.8M points pooled (5.2% of the budget, up from 1.0%), 181 bookings, about 756 firms' worth; largest 29.5% of a budget (seed 28, whose largest province is 1,383 tiles). But budget firms reach the 120-per-body ceiling on 15 of 16 worlds (1,909 of 1,920) and density_ceiling itself now books 123.5M (10.5%), so the cap mostly moves firms from the richest centres to poorer ones rather than cutting the total. NR-960 puts the cap to Ben.\n\nMEASURED 2026-09-26 (stockpile_budget_check --firm-census, merged ae9111e8; 16 curated seeds, the shipped path): BL-1133 alone did make the cap bind harder (province_cap 4.7% -> 5.6% of the pooled budget, 11 -> 14 worlds, seed 11 at 25.4%), but on main the later merges (BL-1132 spacing, BL-1098 lanes, the BL-1130 footprint fixes) spread the budget so it concentrates far less: province_cap 1.0% pooled, 11 of 16 worlds, largest 8.0% (seed 32); budget firms 1,169 -> 1,721; no province holds more than 2; Pass 6 lays no firm on any shipped world. Weighted by budget a window still spans 9-13 provinces. Unspent points are lost (charter_pool::none; nothing credits them). The larger loss is `remainder`, 63.7% of the pooled budget: most centres have under one firm price left after their specialist. NO CALL FOR BEN YET: re-read after BL-1141 (centres deepen) lands, since ~500 centres a world means far larger provinces.\n\nFOUND 2026-09-26 by the BL-1133 cold review. The per-province firm cap of 2 (corporation_generation.cpp ~2218, Pass 6; ~2634, the charter budget; applied ~2440, ~2769-2787) was ruled by Ben on NR-910 against provinces of <= 20 tiles, where it bound on 7 of 16 worlds. The charter spend's window is ~49 tiles round each centre (stockpile_budget.cpp ~266-267): a large centre's window used to span 4-6 provinces (8-12 firms); now it sits inside one province, so after 2 firms every window tile is refused and the rest is booked unspent[province_cap] or never placed. The merge measured provinces, not firms. The same pattern as the readers of region::centres sized for the old count.\n\nTHE WORK, measure only: firms placed and unspent by reason (province_cap above all) per seed on the 16 curated seeds, at 5cab560b^1 (before BL-1133) and at main; re-read after BL-1141. Then Ben rules on the cap (NR-910 was his). A named cause in the re-bless if it moves."
+   "design": "SETTLED (Ben, 2026-09-27, NR-960 B): the per-province cap scales with the province's centre, two firms per rung -- village 2, town 4, city 6, metropolis 8, megacity 10 (INDUSTRIALISATION.md § 1). BUILD: both cap sites in corporation_generation.cpp (per_province_firm_cap ~2218, k_charter_per_province_firm_cap ~2634) read the anchor centre's scale. Measure with stockpile_budget_check --firm-census before and after: the province_cap share of the budget, firms by the scale of the centre they stand in, budget firms against the 120 body ceiling, specialists chartered, markets.\n\nRE-READ AFTER BL-1141 (2026-09-26, main 8cbdbc9d, stockpile_budget_check --firm-census): province_cap now binds on 16 of 16 worlds, 60.8M points pooled (5.2% of the budget, up from 1.0%), 181 bookings, about 756 firms' worth; largest 29.5% of a budget (seed 28, whose largest province is 1,383 tiles). But budget firms reach the 120-per-body ceiling on 15 of 16 worlds (1,909 of 1,920) and density_ceiling itself now books 123.5M (10.5%), so the cap mostly moves firms from the richest centres to poorer ones rather than cutting the total. NR-960 puts the cap to Ben.\n\nMEASURED 2026-09-26 (stockpile_budget_check --firm-census, merged ae9111e8; 16 curated seeds, the shipped path): BL-1133 alone did make the cap bind harder (province_cap 4.7% -> 5.6% of the pooled budget, 11 -> 14 worlds, seed 11 at 25.4%), but on main the later merges (BL-1132 spacing, BL-1098 lanes, the BL-1130 footprint fixes) spread the budget so it concentrates far less: province_cap 1.0% pooled, 11 of 16 worlds, largest 8.0% (seed 32); budget firms 1,169 -> 1,721; no province holds more than 2; Pass 6 lays no firm on any shipped world. Weighted by budget a window still spans 9-13 provinces. Unspent points are lost (charter_pool::none; nothing credits them). The larger loss is `remainder`, 63.7% of the pooled budget: most centres have under one firm price left after their specialist. NO CALL FOR BEN YET: re-read after BL-1141 (centres deepen) lands, since ~500 centres a world means far larger provinces.\n\nFOUND 2026-09-26 by the BL-1133 cold review. The per-province firm cap of 2 (corporation_generation.cpp ~2218, Pass 6; ~2634, the charter budget; applied ~2440, ~2769-2787) was ruled by Ben on NR-910 against provinces of <= 20 tiles, where it bound on 7 of 16 worlds. The charter spend's window is ~49 tiles round each centre (stockpile_budget.cpp ~266-267): a large centre's window used to span 4-6 provinces (8-12 firms); now it sits inside one province, so after 2 firms every window tile is refused and the rest is booked unspent[province_cap] or never placed. The merge measured provinces, not firms. The same pattern as the readers of region::centres sized for the old count.\n\nTHE WORK, measure only: firms placed and unspent by reason (province_cap above all) per seed on the 16 curated seeds, at 5cab560b^1 (before BL-1133) and at main; re-read after BL-1141. Then Ben rules on the cap (NR-910 was his). A named cause in the re-bless if it moves."
   },
   {
    "status": "designed",
@@ -1330,6 +1330,81 @@
     "src/world/history_sim.cpp"
    ],
    "design": "FOUND 2026-09-26 by the BL-1137 rebuild's cold review: INDUSTRIALISATION.md Beat 2 (PROPOSED) says \"a stream moves culture shares into its destination centre ... This is what produces property 4's checkered provinces\", and settle_urban_migrants moves people and capacity but no culture share. The Beat 2 paragraph is PROPOSED, not SETTLED, so this is design-then-build: Ben settles whether migrants carry their culture share, then the stream moves shares in proportion to the heads it moves, with the same largest-remainder rounding and conservation. Measure the checkered-province reading (property 4) before and after. Runs after BL-1137 (industrial urbanisation) merges."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-27",
+   "requires": [
+    "BL-1137"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1149",
+   "short_name": "SCALE_CREDIT_FROM_WORKS",
+   "author": "Claude (sprint 48, Ben's density calls form, 2026-09-27)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A head earns industry scale credit only where a work employs it, so points follow the works a city built and not its crowd",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "scripts/works.lua",
+    "src/world/works_roster.hpp",
+    "src/world/works_registry.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-27): INDUSTRIALISATION.md § 1, 'a head earns scale credit only where a work employs it'. The BL-1137 rebuild's cold review found the stream's pull is only the scale credit (urban heads x rate x fuel x tree), so migrants went in proportion to a city's existing heads and then earned credit for arriving: rho(points, urban heads) 0.83, near headcount by construction. BUILD: a new field on the works table, the heads a work employs (authored per row, validated by the loader like every other field); a region's scale credit counts its urban heads up to the sum its held works employ. Report rho(points, urban heads) and rho(points, employed heads) before and after, the share of urban heads employed, and how the stream's destinations change. The per-row magnitudes are authored by judgement and read on BL-1137's rate ladder; say which rows employ and why."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-27",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1150",
+   "short_name": "PROVINCE_FILL_CROSSES_SETTLED_LINE",
+   "author": "Claude (sprint 48, NR-954 ruled B, 2026-09-27)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "A centre's province fill crosses the settled line, so never-settled ground joins the province that reaches it rather than an anchor village founded to hold it",
+   "authority_doc": "docs/generation/PROVINCES.md",
+   "files": [
+    "src/world/province.cpp",
+    "src/world/population_generation.cpp",
+    "tools/verify/province_partition_harness.cpp",
+    "tools/verify/centre_census.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-27, NR-954 B): PROVINCES.md § The settled cells are a binding input. The land fill's settlement lock (BL-849; province.cpp ~340-346, domain settlement_lock) retires for land; the nation lock stays. MEASURE FIRST on the 16 seeds and report before building: anchor foundings (6,856 pooled after BL-1133; 3,753 attributed to the lock), provinces, province size p50 / p90 / max (and C7b's anchor-only maximum, per the NR-954 caution), centres including anchors, uncentred islands left. Then build and read the same columns, plus the partition harness and centre_census. Report giant provinces explicitly: crossing the line lets one centre take a whole never-settled hinterland."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-27",
+   "requires": [
+    "BL-1137",
+    "BL-1146"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1151",
+   "short_name": "SEAT_MENU_REANCHORED",
+   "author": "Claude (sprint 48, the centres lane's seat reading, 2026-09-27)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "The specialist price is re-anchored so the median library world again offers about as many seats as a world with no budget",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "tools/verify/stockpile_budget_check.cpp"
+   ],
+   "design": "DOC AND CODE DISAGREE (found 2026-09-26): CORPORATION_GENERATION.md says a specialist's price is anchored to the seat menu, 'the median library world offers about as many seats as a world with no budget' (NR-907, NR-910; the 650 divisor was pinned for that). On main the median world charters 81.5 specialists (61-111 a seed), and the BL-1137 rebuild barely moves it (88), because the price rises with the stock. The anchor was pinned on a world that no longer exists (before BL-1130/1133/1141). WORK: re-read the seat curve (stockpile_budget_check --seat-curve) after BL-1137 and BL-1146 land, and re-pin the divisor to the doc's target, measured, never clamped to a count. If no divisor reaches it without starving the web, report that for Ben rather than forcing it."
   }
  ]
 }

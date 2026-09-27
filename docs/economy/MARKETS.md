@@ -87,9 +87,10 @@ A folded market's catchment, inventory and pools pass to the market that absorbs
 rule above still only lowers the gate; the folds run after it, on the whole set.
 
 **On a world whose firms come from the charter budget, the competitors the carve counts are the
-budget's planned firms (Ben, 2026-09-26; BL-1086)** — the firms each nation's centres can afford —
-so no roster is laid only to be discarded, and the landscape search, which scores the carve's
-markets, still runs after the carve.
+budget's planned corporations (Ben, 2026-09-26; BL-1086), its specialists as well as its firms
+(Ben, 2026-09-27, NR-957)** — every corporation each nation's centres can afford, under the same
+ceiling the charter walk honours — so no roster is laid only to be discarded, and the landscape
+search, which scores the carve's markets, still runs after the carve.
 
 **Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
 (`market_for_tile`). **A corporation clears in every market it holds a pool in** (Ben, 2026-09-15):

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*65 entries — 10 open, 55 resolved.*
+*65 entries — 6 open, 59 resolved.*
 
 ---
 
@@ -60,22 +60,6 @@ The partition grew each centre by a budget of 7 tiles (village) to 12 (metropoli
 
 *Files: `docs/generation/PROVINCES.md`, `src/world/province.cpp`*
 
-### NR-954 — CALL: three consequences of "a province is its centre's ground" (hemmed villages absorbed; anchors kept by the settled-ground lock; giant provinces)
-*question · raised 2026-09-26 · from BL-1133 as merged (5cab560b), 2026-09-26*
-
-Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, every province invariant green. Three consequences. (1) 21,457 seed centres (47%) end on their own tile, hemmed by a larger neighbour's reach, and singleton absorption (the 2026-08-21 ruling) folds each into its cheapest neighbour, so provinces = centres holds with that counted exception. (2) 3,753 of the 6,856 remaining anchor villages exist only because the settlement lock (BL-849) stops the fill crossing from settled into never-settled ground. (3) Provinces now reach 1,315 tiles (a lone village over lightly settled land); p90 stays 7-13. COLD REVIEW CAUTION (2026-09-26): centre_census C8 buckets anchor-only provinces (the uncentred leftovers) as villages, so (3)'s 1,315-tile 'lone village' may be leftover ground, not a village's draw; read C7b's anchor-only maximum before ruling on option C (the fix is BL-1145). PROVINCES.md now says a world has at most as many provinces as centres, with the hemmed ones counted.
-
-**Why it matters.** (2) is the remaining gap to a world without villages founded on empty ground; (3) decides whether a province can be a continent-sized conquest unit.
-
-- A: keep all three as built
-- B: let the fill cross the settled line (relaxes BL-849; removes most of (2))
-- C: bound a province's size again on sparsely settled land (a cap that splits a giant into anchored pieces)
-- D: other
-
-> **Recommendation:** A for (1); read (2) and (3) again after BL-1137 (industrial urbanisation) and BL-1132 (settle spacing) land, since both change what is settled and how many centres stand.
-
-*Files: `src/world/province.cpp`, `docs/generation/PROVINCES.md`*
-
 ### NR-955 — DECISION TAKEN + CALL: how a sea lane is laid (ports, direction), and whether a lane should compete with land
 *decision · raised 2026-09-26 · from BL-1098 (the sea-lane tier stamped), merged 7238f8ef, 2026-09-26*
 
@@ -108,37 +92,6 @@ The review found the three-tile rule bound only Settle. A founding the migration
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/CIVILISATION.md`, `tools/verify/centre_census.cpp`*
 
-### NR-957 — CALL: what the carve counts as a competitor on a budget world (planned firms, specialists, or both), and at what scale
-*question · raised 2026-09-26 · from BL-1086 (the carve counts the budget's planned firms), merged 15da1bd2, 2026-09-26*
-
-You ruled the carve reads the budget's planned firms (MARKETS.md). As built, it counts each centre's specialist as well as its whole firms, since both are corporations the budget buys, so the doc and code disagree. The scale changed too: the carve used to count at most 8 laid corporations a world; it now counts 147-313 planned charters (specialists alone would be 22-88), under the same gain (0.15). On the spaced world (after BL-1132) this moves markets 5,784 -> 5,800 (+0.3%, every seed within 3%); before the spacing, the same change swung seeds +62% (seed 28) to -35% (seed 40). The winner keeps its candidate on 13 of 16 seeds. COLD REVIEW (2026-09-26): the plan also counts firms above the walk's ceiling (120 a body, spent richest first), so on a world planning more than 120 on a body the carve counts firms never chartered, and inflates exactly the poorer nations the walk starves. The lane is making the plan honour the ceiling and will report planned against chartered per nation; read that before ruling. THE PLAN NOW HONOURS THE CEILING (fix round, merged b92165e4): all 16 seeds plan exactly 120 firms a body; chartered 806 specialists + 1,721 firms against planned 861 + 1,920 (shortfall is placements that find no ground; seed 28 places 59 of 84 planned specialists). Markets 5,800 -> 5,803. So option A (firms only) counts 120 a world, B (both) 142-208.
-
-**Why it matters.** The market folds (BL-1125) are calibrated next on this carve; its input should be settled first. The small move now may be luck of the spaced world, given the swings before it.
-
-- A: planned firms only, as the doc says; the gain unchanged
-- B: firms and specialists, as built; the doc widened to say so
-- C: specialists only (22-88 a world, nearest the old scale)
-- D: re-tune the gain for the new scale (measured, never to a count)
-
-> **Recommendation:** A: the doc as ruled, gain unchanged until the folds are calibrated; D only if the folds' reading shows the count dominating.
-
-*Files: `src/world/corporation_generation.cpp`, `src/world/hard_coded_world.cpp`, `docs/economy/MARKETS.md`*
-
-### NR-958 — DECISION TAKEN: a migrant carries its food with it, and a sack never lowers a region's ceiling (BL-1137 reverted and rebuilt)
-*decision · raised 2026-09-26 · from BL-1137 (industrial urbanisation) cold review, 2026-09-26; merged b591d1e9, reverted 8cbdbc9d*
-
-The first build of the urbanisation stream raised each destination's carrying capacity by every migrant it took while the source kept its own, so every move created capacity and the emptied countryside regrew by births: population 6.08B -> 10.92B pooled, urban share ~15% -> 70-72%, and centres fell only 3% (carved 7%). A sack then cut a city's industrial heads, the ceiling fell with them, and the next year deleted about 40% of the city with no record. Both break the docs: the displacement row (the count is conserved), Beat 2 (the countryside empties, far fewer centres) and BL-835 (war does not consume people). I reverted it on main and took two readings for the rebuild: (1) a migrant carries its food with it -- whatever ceiling a destination gains, its source loses, so a move conserves the world's carrying capacity and an emptied village cannot regrow; (2) a sack never lowers a ceiling -- a sacked city's people scatter into its countryside. Also: a razing is counted in heads lost, uncapped (a sacked 10M city recorded none).
-
-**Why it matters.** The alternative reading is that industry raises what the land can feed (a real historical effect), which would be a new mechanism with no doc and a population near double; the conserving reading is what makes the stream thin the map to your ~500 aim.
-
-- A: keep as taken (the move conserves capacity; a sack moves no one out)
-- B: industry raises carrying capacity, designed and bounded in INDUSTRIALISATION.md as its own mechanism
-- C: other
-
-> **Recommendation:** A: it is the doc as written; B only as its own designed beat.
-
-*Files: `src/world/settlement.cpp`, `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`, `docs/economy/POPULATION.md`*
-
 ### NR-959 — CALL: far pairs across water bind almost wholesale (the sea far-penalty set to 0), and a leg against the current loses cargo at weight 500
 *question · raised 2026-09-26 · from BL-1142 (far pairs bind across water; cargo against the current), branch 1a00072e, 2026-09-26; not merged until its cold review returns*
 
@@ -154,22 +107,6 @@ Found first: the far-pair force NR-888 ruled on was never built, so far realms a
 > **Recommendation:** B at 300: inside the plateau (526 bound, against 518 at 0), so the dial does not choose the count, and distance still reads across water; the loss at 500 as set.
 
 *Files: `src/world/history_sim.cpp`, `src/world/history_sim.hpp`, `docs/generation/INDUSTRIALISATION.md`, `docs/generation/EXPLORATION.md`*
-
-### NR-960 — CALL: the two-firms-per-province cap on provinces that are now a centre's whole ground
-*question · raised 2026-09-26 · from BL-1146 (the firm cap on grown provinces), re-read after BL-1141 (one centre a region), 2026-09-26*
-
-You set two firms a province (NR-910) when provinces were at most ~20 tiles. A province is now its centre's ground (BL-1133) and a region stands one centre (BL-1141), so a city's province holds the whole city. Re-read on main: the cap refuses 5.2% of the pooled charter budget (1.0% before BL-1141, 4.7% before BL-1133), binds on 16 of 16 worlds, and takes 29.5% of seed 28's budget. The total barely moves: budget firms reach the 120-per-body ceiling on 15 of 16 worlds (1,909 of 1,920). So the cap decides WHERE firms stand -- away from the big cities, into smaller centres -- not how many. ALSO FOUND (the centres lane, stockpile_budget_check --seat-curve 650:2, 2026-09-26): main already opens a median of 81.5 seats (61-111 a seed; centres affording a specialist), not the nine the NR-910 divisor of 650 was pinned to give; the price rises with the stock, so the BL-1137 rebuild barely moves it (88). The cap and the divisor were both set on a world that no longer exists.
-
-**Why it matters.** Industry that gathers where people gather (Beat 2) is pushed out of the cities by a cap sized for a different province.
-
-- A: keep two a province
-- B: the cap scales with the province's centre (e.g. two per rung: a village 2, a city 6)
-- C: retire the province cap; the 120-per-body ceiling bounds the total
-- D: other
-
-> **Recommendation:** B: it keeps the spread NR-910 wanted on small ground and lets a city's province hold a city's industry; read it on the census before it is set.
-
-*Files: `src/world/corporation_generation.cpp`, `src/world/stockpile_budget.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
 
 ### NR-961 — CALL: should a fleet gate sea crossings (the doc says it does; the code never reads it), and at what rung does the naval carry-over open?
 *question · raised 2026-09-26 · from BL-1147 (naval points carry over), merged 5f734c76 with the conversion at 0; its cold review, 2026-09-26*
@@ -1097,4 +1034,75 @@ Two readings taken on your behalf to make your rulings hold as written. (1) The 
 > **RESOLVED.** RULED (Ben, 2026-09-26, the review form): A, keep both -- a footprint stops at its region's cell edge, and "no land" means no ground a centre can stand on.
 
 *Files: `docs/economy/POPULATION.md`, `src/world/population_generation.cpp`, `src/world/settlement.cpp`*
+
+### NR-954 — CALL: three consequences of "a province is its centre's ground" (hemmed villages absorbed; anchors kept by the settled-ground lock; giant provinces)
+*question · raised 2026-09-26 · from BL-1133 as merged (5cab560b), 2026-09-26*
+
+Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, every province invariant green. Three consequences. (1) 21,457 seed centres (47%) end on their own tile, hemmed by a larger neighbour's reach, and singleton absorption (the 2026-08-21 ruling) folds each into its cheapest neighbour, so provinces = centres holds with that counted exception. (2) 3,753 of the 6,856 remaining anchor villages exist only because the settlement lock (BL-849) stops the fill crossing from settled into never-settled ground. (3) Provinces now reach 1,315 tiles (a lone village over lightly settled land); p90 stays 7-13. COLD REVIEW CAUTION (2026-09-26): centre_census C8 buckets anchor-only provinces (the uncentred leftovers) as villages, so (3)'s 1,315-tile 'lone village' may be leftover ground, not a village's draw; read C7b's anchor-only maximum before ruling on option C (the fix is BL-1145). PROVINCES.md now says a world has at most as many provinces as centres, with the hemmed ones counted.
+
+**Why it matters.** (2) is the remaining gap to a world without villages founded on empty ground; (3) decides whether a province can be a continent-sized conquest unit.
+
+- A: keep all three as built
+- B: let the fill cross the settled line (relaxes BL-849; removes most of (2))
+- C: bound a province's size again on sparsely settled land (a cap that splits a giant into anchored pieces)
+- D: other
+
+> **Recommendation:** A for (1); read (2) and (3) again after BL-1137 (industrial urbanisation) and BL-1132 (settle spacing) land, since both change what is settled and how many centres stand.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the density calls form): B -- a centre's fill crosses the settled line (the settlement lock, BL-849, retires on land), so never-settled ground joins the province of the centre that reaches it; measured before it is built. Written into PROVINCES.md; BL-1150 (province fill crosses the settled line) builds it. Parts (1) hemmed villages and (3) giant provinces were not asked: (1) stands as built, and (3) is read in BL-1150's report, since crossing the line grows provinces.
+
+*Files: `src/world/province.cpp`, `docs/generation/PROVINCES.md`*
+
+### NR-957 — CALL: what the carve counts as a competitor on a budget world (planned firms, specialists, or both), and at what scale
+*question · raised 2026-09-26 · from BL-1086 (the carve counts the budget's planned firms), merged 15da1bd2, 2026-09-26*
+
+You ruled the carve reads the budget's planned firms (MARKETS.md). As built, it counts each centre's specialist as well as its whole firms, since both are corporations the budget buys, so the doc and code disagree. The scale changed too: the carve used to count at most 8 laid corporations a world; it now counts 147-313 planned charters (specialists alone would be 22-88), under the same gain (0.15). On the spaced world (after BL-1132) this moves markets 5,784 -> 5,800 (+0.3%, every seed within 3%); before the spacing, the same change swung seeds +62% (seed 28) to -35% (seed 40). The winner keeps its candidate on 13 of 16 seeds. COLD REVIEW (2026-09-26): the plan also counts firms above the walk's ceiling (120 a body, spent richest first), so on a world planning more than 120 on a body the carve counts firms never chartered, and inflates exactly the poorer nations the walk starves. The lane is making the plan honour the ceiling and will report planned against chartered per nation; read that before ruling. THE PLAN NOW HONOURS THE CEILING (fix round, merged b92165e4): all 16 seeds plan exactly 120 firms a body; chartered 806 specialists + 1,721 firms against planned 861 + 1,920 (shortfall is placements that find no ground; seed 28 places 59 of 84 planned specialists). Markets 5,800 -> 5,803. So option A (firms only) counts 120 a world, B (both) 142-208.
+
+**Why it matters.** The market folds (BL-1125) are calibrated next on this carve; its input should be settled first. The small move now may be luck of the spaced world, given the swings before it.
+
+- A: planned firms only, as the doc says; the gain unchanged
+- B: firms and specialists, as built; the doc widened to say so
+- C: specialists only (22-88 a world, nearest the old scale)
+- D: re-tune the gain for the new scale (measured, never to a count)
+
+> **Recommendation:** A: the doc as ruled, gain unchanged until the folds are calibrated; D only if the folds' reading shows the count dominating.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the density calls form): B -- the carve counts the budget's planned firms AND specialists (142-208 a world), as built; MARKETS.md widened to say so. No code change; BL-1086 stands.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/hard_coded_world.cpp`, `docs/economy/MARKETS.md`*
+
+### NR-958 — DECISION TAKEN: a migrant carries its food with it, and a sack never lowers a region's ceiling (BL-1137 reverted and rebuilt)
+*decision · raised 2026-09-26 · from BL-1137 (industrial urbanisation) cold review, 2026-09-26; merged b591d1e9, reverted 8cbdbc9d*
+
+The first build of the urbanisation stream raised each destination's carrying capacity by every migrant it took while the source kept its own, so every move created capacity and the emptied countryside regrew by births: population 6.08B -> 10.92B pooled, urban share ~15% -> 70-72%, and centres fell only 3% (carved 7%). A sack then cut a city's industrial heads, the ceiling fell with them, and the next year deleted about 40% of the city with no record. Both break the docs: the displacement row (the count is conserved), Beat 2 (the countryside empties, far fewer centres) and BL-835 (war does not consume people). I reverted it on main and took two readings for the rebuild: (1) a migrant carries its food with it -- whatever ceiling a destination gains, its source loses, so a move conserves the world's carrying capacity and an emptied village cannot regrow; (2) a sack never lowers a ceiling -- a sacked city's people scatter into its countryside. Also: a razing is counted in heads lost, uncapped (a sacked 10M city recorded none).
+
+**Why it matters.** The alternative reading is that industry raises what the land can feed (a real historical effect), which would be a new mechanism with no doc and a population near double; the conserving reading is what makes the stream thin the map to your ~500 aim.
+
+- A: keep as taken (the move conserves capacity; a sack moves no one out)
+- B: industry raises carrying capacity, designed and bounded in INDUSTRIALISATION.md as its own mechanism
+- C: other
+
+> **Recommendation:** A: it is the doc as written; B only as its own designed beat.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the density calls form): A, keep -- a migrant carries its food with it and a sack never lowers a ceiling. Written into INDUSTRIALISATION.md Beat 2 with the land-line reading of held corridors.
+
+*Files: `src/world/settlement.cpp`, `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`, `docs/economy/POPULATION.md`*
+
+### NR-960 — CALL: the two-firms-per-province cap on provinces that are now a centre's whole ground
+*question · raised 2026-09-26 · from BL-1146 (the firm cap on grown provinces), re-read after BL-1141 (one centre a region), 2026-09-26*
+
+You set two firms a province (NR-910) when provinces were at most ~20 tiles. A province is now its centre's ground (BL-1133) and a region stands one centre (BL-1141), so a city's province holds the whole city. Re-read on main: the cap refuses 5.2% of the pooled charter budget (1.0% before BL-1141, 4.7% before BL-1133), binds on 16 of 16 worlds, and takes 29.5% of seed 28's budget. The total barely moves: budget firms reach the 120-per-body ceiling on 15 of 16 worlds (1,909 of 1,920). So the cap decides WHERE firms stand -- away from the big cities, into smaller centres -- not how many. ALSO FOUND (the centres lane, stockpile_budget_check --seat-curve 650:2, 2026-09-26): main already opens a median of 81.5 seats (61-111 a seed; centres affording a specialist), not the nine the NR-910 divisor of 650 was pinned to give; the price rises with the stock, so the BL-1137 rebuild barely moves it (88). The cap and the divisor were both set on a world that no longer exists.
+
+**Why it matters.** Industry that gathers where people gather (Beat 2) is pushed out of the cities by a cap sized for a different province.
+
+- A: keep two a province
+- B: the cap scales with the province's centre (e.g. two per rung: a village 2, a city 6)
+- C: retire the province cap; the 120-per-body ceiling bounds the total
+- D: other
+
+> **Recommendation:** B: it keeps the spread NR-910 wanted on small ground and lets a city's province hold a city's industry; read it on the census before it is set.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the density calls form): B -- the cap scales with the province's centre, two firms per rung: village 2, town 4, city 6 (the form's reading), metropolis 8, megacity 10 (extended by the same rule; say if the top two should differ). Written into INDUSTRIALISATION.md § 1; BL-1146 builds it. The seat-menu finding (81.5 seats against the nine the price was anchored to) is filed as BL-1151 (seat menu re-anchored).
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/stockpile_budget.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
 
