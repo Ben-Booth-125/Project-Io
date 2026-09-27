@@ -196,7 +196,7 @@ struct config
     bool yard = false;                     ///< a construction recipe, and capacity wanted per building
     float yard_seed = 1.0f;                ///< capacity wanted per standing building
     float yard_output = 1.0f;              ///< the yard recipe's capacity per batch
-    bool one_province = false;             ///< every tile in province 1 (cap 2 firms)
+    bool one_province = false;             ///< every tile in province 1 (its cap: 2 x the centre's rung, BL-1146)
 };
 
 struct reading
@@ -711,20 +711,49 @@ int main()
         expect_true("yard: the rest (6) is window_exhausted", r.u(why_t::window_exhausted) == 6 && r.balanced);
     }
     {
-        // THE STOP'S REASON: province_cap WINS. Every tile is one province (2
-        // firms at most) and the window has no deposit tile: the ore fails on
-        // the WINDOW, then two works fill the province and the next works fails
-        // on the CAP. The centre stops with both reasons among its goods; the cap
-        // took ground from one of them, so the rest is province_cap.
+        // THE STOP'S REASON: province_cap WINS. Every tile is one province and
+        // its centre is a VILLAGE, so its cap is 2 firms (BL-1146: 2 x the
+        // centre's rung; the demand is held where the scale-5 fixture had it by
+        // a basket x5, since demand is per scale point). The window has no
+        // deposit tile: the ore fails on the WINDOW, then two works fill the
+        // province and the next works fails on the CAP. The centre stops with
+        // both reasons among its goods; the cap took ground from one of them, so
+        // the rest is province_cap.
         turn::config cfg;
         cfg.g            = ground::outside_window;
         cfg.one_province = true;
+        cfg.scale        = 1;
+        cfg.basket       = { { turn::k_raw, 500.0f, false }, { turn::k_mill1, 500.0f, true },
+                             { turn::k_mill2, 500.0f, true } };
         const turn::reading r = turn::run(cfg);
-        turn::print("one province, no deposit tile", r);
-        expect_true("precedence: two works, then the province is full",
+        turn::print("one province (a village's), no deposit tile", r);
+        expect_true("precedence: two works, then the village's province is full",
                     r.firms[turn::k_mill1] == 1 && r.firms[turn::k_mill2] == 1 && r.firms[turn::k_raw] == 0);
         expect_true("precedence: the rest (6) is province_cap, not window_exhausted",
                     r.u(why_t::province_cap) == 6 && r.u(why_t::window_exhausted) == 0 && r.balanced);
+    }
+    {
+        // BL-1146: THE CAP SCALES WITH THE PROVINCE'S CENTRE. The same one-
+        // province world with a TOWN at its centre (rung 2, a cap of 4; the
+        // same demand, a basket x2.5): both works now take their per-good cap
+        // of 2 inside the province, and the cap refuses nothing — the ore still
+        // fails on the window, so the rest is window_exhausted.
+        turn::config cfg;
+        cfg.g            = ground::outside_window;
+        cfg.one_province = true;
+        cfg.scale        = 2;
+        cfg.basket       = { { turn::k_raw, 250.0f, false }, { turn::k_mill1, 250.0f, true },
+                             { turn::k_mill2, 250.0f, true } };
+        const turn::reading r = turn::run(cfg);
+        turn::print("one province (a town's), no deposit tile", r);
+        expect_true("BL-1146: a town's province holds 4 works (2 per good), where a village's held 2",
+                    r.firms[turn::k_mill1] == 2 && r.firms[turn::k_mill2] == 2 && r.firms[turn::k_raw] == 0);
+        expect_true("BL-1146: the town's cap refuses nothing; the rest (4) is window_exhausted",
+                    r.u(why_t::province_cap) == 0 && r.u(why_t::window_exhausted) == 4 && r.balanced);
+        expect_true("BL-1146: the rule reads 2 per rung, village 2 .. megacity 10",
+                    province_firm_cap(1) == 2 && province_firm_cap(2) == 4 && province_firm_cap(3) == 6
+                    && province_firm_cap(4) == 8 && province_firm_cap(5) == 10
+                    && province_firm_cap(0) == 2 && province_firm_cap(9) == 10);
     }
     {
         // TWO CENTRES: the first (6 points, at (6,6)) has no deposit tile and
