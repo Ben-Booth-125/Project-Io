@@ -282,8 +282,16 @@ void stamp_history_roads(world& w, entity_id body,
 // carries it rather than hugging the straight line.
 //
 // ENDPOINTS: each seat's PORT is its nearest sea tile within `kSeaLanePortRadius`
-// (Chebyshev, ties to the lower raster index). A seat with no sea that near cannot
-// carry a lane, and the leg is counted rather than stamped.
+// (Chebyshev, ties to the lower raster index). A REALM'S PORT IS ITS NEAREST COASTAL
+// REGION'S SEAT (BL-1153; Ben, 2026-09-27, NR-955 B): a lane end whose seat has no sea
+// that near moves to the nearest region OF THE SAME REALM whose seat has one, and the
+// lane starts at that seat's nearest sea tile. "Nearest" is the sim's own region
+// measure (`region_distance`: Chebyshev between the two seats, columns wrapping),
+// ties to the lower region index. The realm is the one the caller hands per region
+// (the polity holding it at the history's last close). An end held by no realm, or
+// whose realm holds no coastal region at all, still carries no lane, and the leg is
+// counted rather than stamped. The port picked for a seat stays its nearest sea tile;
+// a port facing the partner (NR-955's option E) was not taken.
 //
 // DIRECTION: the record carries no direction (`sea_leg` is `a < b`), so the walk is
 // priced TOWARD THE BUSIER END -- the seat more earned lanes touch -- as the ancient
@@ -308,8 +316,11 @@ struct sea_lane_stats
 {
     int       earned      = 0; ///< legs at or over the lane tier, both seats on the body
     int       laid        = 0; ///< of them, walked and stamped
-    int       no_port     = 0; ///< a seat with no sea within kSeaLanePortRadius
+    int       no_port     = 0; ///< an end with no port even from its realm's coast (the two below, summed)
+    int       no_port_unheld   = 0; ///< of them, an end's seat is inland and no realm holds it (or no realms were handed)
+    int       no_port_no_coast = 0; ///< of them, an end's seat is inland and its realm holds no coastal region
     int       unreachable = 0; ///< both ports found, but no water joins them
+    int       moved_ends  = 0; ///< lane ends (of legs reaching the walk) whose port came from their realm's coast
     long long path_tiles  = 0; ///< tiles over every laid path (a shared tile counts per lane)
     int       lane_tiles  = 0; ///< distinct tiles carrying a lane after the call
 };
@@ -324,6 +335,10 @@ struct sea_lane_trace
         int              uses = 0;       ///< the leg's recorded uses
         int              from_port = -1; ///< raster index the walk started at
         int              to_port   = -1; ///< raster index it ended at
+        /// The region whose seat each port was taken from, in walk order: the lane
+        /// end itself, or (BL-1153) its realm's nearest coastal region.
+        int              from_seat = -1;
+        int              to_seat   = -1;
         std::vector<int> path;           ///< raster indices, from_port -> to_port
     };
     std::vector<lane> lanes;
@@ -342,7 +357,10 @@ std::vector<int> sea_lane_walk(const std::vector<std::uint8_t>& sea, int gw, int
                                int from, int to);
 
 /// Stamp every earned lane in @p legs onto @p body's sea tiles. @p nodes is indexed by
-/// region (where each seat stood), as `stamp_history_roads` takes it. @p lane_tier_uses
+/// region (where each seat stood), as `stamp_history_roads` takes it. @p region_realm
+/// is parallel to @p nodes: the realm holding each region, -1 for none (BL-1153 -- an
+/// inland end moves to its realm's nearest coastal seat). Empty, or of another length,
+/// it names no realm and an inland end lays nothing. @p lane_tier_uses
 /// is the record's own threshold; @p current_weight_q and @p rotation_sense are the
 /// spans' current params (`history_sim_params::sea_current_*`) -- the field is rebuilt
 /// here from the body's tiles, the pure function the spans built it with. Empty @p legs
@@ -350,6 +368,7 @@ std::vector<int> sea_lane_walk(const std::vector<std::uint8_t>& sea, int gw, int
 void stamp_sea_lanes(world& w, entity_id body,
                      const std::vector<history_road_node>& nodes,
                      const std::vector<sea_leg>&           legs,
+                     const std::vector<int>&               region_realm,
                      int lane_tier_uses, int current_weight_q, int rotation_sense,
                      sea_lane_stats* stats = nullptr,
                      sea_lane_trace* trace = nullptr);

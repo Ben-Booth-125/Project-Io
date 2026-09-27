@@ -16,10 +16,17 @@
 //       the outbound; the walk is deterministic
 //   S3  a seat's port is its nearest sea tile within the radius, ties low;
 //       an inland seat beyond it has none
+//   R1  (BL-1153) a seat inland of the radius lays its lane from its REALM's
+//       nearest coastal seat -- the sim's Chebyshev region measure, the same
+//       realm only, ties to the lower region
+//   R2  a realm with no coastal region lays nothing, and is counted so
+//   R3  an inland seat no realm holds lays nothing, and is counted so
 //   W1  on a generated 1960 world lanes are stamped (count reported), only on
 //       sea tiles, and no road lies on water (the road lens has none to draw);
-//       the stamp's earned / laid / no-port / unreachable split matches the
-//       harness's own count off the record, the ports and the sea's components
+//       the stamp's earned / laid / no-port (unheld, no coast) / unreachable /
+//       moved-end split matches the harness's own count off the record, the
+//       realms, the ports and the sea's components, and every laid lane starts
+//       at the seat the harness picks (by `region_distance` itself)
 //   W2  re-stamping the world's own lane record reproduces its lane field
 //       exactly (the stamp is a pure function of the record and the ground)
 //   W3  the A* cost between two lane-joined ports falls below the unlaned cost
@@ -159,6 +166,111 @@ double mean_step_alignment(const std::vector<int>& path, const ocean_current_fie
         sum += (f.east_q[k] * dc + f.north_q[k] * (-dr)) / len;
     }
     return sum / static_cast<double>(path.size() - 1);
+}
+
+// ---------------------------------------------------------------------------
+// R1-R3: a realm's port is its nearest coastal region's seat (BL-1153)
+// ---------------------------------------------------------------------------
+//
+// LOGISTICS.md § 4b (Ben, 2026-09-27, NR-955 B). One synthetic body, 60 x 30: a
+// channel of sea in columns [24, 44), land either side. A seat is COASTAL when a
+// sea tile lies within kSeaLanePortRadius (9) of it -- west of the channel that is
+// columns 15..23. The regions, and what each one is there to catch:
+//
+//   0  realm 7   (4,15)   INLAND: the lane end under test (sea 20 tiles off)
+//   1  realm 7   (16,6)   coastal, 12 from region 0 -- THE ANSWER
+//   2  realm 9   (46,15)  the partner, on the east shore
+//   3  realm 7   (16,24)  coastal, 12 from region 0 too: the TIE, lost to the lower index
+//   4  realm 8   (15,15)  coastal and NEARER (11), but another realm's
+//   5  realm 7   (18,15)  coastal, 14 by the sim's Chebyshev -- but 14 against 21 by
+//                         Manhattan and 14 against 15 by Euclid, so any other
+//                         measure picks it
+//   6  realm 10  (4,4)    inland, and realm 10 holds no coastal region at all
+//   7  realm 10  (6,26)   inland, realm 10's only other region
+//   8  no realm  (8,15)   inland and held by nobody
+//
+// Each row stamps one leg on a fresh copy of the body, so each count is that
+// leg's alone.
+
+struct realm_port_case
+{
+    sea_lane_stats st;
+    sea_lane_trace tr;
+    std::vector<uint8_t> sea;
+};
+
+realm_port_case stamp_one_realm_leg(const sea_leg& leg)
+{
+    constexpr int gw = 60, gh = 30;
+    world fw;
+    const entity_id fbody = fw.create_entity();
+    body_component bc{};
+    bc.grid_width = gw;
+    bc.grid_height = gh;
+    fw.bodies[fbody] = bc;
+    realm_port_case out;
+    out.sea.assign(static_cast<std::size_t>(gw) * gh, 0);
+    for (int r = 0; r < gh; ++r)
+        for (int c = 0; c < gw; ++c)
+        {
+            const bool wet = c >= 24 && c < 44;
+            out.sea[static_cast<std::size_t>(r) * gw + c] = wet ? 1 : 0;
+            const entity_id id = fw.create_entity();
+            tile_component t{};
+            t.body = fbody; t.grid_x = c; t.grid_y = r;
+            t.substrate = wet ? terrain_substrate::ocean : terrain_substrate::sedimentary;
+            t.landform = terrain_landform::plains;
+            t.habitability = wet ? 0.0f : 0.5f;
+            fw.tiles.emplace(id, t);
+        }
+    const std::vector<history_road_node> nodes = {
+        {4, 15, 0}, {16, 6, 0}, {46, 15, 0}, {16, 24, 0}, {15, 15, 0},
+        {18, 15, 0}, {4, 4, 0}, {6, 26, 0}, {8, 15, 0} };
+    const std::vector<int> realms = { 7, 7, 9, 7, 8, 7, 10, 10, -1 };
+    stamp_sea_lanes(fw, fbody, nodes, { leg }, realms, 4, /*weight=*/0, 1, &out.st, &out.tr);
+    return out;
+}
+
+void realm_port_rows()
+{
+    std::printf("\n--- R1-R3: a realm's port is its nearest coastal region's seat (BL-1153) ---\n");
+    constexpr int gw = 60, gh = 30;
+
+    // R1: region 0's seat is inland; the leg 0-2 lays from region 1's seat.
+    {
+        const realm_port_case k = stamp_one_realm_leg(sea_leg{0, 2, 10});
+        const sea_lane_trace::lane* ln = k.tr.lanes.empty() ? nullptr : &k.tr.lanes.front();
+        const int want_port = sea_lane_port(k.sea, gw, gh, 16, 6, kSeaLanePortRadius);
+        std::printf("      leg 0-2: laid %d, moved ends %d, no port %d; the inland end's port taken at region %d"
+                    " (want 1), tile %d (want %d); %zu-tile lane\n",
+                    k.st.laid, k.st.moved_ends, k.st.no_port, ln ? ln->from_seat : -1,
+                    ln ? ln->from_port : -1, want_port, ln ? ln->path.size() : static_cast<std::size_t>(0));
+        check(sea_lane_port(k.sea, gw, gh, 4, 15, kSeaLanePortRadius) < 0 && k.st.laid == 1 && k.st.moved_ends == 1
+              && ln != nullptr && ln->from_seat == 1 && ln->to_seat == 2 && ln->from_port == want_port
+              && !ln->path.empty() && ln->path.front() == want_port,
+              "R1  a seat inland of nine tiles lays its lane from its realm's nearest coastal seat"
+              " (the sim's Chebyshev measure, same realm only, ties to the lower region)");
+    }
+
+    // R2: region 6's realm holds no coastal region, so the leg 2-6 lays nothing.
+    {
+        const realm_port_case k = stamp_one_realm_leg(sea_leg{2, 6, 10});
+        std::printf("      leg 2-6: laid %d, no port %d (no coast %d, unheld %d), lane tiles %d\n",
+                    k.st.laid, k.st.no_port, k.st.no_port_no_coast, k.st.no_port_unheld, k.st.lane_tiles);
+        check(k.st.earned == 1 && k.st.laid == 0 && k.st.lane_tiles == 0 && k.st.no_port == 1
+              && k.st.no_port_no_coast == 1 && k.st.no_port_unheld == 0,
+              "R2  a realm with no coastal region lays nothing, and is counted as such");
+    }
+
+    // R3: region 8 is held by no realm, so there is no realm's coast to move to.
+    {
+        const realm_port_case k = stamp_one_realm_leg(sea_leg{2, 8, 10});
+        std::printf("      leg 2-8: laid %d, no port %d (no coast %d, unheld %d), lane tiles %d\n",
+                    k.st.laid, k.st.no_port, k.st.no_port_no_coast, k.st.no_port_unheld, k.st.lane_tiles);
+        check(k.st.earned == 1 && k.st.laid == 0 && k.st.lane_tiles == 0 && k.st.no_port == 1
+              && k.st.no_port_unheld == 1 && k.st.no_port_no_coast == 0,
+              "R3  an inland seat no realm holds lays nothing, and is counted as such");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +418,7 @@ void synthetic_rows()
                 history_road_node{fc.ac, fc.ar, 0}, history_road_node{fc.bc, fc.br, 0} };
             const std::vector<sea_leg> legs = { sea_leg{0, 1, 10} };
             sea_lane_stats fst;
-            stamp_sea_lanes(fw, fbody, nodes, legs, 4, /*weight=*/0, 1, &fst);
+            stamp_sea_lanes(fw, fbody, nodes, legs, /*region_realm=*/{}, 4, /*weight=*/0, 1, &fst);
             const entity_id ta = fgrid[static_cast<std::size_t>(fc.ar) * fgw + fc.ac];
             const entity_id tb = fgrid[static_cast<std::size_t>(fc.br) * fgw + fc.bc];
             invalidate_logistics_caches(fw);
@@ -335,6 +447,8 @@ void synthetic_rows()
         check(sea_lane_port(s3, 20, 20, 10, 10, 3) == -1, "S3  a seat with no sea within the radius has no port");
         check(sea_lane_port(s3, 20, 20, 14, 10, 9) == 10 * 20 + 14, "S3  a seat on the sea is its own port");
     }
+
+    realm_port_rows();
 }
 
 // ---------------------------------------------------------------------------
@@ -367,6 +481,7 @@ struct lane_world
     int gw = 0, gh = 0;
     std::vector<sea_leg> legs;
     std::vector<history_road_node> nodes;
+    std::vector<int> realms; ///< what world setup handed the stamp (`setup_lane_realms`)
     std::vector<uint8_t> sea;
     std::vector<terrain_substrate> sub;
     std::vector<entity_id> grid;
@@ -386,6 +501,7 @@ bool build_lane_world(shipped_inputs& shipped, uint32_t seed, lane_world& L)
     if (L.w.gen_settlement)
         for (const region& p : L.w.gen_settlement->regions)
             L.nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
+    L.realms = L.fx.setup_lane_realms;
     L.grid = body_tile_grid(L.w, L.body);
     L.sea.assign(static_cast<std::size_t>(L.gw) * L.gh, 0);
     L.sub.assign(static_cast<std::size_t>(L.gw) * L.gh, terrain_substrate::sedimentary);
@@ -458,11 +574,14 @@ void world_rows(shipped_inputs& shipped, uint32_t seed)
     set_lane_field(L, std::vector<uint8_t>(generated.size(), 0));
     sea_lane_stats st;
     sea_lane_trace tr;
-    stamp_sea_lanes(L.w, L.body, L.nodes, L.legs, lp.sea_lane_tier1_uses, lp.sea_current_weight_q,
+    const auto t_stamp = std::chrono::steady_clock::now();
+    stamp_sea_lanes(L.w, L.body, L.nodes, L.legs, L.realms, lp.sea_lane_tier1_uses, lp.sea_current_weight_q,
                     lp.sea_current_rotation_sense, &st, &tr);
+    const double stamp_ms = seconds_since(t_stamp) * 1000.0;
     const std::vector<uint8_t> restamped = lane_field(L);
-    std::printf("      stamp: earned %d, laid %d, no port %d, unreachable %d; %lld path tiles, %d lane tiles\n",
-                st.earned, st.laid, st.no_port, st.unreachable, st.path_tiles, st.lane_tiles);
+    std::printf("      stamp: earned %d, laid %d, no port %d, unreachable %d; %lld path tiles, %d lane tiles;"
+                " the stamp (walker included) took %.1f ms\n",
+                st.earned, st.laid, st.no_port, st.unreachable, st.path_tiles, st.lane_tiles, stamp_ms);
     check(restamped == generated && st.lane_tiles == lane_tiles,
           "W2  re-stamping the world's own lane record reproduces its lane field exactly");
     // A world whose record earned no lane with a port at both ends legitimately
@@ -476,8 +595,9 @@ void world_rows(shipped_inputs& shipped, uint32_t seed)
     // nodes and the sea -- not the stamp's own sum (laid + no_port +
     // unreachable == earned holds by construction inside the stamp, so it
     // could never fail). Earned: legs at the tier between two on-grid nodes.
-    // No port: either seat's nearest sea tile lies beyond kSeaLanePortRadius
-    // (`sea_lane_port`, the port rule itself being with Ben, NR-955).
+    // No port: an end whose seat's nearest sea tile lies beyond
+    // kSeaLanePortRadius (`sea_lane_port`) AND whose realm holds no region with
+    // one, or which no realm holds (BL-1153, NR-955 B; picked below).
     // Unreachable: the two ports lie on different WATER COMPONENTS -- the
     // harness's own flood of the sea mask on the four cardinal steps, columns
     // wrapping, never the walker's search. Laid is what remains. `no_port` and
@@ -508,7 +628,32 @@ void world_rows(shipped_inputs& shipped, uint32_t seed)
             }
             ++comps;
         }
-        int h_earned = 0, h_no_port = 0, h_unreachable = 0, h_laid = 0;
+        // BL-1153: an inland end's port is its REALM's nearest coastal seat, counted
+        // again here with the sim's own `region_distance` over the settlement's own
+        // `region`s (the stamp restates the measure on the flattened node) and the
+        // realms world setup handed the stamp. A pick is a region index, -1 for an
+        // end no realm holds, -2 for a realm with no coastal region.
+        const std::vector<region>* regs = L.w.gen_settlement ? &L.w.gen_settlement->regions : nullptr;
+        const bool realms_ok = regs != nullptr && L.realms.size() == L.nodes.size() && regs->size() == L.nodes.size();
+        std::vector<int> port_of(L.nodes.size(), -1);
+        for (std::size_t j = 0; j < L.nodes.size(); ++j)
+            port_of[j] = sea_lane_port(L.sea, L.gw, L.gh, L.nodes[j].col, L.nodes[j].row, kSeaLanePortRadius);
+        const auto pick = [&](int ri) -> int {
+            if (port_of[static_cast<std::size_t>(ri)] >= 0) return ri;
+            if (!realms_ok || L.realms[static_cast<std::size_t>(ri)] < 0) return -1;
+            int best = -2, best_d = std::numeric_limits<int>::max();
+            for (std::size_t j = 0; j < L.nodes.size(); ++j)
+            {
+                if (L.realms[j] != L.realms[static_cast<std::size_t>(ri)] || port_of[j] < 0) continue;
+                const int d = region_distance((*regs)[static_cast<std::size_t>(ri)], (*regs)[j], L.gw);
+                if (d < best_d) { best_d = d; best = static_cast<int>(j); }
+            }
+            return best;
+        };
+        int h_earned = 0, h_no_port = 0, h_unheld = 0, h_no_coast = 0, h_unreachable = 0, h_laid = 0, h_moved = 0;
+        int moved_laid = 0, moved_unreachable = 0, move_max = 0;
+        long long move_sum = 0;
+        std::map<std::pair<int, int>, std::pair<int, int>> want_seats; // (a, b) -> (pick a, pick b)
         for (const sea_leg& l : L.legs)
         {
             if (l.uses < lp.sea_lane_tier1_uses || l.a == l.b) continue;
@@ -518,16 +663,61 @@ void world_rows(shipped_inputs& shipped, uint32_t seed)
             if (na.col < 0 || na.row < 0 || na.col >= L.gw || na.row >= L.gh
              || nb.col < 0 || nb.row < 0 || nb.col >= L.gw || nb.row >= L.gh) continue;
             ++h_earned;
-            const int pa = sea_lane_port(L.sea, L.gw, L.gh, na.col, na.row, kSeaLanePortRadius);
-            const int pb = sea_lane_port(L.sea, L.gw, L.gh, nb.col, nb.row, kSeaLanePortRadius);
-            if (pa < 0 || pb < 0) { ++h_no_port; continue; }
-            if (water_comp[static_cast<std::size_t>(pa)] != water_comp[static_cast<std::size_t>(pb)]) { ++h_unreachable; continue; }
+            const int sa = pick(l.a), sb = pick(l.b);
+            if (sa < 0 || sb < 0)
+            {
+                ++h_no_port;
+                if (sa == -1 || sb == -1) ++h_unheld; else ++h_no_coast;
+                continue;
+            }
+            const int moved_here = (sa != l.a ? 1 : 0) + (sb != l.b ? 1 : 0);
+            h_moved += moved_here;
+            for (const auto& [end, seat] : { std::pair<int, int>{l.a, sa}, std::pair<int, int>{l.b, sb} })
+                if (end != seat)
+                {
+                    const int d = region_distance((*regs)[static_cast<std::size_t>(end)], (*regs)[static_cast<std::size_t>(seat)], L.gw);
+                    move_sum += d;
+                    move_max = std::max(move_max, d);
+                }
+            const int pa = port_of[static_cast<std::size_t>(sa)], pb = port_of[static_cast<std::size_t>(sb)];
+            if (water_comp[static_cast<std::size_t>(pa)] != water_comp[static_cast<std::size_t>(pb)])
+            {
+                ++h_unreachable;
+                if (moved_here > 0) ++moved_unreachable;
+                continue;
+            }
             ++h_laid;
+            if (moved_here > 0) ++moved_laid;
+            want_seats[{l.a, l.b}] = {sa, sb};
         }
-        std::printf("      the harness's own count: earned %d, laid %d, no port %d, unreachable %d (%d water components)\n",
-                    h_earned, h_laid, h_no_port, h_unreachable, comps);
-        check(h_earned == st.earned && h_laid == st.laid && h_no_port == st.no_port && h_unreachable == st.unreachable,
-              "W1  the stamp's split matches the harness's own count off the record, the ports and the sea's components");
+        std::printf("      the harness's own count: earned %d, laid %d, no port %d (%d held by no realm, %d of a realm with"
+                    " no coast), unreachable %d (%d water components)\n",
+                    h_earned, h_laid, h_no_port, h_unheld, h_no_coast, h_unreachable, comps);
+        std::printf("      realm ports: %d lane ends moved to their realm's nearest coastal seat (mean %.1f, max %d tiles"
+                    " away); legs with a moved end: %d laid, %d unreachable\n",
+                    h_moved, h_moved > 0 ? static_cast<double>(move_sum) / h_moved : 0.0, move_max, moved_laid,
+                    moved_unreachable);
+        check(h_earned == st.earned && h_laid == st.laid && h_no_port == st.no_port && h_unreachable == st.unreachable
+              && h_unheld == st.no_port_unheld && h_no_coast == st.no_port_no_coast && h_moved == st.moved_ends,
+              "W1  the stamp's split matches the harness's own count off the record, the realms, the ports and the"
+              " sea's components");
+        // Every laid lane took each port at the seat the harness picked for it.
+        bool seats_agree = static_cast<int>(want_seats.size()) == static_cast<int>(tr.lanes.size());
+        int same_port = 0;
+        for (const sea_lane_trace::lane& ln : tr.lanes)
+        {
+            const auto it = want_seats.find({ln.a, ln.b});
+            if (it == want_seats.end()) { seats_agree = false; continue; }
+            const int wa = it->second.first, wb = it->second.second;
+            if (!((ln.from_seat == wa && ln.to_seat == wb) || (ln.from_seat == wb && ln.to_seat == wa))) seats_agree = false;
+            if (ln.from_port != port_of[static_cast<std::size_t>(ln.from_seat)]
+             || ln.to_port != port_of[static_cast<std::size_t>(ln.to_seat)]) seats_agree = false;
+            if (ln.from_port == ln.to_port) ++same_port;
+        }
+        std::printf("      laid lanes whose two ends share one port tile: %d\n", same_port);
+        check(realms_ok && seats_agree,
+              "W1  every laid lane starts at the seat the harness picks: its own, or its realm's nearest coastal one"
+              " by region_distance, ties low");
     }
     bool honest = true;
     for (const sea_lane_trace::lane& ln : tr.lanes) if (!walk_is_honest(ln.path, L.sea, L.gw)) honest = false;

@@ -2496,14 +2496,24 @@ void run_tail(generation_cursor& c)
     // tier (`exploration_sim_params`, which the Industrialisation span inherits).
     // Purely water, so its order against the road stamps cannot matter; no-op when
     // no span ran (the record is empty).
+    //
+    // BL-1153 (NR-955 B): a lane end whose seat has no sea in reach starts from
+    // its REALM's nearest coastal seat, so the stamp is handed each region's realm
+    // -- the polity holding it at the last close, `kepler_region_polity`, the one
+    // table that still says so once `region::nation` holds a nation index. A
+    // table of the wrong length is handed as empty, which keeps the old rule.
     if (!c.kepler_sea_legs.empty())
     {
         std::vector<history_road_node> lane_nodes;
         lane_nodes.reserve(kepler_settlement.regions.size());
         for (const region& p : kepler_settlement.regions)
             lane_nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
+        const std::vector<int> lane_realms =
+            kepler_region_polity.size() == kepler_settlement.regions.size()
+                ? kepler_region_polity : std::vector<int>{};
+        if (fixture != nullptr) fixture->setup_lane_realms = lane_realms;
         const history_sim_params lp = exploration_sim_params(params);
-        stamp_sea_lanes(w, kepler, lane_nodes, c.kepler_sea_legs, lp.sea_lane_tier1_uses,
+        stamp_sea_lanes(w, kepler, lane_nodes, c.kepler_sea_legs, lane_realms, lp.sea_lane_tier1_uses,
                         lp.sea_current_weight_q, lp.sea_current_rotation_sense);
     }
 
