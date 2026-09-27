@@ -1405,6 +1405,33 @@
     "tools/verify/stockpile_budget_check.cpp"
    ],
    "design": "DOC AND CODE DISAGREE (found 2026-09-26): CORPORATION_GENERATION.md says a specialist's price is anchored to the seat menu, 'the median library world offers about as many seats as a world with no budget' (NR-907, NR-910; the 650 divisor was pinned for that). On main the median world charters 81.5 specialists (61-111 a seed), and the BL-1137 rebuild barely moves it (88), because the price rises with the stock. The anchor was pinned on a world that no longer exists (before BL-1130/1133/1141). WORK: re-read the seat curve (stockpile_budget_check --seat-curve) after BL-1137 and BL-1146 land, and re-pin the divisor to the doc's target, measured, never clamped to a count. If no divisor reaches it without starving the web, report that for Ben rather than forcing it."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-27",
+   "requires": [
+    "BL-1147"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1152",
+   "short_name": "FLEETS_PROJECT_POWER",
+   "author": "Claude (sprint 48, NR-961 ruled, 2026-09-27)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "A fleet bounds the army it carries, and a crossing its target's side out-projects at sea never sails",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "src/world/ocean_currents.cpp",
+    "src/world/era_minus_one.cpp",
+    "tools/verify/ocean_currents_harness.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-27, NR-961): EXPLORATION.md, the SETTLED paragraph under the stocks table; MILITARY_HISTORY.md carries a pointer. Spans: Exploration and Industrialisation (the Empires round keeps the band gate). (1) CAPACITY: a campaign that crosses water carries no more of its army than the fleet staged from its hub's port lifts (men per hull, one named constant). (2) DEFENDERS: the target realm and its mutual-defence partners (treaty_clause::mutual_defence). (3) REACH: a fleet's power falls with sea distance from its own ports, halving over a fixed run of sea tiles (one named constant), the distance priced by the currents. (4) STOPPED: where anywhere on the crossing's sea leg the defenders' projected power outweighs the attacker's fleet there, the crossing never sails; the attacker keeps army and fleet; the round's campaign is lost. MEASURE FIRST: crossings per span, their hubs' ports, the attacker's fleet at launch, mutual-defence pairs, how often a target has a defending fleet in reach; then build; then read both constants on ladders and the BL-1147 conversion again. Ben sets all three."
   }
  ]
 }

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*65 entries — 6 open, 59 resolved.*
+*65 entries — 5 open, 60 resolved.*
 
 ---
 
@@ -107,22 +107,6 @@ Found first: the far-pair force NR-888 ruled on was never built, so far realms a
 > **Recommendation:** B at 300: inside the plateau (526 bound, against 518 at 0), so the dial does not choose the count, and distance still reads across water; the loss at 500 as set.
 
 *Files: `src/world/history_sim.cpp`, `src/world/history_sim.hpp`, `docs/generation/INDUSTRIALISATION.md`, `docs/generation/EXPLORATION.md`*
-
-### NR-961 — CALL: should a fleet gate sea crossings (the doc says it does; the code never reads it), and at what rung does the naval carry-over open?
-*question · raised 2026-09-26 · from BL-1147 (naval points carry over), merged 5f734c76 with the conversion at 0; its cold review, 2026-09-26*
-
-Built as you ruled: an Empires polity earns naval points (coastal province-years, crossings, coastal sea techs; weighted about a third each) and opens the Exploration age with points x rate / 1000 hulls. Left at rate 0 (today's world, byte-identical). The ladder moves little: at 50 / 250 / 1000 the largest opening fleet is 10k / 52k / 207k hulls, Exploration purchases 30 / 21 / 38 (21 today), subjections 42 / 31 / 65 (32), purchase-written lanes 0-1 at every rung. WHY: a sea crossing never reads the fleet. The crossing gate (history_sim.cpp ~6736-6739) is the hub's army and can_field_naval (the military band at a port window); navy_stock is read only by upkeep, the sea trade line, meeting by sea, a sea-legs ration bonus (at most +400 per mille) and the Alarm a visible fleet raises. The first Exploration crossing is at 1200 on 13 of 16 seeds with no fleet. And the navy bill is under 0.1% of the treasuries at every rung, so upkeep does not bite. EXPLORATION.md's stocks table says a navy buys "crossing capacity, and contest of a crossing": the code disagrees. Also: 15,395 polities dead by 1200 held 16.7M points (more than the living's 14.1M) and carry nothing, as ruled. AFTER THE REVIEW FIXES (merged 572a0afb; a corridor walked across sea is no longer a road, and the coastal deed reads the terrain, not the inherited port window): weights re-derived to 1 / 280 / 9,600 (still a third each); 7,841 dead polities held 7.0M points; the ladder at 10 / 50 / 250 / 1000 gives a largest opening fleet of 1k / 5k / 25k / 101k hulls, Exploration purchases 35 / 23 / 26 / 17 (20 at 0), subjections 61 / 50 / 38 / 31 (46), purchase-written lanes 0 at every rung, the navy bill under 0.05% of the treasuries. The shape is unchanged: no rung decides who crosses. BEN'S STEER (2026-09-27, mid-session): "Fleets should project power so allies with large fleets stop enemy fleets before they move." Written into EXPLORATION.md under the stocks table as SET; the mechanics (who defends, how power falls with distance, what a stopped crossing costs, whether a fleet also bounds its army, which spans) are put to Ben in a form.
-
-**Why it matters.** Your aim for the carry-over (coastal empires open the age already at sea) can only happen if a fleet decides who crosses; as built it only prices trade and raises Alarm.
-
-- A: make the doc true -- a wet campaign's size is bounded by the navy staged from its hub's port, so fleets gate crossings; then read the carry-over ladder again and pick a rung
-- B: correct the doc -- a navy prices trade and raises Alarm, crossings stay band-gated; pick a rung now from the ladder above
-- C: leave the carry-over at 0 until the fleet has a job
-- D: other
-
-> **Recommendation:** A: it is what the stocks table says and what your ruling needs; the upkeep that does not bite today becomes a real cost once a fleet is used. A world-mover and its own build.
-
-*Files: `src/world/history_sim.cpp`, `src/world/combat.cpp`, `docs/generation/EXPLORATION.md`*
 
 ---
 
@@ -1105,4 +1089,22 @@ You set two firms a province (NR-910) when provinces were at most ~20 tiles. A p
 > **RESOLVED.** RULED (Ben, 2026-09-27, the density calls form): B -- the cap scales with the province's centre, two firms per rung: village 2, town 4, city 6 (the form's reading), metropolis 8, megacity 10 (extended by the same rule; say if the top two should differ). Written into INDUSTRIALISATION.md § 1; BL-1146 builds it. The seat-menu finding (81.5 seats against the nine the price was anchored to) is filed as BL-1151 (seat menu re-anchored).
 
 *Files: `src/world/corporation_generation.cpp`, `src/world/stockpile_budget.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-961 — CALL: should a fleet gate sea crossings (the doc says it does; the code never reads it), and at what rung does the naval carry-over open?
+*question · raised 2026-09-26 · from BL-1147 (naval points carry over), merged 5f734c76 with the conversion at 0; its cold review, 2026-09-26*
+
+Built as you ruled: an Empires polity earns naval points (coastal province-years, crossings, coastal sea techs; weighted about a third each) and opens the Exploration age with points x rate / 1000 hulls. Left at rate 0 (today's world, byte-identical). The ladder moves little: at 50 / 250 / 1000 the largest opening fleet is 10k / 52k / 207k hulls, Exploration purchases 30 / 21 / 38 (21 today), subjections 42 / 31 / 65 (32), purchase-written lanes 0-1 at every rung. WHY: a sea crossing never reads the fleet. The crossing gate (history_sim.cpp ~6736-6739) is the hub's army and can_field_naval (the military band at a port window); navy_stock is read only by upkeep, the sea trade line, meeting by sea, a sea-legs ration bonus (at most +400 per mille) and the Alarm a visible fleet raises. The first Exploration crossing is at 1200 on 13 of 16 seeds with no fleet. And the navy bill is under 0.1% of the treasuries at every rung, so upkeep does not bite. EXPLORATION.md's stocks table says a navy buys "crossing capacity, and contest of a crossing": the code disagrees. Also: 15,395 polities dead by 1200 held 16.7M points (more than the living's 14.1M) and carry nothing, as ruled. AFTER THE REVIEW FIXES (merged 572a0afb; a corridor walked across sea is no longer a road, and the coastal deed reads the terrain, not the inherited port window): weights re-derived to 1 / 280 / 9,600 (still a third each); 7,841 dead polities held 7.0M points; the ladder at 10 / 50 / 250 / 1000 gives a largest opening fleet of 1k / 5k / 25k / 101k hulls, Exploration purchases 35 / 23 / 26 / 17 (20 at 0), subjections 61 / 50 / 38 / 31 (46), purchase-written lanes 0 at every rung, the navy bill under 0.05% of the treasuries. The shape is unchanged: no rung decides who crosses. BEN'S STEER (2026-09-27, mid-session): "Fleets should project power so allies with large fleets stop enemy fleets before they move." Written into EXPLORATION.md under the stocks table as SET; the mechanics (who defends, how power falls with distance, what a stopped crossing costs, whether a fleet also bounds its army, which spans) are put to Ben in a form.
+
+**Why it matters.** Your aim for the carry-over (coastal empires open the age already at sea) can only happen if a fleet decides who crosses; as built it only prices trade and raises Alarm.
+
+- A: make the doc true -- a wet campaign's size is bounded by the navy staged from its hub's port, so fleets gate crossings; then read the carry-over ladder again and pick a rung
+- B: correct the doc -- a navy prices trade and raises Alarm, crossings stay band-gated; pick a rung now from the ladder above
+- C: leave the carry-over at 0 until the fleet has a job
+- D: other
+
+> **Recommendation:** A: it is what the stocks table says and what your ruling needs; the upkeep that does not bite today becomes a real cost once a fleet is used. A world-mover and its own build.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the fleet projection form, after his steer "fleets should project power so allies with large fleets stop enemy fleets before they move"): A, make the doc true, in the Exploration and Industrialisation spans. A fleet bounds the army a sea campaign carries (staged from its hub's port); the defenders are the target and its mutual-defence partners; a fleet's power falls with sea distance from its own ports, priced by the currents; a crossing out-projected anywhere on its leg never sails, and the attacker keeps its army and fleet. Build this sprint, measured first: BL-1152 (fleets project power). The carry-over rung is NOT yet chosen: it is read again once fleets have this job, and put to Ben then.
+
+*Files: `src/world/history_sim.cpp`, `src/world/combat.cpp`, `docs/generation/EXPLORATION.md`*
 
