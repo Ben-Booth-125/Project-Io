@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -813,6 +814,30 @@ private:
 ///          `tile_to_nation` is already populated; `province_holder` is
 ///          replaced.
 void seed_province_holders(world& w);
+
+/// THE PROVINCE ANCHOR, ONE DERIVATION (BL-611; shared since the BL-1146 review,
+/// 2026-09-27). A province's anchor is the tile carrying the highest SUMMED
+/// centre scale standing in it — the scales of every `population_centres` entry
+/// whose `population_centre_tile` is that tile, added — ties to the LOWEST tile
+/// id; a province with no centre (no tile with a positive sum) has none. Derived
+/// on the spot, never stored.
+///
+/// THE ONE PLACE IT IS COMPUTED: `seed_province_holders` (the holder is the
+/// anchor's nation), the charter budget's per-province firm cap (the cap is 2 x
+/// the anchor's scale rung, BL-1146 — `province_centre_rungs`,
+/// corporation_generation.hpp) and the instruments that report it read this, so
+/// the three cannot drift apart.
+///
+/// Every province in `w.provinces.provinces`, land or not, walked in its own
+/// ascending `province::tiles` order (the partition's contract) with a
+/// strictly-greater scan over an ordered per-tile sum, so no unordered
+/// container's layout reaches the pick. Keyed by province id.
+struct province_anchor
+{
+    entity_id tile  = null_entity;   ///< the anchor tile
+    int       scale = 0;             ///< the summed centre scale standing on it (> 0)
+};
+std::map<uint32_t, province_anchor> province_anchors(const world& w);
 
 /// The current holder of the province with id @p province_id, or `null_entity`
 /// if there is no such province or no holder is recorded. O(log n): binary

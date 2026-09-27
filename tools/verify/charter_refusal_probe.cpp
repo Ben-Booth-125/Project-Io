@@ -61,6 +61,7 @@
 #include "world/components.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/landscape_search.hpp"  // apply_landscape_candidate's budget overload (NR-910)
+#include "world/province.hpp"          // province_anchors, the fixture's province (BL-1146)
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
 #include "world/world.hpp"
@@ -274,6 +275,18 @@ std::unique_ptr<world> build(const config& cfg, recipe_registry& reg,
             at[{ x, y }] = tid;
         }
     w->nations[nation] = nc;
+    // The province ITSELF, not only the tile index (BL-1146 review): the cap
+    // reads its centre's rung from `province_anchors`, which walks the province
+    // list's tiles, as `seed_province_holders` does. Tiles ascend by id (the
+    // partition's contract) because they were created in this order.
+    if (cfg.one_province)
+    {
+        province pr;
+        pr.id    = 1u;
+        pr.body  = body;
+        pr.tiles = nc.tiles;
+        w->provinces.provinces.push_back(std::move(pr));
+    }
 
     for (const centre_spec& cs : cfg.centres)
     {
@@ -735,25 +748,96 @@ int main()
     {
         // BL-1146: THE CAP SCALES WITH THE PROVINCE'S CENTRE. The same one-
         // province world with a TOWN at its centre (rung 2, a cap of 4; the
-        // same demand, a basket x2.5): both works now take their per-good cap
-        // of 2 inside the province, and the cap refuses nothing — the ore still
-        // fails on the window, so the rest is window_exhausted.
+        // same demand, a basket x2.5), and the per-good cap raised to 3 so the
+        // works WANT MORE than the town's cap (3 + 3 = 6 > 4): the cap must be
+        // what stops them. (At c = 2 the works saturate at 4 on their own, so a
+        // cap of 4 or anything larger passes — the review found that row could
+        // not fail.) Four works place, two per good; the next is refused by the
+        // cap; the ore still fails on the window; the rest (4) is province_cap.
         turn::config cfg;
         cfg.g            = ground::outside_window;
         cfg.one_province = true;
         cfg.scale        = 2;
+        cfg.c            = 3;
         cfg.basket       = { { turn::k_raw, 250.0f, false }, { turn::k_mill1, 250.0f, true },
                              { turn::k_mill2, 250.0f, true } };
         const turn::reading r = turn::run(cfg);
-        turn::print("one province (a town's), no deposit tile", r);
-        expect_true("BL-1146: a town's province holds 4 works (2 per good), where a village's held 2",
+        turn::print("one province (a town's), no deposit tile, per-good cap 3", r);
+        expect_true("BL-1146: a town's province holds exactly 4 works (its cap), where the works wanted 6",
                     r.firms[turn::k_mill1] == 2 && r.firms[turn::k_mill2] == 2 && r.firms[turn::k_raw] == 0);
-        expect_true("BL-1146: the town's cap refuses nothing; the rest (4) is window_exhausted",
-                    r.u(why_t::province_cap) == 0 && r.u(why_t::window_exhausted) == 4 && r.balanced);
+        expect_true("BL-1146: the town's cap refuses the rest (4) as province_cap, not window_exhausted",
+                    r.u(why_t::province_cap) == 4 && r.u(why_t::window_exhausted) == 0 && r.balanced);
         expect_true("BL-1146: the rule reads 2 per rung, village 2 .. megacity 10",
                     province_firm_cap(1) == 2 && province_firm_cap(2) == 4 && province_firm_cap(3) == 6
                     && province_firm_cap(4) == 8 && province_firm_cap(5) == 10
                     && province_firm_cap(0) == 2 && province_firm_cap(9) == 10);
+    }
+    {
+        // BL-1146 review: THE RUNG HELPER, DIRECTLY — `province_anchors` (the
+        // anchor seed_province_holders reads) and `province_centre_rungs` over
+        // it. Three provinces on a 6-tile strip:
+        //   P1 tiles t0 t1: NO centre              -> no anchor, a village's cap 2;
+        //   P2 tiles t2 t3: a city (3) on t2 and a town (2) on t3
+        //                   -> the anchor is t2, rung 3, cap 6;
+        //   P3 tiles t4 t5: two megacities on t5 (a sum of 10) and a town on t4
+        //                   -> the anchor is t5, the sum CLAMPED to rung 5, cap 10.
+        // And a tie: a fourth province P4 with two villages, one each on t6 and
+        // t7, anchors on the LOWER tile id.
+        world w;
+        const entity_id body = w.create_entity();
+        w.bodies[body] = body_component{};
+        std::vector<entity_id> t;
+        for (int i = 0; i < 8; ++i)
+        {
+            const entity_id id = w.create_entity();
+            tile_component tc{};
+            tc.body = body;
+            tc.grid_x = i;
+            w.tiles[id] = tc;
+            t.push_back(id);
+        }
+        const auto add_province = [&](std::uint32_t id, std::initializer_list<int> tiles) {
+            province pr;
+            pr.id   = id;
+            pr.body = body;
+            for (const int i : tiles)
+            {
+                pr.tiles.push_back(t[static_cast<std::size_t>(i)]);
+                w.provinces.tile_province[t[static_cast<std::size_t>(i)]] = id;
+            }
+            w.provinces.provinces.push_back(std::move(pr));
+        };
+        add_province(11u, { 0, 1 });
+        add_province(12u, { 2, 3 });
+        add_province(13u, { 4, 5 });
+        add_province(14u, { 6, 7 });
+        const auto add_centre = [&](int tile, int scale) {
+            const entity_id id = w.create_entity();
+            population_centre_component pc{};
+            pc.scale = scale;
+            w.population_centres[id] = pc;
+            w.population_centre_tile[id] = t[static_cast<std::size_t>(tile)];
+        };
+        add_centre(2, 3);
+        add_centre(3, 2);
+        add_centre(5, 5);
+        add_centre(5, 5);
+        add_centre(4, 2);
+        add_centre(7, 1);
+        add_centre(6, 1);
+        const std::map<std::uint32_t, province_anchor> anchors = province_anchors(w);
+        const std::map<std::uint32_t, int> rungs = province_centre_rungs(w);
+        expect_true("BL-1146: a province with NO centre has no anchor and a village's cap (2)",
+                    anchors.count(11u) == 0 && rungs.count(11u) == 0
+                    && province_firm_cap_of(rungs, 11u) == 2 && province_firm_cap_of(rungs, 99u) == 2);
+        expect_true("BL-1146: the anchor is the highest summed scale: a city (3) over a town, cap 6",
+                    anchors.count(12u) == 1 && anchors.at(12u).tile == t[2] && anchors.at(12u).scale == 3
+                    && rungs.at(12u) == 3 && province_firm_cap_of(rungs, 12u) == 6);
+        expect_true("BL-1146: two megacities on one tile sum to 10, CLAMPED to rung 5, cap 10",
+                    anchors.count(13u) == 1 && anchors.at(13u).tile == t[5] && anchors.at(13u).scale == 10
+                    && rungs.at(13u) == 5 && province_firm_cap_of(rungs, 13u) == 10);
+        expect_true("BL-1146: a tie in summed scale anchors on the LOWER tile id",
+                    anchors.count(14u) == 1 && anchors.at(14u).tile == t[6] && rungs.at(14u) == 1);
     }
     {
         // TWO CENTRES: the first (6 points, at (6,6)) has no deposit tile and

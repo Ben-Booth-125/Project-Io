@@ -2206,9 +2206,7 @@ std::vector<entity_id> generate_background_firms(
     //   firms pile into whichever province holds the best anchor tiles, and the
     //   density arrives as one blot instead of as industry spread over the map.
     //   The province is the right grain because it is already the partition the
-    //   world is carved into (BL-466). Its size is no longer a flat 2: it scales
-    //   with the province's centre (BL-1146, below), since a province is now its
-    //   centre's whole ground.
+    //   world is carved into (BL-466).
     //
     // BOTH NUMBERS ARE PROVISIONAL AND UNPINNED - a first cut chosen to be
     // measured, not derived. Shipping an unpinned number quietly is exactly what
@@ -2217,12 +2215,12 @@ std::vector<entity_id> generate_background_firms(
     // the shape is agreed.
     constexpr int   max_firms_per_body      = 200;  // anti-runaway only
     constexpr int   per_resource_firm_cap   = 8;    // provisional - measure, then pin
+    // A FLAT 2, AND IT STAYS FLAT (BL-1146 review, 2026-09-27): the cap that
+    // scales with the province's centre (NR-960, `province_firm_cap`) is a
+    // BUDGET-WORLD ruling (INDUSTRIALISATION.md § 1). This pass runs on every
+    // world without a budget, whose bytes are BL-1031's pinned contract.
+    constexpr int   per_province_firm_cap   = 2;    // provisional - measure, then pin
     constexpr int   max_iterations_per_body = 3 * max_firms_per_body; // slack for placement misses
-    // THE PER-PROVINCE CAP SCALES WITH THE PROVINCE'S CENTRE (BL-1146, Ben,
-    // 2026-09-27, NR-960 B): two firms per rung, the one rule the charter
-    // budget reads too (`province_firm_cap`). Read once: this pass lays
-    // buildings, never centres, so no province's rung moves under it.
-    const std::map<uint32_t, int> province_rungs = province_centre_rungs(w);
 
     // Distinct xor-offset seeds, independent of generate_corporations' own
     // streams (seed_asset etc.) so the two passes cannot collide even though
@@ -2444,8 +2442,7 @@ std::vector<entity_id> generate_background_firms(
                     anchor_province = w.provinces.province_of(abit->second.tile);
             }
             if (anchor_province != 0
-                && firms_by_province[anchor_province]
-                       >= province_firm_cap_of(province_rungs, anchor_province))
+                && firms_by_province[anchor_province] >= per_province_firm_cap)
             {
                 // Hand the tiles back so a later, better-placed firm can use them -
                 // otherwise a refused placement silently sterilises good ground.
@@ -2634,11 +2631,13 @@ constexpr uint32_t k_charter_salt_player       = 0x2E97A3F1u;
 // exactly as they are for every world without a budget.
 //
 // The per-province cap is NOT a number held here any more (BL-1146, Ben,
-// 2026-09-27, NR-960 B, superseding NR-910's flat 2): it scales with the
-// province's centre, two firms per rung (`province_firm_cap`,
-// corporation_generation.hpp), the one rule Pass 6 reads too. The flat 2 was
-// ruled against provinces of <= 20 tiles; a province is now its centre's whole
-// ground, and a flat 2 pushed a city's industry out into its villages.
+// 2026-09-27, NR-960 B, superseding NR-910's flat 2 on a budget world): it
+// scales with the province's centre, two firms per rung (`province_firm_cap`,
+// corporation_generation.hpp). It is the budget path's own rule, NOT a copy
+// that tracks Pass 6's: Pass 6 keeps its flat 2 in `generate_background_firms`
+// for every world without a budget, as above. The flat 2 was ruled against
+// provinces of <= 20 tiles; a province is now its centre's whole ground, and a
+// flat 2 pushed a city's industry out into its villages.
 
 /// A fresh std::mt19937 for one (centre, role): a KEYED draw, the checkpoint
 /// idiom — the (seed ^ role salt, centre id) pair keys a splitmix64 state, one
@@ -3332,30 +3331,13 @@ bool charter_budget_affords_specialist(const world& w, const charter_budget& bud
 
 std::map<uint32_t, int> province_centre_rungs(const world& w)
 {
-    // Summed centre scale per tile, as `seed_province_holders` sums it. Ordered
-    // by tile id, so the strictly-greater scan below lets the LOWEST tile id win
-    // a tie within its province — the anchor's own tie-break.
-    std::map<entity_id, int> scale_by_tile;
-    for (const auto& [centre_id, tile_id] : w.population_centre_tile)
-    {
-        const auto pit = w.population_centres.find(centre_id);
-        if (pit == w.population_centres.end())
-            continue;
-        scale_by_tile[tile_id] += pit->second.scale;
-    }
-    std::map<uint32_t, int> anchor_scale;   // province id -> its anchor's summed scale
-    for (const auto& [tile_id, scale] : scale_by_tile)
-    {
-        const uint32_t prov = w.provinces.province_of(tile_id);
-        if (prov == 0)
-            continue;
-        const auto it = anchor_scale.find(prov);
-        if (it == anchor_scale.end() || scale > it->second)
-            anchor_scale[prov] = scale;
-    }
-    for (auto& [prov, scale] : anchor_scale)
-        scale = std::clamp(scale, 1, 5);   // the ladder's rungs
-    return anchor_scale;
+    // THE ANCHOR IS province.cpp's (`province_anchors`), the one derivation
+    // `seed_province_holders` reads too; the rung is its summed scale on the
+    // ladder's 1-5.
+    std::map<uint32_t, int> rungs;
+    for (const auto& [prov, anchor] : province_anchors(w))
+        rungs[prov] = std::clamp(anchor.scale, 1, 5);
+    return rungs;
 }
 
 int province_firm_cap_of(const std::map<uint32_t, int>& rungs, uint32_t province)

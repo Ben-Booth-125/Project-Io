@@ -287,10 +287,12 @@ bool charter_budget_affords_specialist(const world& w, const charter_budget& bud
 /// centre") — THE PER-PROVINCE FIRM CAP. Two firms per rung the province's centre
 /// reaches: a village 2, a town 4, a city 6, a metropolis 8, a megacity 10. A
 /// province is its centre's whole ground (PROVINCES.md), so a flat 2 pushed a
-/// city's industry out into its villages. ONE RULE for both caps that read it —
-/// Pass 6's (`generate_background_firms`) and the charter budget's
-/// (`charter_web_from_budget`) — so they cannot drift apart. A rung outside 1-5
-/// reads as the nearest end: a province with no centre is a village's 2.
+/// city's industry out into its villages. A BUDGET-WORLD RULE (INDUSTRIALISATION.md
+/// § 1): read by the charter budget's walk (`charter_web_from_budget`) and nothing
+/// else. Pass 6 (`generate_background_firms`), which runs on every world without
+/// a budget, keeps its flat 2 — those worlds' bytes are BL-1031's pinned contract.
+/// A rung outside 1-5 reads as the nearest end: a province with no centre is a
+/// village's 2.
 inline constexpr int k_province_firm_cap_per_rung = 2;
 
 constexpr int province_firm_cap(int centre_rung)
@@ -299,15 +301,14 @@ constexpr int province_firm_cap(int centre_rung)
 }
 
 /// BL-1146 — every province's CENTRE RUNG (1-5), keyed by province id. "The
-/// province's centre" is its ANCHOR as `seed_province_holders` derives it
-/// (province.cpp, BL-611; PROVINCES.md): the highest SUMMED centre scale standing
-/// on one tile of the province, ties to the lowest tile id — derived on the spot,
-/// never stored, from `population_centre_tile` and each centre's `scale` (a
-/// razed centre keeps scale 1, so it still anchors). The rung is that sum on the
-/// ladder's 1-5, clamped: two centres sharing a tile could sum past a megacity.
-/// A province absent from the map carries no centre (the village's cap).
-/// READ-ONLY, pure, integer; walks ordered maps, so no container layout reaches
-/// it. The caps build it ONCE per pass: nothing either pass does moves a centre.
+/// province's centre" is its ANCHOR, read from `province_anchors` (province.hpp,
+/// BL-611; PROVINCES.md) — the one derivation `seed_province_holders` reads: the
+/// highest SUMMED centre scale standing on one tile of the province, ties to the
+/// lowest tile id (a razed centre keeps scale 1, so it still anchors). The rung
+/// is that sum on the ladder's 1-5, clamped: two centres sharing a tile could sum
+/// past a megacity. A province absent from the map carries no centre (the
+/// village's cap). READ-ONLY, pure, integer. The budget walk builds it ONCE: the
+/// walk charters buildings, never centres, so no rung moves under it.
 std::map<std::uint32_t, int> province_centre_rungs(const world& w);
 
 /// The cap for province @p province under @p rungs (`province_centre_rungs`):

@@ -49,7 +49,8 @@
 // is read at the seam before the settle: budget firms and Pass 6 firms apart,
 // every charter-unspent reason as points and as bookings (one row per centre and
 // reason), the land provinces on the charter bodies and the largest, the
-// provinces holding exactly the cap's 2 firms, and where the budget concentrates
+// provinces holding exactly 2 firms (the village's cap; since BL-1146 a province's
+// cap is 2 per rung of its centre — table E reads firms by rung), and where the budget concentrates
 // — the richest centre's share, its firms, its `province_cap`, and how many
 // provinces its window (the spend's own radius, the centre nation's tiles, the
 // walk's column-wrapped metric) spans. Asserts only that each world's budget
@@ -62,6 +63,7 @@
 #include "scripting/lua_state.hpp"
 #include "world/charter_budget.hpp"
 #include "world/components.hpp"
+#include "world/corporation_generation.hpp"   // province_centre_rungs (BL-1146)
 #include "world/province.hpp"
 #include "world/settlement.hpp"
 #include "world/stockpile_budget.hpp"
@@ -596,9 +598,11 @@ void part_three_seat_curve(const std::vector<std::uint32_t>& seeds,
 // ---------------------------------------------------------------------------
 // BL-1133 made a province its centre's whole ground, so a large centre's spend
 // window, which spanned several small provinces, may now sit inside one — and
-// the budget path's per-province cap (2 firms, NR-910) would then refuse the
-// rest of that centre's budget. This reads what the cap does on the shipped
-// start. READ-ONLY on the world: nothing here writes it after the build.
+// the budget path's per-province cap would then refuse the rest of that
+// centre's budget. The cap was a flat 2 (NR-910); since BL-1146 (NR-960) it is 2
+// per rung of the province's centre, a village 2 .. a megacity 10. This reads
+// what the cap does on the shipped start. READ-ONLY on the world: nothing here
+// writes it after the build.
 
 /// Distinct provinces (non-zero ids) among @p centre's charter window: the
 /// centre nation's tiles on the centre's body within @p radius of the centre
@@ -683,41 +687,23 @@ struct census_row
     int           winner_tier = 0;
 };
 
-/// BL-1146 — each land province's CENTRE RUNG, read-only: the ANCHOR as
-/// `seed_province_holders` derives it (province.cpp, BL-611) — the highest
-/// summed centre scale standing on one tile of the province, ties to the lowest
-/// tile id — and that scale on the ladder's 1-5 (clamped: two centres sharing a
-/// tile could sum past a megacity). Restated here, not called, so the census
-/// reads the same number before the cap reads it and after. A province absent
-/// from the map carries no centre. @p shared_out counts anchors whose tile holds
-/// more than one centre, where the sum and the largest single centre differ.
+/// BL-1146 — each province's CENTRE RUNG, the one rule the charter cap reads
+/// (`province_centre_rungs`, corporation_generation.hpp, over province.cpp's
+/// `province_anchors` — the anchor `seed_province_holders` reads). CALLED, not
+/// restated (the review's fix round), so the census cannot read a different
+/// province from the cap. @p shared_out counts anchors whose tile holds more than
+/// one centre, where the summed scale and the largest single centre differ — a
+/// diagnostic of the clamp, read off the same anchors.
 std::map<std::uint32_t, int> census_province_rungs(const world& w, int& shared_out)
 {
     shared_out = 0;
-    std::map<entity_id, int> scale_by_tile, centres_on_tile;   // ordered: ascending tile id
+    std::map<entity_id, int> centres_on_tile;
     for (const auto& [cid, tid] : w.population_centre_tile)
-    {
-        const auto pit = w.population_centres.find(cid);
-        if (pit == w.population_centres.end()) continue;
-        scale_by_tile[tid] += pit->second.scale;
-        ++centres_on_tile[tid];
-    }
-    std::map<std::uint32_t, std::pair<int, entity_id>> best;   // province -> (summed scale, tile)
-    for (const auto& [tid, s] : scale_by_tile)
-    {
-        const std::uint32_t pv = w.provinces.province_of(tid);
-        if (pv == 0) continue;
-        const auto it = best.find(pv);
-        if (it == best.end() || s > it->second.first)   // strictly greater: the lowest tile wins ties
-            best[pv] = { s, tid };
-    }
-    std::map<std::uint32_t, int> rung;
-    for (const auto& [pv, st] : best)
-    {
-        rung[pv] = std::clamp(st.first, 1, 5);
-        if (centres_on_tile[st.second] > 1) ++shared_out;
-    }
-    return rung;
+        if (w.population_centres.count(cid) != 0)
+            ++centres_on_tile[tid];
+    for (const auto& [pv, anchor] : province_anchors(w))
+        if (centres_on_tile[anchor.tile] > 1) ++shared_out;
+    return province_centre_rungs(w);
 }
 
 census_row census_one(std::uint32_t seed)
