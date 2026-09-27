@@ -80,9 +80,9 @@ how borders were defined in history."* What a province *is*, and everything down
 independent of how the shapes are drawn.
 
 **A province is its centre's ground (Ben, 2026-09-26; BL-1133).** The fill no longer stops at a
-growth budget: every centre's province grows until its nation's land — within its settled cell
-(§ The settled cells are a binding input) — is covered, so every province on settled land holds
-a centre and no centre's ground goes unclaimed. A world has at most as many provinces as centres,
+growth budget: every centre's province grows until its nation's land is covered, across the settled
+line as well as within it (§ The settled cells are a binding input), so every province holds a
+centre and no centre's ground goes unclaimed. A world has at most as many provinces as centres,
 not exactly as many: a centre its stronger neighbours hem to its own tile is absorbed into one of
 theirs, counted rather than hidden (NR-954). The budget becomes a **weight on reach** (delegated reading,
 NR-953): a centre's scale divides its step cost, so a metropolis still draws the larger province
@@ -141,8 +141,8 @@ land — and it is the spacing, not the budget, that sets hinterland size.
 nation, and singleton absorption honours the same lock, so a land province is single-nation by
 construction and its anchor's nation *is* its tile-derived nation. On a settled body the spaced
 hinterland seeding is retired; the fill covers the land, so the only ground left over is an
-**uncentred island** — land no centre of its nation can reach under the nation and settlement
-locks — which grows whole into one province and receives a **scale-1 anchor founding** on its best
+**uncentred island** — land no centre of its nation can reach under the nation lock — which grows
+whole into one province and receives a **scale-1 anchor founding** on its best
 ground
 (`ensure_province_anchor_centres`, `population_generation.cpp`) before the holder is derived —
 a pure-ice province gets its anchor on its least-bad tile, counted rather than hidden. The
@@ -156,6 +156,12 @@ unsettled body (no centres anywhere), where there is nothing else to seed from.
 ([COLONISATION.md](COLONISATION.md)) leaves a set of settled cells and their anchors, and the
 partition takes them as a **hard input** the way it already takes the national assignment — the
 ordering is unchanged (after the sim, before roads), and so is the nation lock.
+
+**SETTLED (Ben, 2026-09-27, NR-954): a centre's fill crosses the settled line.** The settled cells
+seed the partition, but a centre's region grows from settled ground into never-settled ground of
+its own nation, so never-settled country joins the province of the centre that reaches it. Before
+this, a settlement lock (BL-849) stopped the fill at the line, and 3,753 of 6,856 anchor villages
+were founded only to hold the never-settled ground it left over.
 
 The alternative was considered and not taken: colonisation drawing the real partition, with the
 nation carve then assigning whole provinces rather than tiles, which would make ruling 5's

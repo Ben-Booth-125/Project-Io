@@ -208,6 +208,9 @@ void fold_polity(uint64_t& h, const polity& p)
     fold_i32(h, p.overlord);
     fold_i32(h, p.subject_kind);
     fold_i64(h, p.navy_stock);
+    fold_i64(h, p.naval_coastal_years); // BL-1147: the naval ledger crosses every handoff
+    fold_i64(h, p.naval_crossings);
+    fold_i64(h, p.naval_sea_techs);
     fold_i32(h, p.treaties_broken);
     fold_u32(h, p.tree_keys);
 }
@@ -274,6 +277,7 @@ void fold_corridors(uint64_t& h, const std::vector<history_corridor>& cs)
         fold_u32(h, c.a);
         fold_u32(h, c.b);
         fold_u32(h, c.tier);
+        fold_u32(h, c.wet); // BL-1147 review: a corridor walked across sea
         fold_i64(h, static_cast<int64_t>(c.uses));
     }
 }
@@ -318,6 +322,7 @@ void fold_contacts(uint64_t& h, const std::vector<contact>& cs)
         fold_i32(h, c.first.year);
         fold_u32(h, c.first.region);
         fold_i32(h, static_cast<int32_t>(c.first.kind));
+        fold_u32(h, c.first.across_water); // BL-1142: the class the meeting recorded
     }
 }
 
@@ -499,6 +504,7 @@ uint64_t cursor_state_digest(const generation_cursor& c)
     fold_timelapse(h, c.migration_lapse);
 
     fold_corridors(h, c.kepler_corridors);
+    fold_sea_legs(h, c.kepler_sea_legs); // BL-1098: the lane stamp's record, carried to the tail
     fold_grudges(h, c.kepler_grudges);
     fold_i32(h, c.kepler_grudge_cap);
     fold_ints(h, c.kepler_polity_treasuries);

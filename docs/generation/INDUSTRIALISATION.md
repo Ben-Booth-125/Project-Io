@@ -318,8 +318,11 @@ none. Affording is not placing: a centre that affords a specialist and finds no 
 charters none, so a world whose every affording centre does so opens with no player. **That residual
 is reported and counted, not patched (Ben, 2026-09-22, NR-911)** — the app says so on its seat
 line and the seat sweep fails such a world — and it is fixed only if a library world is ever
-measured there. **The per-province cap stays at 2** on a budget world, and **the square root's base is 8**,
-the legacy per-good cap, so a body at the legacy spend keeps the legacy cap.
+measured there. **The per-province cap scales with the province's centre (Ben, 2026-09-27, NR-960,
+superseding NR-910's flat 2):** two firms per rung the centre reaches — a village 2, a town 4, a
+city 6, a metropolis 8, a megacity 10. A province is its centre's whole ground (`PROVINCES.md`), so
+a flat 2 pushed a city's industry out into its villages. **The square root's base is 8**, the legacy
+per-good cap, so a body at the legacy spend keeps the legacy cap.
 
 **SETTLED (Ben, 2026-09-18, wave 1 form, reversing the same morning's ruling): a budget
 specialist opens on TODAY'S STARTING CAPITAL**, the seeded 400 ±40% draw with the focus premium
@@ -335,8 +338,8 @@ ground there is counted unspent rather than scattered across the nation, because
 is capital that left the city that built it. **No budget and an empty budget are the same world as
 today's**: the population-blind placement stands until a budget with something in it arrives.
 
-PROPOSED (listed to Ben 2026-09-18, not overturned; the cap SETTLED at 2 by NR-910): **the per-province cap stays at 2** on a
-budget world until real budgets show whether they concentrate; and **a budget world does not read
+PROPOSED (listed to Ben 2026-09-18, not overturned; the cap since scaled with the centre, NR-960, above):
+**a budget world does not read
 the Works charter terms** (`trees/INDUSTRY_TREE.md` § What the tree hands the 1960 campaign), because
 a specialist stands wherever its centre can afford one.
 
@@ -544,9 +547,15 @@ the points spread over the polity's regions that hold centres, in proportion to 
 scale** — a treasury builds its realm's works where its people are. The capital still leads
 because it is usually the largest centre. Landing them all on the capital's own region let one
 region hold up to 65% of a world's points, so charters would have followed capitals, not cities.
-The constants stand: 1000 points per million urban heads per year; fuel factor
+The constants stand: 1000 points per million employed urban heads per year; fuel factor
 250 + 750 × reading/1000; a 250‰ share of the round's surplus, debited; 1000 points per
-treasury unit. **A polity that holds no town converts nothing (Ben, 2026-09-19, NR-901):** there is
+treasury unit. **SETTLED (Ben, 2026-09-27): a head earns scale credit only where a work employs
+it — the works, not the crowd.** Each work a region holds employs a stated number of heads, authored
+on its row of the works table, and the centre-scale input counts the region's urban heads up to what
+its works employ; the heads beyond them are a crowd and earn nothing. So points follow the works a
+city built, and the stream's pull, which reads points, draws people toward work rather than toward a
+crowd. Without it the stream moved people in proportion to the urban heads a city already had and
+then paid them scale credit for arriving, and the points read headcount by another name. **A polity that holds no town converts nothing (Ben, 2026-09-19, NR-901):** there is
 nowhere for its works to stand, so its treasury keeps the round's share rather than paying for
 points on townless ground that no campaign centre can receive. **Points on a region whose towns
 were razed are lost with them:** a region earns points only while it holds centres, and if war
@@ -635,6 +644,16 @@ industrialise, and a village emptied below a village's worth is abandoned
 (`../economy/POPULATION.md` § Generation, "Centres follow the heads both ways"), so the 1960 world
 carries far fewer, larger centres than the ages before it left. BL-1137 (industrial urbanisation)
 owns the build.
+
+**SETTLED (Ben, 2026-09-27, NR-958): the stream conserves.** A migrant carries its food with it:
+whatever carrying capacity a destination gains, its source loses, so a move never creates capacity
+and an emptied village does not regrow. Only the heads a region's own farmland feeds bear children.
+A sack never lowers a region's ceiling: the heads its walls can no longer hold scatter into the same
+region's countryside, and the razing is counted in the heads lost. People move only along a held
+corridor whose line between the two centres stays on land; a centre anchored on a shore or a lake
+still joins it. **The stream's rate is a chosen number, and Ben sets it from a ladder (2026-09-27)**
+— the share of a strained countryside that moves each year, read at several rungs for urban share,
+centres and points before one is set.
 
 **PROPOSED: migration moves people and culture shares along a line, toward work.** Two streams on
 one rule:

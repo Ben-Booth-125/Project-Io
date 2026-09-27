@@ -7257,23 +7257,23 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: sea_lane_stamp_harness realised-discount rows (straight and diagonal)"
      ],
      "requirement": "A laid lane discounts traversal x0.50 on every bearing, which the harness asserts and was shown to fail on the eight-way walker.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "sea chain review fixes 04a58f0c, merged e5be22bf: the walk is four-cardinal; S4 fails on the eight-way walker at 0.750 (37.50 vs 50.00) and passes at 0.500 (25.00); lanes earned 468 -> 493, laid 352 -> 371, unreachable 6 -> 6."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: ocean_currents_harness weight-0 vs weight-500 row"
      ],
      "requirement": "The current price moves the sim, asserted, not only printed.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "ocean_currents_harness W5: the weight-500 sea-leg record differs from still water; the campaign call site prices hub -> target (192 = 192)."
     },
     {
      "id": "R4",
@@ -7434,13 +7434,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold)"
      ],
      "requirement": "A cold review: whether the population rise is the stream's consequence or a double count, and whether points have become headcount by another name (INDUSTRIALISATION.md § 1).",
      "notes": "Cold review 2026-09-26: DO NOT MERGE as built. The stream adds each migrant to the destination ceiling (capacity created: the population rise); a sack clamps the ceiling and deletes ~40% of a sacked city silently; a razing above 320,000 heads is not recorded; the new rules asserted only in prose; points left behind never retried. It had been merged (b591d1e9) before the review returned; reverted on main (8cbdbc9d). Rebuild in the centres lane under NR-958.",
-     "result_metric": ""
+     "result_metric": "Rebuild dccf7e05 + fixes d79e0c81 on the lane branch: the cold review found no conservation bug; census C13 gates carried capacity summing to 0 and farm-fed within its ceiling on all 16 seeds (it fails all 16 on the first build: 7.2B heads of ceiling created); the close retry skips only a ruin; the real water test exercised; R2 at the real sack; a direct cut proportional (remove_region_people); overflow bound 2^30. Centres 22,521 -> 20,922 (-7.1%), carved -17.6%, urban share 67.4%, population 6.077B -> 6.045B. NOT MERGED: Beat 2 wants far fewer centres; R4 is Ben's."
     },
     {
      "id": "R4",
@@ -7449,6 +7449,124 @@
       "decision: Ben, on the population, urban share and points readings"
      ],
      "requirement": "Ben reads the stream's consequences before the re-bless names it.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "far-pairs-across-water",
+   "title": "BL-1142 - Far realms across water meet by sea and bind in the Industrialisation span, and a leg against its current delivers less",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1142 - sprint 48 (Ben, the density-and-trade form 2026-09-26: \"intercontinental: both\")",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: ocean_currents_harness W9, C7-C10, F1-F5 on the 16 seeds"
+     ],
+     "requirement": "Realms on different landmasses meet when a trade by sea is open (the seller's navy, two ports, the sea line) and far pairs across water read their own penalty; the class is fixed at first contact.",
+     "notes": "",
+     "result_metric": "Lane 1a00072e + a5d20a1a: cross-water pairs bound 53 -> ~538 at 1960, far 518 at penalty 0; the seat-move break fixed; every new row fails when its line is broken."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: ocean_currents_harness C7, C8, W10"
+     ],
+     "requirement": "A leg against its current delivers less, only on the sea line; an out-of-range loss is rejected, never clamped.",
+     "notes": "",
+     "result_metric": "Loss 500: 0.86% of Industrialisation trade across water; the Exploration span loses none (its against-current trade has a road at least as wide)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism twice, history_sim_harness, exploration_sim_harness, world_cursor_equivalence on main"
+     ],
+     "requirement": "Deterministic on main; only the known failures.",
+     "notes": "",
+     "result_metric": "Main e5be22bf: world_determinism ALL PASS twice at DE356678C6844F9D (seedB 00DE77E01E029591, prehistory-off 69277979DF8A52E9 unmoved); save_roundtrip OK; ocean_currents_harness, sea_lane_stamp_harness, world_cursor_equivalence ALL PASS; history_sim_harness only R3a2/R3a3; exploration_sim_harness only R3b/R3d.1."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review of the change, fix round included.",
+     "notes": "",
+     "result_metric": "2026-09-26: no crash or determinism break; the stale ladder, the seat-move break, loss on road-carried trade, meeting without the seller's navy, a clamp and vacuous rows -- all fixed in a5d20a1a."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "decision: NR-959"
+     ],
+     "requirement": "Ben sets the sea far-penalty and the loss weight from the re-run ladder.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "naval-points-carry-over",
+   "title": "BL-1147 - Empires earn naval points at sea, and carry them into the Exploration age as a starting fleet",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1147 - sprint 48 (Ben, the naval carry-over form 2026-09-26)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: ocean_currents_harness N1-N8 on the 16 seeds"
+     ],
+     "requirement": "A polity's ledger counts the three deeds in the Empires round only and opens its fleet from its own points; a lost coast keeps its sailors, a dead polity carries nothing.",
+     "notes": "",
+     "result_metric": "Lane 7fb62ee7: 1,665 living polities at 1200, 4.84M province-years / 7,819 crossings / 230 techs, weights 1 / 600 / 20,000 (about a third each)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism twice on main"
+     ],
+     "requirement": "At a conversion of 0 the world is byte-identical.",
+     "notes": "",
+     "result_metric": "Main 5f734c76: DE91F01AAAD0473E both runs, equal to the sea-trade commit alone; history_sim_harness R3a2/R3a3, exploration_sim_harness R3b/R3d.1 only; ocean_currents, sea_lane_stamp, world_cursor_equivalence ALL PASS."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review, fix round included.",
+     "notes": "",
+     "result_metric": "Fix round 99b86768, merged 572a0afb: wet corridors are not roads (history_corridor::wet), the coastal deed reads the terrain (weights 1/280/9,600), the conversion guarded by a span flag (N9), the census reads by_sea, construction rows labelled. Main: world_determinism ALL PASS twice at 0C8A42270888B95C; ocean_currents, sea_lane_stamp, world_cursor_equivalence ALL PASS; only the known four failures."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "decision: NR-961"
+     ],
+     "requirement": "Ben rules whether a fleet gates crossings and sets the rung.",
      "notes": "",
      "result_metric": ""
     }

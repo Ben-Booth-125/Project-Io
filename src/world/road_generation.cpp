@@ -1047,48 +1047,43 @@ std::vector<int> sea_lane_walk(const std::vector<std::uint8_t>& sea, int gw, int
         if (u == to)
             break;
         const int uc = u % gw, ur = u / gw;
-        for (int dr = -1; dr <= 1; ++dr)
+        // FOUR CARDINAL STEPS, columns wrapping and rows not -- the pathfinder's own
+        // grid (logistics.cpp, LOGISTICS.md sec 2). A lane walked eight ways leaves
+        // no two laned tiles side by side on a diagonal, so a four-way traveller
+        // rides it at about x0.75 instead of x0.50; walked on the traveller's grid,
+        // every step of the lane is a step the traveller can take.
+        constexpr int kStepDc[4] = { 0, 0, -1, 1 };
+        constexpr int kStepDr[4] = { -1, 1, 0, 0 };
+        for (int k4 = 0; k4 < 4; ++k4)
         {
+            const int dc = kStepDc[k4], dr = kStepDr[k4];
             const int vr = ur + dr;
             if (vr < 0 || vr >= gh)
                 continue; // rows do not wrap
-            for (int dc = -1; dc <= 1; ++dc)
+            const int vc = ((uc + dc) % gw + gw) % gw;
+            const int v = vr * gw + vc;
+            if (!sea[static_cast<std::size_t>(v)])
+                continue; // water only
+            constexpr int64_t len = 1000;
+            int64_t step = len;
+            if (priced)
             {
-                if (dc == 0 && dr == 0)
-                    continue;
-                const int vc = ((uc + dc) % gw + gw) % gw;
-                const int v = vr * gw + vc;
-                if (!sea[static_cast<std::size_t>(v)])
-                    continue; // water only
-                if (dc != 0 && dr != 0)
-                {
-                    // Never through a land corner: one orthogonal neighbour must be sea.
-                    const int side_a = ur * gw + vc;
-                    const int side_b = vr * gw + uc;
-                    if (!sea[static_cast<std::size_t>(side_a)] && !sea[static_cast<std::size_t>(side_b)])
-                        continue;
-                }
-                const int64_t len = (dc != 0 && dr != 0) ? 1414 : 1000;
-                int64_t step = len;
-                if (priced)
-                {
-                    // The step's direction (east = dc, north = -dr) against the entered
-                    // tile's ocean-region current, per mille of a full current along it.
-                    const std::size_t k = static_cast<std::size_t>(currents->region_of(vc, vr));
-                    const int64_t dot = static_cast<int64_t>(currents->east_q[k]) * dc
-                                      + static_cast<int64_t>(currents->north_q[k]) * (-dr);
-                    const int align = static_cast<int>(std::clamp<int64_t>((dot * 1000) / len, -1000, 1000));
-                    step = (len * ocean_current_leg_cost_q(weight_q, align)) / 1000;
-                    if (step < 1)
-                        step = 1; // no step is ever free
-                }
-                const int64_t cand = dist[static_cast<std::size_t>(u)] + step;
-                if (cand < dist[static_cast<std::size_t>(v)])
-                {
-                    dist[static_cast<std::size_t>(v)] = cand;
-                    prev[static_cast<std::size_t>(v)] = u;
-                    frontier.push({cand, v});
-                }
+                // The step's direction (east = dc, north = -dr) against the entered
+                // tile's ocean-region current, per mille of a full current along it.
+                const std::size_t k = static_cast<std::size_t>(currents->region_of(vc, vr));
+                const int64_t dot = static_cast<int64_t>(currents->east_q[k]) * dc
+                                  + static_cast<int64_t>(currents->north_q[k]) * (-dr);
+                const int align = static_cast<int>(std::clamp<int64_t>(dot, -1000, 1000));
+                step = (len * ocean_current_leg_cost_q(weight_q, align)) / 1000;
+                if (step < 1)
+                    step = 1; // no step is ever free
+            }
+            const int64_t cand = dist[static_cast<std::size_t>(u)] + step;
+            if (cand < dist[static_cast<std::size_t>(v)])
+            {
+                dist[static_cast<std::size_t>(v)] = cand;
+                prev[static_cast<std::size_t>(v)] = u;
+                frontier.push({cand, v});
             }
         }
     }
