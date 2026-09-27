@@ -1486,6 +1486,27 @@
     "tools/verify/spawn_solvency.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-964",
+   "title": "CALL: should a treasury's share of industry points spread by employed heads, now that scale credit does?",
+   "raised": "2026-09-27",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1149 (scale credit from the works), its lane report and cold review, 2026-09-27",
+   "what": "NR-897 spreads a treasury's share of industry points over its realm's centre-holding regions by urban heads. BL-1149 made scale credit read only the heads a work employs (min(urban heads, employed)); the treasury half still reads urban heads (history_sim.cpp ~10344-10348), so part of every region's points still follows the crowd. On the lane's reading 94% of 1960 urban heads are employed by no work.",
+   "why_it_matters": "Whether all industry points follow the works, or the treasury still builds where the people are.",
+   "options": [
+    "A: spread by employed heads, so every point follows the works",
+    "B: keep urban heads (a treasury builds where its people are)",
+    "C: other"
+   ],
+   "recommendation": "A: one rule for both halves of the points; read after BL-1155 (every centre a work candidate) raises the employed share.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/INDUSTRIALISATION.md"
+   ],
+   "resolution": null
   }
  ]
 }

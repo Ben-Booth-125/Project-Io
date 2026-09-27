@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*67 entries — 2 open, 65 resolved.*
+*68 entries — 3 open, 65 resolved.*
 
 ---
 
@@ -61,6 +61,21 @@ spawn_solvency R4 ('the field still fields a standing force') reads 0 rival unit
 > **Recommendation:** A: it is the doc as written and restores conflict from the first tick; the seat's opt-out stays, so BL-635's cause does not return for the player. It costs rival solvency (upkeep was the dominant outgoing when armed) -- read that before it ships.
 
 *Files: `src/world/corporation_generation.cpp`, `src/world/corporation_generation.hpp`, `src/world/corp_ai.cpp`, `docs/military/MILITARY.md`, `tools/verify/spawn_solvency.cpp`*
+
+### NR-964 — CALL: should a treasury's share of industry points spread by employed heads, now that scale credit does?
+*question · raised 2026-09-27 · from BL-1149 (scale credit from the works), its lane report and cold review, 2026-09-27*
+
+NR-897 spreads a treasury's share of industry points over its realm's centre-holding regions by urban heads. BL-1149 made scale credit read only the heads a work employs (min(urban heads, employed)); the treasury half still reads urban heads (history_sim.cpp ~10344-10348), so part of every region's points still follows the crowd. On the lane's reading 94% of 1960 urban heads are employed by no work.
+
+**Why it matters.** Whether all industry points follow the works, or the treasury still builds where the people are.
+
+- A: spread by employed heads, so every point follows the works
+- B: keep urban heads (a treasury builds where its people are)
+- C: other
+
+> **Recommendation:** A: one rule for both halves of the points; read after BL-1155 (every centre a work candidate) raises the employed share.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`*
 
 ---
 
