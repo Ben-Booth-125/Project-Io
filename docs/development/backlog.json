@@ -1103,9 +1103,11 @@
     "src/world/province.cpp",
     "src/world/corp_command.cpp",
     "src/world/world_save.cpp",
-    "tools/verify/econ_harness.cpp"
+    "tools/verify/econ_harness.cpp",
+    "src/world/province.hpp",
+    "src/world/battle_system.cpp"
    ],
-   "design": "OVERTURNED (Ben, 2026-09-26, the review form, NR-948): in play an abandoned centre is DELETED and its province merges into the adjacent province of its own nation whose centre is nearest (the BL-1133 join, at runtime); only a province with no such neighbour keeps its centre as a ruin at the razed tier (NR-952). THE WORK now: the runtime decline check abandons a centre below a village's worth; the province join at runtime moves ownership records, provinces, anchors, any buildings on the centre's tile and the map's province lens consistently; a save round-trips it. Heavier than the ruin reading: it touches the province partition in play, so it waits for BL-1133 and slips first.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form). POPULATION.md § Growth, decline and razing states it: play follows the history's abandonment rule. DELEGATED READING (NR-948): in play an abandoned centre drops to the existing RAZED tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle) rather than vanishing, because a centre is its province's capture anchor. THE WORK: the runtime decline check (the ordinary growth pass) demotes a centre below a village's worth to razed; no province loses its anchor; a save round-trips it. The last item in the sprint's order; the first to slip if the wave runs long. Not a generation world-mover (play only), but it moves every settled world whose centres decline in the settle -- measure the settle digests."
+   "design": "AMENDED (Ben, 2026-09-27, NR-952): NO RUIN FALLBACK. An abandoned centre is always deleted; a province with no same-nation neighbour stands without a centre, held by its recorded holder and taken by a battle decided on it. A province's id is RECORDED for its life once generation ends (PROVINCES.md § Two contracts), not derived from its lowest member tile, because the runtime merge would otherwise renumber provinces under battle records, march orders, province_holder's positional alignment and saves (province.hpp ~388-392 states the derived id is safe only because borders move in generation). THE WORK adds: the id recorded at generation's end and saved; the merge keeps the surviving province's id and removes the other in order; every reader of a province's centre (the holder derivation, BL-1145's front-tile readers, the province lens, selection) handles a centreless province. A save round-trips a merge and a centreless province.\n\nOVERTURNED (Ben, 2026-09-26, the review form, NR-948): in play an abandoned centre is DELETED and its province merges into the adjacent province of its own nation whose centre is nearest (the BL-1133 join, at runtime); only a province with no such neighbour keeps its centre as a ruin at the razed tier (NR-952). THE WORK now: the runtime decline check abandons a centre below a village's worth; the province join at runtime moves ownership records, provinces, anchors, any buildings on the centre's tile and the map's province lens consistently; a save round-trips it. Heavier than the ruin reading: it touches the province partition in play, so it waits for BL-1133 and slips first.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form). POPULATION.md § Growth, decline and razing states it: play follows the history's abandonment rule. DELEGATED READING (NR-948): in play an abandoned centre drops to the existing RAZED tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle) rather than vanishing, because a centre is its province's capture anchor. THE WORK: the runtime decline check (the ordinary growth pass) demotes a centre below a village's worth to razed; no province loses its anchor; a save round-trips it. The last item in the sprint's order; the first to slip if the wave runs long. Not a generation world-mover (play only), but it moves every settled world whose centres decline in the settle -- measure the settle digests."
   },
   {
    "status": "designed",
@@ -1432,6 +1434,28 @@
     "tools/verify/ocean_currents_harness.cpp"
    ],
    "design": "SETTLED (Ben, 2026-09-27, NR-961): EXPLORATION.md, the SETTLED paragraph under the stocks table; MILITARY_HISTORY.md carries a pointer. Spans: Exploration and Industrialisation (the Empires round keeps the band gate). (1) CAPACITY: a campaign that crosses water carries no more of its army than the fleet staged from its hub's port lifts (men per hull, one named constant). (2) DEFENDERS: the target realm and its mutual-defence partners (treaty_clause::mutual_defence). (3) REACH: a fleet's power falls with sea distance from its own ports, halving over a fixed run of sea tiles (one named constant), the distance priced by the currents. (4) STOPPED: where anywhere on the crossing's sea leg the defenders' projected power outweighs the attacker's fleet there, the crossing never sails; the attacker keeps army and fleet; the round's campaign is lost. MEASURE FIRST: crossings per span, their hubs' ports, the attacker's fleet at launch, mutual-defence pairs, how often a target has a defending fleet in reach; then build; then read both constants on ladders and the BL-1147 conversion again. Ben sets all three."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-09-27",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1153",
+   "short_name": "LANE_PORT_AT_COASTAL_SEAT",
+   "author": "Claude (sprint 48, NR-955 ruled B, 2026-09-27)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "A realm's sea lane starts at its nearest coastal region's seat, so a seat with no sea in reach still lays its lane",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/road_generation.cpp",
+    "tools/verify/sea_lane_stamp_harness.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-27, NR-955 B): LOGISTICS.md § 4b, 'A realm's port is its nearest coastal region's seat'. Today a seat's port is its nearest sea tile within nine tiles, and a seat with none lays no lane (about a quarter of earned lanes unlaid: 371 of 493 after the four-way walk). THE WORK: where a seat has no sea within nine tiles, its lane end moves to the nearest region of the same realm that has one (nearest by the same measure the sim uses; ties to the lower region), and starts at that seat's nearest sea tile. Report earned / laid / unlaid lanes before and after, and the walker's cost. E (a port facing the partner) was NOT taken. Find the port picker first (sea_lane_port; the file list is a guess)."
   }
  ]
 }

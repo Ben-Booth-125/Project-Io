@@ -317,7 +317,10 @@ the columns wrapping. A lane is laid only where a convoy can follow it tile to t
 is the same whatever its bearing; a diagonal walk would leave every other step on open water and
 the pathfinder could not ride it. A lane goes round a headland rather than across it. Each step is priced by its length
 and by the current it runs with or against (`EXPLORATION.md` § Currents), so a lane bends along the
-current. A seat's port is its nearest sea tile within the sim's neighbour radius (nine tiles). The
+current. **A realm's port is its nearest coastal region's seat (Ben, 2026-09-27, NR-955):** a seat
+with no sea within the sim's neighbour radius (nine tiles) lays its lane from the nearest region of
+its realm that has one, rather than laying none, and the lane starts at that seat's nearest sea
+tile. The
 lane record carries no direction, so the walk runs toward the busier end — the seat more lanes
 touch — as the old-road stamp does (§ 4a), which is where tribute and trade flow (delegated
 readings, NR-955). A laned sea tile's traversal cost is **halved** (× 0.50): the lane is the road

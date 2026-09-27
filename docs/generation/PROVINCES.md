@@ -114,7 +114,10 @@ provinces rather than of thousands of villages founded on empty ground.
    demography), dense enough that every province seeds from a centre of *some* scale; the
    centre is the province's **political decider** — its nation is the province's nation, and
    under BL-567 (province is the conquest unit) taking the centre takes the province, making
-   every anchor a strategic objective. *Superseded original ruling, kept for the record:*
+   every anchor a strategic objective. In play a province can outlive its centre (Ben, 2026-09-27,
+   NR-952): an abandoned centre with no neighbour of its nation to merge into leaves its province
+   standing without one, held and taken through its recorded holder. *Superseded original ruling,
+   kept for the record:*
    country no centre reaches became hinterland, seeded from the least-accessible tile.
 4. **Size is not clamped.** *"Don't reject tiny provinces"* — nothing is merged away to satisfy a
    floor, **boundaries win ties**, and on settled land nothing stops the fill before the land is
@@ -351,11 +354,16 @@ gets an order that does not depend on container internals, tile-map iteration or
 bodies were created in. The id is the province's **lowest-id member tile** — derived, never
 allocated, so ascending id order is ascending lowest-member-tile order and an id cannot be
 handed out in the wrong order. **Province id 0 is a real province**, so any seam needing a
-sentinel must not use zero (NR-412).
+sentinel must not use zero (NR-412). **In play the id is recorded, not derived (Ben, 2026-09-27,
+NR-952):** the id a province carries when generation ends is kept for its life, so the merge an
+abandoned centre makes in play (`POPULATION.md` § Growth, decline and razing) keeps the surviving
+province's id, and a province that loses its centre keeps its own. Ids stay in ascending order,
+because a merge only removes one.
 
 **2. The partition is part of world generation and versions with it.** It is **never patched in
 place**: a change to the algorithm re-rolls every battle in every world, so partition fixtures do
-not survive a repartition, and that is correct rather than a defect (NR-422).
+not survive a repartition, and that is correct rather than a defect (NR-422). A merge in play is
+not a patch to the partition: it is a play event over recorded ids, and it re-rolls nothing.
 
 ### Storage and determinism
 

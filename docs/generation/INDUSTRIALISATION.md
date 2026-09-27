@@ -679,7 +679,10 @@ inheriting a treaty graph that never reached past the old neighbourhood. Explora
 revisited for it. **Far pairs bind across water, not only across a border (Ben, 2026-09-26;
 BL-1142, far pairs across water):** the binding reaches realms on other landmasses, so the
 inter-continental trade the sea lanes carry is common rather than a handful of pairs — seven realm
-pairs on six of sixteen curated worlds before it.
+pairs on six of sixteen curated worlds before it. **A far pair across water reads a penalty of 300
+against a land pair's 700 (Ben, 2026-09-27, NR-959):** 300 sits where the pair's own aggression,
+grudges and trade decide whether it binds, so the number does not choose the count, and distance
+still reads across water. A leg against the current delivers less, at the current's own weight (500).
 
 **Migration carries culture.** A stream moves culture shares into its destination centre, so a
 destination becomes mixed while its countryside stays plain. **This is what produces property 4's
