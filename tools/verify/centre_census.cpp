@@ -248,6 +248,24 @@ int64_t employed_heads_of(const W& works, lua_state& lua, uint32_t mask)
     }
 }
 
+/// BL-1149 (the review fix): the Industrialisation span's scale credit, heads
+/// moved and inert rounds off the report, where the tree records them; -1 where
+/// it does not (a tree before the fix), so the census still builds there.
+struct span_industry { int64_t from_scale = -1, moved = -1, inert_rounds = -1; };
+template <typename G>
+span_industry span_industry_of(const G& rep)
+{
+    span_industry s;
+    if constexpr (requires { rep.industrialisation_points_from_scale; rep.industrialisation_stream_moved;
+                             rep.industrialisation_scale_inert_rounds; })
+    {
+        s.from_scale   = rep.industrialisation_points_from_scale;
+        s.moved        = rep.industrialisation_stream_moved;
+        s.inert_rounds = rep.industrialisation_scale_inert_rounds;
+    }
+    return s;
+}
+
 /// Spearman's rho over paired samples, ties at their mean rank. 0 on fewer
 /// than two samples or a constant side.
 double spearman(const std::vector<int64_t>& a, const std::vector<int64_t>& b)
@@ -331,6 +349,15 @@ struct seed_record
     int     receiving = 0;             ///< regions holding any
     double  migrants_top_decile = 0.0; ///< share held by the top tenth of receiving regions
     double  migrants_to_worked = 0.0;  ///< share on the top tenth of centred regions by employed heads
+    // BL-1149 review fix — THE WIRING, ASSERTED (FAIL rows). With the works
+    // table loaded, a world whose held works employ anyone must have earned
+    // scale credit and moved heads; and the span must never have run inert.
+    int64_t span_from_scale = -1;      ///< the span's scale credit (-1: not recorded by this tree)
+    int64_t span_moved = -1;           ///< heads the stream moved (-1: not recorded)
+    int64_t span_inert_rounds = -1;    ///< rounds run with no works table (-1: not recorded)
+    int64_t held_employed = 0;         ///< heads the works of HELD regions employ
+    int     works_rows = 0;            ///< rows in the loaded works table
+    bool    wiring_ok = true;
     int     max_region_centres = 0, at_limit = 0;
     int     region_centre_hist[6] = {}; // 0, 1, 2-4, 5-9, 10-19, 20+
 
@@ -557,6 +584,21 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
     }
 
     // --- BL-1149: the works and the points ----------------------------------
+    {
+        const span_industry si = span_industry_of(out.report);
+        r.span_from_scale   = si.from_scale;
+        r.span_moved        = si.moved;
+        r.span_inert_rounds = si.inert_rounds;
+        r.works_rows        = static_cast<int>(out.works.size());
+        for (const region& p : ss.regions)
+            if (p.nation >= 0 && p.population > 0)
+                r.held_employed += employed_heads_of(out.works, lua, p.works_built);
+        // Recorded by this tree: the table is loaded and some held work employs,
+        // so the span must have earned scale credit, moved heads, and never run
+        // inert. A world whose call site dropped the table fails here.
+        if (si.from_scale >= 0 && r.works_rows > 0 && r.held_employed > 0)
+            r.wiring_ok = si.from_scale > 0 && si.moved > 0 && si.inert_rounds == 0;
+    }
     {
         std::vector<int64_t> pts, urb, emp;
         std::vector<std::pair<int64_t, int64_t>> by_employed; // (employed, migrants) on centred regions
@@ -1164,9 +1206,10 @@ int main(int argc, char** argv)
 
     // BL-1149 (scale credit from the works; INDUSTRIALISATION.md sec 1, "a head
     // earns scale credit only where a work employs it"). Readings, never gated.
-    std::printf("\n=== C14 the works and the points (BL-1149; readings, not gated) ===\n");
+    std::printf("\n=== C14 the works and the points (BL-1149; readings, and the wiring FAIL row) ===\n");
     std::printf("seed  points_close  rho_set  rho(p,urban)  rho(p,employed) | urban_centred  employed  "
-                "employed%% | migrants  receiving  top_decile%%  to_top_worked%%\n");
+                "employed%% | migrants  receiving  top_decile%%  to_top_worked%% | span: from_scale  "
+                "moved  inert_rounds  held_employed  wiring\n");
     for (const seed_record& r : recs)
     {
         char mig[24] = "n/a", top[16] = "n/a", worked[16] = "n/a";
@@ -1177,10 +1220,14 @@ int main(int argc, char** argv)
             std::snprintf(worked, sizeof worked, "%.1f", 100.0 * r.migrants_to_worked);
         }
         std::printf("%4u  %12" PRId64 "  %7d  %12.3f  %15.3f | %13" PRId64 "  %8" PRId64 "  %9.1f | "
-                    "%8s  %9d  %11s  %14s\n",
+                    "%8s  %9d  %11s  %14s | %16" PRId64 "  %10" PRId64 "  %12" PRId64 "  %13" PRId64 "  %s\n",
                     r.seed, r.points_close, r.rho_regions, r.rho_points_urban, r.rho_points_employed,
                     r.heads_urban_centred, r.heads_employed, pct(r.heads_employed, r.heads_urban_centred),
-                    mig, r.receiving, top, worked);
+                    mig, r.receiving, top, worked, r.span_from_scale, r.span_moved, r.span_inert_rounds,
+                    r.held_employed, r.span_from_scale < 0 ? "n/a" : r.wiring_ok ? "ok" : "FAIL");
+        if (r.span_inert_rounds > 0)
+            std::printf("      seed %u: Industrialisation scale credit inert: no works table (%" PRId64
+                        " rounds)\n", r.seed, r.span_inert_rounds);
     }
 
     // Pooled.
@@ -1196,6 +1243,7 @@ int main(int argc, char** argv)
         if (!r.cap_ok) ++fails;
         if (!r.spacing_ok) ++fails;
         if (!r.ledger_ok) ++fails;
+        if (!r.wiring_ok) ++fails;
     }
     // POPULATION.md § Generation: "a 1960 world aims at roughly 500 centres" --
     // an aim the forces are calibrated against, never a count any rule
@@ -1234,6 +1282,12 @@ int main(int argc, char** argv)
                         "sim-founded member (%d on one tile)\n",
                         r.seed, r.close_pairs_sim, generation_settle_spacing_tiles,
                         r.close_pairs_stacked);
+        if (!r.wiring_ok)
+            std::printf("FAIL  seed %u: the works table is loaded (%d rows) and held works employ %" PRId64
+                        " heads, but the span earned %" PRId64 " points by scale, moved %" PRId64
+                        " heads and ran %" PRId64 " rounds inert -- the table did not reach the accrual\n",
+                        r.seed, r.works_rows, r.held_employed, r.span_from_scale, r.span_moved,
+                        r.span_inert_rounds);
         if (!r.ledger_ok)
             std::printf("FAIL  seed %u: the conservation ledger breaks -- the stream moved a net "
                         "%" PRId64 " heads of ceiling into being; %d regions over their farm-fed "
@@ -1242,8 +1296,8 @@ int main(int argc, char** argv)
                         r.seed, r.ledger_carried_sum, r.ledger_farm_over, r.ledger_farm_negative,
                         r.ledger_ind_over_urban, r.ledger_urban_over_pop);
     }
-    std::printf("\n%s\n", fails == 0 ? "centre_census: OK (the cap, the spacing and the conservation ledger hold; "
-                                       "no density is asserted)"
+    std::printf("\n%s\n", fails == 0 ? "centre_census: OK (the cap, the spacing, the conservation ledger and the "
+                                       "works wiring hold; no density is asserted)"
                                      : "centre_census: FAIL (see the FAIL rows)");
     return fails == 0 ? 0 : 1;
 }

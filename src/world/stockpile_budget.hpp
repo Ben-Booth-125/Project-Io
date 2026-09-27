@@ -73,7 +73,8 @@ enum class stockpile_unspent_reason : std::uint8_t
     carve_dropped    = 0, ///< its slot's carved centre was never founded: the body was built out
     carve_no_tile    = 1, ///< its slot's carved centre resolved to no tile (defensive; unreached)
     razed            = 2, ///< the region carved no centre because history razed its towns
-                          ///< (`centres_razed` > 0): the works went with the towns (NR-901)
+                          ///< (`centres_razed` > 0): the points went with the towns (NR-901;
+                          ///< the works themselves stand, Ben 2026-09-27)
     no_carved_centre = 3, ///< RESIDUAL: the region carved no centre and records no razing
     rejected         = 4, ///< the whole budget was REJECTED (a domain violation or an
                           ///< inconsistent world; see `rejection`)

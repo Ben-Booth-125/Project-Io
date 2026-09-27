@@ -851,6 +851,16 @@ struct generation_report
     int64_t industrialisation_battles   = 0; ///< Battles fought in that span.
     int64_t industrialisation_conquests = 0; ///< Regions that changed hands.
     int64_t industrialisation_foundings = 0; ///< Regions founded in that span.
+    /// BL-1149 (the review fix) — the span's INDUSTRY and MIGRATION, read off the
+    /// same run: points credited by scale, heads the urbanisation stream moved,
+    /// and the decision rounds the scale accrual ran with NO works table (with
+    /// none, no work stands, no region earns scale credit and the stream moves
+    /// no one — inert, and said so here and on stderr). NOT SAVED, on the
+    /// footing `grudge_sentiment_rows` is: a generation-time reading for the
+    /// build that made it; a loaded game's report carries them zero.
+    int64_t industrialisation_points_from_scale = 0;
+    int64_t industrialisation_stream_moved      = 0;
+    int64_t industrialisation_scale_inert_rounds = 0;
 
     // --- What the grudge record seeded (BL-898) -----------------------------
     //

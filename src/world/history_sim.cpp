@@ -2573,8 +2573,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // cell's ground taken by a newer founding, or its people gone — hands the
     // industry points it earned to the NEAREST centre of the same realm
     // (`region_distance`, ties to the lower region index), so none vanish. A
-    // sack keeps its points on the ruin: NR-901, "the works went with the
-    // towns", stays the budget's razed reason. Nothing moves where the region
+    // sack keeps its points on the ruin: NR-901, "the points went with the
+    // towns" (the works themselves stand, Ben 2026-09-27), stays the budget's
+    // razed reason. Nothing moves where the region
     // is held by no realm, where the realm stands no other centre, or where the
     // receiving stock would pass `industry_points_ceiling` (refused, never
     // clamped) — each of those stays on the region, and the close's budget
@@ -4687,6 +4688,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const industry_points_round pr =
                     accrue_industry_points(ss.regions, out.polities, params, step_years, works);
                 out.industry_points_from_scale += pr.credited;
+                if (works == nullptr) ++out.industry_scale_inert_rounds; // BL-1149: said, not silent
                 out.industry_points_refused    += pr.refused;
 
                 // ---- BL-1099: WORKS CHARTERED, A RECORD-ONLY NOTE ------------
@@ -4811,6 +4813,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const urbanisation_round ur = run_urbanisation_stream(
                         ss.regions, owner, supply_neighbours,
                         [&](int a, int b) { return stream_lines.joined(ss.regions, a, b); }, credit, step_years);
+                    out.urbanisation_heads_moved += ur.moved;
                     for (const int d : ur.destinations)
                         if (relay_rebate_of(ss.regions[static_cast<std::size_t>(d)])
                             != rebate_before[static_cast<std::size_t>(d)])

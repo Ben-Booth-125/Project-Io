@@ -533,12 +533,13 @@ struct history_sim_params
     //                       * industry_points_per_million_urban_heads_year
     //                                                   * step_years / 1000000
     //              * fuel_factor_q / 1000
+    //              * (1000 + industry industrial per-mille) / 1000
     //
     //     employed heads = the heads the region's works employ
     //                      (`works_registry::employed_heads_mask`, BL-1149: the
-    //                      works, not the crowd; Ben 2026-09-27)
-    //              * (1000 + industry industrial per-mille) / 1000
-    //
+    //                      works, not the crowd; Ben 2026-09-27). No works
+    //                      table: none, so no scale credit and no stream
+    //                      (`history_sim_state::industry_scale_inert_rounds`)
     //     fuel_factor_q = floor + (1000 - floor) * fuel_reading_q / 1000
     //     fuel_reading_q = `industry_fuel_reading_q(region)` (the span-open
     //                      survey, or energy_q where nothing was surveyed)
@@ -4586,6 +4587,15 @@ struct history_sim_state
     /// reader can hold the region table to that. Zero off the span.
     int64_t industry_points_from_scale    = 0;
     int64_t industry_points_from_treasury = 0;
+    /// BL-1149 (the review fix): decision rounds the scale accrual ran with NO
+    /// works table. With none, no work stands, so no region earns scale credit
+    /// and the urbanisation stream, which pulls by that credit, moves no one:
+    /// the whole span's migration is inert, and this says so rather than
+    /// leaving a quiet zero. 0 on every run the table was handed to.
+    int64_t industry_scale_inert_rounds   = 0;
+    /// BL-1137: heads the urbanisation stream moved over the run, every round
+    /// summed (`run_urbanisation_stream`). Report-only.
+    int64_t urbanisation_heads_moved      = 0;
     /// ... and the TREASURY UNITS that conversion took out of capitals (the
     /// points above divided by `industry_points_per_treasury_unit`): the
     /// observable for how hard paying in draws on the round's other spend.
@@ -4826,7 +4836,8 @@ bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>
 /// the map stands at the span's close — the handoff made when a settlement
 /// ended can have found nothing then. SKIPPED ONLY WHERE THE POINTS SIT ON A
 /// RUIN: @p on_ruin[i] != 0 when the event that last ended region i's
-/// settlement was a SACK (NR-901, the works went with the towns). A razing in
+/// settlement was a SACK (NR-901: the points went with the towns; the works
+/// themselves stand, Ben 2026-09-27). A razing in
 /// a region's PAST is not a ruin — every conquest sacks, so "ever razed" is
 /// near "ever conquered" (the rebuild's review, 2026-09-26): a region sacked
 /// in one century whose settlement survived, and ended by ground loss in

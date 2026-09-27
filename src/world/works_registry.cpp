@@ -4,6 +4,8 @@
 
 #include <sol/sol.hpp>
 
+#include <cmath>
+#include <cstdio>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -19,7 +21,8 @@
 // typo'd band, a row that does nothing, a duplicated name or a reach work no
 // ground can gate would all now be runtime data rather than a build error. So
 // the loader re-imposes what the compiler used to, and throws on the way in.
-// A bad edit to works.lua fails loudly at startup instead of quietly producing
+// A bad edit to works.lua fails loudly when the table is first loaded — at the
+// first world build (app::ensure_works_loaded) — instead of quietly producing
 // a degraded world nobody notices for a month.
 // ---------------------------------------------------------------------------
 
@@ -130,22 +133,29 @@ void works_registry::load_from_lua(lua_state& lua)
         // --- employs (BL-1149): REQUIRED, heads, [0, work_employs_max] -----
         // Required rather than defaulted: every row answers "how many heads
         // does this work employ", and a forgotten row would otherwise read 0
-        // and silently earn its town nothing.
+        // and silently earn its town nothing. Read as a NUMBER and checked as
+        // the value that lands: finite, whole and in range BEFORE the narrowing
+        // cast, so a whole-valued float (20000.0, 2e4) is the whole number it
+        // spells and a fraction, a NaN or an infinity is refused, never rounded.
         {
             const sol::object e = (*row)["employs"];
             if (!e.valid() || e.get_type() == sol::type::lua_nil)
                 throw std::runtime_error(where + " ('" + r.name + "') has no 'employs' -- every "
                                          "work states the heads it employs (0 is a legal answer)");
-            const sol::optional<int64_t> v = e.as<sol::optional<int64_t>>();
-            if (!v || e.get_type() != sol::type::number)
+            const sol::optional<double> d =
+                (e.get_type() == sol::type::number) ? e.as<sol::optional<double>>() : sol::optional<double>{};
+            if (!d || !std::isfinite(*d) || std::floor(*d) != *d)
                 throw std::runtime_error(where + " ('" + r.name + "'): 'employs' is not a whole number");
-            const sol::optional<double> d = e.as<sol::optional<double>>();
-            if (d && static_cast<double>(*v) != *d)
-                throw std::runtime_error(where + " ('" + r.name + "'): 'employs' is not a whole number");
-            if (*v < 0 || *v > work_employs_max)
-                throw std::runtime_error(where + " ('" + r.name + "'): 'employs' " + std::to_string(*v) +
+            if (*d < 0.0 || *d > static_cast<double>(work_employs_max))
+            {
+                // Whole, so printed whole where it fits a long long; beyond that, as %g.
+                char shown[48];
+                if (std::fabs(*d) < 9.0e18) std::snprintf(shown, sizeof shown, "%lld", static_cast<long long>(*d));
+                else                        std::snprintf(shown, sizeof shown, "%g", *d);
+                throw std::runtime_error(where + " ('" + r.name + "'): 'employs' " + shown +
                                          " is outside [0, " + std::to_string(work_employs_max) + "]");
-            r.employs = *v;
+            }
+            r.employs = static_cast<int64_t>(*d);
         }
 
         r.weight = opt_int(*row, "weight");

@@ -232,8 +232,10 @@ int main()
         check(er.employed_heads_mask(0b010) == 0, "R7 a work that employs nobody adds nothing");
         check(er.employed_heads_mask(0b101 | (1u << 17) | (1u << 31)) == 25000,
               "R7 bits past the table are SKIPPED, never read as a neighbouring row");
-        check(32 * work_employs_max < (int64_t{1} << 31),
-              "R7 a full mask at the loader's ceiling stays inside the scale credit's head domain");
+        // A full mask at the loader's ceiling stays inside the scale credit's
+        // head domain: a compile-time fact, so asserted at compile time.
+        static_assert(32 * work_employs_max < (int64_t{1} << 31),
+                      "32 works at work_employs_max must stay under industry_points_urban_heads_max");
     }
 
     std::printf("\n=== %s ===\n", g_fail == 0 ? "ALL PASS" : "FAILURES PRESENT");

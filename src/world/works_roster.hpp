@@ -131,8 +131,8 @@ public:
     /// Validation is the loader's job rather than a harness's, because the data
     /// now lives outside the compiler's reach: an unknown band, a row with no
     /// effect at all, a duplicate name, or a reach-bearing row no ground can
-    /// gate would otherwise produce a quietly degraded world. Failing at
-    /// startup makes a bad edit loud and immediate.
+    /// gate would otherwise produce a quietly degraded world. Failing when the
+    /// table is first loaded (the first world build) makes a bad edit loud.
     ///
     /// @throws std::runtime_error on a Lua error or an invalid table.
     void load_from_lua(lua_state& lua);

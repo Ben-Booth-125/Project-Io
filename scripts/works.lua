@@ -1,6 +1,6 @@
 -- Project Io — works.lua
 -- The Era -1 works table (BL-321): what a polity can BUILD in pre-history.
--- Loaded at startup into the C++ works registry (see src/world/works_roster.hpp
+-- Loaded at the first world build into the C++ works registry (see src/world/works_roster.hpp
 -- and src/world/works_registry.cpp).
 --
 -- Sibling of the unit roster: unit_roster says what a polity can FIELD, this
@@ -30,8 +30,9 @@
 --           scale credit counts its urban heads up to the sum its works employ;
 --           the heads beyond them are a crowd and earn nothing. REQUIRED on
 --           every row (0 is a legal answer: a wall employs nobody once built,
---           its garrison is the army stock). Heads, not per-mille, and not a
---           cost. The magnitudes are authored by judgement:
+--           its garrison is the army stock). A whole number of heads (a
+--           whole-valued float such as 2e4 reads as 20000; a fraction is
+--           refused), not per-mille, and not a cost. The magnitudes are authored by judgement:
 --             * a work that stores, moves or guards employs few (Granary 2,000,
 --               Way Station and Span Bridge 1,000; walls and forts 0);
 --             * a work that makes or trades employs a quarter of a town
@@ -56,8 +57,9 @@
 -- The loader VALIDATES this table and throws on a malformed or incoherent row
 -- (unknown band, no effect at all, duplicate name, an unreachable reach work, a
 -- missing or out-of-range 'employs', a table in which no work employs anyone).
--- That check runs on every startup, so a bad edit here fails loudly and early
--- rather than producing a quietly degraded world.
+-- That check runs when the table is first loaded -- at the first world build, not at
+-- app start -- so a bad edit here fails loudly there rather than producing a quietly
+-- degraded world.
 --
 -- Magnitudes are authored by judgement and are meant to be calibrated against
 -- BL-275's sweep once BL-316's terrain-weighted reach exists to discount.

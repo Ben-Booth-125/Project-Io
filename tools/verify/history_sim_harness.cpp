@@ -1948,7 +1948,7 @@ int main()
         // hands region 3's points on. Region 1 is SACKED to nothing holding
         // points: the sack moves none of them, and the sim records that a sack
         // ended it (`on_ruin`, as `run_history_sim` does at the conquest), so
-        // the retry skips the ruin (NR-901: the works went with the towns).
+        // the retry skips the ruin (NR-901: the points went with the towns).
         //
         // D8 THE REVIEW'S SCENARIO: region 5 was conquered and SACKED long ago
         // (its razings stand in the record) but its settlement survived that;
