@@ -172,6 +172,9 @@ struct generation_cursor
     bool               exploration_ran = false;
     /// The 1660 handoff (BL-956) -- the Industrialisation span's resume struct.
     exploration_output exploration;
+    /// BL-1152 -- the Industrialisation span's fleet ledger at 1960 (the 1660
+    /// one rides in `exploration.fleet`). Empty when the span did not run.
+    fleet_ledger       fleet_1960;
 
     // tail (the history's close)
     /// The close has run (the tail's first act, or a stopped build's ending).

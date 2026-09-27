@@ -337,6 +337,21 @@ void fold_sea_legs(uint64_t& h, const std::vector<sea_leg>& ls)
     }
 }
 
+/// BL-1152: a span's fleet ledger -- the counters and every stop, by content.
+void fold_fleet(uint64_t& h, const fleet_ledger& f)
+{
+    fold_i64(h, f.read); fold_i64(h, f.stopped); fold_i64(h, f.stopped_by_partner);
+    fold_i64(h, f.unlifted); fold_i64(h, f.clipped); fold_i64(h, f.men_ashore);
+    fold_i64(h, f.no_leg); fold_i64(h, f.partners_abstained); fold_i64(h, f.seat_coast_fleets);
+    fold_u32(h, static_cast<uint32_t>(f.stops.size()));
+    for (const crossing_stop& c : f.stops)
+    {
+        fold_i32(h, c.year); fold_u32(h, c.attacker); fold_u32(h, c.realm); fold_u32(h, c.stopper);
+        fold_u32(h, c.region); fold_u32(h, c.hub); fold_i64(h, c.attacker_power); fold_i64(h, c.defender_power);
+        fold_i64(h, c.hub_army); fold_i64(h, c.realm_army); fold_i64(h, c.navy);
+    }
+}
+
 void fold_dated(uint64_t& h, const std::vector<dated_object>& ds)
 {
     fold_u32(h, static_cast<uint32_t>(ds.size()));
@@ -541,6 +556,8 @@ uint64_t cursor_state_digest(const generation_cursor& c)
     fold_dated(h, c.exploration.dated_objects);
     fold_civilisations(h, c.exploration.civilisations);
     fold_creeds(h, c.exploration.universal_creeds);
+    fold_fleet(h, c.exploration.fleet); // BL-1152: the 1660 ledger
+    fold_fleet(h, c.fleet_1960);        // BL-1152: the 1960 ledger
     return h;
 }
 

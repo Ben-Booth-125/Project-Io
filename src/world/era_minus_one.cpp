@@ -440,6 +440,15 @@ history_sim_params exploration_sim_params(const world_params& params)
     hp.naval_points_navy_per_1000   = 0;
     hp.naval_points_convert_at_open = true; // the open where the deeds become fleets
 
+    // BL-1152 -- A FLEET DECIDES WHO CROSSES, in this span and Industrialisation's
+    // (EXPLORATION.md, the SETTLED paragraph under the stocks table; Ben,
+    // 2026-09-27, NR-961). The switch is on; both constants stand at 0 -- no
+    // lift bound, no projection, today's world byte for byte -- pending Ben's
+    // pick off the measured ladders in BL-1152's report.
+    hp.fleet_decides_crossings   = true;
+    hp.fleet_men_per_hull        = 0;
+    hp.fleet_power_halving_tiles = 0;
+
     return hp;
 }
 
