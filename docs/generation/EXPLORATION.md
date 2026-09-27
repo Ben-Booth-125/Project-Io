@@ -462,6 +462,30 @@ Three objects, and each is a stock the treasury maintains:
 | **Navy** | Capital, staged from a port, on top of the fleet its naval points carried | Crossing capacity, and contest of a crossing | Decays; a fleet is a running cost, not a purchase |
 | **Standing army** | Capital, on top of inherited `army_stock` | Force that is *already raised* when a skirmish opens | Falls back toward what muster alone provides |
 
+**SET (Ben, 2026-09-27):** *"Fleets should project power so allies with large fleets stop enemy
+fleets before they move."* A navy's contest of a crossing is **projected**: a fleet's power reaches
+out over the sea from the ports it stages from, and a crossing against a realm meets the power its
+allies project over that sea as well as its own. Where the defenders' projected power outweighs the
+attacker's fleet, the crossing is stopped before it sails.
+
+**SETTLED (Ben, 2026-09-27, NR-961): the fleet decides who crosses, in the Exploration and
+Industrialisation spans.** The Empires round stays gated by the military band alone.
+
+- **A fleet bounds the army it carries.** A campaign that crosses water carries no more of its
+  army than the fleet staged from its hub's port can lift.
+- **The defenders are the target realm and its mutual-defence partners** — the treaty clause under
+  which an attack on one draws the other in.
+- **A fleet's power falls with sea distance from its own ports,** halving over a fixed run of sea
+  tiles, and the distance is priced by the currents, so a fleet reaches less far against them.
+- **A crossing the defenders out-project never sails.** Where, anywhere along its sea leg, the
+  power the defenders project outweighs the attacker's fleet there, the campaign is lost for the
+  round, and the attacker keeps its army and its fleet. Nothing is fought and nothing dies: the
+  crossing is stopped before it moves.
+
+How many men a hull lifts and how far a fleet's power runs before it halves are named constants,
+read on a measured ladder over the curated seeds and set by Ben, never set to hit a count. The
+naval carry-over's conversion is read again once the fleet has this job.
+
 **Decay is what makes the choice a choice.** A purchase the treasury never revisits is a one-time
 score; a stock with upkeep means a polity that over-builds is poorer every round afterwards and a
 polity that under-builds arrives late. That is the pressure the phase wants, and it is a cost in

@@ -279,6 +279,20 @@ slip to sprint 49 from the END of a chain, never the middle.
   49.6 s on seed 0 and 10.9 s on seed 28 under load, against ~18 s after BL-1117 -- a quiet
   re-read is owed with BL-1119 R5 (the 35 s tail) before anything is concluded.
 
+### Wave 3b (opened 2026-09-27, after Ben's density calls and fleet forms)
+
+- **Density:** BL-1149 (scale credit from the works) on the centres lane's branch -> BL-1137's
+  rate ladder (6 / 9 / 12 / 18 per mille) -> Ben picks the rung -> BL-1137 merges. Parallel on
+  main: BL-1150 (a centre's province fill crosses the settled line, NR-954 B; measured first).
+  Then BL-1125 (market folds) on the thinned world, and the chain as above.
+- **Firms:** BL-1146 (the firm cap scales with the centre's rung, NR-960 B). NR-957 ruled B (the
+  carve counts firms and specialists, as built; doc only). After it and BL-1137: BL-1151 (the
+  seat menu re-anchored; not this sprint unless Ben pulls it).
+- **Sea:** BL-1142 and BL-1147 MERGED and gated (572a0afb; carry-over at 0). BL-1152 (fleets
+  project power, NR-961): a fleet bounds its army, the target and its mutual-defence partners
+  project power that falls with distance from their ports, and an out-projected crossing never
+  sails; measured first; then the carry-over ladder again and Ben picks its rung.
+
 Then the one re-bless, each cause named with its own before/after (split it before any cause
 goes unmeasured).
 
