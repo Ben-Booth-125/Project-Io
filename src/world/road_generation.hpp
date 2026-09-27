@@ -291,13 +291,19 @@ void stamp_history_roads(world& w, entity_id body,
 // (the polity holding it at the history's last close). An end held by no realm, or
 // whose realm holds no coastal region at all, still carries no lane, and the leg is
 // counted rather than stamped. The port picked for a seat stays its nearest sea tile;
-// a port facing the partner (NR-955's option E) was not taken.
+// a port facing the partner (NR-955's option E) was not taken. A leg whose two ends
+// land on ONE port tile lays nothing and is counted apart (the ancient road stamp
+// skips a corridor whose two ends are one tile, for the same reason: no water lies
+// between them).
 //
 // DIRECTION: the record carries no direction (`sea_leg` is `a < b`), so the walk is
-// priced TOWARD THE BUSIER END -- the seat more earned lanes touch -- as the ancient
-// road stamp prices its corridors; a tie walks from `a` to `b`. Lanes radiate from
-// metropoles and entrepots, and what a lane carries (tribute, trade) flows to them,
-// so the walk runs the way the cargo does.
+// priced TOWARD THE BUSIER END -- the PORT TILE more walkable lanes land on, counted
+// after the moves -- as the ancient road stamp keys its degree by the tile a road
+// lands on. A tie walks from the lower raster index. The direction is therefore a
+// pure function of the port pair, so one port pair is never walked both ways (which
+// with the current on would lay two different paths). Lanes radiate from metropoles
+// and entrepots, and what a lane carries (tribute, trade) flows to them, so the walk
+// runs the way the cargo does.
 //
 // Deterministic: the legs arrive sorted, the Dijkstra orders its frontier on the pair
 // (cost, raster index), which is unique, and the stamp takes the max per tile, so
@@ -316,10 +322,12 @@ struct sea_lane_stats
 {
     int       earned      = 0; ///< legs at or over the lane tier, both seats on the body
     int       laid        = 0; ///< of them, walked and stamped
-    int       no_port     = 0; ///< an end with no port even from its realm's coast (the two below, summed)
-    int       no_port_unheld   = 0; ///< of them, an end's seat is inland and no realm holds it (or no realms were handed)
+    int       no_port     = 0; ///< an end with no port even from its realm's coast (the three below, summed)
+    int       no_port_no_realms = 0; ///< of them, an end's seat is inland and no realm table reached it (a caller fault)
+    int       no_port_unheld   = 0; ///< of them, an end's seat is inland and no realm holds it
     int       no_port_no_coast = 0; ///< of them, an end's seat is inland and its realm holds no coastal region
-    int       unreachable = 0; ///< both ports found, but no water joins them
+    int       same_port   = 0; ///< both ends' ports are one tile: no water between them, nothing laid
+    int       unreachable = 0; ///< two distinct ports found, but no water joins them
     int       moved_ends  = 0; ///< lane ends (of legs reaching the walk) whose port came from their realm's coast
     long long path_tiles  = 0; ///< tiles over every laid path (a shared tile counts per lane)
     int       lane_tiles  = 0; ///< distinct tiles carrying a lane after the call
@@ -359,8 +367,9 @@ std::vector<int> sea_lane_walk(const std::vector<std::uint8_t>& sea, int gw, int
 /// Stamp every earned lane in @p legs onto @p body's sea tiles. @p nodes is indexed by
 /// region (where each seat stood), as `stamp_history_roads` takes it. @p region_realm
 /// is parallel to @p nodes: the realm holding each region, -1 for none (BL-1153 -- an
-/// inland end moves to its realm's nearest coastal seat). Empty, or of another length,
-/// it names no realm and an inland end lays nothing. @p lane_tier_uses
+/// inland end moves to its realm's nearest coastal seat). A region it does not reach
+/// (an empty table reaches none) has no realm handed, and an inland end there lays
+/// nothing, counted as `no_port_no_realms`. @p lane_tier_uses
 /// is the record's own threshold; @p current_weight_q and @p rotation_sense are the
 /// spans' current params (`history_sim_params::sea_current_*`) -- the field is rebuilt
 /// here from the body's tiles, the pure function the spans built it with. Empty @p legs
