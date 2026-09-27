@@ -7571,6 +7571,94 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "province-fill-crosses-settled-line",
+   "title": "BL-1150 - A centre's province fill crosses the settled line",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1150 - sprint 48 (Ben, NR-954 B, 2026-09-27)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: province_partition_harness P2d, P5d, G1 (fail on the old code)"
+     ],
+     "requirement": "The land fill crosses the settled line; the nation lock holds; water and unsettled bodies keep their seeding.",
+     "notes": "",
+     "result_metric": "Lane adc45b16: anchors 10,381 -> 1,430 pooled; lock islands 9,295 -> 0; land provinces 21,972 -> 13,232; centres incl. anchors 22,550 -> 13,599; max province unchanged at 1,383 tiles; four new 767-1,077-tile provinces held by villages and towns."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, save_roundtrip, centre_census, history_sim_harness, world_cursor_equivalence on main"
+     ],
+     "requirement": "Deterministic on main; only the known failures.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review, including the re-scoped river rows C2a/C2b and the prehistory-off digest move.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "scale-credit-from-works",
+   "title": "BL-1149 - A head earns industry scale credit only where a work employs it",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1149 - sprint 48 (Ben, the density calls form, 2026-09-27)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness BL1149a-f, works_roster_harness R7, centre_census C14"
+     ],
+     "requirement": "Scale credit counts min(urban heads, heads the region's built works employ); every works row carries employs, validated by the loader.",
+     "notes": "",
+     "result_metric": "Lane ec5f2308 (on the BL-1137 branch): rho(points, urban heads) 0.846 -> 0.568, rho(points, employed) 0.480 -> 0.685, points per world 107.7M -> 57.5M; employed 6% of urban heads; pre-1660 identical."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "decision: the stream rate rung and the treasury spread"
+     ],
+     "requirement": "Ben picks the rate from the 6/9/12/18 ladder; the branch merges at it.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

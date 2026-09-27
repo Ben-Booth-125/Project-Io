@@ -163,7 +163,7 @@ ordering is unchanged (after the sim, before roads), and so is the nation lock.
 **SETTLED (Ben, 2026-09-27, NR-954): a centre's fill crosses the settled line.** The settled cells
 seed the partition, but a centre's region grows from settled ground into never-settled ground of
 its own nation, so never-settled country joins the province of the centre that reaches it. Before
-this, a settlement lock (BL-849) stopped the fill at the line, and 3,753 of 6,856 anchor villages
+this, a settlement lock (BL-849) stopped the fill at the line, and 9,295 of 10,381 anchor villages
 were founded only to hold the never-settled ground it left over.
 
 The alternative was considered and not taken: colonisation drawing the real partition, with the
