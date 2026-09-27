@@ -57,7 +57,10 @@
 //       size distribution in land tiles (median, p90, max), overall and by
 //       the ANCHOR's scale — the anchor being the highest summed centre scale
 //       standing in the province, ties to the lowest tile id, exactly as
-//       `seed_province_holders` derives it.
+//       `seed_province_holders` derives it. C7b reads the anchor-only
+//       provinces (the uncentred islands) on their own, with WHY each is left
+//       (BL-1150): touching its own nation's land (the retired settlement
+//       lock's islands), a nation lock, water, or no nation at all.
 //     * THE SPACING LADDER ROW (C9; BL-1132, settle spacing) — one compact row per
 //       seed of what a settle-spacing candidate moves: regions, living, living
 //       regions by cell land (1 / 2-4 / 5-9 / 10-24 / 25+ tiles), centres, the
@@ -267,7 +270,15 @@ struct seed_record
     int multi_centre = 0;        ///< ...holding more than one centre of any kind
     int anchor_only = 0;         ///< ...holding an anchor founding and no seed centre
     int unanchored = 0;          ///< ...holding no centre at all (the invariant says 0)
-    int anchor_only_unsettled = 0; ///< anchor-only provinces on ground the colonisation never settled
+    int anchor_only_unsettled = 0; ///< anchor-only provinces WHOLLY on ground the colonisation never settled
+    /// BL-1150 (a centre's fill crosses the settled line): WHY each anchor-only
+    /// province — an uncentred island — is left, read off its land neighbours
+    /// outside it. `own_nation`: it touches land of its OWN nation, which the
+    /// fill should have reached (0 once the settled line is no lock; the
+    /// settlement lock's islands, before). `unowned`: no nation holds it.
+    /// `nation_lock`: its only land neighbours are another nation's.
+    /// `water`: it touches no other land at all.
+    int why_own_nation = 0, why_unowned = 0, why_nation_lock = 0, why_water = 0;
     std::vector<int> anchor_only_sizes; ///< land tiles per anchor-only province
     std::vector<int> sizes;      ///< land tiles per province
     std::vector<int> sizes_by_anchor[5]; ///< ...split by the anchor's scale (1-5)
@@ -656,6 +667,8 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
 
     // --- the provinces (BL-1133) --------------------------------------------
     {
+        std::vector<entity_id> id_at(static_cast<std::size_t>(gw) * gh, null_entity);
+        for (const auto& [tid, idx] : tile_raster) id_at[static_cast<std::size_t>(idx)] = tid;
         std::map<entity_id, int> scale_on_tile, seeds_on_tile, centres_on_tile;
         for (const auto& [cid, tid] : w.population_centre_tile)
         {
@@ -686,8 +699,42 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
             {
                 ++r.anchor_only;
                 r.anchor_only_sizes.push_back(static_cast<int>(pr.tiles.size()));
-                if (w.tile_settled.find(pr.tiles.front()) == w.tile_settled.end())
-                    ++r.anchor_only_unsettled;
+                // WHOLLY never-settled (BL-1150: a province may now span the
+                // line, so its first tile no longer speaks for all of it).
+                bool wholly_unsettled = true;
+                for (const entity_id t : pr.tiles)
+                    if (w.tile_settled.count(t) != 0) { wholly_unsettled = false; break; }
+                if (wholly_unsettled) ++r.anchor_only_unsettled;
+
+                // WHY the island is left (BL-1150), off its outside land neighbours.
+                const auto nat_of = [&](entity_id t) {
+                    const auto it = w.tile_to_nation.find(t);
+                    return it == w.tile_to_nation.end() ? null_entity : it->second;
+                };
+                const entity_id own = nat_of(pr.tiles.front());
+                const std::set<entity_id> mine(pr.tiles.begin(), pr.tiles.end());
+                bool same = false, foreign = false;
+                for (const entity_id t : pr.tiles)
+                {
+                    const auto rit = tile_raster.find(t);
+                    if (rit == tile_raster.end()) continue;
+                    const int idx = rit->second;
+                    for (int sd = 0; sd < 6; ++sd)
+                    {
+                        const auto [nx_raw, ny] = hex_neighbors::neighbour(idx % gw, idx / gw, sd);
+                        if (ny < 0 || ny >= gh) continue;
+                        const int ni = ny * gw + ((nx_raw % gw) + gw) % gw;
+                        const entity_id nb = id_at[static_cast<std::size_t>(ni)];
+                        if (nb == null_entity || mine.count(nb) != 0) continue;
+                        const tile_component* ntc = grid[static_cast<std::size_t>(ni)];
+                        if (ntc == nullptr || is_water(ntc->substrate)) continue;
+                        if (nat_of(nb) == own) same = true; else foreign = true;
+                    }
+                }
+                if (same)                     ++r.why_own_nation;
+                else if (own == null_entity)  ++r.why_unowned;
+                else if (foreign)             ++r.why_nation_lock;
+                else                          ++r.why_water;
             }
             if (centres_here == 0) { ++r.unanchored; continue; }
             const int n = static_cast<int>(pr.tiles.size());
@@ -879,16 +926,25 @@ int main(int argc, char** argv)
                     r.part_stats.uncentred_regions, r.part_stats.covered_centre_singletons_absorbed);
     }
 
-    std::printf("\nC7b the provinces resting on an anchor founding alone\n");
-    std::printf("seed  anchor_only  on_unsettled_ground | size: median  p90   max  one_tile\n");
+    std::printf("\nC7b the provinces resting on an anchor founding alone (the uncentred islands)\n");
+    std::printf("seed  anchor_only  wholly_unsettled | size: median  p90   max  one_tile |"
+                " why left: own_nation  nation_lock  water  unowned\n");
+    int64_t why[4] = {};
     for (const seed_record& r : recs)
     {
         const size_summary s = summarise(r.anchor_only_sizes);
         const int one = static_cast<int>(
             std::count(r.anchor_only_sizes.begin(), r.anchor_only_sizes.end(), 1));
-        std::printf("%4u  %11d  %19d | %12d  %4d  %4d  %8d\n", r.seed, r.anchor_only,
-                    r.anchor_only_unsettled, s.median, s.p90, s.max, one);
+        std::printf("%4u  %11d  %16d | %12d  %4d  %4d  %8d | %20d  %11d  %5d  %7d\n", r.seed,
+                    r.anchor_only, r.anchor_only_unsettled, s.median, s.p90, s.max, one,
+                    r.why_own_nation, r.why_nation_lock, r.why_water, r.why_unowned);
+        why[0] += r.why_own_nation; why[1] += r.why_nation_lock;
+        why[2] += r.why_water; why[3] += r.why_unowned;
     }
+    std::printf("pool  why left: own_nation %" PRId64 "  nation_lock %" PRId64 "  water %" PRId64
+                "  unowned %" PRId64 "  (own_nation is the settlement lock's islands; 0 once the"
+                " fill crosses the settled line, BL-1150)\n",
+                why[0], why[1], why[2], why[3]);
 
     std::printf("\n=== C8 province size (land tiles) by the ANCHOR's scale: n / median / p90 / max ===\n");
     std::printf("seed  %-22s  %-22s  %-22s  %-22s  %-22s\n", "village(1)", "town(2)", "city(3)",
