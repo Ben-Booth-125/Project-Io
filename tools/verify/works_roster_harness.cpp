@@ -220,6 +220,22 @@ int main()
         check(reg.row_at(reg.size()) == nullptr, "R6 row_at rejects an out-of-range id with null");
     }
 
+    // --- R7: the heads a region's works employ (BL-1149) -------------------
+    {
+        works_registry er;
+        work_row a = make_row("Mill",  roster_band::classical, {}, { 0, 0, 0, 0, 10 }); a.employs = 5000;
+        work_row b = make_row("Wall",  roster_band::classical, {}, { 0, 0, 0, 50, 0 }); b.employs = 0;
+        work_row c = make_row("Forge", roster_band::medieval,  {}, { 0, 0, 0, 0, 20 }); c.employs = 20000;
+        er.add_row(a); er.add_row(b); er.add_row(c);
+        check(er.employed_heads_mask(0) == 0, "R7 no works employ nobody");
+        check(er.employed_heads_mask(0b101) == 25000, "R7 the built works' heads add");
+        check(er.employed_heads_mask(0b010) == 0, "R7 a work that employs nobody adds nothing");
+        check(er.employed_heads_mask(0b101 | (1u << 17) | (1u << 31)) == 25000,
+              "R7 bits past the table are SKIPPED, never read as a neighbouring row");
+        check(32 * work_employs_max < (int64_t{1} << 31),
+              "R7 a full mask at the loader's ceiling stays inside the scale credit's head domain");
+    }
+
     std::printf("\n=== %s ===\n", g_fail == 0 ? "ALL PASS" : "FAILURES PRESENT");
     return g_fail == 0 ? 0 : 1;
 }

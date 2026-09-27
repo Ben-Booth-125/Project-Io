@@ -529,9 +529,14 @@ struct history_sim_params
     //   SCALE (`accrue_industry_points`), on EVERY region with `centres > 0`,
     //   credited to that region itself:
     //
-    //     points = urban_population * industry_points_per_million_urban_heads_year
+    //     points = min(urban_population, employed heads)
+    //                       * industry_points_per_million_urban_heads_year
     //                                                   * step_years / 1000000
     //              * fuel_factor_q / 1000
+    //
+    //     employed heads = the heads the region's works employ
+    //                      (`works_registry::employed_heads_mask`, BL-1149: the
+    //                      works, not the crowd; Ben 2026-09-27)
     //              * (1000 + industry industrial per-mille) / 1000
     //
     //     fuel_factor_q = floor + (1000 - floor) * fuel_reading_q / 1000
@@ -3504,15 +3509,23 @@ int industry_points_fuel_factor_q(int fuel_reading_q, const history_sim_params& 
 int industry_tree_industrial_q(uint64_t industry_mask);
 
 /// One region's scale credit for one round, or -1 when the credit is REFUSED
-/// (its urban headcount or the step is outside the accrual's domain). 0 for a
-/// region with no centres. `industrial_q` is its holder's
+/// (its urban headcount, its employed heads or the step is outside the
+/// accrual's domain). 0 for a region with no centres.
+///
+/// THE WORKS, NOT THE CROWD (BL-1149; Ben, 2026-09-27, INDUSTRIALISATION.md
+/// sec 1): the heads credited are the region's urban heads UP TO @p
+/// employed_heads, the heads its works employ
+/// (`works_registry::employed_heads_mask` of `works_built`); the heads beyond
+/// earn nothing, and a region with no works earns no scale credit.
+/// `industrial_q` is its holder's
 /// `industry_tree_industrial_q` (0 for unheld ground); the tree multiplier
 /// `1000 + industrial_q` is held to [100, 5000] per mille -- a DOMAIN, not a
 /// tuning clamp: the table's industrial nodes sum to well inside it, and a
 /// holder whose tree left it would be a table defect, refused (-1) like any
 /// other out-of-domain input. Integer, staged so no intermediate overflows.
 int64_t industry_points_scale_credit(const region& r, int industrial_q,
-                                     const history_sim_params& p, int step_years);
+                                     const history_sim_params& p, int step_years,
+                                     int64_t employed_heads);
 
 /// The most urban heads one polity's apportionment weighs in total. Keeps
 /// the exact integer apportionment inside int64: a remainder under this times
@@ -3547,14 +3560,17 @@ struct industry_points_round
 
 /// THE ROUND'S SCALE ACCRUAL: every region with `centres > 0` is credited, ON
 /// ITSELF, `industry_points_scale_credit` against its holder's Industry-tree
-/// industrial capacity. ORDER-INDEPENDENT BY CONSTRUCTION: each region's credit
-/// reads only its own fields and its holder's mask, and writes only its own
-/// stock, so walking the table in any order gives the same table. The caller
-/// gates it (the switch, the open year, and `industry_points_params_valid`).
+/// industrial capacity and the heads its works employ (@p works; BL-1149 —
+/// with no works table no work stands, so no region earns scale credit).
+/// ORDER-INDEPENDENT BY CONSTRUCTION: each region's credit reads only its own
+/// fields, its holder's mask and the table, and writes only its own stock, so
+/// walking the table in any order gives the same table. The caller gates it
+/// (the switch, the open year, and `industry_points_params_valid`).
 industry_points_round accrue_industry_points(std::vector<region>&       regions,
                                              const std::vector<polity>& polities,
                                              const history_sim_params&  p,
-                                             int                        step_years);
+                                             int                        step_years,
+                                             const works_registry*      works);
 
 /// Every scorer term's value for one polity, indexed by the generated
 /// `io::industry_tree::scorer_term` (never positionally — see the guard in

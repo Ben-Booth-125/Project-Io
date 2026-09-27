@@ -92,10 +92,25 @@ struct work_row
     work_gate   gate;
     work_effect effect;
 
+    /// BL-1149 (Ben, 2026-09-27; INDUSTRIALISATION.md sec 1, "a head earns scale
+    /// credit only where a work employs it"): the HEADS this work employs once
+    /// standing. A region's industry scale credit counts its urban heads up to
+    /// the sum its works employ (`works_registry::employed_heads_mask`); the
+    /// heads beyond are a crowd and earn nothing. Heads, not per-mille. 0 is a
+    /// legal answer (a wall employs nobody once built). The loader requires it
+    /// on every row and holds it to [0, `work_employs_max`].
+    int64_t employs = 0;
+
     /// Relative weight when a polity scores which work to raise next. Not a
     /// count and not a cost — the pull this row exerts among the available set.
     int weight = 0;
 };
+
+/// The most heads one work may employ (BL-1149). A DOMAIN, not a tuning clamp:
+/// ten million is past any works a region could stand, so a row above it is an
+/// authoring slip (a stray zero), and the loader refuses it. It also keeps a
+/// full mask's sum (32 rows) under 2^31, the scale credit's own head domain.
+inline constexpr int64_t work_employs_max = 10000000;
 
 /// How many rows `region::works_built` can address. The region records its
 /// works as a 32-bit mask rather than a heap-owning vector (settlement.hpp
@@ -206,6 +221,19 @@ public:
             t.industrial_mod += e.industrial_mod;
         }
         return t;
+    }
+
+    /// BL-1149: the heads the works in @p mask employ — the sum of `employs`
+    /// over its built bits. Bits past `works_mask_bits` and past the table's
+    /// end are SKIPPED, as `total_effect_mask` skips them. At most 32 x
+    /// `work_employs_max`, under 2^31.
+    int64_t employed_heads_mask(uint32_t mask) const
+    {
+        int64_t heads = 0;
+        const std::size_t n = m_rows.size() < works_mask_bits ? m_rows.size() : works_mask_bits;
+        for (std::size_t i = 0; i < n; ++i)
+            if ((mask & (uint32_t{1} << i)) != 0) heads += m_rows[i].employs;
+        return heads;
     }
 
     // --- direct construction for tests (headless harness builds these by hand) ---

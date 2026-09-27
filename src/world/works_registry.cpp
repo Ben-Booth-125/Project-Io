@@ -127,6 +127,27 @@ void works_registry::load_from_lua(lua_state& lua)
                                      "a work that does nothing is an authoring mistake, "
                                      "not a valid row");
 
+        // --- employs (BL-1149): REQUIRED, heads, [0, work_employs_max] -----
+        // Required rather than defaulted: every row answers "how many heads
+        // does this work employ", and a forgotten row would otherwise read 0
+        // and silently earn its town nothing.
+        {
+            const sol::object e = (*row)["employs"];
+            if (!e.valid() || e.get_type() == sol::type::lua_nil)
+                throw std::runtime_error(where + " ('" + r.name + "') has no 'employs' -- every "
+                                         "work states the heads it employs (0 is a legal answer)");
+            const sol::optional<int64_t> v = e.as<sol::optional<int64_t>>();
+            if (!v || e.get_type() != sol::type::number)
+                throw std::runtime_error(where + " ('" + r.name + "'): 'employs' is not a whole number");
+            const sol::optional<double> d = e.as<sol::optional<double>>();
+            if (d && static_cast<double>(*v) != *d)
+                throw std::runtime_error(where + " ('" + r.name + "'): 'employs' is not a whole number");
+            if (*v < 0 || *v > work_employs_max)
+                throw std::runtime_error(where + " ('" + r.name + "'): 'employs' " + std::to_string(*v) +
+                                         " is outside [0, " + std::to_string(work_employs_max) + "]");
+            r.employs = *v;
+        }
+
         r.weight = opt_int(*row, "weight");
         if (r.weight <= 0)
             throw std::runtime_error(where + " ('" + r.name + "') has a non-positive 'weight'; "
@@ -171,4 +192,14 @@ void works_registry::load_from_lua(lua_state& lua)
         throw std::runtime_error("works.lua: every reach-bearing work is endowment-gated — "
                                  "a region with poor ground could never buy reach, which "
                                  "turns breadth back into a ceiling");
+
+    // BL-1149: a table in which no work employs anyone earns no region any
+    // scale credit at all -- every city a crowd. An authoring slip, not a world.
+    bool any_employs = false;
+    for (const work_row& r : m_rows)
+        if (r.employs > 0) any_employs = true;
+    if (!any_employs)
+        throw std::runtime_error("works.lua: no work employs anyone -- a region's scale credit "
+                                 "counts only the heads its works employ, so nothing would ever "
+                                 "earn one");
 }

@@ -4685,7 +4685,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
                     urb_points_before[ri] = ss.regions[ri].industry_points;
                 const industry_points_round pr =
-                    accrue_industry_points(ss.regions, out.polities, params, step_years);
+                    accrue_industry_points(ss.regions, out.polities, params, step_years, works);
                 out.industry_points_from_scale += pr.credited;
                 out.industry_points_refused    += pr.refused;
 
@@ -10303,11 +10303,14 @@ int industry_tree_industrial_q(uint64_t industry_mask)
 }
 
 int64_t industry_points_scale_credit(const region& r, int industrial_q,
-                                     const history_sim_params& p, int step_years)
+                                     const history_sim_params& p, int step_years,
+                                     int64_t employed_heads)
 {
     if (r.centres <= 0) return 0; // only a region with centres builds
-    const int64_t heads = r.urban_population;
-    if (heads < 0 || heads > industry_points_urban_heads_max) return -1;
+    if (r.urban_population < 0 || r.urban_population > industry_points_urban_heads_max) return -1;
+    if (employed_heads < 0 || employed_heads > industry_points_urban_heads_max) return -1;
+    // BL-1149 — THE WORKS, NOT THE CROWD: the urban heads its works employ.
+    const int64_t heads = std::min(r.urban_population, employed_heads);
     if (step_years < 1 || step_years > industry_points_step_years_max) return -1;
     // The tree multiplier's DOMAIN (see the header): outside it is a table
     // defect, refused rather than clamped into a plausible number.
@@ -10374,7 +10377,8 @@ bool industry_points_apportion_by_scale(const std::vector<region>& regions, int 
 industry_points_round accrue_industry_points(std::vector<region>&       regions,
                                              const std::vector<polity>& polities,
                                              const history_sim_params&  p,
-                                             int                        step_years)
+                                             int                        step_years,
+                                             const works_registry*      works)
 {
     // The holder's capacity, once per polity per round, indexed like the
     // table (every creation site assigns id = index; checked, and a region
@@ -10390,7 +10394,9 @@ industry_points_round accrue_industry_points(std::vector<region>&       regions,
         if (r.centres <= 0) continue;
         const int ind = (r.nation >= 0 && static_cast<std::size_t>(r.nation) < industrial.size())
                             ? industrial[static_cast<std::size_t>(r.nation)] : 0;
-        const int64_t credit = industry_points_scale_credit(r, ind, p, step_years);
+        // BL-1149: the heads its works employ; no table, no work, none.
+        const int64_t employed = (works != nullptr) ? works->employed_heads_mask(r.works_built) : 0;
+        const int64_t credit = industry_points_scale_credit(r, ind, p, step_years, employed);
         if (credit < 0 || r.industry_points > industry_points_ceiling - credit)
         {
             ++out.refused; // nothing moves on this region

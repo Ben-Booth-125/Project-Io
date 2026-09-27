@@ -2247,6 +2247,72 @@ int main()
         // [/rebuild-api]
     }
 
+    // ---------------------------------------------------------------------
+    // BL-1149 — a head earns scale credit only where a work employs it (Ben,
+    // 2026-09-27; INDUSTRIALISATION.md sec 1: the works, not the crowd). The
+    // scale credit and the round's accrual, on hand-built regions and a
+    // hand-built works table.
+    // ---------------------------------------------------------------------
+    {
+        history_sim_params ip = params;
+        ip.industry_points_per_million_urban_heads_year = 1000;
+        region town;
+        town.centres = 1;
+        town.urban_population = 500000;
+        town.energy_q = 500;
+        region small = town;
+        small.urban_population = 30000;
+        const int64_t crowd   = industry_points_scale_credit(town, 0, ip, 10, 60000);
+        const int64_t worked  = [&] { region r = town; r.urban_population = 60000;
+                                      return industry_points_scale_credit(r, 0, ip, 10, 60000); }();
+        const int64_t loose   = [&] { region r = town; r.urban_population = 60000;
+                                      return industry_points_scale_credit(r, 0, ip, 10, 1000000); }();
+        const int64_t none    = industry_points_scale_credit(town, 0, ip, 10, 0);
+        const int64_t few     = industry_points_scale_credit(small, 0, ip, 10, 60000);
+        const int64_t few_ref = [&] { region r = small;
+                                      return industry_points_scale_credit(r, 0, ip, 10, 30000); }();
+        const int64_t bad     = industry_points_scale_credit(town, 0, ip, 10, -1);
+        std::printf("      scale credit: 500k heads / 60k employed %lld; 60k / 60k %lld; 60k / 1M %lld; "
+                    "no works %lld; 30k / 60k %lld\n",
+                    static_cast<long long>(crowd), static_cast<long long>(worked),
+                    static_cast<long long>(loose), static_cast<long long>(none),
+                    static_cast<long long>(few));
+        check(crowd > 0 && crowd == worked && worked == loose,
+              "BL1149a the heads beyond what its works employ earn nothing: a 500,000-head city whose "
+              "works employ 60,000 earns exactly a 60,000-head town's credit");
+        check(none == 0,
+              "BL1149b a region with no works earns no scale credit, whatever its crowd");
+        check(few == few_ref && few > 0 && few < crowd,
+              "BL1149c below its works' employment a town earns on the heads it has");
+        check(bad == -1,
+              "BL1149d an employment outside the domain is refused, never clamped");
+
+        // The accrual reads the heads a region's BUILT works employ, off the table.
+        works_registry wr;
+        work_row mill;  mill.name = "Mill";  mill.effect.industrial_mod = 1; mill.employs = 40000; mill.weight = 1;
+        work_row wall;  wall.name = "Wall";  wall.effect.defence_mod = 1;    wall.employs = 0;     wall.weight = 1;
+        work_row forge; forge.name = "Forge"; forge.effect.industrial_mod = 1; forge.employs = 20000; forge.weight = 1;
+        wr.add_row(mill); wr.add_row(wall); wr.add_row(forge);
+        std::vector<region> rs(3, town);
+        for (region& r : rs) r.nation = -1;
+        rs[0].works_built = 0b101; // mill + forge: 60,000 employed
+        rs[1].works_built = 0b010; // the wall alone: none
+        rs[2].works_built = 0;     // no works: none
+        const std::vector<polity> no_polities;
+        const industry_points_round round = accrue_industry_points(rs, no_polities, ip, 10, &wr);
+        std::printf("      accrual: mill+forge %lld, wall %lld, bare %lld (credited %lld)\n",
+                    static_cast<long long>(rs[0].industry_points), static_cast<long long>(rs[1].industry_points),
+                    static_cast<long long>(rs[2].industry_points), static_cast<long long>(round.credited));
+        check(wr.employed_heads_mask(0b101) == 60000 && rs[0].industry_points == crowd
+              && rs[1].industry_points == 0 && rs[2].industry_points == 0,
+              "BL1149e the round's accrual credits each region on the heads its built works employ");
+        std::vector<region> no_table(1, town);
+        no_table[0].works_built = 0b101;
+        accrue_industry_points(no_table, no_polities, ip, 10, nullptr);
+        check(no_table[0].industry_points == 0,
+              "BL1149f with no works table no work stands, so no region earns scale credit");
+    }
+
     // --- M1  over-muster starves industry (BL-867) --------------------------
     //
     // CIVILISATION.md § Materials are spent: "a polity that musters too hard

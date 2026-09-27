@@ -135,11 +135,14 @@
 #include "world/stockpile_budget.hpp"
 #include "world/world.hpp"
 
+#include <sol/sol.hpp>
+
 #include <algorithm>
 #include <chrono>
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <map>
@@ -217,6 +220,69 @@ int64_t farm_fed_ceiling_of(const R& p)
         return region_carrying_capacity(p.farm_q, p.work_capacity_mod);
 }
 
+/// BL-1149 (scale credit from the works): the heads the works in @p mask employ.
+/// Read off the registry where the tree carries `employed_heads_mask`, and on a
+/// tree without it off scripts/works.lua's own `employs` column (the loaded Lua
+/// global, row i+1 for bit i), so the census's BEFORE reading applies the same
+/// table to the world that ignored it.
+template <typename W>
+int64_t employed_heads_of(const W& works, lua_state& lua, uint32_t mask)
+{
+    if constexpr (requires { works.employed_heads_mask(mask); })
+        return works.employed_heads_mask(mask);
+    else
+    {
+        sol::state& L = lua.state();
+        const sol::optional<sol::table> rows = L["works"];
+        if (!rows) return 0;
+        int64_t heads = 0;
+        for (int b = 0; b < 32; ++b)
+        {
+            if ((mask & (1u << b)) == 0) continue;
+            const sol::optional<sol::table> row = (*rows)[b + 1];
+            if (!row) continue;
+            const sol::optional<int64_t> e = (*row)["employs"];
+            if (e) heads += *e;
+        }
+        return heads;
+    }
+}
+
+/// Spearman's rho over paired samples, ties at their mean rank. 0 on fewer
+/// than two samples or a constant side.
+double spearman(const std::vector<int64_t>& a, const std::vector<int64_t>& b)
+{
+    const std::size_t n = a.size();
+    if (n < 2 || b.size() != n) return 0.0;
+    const auto ranks = [n](const std::vector<int64_t>& v) {
+        std::vector<std::size_t> idx(n);
+        for (std::size_t i = 0; i < n; ++i) idx[i] = i;
+        std::stable_sort(idx.begin(), idx.end(), [&v](std::size_t x, std::size_t y) { return v[x] < v[y]; });
+        std::vector<double> r(n, 0.0);
+        for (std::size_t i = 0; i < n;)
+        {
+            std::size_t j = i;
+            while (j + 1 < n && v[idx[j + 1]] == v[idx[i]]) ++j;
+            const double mean = (static_cast<double>(i) + static_cast<double>(j)) / 2.0 + 1.0;
+            for (std::size_t k = i; k <= j; ++k) r[idx[k]] = mean;
+            i = j + 1;
+        }
+        return r;
+    };
+    const std::vector<double> ra = ranks(a), rb = ranks(b);
+    double ma = 0, mb = 0;
+    for (std::size_t i = 0; i < n; ++i) { ma += ra[i]; mb += rb[i]; }
+    ma /= static_cast<double>(n); mb /= static_cast<double>(n);
+    double sab = 0, saa = 0, sbb = 0;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        sab += (ra[i] - ma) * (rb[i] - mb);
+        saa += (ra[i] - ma) * (ra[i] - ma);
+        sbb += (rb[i] - mb) * (rb[i] - mb);
+    }
+    return (saa > 0 && sbb > 0) ? sab / std::sqrt(saa * sbb) : 0.0;
+}
+
 std::vector<uint32_t> parse_seed_list(const std::string& s)
 {
     std::vector<uint32_t> out;
@@ -254,6 +320,17 @@ struct seed_record
     int     ledger_ind_over_urban = 0;///< industrial heads over urban heads
     int     ledger_urban_over_pop = 0;///< urban heads over population
     bool    ledger_ok = true;
+    // BL-1149 — THE WORKS AND THE POINTS (C14; readings, never gated).
+    int64_t points_close = 0;          ///< industry points standing on regions at the close
+    int     rho_regions = 0;           ///< regions with points or centres (the rho set)
+    double  rho_points_urban = 0.0;    ///< Spearman(points, urban heads) over the rho set
+    double  rho_points_employed = 0.0; ///< Spearman(points, employed heads) over the rho set
+    int64_t heads_urban_centred = 0;   ///< urban heads on living regions standing centres
+    int64_t heads_employed = 0;        ///< ...of them within what their works employ
+    int64_t migrants = -1;             ///< industrial heads standing at the close (-1: no stream)
+    int     receiving = 0;             ///< regions holding any
+    double  migrants_top_decile = 0.0; ///< share held by the top tenth of receiving regions
+    double  migrants_to_worked = 0.0;  ///< share on the top tenth of centred regions by employed heads
     int     max_region_centres = 0, at_limit = 0;
     int     region_centre_hist[6] = {}; // 0, 1, 2-4, 5-9, 10-19, 20+
 
@@ -477,6 +554,55 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
                 at[static_cast<std::size_t>(ar * gw + ac)].push_back(i);
         }
         r.spacing_ok = r.close_pairs_sim == 0;
+    }
+
+    // --- BL-1149: the works and the points ----------------------------------
+    {
+        std::vector<int64_t> pts, urb, emp;
+        std::vector<std::pair<int64_t, int64_t>> by_employed; // (employed, migrants) on centred regions
+        std::vector<int64_t> received;
+        int64_t mig_total = 0;
+        bool has_stream = false;
+        for (const region& p : ss.regions)
+        {
+            r.points_close += p.industry_points;
+            const int64_t e = employed_heads_of(out.works, lua, p.works_built);
+            const int64_t ind = industrial_heads_of(p);
+            if (ind >= 0) has_stream = true;
+            if (p.industry_points > 0 || p.centres > 0)
+            {
+                pts.push_back(p.industry_points);
+                urb.push_back(p.urban_population);
+                emp.push_back(e);
+            }
+            if (p.population > 0 && p.centres > 0)
+            {
+                r.heads_urban_centred += p.urban_population;
+                r.heads_employed += std::min(p.urban_population, e);
+                by_employed.push_back({ e, std::max<int64_t>(ind, 0) });
+            }
+            if (ind > 0) { received.push_back(ind); mig_total += ind; }
+        }
+        r.rho_regions = static_cast<int>(pts.size());
+        r.rho_points_urban = spearman(pts, urb);
+        r.rho_points_employed = spearman(pts, emp);
+        if (has_stream)
+        {
+            r.migrants = mig_total;
+            r.receiving = static_cast<int>(received.size());
+            std::sort(received.begin(), received.end(), std::greater<int64_t>());
+            const std::size_t top = (received.size() + 9) / 10;
+            int64_t top_sum = 0;
+            for (std::size_t k = 0; k < top && k < received.size(); ++k) top_sum += received[k];
+            r.migrants_top_decile = mig_total > 0 ? static_cast<double>(top_sum) / mig_total : 0.0;
+            std::stable_sort(by_employed.begin(), by_employed.end(),
+                             [](const std::pair<int64_t, int64_t>& a, const std::pair<int64_t, int64_t>& b)
+                             { return a.first > b.first; });
+            const std::size_t wtop = (by_employed.size() + 9) / 10;
+            int64_t worked = 0;
+            for (std::size_t k = 0; k < wtop && k < by_employed.size(); ++k) worked += by_employed[k].second;
+            r.migrants_to_worked = mig_total > 0 ? static_cast<double>(worked) / mig_total : 0.0;
+        }
     }
 
     // --- the sim record -----------------------------------------------------
@@ -1035,6 +1161,27 @@ int main(int argc, char** argv)
         std::printf("%4u  %11" PRId64 " | %16d  %10d  %16d  %16d | %s\n", r.seed, r.ledger_carried_sum,
                     r.ledger_farm_over, r.ledger_farm_negative, r.ledger_ind_over_urban,
                     r.ledger_urban_over_pop, r.ledger_ok ? "ok" : "FAIL");
+
+    // BL-1149 (scale credit from the works; INDUSTRIALISATION.md sec 1, "a head
+    // earns scale credit only where a work employs it"). Readings, never gated.
+    std::printf("\n=== C14 the works and the points (BL-1149; readings, not gated) ===\n");
+    std::printf("seed  points_close  rho_set  rho(p,urban)  rho(p,employed) | urban_centred  employed  "
+                "employed%% | migrants  receiving  top_decile%%  to_top_worked%%\n");
+    for (const seed_record& r : recs)
+    {
+        char mig[24] = "n/a", top[16] = "n/a", worked[16] = "n/a";
+        if (r.migrants >= 0)
+        {
+            std::snprintf(mig, sizeof mig, "%" PRId64, r.migrants);
+            std::snprintf(top, sizeof top, "%.1f", 100.0 * r.migrants_top_decile);
+            std::snprintf(worked, sizeof worked, "%.1f", 100.0 * r.migrants_to_worked);
+        }
+        std::printf("%4u  %12" PRId64 "  %7d  %12.3f  %15.3f | %13" PRId64 "  %8" PRId64 "  %9.1f | "
+                    "%8s  %9d  %11s  %14s\n",
+                    r.seed, r.points_close, r.rho_regions, r.rho_points_urban, r.rho_points_employed,
+                    r.heads_urban_centred, r.heads_employed, pct(r.heads_employed, r.heads_urban_centred),
+                    mig, r.receiving, top, worked);
+    }
 
     // Pooled.
     int64_t land = 0, centres = 0, ctiles = 0, spilled = 0, carved = 0, roads = 0, markets = 0;
