@@ -318,6 +318,12 @@ divide the whole manpower rather than sharing it with a fleet that cannot be the
 > contingent is a polity crossing coastal water *it owns* with land units — the middle case of
 > `MILITARY.md` § Domains and traversal, showing up in the data on its own.
 
+**In the Exploration and Industrialisation spans a fleet also decides who crosses (Ben,
+2026-09-27; `EXPLORATION.md` § the stocks table).** The fleet staged from a campaign's hub bounds
+the army it carries, and a crossing the target's side out-projects at sea never sails. The
+roster's naval rows still decide what a sea battle scores; the fleet decides whether the crossing
+happens. The Empires round keeps the band gate alone.
+
 **Rare is the design, not a shortfall.** Most contests stay on land. The water model exists so the
 uncommon ones — a contested strait, a coastal province changing hands, a trade shore denied — are
 expressible *at all*. A sim in which sea battles were routine would be generating a different

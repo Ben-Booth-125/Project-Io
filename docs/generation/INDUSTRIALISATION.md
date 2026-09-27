@@ -559,8 +559,10 @@ then paid them scale credit for arriving, and the points read headcount by anoth
 nowhere for its works to stand, so its treasury keeps the round's share rather than paying for
 points on townless ground that no campaign centre can receive. **Points on a region whose towns
 were razed are lost with them:** a region earns points only while it holds centres, and if war
-later takes its towns while people remain, the works went with the towns; the handoff counts those
-points unspent as razed, a cause the map shows.
+later takes its towns while people remain, the points went with the towns; the handoff counts those
+points unspent as razed, a cause the map shows. **The works themselves stand (Ben, 2026-09-27):** a
+work is physical, so a town that regrows on the region employs in them again. Clearing them would
+lower the ceiling they raised, and a sack never lowers a ceiling (Beat 2).
 
 **PROPOSED (listed to Ben 2026-09-18, not overturned): the stock sits on each region that holds
 centres.** The sim holds a city as counts on its region, not as an entity, so *one number per
@@ -660,7 +662,7 @@ one rule:
 
 | Stream | From → to | Pull | Push | Line |
 |---|---|---|---|---|
-| **Urbanisation** | A region's countryside → a centre in the same polity | Industry-point output at the centre | Depleted or strained ground | Held corridors |
+| **Urbanisation** | A region's countryside → a centre in the same polity | Open work at the centre: the jobs its works offer beyond the heads already there | Depleted or strained ground | Held corridors |
 | **Emigration** | A centre → a centre in another polity | The same pull, larger | War, a lost colony, strain | Contact, a line that can carry people, no war between them |
 
 #### Far pairs meet and bind, and this phase makes them
@@ -679,7 +681,10 @@ inheriting a treaty graph that never reached past the old neighbourhood. Explora
 revisited for it. **Far pairs bind across water, not only across a border (Ben, 2026-09-26;
 BL-1142, far pairs across water):** the binding reaches realms on other landmasses, so the
 inter-continental trade the sea lanes carry is common rather than a handful of pairs — seven realm
-pairs on six of sixteen curated worlds before it.
+pairs on six of sixteen curated worlds before it. **A far pair across water reads a penalty of 300
+against a land pair's 700 (Ben, 2026-09-27, NR-959):** 300 sits where the pair's own aggression,
+grudges and trade decide whether it binds, so the number does not choose the count, and distance
+still reads across water. A leg against the current delivers less, at the current's own weight (500).
 
 **Migration carries culture.** A stream moves culture shares into its destination centre, so a
 destination becomes mixed while its countryside stays plain. **This is what produces property 4's
@@ -696,8 +701,11 @@ may not carry a term that grows with size (`trees/TREES.md` § State, and where 
 from). It also gives the leaderboard a research column that no longer restates population — the
 reason Empires refused one.
 
-**The pull is industry-point output, because the sim holds no wage.** The campaign carries wages;
-the sim does not, and industry points at the destination are the nearest thing it holds.
+**SETTLED (Ben, 2026-09-27): the pull is open work, because the sim holds no wage.** A destination
+pulls by the jobs its works offer beyond the heads already there, so people go where jobs are
+unfilled, and a city whose works are full stops drawing. Points could not carry this: a city's points
+stop at the heads its works employ, so a crowded city pulled like a full town and its arrivals earned
+nothing. The campaign carries wages; open work is the nearest thing the sim holds.
 
 ### Beat 3 — Decolonisation, and wars over empire
 
