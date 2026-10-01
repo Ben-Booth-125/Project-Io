@@ -544,7 +544,9 @@ points. No polity scores it, so it adds no verb to the grant register (`../ai/AI
 It is also the one input that is neither headcount nor fixed ground: points from scale and fuel
 alone would be headcount by another name, which § 1 forbids. **SETTLED (Ben, 2026-09-19, NR-897):
 the points spread over the polity's regions that hold centres, in proportion to their urban
-scale** — a treasury builds its realm's works where its people are. The capital still leads
+scale** — a treasury builds its realm's works where its people are. **AMENDED (Ben, 2026-10-01,
+NR-964): in proportion to the heads their works employ**, so every point, the treasury's and the
+scale credit's alike, follows the works rather than the crowd. The capital still leads
 because it is usually the largest centre. Landing them all on the capital's own region let one
 region hold up to 65% of a world's points, so charters would have followed capitals, not cities.
 The constants stand: 1000 points per million employed urban heads per year; fuel factor

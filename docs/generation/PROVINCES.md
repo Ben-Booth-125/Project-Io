@@ -128,6 +128,13 @@ provinces rather than of thousands of villages founded on empty ground.
    reaches one (Ben, 2026-08-22; BL-563, province respects nation). Regions grown to fit the border
    need no cutting, so there is no scatter of one- and two-tile offcuts and no merge pass.
 
+**SETTLED (Ben, 2026-10-01, NR-962): a river divides its banks.** The fill pays the river's cost
+to CROSS a course — to step from one bank onto the river and off it to the other — not to travel
+along it, so a province holds one bank and its border follows the water. The cost as first built
+was charged on the step along a course, so it braked travel down a river and let the fill cross from
+bank to bank for nothing; on the shipped worlds a river edge was a border only 1.19 times as often
+as plain ground.
+
 The cost model that makes an edge a border lives in `province.hpp`, and it is integer arithmetic
 throughout: base 10 (`k_province_edge_base_cost`) + river 40 (`k_province_river_edge_cost`) +
 round(|Δheight| × 683) (`k_province_height_cost`, pinned so a p90 height step costs the same as a
