@@ -170,9 +170,9 @@ int stamp_urban_land_use(world& w, entity_id body_id,
 /// `ensure_national_population_centres`: a guarantee pass, not a tuned top-up.
 ///
 /// THE LAST RESORT (BL-1133, a province is its centre's ground): the centre
-/// fill covers its nation's land within its settled cell, so the only
-/// centre-less province left is an UNCENTRED ISLAND — ground no centre of its
-/// nation can reach — and that is all this founds in.
+/// fill covers its nation's land, across the settled line (BL-1150), so the
+/// only centre-less province left is an UNCENTRED ISLAND — ground no centre of
+/// its nation can reach — and that is all this founds in.
 ///
 /// The founding site is a pure argmax over the province's own tiles
 /// (ascending, the partition's contract) on habitability weighted by

@@ -76,8 +76,9 @@
 //
 // A PROVINCE IS ITS CENTRE'S GROUND (Ben, 2026-09-26; BL-1133) — superseding
 // rulings 3 and 4 ON THE LAND OF A BODY THAT HAS CENTRES ("covered land"): the
-// centre fill runs until its nation's land within its settled cell is covered,
-// so provinces = centres and none is left without one; the budget becomes a
+// centre fill runs until its nation's land is covered, across the settled line
+// as well as within it (Ben, 2026-09-27, NR-954 B; BL-1150), so provinces =
+// centres and none is left without one; the budget becomes a
 // WEIGHT ON REACH (delegated reading NR-953: scale divides step cost), which
 // is what keeps ruling 1 true; the 20-tile cap and the preferred 12 no longer
 // bind there. Leftover ground exists only where no centre of the nation can
@@ -341,9 +342,9 @@ struct province_absorption_stats
     int covered_bodies = 0;
 
     /// Leftover provinces on covered land: each an UNCENTRED ISLAND — ground
-    /// of a nation (and settlement verdict) that no centre of it can reach at
-    /// all — grown whole, and the ones `ensure_province_anchor_centres` founds
-    /// a village in.
+    /// of a nation that no centre of it can reach at all under the nation lock
+    /// (the settled line is not a lock, BL-1150) — grown whole, and the ones
+    /// `ensure_province_anchor_centres` founds a village in.
     int uncentred_regions = 0;
 
     /// Centre singletons absorbed on covered land: a centre whose province
@@ -458,23 +459,22 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///
 /// Pure in everything but its inputs: the result is a function of (@p seed, each
 /// body's grid dimensions, its land mask, its tiles' height / river edges, its
-/// nation assignment, its non-anchor population centres, and `w.tile_settled`)
-/// alone — the PRE-ROAD world (BL-623, provinces before roads: road_level is
+/// nation assignment, and its non-anchor population centres) alone — the PRE-ROAD world (BL-623, provinces before roads: road_level is
 /// deliberately not an input, so a recompute on a world whose roads have since
 /// been stamped reproduces the partition exactly). NO RNG STREAM IS CONSUMED —
 /// every draw is a stateless fold from @p seed, the campaign_battle identity
 /// idiom, so the partition can never perturb another generation pass's draws no
 /// matter where it is called.
 ///
-/// THE SETTLED CELLS ARE A HARD INPUT TOO (BL-849; docs/generation/PROVINCES.md
-/// § The settled cells are a binding input), the same way the nation assignment
-/// already is: on LAND, a region is locked to `w.tile_settled`'s verdict on its
-/// seed tile exactly as it is locked to the seed's nation — a province anchored
-/// on settled ground claims only settled ground, and ground the colonisation
-/// span never reached partitions into its own hinterland, never blending into a
-/// settled neighbour's shape. Colonisation still only SEEDS the partition; this
-/// pass still DRAWS it — the lock changes which tiles a region MAY claim, not
-/// who claims first or how the cost model prices an edge.
+/// THE SETTLED CELLS SEED THE PARTITION; THEY DO NOT BOUND IT (Ben, 2026-09-27,
+/// NR-954 B; BL-1150; docs/generation/PROVINCES.md § The settled cells are a
+/// binding input). Colonisation's settled cells are where the centres stand, so
+/// they seed the fill through the centre set; but a centre's region grows from
+/// settled ground into the never-settled ground of its own nation, so
+/// never-settled country joins the province of the centre that reaches it.
+/// BL-849's settlement lock — a region held to its seed tile's colonisation
+/// verdict the way it is held to its nation — retired; the nation lock is the
+/// one lock left, and `w.tile_settled` is not read here.
 ///
 /// The passes (BL-515's settled algorithm, as BL-1133 re-ruled pass 1):
 ///
@@ -483,8 +483,9 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///      ascending tile id, and all seeds grow SIMULTANEOUSLY as one
 ///      cost-weighted multi-source fill, so neighbouring centres meet on the
 ///      terrain between them rather than in the order they were listed. NOTHING
-///      STOPS IT but the locks: it runs until its nation's land within its
-///      settled cell is covered — no budget, no brake, no 12, no 20. The budget
+///      STOPS IT but the nation lock: it runs until its nation's land is
+///      covered, across the settled line (BL-1150) — no budget, no brake, no 12,
+///      no 20. The budget
 ///      that used to scale with the centre (1 -> 7 tiles .. 5 -> 12) becomes a
 ///      WEIGHT ON REACH (delegated reading NR-953): a region's path cost is its
 ///      step costs times 60 / scale, so a metropolis reaches five times as far
@@ -508,8 +509,8 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///      is KEPT.
 ///
 ///      ON COVERED LAND the spaced pass never runs, and the leftover pass meets
-///      only UNCENTRED ISLANDS — a nation's ground, on one side of the settled
-///      line, that no centre of it can reach — and grows each one unbounded,
+///      only UNCENTRED ISLANDS — a nation's ground that no centre of it can
+///      reach under the nation lock — and grows each one unbounded,
 ///      so it becomes one province, counted (`uncentred_regions`), and the
 ///      province `ensure_province_anchor_centres` founds its village in.
 ///

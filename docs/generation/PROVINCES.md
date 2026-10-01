@@ -81,7 +81,7 @@ independent of how the shapes are drawn.
 
 **A province is its centre's ground (Ben, 2026-09-26; BL-1133).** The fill no longer stops at a
 growth budget: every centre's province grows until its nation's land is covered, across the settled
-line as well as within it (§ The settled cells are a binding input), so every province holds a
+line as well as within it (§ Colonisation seeds the partition), so every province holds a
 centre and no centre's ground goes unclaimed. A world has at most as many provinces as centres,
 not exactly as many: a centre its stronger neighbours hem to its own tile is absorbed into one of
 theirs, counted rather than hidden (NR-954). The budget becomes a **weight on reach** (delegated reading,
@@ -128,6 +128,13 @@ provinces rather than of thousands of villages founded on empty ground.
    reaches one (Ben, 2026-08-22; BL-563, province respects nation). Regions grown to fit the border
    need no cutting, so there is no scatter of one- and two-tile offcuts and no merge pass.
 
+**SETTLED (Ben, 2026-10-01, NR-962): a river divides its banks.** The fill pays the river's cost
+to CROSS a course — to step from one bank onto the river and off it to the other — not to travel
+along it, so a province holds one bank and its border follows the water. The cost as first built
+was charged on the step along a course, so it braked travel down a river and let the fill cross from
+bank to bank for nothing; on the shipped worlds a river edge was a border only 1.19 times as often
+as plain ground.
+
 The cost model that makes an edge a border lives in `province.hpp`, and it is integer arithmetic
 throughout: base 10 (`k_province_edge_base_cost`) + river 40 (`k_province_river_edge_cost`) +
 round(|Δheight| × 683) (`k_province_height_cost`, pinned so a p90 height step costs the same as a
@@ -153,18 +160,16 @@ a pure-ice province gets its anchor on its least-bad tile, counted rather than h
 the lowest tile id. The spaced hinterland survives for the water domains and for the land of an
 unsettled body (no centres anywhere), where there is nothing else to seed from.
 
-### The settled cells are a binding input (Ben, 2026-09-09)
+### Colonisation seeds the partition (Ben, 2026-09-09; narrowed 2026-09-27)
 
 **Colonisation seeds the partition; this pass still draws it.** The colonisation span
-([COLONISATION.md](COLONISATION.md)) leaves a set of settled cells and their anchors, and the
-partition takes them as a **hard input** the way it already takes the national assignment — the
-ordering is unchanged (after the sim, before roads), and so is the nation lock.
+([COLONISATION.md](COLONISATION.md)) leaves the centres the fill grows from — the ordering is
+unchanged (after the sim, before roads), and so is the nation lock, which stays the one hard input.
 
 **SETTLED (Ben, 2026-09-27, NR-954): a centre's fill crosses the settled line.** The settled cells
-seed the partition, but a centre's region grows from settled ground into never-settled ground of
-its own nation, so never-settled country joins the province of the centre that reaches it. Before
-this, a settlement lock (BL-849) stopped the fill at the line, and 3,753 of 6,856 anchor villages
-were founded only to hold the never-settled ground it left over.
+no longer bound the fill: a centre's region grows from settled ground into never-settled ground of
+its own nation, so never-settled country joins the province of the centre that reaches it, and no
+anchor village is founded only to hold ground that the settled line cut off.
 
 The alternative was considered and not taken: colonisation drawing the real partition, with the
 nation carve then assigning whole provinces rather than tiles, which would make ruling 5's

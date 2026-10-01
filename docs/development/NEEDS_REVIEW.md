@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*65 entries — 0 open, 65 resolved.*
+*69 entries — 0 open, 69 resolved.*
 
 ---
 
@@ -1119,4 +1119,74 @@ Built as you ruled: an Empires polity earns naval points (coastal province-years
 > **RESOLVED.** RULED (Ben, 2026-09-27, the fleet projection form, after his steer "fleets should project power so allies with large fleets stop enemy fleets before they move"): A, make the doc true, in the Exploration and Industrialisation spans. A fleet bounds the army a sea campaign carries (staged from its hub's port); the defenders are the target and its mutual-defence partners; a fleet's power falls with sea distance from its own ports, priced by the currents; a crossing out-projected anywhere on its leg never sails, and the attacker keeps its army and fleet. Build this sprint, measured first: BL-1152 (fleets project power). The carry-over rung is NOT yet chosen: it is read again once fleets have this job, and put to Ben then.
 
 *Files: `src/world/history_sim.cpp`, `src/world/combat.cpp`, `docs/generation/EXPLORATION.md`*
+
+### NR-962 — CALL: rivers divide provinces much less once the fill crosses the settled line, and the river cost never made a river divide its banks
+*question · raised 2026-09-27 · from BL-1150 (province fill crosses the settled line), lane adc45b16, cold review 2026-09-27*
+
+Ruling 2 (PROVINCES.md): 'Boundaries are rivers and elevation difference.' After BL-1150, on the home body a river edge is a province border 14.92% of the time against 12.13% for plain ground (1.23x), down from 44.52% vs 27.73% (1.61x); on 3 of 16 shipped seeds rivers divide no more than plain ground. Mechanism (review, from the code): the settled line used to be a 100% border, and river courses cross that line more than plain ground does (colonisation prices river tiles as corridors, and streams cross unfarmable ground), so removing the lock removed borders that happened to sit on rivers. DEEPER, PRE-EXISTING: the river cost (+40, k_province_river_edge_cost) is charged on the step ALONG a course, from a course tile to its downstream neighbour (river_generation.cpp ~223-230, province.cpp ~212-213). So the fill pays to travel along a river, and crossing from one bank to the other through a course tile over two plain edges costs nothing. A river never divided its banks; borders 'on river edges' cut the river across. The river row (C2a) likely passes even with the river cost at 0 -- the lane is running that mutation now. ON THE SHIPPED WORLDS (fix round 67118846, 16 seeds pooled, home body): rivers were already weak before BL-1150 -- a river edge is a border 1.19x as often as plain ground on main (41.61% vs 34.87%) and 1.18x after (29.63% vs 25.15%); the 1.61 -> 1.23 drop is the harness world only. Per seed, rivers divide no more than plain on 1 seed on main (38) and 3 after (12, 37, 38). The river cost does matter on shipped worlds: at cost 0, 7 of 16 go red (the harness world still passes, so its row never tested the cost). The geometry is confirmed from the code: the +40 is paid travelling along a course; crossing bank to bank costs nothing extra.
+
+**Why it matters.** Rivers as borders is a named property of the map, and as built it holds only by accident of where centres and the settled line fall.
+
+- A: accept the weaker river borders as the cost of a centre holding its whole ground
+- B: make a river divide its banks -- the fill pays to CROSS a course (stepping onto or off it across the flow), not to travel along it; measured first
+- C: raise the river cost on today's geometry
+- D: other
+
+> **Recommendation:** B: rivers divide banks as ruling 2 says -- on shipped worlds they barely divide at all today (1.19x plain), with or without BL-1150. BL-1150 can merge first; the red C13 river row is this call.
+
+> **RESOLVED.** RULED (Ben, 2026-10-01, the open calls form): B: a river divides its banks -- the fill pays to cross a course, not to travel along it; measured first, with a row that fails at river cost 0. PROVINCES.md; BL-1156 (rivers divide banks).
+
+*Files: `src/world/province.cpp`, `src/world/province.hpp`, `tools/verify/province_partition_harness.cpp`, `docs/generation/PROVINCES.md`*
+
+### NR-963 — CALL: the rival corporations open unarmed and cannot arm inside the settle -- should they start with a force?
+*question · raised 2026-09-27 · from BL-1154 (rivals field no force), traced by the BL-1146 cold review, 2026-09-27*
+
+spawn_solvency R4 ('the field still fields a standing force') reads 0 rival units over 12 seeds (baseline 15-20 a seed in 2026-08; 0 since the settle went from 80 ticks to 12). The chain, from the code: a hire needs a completed military base the corp owns (corp_ai.cpp ~1808-1832); the charter web never builds one; the opening force (seed_starting_military, BL-331/BL-476 'rivals start armed') has been OPT-IN since 2026-08-26 (corporation_params::seed_starting_force, default false), turned off when the seated corp's standing-force upkeep was 90% of its outgoings (BL-635); a base needs tech E0-ML-01, which needs two extraction sites and a Cr 2,000 balance, and rivals open at Cr 0 (budget firms) or at most Cr 644 (specialists); the settle is 12 ticks, a corp evaluates 3 times in it, and a base takes 4 ticks to build. So no rival can arm before play. MILITARY.md still says every non-background corp starts with a unit beside its base -- the doc and the code disagree either way.
+
+**Why it matters.** Every system should feed Trade or Conflict; a field that opens unarmed has no conflict until a rival earns Cr 2,000 and a tech, and the seat's rivals read as traders only.
+
+- A: rivals start armed again (BL-476 as MILITARY.md says); the seat keeps opening unarmed as BL-635 left it; measure rival solvency with the upkeep back
+- B: rivals earn their force in play -- the E0-ML-01 gate or the base's cost is re-read against what a rival holds at the start
+- C: accept an unarmed opening field; MILITARY.md corrected, and R4 retired as a requirement of the settle
+- D: other
+
+> **Recommendation:** A: it is the doc as written and restores conflict from the first tick; the seat's opt-out stays, so BL-635's cause does not return for the player. It costs rival solvency (upkeep was the dominant outgoing when armed) -- read that before it ships.
+
+> **RESOLVED.** RULED (Ben, 2026-10-01, the open calls form): A: the rivals start armed again (MILITARY.md as written); the seat keeps opening unarmed; rival solvency measured with the upkeep back. BL-1154 builds it.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/corporation_generation.hpp`, `src/world/corp_ai.cpp`, `docs/military/MILITARY.md`, `tools/verify/spawn_solvency.cpp`*
+
+### NR-964 — CALL: should a treasury's share of industry points spread by employed heads, now that scale credit does?
+*question · raised 2026-09-27 · from BL-1149 (scale credit from the works), its lane report and cold review, 2026-09-27*
+
+NR-897 spreads a treasury's share of industry points over its realm's centre-holding regions by urban heads. BL-1149 made scale credit read only the heads a work employs (min(urban heads, employed)); the treasury half still reads urban heads (history_sim.cpp ~10344-10348), so part of every region's points still follows the crowd. On the lane's reading 94% of 1960 urban heads are employed by no work.
+
+**Why it matters.** Whether all industry points follow the works, or the treasury still builds where the people are.
+
+- A: spread by employed heads, so every point follows the works
+- B: keep urban heads (a treasury builds where its people are)
+- C: other
+
+> **Recommendation:** A: one rule for both halves of the points; read after BL-1155 (every centre a work candidate) raises the employed share.
+
+> **RESOLVED.** RULED (Ben, 2026-10-01, the open calls form): A: the treasury share spreads by the heads a region's works employ. INDUSTRIALISATION.md § 1; the centres lane builds it on the BL-1137 branch.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`*
+
+### NR-965 — CALL: the campaign scorer cannot see the fleet rule, so a realm with no fleet picks the same failing crossing every round
+*question · raised 2026-09-27 · from BL-1152 (fleets project power), lane checkpoint c4b5027e, 2026-09-27*
+
+With the fleet rule on, a crossing whose fleet cannot lift the army, or which the defenders out-project, never sails. But the campaign scorer does not read either test, so a realm without a fleet scores the same crossing best every round and fails it every round: at 1 man per hull, on 7 seeds, 4,161 such failures against 672 real crossings. Most crossings today launch from a hub with no built port (88-90%) and with no fleet (69-77%).
+
+**Why it matters.** A realm that wastes every round on a crossing it cannot make stops acting; the fleet rule would freeze overseas realms rather than make fleets matter.
+
+- A: the candidate list drops a crossing the rule would refuse (a legality filter, like the other gates on a verb, not a scorer term)
+- B: a refused crossing is remembered and not re-scored for a term (a cooldown)
+- C: other
+
+> **Recommendation:** A: the scorer already only scores legal verbs; the fleet test becomes part of legality. Check it against the grant register (AI_OPPONENT.md § 11) first.
+
+> **RESOLVED.** RULED (Ben, 2026-10-01, the open calls form): A: a crossing the fleet rule would refuse is not a candidate -- a legality filter, like every other verb gate, not a scorer term. EXPLORATION.md; BL-1152 builds it.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
 

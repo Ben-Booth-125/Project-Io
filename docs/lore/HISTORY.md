@@ -458,8 +458,12 @@ A work's benefit splits by who receives it: local effects are valued against the
 endowment, reach against the polity's **mean** holding. Scoring reach against the *total* makes it
 worth ~40× every local effect and reduces the roster to its five road rows.
 
-**Bounded by construction**, like the other four verbs. Two candidate regions per polity per
-round — the capital, plus one rotated through the holdings by a hash of (polity, year, slot).
+**SETTLED (Ben, 2026-09-27): every region a polity holds that stands a centre is a candidate**,
+still one work a round and the same scorer. Two candidates kept industry to about 110 of some
+15,000 regions on the curated seeds, because a work anywhere but the capital waited for the
+rotation to reach it; the bound is now the centres the polity holds. *The rule it replaces, kept
+for the record:* **bounded by construction**, like the other four verbs, two candidate regions per
+polity per round — the capital, plus one rotated through the holdings by a hash of (polity, year, slot).
 Scoring every holding would be O(held × rows) inside the most expensive pass in generation; the
 rotation still reaches every region over a run, because the round count is large against any one
 polity's holdings.
