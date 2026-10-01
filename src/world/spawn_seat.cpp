@@ -2,6 +2,7 @@
 
 #include "components.hpp"
 #include "market_clearing.hpp" // market_for_tile — the score's own catchment partition
+#include "corporation_generation.hpp" // BL-1154: the seat opens unarmed
 
 #include <algorithm>
 #include <random>
@@ -269,10 +270,21 @@ bool repoint_player(world& w, entity_id corp)
 {
     if (corp == null_entity || w.corporations.find(corp) == w.corporations.end())
         return false;
+    const entity_id previous = w.player_entity;
     for (auto& [id, cc] : w.corporations)
         cc.is_player = false;
     w.corporations[corp].is_player = true;
     w.player_entity                = corp;
+    // BL-1154 (Ben, 2026-10-01, NR-963 A): THE SEAT OPENS UNARMED, WHICHEVER
+    // CORPORATION IT IS. Rivals were armed at chartering and the generation-time
+    // pick was not; when the seat moves, the new seat's opening force goes and
+    // the corporation it leaves takes the one every rival has. Deterministic and
+    // draw-free: the seeding is a nearest-valid-tile search.
+    if (previous != corp)
+    {
+        disarm_corporation(w, corp);
+        arm_corporation(w, previous);
+    }
     return true;
 }
 

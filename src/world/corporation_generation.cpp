@@ -1460,6 +1460,81 @@ void seed_starting_military(world& w, entity_id corp_id,
 
 } // namespace
 
+bool corporation_has_opening_force(const world& w, entity_id corp)
+{
+    const auto it = w.corporations.find(corp);
+    if (it == w.corporations.end())
+        return false;
+    for (const entity_id bid : it->second.assets)
+    {
+        const auto b = w.buildings.find(bid);
+        if (b != w.buildings.end() && b->second.type == building_type::military_base)
+            return true;
+    }
+    return false;
+}
+
+void arm_rivals(world& w)
+{
+    // Ascending corporation id (std::map), so the bases claim ground in one
+    // order on every machine; occupancy from every building standing.
+    std::map<entity_id, bool> rivals;
+    for (const auto& [cid, cc] : w.corporations)
+        if (!cc.is_background && cid != w.player_entity)
+            rivals[cid] = true;
+    std::unordered_set<entity_id> occupied;
+    occupied.reserve(w.buildings.size() * 2);
+    for (const auto& [bid, bc] : w.buildings)
+        occupied.insert(bc.tile);
+    for (const auto& [cid, _] : rivals)
+        if (!corporation_has_opening_force(w, cid))
+            seed_starting_military(w, cid, occupied);
+}
+
+void arm_corporation(world& w, entity_id corp)
+{
+    const auto it = w.corporations.find(corp);
+    if (it == w.corporations.end() || it->second.is_background
+        || corporation_has_opening_force(w, corp))
+        return;
+    std::unordered_set<entity_id> occupied;
+    occupied.reserve(w.buildings.size() * 2);
+    for (const auto& [bid, bc] : w.buildings)
+        occupied.insert(bc.tile);
+    seed_starting_military(w, corp, occupied);
+}
+
+void disarm_corporation(world& w, entity_id corp)
+{
+    auto it = w.corporations.find(corp);
+    if (it == w.corporations.end())
+        return;
+    // Its units first (ascending id, so the erase order is fixed), then its
+    // military bases with their stockpiles, out of its asset list too.
+    std::vector<entity_id> units;
+    for (const auto& [uid, uc] : w.units)
+        if (uc.owner == corp)
+            units.push_back(uid);
+    std::sort(units.begin(), units.end());
+    for (const entity_id uid : units)
+        w.units.erase(uid);
+    std::vector<entity_id>& assets = it->second.assets;
+    std::vector<entity_id> kept;
+    kept.reserve(assets.size());
+    for (const entity_id bid : assets)
+    {
+        const auto b = w.buildings.find(bid);
+        if (b != w.buildings.end() && b->second.type == building_type::military_base)
+        {
+            w.buildings.erase(bid);
+            w.stockpiles.erase(bid);
+            continue;
+        }
+        kept.push_back(bid);
+    }
+    assets = std::move(kept);
+}
+
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631, re-pointed by BL-638). One more mapping
 // over an existing signal — and BL-638 is the story of which one.
@@ -2072,14 +2147,21 @@ std::vector<entity_id> generate_corporations(
     // is a nearest-valid-tile search — so a world generated with the flag off is
     // identical to one generated with it on minus the bases and units, and every
     // downstream RNG stream is untouched.
-    if (params.seed_starting_force)
+    //
+    // BL-1154 (Ben, 2026-10-01, NR-963 A; MILITARY.md § "BL-476 rivals start
+    // armed"): RIVALS ARE ALWAYS ARMED; the flag now governs the SEAT only. The
+    // player keeps opening unarmed (BL-635's cause stays off for the player);
+    // `seed_starting_force` still arms it too, for
+    // rival_military_seeding_harness. Order unchanged: the player (when armed)
+    // first, then the rivals in corp_ids order.
     {
         std::unordered_set<entity_id> military_occupied_tiles;
         military_occupied_tiles.reserve(w.buildings.size());
         for (const auto& [bld_id, bc] : w.buildings)
             military_occupied_tiles.insert(bc.tile);
 
-        seed_starting_military(w, w.player_entity, military_occupied_tiles);
+        if (params.seed_starting_force)
+            seed_starting_military(w, w.player_entity, military_occupied_tiles);
 
         for (entity_id corp_id : corp_ids)
             if (corp_id != w.player_entity)
@@ -4339,6 +4421,13 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         w.player_entity = seat;
         rep.player = seat;
     }
+
+    // BL-1154 (Ben, 2026-10-01, NR-963 A): every chartered SPECIALIST but the
+    // seat opens armed — a muster base beside its HQ and a 50-head unit
+    // (`seed_starting_military`, MILITARY.md § "BL-476 rivals start armed").
+    // Background firms stay unarmed. After the pick and every placement, so no
+    // charter's ground or draw moves; the seeding draws no randomness.
+    arm_rivals(w);
 
     // --- unspent, by (centre, reason) ----------------------------------------
     // `centres` is in budget-map order, i.e. ascending centre id, and the reasons
