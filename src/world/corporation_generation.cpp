@@ -2215,6 +2215,10 @@ std::vector<entity_id> generate_background_firms(
     // the shape is agreed.
     constexpr int   max_firms_per_body      = 200;  // anti-runaway only
     constexpr int   per_resource_firm_cap   = 8;    // provisional - measure, then pin
+    // A FLAT 2, AND IT STAYS FLAT (BL-1146 review, 2026-09-27): the cap that
+    // scales with the province's centre (NR-960, `province_firm_cap`) is a
+    // BUDGET-WORLD ruling (INDUSTRIALISATION.md § 1). This pass runs on every
+    // world without a budget, whose bytes are BL-1031's pinned contract.
     constexpr int   per_province_firm_cap   = 2;    // provisional - measure, then pin
     constexpr int   max_iterations_per_body = 3 * max_firms_per_body; // slack for placement misses
 
@@ -2626,12 +2630,14 @@ constexpr uint32_t k_charter_salt_player       = 0x2E97A3F1u;
 // 6's function-local constants in `generate_background_firms` — which stay
 // exactly as they are for every world without a budget.
 //
-// The per-province cap is the one number still held here. It is the budget
-// path's own constant, NOT a copy that tracks Pass 6's. RULED at 2 on a budget
-// world (Ben, 2026-09-21, NR-910; INDUSTRIALISATION.md § 1), read on real budgets:
-// BL-1043 stage 2 found it binding on 7 of 16 library worlds at 650:4, up to
-// 24.6% of one world's budget, and the ruling keeps it there.
-constexpr int k_charter_per_province_firm_cap = 2;
+// The per-province cap is NOT a number held here any more (BL-1146, Ben,
+// 2026-09-27, NR-960 B, superseding NR-910's flat 2 on a budget world): it
+// scales with the province's centre, two firms per rung (`province_firm_cap`,
+// corporation_generation.hpp). It is the budget path's own rule, NOT a copy
+// that tracks Pass 6's: Pass 6 keeps its flat 2 in `generate_background_firms`
+// for every world without a budget, as above. The flat 2 was ruled against
+// provinces of <= 20 tiles; a province is now its centre's whole ground, and a
+// flat 2 pushed a city's industry out into its villages.
 
 /// A fresh std::mt19937 for one (centre, role): a KEYED draw, the checkpoint
 /// idiom — the (seed ^ role salt, centre id) pair keys a splitmix64 state, one
@@ -2764,11 +2770,14 @@ const std::vector<entity_id>& charter_region_window(const world& w, const nation
 /// @p window minus every tile standing in a province already at the firm cap —
 /// Pass 6's per-province cap, applied to where the ANCHOR may stand (the anchor's
 /// province is the firm's province, exactly the tile Pass 6 reads the cap at).
+/// The cap is the province's own (BL-1146): `province_firm_cap_of` its centre
+/// rung in @p province_rungs, the table `province_centre_rungs` builds once.
 /// Filtering before placement rather than refusing after it keeps a capped
 /// province from consuming draws; the admissible set is the same.
 std::vector<entity_id> charter_under_province_cap(const world& w,
                                                   const std::vector<entity_id>& window,
-                                                  const std::map<uint32_t, int>& by_province)
+                                                  const std::map<uint32_t, int>& by_province,
+                                                  const std::map<uint32_t, int>& province_rungs)
 {
     std::vector<entity_id> out;
     out.reserve(window.size());
@@ -2777,8 +2786,10 @@ std::vector<entity_id> charter_under_province_cap(const world& w,
         const uint32_t prov = w.provinces.province_of(tid);
         if (prov != 0)
         {
+            // BL-1146: the province's cap is its centre's rung x 2.
             const auto it = by_province.find(prov);
-            if (it != by_province.end() && it->second >= k_charter_per_province_firm_cap)
+            if (it != by_province.end()
+                && it->second >= province_firm_cap_of(province_rungs, prov))
                 continue;
         }
         out.push_back(tid);
@@ -2871,14 +2882,15 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      const settlement_state* settle,
                                      const charter_spend_params& spend,
                                      const std::map<uint32_t, int>* by_province,
+                                     const std::map<uint32_t, int>* province_rungs,
                                      charter_rung& rung_out,
                                      charter_unspent_reason& fail_out)
 {
     for (const charter_rung rung : k_charter_rungs)
     {
         const std::vector<entity_id>& base = charter_rung_window(w, nc, cc, settle, spend, rung);
-        std::vector<entity_id> window = (by_province != nullptr)
-            ? charter_under_province_cap(w, base, *by_province)
+        std::vector<entity_id> window = (by_province != nullptr && province_rungs != nullptr)
+            ? charter_under_province_cap(w, base, *by_province, *province_rungs)
             : base;
         if (window.empty())
             continue;
@@ -3317,6 +3329,23 @@ bool charter_budget_affords_specialist(const world& w, const charter_budget& bud
     return false;
 }
 
+std::map<uint32_t, int> province_centre_rungs(const world& w)
+{
+    // THE ANCHOR IS province.cpp's (`province_anchors`), the one derivation
+    // `seed_province_holders` reads too; the rung is its summed scale on the
+    // ladder's 1-5.
+    std::map<uint32_t, int> rungs;
+    for (const auto& [prov, anchor] : province_anchors(w))
+        rungs[prov] = std::clamp(anchor.scale, 1, 5);
+    return rungs;
+}
+
+int province_firm_cap_of(const std::map<uint32_t, int>& rungs, uint32_t province)
+{
+    const auto it = rungs.find(province);
+    return province_firm_cap(it == rungs.end() ? 1 : it->second);
+}
+
 budget_world_reading read_budget_world(const world& w, const charter_budget* budget,
                                        const charter_spend_params& spend,
                                        const recipe_registry* reg)
@@ -3618,6 +3647,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     for (const auto& kv : w.buildings)
         occupied.insert(kv.second.tile);
 
+    // BL-1146: each province's centre rung, read ONCE — the walk charters
+    // buildings, never centres, so no rung moves under it.
+    const std::map<uint32_t, int> province_rungs = province_centre_rungs(w);
+
     // --- EACH BODY'S DENSITY RULE, FIXED BEFORE THE WALK (BL-1039) -----------
     // Every body holding a nation-resolved budgeted centre gets its state here,
     // before any charter lands, and three things are read ONCE:
@@ -3747,7 +3780,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             charter_unspent_reason why = charter_unspent_reason::window_exhausted;
             std::vector<entity_id> assets = charter_place(w, nc, focus, occupied, asset_rng, cc,
                                                           settle, spend, /*by_province=*/nullptr,
-                                                          rung, why);
+                                                          /*province_rungs=*/nullptr, rung, why);
             if (assets.empty())
             {
                 // No ground in either window: the specialist's price stays
@@ -4120,7 +4153,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 else
                 {
                     assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
-                                           by_province, rung, why);
+                                           by_province, &province_rungs, rung, why);
                     if (!assets.empty())
                         break;
                     focus_failed[fi] = true;

@@ -189,7 +189,8 @@ int remove_specialist_roster(world& w);
 ///    then the biggest gap under the body's per-good cap (`per_resource_firm_cap`
 ///    under `fixed`, none under `lifted`), or under `sqrt_capital` the goods IN
 ///    TURN, a firm per good each pass up to the square-root cap (BL-1039) — under
-///    the budget path's per-province cap 2 when `spend.province_cap`, the
+///    the per-province cap when `spend.province_cap` (2 per rung of the
+///    province's centre, BL-1146 — `province_firm_cap`), the
 ///    `density_ceiling` under `sqrt_capital`, and the `max_firms_per_body`
 ///    runaway guard. Each body's firm points B, its goods with demand G, B_ref
 ///    and the per-good cap are FIXED BEFORE THE WALK (`charter_sqrt_per_good_cap`).
@@ -280,6 +281,39 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
 /// no_specialists` with neither `refused` nor `fell_back`).
 bool charter_budget_affords_specialist(const world& w, const charter_budget& budget,
                                        const charter_spend_params& spend);
+
+/// BL-1146 (Ben, 2026-09-27, NR-960 B, superseding NR-910's flat 2;
+/// INDUSTRIALISATION.md § 1, "The per-province cap scales with the province's
+/// centre") — THE PER-PROVINCE FIRM CAP. Two firms per rung the province's centre
+/// reaches: a village 2, a town 4, a city 6, a metropolis 8, a megacity 10. A
+/// province is its centre's whole ground (PROVINCES.md), so a flat 2 pushed a
+/// city's industry out into its villages. A BUDGET-WORLD RULE (INDUSTRIALISATION.md
+/// § 1): read by the charter budget's walk (`charter_web_from_budget`) and nothing
+/// else. Pass 6 (`generate_background_firms`), which runs on every world without
+/// a budget, keeps its flat 2 — those worlds' bytes are BL-1031's pinned contract.
+/// A rung outside 1-5 reads as the nearest end: a province with no centre is a
+/// village's 2.
+inline constexpr int k_province_firm_cap_per_rung = 2;
+
+constexpr int province_firm_cap(int centre_rung)
+{
+    return k_province_firm_cap_per_rung * (centre_rung < 1 ? 1 : centre_rung > 5 ? 5 : centre_rung);
+}
+
+/// BL-1146 — every province's CENTRE RUNG (1-5), keyed by province id. "The
+/// province's centre" is its ANCHOR, read from `province_anchors` (province.hpp,
+/// BL-611; PROVINCES.md) — the one derivation `seed_province_holders` reads: the
+/// highest SUMMED centre scale standing on one tile of the province, ties to the
+/// lowest tile id (a razed centre keeps scale 1, so it still anchors). The rung
+/// is that sum on the ladder's 1-5, clamped: two centres sharing a tile could sum
+/// past a megacity. A province absent from the map carries no centre (the
+/// village's cap). READ-ONLY, pure, integer. The budget walk builds it ONCE: the
+/// walk charters buildings, never centres, so no rung moves under it.
+std::map<std::uint32_t, int> province_centre_rungs(const world& w);
+
+/// The cap for province @p province under @p rungs (`province_centre_rungs`):
+/// `province_firm_cap` of its rung, the village's for a province with no centre.
+int province_firm_cap_of(const std::map<std::uint32_t, int>& rungs, std::uint32_t province);
 
 /// BL-1086 (the review's fix round) — THE BUDGET-WORLD TEST, ONE PREDICATE. Is
 /// @p w, with @p budget charged at @p spend, a world whose whole web is chartered
