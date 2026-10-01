@@ -250,16 +250,18 @@ centres abandoned in play)**: a centre whose population falls below a village's 
 abandoned. **In play an abandoned centre is deleted, and its province merges into a neighbour
 (Ben, 2026-09-26, NR-948):** it joins the adjacent province of its own nation whose centre is
 nearest, the same join generation makes for a centre-less province (§ Generation), so the merged
-province's centre is its capture anchor. Only a province with no such neighbour keeps its centre
-as a ruin at the **razed tier** below, so no province is ever left without an anchor (delegated
-fallback, NR-952). Abandonment is not razing: razing stays a deliberate act and stays a tier.
+province's centre is its capture anchor. **No ruin is kept (Ben, 2026-09-27, NR-952):** a province
+with no such neighbour loses its centre and stands without one, held by its recorded holder and
+taken as any province is, by a battle decided on it. That holds because a province's id is recorded
+rather than derived from its tiles (`PROVINCES.md` § Two contracts), so neither the merge nor a
+lost centre renumbers what a battle, a march order or a save holds. Abandonment is not razing:
+razing stays a deliberate act and stays a tier.
 
 **A razed settlement is a TIER, not an erasure** (Ben, 2026-08-25; BL-624, razed settlement
 tier). Razing demotes the centre to the **razed** state: population zeroed, no labour, no
 demand, no agglomeration — but the entity, its name, its tile, and its urban ground all
 persist. Two consequences are the point: the province **keeps its capture anchor** (a ruin can
-still be taken, so razing never deletes a conquest handle — the province-settlement invariant
-survives play), and **rebuilding there is cheap** — the urban ground and the entity already
+still be taken, so razing never deletes a conquest handle), and **rebuilding there is cheap** — the urban ground and the entity already
 exist, so the ordinary growth pass re-settles a razed centre at a reduced gate rather than
 anyone founding from nothing. A shrunk or razed centre reads as historied, not deleted. Razing
 is a `corp_verb` under the ordinary command seam; no rival-AI grant covers it, so only a human

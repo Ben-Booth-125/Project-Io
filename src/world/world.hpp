@@ -333,10 +333,16 @@ struct world
     /// WRITTEN BEFORE `build_province_partition` RUNS, from
     /// `settlement_state::settled_cells` (`run_settlement`'s colonisation field,
     /// `colonisation_field::farmable` — see `hard_coded_world.cpp`). Nothing
-    /// downstream of the partition writes it, and it is NOT SERIALISED: like the
-    /// reverse index `tile_to_nation` is, it is a generation-time index with no
-    /// committed record to rebuild it from — the colonisation field itself is
-    /// discarded once the partition has read it.
+    /// downstream writes it, and it is NOT SERIALISED: like the reverse index
+    /// `tile_to_nation` is, it is a generation-time index with no committed
+    /// record to rebuild it from — the colonisation field itself is discarded
+    /// once this is written.
+    ///
+    /// NO LONGER A PARTITION INPUT (Ben, 2026-09-27, NR-954 B; BL-1150, a
+    /// centre's fill crosses the settled line): BL-849's settlement lock, which
+    /// held a province to one side of this line, retired. The record stays the
+    /// settled line's one index, read by the instruments that measure it
+    /// (province_partition_harness P2d, centre_census C7b).
     ///
     /// A `std::set` so a deterministic walk over it needs no sort of its own.
     std::set<entity_id>                                 tile_settled;

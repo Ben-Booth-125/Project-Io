@@ -81,7 +81,7 @@ independent of how the shapes are drawn.
 
 **A province is its centre's ground (Ben, 2026-09-26; BL-1133).** The fill no longer stops at a
 growth budget: every centre's province grows until its nation's land is covered, across the settled
-line as well as within it (§ The settled cells are a binding input), so every province holds a
+line as well as within it (§ Colonisation seeds the partition), so every province holds a
 centre and no centre's ground goes unclaimed. A world has at most as many provinces as centres,
 not exactly as many: a centre its stronger neighbours hem to its own tile is absorbed into one of
 theirs, counted rather than hidden (NR-954). The budget becomes a **weight on reach** (delegated reading,
@@ -114,7 +114,10 @@ provinces rather than of thousands of villages founded on empty ground.
    demography), dense enough that every province seeds from a centre of *some* scale; the
    centre is the province's **political decider** — its nation is the province's nation, and
    under BL-567 (province is the conquest unit) taking the centre takes the province, making
-   every anchor a strategic objective. *Superseded original ruling, kept for the record:*
+   every anchor a strategic objective. In play a province can outlive its centre (Ben, 2026-09-27,
+   NR-952): an abandoned centre with no neighbour of its nation to merge into leaves its province
+   standing without one, held and taken through its recorded holder. *Superseded original ruling,
+   kept for the record:*
    country no centre reaches became hinterland, seeded from the least-accessible tile.
 4. **Size is not clamped.** *"Don't reject tiny provinces"* — nothing is merged away to satisfy a
    floor, **boundaries win ties**, and on settled land nothing stops the fill before the land is
@@ -150,18 +153,16 @@ a pure-ice province gets its anchor on its least-bad tile, counted rather than h
 the lowest tile id. The spaced hinterland survives for the water domains and for the land of an
 unsettled body (no centres anywhere), where there is nothing else to seed from.
 
-### The settled cells are a binding input (Ben, 2026-09-09)
+### Colonisation seeds the partition (Ben, 2026-09-09; narrowed 2026-09-27)
 
 **Colonisation seeds the partition; this pass still draws it.** The colonisation span
-([COLONISATION.md](COLONISATION.md)) leaves a set of settled cells and their anchors, and the
-partition takes them as a **hard input** the way it already takes the national assignment — the
-ordering is unchanged (after the sim, before roads), and so is the nation lock.
+([COLONISATION.md](COLONISATION.md)) leaves the centres the fill grows from — the ordering is
+unchanged (after the sim, before roads), and so is the nation lock, which stays the one hard input.
 
 **SETTLED (Ben, 2026-09-27, NR-954): a centre's fill crosses the settled line.** The settled cells
-seed the partition, but a centre's region grows from settled ground into never-settled ground of
-its own nation, so never-settled country joins the province of the centre that reaches it. Before
-this, a settlement lock (BL-849) stopped the fill at the line, and 3,753 of 6,856 anchor villages
-were founded only to hold the never-settled ground it left over.
+no longer bound the fill: a centre's region grows from settled ground into never-settled ground of
+its own nation, so never-settled country joins the province of the centre that reaches it, and no
+anchor village is founded only to hold ground that the settled line cut off.
 
 The alternative was considered and not taken: colonisation drawing the real partition, with the
 nation carve then assigning whole provinces rather than tiles, which would make ruling 5's
@@ -351,11 +352,16 @@ gets an order that does not depend on container internals, tile-map iteration or
 bodies were created in. The id is the province's **lowest-id member tile** — derived, never
 allocated, so ascending id order is ascending lowest-member-tile order and an id cannot be
 handed out in the wrong order. **Province id 0 is a real province**, so any seam needing a
-sentinel must not use zero (NR-412).
+sentinel must not use zero (NR-412). **In play the id is recorded, not derived (Ben, 2026-09-27,
+NR-952):** the id a province carries when generation ends is kept for its life, so the merge an
+abandoned centre makes in play (`POPULATION.md` § Growth, decline and razing) keeps the surviving
+province's id, and a province that loses its centre keeps its own. Ids stay in ascending order,
+because a merge only removes one.
 
 **2. The partition is part of world generation and versions with it.** It is **never patched in
 place**: a change to the algorithm re-rolls every battle in every world, so partition fixtures do
-not survive a repartition, and that is correct rather than a defect (NR-422).
+not survive a repartition, and that is correct rather than a defect (NR-422). A merge in play is
+not a patch to the partition: it is a play event over recorded ids, and it re-rolls nothing.
 
 ### Storage and determinism
 

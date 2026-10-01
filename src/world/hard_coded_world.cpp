@@ -1132,18 +1132,18 @@ void run_culture(generation_cursor& c)
                                            /*sim_start_year=*/sim_start);
         c.clocks.settlement_end = gen_clock::now(); // BL-754
 
-        // THE SETTLED CELLS BECOME A HARD INPUT TO THE PROVINCE PARTITION
-        // (BL-849; docs/generation/PROVINCES.md § The settled cells are a
-        // binding input). `kepler_settlement.settled_cells` is raster-order,
-        // exactly the order `kepler_tiles` holds this body's tile ids in, so the
-        // two zip directly — same convention `col_sub`/`col_cov`/`col_river`
+        // THE SETTLED CELLS BECOME THE SETTLED LINE'S RECORD (BL-849;
+        // docs/generation/PROVINCES.md § The settled cells are a binding
+        // input). `kepler_settlement.settled_cells` is raster-order, exactly
+        // the order `kepler_tiles` holds this body's tile ids in, so the two
+        // zip directly — same convention `col_sub`/`col_cov`/`col_river`
         // already use inside `run_settlement` itself.
         //
-        // WRITTEN HERE, LONG BEFORE `build_province_partition` RUNS, because
-        // this is the one place both the raster and the entity ids are in
-        // scope together; the partition itself only ever reads `w.tile_settled`
-        // as a plain per-tile lookup, the same shape `tile_to_nation` already
-        // is for the national assignment.
+        // WRITTEN HERE because this is the one place both the raster and the
+        // entity ids are in scope together. The province partition no longer
+        // reads it (Ben, 2026-09-27, NR-954 B; BL-1150: the settlement lock
+        // retired and a centre's fill crosses the settled line); the settled
+        // cells seed the partition through the centres standing on them.
         for (std::size_t ci = 0;
             ci < kepler_settlement.settled_cells.size() && ci < kepler_tiles.size(); ++ci)
             if (kepler_settlement.settled_cells[ci] != 0 && kepler_tiles[ci] != null_entity)

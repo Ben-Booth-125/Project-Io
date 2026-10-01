@@ -50,6 +50,7 @@
 #include "harness_params.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <map>
@@ -217,43 +218,8 @@ int main()
                     prov_by_kind[1], by_kind[2], prov_by_kind[2]);
     }
 
-    // P2d — BL-849: THE SETTLEMENT LOCK. Every land province's tiles agree on
-    // `w.tile_settled`'s verdict, the same claim P2b/P2c make about domain and
-    // body — a province that mixed settled and unsettled ground would mean the
-    // colonisation span was read as a suggestion rather than the hard input the
-    // ruling names. Also the instrument for "province shapes visibly follow
-    // settlement history": it reports how much of the land is settled at all,
-    // and how many land provinces are wholly settled vs wholly wild — numbers
-    // that mean nothing if the partition never read the field.
-    {
-        std::size_t settled_tiles = 0, unsettled_tiles = 0;
-        std::size_t settled_provinces = 0, unsettled_provinces = 0, mixed_provinces = 0;
-        for (const province& p : part.provinces)
-        {
-            if (province_kind_of(w, p) != province_kind::land)
-                continue;
-            std::size_t s = 0, u = 0;
-            for (const entity_id t : p.tiles)
-            {
-                const bool on = w.tile_settled.find(t) != w.tile_settled.end();
-                if (on) { ++s; ++settled_tiles; } else { ++u; ++unsettled_tiles; }
-            }
-            if (s > 0 && u > 0) ++mixed_provinces;
-            else if (s > 0)     ++settled_provinces;
-            else                ++unsettled_provinces;
-        }
-        check(mixed_provinces == 0,
-              "P2d every land province is wholly settled or wholly unsettled"
-              " (the colonisation span's settled cells are a hard input, BL-849)");
-        const std::size_t land_tiles = settled_tiles + unsettled_tiles;
-        std::printf("        settlement: %zu/%zu land tiles settled (%.1f%%) across"
-                    " %zu settled + %zu unsettled land provinces (%zu mixed)\n",
-                    settled_tiles, land_tiles,
-                    land_tiles > 0 ? 100.0 * static_cast<double>(settled_tiles)
-                                       / static_cast<double>(land_tiles)
-                                   : 0.0,
-                    settled_provinces, unsettled_provinces, mixed_provinces);
-    }
+    // P2d moved below the grids (it walks nation components on them): BL-1150
+    // rewrote it from the retired settlement lock to the rule that replaced it.
 
     // P3 — tile_province agrees with the province membership, both ways.
     {
@@ -310,6 +276,134 @@ int main()
         const auto tit = w.tiles.find(tid);
         if (tit != w.tiles.end() && domain_matches(tit->second.substrate, province_kind::land))
             covered_bodies.insert(tit->second.body);
+    }
+
+    // P2d — THE SETTLED LINE IS NOT A BORDER (Ben, 2026-09-27, NR-954 B;
+    // BL-1150, a centre's fill crosses the settled line). REWRITTEN from the
+    // row that asserted BL-849's settlement lock ("every land province is
+    // wholly settled or wholly unsettled"), which the ruling retired. The rule
+    // that replaced it: a centre's region grows from settled ground into the
+    // never-settled ground of its own nation, so never-settled country joins
+    // the province of the centre that reaches it. Asserted by re-deriving it
+    // here, not by reading province.cpp: on covered land, split the land into
+    // NATION COMPONENTS (hex-connected land of one nation, null counted as a
+    // nation, exactly the nation lock's reach); every tile of a component that
+    // holds a seed centre must lie in a province holding a seed centre. A
+    // settlement lock would strand the never-settled part of such a component
+    // in an anchor-only province and fail this row.
+    //
+    // NOT VACUOUS: the row also requires some seeded province to hold
+    // never-settled ground, i.e. the fill demonstrably crossed the line on
+    // this world (the default world's land is ~80% never settled).
+    {
+        std::set<entity_id> seed_tiles;
+        for (const auto& [cid, tid] : w.population_centre_tile)
+        {
+            const auto pit = w.population_centres.find(cid);
+            if (pit == w.population_centres.end() || pit->second.province_anchor)
+                continue;
+            const auto tit = w.tiles.find(tid);
+            if (tit != w.tiles.end() && covered_bodies.count(tit->second.body)
+                && domain_matches(tit->second.substrate, province_kind::land))
+                seed_tiles.insert(tid);
+        }
+        const auto nation_of = [&](entity_id t) {
+            const auto it = w.tile_to_nation.find(t);
+            return (it == w.tile_to_nation.end()) ? null_entity : it->second;
+        };
+
+        // Component labels, flood-filled in raster order per covered body.
+        std::unordered_map<entity_id, std::size_t> comp_of;
+        std::vector<bool>                          comp_has_seed;
+        for (const entity_id bid : covered_bodies)
+        {
+            const auto& grid = grids.at(bid);
+            const int   gw   = dims.at(bid).first;
+            const int   gh   = dims.at(bid).second;
+            for (const entity_id start : grid)
+            {
+                if (start == null_entity || comp_of.count(start))
+                    continue;
+                const auto sit = w.tiles.find(start);
+                if (sit == w.tiles.end()
+                    || !domain_matches(sit->second.substrate, province_kind::land))
+                    continue;
+                const std::size_t ci    = comp_has_seed.size();
+                const entity_id   natn  = nation_of(start);
+                bool              seeded = false;
+                std::vector<entity_id> open{ start };
+                comp_of[start] = ci;
+                while (!open.empty())
+                {
+                    const entity_id cur = open.back();
+                    open.pop_back();
+                    if (seed_tiles.count(cur))
+                        seeded = true;
+                    const tile_component& tc = w.tiles.at(cur);
+                    for (int s = 0; s < 6; ++s)
+                    {
+                        const auto c = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, s);
+                        if (c.gy < 0 || c.gy >= gh)
+                            continue;
+                        int nx = c.gx % gw;
+                        if (nx < 0)
+                            nx += gw;
+                        const entity_id n = grid[static_cast<std::size_t>(c.gy) * gw + nx];
+                        if (n == null_entity || comp_of.count(n))
+                            continue;
+                        const auto nit = w.tiles.find(n);
+                        if (nit == w.tiles.end()
+                            || !domain_matches(nit->second.substrate, province_kind::land)
+                            || nation_of(n) != natn)
+                            continue;
+                        comp_of[n] = ci;
+                        open.push_back(n);
+                    }
+                }
+                comp_has_seed.push_back(seeded);
+            }
+        }
+
+        std::set<uint32_t> seeded_provinces;
+        for (const entity_id t : seed_tiles)
+            seeded_provinces.insert(part.province_of(t));
+
+        std::size_t stranded = 0, crossed_tiles = 0, crossed_provinces = 0;
+        std::size_t settled_tiles = 0, unsettled_tiles = 0;
+        for (const province& p : part.provinces)
+        {
+            if (province_kind_of(w, p) != province_kind::land || !covered_bodies.count(p.body))
+                continue;
+            const bool seeded = seeded_provinces.count(p.id) != 0;
+            std::size_t s = 0, u = 0;
+            for (const entity_id t : p.tiles)
+            {
+                const bool on = w.tile_settled.find(t) != w.tile_settled.end();
+                if (on) { ++s; ++settled_tiles; } else { ++u; ++unsettled_tiles; }
+                const auto cit = comp_of.find(t);
+                if (!seeded && cit != comp_of.end() && comp_has_seed[cit->second])
+                    ++stranded;
+            }
+            if (seeded && u > 0)
+            {
+                crossed_tiles += u;
+                if (s > 0)
+                    ++crossed_provinces;
+            }
+        }
+        const std::size_t land_tiles = settled_tiles + unsettled_tiles;
+        std::printf("        covered land: %zu/%zu tiles settled (%.1f%%); %zu never-settled tiles"
+                    " held by seeded provinces, %zu of those provinces spanning the line;"
+                    " %zu tiles of a seeded nation component left outside a seeded province\n",
+                    settled_tiles, land_tiles,
+                    land_tiles > 0 ? 100.0 * static_cast<double>(settled_tiles)
+                                       / static_cast<double>(land_tiles)
+                                   : 0.0,
+                    crossed_tiles, crossed_provinces, stranded);
+        check(!seed_tiles.empty() && stranded == 0 && crossed_provinces > 0,
+              "P2d the settled line is not a border: every tile of a nation component holding"
+              " a seed centre lies in a seeded province, and the fill crossed the line"
+              " (NR-954 B, BL-1150)");
     }
 
     const auto collect_land_edges = [](const world& sw,
@@ -575,9 +669,9 @@ int main()
                 const auto own_nat = w.tile_to_nation.find(p.tiles.front());
                 const entity_id own_nation =
                     (own_nat == w.tile_to_nation.end()) ? null_entity : own_nat->second;
-                // BL-849: the settlement lock's key for this singleton.
-                const bool own_settled = w.tile_settled.find(p.tiles.front())
-                                        != w.tile_settled.end();
+                // BL-1150: no settled verdict is read — the settlement lock
+                // (BL-849) retired, so a neighbour across the settled line was
+                // always somewhere to go.
                 for (int s = 0; s < 6; ++s)
                 {
                     const auto c =
@@ -607,13 +701,6 @@ int main()
                             (nn == w.tile_to_nation.end()) ? null_entity : nn->second;
                         if (n_nation != own_nation)
                             continue;
-                        // BL-849: and the same settled/unsettled verdict — a
-                        // neighbour on the other side of the colonisation
-                        // frontier was never available either, the same
-                        // reasoning as the nation check just above.
-                        const bool n_settled = w.tile_settled.find(n) != w.tile_settled.end();
-                        if (n_settled != own_settled)
-                            continue;
                     }
                     ++not_islands;
                     break;
@@ -623,7 +710,7 @@ int main()
                         singles, not_islands == 0 ? "yes" : "NO");
             check(not_islands == 0,
                   "P5d every surviving one-tile province had NOWHERE TO GO (no same-domain,"
-                  " on-land same-nation, and on-land same-settlement, neighbour)");
+                  " and on-land same-nation, neighbour; the settled line is no bar, BL-1150)");
         }
     }
 
@@ -883,15 +970,17 @@ int main()
         }
 
         // G — A PROVINCE IS ITS CENTRE'S GROUND (Ben, 2026-09-26; BL-1133). On
-        // covered land the centre fill runs until its nation's land within its
-        // settled cell is covered, so:
+        // covered land the centre fill runs until its nation's land is covered,
+        // across the settled line as well as within it (BL-1150), so:
         //
         //   G1  every covered-land province resting on an ANCHOR FOUNDING alone
         //       is an UNCENTRED ISLAND — asserted on the shipped partition,
-        //       re-derived from tiles, nations and the settled set: no tile of
-        //       it touches land of its own nation and settlement verdict
-        //       outside it. (If one did, that ground belongs to a province some
+        //       re-derived from tiles and nations: no tile of it touches land
+        //       of its own nation outside it, whatever either side's settled
+        //       verdict. (If one did, that ground belongs to a province some
         //       centre reached, and the fill would have reached this one too.)
+        //       RE-SCOPED by BL-1150: it used to exempt a neighbour across the
+        //       settled line, which the retired settlement lock kept apart.
         //   G2  the ledger, asserted: anchor-only provinces == anchor foundings
         //       == the partition's uncentred islands; and every seeded centre
         //       tile on covered land heads a province of its own except the
@@ -926,8 +1015,6 @@ int main()
                 const auto nat = w.tile_to_nation.find(p.tiles.front());
                 const entity_id own_nation =
                     (nat == w.tile_to_nation.end()) ? null_entity : nat->second;
-                const bool own_settled =
-                    w.tile_settled.find(p.tiles.front()) != w.tile_settled.end();
                 const auto& grid = grids.at(p.body);
                 const int   gw   = dims.at(p.body).first;
                 const int   gh   = dims.at(p.body).second;
@@ -958,9 +1045,7 @@ int main()
                             (nn == w.tile_to_nation.end()) ? null_entity : nn->second;
                         if (n_nation != own_nation)
                             continue;
-                        if ((w.tile_settled.find(n) != w.tile_settled.end()) != own_settled)
-                            continue;
-                        touches = true;
+                        touches = true; // BL-1150: whatever the settled verdict
                     }
                     if (touches)
                         break;
@@ -979,7 +1064,8 @@ int main()
                         anchor_only, sg.uncentred_regions, anchor_foundings);
             check(!covered_bodies.empty() && not_island == 0,
                   "G1  every covered-land province on an anchor founding alone is an UNCENTRED"
-                  " ISLAND (touches no land of its nation and settlement verdict outside itself)");
+                  " ISLAND (touches no land of its own nation outside itself, across the settled"
+                  " line or not; BL-1150)");
             check(anchor_only == anchor_foundings
                       && anchor_only == static_cast<std::size_t>(sg.uncentred_regions)
                       && seeded_provinces + static_cast<std::size_t>(
@@ -1114,32 +1200,100 @@ int main()
 
     {
         struct tally { std::size_t n = 0, border = 0; };
-        tally river, steep, plain, all;
+        struct classes { tally river, steep, plain, all; };
+        classes pooled;
+        std::map<entity_id, classes> by_body; // ordered: the rows print in body order
         for (const land_edge& e : edges)
         {
             const bool is_border = part.province_of(e.a) != part.province_of(e.b);
             const auto bump      = [&](tally& t) { ++t.n; if (is_border) ++t.border; };
-            bump(all);
-            if (e.river)               bump(river);
-            if (e.dh >= p90_dh)        bump(steep);
-            if (!e.river && e.dh < p90_dh) bump(plain);
+            classes& b = by_body[w.tiles.at(e.a).body];
+            for (classes* c : { &pooled, &b })
+            {
+                bump(c->all);
+                if (e.river)                   bump(c->river);
+                if (e.dh >= p90_dh)            bump(c->steep);
+                if (!e.river && e.dh < p90_dh) bump(c->plain);
+            }
         }
         const auto pctf = [](const tally& t) {
             return t.n ? 100.0 * double(t.border) / double(t.n) : 0.0;
         };
-        std::printf("  C2  border share by edge class — all %.2f%% (%zu edges)\n", pctf(all),
-                    all.n);
-        std::printf("      river  %6.2f%% (%zu)   steep(>=p90) %6.2f%% (%zu)   plain %6.2f%%"
-                    " (%zu)\n",
-                    pctf(river), river.n, pctf(steep), steep.n, pctf(plain), plain.n);
+        std::printf("  C2  border share by edge class — all %.2f%% (%zu edges)\n",
+                    pctf(pooled.all), pooled.all.n);
+        std::printf("      pooled over bodies (REPORTED): river %6.2f%% (%zu)   steep(>=p90)"
+                    " %6.2f%% (%zu)   plain %6.2f%% (%zu)\n",
+                    pctf(pooled.river), pooled.river.n, pctf(pooled.steep), pooled.steep.n,
+                    pctf(pooled.plain), pooled.plain.n);
 
-        // The two claims the ruling makes about what a boundary IS. C2c (a road
-        // binds) RETIRED with BL-623: roads are laid after the partition and
-        // are not an input to it.
-        check(river.n > 0 && pctf(river) > pctf(plain),
-              "C2a a river edge is a border more often than plain ground (rivers divide)");
-        check(steep.n > 0 && pctf(steep) > pctf(plain),
-              "C2b a steep edge is a border more often than plain ground (elevation divides)");
+        // The two claims the ruling makes about what a boundary IS, asserted
+        // LIKE FOR LIKE: on every body carrying the edge class, against the
+        // plain ground OF THAT BODY. RE-SCOPED with BL-1150 (a centre's fill
+        // crosses the settled line), which exposed that the pooled comparison
+        // mixed province grains: the covered home body (the only body with
+        // rivers, its land drawn by a few hundred unbounded centre provinces)
+        // against the hinterland bodies' 7-12 tile provinces, whose small
+        // provinces make most plain edges borders. Measured on the primary
+        // world: pooled river 44.52% vs plain 36.83% before BL-1150 and 14.92%
+        // vs 30.40% after — a "failure" that is the plain denominator moving to
+        // other bodies, while on the home body itself rivers divide both
+        // before (44.52% vs 27.73%) and after (14.92% vs 12.13%). The per-body
+        // claim is the ruling's (a river edge, other things equal, is the
+        // likelier border); the pooled line stays printed. C2c (a road binds)
+        // RETIRED with BL-623: roads are laid after the partition and are not
+        // an input to it.
+        std::size_t river_bodies = 0, steep_bodies = 0;
+        bool        rivers_divide = true, slopes_divide = true;
+        for (const auto& [bid, c] : by_body)
+        {
+            std::printf("      body %u%s: river %6.2f%% (%zu)   steep %6.2f%% (%zu)   plain"
+                        " %6.2f%% (%zu)\n",
+                        bid, covered_bodies.count(bid) ? " (covered)" : "", pctf(c.river),
+                        c.river.n, pctf(c.steep), c.steep.n, pctf(c.plain), c.plain.n);
+            if (c.river.n > 0)
+            {
+                ++river_bodies;
+                if (!(pctf(c.river) > pctf(c.plain)))
+                    rivers_divide = false;
+            }
+            if (c.steep.n > 0)
+            {
+                ++steep_bodies;
+                if (!(pctf(c.steep) > pctf(c.plain)))
+                    slopes_divide = false;
+            }
+        }
+        // REPORTED (BL-1150 review): the share of each class lying ON THE
+        // SETTLED LINE (one side in `w.tile_settled`, the other not), per body
+        // that has any. The line BL-849's retired lock drew a border along, so
+        // a class that sits on it more often was bordered more often by the
+        // lock rather than by its own edge cost.
+        {
+            std::map<entity_id, std::array<std::size_t, 4>> on_line; // river n/on, plain n/on
+            for (const land_edge& e : edges)
+            {
+                const bool line = (w.tile_settled.count(e.a) != 0) != (w.tile_settled.count(e.b) != 0);
+                auto& row = on_line[w.tiles.at(e.a).body];
+                if (e.river) { ++row[0]; if (line) ++row[1]; }
+                if (!e.river && e.dh < p90_dh) { ++row[2]; if (line) ++row[3]; }
+            }
+            for (const auto& [bid, row] : on_line)
+            {
+                if (row[1] + row[3] == 0)
+                    continue;
+                const double rp = row[0] ? 100.0 * double(row[1]) / double(row[0]) : 0.0;
+                const double pp = row[2] ? 100.0 * double(row[3]) / double(row[2]) : 0.0;
+                std::printf("      body %u on the settled line (REPORTED): river %.2f%% (%zu of %zu)"
+                            "   plain %.2f%% (%zu of %zu)   ratio %.2f\n",
+                            bid, rp, row[1], row[0], pp, row[3], row[2], pp > 0.0 ? rp / pp : 0.0);
+            }
+        }
+        check(river_bodies > 0 && rivers_divide,
+              "C2a on every body with rivers, a river edge is a border more often than that"
+              " body's plain ground (rivers divide; like for like since BL-1150)");
+        check(steep_bodies > 0 && slopes_divide,
+              "C2b on every body with steep edges, a steep edge is a border more often than"
+              " that body's plain ground (elevation divides; like for like since BL-1150)");
     }
 
     // -----------------------------------------------------------------------

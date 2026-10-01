@@ -7571,6 +7571,192 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "province-fill-crosses-settled-line",
+   "title": "BL-1150 - A centre's province fill crosses the settled line",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1150 - sprint 48 (Ben, NR-954 B, 2026-09-27)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: province_partition_harness P2d, P5d, G1 (fail on the old code)"
+     ],
+     "requirement": "The land fill crosses the settled line; the nation lock holds; water and unsettled bodies keep their seeding.",
+     "notes": "",
+     "result_metric": "Lane adc45b16: anchors 10,381 -> 1,430 pooled; lock islands 9,295 -> 0; land provinces 21,972 -> 13,232; centres incl. anchors 22,550 -> 13,599; max province unchanged at 1,383 tiles; four new 767-1,077-tile provinces held by villages and towns."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, save_roundtrip, centre_census, history_sim_harness, world_cursor_equivalence on main"
+     ],
+     "requirement": "Deterministic on main; only the known failures.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review, including the re-scoped river rows C2a/C2b and the prehistory-off digest move.",
+     "notes": "",
+     "result_metric": "Review 2026-09-27: source correct and deterministic; the nation lock intact; the prehistory-off move expected (the lock was live there). HIGH: the re-scoped river row (C2a, per body) hides a real weakening (home-body river:plain 1.61 -> 1.23; 3 of 16 shipped seeds at or below plain) and runs only on a non-shipped world -> NR-962 raised; fix round: assert across the 16 shipped seeds, a river-cost-0 mutation. Also: the firm cap re-read after BL-1150 (provinces -40%); BL-1145 sequenced after it."
+    }
+   ]
+  },
+  {
+   "brief": "scale-credit-from-works",
+   "title": "BL-1149 - A head earns industry scale credit only where a work employs it",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1149 - sprint 48 (Ben, the density calls form, 2026-09-27)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness BL1149a-f, works_roster_harness R7, centre_census C14"
+     ],
+     "requirement": "Scale credit counts min(urban heads, heads the region's built works employ); every works row carries employs, validated by the loader.",
+     "notes": "",
+     "result_metric": "Lane ec5f2308 (on the BL-1137 branch): rho(points, urban heads) 0.846 -> 0.568, rho(points, employed) 0.480 -> 0.685, points per world 107.7M -> 57.5M; employed 6% of urban heads; pre-1660 identical."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "decision: the stream rate rung and the treasury spread"
+     ],
+     "requirement": "Ben picks the rate from the 6/9/12/18 ladder; the branch merges at it.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "firm-cap-scales-with-centre",
+   "title": "BL-1146 - The per-province firm cap scales with the province's centre",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1146 - sprint 48 (Ben, NR-960 B, 2026-09-27)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: charter_refusal_probe (rule pin 2/4/6/8/10, the town case), stockpile_budget_check --firm-census on 16 seeds"
+     ],
+     "requirement": "Both caps read two firms per rung of the province's centre.",
+     "notes": "Measured on main without BL-1150; provinces fall ~40% with it, so the firm census is re-read after BL-1150 merges (BL-1150 cold review, 2026-09-27).",
+     "result_metric": "Lane c6670be9: province_cap refused 6.0% -> 3.1% of the budget; budget firms 1,911 -> 1,914 of 1,920; the most in one province 2 -> 6 (a city); markets unchanged; the winner keeps its candidate on 5 of 16. Metropolis and megacity rungs unexercised on main (no such provinces before BL-1137)."
+    },
+    {
+     "id": "R2",
+     "status": "failed",
+     "verification": [
+      "headless: spawn_solvency default (12 seeds)"
+     ],
+     "requirement": "The seat and the field stay solvent and acting.",
+     "notes": "",
+     "result_metric": "R1-R3 pass; R4 \"the field still fields a standing force\" FAILS: rival units 1 -> 0 (seed 1's last unit). Not relaxed; the thinning predates this item (baseline ~17 a seed; 3 on 29b87817) -- filed as BL-1154 (rivals field no force)."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review.",
+     "notes": "",
+     "result_metric": "Review 2026-09-27: the budget-world cap correct (no tile holds two centres; the reason path consistent). HIGH: Pass 6 (the no-budget legacy path) was changed outside NR-960 -- the main session's own brief extended it; seed 28's legacy pin moved -> reverted to a flat 2 in the fix round. Also: the town row passes by construction (cfg.c = 3 fix), the anchor rule in three copies (one helper), stale comments. R4's cause traced -> NR-963."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, landscape_search_harness, legacy digests on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "lane-port-at-coastal-seat",
+   "title": "BL-1153 - A realm's sea lane starts at its nearest coastal region's seat",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1153 - sprint 48 (Ben, NR-955 B, 2026-09-27)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: sea_lane_stamp_harness R1-R3, W1 re-count, five mutations"
+     ],
+     "requirement": "An inland lane end takes its port at its realm's nearest coastal seat; a coastless realm lays nothing.",
+     "notes": "",
+     "result_metric": "Lane 80381678: laid 327 -> 382 of 446 earned; unlaid 119 -> 64 (58 coastless realms, 6 disconnected water); 61 ends moved; lane tiles 10,657 -> 11,902. The realm read as the polity at the last close (a reading; the nation reading gains 3)."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review, fix round included.",
+     "notes": "",
+     "result_metric": "Review 2026-09-27: the pick correct and deterministic. Defects: same-port legs laid as one-tile lanes and counted; the busier-end direction read from the record end, not the picked seat (braids under currents). Gaps: the realm snapshot unbound, a silent fallback, the column wrap untested. Fix round running."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, save_roundtrip, world_cursor_equivalence on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

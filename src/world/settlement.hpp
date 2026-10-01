@@ -976,12 +976,14 @@ struct settlement_state
     /// record, it is "did anybody's stream actually live here".
     ///
     /// WHY IT IS CARRIED HERE RATHER THAN LEFT INSIDE `run_settlement`: the
-    /// province partition (`docs/generation/PROVINCES.md` § The settled cells
-    /// are a binding input) needs it as a HARD INPUT, the way it already takes
-    /// the national assignment, and the partition runs long after this call has
-    /// returned and `col_field` has gone out of scope. The caller
-    /// (`hard_coded_world.cpp`) turns this into `world::tile_settled` before
-    /// `build_province_partition` runs.
+    /// caller (`hard_coded_world.cpp`) turns it into `world::tile_settled`, the
+    /// settled line's record, long after this call has returned and `col_field`
+    /// has gone out of scope. The province partition took it as a HARD INPUT
+    /// (BL-849's settlement lock) until the lock retired (Ben, 2026-09-27,
+    /// NR-954 B; BL-1150, a centre's fill crosses the settled line —
+    /// `docs/generation/PROVINCES.md` § The settled cells are a binding input):
+    /// the settled cells now seed the partition through the centres standing on
+    /// them, and no longer bound it.
     ///
     /// EMPTY for a caller that never asked for a schedule (`sim_start_year`
     /// still at its `INT64_MAX` default runs the walk exactly as before and

@@ -57,7 +57,10 @@
 //       size distribution in land tiles (median, p90, max), overall and by
 //       the ANCHOR's scale — the anchor being the highest summed centre scale
 //       standing in the province, ties to the lowest tile id, exactly as
-//       `seed_province_holders` derives it.
+//       `seed_province_holders` derives it. C7b reads the anchor-only
+//       provinces (the uncentred islands) on their own, with WHY each is left
+//       (BL-1150): touching its own nation's land (the retired settlement
+//       lock's islands), a nation lock, water, or no nation at all.
 //     * THE SPACING LADDER ROW (C9; BL-1132, settle spacing) — one compact row per
 //       seed of what a settle-spacing candidate moves: regions, living, living
 //       regions by cell land (1 / 2-4 / 5-9 / 10-24 / 25+ tiles), centres, the
@@ -82,15 +85,32 @@
 //
 // A READING, NOT A GATE ON DENSITY. Nothing here asserts a centre count, a land
 // share or a scale mix: those are what the rule is ruled against, and a harness
-// that pinned them would be making that call. Two rows FAIL the run (exit 1):
+// that pinned them would be making that call. Rows that FAIL the run (exit 1):
 // the instrument's own honesty check (a world with no settlement record, or no
-// carved centre, would make every fit row vacuous), and THE CAP (BL-1130 review
-// fix) — the rule's own invariant on the saved sim record, not a density.
-// (The spacing, C10, fails the run too.) And THE CONSERVATION LEDGER (C13,
-// BL-1137 rebuild review): the ceiling the urbanisation stream moved sums to
-// exactly zero, and every region holds 0 <= farm-fed <= its farm-fed ceiling
-// and industrial <= urban <= population — on the generated world, not only on
-// fixtures.
+// carved centre, would make every fit row vacuous), THE CAP (BL-1130 review
+// fix) — the rule's own invariant on the saved sim record, not a density —
+// THE SPACING (C10), and THE COST MODEL ON THE SHIPPED WORLDS (C13).
+//
+//     * THE COST MODEL ON THE SHIPPED WORLDS (C13; BL-1150 review) —
+//       province_partition_harness C2a/C2b, per body and like for like, on the
+//       worlds the app ships rather than the harness's no-prehistory fixture:
+//       on every body with river edges a river edge is a province border more
+//       often than that body's plain ground (C2a, "rivers divide"), and on
+//       every body with steep edges likewise (C2b, "elevation divides").
+//       Edge classes are the harness's: a river edge carries either side's
+//       `river_edges` bit; steep is |dh| at or above the 90th percentile of
+//       this world's adjacent-land |dh| (the harness's nearest-rank index);
+//       plain is neither. Beside it, REPORTED: the share of home-body river
+//       and plain edges lying ON THE SETTLED LINE (one side in
+//       `w.tile_settled`, the other not) — the line BL-849's lock drew a border
+//       along. A C13 FAIL is Ben's call against the numbers (NR-962), not a
+//       tolerance to widen.
+//     * THE CONSERVATION LEDGER (C15, BL-1137 rebuild review): the ceiling the
+//       urbanisation stream moved sums to exactly zero, and every region holds
+//       0 <= farm-fed <= its farm-fed ceiling and industrial <= urban <=
+//       population. And THE WORKS WIRING (C14, BL-1149 review): with the works
+//       table loaded and held works employing, the span earned scale credit and
+//       moved heads.
 //
 // READ-ONLY OVER src/world/*. It calls the world's own functions and nothing in
 // src/ changes for it.
@@ -140,6 +160,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cinttypes>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cmath>
@@ -417,7 +438,15 @@ struct seed_record
     int multi_centre = 0;        ///< ...holding more than one centre of any kind
     int anchor_only = 0;         ///< ...holding an anchor founding and no seed centre
     int unanchored = 0;          ///< ...holding no centre at all (the invariant says 0)
-    int anchor_only_unsettled = 0; ///< anchor-only provinces on ground the colonisation never settled
+    int anchor_only_unsettled = 0; ///< anchor-only provinces WHOLLY on ground the colonisation never settled
+    /// BL-1150 (a centre's fill crosses the settled line): WHY each anchor-only
+    /// province — an uncentred island — is left, read off its land neighbours
+    /// outside it. `own_nation`: it touches land of its OWN nation, which the
+    /// fill should have reached (0 once the settled line is no lock; the
+    /// settlement lock's islands, before). `unowned`: no nation holds it.
+    /// `nation_lock`: its only land neighbours are another nation's.
+    /// `water`: it touches no other land at all.
+    int why_own_nation = 0, why_unowned = 0, why_nation_lock = 0, why_water = 0;
     std::vector<int> anchor_only_sizes; ///< land tiles per anchor-only province
     std::vector<int> sizes;      ///< land tiles per province
     std::vector<int> sizes_by_anchor[5]; ///< ...split by the anchor's scale (1-5)
@@ -428,6 +457,13 @@ struct seed_record
 
     int road_tiles = 0, street_tiles = 0;
     int markets = 0;
+
+    // C13, the cost model on this shipped world (BL-1150 review).
+    struct edge_class { int64_t n = 0, border = 0, on_line = 0; };
+    edge_class c13_river, c13_steep, c13_plain; ///< the HOME body's land edges
+    float c13_p90 = 0.0f;                       ///< this world's p90 of adjacent-land |dh|
+    int   c13_river_bodies = 0, c13_steep_bodies = 0; ///< bodies carrying each class
+    std::vector<std::string> c13_fail;          ///< one line per body failing C2a or C2b
 };
 
 /// The centre map: every centre by origin, so a reader can see what the density
@@ -885,6 +921,8 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
 
     // --- the provinces (BL-1133) --------------------------------------------
     {
+        std::vector<entity_id> id_at(static_cast<std::size_t>(gw) * gh, null_entity);
+        for (const auto& [tid, idx] : tile_raster) id_at[static_cast<std::size_t>(idx)] = tid;
         std::map<entity_id, int> scale_on_tile, seeds_on_tile, centres_on_tile;
         for (const auto& [cid, tid] : w.population_centre_tile)
         {
@@ -915,8 +953,42 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
             {
                 ++r.anchor_only;
                 r.anchor_only_sizes.push_back(static_cast<int>(pr.tiles.size()));
-                if (w.tile_settled.find(pr.tiles.front()) == w.tile_settled.end())
-                    ++r.anchor_only_unsettled;
+                // WHOLLY never-settled (BL-1150: a province may now span the
+                // line, so its first tile no longer speaks for all of it).
+                bool wholly_unsettled = true;
+                for (const entity_id t : pr.tiles)
+                    if (w.tile_settled.count(t) != 0) { wholly_unsettled = false; break; }
+                if (wholly_unsettled) ++r.anchor_only_unsettled;
+
+                // WHY the island is left (BL-1150), off its outside land neighbours.
+                const auto nat_of = [&](entity_id t) {
+                    const auto it = w.tile_to_nation.find(t);
+                    return it == w.tile_to_nation.end() ? null_entity : it->second;
+                };
+                const entity_id own = nat_of(pr.tiles.front());
+                const std::set<entity_id> mine(pr.tiles.begin(), pr.tiles.end());
+                bool same = false, foreign = false;
+                for (const entity_id t : pr.tiles)
+                {
+                    const auto rit = tile_raster.find(t);
+                    if (rit == tile_raster.end()) continue;
+                    const int idx = rit->second;
+                    for (int sd = 0; sd < 6; ++sd)
+                    {
+                        const auto [nx_raw, ny] = hex_neighbors::neighbour(idx % gw, idx / gw, sd);
+                        if (ny < 0 || ny >= gh) continue;
+                        const int ni = ny * gw + ((nx_raw % gw) + gw) % gw;
+                        const entity_id nb = id_at[static_cast<std::size_t>(ni)];
+                        if (nb == null_entity || mine.count(nb) != 0) continue;
+                        const tile_component* ntc = grid[static_cast<std::size_t>(ni)];
+                        if (ntc == nullptr || is_water(ntc->substrate)) continue;
+                        if (nat_of(nb) == own) same = true; else foreign = true;
+                    }
+                }
+                if (same)                     ++r.why_own_nation;
+                else if (own == null_entity)  ++r.why_unowned;
+                else if (foreign)             ++r.why_nation_lock;
+                else                          ++r.why_water;
             }
             if (centres_here == 0) { ++r.unanchored; continue; }
             const int n = static_cast<int>(pr.tiles.size());
@@ -925,6 +997,116 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
         }
         world wc = w; // read-only over the census world: the rebuild runs on a copy
         build_province_partition(wc, w.provinces.seed, &r.part_stats);
+    }
+
+    // --- C13 the cost model on the shipped world (BL-1150 review) ----------
+    // province_partition_harness C2a/C2b's classes, re-derived here from the
+    // tiles: every adjacent pair of land tiles on one body, once, from its
+    // lower id (the harness's collect_land_edges).
+    {
+        std::map<entity_id, std::pair<int, int>>    bdims;
+        std::map<entity_id, std::vector<entity_id>> rasters;
+        for (const auto& [bid, bc] : w.bodies)
+            if (bc.grid_width > 0 && bc.grid_height > 0)
+            {
+                bdims[bid] = { bc.grid_width, bc.grid_height };
+                rasters[bid].assign(static_cast<std::size_t>(bc.grid_width) * bc.grid_height,
+                                    null_entity);
+            }
+        for (const auto& [tid, tc] : w.tiles)
+        {
+            const auto rit = rasters.find(tc.body);
+            if (rit == rasters.end()) continue;
+            const auto& d = bdims.at(tc.body);
+            if (tc.grid_x < 0 || tc.grid_x >= d.first || tc.grid_y < 0 || tc.grid_y >= d.second)
+                continue;
+            rit->second[static_cast<std::size_t>(tc.grid_y) * d.first + tc.grid_x] = tid;
+        }
+        struct land_edge { entity_id body; float dh; bool river, border, on_line; };
+        std::vector<land_edge> edges;
+        for (const auto& [bid, raster] : rasters) // ascending body id
+        {
+            const int bw = bdims.at(bid).first, bh = bdims.at(bid).second;
+            for (const entity_id t : raster)
+            {
+                if (t == null_entity) continue;
+                const tile_component& tc = w.tiles.at(t);
+                if (is_water(tc.substrate)) continue;
+                for (int s = 0; s < 6; ++s)
+                {
+                    const auto [nx_raw, ny] = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, s);
+                    if (ny < 0 || ny >= bh) continue;
+                    const int nx = ((nx_raw % bw) + bw) % bw;
+                    const entity_id n = raster[static_cast<std::size_t>(ny) * bw + nx];
+                    if (n == null_entity || n <= t) continue;
+                    const tile_component& nt = w.tiles.at(n);
+                    if (is_water(nt.substrate)) continue;
+                    land_edge e;
+                    e.body    = bid;
+                    e.dh      = std::fabs(tc.height - nt.height);
+                    e.river   = ((tc.river_edges >> s) & 1u) != 0u
+                                || ((nt.river_edges >> ((s + 3) % 6)) & 1u) != 0u;
+                    e.border  = w.provinces.province_of(t) != w.provinces.province_of(n);
+                    e.on_line = (w.tile_settled.count(t) != 0) != (w.tile_settled.count(n) != 0);
+                    edges.push_back(e);
+                }
+            }
+        }
+        std::vector<float> dh;
+        dh.reserve(edges.size());
+        for (const land_edge& e : edges) dh.push_back(e.dh);
+        std::sort(dh.begin(), dh.end());
+        if (!dh.empty())
+            r.c13_p90 = dh[std::min(dh.size() - 1, static_cast<std::size_t>(0.9 * double(dh.size())))];
+
+        using ec = seed_record::edge_class;
+        struct classes { ec river, steep, plain; };
+        std::map<entity_id, classes> by_body;
+        for (const land_edge& e : edges)
+        {
+            classes& c = by_body[e.body];
+            const auto bump = [&](ec& k) { ++k.n; if (e.border) ++k.border; if (e.on_line) ++k.on_line; };
+            if (e.river) bump(c.river);
+            if (e.dh >= r.c13_p90) bump(c.steep);
+            if (!e.river && e.dh < r.c13_p90) bump(c.plain);
+        }
+        const auto share = [](const ec& k) { return k.n ? double(k.border) / double(k.n) : 0.0; };
+        for (const auto& [bid, c] : by_body)
+        {
+            if (bid == body)
+            {
+                r.c13_river = c.river;
+                r.c13_steep = c.steep;
+                r.c13_plain = c.plain;
+            }
+            char line[192];
+            if (c.river.n > 0)
+            {
+                ++r.c13_river_bodies;
+                if (!(share(c.river) > share(c.plain)))
+                {
+                    std::snprintf(line, sizeof line,
+                                  "C2a body %u%s: river %.2f%% (%" PRId64 ") <= plain %.2f%% (%" PRId64 ")",
+                                  bid, bid == body ? " (home)" : "", 100.0 * share(c.river),
+                                  c.river.n, 100.0 * share(c.plain), c.plain.n);
+                    r.c13_fail.emplace_back(line);
+                }
+            }
+            if (c.steep.n > 0)
+            {
+                ++r.c13_steep_bodies;
+                if (!(share(c.steep) > share(c.plain)))
+                {
+                    std::snprintf(line, sizeof line,
+                                  "C2b body %u%s: steep %.2f%% (%" PRId64 ") <= plain %.2f%% (%" PRId64 ")",
+                                  bid, bid == body ? " (home)" : "", 100.0 * share(c.steep),
+                                  c.steep.n, 100.0 * share(c.plain), c.plain.n);
+                    r.c13_fail.emplace_back(line);
+                }
+            }
+        }
+        if (r.c13_river_bodies == 0) r.c13_fail.emplace_back("C2a no body carries a river edge");
+        if (r.c13_steep_bodies == 0) r.c13_fail.emplace_back("C2b no body carries a steep edge");
     }
 
     if (!map_dir.empty())
@@ -1110,16 +1292,25 @@ int main(int argc, char** argv)
                     r.part_stats.uncentred_regions, r.part_stats.covered_centre_singletons_absorbed);
     }
 
-    std::printf("\nC7b the provinces resting on an anchor founding alone\n");
-    std::printf("seed  anchor_only  on_unsettled_ground | size: median  p90   max  one_tile\n");
+    std::printf("\nC7b the provinces resting on an anchor founding alone (the uncentred islands)\n");
+    std::printf("seed  anchor_only  wholly_unsettled | size: median  p90   max  one_tile |"
+                " why left: own_nation  nation_lock  water  unowned\n");
+    int64_t why[4] = {};
     for (const seed_record& r : recs)
     {
         const size_summary s = summarise(r.anchor_only_sizes);
         const int one = static_cast<int>(
             std::count(r.anchor_only_sizes.begin(), r.anchor_only_sizes.end(), 1));
-        std::printf("%4u  %11d  %19d | %12d  %4d  %4d  %8d\n", r.seed, r.anchor_only,
-                    r.anchor_only_unsettled, s.median, s.p90, s.max, one);
+        std::printf("%4u  %11d  %16d | %12d  %4d  %4d  %8d | %20d  %11d  %5d  %7d\n", r.seed,
+                    r.anchor_only, r.anchor_only_unsettled, s.median, s.p90, s.max, one,
+                    r.why_own_nation, r.why_nation_lock, r.why_water, r.why_unowned);
+        why[0] += r.why_own_nation; why[1] += r.why_nation_lock;
+        why[2] += r.why_water; why[3] += r.why_unowned;
     }
+    std::printf("pool  why left: own_nation %" PRId64 "  nation_lock %" PRId64 "  water %" PRId64
+                "  unowned %" PRId64 "  (own_nation is the settlement lock's islands; 0 once the"
+                " fill crosses the settled line, BL-1150)\n",
+                why[0], why[1], why[2], why[3]);
 
     std::printf("\n=== C8 province size (land tiles) by the ANCHOR's scale: n / median / p90 / max ===\n");
     std::printf("seed  %-22s  %-22s  %-22s  %-22s  %-22s\n", "village(1)", "town(2)", "city(3)",
@@ -1148,6 +1339,48 @@ int main(int argc, char** argv)
         std::printf("  %-22s", cell);
     }
     std::printf("\n");
+
+    std::printf("\n=== C13 the cost model on the shipped worlds (province_partition_harness C2a/C2b,"
+                " per body, like for like; BL-1150 review) ===\n");
+    std::printf("home body: border share of each edge class, ratio to plain; ON THE SETTLED LINE:"
+                " share of each class with one side settled and the other not\n");
+    std::printf("seed  p90|dh| | river%%    (n)  plain%%     (n)  r/p  | steep%%    (n)  s/p  |"
+                " on line: river%%  plain%%  r/p | bodies r/s | C2a  C2b\n");
+    seed_record::edge_class pr_river, pr_steep, pr_plain;
+    const auto shr = [](const seed_record::edge_class& k) {
+        return k.n ? 100.0 * double(k.border) / double(k.n) : 0.0;
+    };
+    const auto onl = [](const seed_record::edge_class& k) {
+        return k.n ? 100.0 * double(k.on_line) / double(k.n) : 0.0;
+    };
+    const auto ratio = [](double a, double b) { return b > 0.0 ? a / b : 0.0; };
+    const auto add = [](seed_record::edge_class& to, const seed_record::edge_class& k) {
+        to.n += k.n; to.border += k.border; to.on_line += k.on_line;
+    };
+    for (const seed_record& r : recs)
+    {
+        bool a_ok = true, b_ok = true;
+        for (const std::string& f : r.c13_fail)
+        {
+            if (f.rfind("C2a", 0) == 0) a_ok = false;
+            if (f.rfind("C2b", 0) == 0) b_ok = false;
+        }
+        std::printf("%4u  %.4f | %6.2f %6" PRId64 "  %6.2f %8" PRId64 "  %4.2f | %6.2f %6" PRId64
+                    "  %4.2f | %14.2f  %6.2f  %4.2f | %4d/%-4d | %-4s %-4s\n",
+                    r.seed, r.c13_p90, shr(r.c13_river), r.c13_river.n, shr(r.c13_plain),
+                    r.c13_plain.n, ratio(shr(r.c13_river), shr(r.c13_plain)), shr(r.c13_steep),
+                    r.c13_steep.n, ratio(shr(r.c13_steep), shr(r.c13_plain)), onl(r.c13_river),
+                    onl(r.c13_plain), ratio(onl(r.c13_river), onl(r.c13_plain)),
+                    r.c13_river_bodies, r.c13_steep_bodies, a_ok ? "ok" : "FAIL",
+                    b_ok ? "ok" : "FAIL");
+        add(pr_river, r.c13_river); add(pr_steep, r.c13_steep); add(pr_plain, r.c13_plain);
+    }
+    std::printf("pool          | %6.2f %6" PRId64 "  %6.2f %8" PRId64 "  %4.2f | %6.2f %6" PRId64
+                "  %4.2f | %14.2f  %6.2f  %4.2f |\n",
+                shr(pr_river), pr_river.n, shr(pr_plain), pr_plain.n,
+                ratio(shr(pr_river), shr(pr_plain)), shr(pr_steep), pr_steep.n,
+                ratio(shr(pr_steep), shr(pr_plain)), onl(pr_river), onl(pr_plain),
+                ratio(onl(pr_river), onl(pr_plain)));
 
     std::printf("\n=== C9 the settle-spacing ladder row (BL-1132; spacing %d tiles) ===\n",
                 generation_settle_spacing_tiles);
@@ -1197,7 +1430,7 @@ int main(int argc, char** argv)
     // moves ceiling, never makes it, so the ceiling it moved sums to exactly
     // zero over the world; and every region holds 0 <= farm-fed <= its
     // farm-fed ceiling and industrial <= urban <= population.
-    std::printf("\n=== C13 the conservation ledger (every region at the close; a FAIL row) ===\n");
+    std::printf("\n=== C15 the conservation ledger (every region at the close; a FAIL row) ===\n");
     std::printf("seed  carried_sum | farm_fed>ceiling  farm_fed<0  industrial>urban  urban>population | ok\n");
     for (const seed_record& r : recs)
         std::printf("%4u  %11" PRId64 " | %16d  %10d  %16d  %16d | %s\n", r.seed, r.ledger_carried_sum,
@@ -1244,6 +1477,7 @@ int main(int argc, char** argv)
         if (!r.spacing_ok) ++fails;
         if (!r.ledger_ok) ++fails;
         if (!r.wiring_ok) ++fails;
+        if (!r.c13_fail.empty()) ++fails;
     }
     // POPULATION.md § Generation: "a 1960 world aims at roughly 500 centres" --
     // an aim the forces are calibrated against, never a count any rule
@@ -1295,9 +1529,24 @@ int main(int argc, char** argv)
                         "urban, %d urban over population\n",
                         r.seed, r.ledger_carried_sum, r.ledger_farm_over, r.ledger_farm_negative,
                         r.ledger_ind_over_urban, r.ledger_urban_over_pop);
+        // BL-1150 review, the partition's cost model on the shipped world
+        // (province_partition_harness C2a/C2b, per body): rivers and slopes
+        // divide. Ben's call against the numbers (NR-962), never a tolerance.
+        for (const std::string& f : r.c13_fail)
+            std::printf("FAIL  seed %u: C13 %s\n", r.seed, f.c_str());
     }
-    std::printf("\n%s\n", fails == 0 ? "centre_census: OK (the cap, the spacing, the conservation ledger and the "
-                                       "works wiring hold; no density is asserted)"
-                                     : "centre_census: FAIL (see the FAIL rows)");
+    int c13_seeds = 0, other_fails = 0;
+    for (const seed_record& r : recs)
+    {
+        if (!r.c13_fail.empty()) ++c13_seeds;
+        if (!r.ok || !r.cap_ok || !r.spacing_ok || !r.ledger_ok || !r.wiring_ok) ++other_fails;
+    }
+    if (fails == 0)
+        std::printf("\ncentre_census: OK (the cap, the spacing, the cost model, the conservation ledger and the works wiring hold; no density is"
+                    " asserted)\n");
+    else
+        std::printf("\ncentre_census: FAIL (see the FAIL rows: %d seed(s) fail C13, the cost model;"
+                    " %d fail the honesty check, the cap, the spacing, the ledger or the wiring)\n",
+                    c13_seeds, other_fails);
     return fails == 0 ? 0 : 1;
 }
