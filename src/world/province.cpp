@@ -209,7 +209,16 @@ int edge_cost_impl(uint32_t seed, entity_id a_id, const tile_component& a, entit
 
     int c = k_province_edge_base_cost;
 
-    if (((a.river_edges >> side) & 1u) != 0u || ((b.river_edges >> opposite) & 1u) != 0u)
+    // A RIVER DIVIDES ITS BANKS (Ben, 2026-10-01, NR-962 B; BL-1156). A river
+    // is a run of course tiles (`river_edges != 0`) joined by the steps its
+    // bits mark, from each course tile to the next downstream. The fill pays
+    // the river's cost to step ONTO or OFF a course sideways — one end a
+    // course tile, the step not one the river flows through — so crossing
+    // from bank to bank costs it twice, and stepping along the course pays
+    // nothing extra. Symmetric: both ends' course-ness and either side's bit.
+    const bool along = ((a.river_edges >> side) & 1u) != 0u
+                       || ((b.river_edges >> opposite) & 1u) != 0u;
+    if (!along && (a.river_edges != 0u || b.river_edges != 0u))
         c += k_province_river_edge_cost;
 
     const float dh = std::fabs(a.height - b.height);

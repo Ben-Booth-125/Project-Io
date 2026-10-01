@@ -94,17 +94,18 @@
 //     * THE COST MODEL ON THE SHIPPED WORLDS (C13; BL-1150 review) —
 //       province_partition_harness C2a/C2b, per body and like for like, on the
 //       worlds the app ships rather than the harness's no-prehistory fixture:
-//       on every body with river edges a river edge is a province border more
-//       often than that body's plain ground (C2a, "rivers divide"), and on
-//       every body with steep edges likewise (C2b, "elevation divides").
-//       Edge classes are the harness's: a river edge carries either side's
-//       `river_edges` bit; steep is |dh| at or above the 90th percentile of
-//       this world's adjacent-land |dh| (the harness's nearest-rank index);
-//       plain is neither. Beside it, REPORTED: the share of home-body river
-//       and plain edges lying ON THE SETTLED LINE (one side in
-//       `w.tile_settled`, the other not) — the line BL-849's lock drew a border
-//       along. A C13 FAIL is Ben's call against the numbers (NR-962), not a
-//       tolerance to widen.
+//       on every body with rivers a step ACROSS a course (onto or off a course
+//       tile sideways, the step the cost model charges since BL-1156, a river
+//       divides its banks) is a province border more often than that body's
+//       plain ground AND than a step ALONG the course (C2a; the along class is
+//       the control that shares the centres-on-rivers confound), and on every
+//       body with steep edges a steep edge beats plain ground (C2b). Steep is
+//       |dh| at or above the 90th percentile of this world's adjacent-land |dh|
+//       (the harness's nearest-rank index); plain is none of the others.
+//       REPORTED beside it: BANKS — home-body course sites (one inflow, one
+//       outflow) whose two banks lie in one province, how many provinces do
+//       that, and the one doing it most. A C13 FAIL is a call against the
+//       numbers, never a tolerance to widen.
 //
 // READ-ONLY OVER src/world/*. It calls the world's own functions and nothing in
 // src/ changes for it.
@@ -309,7 +310,15 @@ struct seed_record
 
     // C13, the cost model on this shipped world (BL-1150 review).
     struct edge_class { int64_t n = 0, border = 0, on_line = 0; };
-    edge_class c13_river, c13_steep, c13_plain; ///< the HOME body's land edges
+    edge_class c13_river, c13_cross, c13_steep, c13_plain; ///< the HOME body's land edges
+    /// BL-1156: home-body course tiles with one inflow and one outflow whose two
+    /// banks (the land beside the course on either side of the flow) are both
+    /// readable, and of those how many have the two banks in ONE province.
+    int64_t c13_bank_sites = 0, c13_banks_joined = 0;
+    int     c13_joining_provinces = 0;   ///< distinct provinces joining two banks somewhere
+    int     c13_joining_max_sites = 0;   ///< the most sites one province joins
+    uint32_t c13_joining_max_id = 0;     ///< ...that province
+    int     c13_joining_max_tiles = 0;   ///< ...and its land tiles
     float c13_p90 = 0.0f;                       ///< this world's p90 of adjacent-land |dh|
     int   c13_river_bodies = 0, c13_steep_bodies = 0; ///< bodies carrying each class
     std::vector<std::string> c13_fail;          ///< one line per body failing C2a or C2b
@@ -792,7 +801,12 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
                 continue;
             rit->second[static_cast<std::size_t>(tc.grid_y) * d.first + tc.grid_x] = tid;
         }
-        struct land_edge { entity_id body; float dh; bool river, border, on_line; };
+        // `river`: ALONG a course (the river bit on the step). `cross`: a step
+        // onto or off a course sideways — one end a course tile, the step not
+        // along the flow. BL-1156 (a river divides its banks; Ben, 2026-10-01,
+        // NR-962 B): the crossing is what the cost model charges, so C2a
+        // asserts the CROSSING class; the along class is reported.
+        struct land_edge { entity_id body; float dh; bool river, cross, border, on_line; };
         std::vector<land_edge> edges;
         for (const auto& [bid, raster] : rasters) // ascending body id
         {
@@ -816,12 +830,56 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
                     e.dh      = std::fabs(tc.height - nt.height);
                     e.river   = ((tc.river_edges >> s) & 1u) != 0u
                                 || ((nt.river_edges >> ((s + 3) % 6)) & 1u) != 0u;
+                    e.cross   = !e.river && (tc.river_edges != 0 || nt.river_edges != 0);
                     e.border  = w.provinces.province_of(t) != w.provinces.province_of(n);
                     e.on_line = (w.tile_settled.count(t) != 0) != (w.tile_settled.count(n) != 0);
                     edges.push_back(e);
                 }
             }
         }
+        // BOTH BANKS IN ONE PROVINCE (BL-1156). A course tile with exactly one
+        // inflow and one outflow side splits its other four sides into two
+        // arcs, one per bank. A site is JOINED when some land, non-course tile
+        // on each arc lies in the same province.
+        if (const auto hit = rasters.find(body); hit != rasters.end())
+        {
+            const int bw = bdims.at(body).first, bh = bdims.at(body).second;
+            std::map<uint32_t, int> joined_by_province;
+            for (const entity_id t : hit->second)
+            {
+                if (t == null_entity) continue;
+                const tile_component& tc = w.tiles.at(t);
+                if (is_water(tc.substrate) || tc.river_edges == 0) continue;
+                int sides[2], k = 0;
+                for (int s = 0; s < 6; ++s)
+                    if ((tc.river_edges >> s) & 1u) { if (k < 2) sides[k] = s; ++k; }
+                if (k != 2) continue;
+                std::set<uint32_t> arc[2];
+                for (int s = 0; s < 6; ++s)
+                {
+                    if (s == sides[0] || s == sides[1]) continue;
+                    const int a = (s > sides[0] && s < sides[1]) ? 0 : 1;
+                    const auto [nx_raw, ny] = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, s);
+                    if (ny < 0 || ny >= bh) continue;
+                    const entity_id n = hit->second[static_cast<std::size_t>(ny) * bw + ((nx_raw % bw) + bw) % bw];
+                    if (n == null_entity) continue;
+                    const tile_component& nt = w.tiles.at(n);
+                    if (is_water(nt.substrate) || nt.river_edges != 0) continue;
+                    arc[a].insert(w.provinces.province_of(n));
+                }
+                if (arc[0].empty() || arc[1].empty()) continue;
+                ++r.c13_bank_sites;
+                for (const uint32_t p : arc[0])
+                    if (arc[1].count(p) != 0) { ++r.c13_banks_joined; ++joined_by_province[p]; break; }
+            }
+            r.c13_joining_provinces = static_cast<int>(joined_by_province.size());
+            for (const auto& [pid, n] : joined_by_province)
+                if (n > r.c13_joining_max_sites) { r.c13_joining_max_sites = n; r.c13_joining_max_id = pid; }
+            if (const province* jp = r.c13_joining_max_sites > 0
+                                         ? w.provinces.find(r.c13_joining_max_id) : nullptr)
+                r.c13_joining_max_tiles = static_cast<int>(jp->tiles.size());
+        }
+
         std::vector<float> dh;
         dh.reserve(edges.size());
         for (const land_edge& e : edges) dh.push_back(e.dh);
@@ -830,15 +888,16 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
             r.c13_p90 = dh[std::min(dh.size() - 1, static_cast<std::size_t>(0.9 * double(dh.size())))];
 
         using ec = seed_record::edge_class;
-        struct classes { ec river, steep, plain; };
+        struct classes { ec river, cross, steep, plain; };
         std::map<entity_id, classes> by_body;
         for (const land_edge& e : edges)
         {
             classes& c = by_body[e.body];
             const auto bump = [&](ec& k) { ++k.n; if (e.border) ++k.border; if (e.on_line) ++k.on_line; };
             if (e.river) bump(c.river);
+            if (e.cross) bump(c.cross);
             if (e.dh >= r.c13_p90) bump(c.steep);
-            if (!e.river && e.dh < r.c13_p90) bump(c.plain);
+            if (!e.river && !e.cross && e.dh < r.c13_p90) bump(c.plain);
         }
         const auto share = [](const ec& k) { return k.n ? double(k.border) / double(k.n) : 0.0; };
         for (const auto& [bid, c] : by_body)
@@ -846,19 +905,24 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
             if (bid == body)
             {
                 r.c13_river = c.river;
+                r.c13_cross = c.cross;
                 r.c13_steep = c.steep;
                 r.c13_plain = c.plain;
             }
             char line[192];
-            if (c.river.n > 0)
+            if (c.cross.n > 0)
             {
                 ++r.c13_river_bodies;
-                if (!(share(c.river) > share(c.plain)))
+                // Against plain ground AND the step along the course: the
+                // control that shares the centres-on-rivers confound (harness C2a).
+                if (!(share(c.cross) > share(c.plain)) || !(share(c.cross) > share(c.river)))
                 {
                     std::snprintf(line, sizeof line,
-                                  "C2a body %u%s: river %.2f%% (%" PRId64 ") <= plain %.2f%% (%" PRId64 ")",
-                                  bid, bid == body ? " (home)" : "", 100.0 * share(c.river),
-                                  c.river.n, 100.0 * share(c.plain), c.plain.n);
+                                  "C2a body %u%s: river crossing %.2f%% (%" PRId64 ") not above plain"
+                                  " %.2f%% (%" PRId64 ") and along %.2f%% (%" PRId64 ")",
+                                  bid, bid == body ? " (home)" : "", 100.0 * share(c.cross),
+                                  c.cross.n, 100.0 * share(c.plain), c.plain.n,
+                                  100.0 * share(c.river), c.river.n);
                     r.c13_fail.emplace_back(line);
                 }
             }
@@ -1109,22 +1173,23 @@ int main(int argc, char** argv)
     std::printf("\n");
 
     std::printf("\n=== C13 the cost model on the shipped worlds (province_partition_harness C2a/C2b,"
-                " per body, like for like; BL-1150 review) ===\n");
-    std::printf("home body: border share of each edge class, ratio to plain; ON THE SETTLED LINE:"
-                " share of each class with one side settled and the other not\n");
-    std::printf("seed  p90|dh| | river%%    (n)  plain%%     (n)  r/p  | steep%%    (n)  s/p  |"
-                " on line: river%%  plain%%  r/p | bodies r/s | C2a  C2b\n");
-    seed_record::edge_class pr_river, pr_steep, pr_plain;
+                " per body, like for like; BL-1150 review, BL-1156) ===\n");
+    std::printf("home body: border share of each edge class and its ratio to plain. CROSS = a step onto or"
+                " off a course sideways (C2a's class, BL-1156); ALONG = a step along a course"
+                " (reported); plain excludes both. BANKS: course sites (one in, one out) with both"
+                " banks in one province\n");
+    std::printf("seed  p90|dh| | cross%%    (n)  along%%   (n)  plain%%     (n)  c/p   a/p | steep%%    (n)  s/p |"
+                " banks joined/sites  provs  max(sites,tiles) | C2a  C2b\n");
+    seed_record::edge_class pr_river, pr_cross, pr_steep, pr_plain;
+    int64_t pr_sites = 0, pr_joined = 0;
     const auto shr = [](const seed_record::edge_class& k) {
         return k.n ? 100.0 * double(k.border) / double(k.n) : 0.0;
-    };
-    const auto onl = [](const seed_record::edge_class& k) {
-        return k.n ? 100.0 * double(k.on_line) / double(k.n) : 0.0;
     };
     const auto ratio = [](double a, double b) { return b > 0.0 ? a / b : 0.0; };
     const auto add = [](seed_record::edge_class& to, const seed_record::edge_class& k) {
         to.n += k.n; to.border += k.border; to.on_line += k.on_line;
     };
+    int c2a_red = 0;
     for (const seed_record& r : recs)
     {
         bool a_ok = true, b_ok = true;
@@ -1133,22 +1198,25 @@ int main(int argc, char** argv)
             if (f.rfind("C2a", 0) == 0) a_ok = false;
             if (f.rfind("C2b", 0) == 0) b_ok = false;
         }
-        std::printf("%4u  %.4f | %6.2f %6" PRId64 "  %6.2f %8" PRId64 "  %4.2f | %6.2f %6" PRId64
-                    "  %4.2f | %14.2f  %6.2f  %4.2f | %4d/%-4d | %-4s %-4s\n",
-                    r.seed, r.c13_p90, shr(r.c13_river), r.c13_river.n, shr(r.c13_plain),
-                    r.c13_plain.n, ratio(shr(r.c13_river), shr(r.c13_plain)), shr(r.c13_steep),
-                    r.c13_steep.n, ratio(shr(r.c13_steep), shr(r.c13_plain)), onl(r.c13_river),
-                    onl(r.c13_plain), ratio(onl(r.c13_river), onl(r.c13_plain)),
-                    r.c13_river_bodies, r.c13_steep_bodies, a_ok ? "ok" : "FAIL",
-                    b_ok ? "ok" : "FAIL");
-        add(pr_river, r.c13_river); add(pr_steep, r.c13_steep); add(pr_plain, r.c13_plain);
+        if (!a_ok) ++c2a_red;
+        std::printf("%4u  %.4f | %6.2f %6" PRId64 "  %6.2f %5" PRId64 "  %6.2f %8" PRId64 "  %4.2f  %4.2f | %6.2f %6"
+                    PRId64 "  %4.2f | %6" PRId64 "/%-6" PRId64 " %5d  %4d,%-5d | %-4s %-4s\n",
+                    r.seed, r.c13_p90, shr(r.c13_cross), r.c13_cross.n, shr(r.c13_river), r.c13_river.n,
+                    shr(r.c13_plain), r.c13_plain.n, ratio(shr(r.c13_cross), shr(r.c13_plain)),
+                    ratio(shr(r.c13_river), shr(r.c13_plain)), shr(r.c13_steep), r.c13_steep.n,
+                    ratio(shr(r.c13_steep), shr(r.c13_plain)), r.c13_banks_joined, r.c13_bank_sites,
+                    r.c13_joining_provinces, r.c13_joining_max_sites, r.c13_joining_max_tiles,
+                    a_ok ? "ok" : "FAIL", b_ok ? "ok" : "FAIL");
+        add(pr_river, r.c13_river); add(pr_cross, r.c13_cross);
+        add(pr_steep, r.c13_steep); add(pr_plain, r.c13_plain);
+        pr_sites += r.c13_bank_sites; pr_joined += r.c13_banks_joined;
     }
-    std::printf("pool          | %6.2f %6" PRId64 "  %6.2f %8" PRId64 "  %4.2f | %6.2f %6" PRId64
-                "  %4.2f | %14.2f  %6.2f  %4.2f |\n",
-                shr(pr_river), pr_river.n, shr(pr_plain), pr_plain.n,
-                ratio(shr(pr_river), shr(pr_plain)), shr(pr_steep), pr_steep.n,
-                ratio(shr(pr_steep), shr(pr_plain)), onl(pr_river), onl(pr_plain),
-                ratio(onl(pr_river), onl(pr_plain)));
+    std::printf("pool          | %6.2f %6" PRId64 "  %6.2f %5" PRId64 "  %6.2f %8" PRId64 "  %4.2f  %4.2f | %6.2f %6"
+                PRId64 "  %4.2f | %6" PRId64 "/%-6" PRId64 " (%.1f%%) | C2a red on %d of %zu seeds\n",
+                shr(pr_cross), pr_cross.n, shr(pr_river), pr_river.n, shr(pr_plain), pr_plain.n,
+                ratio(shr(pr_cross), shr(pr_plain)), ratio(shr(pr_river), shr(pr_plain)),
+                shr(pr_steep), pr_steep.n, ratio(shr(pr_steep), shr(pr_plain)), pr_joined, pr_sites,
+                pr_sites ? 100.0 * double(pr_joined) / double(pr_sites) : 0.0, c2a_red, recs.size());
 
     std::printf("\n=== C9 the settle-spacing ladder row (BL-1132; spacing %d tiles) ===\n",
                 generation_settle_spacing_tiles);

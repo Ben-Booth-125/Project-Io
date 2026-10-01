@@ -251,8 +251,11 @@ inline constexpr std::size_t k_sea_province_soft_target = 42;
 /// changing it rescales the whole model rather than shifting one term.
 inline constexpr int k_province_edge_base_cost = 10;
 
-/// Crossing a river edge (`tile_component::river_edges`, a per-side bitmask —
-/// already the right shape for a border). Four times plain ground: a river is
+/// Crossing a river: charged on a step ONTO or OFF a course tile
+/// (`tile_component::river_edges != 0`) that is not a step the river flows
+/// through (Ben, 2026-10-01, NR-962 B; BL-1156, a river divides its banks), so
+/// bank to bank pays it twice and travel along a course pays nothing extra.
+/// Four times plain ground: a river is
 /// the strongest single boundary signal the terrain offers, and this is the
 /// anchor the elevation coefficient is then pinned AGAINST rather than a
 /// number chosen on its own.
