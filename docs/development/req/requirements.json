@@ -7700,13 +7700,57 @@
      ],
      "requirement": "A cold review.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Review 2026-09-27: the budget-world cap correct (no tile holds two centres; the reason path consistent). HIGH: Pass 6 (the no-budget legacy path) was changed outside NR-960 -- the main session's own brief extended it; seed 28's legacy pin moved -> reverted to a flat 2 in the fix round. Also: the town row passes by construction (cfg.c = 3 fix), the anchor rule in three copies (one helper), stale comments. R4's cause traced -> NR-963."
     },
     {
      "id": "R4",
      "status": "pending",
      "verification": [
       "headless: world_determinism twice, landscape_search_harness, legacy digests on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "lane-port-at-coastal-seat",
+   "title": "BL-1153 - A realm's sea lane starts at its nearest coastal region's seat",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1153 - sprint 48 (Ben, NR-955 B, 2026-09-27)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: sea_lane_stamp_harness R1-R3, W1 re-count, five mutations"
+     ],
+     "requirement": "An inland lane end takes its port at its realm's nearest coastal seat; a coastless realm lays nothing.",
+     "notes": "",
+     "result_metric": "Lane 80381678: laid 327 -> 382 of 446 earned; unlaid 119 -> 64 (58 coastless realms, 6 disconnected water); 61 ends moved; lane tiles 10,657 -> 11,902. The realm read as the polity at the last close (a reading; the nation reading gains 3)."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review, fix round included.",
+     "notes": "",
+     "result_metric": "Review 2026-09-27: the pick correct and deterministic. Defects: same-port legs laid as one-tile lanes and counted; the busier-end direction read from the record end, not the picked seat (braids under currents). Gaps: the realm snapshot unbound, a silent fallback, the column wrap untested. Fix round running."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, save_roundtrip, world_cursor_equivalence on main"
      ],
      "requirement": "Gated on main.",
      "notes": "",

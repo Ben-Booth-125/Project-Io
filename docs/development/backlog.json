@@ -1462,7 +1462,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": null,
+   "sprint": 48,
    "written": "2026-09-27",
    "requires": [],
    "blocked_on": null,
@@ -1481,7 +1481,7 @@
     "src/world/corporation_generation.cpp",
     "tools/verify/spawn_solvency.cpp"
    ],
-   "design": "FOUND 2026-09-27: spawn_solvency R4 'the field still fields a standing force' reads the rival field's units at the settle's close over 12 seeds. Baseline (BL-635, 2026-08-26): 15-20 units a seed. After BL-1008 (settle 12 ticks): 0 on 3 seeds. Budget arc: 3 units in all on 29b87817, 1 on 091401ad, 0 with BL-1146 (the scaled firm cap moved seed 1's last unit). The BL-1086 lane noted the charter web gives the seated corporation no standing force either (no upkeep). MILITARY.md: rivals hire through the same hire_unit verb at a military base (BL-324 grant). WORK: find the cause from the code (no base on the charter web? the rival scorer never chooses hire? the settle too short?) and fix whichever is the defect -- do not relax R4. If the cause is a design gap (the web never builds a base, and no doc says it should), report it for Ben rather than inventing a base. The BL-1146 cold review is asked for the cause first; read it before starting."
+   "design": "RULED (Ben, 2026-10-01, NR-963 A): rivals start armed again (seed_starting_military for every non-background rival corp); the seated corp keeps opening unarmed (BL-635's cause stays off for the player). Measure rival solvency and spawn_solvency R4 before and after.\n\nCAUSE TRACED (2026-09-27, the BL-1146 cold review): no base on the charter web; the opening force opt-in and off since 2026-08-26 (seed_starting_force, BL-635); E0-ML-01 needs Cr 2,000 against openings of Cr 0-644; a 12-tick settle. A design gap with the doc disagreeing (MILITARY.md: rivals start armed) -> NR-963 put to Ben; build waits on his call.\n\nFOUND 2026-09-27: spawn_solvency R4 'the field still fields a standing force' reads the rival field's units at the settle's close over 12 seeds. Baseline (BL-635, 2026-08-26): 15-20 units a seed. After BL-1008 (settle 12 ticks): 0 on 3 seeds. Budget arc: 3 units in all on 29b87817, 1 on 091401ad, 0 with BL-1146 (the scaled firm cap moved seed 1's last unit). The BL-1086 lane noted the charter web gives the seated corporation no standing force either (no upkeep). MILITARY.md: rivals hire through the same hire_unit verb at a military base (BL-324 grant). WORK: find the cause from the code (no base on the charter web? the rival scorer never chooses hire? the settle too short?) and fix whichever is the defect -- do not relax R4. If the cause is a design gap (the web never builds a base, and no doc says it should), report it for Ben rather than inventing a base. The BL-1146 cold review is asked for the cause first; read it before starting."
   },
   {
    "status": "designed",
@@ -1506,6 +1506,32 @@
     "src/world/history_sim.hpp"
    ],
    "design": "SETTLED (Ben, 2026-09-27): HISTORY.md § The verb, 'every region a polity holds that stands a centre is a candidate', still one work a round and the same scorer (work_score_q unchanged; no new scorer term). Today work_candidate_regions = 2 (history_sim.hpp ~1874; loop history_sim.cpp ~6882-6921): the capital plus one rotated region, and industry reached ~110 of ~15,000 regions. MEASURE FIRST and report: works built per span and band, industrial works by region, the employed share, points per world, and the span times (the old comment warns scoring every holding is O(held x rows) in the most expensive pass). READING TO REPORT FOR BEN: the rule applies in every span as written, so it also moves the Empires and Exploration histories (works raise capacity, manpower, reach and defence). Build it with a per-span switch, read both 'every span' and 'Industrialisation only', and commit the ruled reading (every span) unless Ben narrows it. Ordered iteration by region index; ties as the scorer already breaks them."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-10-01",
+   "requires": [
+    "BL-1150"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1156",
+   "short_name": "RIVERS_DIVIDE_BANKS",
+   "author": "Claude (sprint 48, NR-962 ruled B, 2026-10-01)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A river divides its banks: the province fill pays to cross a course, not to travel along it",
+   "authority_doc": "docs/generation/PROVINCES.md",
+   "files": [
+    "src/world/province.cpp",
+    "src/world/province.hpp",
+    "tools/verify/province_partition_harness.cpp",
+    "tools/verify/centre_census.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-10-01, NR-962 B): PROVINCES.md, 'a river divides its banks'. Today the river bit sits on the step between a course tile and its downstream neighbour (river_generation.cpp ~223-230) and province.cpp ~212-213 charges +40 there, so the fill pays to travel along a river and crosses bank to bank free. BUILD: the fill pays the river cost to step onto or off a course across the flow (or an equivalent that makes the banks two sides); stepping along a course pays nothing extra. MEASURE FIRST, then after, on the 16 shipped seeds: the river:plain border ratio (1.19 on main), C13's per-seed river rows (red on 12, 37, 38), province counts and sizes. A row: river cost 0 must turn the river row red on the harness world AND the shipped seeds."
   }
  ]
 }
