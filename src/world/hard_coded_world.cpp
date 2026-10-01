@@ -2496,14 +2496,28 @@ void run_tail(generation_cursor& c)
     // tier (`exploration_sim_params`, which the Industrialisation span inherits).
     // Purely water, so its order against the road stamps cannot matter; no-op when
     // no span ran (the record is empty).
+    //
+    // BL-1153 (NR-955 B): a lane end whose seat has no sea in reach starts from
+    // its REALM's nearest coastal seat, so the stamp is handed each region's realm
+    // -- the polity holding it at the last close, `kepler_region_polity`, the one
+    // table that still says so once `region::nation` holds a nation index. The
+    // table must be parallel to the regions; one that is not is a broken handoff
+    // and is RAISED here (BL-969's rule: recorded, never repaired). It is still
+    // handed as folded, and a region it does not reach reads as "no realm handed"
+    // in the stamp's own count, never as an unheld seat.
     if (!c.kepler_sea_legs.empty())
     {
         std::vector<history_road_node> lane_nodes;
         lane_nodes.reserve(kepler_settlement.regions.size());
         for (const region& p : kepler_settlement.regions)
             lane_nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
+        if (kepler_region_polity.size() != kepler_settlement.regions.size())
+            record_handoff_violation(c, "sea_lane_realms",
+                "kepler_region_polity holds " + std::to_string(kepler_region_polity.size())
+                + " rows for " + std::to_string(kepler_settlement.regions.size()) + " regions");
+        if (fixture != nullptr) fixture->setup_lane_realms = kepler_region_polity;
         const history_sim_params lp = exploration_sim_params(params);
-        stamp_sea_lanes(w, kepler, lane_nodes, c.kepler_sea_legs, lp.sea_lane_tier1_uses,
+        stamp_sea_lanes(w, kepler, lane_nodes, c.kepler_sea_legs, kepler_region_polity, lp.sea_lane_tier1_uses,
                         lp.sea_current_weight_q, lp.sea_current_rotation_sense);
     }
 

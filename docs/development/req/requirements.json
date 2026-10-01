@@ -7596,23 +7596,23 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice, save_roundtrip, centre_census, history_sim_harness, world_cursor_equivalence on main"
      ],
      "requirement": "Deterministic on main; only the known failures.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Main 9ec287f0: world_determinism ALL PASS twice (DB355D6BBD1156C0 / E6F431B1FEBA8085 / off C31DDE727D998BE7); save_roundtrip OK; province_partition_harness ALL PASS; world_cursor_equivalence ALL PASS; history_sim only R3a2/R3a3; centre_census FAIL only C13 (river on 12/37/38, slope on 46) -- owned by BL-1156 (NR-962 B)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold)"
      ],
      "requirement": "A cold review, including the re-scoped river rows C2a/C2b and the prehistory-off digest move.",
      "notes": "",
-     "result_metric": "Review 2026-09-27: source correct and deterministic; the nation lock intact; the prehistory-off move expected (the lock was live there). HIGH: the re-scoped river row (C2a, per body) hides a real weakening (home-body river:plain 1.61 -> 1.23; 3 of 16 shipped seeds at or below plain) and runs only on a non-shipped world -> NR-962 raised; fix round: assert across the 16 shipped seeds, a river-cost-0 mutation. Also: the firm cap re-read after BL-1150 (provinces -40%); BL-1145 sequenced after it."
+     "result_metric": "Review 2026-09-27: source correct and deterministic; the nation lock intact; the prehistory-off move expected (the lock was live there). HIGH: the re-scoped river row (C2a, per body) hides a real weakening (home-body river:plain 1.61 -> 1.23; 3 of 16 shipped seeds at or below plain) and runs only on a non-shipped world -> NR-962 raised; fix round: assert across the 16 shipped seeds, a river-cost-0 mutation. Also: the firm cap re-read after BL-1150 (provinces -40%); BL-1145 sequenced after it. Fix round 67118846: C13 per body on the 16 shipped seeds; river-cost-0 mutation red on 7 of 16 shipped (the harness world still passes)."
     }
    ]
   },

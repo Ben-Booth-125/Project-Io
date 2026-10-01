@@ -320,7 +320,9 @@ and by the current it runs with or against (`EXPLORATION.md` § Currents), so a 
 current. **A realm's port is its nearest coastal region's seat (Ben, 2026-09-27, NR-955):** a seat
 with no sea within the sim's neighbour radius (nine tiles) lays its lane from the nearest region of
 its realm that has one, rather than laying none, and the lane starts at that seat's nearest sea
-tile. The
+tile. Nearest is the sim's own region distance (Chebyshev between the seats, columns wrapping), ties
+to the lower region; the realm is the one holding the seat when the history closes. A seat no realm
+holds, or whose realm holds no coastal region, still lays none. The
 lane record carries no direction, so the walk runs toward the busier end — the seat more lanes
 touch — as the old-road stamp does (§ 4a), which is where tribute and trade flow (delegated
 readings, NR-955). A laned sea tile's traversal cost is **halved** (× 0.50): the lane is the road

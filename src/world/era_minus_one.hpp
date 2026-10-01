@@ -378,6 +378,13 @@ struct era_minus_one_fixture
     std::vector<int64_t>          setup_polity_treasuries;
     std::vector<history_corridor> setup_junction_corridors;
 
+    /// BL-1153: the per-region realm world setup handed `stamp_sea_lanes`
+    /// (the polity holding each region at the last close, -1 for none --
+    /// `generation_cursor::kepler_region_polity`), captured at that site on
+    /// the same terms, so a harness re-stamping the lane record hands the
+    /// stamp the realms it was handed rather than re-deriving them.
+    std::vector<int>              setup_lane_realms;
+
     // --- BL-1040: the Industrialisation span's own capture ---------------------
     //
     // Same discipline as the Exploration capture above. Populated only when
