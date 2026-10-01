@@ -343,6 +343,7 @@ void fold_fleet(uint64_t& h, const fleet_ledger& f)
     fold_i64(h, f.read); fold_i64(h, f.stopped); fold_i64(h, f.stopped_by_partner);
     fold_i64(h, f.unlifted); fold_i64(h, f.clipped); fold_i64(h, f.men_ashore);
     fold_i64(h, f.no_leg); fold_i64(h, f.partners_abstained); fold_i64(h, f.seat_coast_fleets);
+    fold_i64(h, f.exec_failed);
     fold_u32(h, static_cast<uint32_t>(f.stops.size()));
     for (const crossing_stop& c : f.stops)
     {

@@ -4057,21 +4057,29 @@ struct crossing_stop
     int64_t  hub_army = 0, realm_army = 0, navy = 0; ///< the attacker's, left as they stood
 };
 
-/// BL-1152 -- WHAT THE FLEET DID TO THE SPAN'S CROSSINGS. `read`: wet
-/// campaigns the rule read; `stopped` (and of them `stopped_by_partner`, where
-/// the stopper is a mutual-defence partner rather than the realm); `unlifted`:
-/// the attacker's fleet lifted no one (no fleet); `clipped`: sailed with fewer
-/// men than it gathered, `men_ashore` the difference; `no_leg`: no sea walk
-/// joined the hub's coast to the target's, so nothing contested it;
-/// `partners_abstained`: partners bound by non-aggression to the attacker;
-/// `seat_coast_fleets`: defending fleets that projected from their seat's
-/// coast, having no built port. Carried in each span's handoff and the
-/// generation cursor. NOT SERIALISED.
+/// BL-1152 -- WHAT THE FLEET DID TO THE SPAN'S CROSSINGS. The rule is a
+/// LEGALITY FILTER on the campaign verb (NR-965): a crossing it would refuse
+/// is never a candidate. So `read` counts wet (hub, target) CANDIDATES the
+/// rule examined; `stopped` the candidates it refused as out-projected (and of
+/// them `stopped_by_partner`, where the stopper is a mutual-defence partner
+/// rather than the realm); `unlifted` the candidates it refused because the
+/// attacker's fleet lifts no one (no fleet). A refusal repeats each round the
+/// candidate stands. `exec_failed`: crossings CHOSEN and then refused when
+/// launched -- the failing crossings the filter exists to remove; it reads 0
+/// unless execute's staging hub could disagree with the filter's.
+/// `clipped`: sailed with fewer men than it gathered, `men_ashore` the
+/// difference; `no_leg`: no sea walk joined the hub's coast to the target's,
+/// so nothing contested it; `partners_abstained`: partners bound by
+/// non-aggression to the attacker; `seat_coast_fleets`: defending fleets that
+/// projected from their seat's coast, having no built port (both per
+/// candidate examined). Carried in each span's handoff and the generation
+/// cursor. NOT SERIALISED.
 struct fleet_ledger
 {
     int64_t read = 0, stopped = 0, stopped_by_partner = 0, unlifted = 0, clipped = 0, men_ashore = 0;
     int64_t no_leg = 0, partners_abstained = 0, seat_coast_fleets = 0;
-    std::vector<crossing_stop> stops;
+    int64_t exec_failed = 0;
+    std::vector<crossing_stop> stops; ///< one per refused-as-out-projected candidate
 };
 
 struct history_sim_state
@@ -5429,10 +5437,20 @@ struct crossing_verdict
     int64_t attacker_power = 0, defender_power = 0; ///< at the stop tile
     int     leg_tiles = 0;
 };
+/// The sea-cost fields a polity's turn reads more than once: from a staging
+/// coast, and from a defender's ports. Valid only while the world stands still
+/// -- one polity's scoring and the launch that follows it -- so the sim builds
+/// one per polity turn and drops it. A pure memo: no answer depends on it.
+struct fleet_field_cache
+{
+    std::vector<std::pair<int, std::vector<int64_t>>> from_tile;   ///< (hub tile, field)
+    std::vector<std::pair<int, std::vector<int64_t>>> from_polity; ///< (defender id, field)
+};
 crossing_verdict judge_crossing(const std::vector<std::uint8_t>& sea, int gw, int gh,
                                 const ocean_current_field* currents, int weight_q, int64_t halving_tiles,
                                 int hub_tile, int landing_tile, int64_t attacker_navy,
-                                const std::vector<fleet_defender>& defenders);
+                                const std::vector<fleet_defender>& defenders,
+                                fleet_field_cache* cache = nullptr);
 
 /// BL-1152 -- the men a fleet lifts: `navy x men_per_hull` (0 with no
 /// fleet), or -1 = unbounded where @p men_per_hull <= 0.

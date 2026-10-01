@@ -942,23 +942,57 @@ void fleet_rows()
     check(lifted_men == 1000 && lifted.fleet.clipped == 1 && lifted.fleet.men_ashore == open_men - 1000
           && lifted_hub_army >= lifted.fleet.men_ashore,
           "P1  a crossing carries exactly its fleet's lift; the rest stay ashore, counted");
+    // NR-965: the fleet gate is a legality filter, so a fleetless realm is
+    // never OFFERED the crossing -- refused where candidates are listed,
+    // never chosen, and never a failing crossing at launch.
     const history_sim_state no_fleet = run_strait(make_strait_world(0, 5000, true, false), 10, 0);
-    check(no_fleet.fleet.unlifted == 1 && no_fleet.battles == 0,
-          "P1  a realm with no fleet lifts no one: the crossing does not sail");
+    std::printf("      no fleet, 10 men a hull: candidates refused %lld, chosen %lld, failing crossings %lld, battles %lld\n",
+                static_cast<long long>(no_fleet.fleet.unlifted), static_cast<long long>(no_fleet.campaign_chosen),
+                static_cast<long long>(no_fleet.fleet.exec_failed), static_cast<long long>(no_fleet.battles));
+    check(no_fleet.fleet.unlifted >= 1 && no_fleet.campaign_chosen == 0 && no_fleet.fleet.exec_failed == 0
+          && no_fleet.battles == 0,
+          "P1  a fleetless realm is never offered a crossing it cannot lift: refused as a candidate, never chosen, failing crossings 0 (NR-965)");
 
     // P2: the partner's fleet in reach stops the crossing; out of reach it does not.
     const history_sim_state near = run_strait(make_strait_world(100, 5000, true, false), 0, 40);
     const history_sim_state far  = run_strait(make_strait_world(100, 5000, true, false), 0, 1);
+    for (const history_sim_state* hp : { &near, &far })
+    {
+        std::printf("      (%s: read %lld, chosen %lld, by-partner %lld, exec-failed %lld; stops:", hp == &near ? "near" : "far",
+                    static_cast<long long>(hp->fleet.read), static_cast<long long>(hp->campaign_chosen),
+                    static_cast<long long>(hp->fleet.stopped_by_partner), static_cast<long long>(hp->fleet.exec_failed));
+        for (const crossing_stop& c : hp->fleet.stops)
+            std::printf(" [y%d a%d realm%d by%d region%d hub%d att%lld def%lld]", c.year, c.attacker, c.realm, c.stopper, c.region, c.hub,
+                        static_cast<long long>(c.attacker_power), static_cast<long long>(c.defender_power));
+        std::printf(")\n");
+    }
     std::printf("      partner fleet 5000 against 100: halving 40 tiles -> stopped %lld (by %d), battles %lld;"
                 " halving 1 tile -> stopped %lld, battles %lld\n",
                 static_cast<long long>(near.fleet.stopped),
                 near.fleet.stops.empty() ? -1 : static_cast<int>(near.fleet.stops[0].stopper),
                 static_cast<long long>(near.battles), static_cast<long long>(far.fleet.stopped),
                 static_cast<long long>(far.battles));
-    check(near.fleet.stopped == 1 && near.fleet.stopped_by_partner == 1 && !near.fleet.stops.empty()
-          && near.fleet.stops[0].stopper == 2 && near.battles == 0,
+    // The rule reads every wet candidate, so the target's own counter-crossing
+    // (polity 1, fleetless, against polity 0's fleet) is refused too; the rows
+    // read polity 0's candidates: one per staging hub (the seat, and the
+    // coastal water beside the target).
+    const auto stops_by = [](const history_sim_state& h, int attacker, int stopper) {
+        int64_t n = 0;
+        for (const crossing_stop& c : h.fleet.stops)
+            if (c.attacker == attacker && (stopper < 0 || c.stopper == stopper)) ++n;
+        return n;
+    };
+    const auto wet_by = [](const history_sim_state& h, int attacker) {
+        int64_t n = 0;
+        for (const battle_trace& bt : h.battle_traces) if (!bt.exec_dry && bt.attacker == attacker) ++n;
+        return n;
+    };
+    check(stops_by(near, 0, -1) == 2 && stops_by(near, 0, 2) == 2 && near.battles == 0
+          && near.campaign_chosen == 0 && near.fleet.exec_failed == 0,
           "P2  a partner's fleet in reach stops the crossing before it sails (stopped by the partner, nothing fought)");
-    check(far.fleet.stopped == 0 && far.battles >= 1,
+    // Out of reach of the near hub's leg (the seat's longer one still meets
+    // the partner's power at a halving of one tile -- both fleets decay alike).
+    check(stops_by(far, 0, -1) < stops_by(near, 0, -1) && wet_by(far, 0) == 1 && far.fleet.exec_failed == 0,
           "P2  ... and out of reach it does not: the crossing sails and is fought");
 
     // P4: the stopped crossing left the attacker's army and fleet as they stood.
@@ -979,7 +1013,7 @@ void fleet_rows()
         view.substrate = &w.ground;
         creed_state cs = strait_creeds();
         const history_sim_state hs = run_history_sim(ss, &cs, view, far_world::gw, far_world::gh, p, 4242u);
-        const bool ok = hs.capture.captured && hs.capture.polities.size() == 3 && hs.fleet.stops.size() == 1
+        const bool ok = hs.capture.captured && hs.capture.polities.size() == 3 && !hs.fleet.stops.empty()
                      && hs.fleet.stops[0].hub < hs.capture.regions.size();
         int64_t realm_close = 0;
         if (ok)
@@ -1319,7 +1353,7 @@ struct span_read
     int64_t fc_md_pairs_mean_x100 = 0, fc_md_pairs_close = 0;
     /// BL-1152: the fleet ledger (`history_sim_state::fleet`).
     int64_t fl_read = 0, fl_stopped = 0, fl_by_partner = 0, fl_unlifted = 0, fl_clipped = 0, fl_ashore = 0;
-    int64_t fl_no_leg = 0, fl_abstained = 0, fl_seat_coast = 0;
+    int64_t fl_no_leg = 0, fl_abstained = 0, fl_seat_coast = 0, fl_exec_failed = 0;
 };
 
 bool contact_known(const std::set<std::pair<int, int>>& known, int a, int b)
@@ -1418,6 +1452,7 @@ span_read read_span(const history_sim_state& hs, const std::set<std::pair<int, i
     s.fl_unlifted = hs.fleet.unlifted; s.fl_clipped = hs.fleet.clipped; s.fl_ashore = hs.fleet.men_ashore;
     s.fl_no_leg = hs.fleet.no_leg; s.fl_abstained = hs.fleet.partners_abstained;
     s.fl_seat_coast = hs.fleet.seat_coast_fleets;
+    s.fl_exec_failed = hs.fleet.exec_failed;
     return s;
 }
 
@@ -2212,7 +2247,7 @@ void put_span(std::FILE* f, const char* key, const span_read& s)
                     "\"first_crossing_year\": %lld, \"fleets_close\": %lld, \"navy_close\": %lld, "
                     "\"navy_close_max\": %lld, \"navy_steps\": %lld, \"navy_upkeep_spent\": %lld, "
                     "\"fc\": [%lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld], "
-                    "\"fl\": [%lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld]}",
+                    "\"fl\": [%lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld]}",
                  key, static_cast<long long>(s.battles), static_cast<long long>(s.wet_battles),
                  static_cast<long long>(s.neighbour), static_cast<long long>(s.frontier),
                  static_cast<long long>(s.ambiguous), static_cast<long long>(s.table),
@@ -2251,7 +2286,7 @@ void put_span(std::FILE* f, const char* key, const span_read& s)
                  static_cast<long long>(s.fl_by_partner), static_cast<long long>(s.fl_unlifted),
                  static_cast<long long>(s.fl_clipped), static_cast<long long>(s.fl_ashore),
                  static_cast<long long>(s.fl_no_leg), static_cast<long long>(s.fl_abstained),
-                 static_cast<long long>(s.fl_seat_coast));
+                 static_cast<long long>(s.fl_seat_coast), static_cast<long long>(s.fl_exec_failed));
 }
 
 void put_naval(std::FILE* f, const char* key, const naval_read& n)

@@ -1564,7 +1564,7 @@ std::vector<fleet_defender> crossing_defenders(const history_sim_state& s, const
 crossing_verdict judge_crossing(const std::vector<std::uint8_t>& sea, int gw, int gh,
                                 const ocean_current_field* currents, int weight_q, int64_t halving_tiles,
                                 int hub_tile, int landing_tile, int64_t attacker_navy,
-                                const std::vector<fleet_defender>& defenders)
+                                const std::vector<fleet_defender>& defenders, fleet_field_cache* cache)
 {
     crossing_verdict v;
     if (hub_tile < 0 || landing_tile < 0) return v;
@@ -1573,11 +1573,22 @@ crossing_verdict judge_crossing(const std::vector<std::uint8_t>& sea, int gw, in
     v.leg = true;
     v.leg_tiles = static_cast<int>(leg.size());
     if (halving_tiles <= 0 || defenders.empty()) return v;
-    const std::vector<int64_t> from_hub = sea_cost_field(sea, gw, gh, currents, weight_q, { hub_tile });
+    // A memo lookup: the field is the same integers whether built here or
+    // found in the turn's cache (linear scan; a turn reads a handful).
+    const auto field = [&](std::vector<std::pair<int, std::vector<int64_t>>>* memo, int key,
+                           const std::vector<int>& sources) -> std::vector<int64_t> {
+        if (memo != nullptr)
+            for (const auto& e : *memo) if (e.first == key) return e.second;
+        std::vector<int64_t> f = sea_cost_field(sea, gw, gh, currents, weight_q, sources);
+        if (memo != nullptr) memo->push_back({ key, f });
+        return f;
+    };
+    const std::vector<int64_t> from_hub =
+        field(cache != nullptr ? &cache->from_tile : nullptr, hub_tile, { hub_tile });
     std::vector<std::vector<int64_t>> from_def;
     from_def.reserve(defenders.size());
     for (const fleet_defender& d : defenders)
-        from_def.push_back(sea_cost_field(sea, gw, gh, currents, weight_q, d.ports));
+        from_def.push_back(field(cache != nullptr ? &cache->from_polity : nullptr, d.polity, d.ports));
     for (const int t : leg)
     {
         const std::size_t ti = static_cast<std::size_t>(t);
@@ -5945,6 +5956,44 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // year in which the ledger moves. The scan order is the sorted
             // (from, to) order of `out.grudges`, so the sum is a property of
             // the integers in the table and not of any container's layout.
+            // BL-1152 / NR-965 -- THE FLEET GATE. Whether the fleet rule lets a
+            // wet crossing from @p hub sail against region @p ti: 0 it may,
+            // 1 the attacker's fleet lifts no one (no fleet, under a lift
+            // bound), 2 the target's realm and its mutual-defence partners
+            // out-project the attacker's fleet somewhere on the leg. Asked
+            // where candidates are listed, so a refused crossing is never a
+            // candidate (a LEGALITY test, like the water gate and the treaty
+            // gate -- not a scorer term), and again where execute picks its
+            // staging hub, so it cannot launch one the scorer would refuse.
+            // The sea fields it reads are memoised for this polity's turn.
+            fleet_field_cache fleet_cache;
+            struct fleet_check { int refusal = 0; crossing_verdict v; int64_t abstained = 0; int64_t seat_coast = 0; };
+            const auto fleet_gate = [&](int hub, std::size_t ti) -> fleet_check
+            {
+                fleet_check c;
+                if (params.fleet_men_per_hull > 0
+                 && fleet_lift_capacity(q.navy_stock, params.fleet_men_per_hull) <= 0)
+                {
+                    c.refusal = 1;
+                    return c;
+                }
+                if (params.fleet_power_halving_tiles > 0)
+                {
+                    const region& hr = ss.regions[static_cast<std::size_t>(hub)];
+                    const region& tr = ss.regions[ti];
+                    const int hub_tile = nearest_sea_tile(fleet_sea, gw, gh, hr.col, hr.row, kFleetCoastRadius);
+                    const int landing  = nearest_sea_tile(fleet_sea, gw, gh, tr.col, tr.row, kFleetCoastRadius);
+                    const std::vector<fleet_defender> defenders =
+                        crossing_defenders(out, ss.regions, owner[ti], q.id, fleet_sea, gw, gh,
+                                           kFleetCoastRadius, &c.abstained);
+                    for (const fleet_defender& d : defenders) if (d.seat_coast) ++c.seat_coast;
+                    c.v = judge_crossing(fleet_sea, gw, gh, currents_on ? &currents : nullptr,
+                                         params.sea_current_weight_q, params.fleet_power_halving_tiles,
+                                         hub_tile, landing, q.navy_stock, defenders, &fleet_cache);
+                    if (c.v.stopped) c.refusal = 2;
+                }
+                return c;
+            };
             std::vector<int> fear_cache;
             const auto fear_here = [&](int target) -> int
             {
@@ -6027,6 +6076,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // one's own shore, starving on a sea leg carried by ships.
                     // Ships get the force there; they do not feed it.
                     const bool forages = dry || shore;
+
+                    // BL-1152 / NR-965 -- THE FLEET GATE (the lambda above): a
+                    // crossing the fleet rule would refuse is not a candidate.
+                    if (!dry && fleet_rule_on)
+                    {
+                        ++out.fleet.read;
+                        const fleet_check fc = fleet_gate(hi, ti);
+                        out.fleet.partners_abstained += fc.abstained;
+                        out.fleet.seat_coast_fleets  += fc.seat_coast;
+                        if (params.fleet_power_halving_tiles > 0 && fc.refusal != 1 && !fc.v.leg)
+                            ++out.fleet.no_leg;
+                        if (fc.refusal == 1) { ++out.fleet.unlifted; continue; } // no fleet: no one sails
+                        if (fc.refusal == 2)
+                        {
+                            ++out.fleet.stopped;
+                            if (fc.v.stopper != to) ++out.fleet.stopped_by_partner;
+                            crossing_stop cst;
+                            cst.year     = static_cast<int32_t>(y);
+                            cst.attacker = static_cast<uint16_t>(q.id);
+                            cst.realm    = static_cast<uint16_t>(to);
+                            cst.stopper  = static_cast<uint16_t>(fc.v.stopper >= 0 ? fc.v.stopper : 0xFFFF);
+                            cst.region   = static_cast<uint16_t>(ti);
+                            cst.hub      = static_cast<uint16_t>(hi);
+                            cst.attacker_power = fc.v.attacker_power;
+                            cst.defender_power = fc.v.defender_power;
+                            cst.hub_army = ss.regions[static_cast<std::size_t>(hi)].army_stock;
+                            for (std::size_t ri = 0; ri < ss.regions.size() && ri < owner.size(); ++ri)
+                                if (owner[ri] == q.id) cst.realm_army += ss.regions[ri].army_stock;
+                            cst.navy     = q.navy_stock;
+                            out.fleet.stops.push_back(cst);
+                            continue; // never a candidate: nothing scored, drawn or fought
+                        }
+                    }
 
                     const region& tgt = ss.regions[ti];
                     const int cap_dist = region_distance(cap, tgt, gw);
@@ -6961,69 +7043,33 @@ history_sim_state run_history_sim(settlement_state&         ss,
                      && !can_field_naval(ss.regions[hs], mil_band))
                         continue;
                     const int d = region_distance(ss.regions[hs], tgt, gw);
-                    if (d < src_d) { src_d = d; src = hi; }
+                    if (d >= src_d) continue;
+                    // BL-1152 / NR-965: and the fleet gate, by the same test
+                    // the scorer used, so execute never stages a crossing the
+                    // scorer would have refused.
+                    if (fleet_rule_on && !dry_contact(hi, ti) && fleet_gate(hi, ti).refusal != 0) continue;
+                    src_d = d; src = hi;
                 }
                 if (src < 0) break; // no legal staging holding — nothing marches
                 region& home = ss.regions[static_cast<std::size_t>(src)];
 
                 // BL-1152 -- A FLEET DECIDES WHO CROSSES (EXPLORATION.md, the
-                // SETTLED paragraph under the stocks table). Asked of a crossing
-                // (a march over sea) BEFORE a man is drawn, so a crossing that
-                // never sails leaves the attacker's army and fleet exactly as
-                // they stood and costs it the round's campaign. First the sea:
-                // the target's realm and its mutual-defence partners project
-                // their fleets over the leg from the hub's coast to the
-                // target's, and where they outweigh the attacker's anywhere
-                // along it, the crossing is stopped. Then the lift: the fleet
-                // carries at most `fleet_men_per_hull` men a hull, and a realm
-                // with no fleet lifts no one.
+                // SETTLED paragraph under the stocks table). The out-projection
+                // and no-fleet tests already ran where candidates were listed
+                // and where `src` was picked (the fleet gate, NR-965), so a
+                // crossing reaching here sails; the re-check is a guard, and
+                // `exec_failed` counts what it would have refused (0 by
+                // construction). Then the lift: the fleet carries at most
+                // `fleet_men_per_hull` men a hull.
                 const bool exec_dry = dry_contact(src, ti);
                 int64_t lift_cap = -1; // -1 = unbounded
                 if (!exec_dry && fleet_rule_on)
                 {
-                    ++out.fleet.read;
-                    const int64_t hub_army_before = home.army_stock;
-                    if (params.fleet_power_halving_tiles > 0)
-                    {
-                        const int hub_tile = nearest_sea_tile(fleet_sea, gw, gh, home.col, home.row, kFleetCoastRadius);
-                        const int landing  = nearest_sea_tile(fleet_sea, gw, gh, tgt.col, tgt.row, kFleetCoastRadius);
-                        int64_t abstained = 0;
-                        const std::vector<fleet_defender> defenders =
-                            crossing_defenders(out, ss.regions, owner[ti], q.id, fleet_sea, gw, gh,
-                                               kFleetCoastRadius, &abstained);
-                        out.fleet.partners_abstained += abstained;
-                        for (const fleet_defender& d : defenders) if (d.seat_coast) ++out.fleet.seat_coast_fleets;
-                        const crossing_verdict v = judge_crossing(
-                            fleet_sea, gw, gh, currents_on ? &currents : nullptr, params.sea_current_weight_q,
-                            params.fleet_power_halving_tiles, hub_tile, landing, q.navy_stock, defenders);
-                        if (!v.leg) ++out.fleet.no_leg;
-                        if (v.stopped)
-                        {
-                            ++out.fleet.stopped;
-                            if (v.stopper != owner[ti]) ++out.fleet.stopped_by_partner;
-                            crossing_stop cst;
-                            cst.year     = static_cast<int32_t>(y);
-                            cst.attacker = static_cast<uint16_t>(q.id);
-                            cst.realm    = static_cast<uint16_t>(owner[ti] >= 0 ? owner[ti] : 0xFFFF);
-                            cst.stopper  = static_cast<uint16_t>(v.stopper >= 0 ? v.stopper : 0xFFFF);
-                            cst.region   = static_cast<uint16_t>(ti);
-                            cst.attacker_power = v.attacker_power;
-                            cst.defender_power = v.defender_power;
-                            cst.hub      = static_cast<uint16_t>(src);
-                            cst.hub_army = hub_army_before;
-                            for (std::size_t ri = 0; ri < ss.regions.size() && ri < owner.size(); ++ri)
-                                if (owner[ri] == q.id) cst.realm_army += ss.regions[ri].army_stock;
-                            cst.navy     = q.navy_stock;
-                            out.fleet.stops.push_back(cst);
-                            break; // never sails: nothing drawn, nothing fought
-                        }
-                    }
+                    if (fleet_gate(src, ti).refusal != 0) { ++out.fleet.exec_failed; break; }
                     if (params.fleet_men_per_hull > 0)
-                    {
                         lift_cap = fleet_lift_capacity(q.navy_stock, params.fleet_men_per_hull);
-                        if (lift_cap <= 0) { ++out.fleet.unlifted; break; } // no fleet: no one sails
-                    }
                 }
+                fleet_cache = fleet_field_cache{}; // the world moves from here on
 
                 // BL-835 — THE FIELD ARMY MARCHES, AND IT LEAVES. The staging
                 // holding's whole garrison goes; `home.army_stock` is zero
