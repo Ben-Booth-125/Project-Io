@@ -1198,6 +1198,10 @@ file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/too
 set(IO_TEST_TIMEOUT_DEFAULT 60)
 set(IO_TEST_TIMEOUT_LONG 240)
 
+# Per-harness ctest arguments (BL-1159): IO_TEST_ARGS_<name> is appended to the test
+# command. Unset for every harness but those named here.
+set(IO_TEST_ARGS_road_generation_harness --seeds 0,28)
+
 # RE-TIERED AGAIN 2026-08-13. Wiring the Era -1 year-tick sim into generation
 # added ~23 s to every generated world. Harnesses that do not test the era now
 # say so (tools/verify/harness_params.hpp, `no_prehistory()`) and pay nothing.
@@ -1256,6 +1260,10 @@ set(IO_TEST_LONG_HARNESSES
     # cost of guessing the tier wrong is a Timeout, which reads as noise rather
     # than as a check that has never verified anything.
     water_ownership_census
+    # road_generation_harness moved 2026-10-02 (BL-1159): its R2s rows build the SHIPPED
+    # world per seed. Under ctest it runs seeds 0 and 28 only (IO_TEST_ARGS_road_generation_harness above); the
+    # default, with no --seeds, is the full 16-seed library for manual and sweep use.
+    road_generation_harness
 )
 
 # EXCLUDED FROM THE ROUTINE GATE - labelled `sweep`. TWO REASONS live here, and
@@ -1516,10 +1524,10 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
             LABELS "sweep"
             SKIP_REGULAR_EXPRESSION "sweep harness skipped")
     elseif(harness_name IN_LIST IO_TEST_LONG_HARNESSES)
-        add_test(NAME ${harness_name} COMMAND ${harness_name})
+        add_test(NAME ${harness_name} COMMAND ${harness_name} ${IO_TEST_ARGS_${harness_name}})
         set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_LONG})
     else()
-        add_test(NAME ${harness_name} COMMAND ${harness_name})
+        add_test(NAME ${harness_name} COMMAND ${harness_name} ${IO_TEST_ARGS_${harness_name}})
         set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_DEFAULT})
     endif()
     if(harness_name IN_LIST IO_TEST_BENCH_HARNESSES)
