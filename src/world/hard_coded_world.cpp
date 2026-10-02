@@ -3068,6 +3068,22 @@ void run_tail(generation_cursor& c)
         }
 
         // ------------------------------------------------------------------
+        // BL-1138 — ROADS PULL TOWARD MARKETS (LOGISTICS.md § 4). HERE, after
+        // the folds, because the markets are carved and folded only now, three
+        // steps after `generate_roads` and the ancient stamp: this is the first
+        // point the final market set exists. Its own pass over the laid
+        // network: every market centre joined to its nation's backbone, each
+        // town's road weighed toward its market, and a Road-tier trunk between
+        // neighbouring market centres, the detour test refusing what the
+        // network already serves (road_generation.hpp § Roads pull toward
+        // markets). The fold above priced its reach on the network as it stood
+        // before this pass and has decided; catchments are grid-nearest, never
+        // traversal cost, so nothing this pass lays moves a catchment or a fold.
+        lay_market_roads(w, kepler,
+                         report != nullptr ? &report->market_roads : nullptr,
+                         report != nullptr ? &report->market_road_links : nullptr);
+
+        // ------------------------------------------------------------------
         // C -> D: endemic goods are priced BY DISTANCE FROM WHERE THEY GROW
         // (BL-191). This is the whole mercantile mechanic, and it needs no
         // change to the clearing engine: market_component::base_price is already

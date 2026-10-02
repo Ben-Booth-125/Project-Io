@@ -185,7 +185,16 @@ joins each market centre to its neighbouring market centres, over a border where
 lies across one, so a larger trade has a road to travel beyond its own catchment; the trunk is
 laid at Road tier or above and the detour test still refuses a trunk link a serviceable route
 already gives. The trunk's shape (which neighbours, and the tier) is a delegated reading, NR-950,
-measured on the curated seeds.
+measured on the curated seeds: each market centre's **three nearest** market centres by direct
+route, unioned over both ends (a Delaunay-like set, never all pairs), walked cheapest-first, at
+**Road**. Both pulls run as their own pass after the folds, over the laid network, so they read
+the detour test on the road raster rather than the town graph: the direct route walks any land
+and strait, the network's route only roaded land and strait, both priced road-free, and every
+link is laid along the direct route it was priced on. A market centre joins the backbone of the
+nation holding it, or, where that nation holds no town, the nearest backbone there is. A town's
+weight toward its market is the gain, network route less direct route; per market the heaviest
+town failing the test is joined first and the network re-read, so one spoke serves its
+neighbours. Catchments are grid-nearest, so these roads move no catchment and no fold.
 
 **Villages join locally, not as lattice members** (BL-620, road generation scales to density):
 **only a village at or above a size floor lays a spur (Ben, 2026-09-25)**, and the floor is
