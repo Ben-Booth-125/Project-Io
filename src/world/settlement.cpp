@@ -1504,7 +1504,8 @@ void derive_national_character(settlement_state& ss,
                                world& w,
                                const std::vector<entity_id>& nation_ids,
                                const std::vector<entity_id>& tile_ids,
-                               int gw, int gh)
+                               int gw, int gh,
+                               const std::vector<int64_t>* polity_industrial_years)
 {
     if (ss.regions.empty() || nation_ids.empty() || gw <= 0 || gh <= 0)
         return;
@@ -1513,6 +1514,19 @@ void derive_national_character(settlement_state& ss,
     const std::vector<int> owner = owner_map_of(w, tile_ids, nidx, gw, gh);
     const int nations = static_cast<int>(nation_ids.size());
     const int total = gw * gh;
+
+    // BL-1159: each region's holder POLITY id, read before the attribution below
+    // overwrites `region::nation` with the nation index (until here it is the polity
+    // the last span closed on). The qualification axis reads that polity's own
+    // industrial crossing through it.
+    const bool polity_timing = polity_industrial_years != nullptr && !polity_industrial_years->empty();
+    std::vector<int> region_polity;
+    if (polity_timing)
+    {
+        region_polity.reserve(ss.regions.size());
+        for (const region& p : ss.regions)
+            region_polity.push_back(p.nation);
+    }
 
     // --- Attribute every region to whoever ended up holding it ---------------
     for (region& p : ss.regions)
@@ -1630,6 +1644,46 @@ void derive_national_character(settlement_state& ss,
     const int64_t early_cut = ranked.empty() ? 0 : ranked[ranked.size() / 3];
     const int64_t late_cut  = ranked.empty() ? 0 : ranked[(ranked.size() * 2) / 3];
 
+    // --- BL-1159: the QUALIFICATION timing, off the polity's own crossing --------
+    // Ben, 2026-10-03 (POPULATION.md § Qualification, "Seeded from history"): on a
+    // generated world the timing qualification reads is the polity's own industrial
+    // crossing year, the one the sim records; the regional furnace flags above are
+    // never lit there, so reading them left every nation tied at the floor and no
+    // Highway ever qualified. The same two terms as the regional rule, re-sourced:
+    //   * WHEN — the EARLIEST crossing among the polities holding the nation's
+    //     regions (the regional rule's own min over first furnaces), ranked in
+    //     terciles over the nations that crossed at all;
+    //   * HOW MUCH — the REGION-WEIGHTED share of the nation's regions held by a
+    //     polity that crossed (the regional rule's ind_share).
+    // A polity that never crossed (INT64_MIN) reads as never industrialised. Integer
+    // years; ties fall to the sorted ranking, as above. Focus and ideology keep the
+    // regional record: the ruling moves qualification alone.
+    std::vector<int64_t> q_first(static_cast<std::size_t>(nations), never);
+    std::vector<int>     q_crossed_regions(static_cast<std::size_t>(nations), 0);
+    int64_t q_early_cut = early_cut, q_late_cut = late_cut;
+    if (polity_timing)
+    {
+        const std::vector<int64_t>& years = *polity_industrial_years;
+        for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
+        {
+            const int ni  = ss.regions[ri].nation;
+            const int pol = region_polity[ri];
+            if (ni < 0 || pol < 0 || static_cast<std::size_t>(pol) >= years.size()) continue;
+            const int64_t y = years[static_cast<std::size_t>(pol)];
+            if (y == std::numeric_limits<int64_t>::min()) continue; // never crossed
+            ++q_crossed_regions[static_cast<std::size_t>(ni)];
+            int64_t& f = q_first[static_cast<std::size_t>(ni)];
+            f = std::min(f, y);
+        }
+        std::vector<int64_t> q_ranked;
+        for (int ni = 0; ni < nations; ++ni)
+            if (q_first[static_cast<std::size_t>(ni)] != never)
+                q_ranked.push_back(q_first[static_cast<std::size_t>(ni)]);
+        std::sort(q_ranked.begin(), q_ranked.end());
+        q_early_cut = q_ranked.empty() ? 0 : q_ranked[q_ranked.size() / 3];
+        q_late_cut  = q_ranked.empty() ? 0 : q_ranked[(q_ranked.size() * 2) / 3];
+    }
+
     // --- Write the four axes ----------------------------------------------------
     for (int ni = 0; ni < nations; ++ni)
     {
@@ -1689,17 +1743,25 @@ void derive_national_character(settlement_state& ss,
         // that never industrialised opens at a floor, not zero: some literate
         // administration exists anywhere a nation does. First-cut constants,
         // tune-not-restructure (the NR-600 idiom).
+        //
+        // BL-1159: on a world the spans closed, the timing is the polity crossing
+        // (q_first / q_crossed_regions above), not the regional furnace record.
         {
+            const int64_t qf      = polity_timing ? q_first[static_cast<std::size_t>(ni)] : ff;
+            const int     q_inds  = polity_timing ? q_crossed_regions[static_cast<std::size_t>(ni)]
+                                                  : ind_regions;
+            const int64_t q_early = polity_timing ? q_early_cut : early_cut;
+            const int64_t q_late  = polity_timing ? q_late_cut : late_cut;
             const float ind_share =
                 region_count[static_cast<std::size_t>(ni)] > 0
-                    ? static_cast<float>(ind_regions)
+                    ? static_cast<float>(q_inds)
                       / static_cast<float>(region_count[static_cast<std::size_t>(ni)])
                     : 0.0f;
             float base = 0.05f;                    // never industrialised
-            if (ff != never)
-                base = ff <= early_cut ? 0.35f
-                     : ff <= late_cut  ? 0.22f
-                                       : 0.12f;
+            if (qf != never)
+                base = qf <= q_early ? 0.35f
+                     : qf <= q_late  ? 0.22f
+                                     : 0.12f;
             const float q = base + 0.25f * ind_share;
             nc.qualification = q < 0.0f ? 0.0f : (q > 1.0f ? 1.0f : q);
         }

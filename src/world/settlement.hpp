@@ -1182,12 +1182,24 @@ std::vector<int> derive_national_protection(const settlement_state& ss, int nati
 ///
 /// @param nation_ids  Nation entity ids in generation order (generate_nations'
 ///                    return value); regions store indices into this list.
+/// @param polity_industrial_years  BL-1159 (Ben, 2026-10-03; POPULATION.md
+///                    § Qualification, "Seeded from history"): indexed by POLITY
+///                    id, each polity's own industrial crossing year at the last
+///                    span's close (`polity::industrial_year`; INT64_MIN — the
+///                    sim's `k_never_industrialised` — for a polity that never
+///                    crossed). When non-null and non-empty, a nation's
+///                    QUALIFICATION reads it through the polity holding each of
+///                    its regions (`region::nation` still holds that polity id on
+///                    entry), not the regional furnace flags, which a generated
+///                    world never lights. Null or empty (no span ran): the
+///                    regional flags, as before. Focus and ideology are unchanged.
 void derive_national_character(settlement_state& ss,
                                const creed_state& cs,
                                world& w,
                                const std::vector<entity_id>& nation_ids,
                                const std::vector<entity_id>& tile_ids,
-                               int gw, int gh);
+                               int gw, int gh,
+                               const std::vector<int64_t>* polity_industrial_years = nullptr);
 
 /// Index of the region whose anchor is nearest (col,row), or -1 when there
 /// are none. Column-wrapped; ties break on the lowest region index.
