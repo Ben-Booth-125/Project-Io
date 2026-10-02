@@ -2041,6 +2041,16 @@ void run_industrialisation(generation_cursor& c)
         kepler_polity_treasuries = polity_treasuries_at_close(kepler_industrialisation.regions);
         kepler_polity_names      = polity_names_at_close(kepler_industrialisation.polities); // BL-1089
 
+        // BL-1149 (the review fix): a span run with no works table earns no
+        // scale credit and moves no one. Said on every build, like the
+        // handoff validators' verdict, so a Lua-free world cannot pass for one
+        // that ran the stream.
+        if (kepler_industrialisation_hs.industry_scale_inert_rounds > 0)
+            std::fprintf(stderr, "make_hard_coded_world: Industrialisation scale credit inert: no works "
+                                 "table (%lld rounds; no region earned scale credit and the "
+                                 "urbanisation stream moved no one)\n",
+                         static_cast<long long>(kepler_industrialisation_hs.industry_scale_inert_rounds));
+
         // BL-1068: THE RECORDED RECORD, on Exploration's footing
         // above -- the four counters and the time-lapse are the
         // record of the run for the wizard's Industrialisation
@@ -2053,6 +2063,10 @@ void run_industrialisation(generation_cursor& c)
             report->industrialisation_battles   = kepler_industrialisation_hs.battles;
             report->industrialisation_conquests = kepler_industrialisation_hs.conquests;
             report->industrialisation_foundings = kepler_industrialisation_hs.foundings;
+            report->industrialisation_points_from_scale  = kepler_industrialisation_hs.industry_points_from_scale;
+            report->industrialisation_stream_moved       = kepler_industrialisation_hs.urbanisation_heads_moved;
+            report->industrialisation_stream_within      = kepler_industrialisation_hs.urbanisation_heads_within;
+            report->industrialisation_scale_inert_rounds = kepler_industrialisation_hs.industry_scale_inert_rounds;
             for (generation_report::body_entry& be : report->bodies)
                 if (be.id == kepler)
                     be.industrialisation_timelapse = as_timelapse(kepler_industrialisation_hs);

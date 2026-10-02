@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Headless world-determinism harness (BL-114; no SDL / Lua / ImGui)
+// Headless world-determinism harness (BL-114; no SDL / ImGui; Lua for the works table)
 // ---------------------------------------------------------------------------
 // Proves make_hard_coded_world is a pure function of its world_params:
 //
@@ -35,14 +35,16 @@
 //       the guarantee. It is why this harness is no longer cheap — see the
 //       timing lines it prints.
 //
-// The process exits non-zero if any assertion FAILs. Links only the SDL/Lua-free
-// world-generation translation units (see CMakeLists.txt), mirroring the manual
-// build in tools/verify/README.md.
+// The process exits non-zero if any assertion FAILs. Needs a live Lua state for the works table
+// (bash tools/verify/build_lua_harness.sh world_determinism; run from the repo root). Earlier
+// rows still build bare worlds; the prehistory-ON rows (R3) build with scripts/works.lua.
 
 #include "world/components.hpp"
 #include "world/era_minus_one.hpp" // BL-754: the per-pass clock rides the fixture
 #include "world/hard_coded_world.hpp"
 #include "harness_params.hpp"
+#include "scripting/lua_state.hpp"
+#include "world/works_roster.hpp"
 #include "world/history_sim.hpp"   // BL-1009: polity::navy_stock, exploration_output
 #include "world/settlement.hpp"    // BL-1009: region stocks on world::gen_settlement
 #include "world/stockpile_budget.hpp" // BL-1042: the stockpile folded into the region digest
@@ -155,11 +157,17 @@ void check(bool ok, const char* label)
 ///
 /// BL-1009: the fixture is the CALLER'S now, because `deep_digest` reads two
 /// fields off it that never land on `world` (the navy and the corridor set).
+/// THE REAL WORKS TABLE (BL-1149 review, 2026-10-01): the prehistory-ON worlds
+/// are built with scripts/works.lua, so the Industrialisation span's scale
+/// credit, stream and stockpile run as they ship (R3.7 reads that stockpile).
+/// Loaded once in main; the prehistory-OFF and legacy rows above stay bare.
+works_registry g_works;
+
 world timed_world(const world_params& p, generation_report* rep, const char* what,
                   era_minus_one_fixture& fx)
 {
     const auto t0 = std::chrono::steady_clock::now();
-    world w = make_hard_coded_world(p, rep, {}, nullptr, nullptr, &fx);
+    world w = make_hard_coded_world(p, rep, {}, nullptr, &g_works, &fx);
     const double secs =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     std::printf("     [%-24s] %7.2f s  (seed %08X, prehistory %d y, epoch %lld)\n",
@@ -188,6 +196,12 @@ world timed_world(const world_params& p, generation_report* rep, const char* wha
 
 int main()
 {
+    lua_state lua;
+    lua.load("scripts/works.lua");
+    g_works.load_from_lua(lua);
+    std::printf("works table: %zu rows (scripts/works.lua)\n", g_works.size());
+    check(g_works.size() > 0, "the works table is loaded (the prehistory-ON worlds run the stream as it ships)");
+
     constexpr uint32_t seed_a = 0xABCDEF01u;
     constexpr uint32_t seed_b = 0x12345678u;
 

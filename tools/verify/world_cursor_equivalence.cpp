@@ -606,6 +606,11 @@ uint64_t report_digest(const generation_report& rep)
         fold_i64(h, v);
     fold_i32(h, rep.grudge_sentiment_rows);
     fold_i32(h, rep.grudge_sentiment_dropped);
+    // BL-1149 (the review fix): the span's scale credit, heads moved, inert rounds.
+    fold_i64(h, rep.industrialisation_points_from_scale);
+    fold_i64(h, rep.industrialisation_stream_moved);
+    fold_i64(h, rep.industrialisation_stream_within);
+    fold_i64(h, rep.industrialisation_scale_inert_rounds);
     fold_bool(h, rep.handoff_invalid);
     fold_str(h, rep.handoff_violation);
     return h;

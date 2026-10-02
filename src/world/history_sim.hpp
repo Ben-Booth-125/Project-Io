@@ -62,6 +62,8 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <functional>
+#include <unordered_map>
 #include <limits>
 #include <memory>
 #include <string>
@@ -529,11 +531,17 @@ struct history_sim_params
     //   SCALE (`accrue_industry_points`), on EVERY region with `centres > 0`,
     //   credited to that region itself:
     //
-    //     points = urban_population * industry_points_per_million_urban_heads_year
+    //     points = min(urban_population, employed heads)
+    //                       * industry_points_per_million_urban_heads_year
     //                                                   * step_years / 1000000
     //              * fuel_factor_q / 1000
     //              * (1000 + industry industrial per-mille) / 1000
     //
+    //     employed heads = the heads the region's works employ
+    //                      (`works_registry::employed_heads_mask`, BL-1149: the
+    //                      works, not the crowd; Ben 2026-09-27). No works
+    //                      table: none, so no scale credit and no stream
+    //                      (`history_sim_state::industry_scale_inert_rounds`)
     //     fuel_factor_q = floor + (1000 - floor) * fuel_reading_q / 1000
     //     fuel_reading_q = `industry_fuel_reading_q(region)` (the span-open
     //                      survey, or energy_q where nothing was surveyed)
@@ -551,7 +559,8 @@ struct history_sim_params
     //   treasury and lands as points, `industry_points_per_treasury_unit` to
     //   the unit. RULED a consequence (Ben, 2026-09-18): no polity scores it,
     //   so it is no verb. The points SPREAD over the polity's held regions
-    //   that stand centres, by urban scale (`industry_points_apportion_by_scale`;
+    //   that stand centres, by the heads their works employ (NR-964, amending
+    //   NR-897's urban scale; `industry_points_apportion_by_scale`;
     //   BL-1056, Ben 2026-09-19, NR-897): a treasury builds its realm's works
     //   where its people are. A realm with no held centre carrying heads
     //   converts NOTHING (NR-901, Ben 2026-09-19): no debit, no credit, the
@@ -1861,11 +1870,20 @@ struct history_sim_params
     /// which is what keeps BL-224's non-hegemony emergent.
     int work_reach_relief_cap_q = 800;
 
-    /// How many held regions a polity considers building on per round. Two:
-    /// its capital, and one rotated deterministically through its holdings.
-    /// Scoring every holding would be O(held x rows) inside a pass already
-    /// costing ~23 s of a ~25 s world; rotating spreads works across the empire
-    /// over a run without paying for a full scan every round.
+    /// BL-1155 (Ben, 2026-09-27; HISTORY.md sec The verb): EVERY REGION A POLITY
+    /// HOLDS THAT STANDS A CENTRE IS A CANDIDATE for `build_work`, still one work
+    /// a round and the same scorer, walked in region order. True everywhere by
+    /// default -- the rule as ruled applies in every span. False is the rule it
+    /// replaces, kept as the switch's other reading: `work_candidate_regions`
+    /// candidates, the capital plus ones rotated through the holdings by a hash
+    /// of (polity, year, slot). Each span's params carry their own value, so the
+    /// switch is per span.
+    bool work_candidates_every_centre = true;
+
+    /// With `work_candidates_every_centre` false: how many held regions a
+    /// polity considers building on per round. Two: its capital, and one
+    /// rotated deterministically through its holdings (the bounded rule that
+    /// kept industry to ~110 of ~15,000 regions on the curated seeds).
     int work_candidate_regions = 2;
 
     // --- BL-929: SUPPLY SITES BOUGHT FROM THE STOCKPILE ---------------------
@@ -2767,7 +2785,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                             exploration_upkeep_spend*              spend = nullptr,
                             const std::vector<dated_object>*       treaties = nullptr,
                             std::vector<trade_flow>*               flows_out = nullptr,
-                            const exploration_spend_context*       spend_ctx = nullptr);
+                            const exploration_spend_context*       spend_ctx = nullptr,
+                            const works_registry*                  works = nullptr);
 
 // ---------------------------------------------------------------------------
 // Actors
@@ -3541,15 +3560,23 @@ int industry_points_fuel_factor_q(int fuel_reading_q, const history_sim_params& 
 int industry_tree_industrial_q(uint64_t industry_mask);
 
 /// One region's scale credit for one round, or -1 when the credit is REFUSED
-/// (its urban headcount or the step is outside the accrual's domain). 0 for a
-/// region with no centres. `industrial_q` is its holder's
+/// (its urban headcount, its employed heads or the step is outside the
+/// accrual's domain). 0 for a region with no centres.
+///
+/// THE WORKS, NOT THE CROWD (BL-1149; Ben, 2026-09-27, INDUSTRIALISATION.md
+/// sec 1): the heads credited are the region's urban heads UP TO @p
+/// employed_heads, the heads its works employ
+/// (`works_registry::employed_heads_mask` of `works_built`); the heads beyond
+/// earn nothing, and a region with no works earns no scale credit.
+/// `industrial_q` is its holder's
 /// `industry_tree_industrial_q` (0 for unheld ground); the tree multiplier
 /// `1000 + industrial_q` is held to [100, 5000] per mille -- a DOMAIN, not a
 /// tuning clamp: the table's industrial nodes sum to well inside it, and a
 /// holder whose tree left it would be a table defect, refused (-1) like any
 /// other out-of-domain input. Integer, staged so no intermediate overflows.
 int64_t industry_points_scale_credit(const region& r, int industrial_q,
-                                     const history_sim_params& p, int step_years);
+                                     const history_sim_params& p, int step_years,
+                                     int64_t employed_heads);
 
 /// The most urban heads one polity's apportionment weighs in total. Keeps
 /// the exact integer apportionment inside int64: a remainder under this times
@@ -3572,8 +3599,16 @@ inline constexpr int64_t industry_points_apportion_heads_max = 1LL << 32;
 /// @p out is empty and the result true: the caller converts NOTHING (NR-901,
 /// Ben 2026-09-19 -- a polity that holds no town has nowhere for its works to
 /// stand, so its treasury keeps the round's share).
+///
+/// AMENDED (Ben, 2026-10-01, NR-964): the weight is the heads the region's
+/// works EMPLOY -- min(urban heads, `works_registry::employed_heads_mask` of
+/// `works_built`) off @p works -- not its urban heads, so the treasury's points
+/// follow the works as the scale credit's do. A polity whose centred regions
+/// employ nobody (or no table at all) has no weighed region: it converts
+/// nothing, NR-901's rule.
 bool industry_points_apportion_by_scale(const std::vector<region>& regions, int holder, int64_t credit,
-                                        std::vector<std::pair<int, int64_t>>& out);
+                                        std::vector<std::pair<int, int64_t>>& out,
+                                        const works_registry* works);
 
 /// What one round's scale accrual did.
 struct industry_points_round
@@ -3584,14 +3619,17 @@ struct industry_points_round
 
 /// THE ROUND'S SCALE ACCRUAL: every region with `centres > 0` is credited, ON
 /// ITSELF, `industry_points_scale_credit` against its holder's Industry-tree
-/// industrial capacity. ORDER-INDEPENDENT BY CONSTRUCTION: each region's credit
-/// reads only its own fields and its holder's mask, and writes only its own
-/// stock, so walking the table in any order gives the same table. The caller
-/// gates it (the switch, the open year, and `industry_points_params_valid`).
+/// industrial capacity and the heads its works employ (@p works; BL-1149 —
+/// with no works table no work stands, so no region earns scale credit).
+/// ORDER-INDEPENDENT BY CONSTRUCTION: each region's credit reads only its own
+/// fields, its holder's mask and the table, and writes only its own stock, so
+/// walking the table in any order gives the same table. The caller gates it
+/// (the switch, the open year, and `industry_points_params_valid`).
 industry_points_round accrue_industry_points(std::vector<region>&       regions,
                                              const std::vector<polity>& polities,
                                              const history_sim_params&  p,
-                                             int                        step_years);
+                                             int                        step_years,
+                                             const works_registry*      works);
 
 /// Every scorer term's value for one polity, indexed by the generated
 /// `io::industry_tree::scorer_term` (never positionally — see the guard in
@@ -4684,6 +4722,20 @@ struct history_sim_state
     /// reader can hold the region table to that. Zero off the span.
     int64_t industry_points_from_scale    = 0;
     int64_t industry_points_from_treasury = 0;
+    /// BL-1149 (the review fix): decision rounds the scale accrual ran with NO
+    /// works table, or an EMPTY one. With none, no work stands, so no region
+    /// earns scale credit and no work is open, so the urbanisation stream, whose
+    /// pull is open work, moves no one: the whole span's migration is inert,
+    /// and this says so rather than leaving a quiet zero. 0 on every run a
+    /// non-empty table was handed to.
+    int64_t industry_scale_inert_rounds   = 0;
+    /// BL-1137: heads the urbanisation stream moved over the run, every round
+    /// summed (`run_urbanisation_stream`). Report-only. Includes
+    /// `urbanisation_heads_within`.
+    int64_t urbanisation_heads_moved      = 0;
+    /// ... of which a destination took from its OWN countryside (its works'
+    /// open work filled at home, a conversion, not a move along a corridor).
+    int64_t urbanisation_heads_within     = 0;
     /// ... and the TREASURY UNITS that conversion took out of capitals (the
     /// points above divided by `industry_points_per_treasury_unit`): the
     /// observable for how hard paying in draws on the round's other spend.
@@ -4903,6 +4955,145 @@ history_sim_state run_history_sim(settlement_state&         ss,
 /// supply-decay stall against it, and a test that recomputed distance its own
 /// way would be testing its own arithmetic rather than the sim's.
 int region_distance(const region& a, const region& b, int gw);
+
+/// POINTS GO WITH THEIR PEOPLE (Ben, 2026-09-26; POPULATION.md § Generation;
+/// BL-1141). Region @p i of @p regions, standing no settlement, hands the
+/// industry points it earned — and their report-only treasury tally, so the
+/// world's paid-in share holds — to the NEAREST region of the same realm
+/// (`owner[i]`, by `region_distance`, ties to the lower region index) that
+/// stands a centre and has people. Nothing moves, and the call returns false,
+/// where the region has no points, still stands a centre, is held by no realm,
+/// where its realm stands no other centre, or where the receiving stock would
+/// pass `industry_points_ceiling` (refused, never clamped). Pure over the
+/// region table: the sim calls it for every settlement that ends without a
+/// sack, and once more for every point still stranded at the span's close.
+bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>& owner,
+                            std::size_t i, int gw);
+
+/// THE CLOSE'S RETRY (the centres cold review, 2026-09-26). Every region of
+/// @p regions still holding points on no settlement is offered once more to
+/// its realm's nearest centre (`rehome_stranded_points`), in region order, as
+/// the map stands at the span's close — the handoff made when a settlement
+/// ended can have found nothing then. SKIPPED ONLY WHERE THE POINTS SIT ON A
+/// RUIN: @p on_ruin[i] != 0 when the event that last ended region i's
+/// settlement was a SACK (NR-901: the points went with the towns; the works
+/// themselves stand, Ben 2026-09-27). A razing in
+/// a region's PAST is not a ruin — every conquest sacks, so "ever razed" is
+/// near "ever conquered" (the rebuild's review, 2026-09-26): a region sacked
+/// in one century whose settlement survived, and ended by ground loss in
+/// another, hands its points on like any other. A region past the end of
+/// @p on_ruin is not a ruin. Returns how many regions' points moved.
+int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner,
+                             const std::vector<uint8_t>& on_ruin, int gw);
+
+/// BL-1137 (the centres cold review, 2026-09-26) — THE STREAM'S LINE STAYS ON
+/// LAND. True when no water tile lies BETWEEN two regions' anchors on the
+/// straight line joining them: Chebyshev steps, the short way round the
+/// cylinder, the anchors themselves not tested. The supply graph
+/// (`supply_neighbours`) joins every region within its radius whatever lies
+/// between, so without this a colony across a strait sits in one piece with
+/// its home towns; people walk, and this is the line they walk.
+///
+/// THE ANCHORS ARE NOT TESTED (the rebuild's review, 2026-09-26): a region
+/// anchored on a shoreline or lake tile (`region_domain::coastal_water`, which
+/// a founding can land on) stands its people there, and a line that tested its
+/// own first tile would cut it out of the stream entirely — never sending,
+/// never receiving. Its line to an inland neighbour walks; its line across the
+/// water does not. THE LIMIT, accepted: a region anchored IN a one-tile strait
+/// has land on both sides one step away, so it joins both shores — the one
+/// way a strait is bridged, and only by a settlement standing on it.
+///
+/// SYMMETRIC: the line is drawn from the endpoint earlier in (row, col) order,
+/// so (a, b) and (b, a) walk the same tiles, including the half-way-round tie
+/// on an even-width cylinder. Pure. A substrate of the wrong size refuses
+/// nothing; a line leaving the grid's rows is refused.
+bool anchors_joined_by_land(const std::vector<terrain_substrate>& sub,
+                            const region& a, const region& b, int gw, int gh);
+
+/// `anchors_joined_by_land`, memoised per corridor — the sim's own line test,
+/// exposed so a harness exercises the same object the sim does. Anchors never
+/// move and terrain is fixed for a run, so a corridor (keyed by its lower and
+/// higher region index) is measured once. Lookups only: the map's layout never
+/// reaches a result. No substrate: every corridor walks.
+struct stream_land_lines
+{
+    const std::vector<terrain_substrate>* substrate = nullptr;
+    int gw = 0;
+    int gh = 0;
+    std::unordered_map<uint64_t, bool> memo;
+    std::size_t measured = 0; ///< corridors actually walked (memo misses)
+
+    bool joined(const std::vector<region>& regions, int a, int b);
+};
+
+/// One round of the urbanisation stream's outcome (`run_urbanisation_stream`).
+struct urbanisation_round
+{
+    int64_t          moved = 0;    ///< heads that left a countryside for a centre this round
+    /// ... of which a destination took from its own countryside: the least of
+    /// what its countryside sent and what it received. The rest, `moved -
+    /// moved_within`, travelled along a held corridor.
+    int64_t          moved_within = 0;
+    std::vector<int> destinations; ///< regions that took any, ascending
+};
+
+/// THE URBANISATION STREAM, ONE DECISION ROUND (BL-1137; INDUSTRIALISATION.md
+/// § Beat 2: "a region's countryside -> a centre in the same polity; pull:
+/// industry-point output at the centre; push: depleted or strained ground;
+/// line: held corridors").
+///
+///   THE LINE. Each realm's held ground (`owner`) splits into the pieces its
+///   own corridors join: edges of @p neighbours between two regions it holds
+///   that @p linked accepts (the sim passes a line that stays on land, so the
+///   supply graph's reach across a strait is not a road people walk). People
+///   move only inside one piece.
+///   THE DESTINATIONS. The piece's regions that hold a centre and whose works
+///   offer OPEN WORK (@p open_work > 0: the heads its works employ beyond the
+///   urban heads already there, `region_open_work`). ANY CENTRE, not towns only
+///   (Ben, 2026-10-02; INDUSTRIALISATION.md Beat 2): a village whose works hire
+///   takes people and grows into a town.
+///   THE PUSH. Every region of the piece would send its countryside at
+///   `urbanisation_outflow` over @p step_years.
+///   THE PULL IS OPEN WORK (Ben, 2026-09-27; INDUSTRIALISATION.md Beat 2: "a
+///   destination pulls by the jobs its works offer beyond the heads already
+///   there ... a city whose works are full stops drawing"). The piece's
+///   destinations take at most the open work they offer, so the countryside
+///   sends what they can take: when the push is larger, each countryside sends
+///   its share of the open work in proportion to its push. The migrants are
+///   shared over the destinations in proportion to their open work, so none
+///   receives more than it offers, and land as industrial heads
+///   (`settle_urban_migrants`). Both splits are largest remainder, exact, ties
+///   to the lower region index.
+///
+/// A piece with no open work sends nobody. CONSERVING (NR-958): every
+/// head is taken whole from a countryside with its ceiling (`take_countryside`)
+/// and landed whole in a town with it, so the world's people and its carrying
+/// capacity are both unchanged by the round. Pure and deterministic over its
+/// arguments: pieces are walked from the lowest region index, members sorted.
+urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
+                                           const std::vector<int>& owner,
+                                           const std::vector<std::vector<int>>& neighbours,
+                                           const std::function<bool(int, int)>& linked,
+                                           const std::vector<int64_t>& open_work,
+                                           int step_years);
+
+/// BL-1155 (Ben, 2026-09-27; HISTORY.md sec The verb): the regions polity
+/// holdings @p held (ascending) scores `build_work` on this round, in order.
+/// With `work_candidates_every_centre`: the CAPITAL ALWAYS (a capital standing
+/// no centre still builds), then every other held region that stands a
+/// centre, in region order. Without it: `work_candidate_regions` slots, the
+/// capital and regions rotated through the holdings by a hash of (@p
+/// polity_salt, @p year, slot) -- the old bounded rule, unchanged. Scoring
+/// uses a strict `>`, so an earlier candidate wins a tie.
+std::vector<int> work_candidates(const std::vector<region>& regions, const std::vector<int>& held,
+                                 int capital, const history_sim_params& p, uint32_t polity_salt,
+                                 int64_t year);
+
+/// THE OPEN WORK a region's works offer (Ben, 2026-09-27; INDUSTRIALISATION.md
+/// Beat 2): the heads its works employ (@p employed_heads,
+/// `works_registry::employed_heads_mask` of `works_built`) beyond the urban
+/// heads already there, never below zero. The urbanisation stream's pull.
+int64_t region_open_work(const region& r, int64_t employed_heads);
 
 /// Years between decision rounds at calendar year @p y, read from @p p's band
 /// table. Returns the first band whose `until_year` exceeds @p y, falling back

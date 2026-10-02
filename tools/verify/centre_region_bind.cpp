@@ -23,10 +23,20 @@
 //       identical (tile, scale) centre table; the campaign placement path draws
 //       no RNG at all.
 //
-// Exits non-zero on any FAIL. Links the generation TU superset (as
-// era_world_harness / world_audit):  node tools/verify/build_harness.js centre_region_bind
+// Exits non-zero on any FAIL.
+//
+// THE SHIPPED GENERATION INPUTS (BL-1149 review, 2026-10-01): every world is
+// built with the app's parsed world_gen.lua and works table
+// (`load_app_generation_inputs`), so the Industrialisation span's scale credit
+// and urbanisation stream run as they ship -- R2 reads their consequences.
+// Built Lua-free it ran them inert. Needs a live Lua state:
+//   bash tools/verify/build_lua_harness.sh centre_region_bind
+// Run from the repo root (it reads scripts/*.lua).
 
+#include "harness_params.hpp"   // load_app_generation_inputs: the app's config and works
+#include "scripting/lua_state.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/history_sim.hpp"
 #include "world/population_generation.hpp"
 #include "world/placement_rules.hpp"
 #include "world/settlement.hpp"
@@ -43,6 +53,10 @@
 namespace {
 
 int g_pass = 0, g_fail = 0;
+
+/// The app's generation inputs, loaded once (main) and read by every build.
+world_gen_config g_cfg;
+works_registry   g_works;
 
 void check(bool ok, const char* what)
 {
@@ -139,7 +153,7 @@ razed_tally sweep_seed(uint32_t seed, bool print_rows)
     wp.epoch_year = 1960;
 
     generation_report rep{};
-    world w = make_hard_coded_world(wp, &rep);
+    world w = make_hard_coded_world(wp, &rep, g_cfg, nullptr, &g_works);
     const generation_report::body_entry* be = home_entry(rep);
     if (be == nullptr) return t;
 
@@ -196,6 +210,10 @@ razed_tally sweep_seed(uint32_t seed, bool print_rows)
 
 int main()
 {
+    lua_state lua;
+    load_app_generation_inputs(lua, g_cfg, g_works);
+    check(g_works.size() > 0, "the works table is loaded (the stream runs as it ships)");
+
     // Seed ABCDEF01 — the seed BL-766's own urban baseline was measured on, so
     // the sim-grain figures printed here are directly comparable to it.
     world_params wp{};
@@ -203,8 +221,8 @@ int main()
     wp.epoch_year = 1960;
 
     generation_report rep_a{}, rep_b{};
-    world wa = make_hard_coded_world(wp, &rep_a);
-    world wb = make_hard_coded_world(wp, &rep_b);
+    world wa = make_hard_coded_world(wp, &rep_a, g_cfg, nullptr, &g_works);
+    world wb = make_hard_coded_world(wp, &rep_b, g_cfg, nullptr, &g_works);
 
     const auto* ka = home_entry(rep_a);
     const auto* kb = home_entry(rep_b);
@@ -501,15 +519,33 @@ int main()
     // item actually asks for — same ground, same farming quality, same
     // everything except the war — and it does not depend on a seed happening to
     // raze anything.
+    //
+    // SELECTED ON SCALE, NOT COUNT (the centres cold review, 2026-09-26). A
+    // region deepens into one place (BL-1141), so no region materialises two
+    // centres and a `got >= 2` selection sacked nothing: the experiment failed
+    // by construction. A CITY-BEARING region is now one whose materialised top
+    // scale is a town or larger (`top >= 2`) — the size the heads a sack cuts
+    // decide — and its controls are chosen the same way.
+    //
+    // THE SIM'S OWN SACK (the rebuild's review, 2026-09-26). At 600 per mille
+    // the walls' multiple (`urban_sack_multiple_q`, 2x) clamped the urban loss
+    // to the whole city, so every sacked region fell to nothing and the rows
+    // below passed by construction. The loss is the sim's shipped
+    // `sack_population_loss_q` (history_sim_params), the one a conquest applies,
+    // so a sack costs a city part of its heads — its size, and its centre only
+    // where the survivors fall below a village's worth — and the rows read the
+    // top-scale sum, which under one place a region carries both the count and
+    // the size.
+    const int sim_sack_q = history_sim_params{}.sack_population_loss_q;
     {
         settlement_state ss2 = ss;
         std::vector<int> sacked_idx;
         for (std::size_t i = 0; i < ss2.regions.size(); ++i)
-            if (got[i] >= 2)
+            if (top[i] >= 2)
             {
                 // Every OTHER eligible region, so the rest stay as controls.
                 if ((i % 2) != 0) continue;
-                sack_region_urban(ss2.regions[i], /*population_loss_q=*/600);
+                sack_region_urban(ss2.regions[i], sim_sack_q);
                 sacked_idx.push_back(static_cast<int>(i));
             }
 
@@ -526,40 +562,49 @@ int main()
                 top2[r] = std::max(top2[r], p.scale);
             }
 
-        int fell = 0, rose = 0, flat = 0, before = 0, after = 0;
+        int fell = 0, rose = 0, flat = 0, before = 0, after = 0, s_before = 0, s_after = 0;
         for (const int i : sacked_idx)
         {
             const std::size_t r = static_cast<std::size_t>(i);
             before += got[r];
             after  += got2[r];
+            s_before += top[r];
+            s_after  += top2[r];
             if (got2[r] < got[r] || top2[r] < top[r]) ++fell;
             else if (got2[r] > got[r] || top2[r] > top[r]) ++rose;
             else ++flat;
         }
         // The controls, so a body-wide collapse cannot masquerade as the effect.
-        int c_before = 0, c_after = 0, c_n = 0;
+        int c_before = 0, c_after = 0, c_n = 0, cs_before = 0, cs_after = 0;
         for (std::size_t i = 0; i < regions.size(); ++i)
         {
-            if (got[i] < 2 || (i % 2) == 0) continue;
+            if (top[i] < 2 || (i % 2) == 0) continue;
             ++c_n; c_before += got[i]; c_after += got2[i];
+            cs_before += top[i]; cs_after += top2[i];
         }
 
-        std::printf("\n-- R2 controlled: sack half the city-bearing regions, re-materialise --\n");
-        std::printf("   sacked %d regions at 600 per-mille countryside loss\n",
-                    static_cast<int>(sacked_idx.size()));
-        std::printf("   sacked   centres %d -> %d   fewer-or-smaller %d, unchanged %d, larger %d\n",
-                    before, after, fell, flat, rose);
-        std::printf("   control  centres %d -> %d over %d untouched regions\n",
-                    c_before, c_after, c_n);
-        std::printf("   sacked lose %.1f%% of their cities; controls %.1f%%\n",
+        std::printf("\n-- R2 controlled: sack half the town-or-larger regions, re-materialise --\n");
+        std::printf("   sacked %d regions at the sim's %d per-mille countryside loss (the walls twice that)\n",
+                    static_cast<int>(sacked_idx.size()), sim_sack_q);
+        std::printf("   sacked   centres %d -> %d   top-scale sum %d -> %d   "
+                    "fewer-or-smaller %d, unchanged %d, larger %d\n",
+                    before, after, s_before, s_after, fell, flat, rose);
+        std::printf("   control  centres %d -> %d   top-scale sum %d -> %d over %d untouched regions\n",
+                    c_before, c_after, cs_before, cs_after, c_n);
+        std::printf("   sacked lose %.1f%% of their top-scale sum (%.1f%% of their centres); "
+                    "controls %.1f%% (%.1f%%)\n",
+                    s_before ? 100.0 * (s_before - s_after) / s_before : 0.0,
                     before ? 100.0 * (before - after) / before : 0.0,
+                    cs_before ? 100.0 * (cs_before - cs_after) / cs_before : 0.0,
                     c_before ? 100.0 * (c_before - c_after) / c_before : 0.0);
 
         check(!sacked_idx.empty(), "R2 the controlled experiment had regions to sack");
-        check(after < before,
-              "R2 sacking a region costs it cities on the materialised map");
+        check(s_after < s_before && after <= before,
+              "R2 sacking a region costs it city size on the materialised map (never a city gained)");
         check(fell > rose,
               "R2 far more sacked regions shrink than grow");
+        check(flat > 0,
+              "R2 the sack is not total: some sacked cities keep their rung (a real sack, not a wipe)");
         // The controls move a little, and the reason is worth stating rather
         // than tolerating: a control's OWN `centres` is untouched by the sack,
         // but some of what it was carrying was SPILL from a neighbour that had
@@ -567,7 +612,7 @@ int main()
         // control gives back borrowed cities. That is the binding working, not
         // a body-wide collapse — so the claim is that the control's loss is an
         // order of magnitude smaller than the sacked regions' own.
-        check((c_before - c_after) * 10 <= (before - after),
+        check((cs_before - cs_after) * 10 <= (s_before - s_after),
               "R2 the loss is LOCAL: controls give up under a tenth of what the sacked lose");
     }
 
@@ -575,7 +620,7 @@ int main()
     // (a) The WHOLE generation, twice: the centre table a player would see.
     {
         const std::vector<placed> full_a = centres_of(wb, kb->id, kb->settlement, gw);
-        world wb2 = make_hard_coded_world(wp, nullptr);
+        world wb2 = make_hard_coded_world(wp, nullptr, g_cfg, nullptr, &g_works);
         const std::vector<placed> full_b = centres_of(wb2, kb->id, kb->settlement, gw);
         bool identical = full_a.size() == full_b.size();
         for (std::size_t i = 0; identical && i < full_a.size(); ++i)

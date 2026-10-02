@@ -837,6 +837,8 @@ void region_fields(const region& a, const region& b, field_census& out)
     FID_CMP(population); FID_CMP(last_demography_year); FID_CMP(manpower_stock); FID_CMP(army_stock);
     FID_CMP(centres); FID_CMP(centres_razed); FID_CMP(urban_population); FID_CMP(network_supply_q);
     FID_CMP(urban_ground);                            // BL-1130: the cell's ground, generation scratch
+    FID_CMP(industrial_heads);                        // BL-1137: the urbanisation stream's heads
+    FID_CMP(capacity_carried);                        // NR-958: the ceiling the stream moved
     FID_CMP(creed_hold); FID_CMP(universal_creed); FID_CMP(creed_residue_culture);
     FID_CMP(creed_hold_years); FID_CMP(works_built); FID_CMP(work_capacity_mod);
     FID_CMP(work_manpower_mod); FID_CMP(work_reach_mod); FID_CMP(work_defence_mod);
@@ -847,26 +849,26 @@ void region_fields(const region& a, const region& b, field_census& out)
     FID_CMP(industry_points_from_treasury);           // BL-1056: the report-only treasury tally
 }
 /// `region`'s data members, and so the fields `region_fields` must list.
-constexpr int k_region_fields = 58;
+constexpr int k_region_fields = 60;
 
 /// COMPILE-TIME: a structured binding of a `region` must name exactly as many
 /// members as it has, so this stops compiling the moment `region` gains or
 /// loses one -- until `k_region_fields` and the list above follow it.
 [[maybe_unused]] void region_member_count(const region& r)
 {
-    static_assert(k_region_fields == 58, "bind every region member below");
+    static_assert(k_region_fields == 60, "bind every region member below");
     const auto& [m01, m02, m03, m04, m05, m06, m07, m08, m09, m10,
                  m11, m12, m13, m14, m15, m16, m17, m18, m19, m20,
                  m21, m22, m23, m24, m25, m26, m27, m28, m29, m30,
                  m31, m32, m33, m34, m35, m36, m37, m38, m39, m40,
                  m41, m42, m43, m44, m45, m46, m47, m48, m49, m50,
-                 m51, m52, m53, m54, m55, m56, m57, m58] = r;
+                 m51, m52, m53, m54, m55, m56, m57, m58, m59, m60] = r;
     (void)m01; (void)m02; (void)m03; (void)m04; (void)m05; (void)m06; (void)m07; (void)m08; (void)m09; (void)m10;
     (void)m11; (void)m12; (void)m13; (void)m14; (void)m15; (void)m16; (void)m17; (void)m18; (void)m19; (void)m20;
     (void)m21; (void)m22; (void)m23; (void)m24; (void)m25; (void)m26; (void)m27; (void)m28; (void)m29; (void)m30;
     (void)m31; (void)m32; (void)m33; (void)m34; (void)m35; (void)m36; (void)m37; (void)m38; (void)m39; (void)m40;
     (void)m41; (void)m42; (void)m43; (void)m44; (void)m45; (void)m46; (void)m47; (void)m48; (void)m49; (void)m50;
-    (void)m51; (void)m52; (void)m53; (void)m54; (void)m55; (void)m56; (void)m57; (void)m58;
+    (void)m51; (void)m52; (void)m53; (void)m54; (void)m55; (void)m56; (void)m57; (void)m58; (void)m59; (void)m60;
 }
 
 /// RUN-TIME: `region_fields` names exactly `k_region_fields` DISTINCT fields.
@@ -2423,12 +2425,22 @@ bool bl1056_self_check()
     const int     nation[7] = { 3, 3, 3, 4, 3, 3, 3 };
     const int     centres[7]= { 1, 1, 0, 2, 1, 1, 1 };
     const int64_t urban[7]  = { 30000, 10000, 50000, 90000, 20000, 20000, 0 };
+    // NR-964: the weight is the heads the works employ; one work employing far
+    // more than any region's heads makes the weight the urban heads, so the
+    // shape below is the NR-897 shape it always was.
+    works_registry apw;
+    {
+        work_row big_works; big_works.name = "Works"; big_works.effect.industrial_mod = 1;
+        big_works.employs = work_employs_max; big_works.weight = 1;
+        apw.add_row(big_works);
+    }
     for (std::size_t i = 0; i < 7; ++i)
     {
         pr[i].nation = nation[i]; pr[i].centres = centres[i]; pr[i].urban_population = urban[i];
+        pr[i].works_built = 1u;
     }
     std::vector<std::pair<int, int64_t>> out;
-    const bool a_ok = industry_points_apportion_by_scale(pr, 3, 1001, out);
+    const bool a_ok = industry_points_apportion_by_scale(pr, 3, 1001, out, &apw);
     int64_t sum = 0;
     for (const auto& p : out) sum += p.second;
     // Weighed: 0 (30k), 1 (10k), 4 (20k), 5 (20k); 2 has no centre, 3 is foreign,
@@ -2439,16 +2451,16 @@ bool bl1056_self_check()
                     && out[2].second == 250 && out[3].second == 250;
     // An exact tie: two equal centres and one point between them -- to the lower index.
     std::vector<std::pair<int, int64_t>> tie;
-    const bool t_ok = industry_points_apportion_by_scale(pr, 3, 2, tie); // 2 x {3,1,2,2}/8
+    const bool t_ok = industry_points_apportion_by_scale(pr, 3, 2, tie, &apw); // 2 x {3,1,2,2}/8
     // 0.75, 0.25, 0.5, 0.5 -> floors all 0; two left: .75 (0), then .5 (4) and .5 (5) tie -> 4.
     const bool tie_ok = tie.size() == 4 && tie[0].second == 1 && tie[1].second == 0
                      && tie[2].second == 1 && tie[3].second == 0;
     std::vector<std::pair<int, int64_t>> none;
-    const bool n_ok = industry_points_apportion_by_scale(pr, 9, 500, none) && none.empty();
+    const bool n_ok = industry_points_apportion_by_scale(pr, 9, 500, none, &apw) && none.empty();
     std::vector<region> big(3);
     for (region& r : big) { r.nation = 1; r.centres = 1; r.urban_population = 1LL << 31; }
     std::vector<std::pair<int, int64_t>> refused;
-    const bool refuse_ok = !industry_points_apportion_by_scale(big, 1, 1000, refused) && refused.empty();
+    const bool refuse_ok = !industry_points_apportion_by_scale(big, 1, 1000, refused, &apw) && refused.empty();
     std::printf("BL-1056 self-check (2): 1001 points over centres {30k,10k,20k,20k} -> %lld/%lld/%lld/%lld (sum %lld);"
                 " 2 points -> %lld/%lld/%lld/%lld; no centre -> %s; past the heads domain -> %s\n",
                 out.size() > 0 ? (long long)out[0].second : -1LL, out.size() > 1 ? (long long)out[1].second : -1LL,

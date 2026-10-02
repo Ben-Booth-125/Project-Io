@@ -1,6 +1,6 @@
 -- Project Io — works.lua
 -- The Era -1 works table (BL-321): what a polity can BUILD in pre-history.
--- Loaded at startup into the C++ works registry (see src/world/works_roster.hpp
+-- Loaded at the first world build into the C++ works registry (see src/world/works_roster.hpp
 -- and src/world/works_registry.cpp).
 --
 -- Sibling of the unit roster: unit_roster says what a polity can FIELD, this
@@ -8,7 +8,7 @@
 -- offered when the province's ground and population clear its gate, and the
 -- bands are cumulative because nothing un-invents a granary.
 --
--- Each row is { name, band, gate, effect, weight }:
+-- Each row is { name, band, gate, effect, employs, weight }:
 --
 --   band    "classical" | "medieval" | "gunpowder" | "industrial"
 --
@@ -24,6 +24,32 @@
 --             defence     modifier this province contributes when DEFENDING
 --             industrial  pull-forward on the Stage 4 furnace date
 --
+--   employs The HEADS the work employs once standing (BL-1149; Ben, 2026-09-27,
+--           INDUSTRIALISATION.md sec 1: "a head earns scale credit only where a
+--           work employs it -- the works, not the crowd"). A region's industry
+--           scale credit counts its urban heads up to the sum its works employ;
+--           the heads beyond them are a crowd and earn nothing. REQUIRED on
+--           every row (0 is a legal answer: a wall employs nobody once built,
+--           its garrison is the army stock). A whole number of heads (a
+--           whole-valued float such as 2e4 reads as 20000; a fraction is
+--           refused), not per-mille, and not a cost. The magnitudes are authored by judgement, then
+--           scaled x4 (Ben, 2026-10-02, the jobs ladder: every row x1 / x2 / x4,
+--           the industrial band alone x1-x8; all rows x4 picked):
+--             * a work that stores, moves or guards employs few (Granary 8,000,
+--               Way Station and Span Bridge 4,000; walls and forts 0);
+--             * a work that makes or trades employs about a town's worth of
+--               heads (Guild Quarter 80,000, Counting House 60,000, Deepwater
+--               Wharf 48,000, Powder Mill 40,000; the town rung is 50,000);
+--             * the largest pre-industrial works employ a city's worth (Naval
+--               Yard 120,000);
+--             * an industrial works employs a city (Blast Works 480,000, Rail
+--               Head 320,000, Arsenal 240,000).
+--           So a fully built pre-industrial town (every classical and medieval
+--           row) employs 236,000 heads -- about four times the urban heads a
+--           region carries at the Industrialisation span's open, so its works
+--           offer open work that draws the stream, and the heads it brings
+--           beyond that earn nothing until the town builds more works.
+--
 --   weight  Relative pull when a polity scores which work to raise next. Not a
 --           count and not a cost.
 --
@@ -32,9 +58,11 @@
 -- institution, and none of these may read as recognisably Latin.
 --
 -- The loader VALIDATES this table and throws on a malformed or incoherent row
--- (unknown band, no effect at all, duplicate name, an unreachable reach work).
--- That check runs on every startup, so a bad edit here fails loudly and early
--- rather than producing a quietly degraded world.
+-- (unknown band, no effect at all, duplicate name, an unreachable reach work, a
+-- missing or out-of-range 'employs', a table in which no work employs anyone).
+-- That check runs when the table is first loaded -- at the first world build, not at
+-- app start -- so a bad edit here fails loudly there rather than producing a quietly
+-- degraded world.
 --
 -- Magnitudes are authored by judgement and are meant to be calibrated against
 -- BL-275's sweep once BL-316's terrain-weighted reach exists to discount.
@@ -49,6 +77,7 @@ works = {
         band   = "classical",
         gate   = { farm_q = 300, population = 4000 },
         effect = { capacity = 180, manpower = 40 },
+        employs = 8000,
         weight = 220,
     },
     {
@@ -56,6 +85,7 @@ works = {
         band   = "classical",
         gate   = { farm_q = 450, population = 6000 },
         effect = { capacity = 240, reach = 40, industrial = 30 },
+        employs = 16000,
         weight = 190,
     },
     {
@@ -63,6 +93,7 @@ works = {
         band   = "classical",
         gate   = { ore_q = 400, population = 5000 },
         effect = { manpower = 60, industrial = 120 },
+        employs = 32000,
         weight = 170,
     },
     {
@@ -70,6 +101,7 @@ works = {
         band   = "classical",
         gate   = { population = 8000 },
         effect = { capacity = 40, defence = 250 },
+        employs = 0,
         weight = 200,
     },
     -- The first reach work, and the cheapest. A polity that cannot yet afford
@@ -79,6 +111,7 @@ works = {
         band   = "classical",
         gate   = { population = 3000 },
         effect = { reach = 120 },
+        employs = 4000,
         weight = 240,
     },
     {
@@ -86,6 +119,7 @@ works = {
         band   = "classical",
         gate   = { port_q = 400, population = 5000 },
         effect = { capacity = 120, reach = 200, industrial = 40 },
+        employs = 24000,
         weight = 150,
     },
 
@@ -97,6 +131,7 @@ works = {
         band   = "medieval",
         gate   = { farm_q = 400, population = 12000 },
         effect = { capacity = 220, industrial = 140 },
+        employs = 20000,
         weight = 180,
     },
     {
@@ -104,6 +139,7 @@ works = {
         band   = "medieval",
         gate   = { ore_q = 350, population = 15000 },
         effect = { manpower = 80, defence = 480 },
+        employs = 0,
         weight = 210,
     },
     {
@@ -111,6 +147,7 @@ works = {
         band   = "medieval",
         gate   = { population = 20000 },
         effect = { capacity = 160, reach = 60, industrial = 220 },
+        employs = 80000,
         weight = 170,
     },
     {
@@ -118,6 +155,7 @@ works = {
         band   = "medieval",
         gate   = { port_q = 550, population = 14000 },
         effect = { capacity = 140, reach = 300, industrial = 120 },
+        employs = 48000,
         weight = 140,
     },
     {
@@ -125,6 +163,7 @@ works = {
         band   = "medieval",
         gate   = { ore_q = 300, population = 10000 },
         effect = { reach = 260, defence = 60 },
+        employs = 4000,
         weight = 190,
     },
 
@@ -138,6 +177,7 @@ works = {
         band   = "gunpowder",
         gate   = { ore_q = 500, energy_q = 350, population = 25000 },
         effect = { manpower = 100, defence = 640 },
+        employs = 0,
         weight = 200,
     },
     {
@@ -145,6 +185,7 @@ works = {
         band   = "gunpowder",
         gate   = { energy_q = 450, population = 22000 },
         effect = { manpower = 180, defence = 80, industrial = 160 },
+        employs = 40000,
         weight = 160,
     },
     {
@@ -152,6 +193,7 @@ works = {
         band   = "gunpowder",
         gate   = { population = 30000 },
         effect = { capacity = 200, reach = 100, industrial = 300 },
+        employs = 60000,
         weight = 180,
     },
     {
@@ -159,6 +201,7 @@ works = {
         band   = "gunpowder",
         gate   = { farm_q = 300, population = 28000 },
         effect = { capacity = 120, reach = 420, industrial = 180 },
+        employs = 32000,
         weight = 170,
     },
     {
@@ -166,6 +209,7 @@ works = {
         band   = "gunpowder",
         gate   = { port_q = 600, energy_q = 300, population = 26000 },
         effect = { capacity = 100, manpower = 60, reach = 340, industrial = 200 },
+        employs = 120000,
         weight = 130,
     },
 
@@ -179,6 +223,7 @@ works = {
         band   = "industrial",
         gate   = { ore_q = 600, energy_q = 500, population = 40000 },
         effect = { capacity = 180, manpower = 140, industrial = 520 },
+        employs = 480000,
         weight = 240,
     },
     {
@@ -186,6 +231,7 @@ works = {
         band   = "industrial",
         gate   = { ore_q = 550, energy_q = 550, population = 45000 },
         effect = { capacity = 220, manpower = 80, reach = 700, industrial = 380 },
+        employs = 320000,
         weight = 260,
     },
     {
@@ -193,6 +239,7 @@ works = {
         band   = "industrial",
         gate   = { ore_q = 450, energy_q = 400, population = 35000 },
         effect = { reach = 380, defence = 80, industrial = 220 },
+        employs = 20000,
         weight = 190,
     },
     {
@@ -200,6 +247,7 @@ works = {
         band   = "industrial",
         gate   = { ore_q = 650, energy_q = 600, population = 50000 },
         effect = { manpower = 320, defence = 260, industrial = 180 },
+        employs = 240000,
         weight = 180,
     },
     {
@@ -207,6 +255,7 @@ works = {
         band   = "industrial",
         gate   = { port_q = 650, energy_q = 550, population = 38000 },
         effect = { capacity = 80, reach = 480, industrial = 200 },
+        employs = 80000,
         weight = 140,
     },
 }
