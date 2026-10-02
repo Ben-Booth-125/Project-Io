@@ -908,9 +908,10 @@ struct generation_report
     double  market_fold_goods_after  = 0.0; ///< ...and after them.
     int64_t market_fold_pop_before   = 0;   ///< Catchment population routed before the folds.
     int64_t market_fold_pop_after    = 0;   ///< ...and after them.
-    /// Markets destroyed by conquest in the history (BL-1125 cause 3), summed
-    /// over the spans that ran: a capital market whose region a rival took.
-    int64_t markets_destroyed_by_conquest = 0;
+    /// Markets destroyed by conquest in the history (BL-1125 cause 3), per
+    /// span -- [0] Empires (to 1200), [1] Exploration (to 1660), [2]
+    /// Industrialisation (to 1960): a capital market whose region a rival took.
+    int64_t markets_destroyed_by_conquest[3] = {0, 0, 0};
 
     // --- The carve ledger: what the carve counted as competitors (BL-1086) --
     //

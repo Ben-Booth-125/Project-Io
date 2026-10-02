@@ -559,6 +559,13 @@ struct seed_record
     int lost_successor = 0;        ///< maker lost it but another living polity's capital stands there
     int has_market_offgrid = 0;
     int index_unstable = 0;
+    // BL-1125 (markets can die)
+    int shells_marked = 0, shells_folded = 0, marks_cleared = 0;
+    int64_t folded_twins = 0, folded_gravity = 0;
+    int64_t conquest_destroyed[3] = { 0, 0, 0 };
+    double  goods_before = 0.0, goods_after = 0.0;
+    int64_t pop_before = 0, pop_after = 0;
+    int major_cities = 0, major_no_market = 0; ///< scale >= 4 centres; of them, no market centre within 8 tiles
     bool id_tile_match = false, price_agrees = false, count_agrees = false;
     int price_shell_votes = 0;
     int zero_tile = 0, colocated = 0;
@@ -717,17 +724,37 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
         shell_region.push_back(static_cast<int>(i));
         shell_anchor.push_back(a);
     }
-    rec.shells = static_cast<int>(shell_region.size());
+    // BL-1125: a shell can FOLD at the carve (twins, gravity), so the shells
+    // standing are a SUBSEQUENCE of the marked regions, in region order, and
+    // the report says how many folded. The S' lowest-id home markets must be
+    // centred, in order, on a subsequence of the marked anchors, with
+    // S' = marked - folded.
+    rec.shells_marked = static_cast<int>(shell_region.size());
+    rec.shells_folded = static_cast<int>(out->report.shells_folded);
+    const int shells_live = rec.shells_marked - rec.shells_folded;
+    rec.id_tile_match = shells_live >= 0 && shells_live <= rec.home_markets;
+    {
+        std::vector<int>       live_region;
+        std::vector<entity_id> live_anchor;
+        std::size_t s = 0;
+        for (int k = 0; rec.id_tile_match && k < shells_live; ++k)
+        {
+            const entity_id centre = w.markets.at(home_ids[static_cast<std::size_t>(k)]).centre_tile;
+            while (s < shell_anchor.size() && shell_anchor[s] != centre) ++s;
+            if (s == shell_anchor.size()) { rec.id_tile_match = false; break; }
+            live_region.push_back(shell_region[s]);
+            live_anchor.push_back(shell_anchor[s]);
+            ++s;
+        }
+        if (rec.id_tile_match) { shell_region = live_region; shell_anchor = live_anchor; }
+    }
+    rec.shells = std::max(0, shells_live);
     {
         bool same = w.gen_settlement != nullptr && w.gen_settlement->regions.size() == t1960.size();
         for (std::size_t i = 0; same && i < t1960.size(); ++i)
             same = w.gen_settlement->regions[i].has_market == t1960[i].has_market;
         rec.count_agrees = same;
     }
-    rec.id_tile_match = rec.shells <= rec.home_markets;
-    for (int k = 0; rec.id_tile_match && k < rec.shells; ++k)
-        rec.id_tile_match = w.markets.at(home_ids[static_cast<std::size_t>(k)]).centre_tile
-                         == shell_anchor[static_cast<std::size_t>(k)];
 
     // -- (2) the price vote, every home market --
     constexpr float k_premium = 1.25f; // hard_coded_world.cpp kCapitalMarketPricePremium (NR-916)
@@ -789,12 +816,30 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
             else ++rec.lost_living_capital;
         }
     }
-    // Index stability: a mark is sticky, so a region marked at 1200 or 1660 is
-    // marked in every later table — unless the region table was reindexed.
+    // Index stability: region i is the same PLACE in every table (its anchor
+    // does not move), unless the region table was reindexed. BL-1125: a mark
+    // is no longer sticky -- conquest clears it -- so stability is read off the
+    // anchors, and a mark set earlier and gone by 1960 is counted as cleared.
     for (std::size_t i = 0; i < t1200.size(); ++i)
-        if (t1200[i].has_market && !(i < t1960.size() && t1960[i].has_market)) ++rec.index_unstable;
+    {
+        if (i >= t1960.size() || t1200[i].row != t1960[i].row || t1200[i].col != t1960[i].col)
+            ++rec.index_unstable;
+        else if (t1200[i].has_market && !t1960[i].has_market) ++rec.marks_cleared;
+    }
     for (std::size_t i = 0; i < t1660.size(); ++i)
-        if (t1660[i].has_market && !(i < t1960.size() && t1960[i].has_market)) ++rec.index_unstable;
+    {
+        if (i >= t1960.size() || t1660[i].row != t1960[i].row || t1660[i].col != t1960[i].col)
+            ++rec.index_unstable;
+        else if (t1660[i].has_market && !t1960[i].has_market
+                 && !(i < t1200.size() && t1200[i].has_market)) ++rec.marks_cleared;
+    }
+    rec.folded_twins   = out->report.markets_folded_twins;
+    rec.folded_gravity = out->report.markets_folded_gravity;
+    for (int k = 0; k < 3; ++k) rec.conquest_destroyed[k] = out->report.markets_destroyed_by_conquest[k];
+    rec.goods_before = out->report.market_fold_goods_before;
+    rec.goods_after  = out->report.market_fold_goods_after;
+    rec.pop_before   = out->report.market_fold_pop_before;
+    rec.pop_after    = out->report.market_fold_pop_after;
 
     rec.carve = 0;
     for (std::size_t k = static_cast<std::size_t>(rec.shells); k < home_ids.size(); ++k)
@@ -870,6 +915,19 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
         if (rit == row_of.end()) continue;
         rec.rows[rit->second].pop_k += pcc.population;
         ++rec.rows[rit->second].centres;
+        // BL-1125: a MAJOR city (metropolis and up) with no market standing
+        // within 8 grid tiles of it -- the carve's own proxy radius.
+        if (pcc.scale >= 4)
+        {
+            ++rec.major_cities;
+            bool near = false;
+            for (const entity_id mid : home_ids)
+            {
+                const auto ct = w.tiles.find(w.markets.at(mid).centre_tile);
+                if (ct != w.tiles.end() && grid_dist(ct->second, tc->second, gw) <= 8.0) { near = true; break; }
+            }
+            if (!near) ++rec.major_no_market;
+        }
     }
     for (const auto& [bid, b] : w.buildings)
     {
@@ -1056,8 +1114,24 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
     check(rec.count_agrees, "I3", "world::gen_settlement's has_market regions ARE the fixture's "
                                   "1960 table, region for region");
     check(rec.fate[3] == 0, "I4", "every shell names a maker at the close that marked it");
-    check(rec.index_unstable == 0, "I5", "every mark set at 1200 or 1660 is still set in the 1960 "
-                                         "table (the region index is stable across the spans)");
+    check(rec.index_unstable == 0, "I5", "every region of the 1200 and 1660 tables is the same place "
+                                         "in the 1960 table (the region index is stable across the spans)");
+    std::printf("     BL-1125 deaths: conquest destroyed %" PRId64 " (Empires) %" PRId64 " (Exploration) %" PRId64
+                " (Industrialisation); marks set earlier and gone by 1960 %d | at the carve: twins folded %" PRId64
+                ", gravity folded %" PRId64 ", of them shells %d (of %d marked)\n",
+                rec.conquest_destroyed[0], rec.conquest_destroyed[1], rec.conquest_destroyed[2],
+                rec.marks_cleared, rec.folded_twins, rec.folded_gravity, rec.shells_folded, rec.shells_marked);
+    std::printf("     major cities (scale >= 4) %d, with no market centre within 8 tiles %d\n",
+                rec.major_cities, rec.major_no_market);
+    {
+        const double tol = 1e-6 * std::max(1.0, std::fabs(rec.goods_before));
+        char cb[200];
+        std::snprintf(cb, sizeof cb, "the folds conserve: goods (inventory + pools) %.3f -> %.3f, "
+                                     "catchment population %" PRId64 "k -> %" PRId64 "k",
+                      rec.goods_before, rec.goods_after, rec.pop_before, rec.pop_after);
+        check(std::fabs(rec.goods_after - rec.goods_before) <= tol && rec.pop_before == rec.pop_after,
+              "C1", cb);
+    }
 
     {
         std::vector<double> tiles, land, pop, nn, nnc, shell_carve;
@@ -1248,6 +1322,18 @@ int main(int argc, char** argv)
                     r.idle_play_shell, r.idle_play_carve, dn.med, dn.min, dc.med,
                     r.lost_rows_play, r.carve_under_shell, r.carve_under_carve, r.no_building);
     }
+
+    std::printf("\n=== BL-1125 per seed: how markets died, conservation, major cities ===\n");
+    std::printf("seed  markets  shells(marked)  conquest E/X/I   cleared  twins  gravity  shells-folded  "
+                "goods before->after        pop(k) before->after   major  no-mkt<=8\n");
+    for (const seed_record& r : recs)
+        std::printf("%4u  %7d  %6d(%5d)  %4" PRId64 "/%3" PRId64 "/%3" PRId64 "  %7d  %5" PRId64 "  %7" PRId64
+                    "  %13d  %11.1f->%-11.1f  %9" PRId64 "->%-9" PRId64 "  %5d  %9d\n",
+                    r.seed, r.home_markets, r.shells, r.shells_marked,
+                    r.conquest_destroyed[0], r.conquest_destroyed[1], r.conquest_destroyed[2],
+                    r.marks_cleared, r.folded_twins, r.folded_gravity, r.shells_folded,
+                    r.goods_before, r.goods_after, r.pop_before, r.pop_after,
+                    r.major_cities, r.major_no_market);
 
     std::printf("\n=== M2 per seed: straddlers (home-body buildings over 2+ markets) and the search ===\n");
     std::printf("seed  laid: corps straddle  max | handoff: corps straddle  bg  spec  max  player | V1-V5  "

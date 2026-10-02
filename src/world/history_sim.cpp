@@ -8095,6 +8095,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const bool was_seat =
                         dq && dq->capital == static_cast<int>(ti);
 
+                    // BL-1125 (markets can die), cause 3 -- CONQUEST
+                    // CONSOLIDATES (Ben, 2026-09-25; MARKETS.md § Market
+                    // centres and seeding). A market standing on ground a RIVAL
+                    // takes is destroyed here, at the conquest, so the
+                    // conqueror's strength is consolidated rather than a
+                    // monument left to the realm that lost it. The market's
+                    // whole history-grain record goes with it: the mark and its
+                    // want signal. Nothing absorbs it in the history -- it held
+                    // no stock -- and at the carve its catchment routes to the
+                    // nearest market still standing. Ground nobody held (a
+                    // prior owner < 0) is no rival's, and taking one's own
+                    // ground back is no conquest of a market.
+                    auto consolidate_market = [&](region& rg, int prior_owner) {
+                        if (!rg.has_market || prior_owner < 0 || prior_owner == q.id)
+                            return;
+                        rg.has_market = false;
+                        for (int g = 0; g < 4; ++g) { rg.scarcity_q[g] = 0; rg.scarcity_raw_q[g] = 0; }
+                        ++out.markets_destroyed;
+                    };
+                    consolidate_market(tgt, owner[ti]);
+
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
                     void_stale_standing_army(tgt); // BL-955 (the conqueror's paid survivors set above)
@@ -8122,6 +8143,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             region& h = ss.regions[hi];
                             if (h.seat_region != static_cast<int>(ti)) continue;
                             touch_owner(owner[hi]); // BL-922: whoever held it
+                            consolidate_market(h, owner[hi]); // BL-1125: taken in this event too
                             owner[hi] = q.id;
                             h.nation  = q.id;
                             void_stale_standing_army(h); // BL-955

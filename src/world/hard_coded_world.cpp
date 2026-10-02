@@ -1607,6 +1607,7 @@ void run_empires(generation_cursor& c)
         {
             report->prehistory_battles   = hs.battles;
             report->prehistory_conquests = hs.conquests;
+            report->markets_destroyed_by_conquest[0] = hs.markets_destroyed; // BL-1125
             report->prehistory_foundings = hs.foundings;
             report->prehistory_years     = hs.years;
             // NR-733: the ownership history itself, so the Ages view can
@@ -1829,6 +1830,7 @@ void run_exploration(generation_cursor& c)
             report->exploration_years     = kepler_exploration_hs.years;
             report->exploration_battles   = kepler_exploration_hs.battles;
             report->exploration_conquests = kepler_exploration_hs.conquests;
+            report->markets_destroyed_by_conquest[1] = kepler_exploration_hs.markets_destroyed; // BL-1125
             report->exploration_foundings = kepler_exploration_hs.foundings;
             for (generation_report::body_entry& be : report->bodies)
                 if (be.id == kepler)
@@ -2064,6 +2066,7 @@ void run_industrialisation(generation_cursor& c)
             report->industrialisation_years     = kepler_industrialisation_hs.years;
             report->industrialisation_battles   = kepler_industrialisation_hs.battles;
             report->industrialisation_conquests = kepler_industrialisation_hs.conquests;
+            report->markets_destroyed_by_conquest[2] = kepler_industrialisation_hs.markets_destroyed; // BL-1125
             report->industrialisation_foundings = kepler_industrialisation_hs.foundings;
             report->industrialisation_points_from_scale  = kepler_industrialisation_hs.industry_points_from_scale;
             report->industrialisation_stream_moved       = kepler_industrialisation_hs.urbanisation_heads_moved;

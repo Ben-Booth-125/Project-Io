@@ -4374,6 +4374,10 @@ struct history_sim_state
     // --- Counters, for the harness and BL-275's sweep metrics -------------
     int64_t battles     = 0;
     int64_t conquests   = 0;
+    /// BL-1125 (markets can die), cause 3 -- CONQUEST CONSOLIDATES: markets
+    /// destroyed because a rival took the region they stood on. Cleared at the
+    /// conquest itself (`region::has_market`), so the close never spawns them.
+    int64_t markets_destroyed = 0;
     int64_t foundings   = 0;
     /// BL-920 -- unorganised ground the ORGANISE verb actually took.
     int64_t organised          = 0;
