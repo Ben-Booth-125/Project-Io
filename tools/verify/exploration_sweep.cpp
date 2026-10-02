@@ -943,7 +943,8 @@ int main(int argc, char** argv)
         {
             const auto prefs = derive_culture_preference(
                 fx.pre_exploration_settlement.regions, fx.pre_exploration_contacts,
-                fx.pre_exploration_polities, static_cast<int>(fx.pre_exploration_creeds.cultures.size()));
+                fx.pre_exploration_polities, static_cast<int>(fx.pre_exploration_creeds.cultures.size()),
+                &fx.pre_exploration_creeds.cultures); // BL-1107: the profile too
             for (const auto& p : prefs) row.preference_weights.push_back(p.weight_q);
         }
 
@@ -1333,7 +1334,7 @@ int main(int argc, char** argv)
         // once, for reading 6's want-divergence count and reading 10's live line.
         const std::vector<culture_good_preference> live_prefs = derive_culture_preference(
             ss_copy.regions, traced.contacts, traced.polities,
-            static_cast<int>(cs_copy.cultures.size()));
+            static_cast<int>(cs_copy.cultures.size()), &cs_copy.cultures); // BL-1107: the profile too
         row.live_pref_entries_1660 = static_cast<int64_t>(live_prefs.size());
         const auto top_want = [&](int polity_id) {
             const region_class goods[4] = { region_class::farm, region_class::ore,

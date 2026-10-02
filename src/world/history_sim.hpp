@@ -5488,13 +5488,40 @@ struct culture_good_preference
 /// `derive_wants` holds itself to. @p culture_count bounds which culture
 /// indices are read, same convention `pass_one_output::culture_count` sets.
 ///
-/// A culture with no plurality-held ground and no contacted polity holding a
-/// good it lacks contributes nothing for that good — an absence with no
-/// route yet is not a preference (EXPLORATION.md sec A good acquires a
-/// cultural preference: "derived... from what its route exposed it to").
+/// TWO INPUTS (EXPLORATION.md sec A good acquires a cultural preference; BL-1107):
+///
+///  1. THE GROUND PROFILE (@p cultures, `culture::profile`; COLONISATION.md sec
+///     The ground profile) -- what the culture's cradle held. Each of the four
+///     profile classes (farm, ore, energy, water -> port) is scored against
+///     the mean over the CRADLE cultures on `score_against`'s scale (500 at
+///     the mean); a good the cradle held below the mean carries a REMEMBERED
+///     LACK of up to `culture_profile_lack_max_q` (at a score of 0). The cradle's
+///     amenity class leans toward the good its country lived by (forest ->
+///     energy, coastal grass -> port, marsh in a valley -> farm), by
+///     `amenity_share / culture_profile_amenity_div`. Read only for a living
+///     (unfolded) culture that is the plurality somewhere -- a people standing
+///     on ground, polity or none.
+///  2. ROUTE EXPOSURE -- 250 per distinct contacted foreign polity holding the
+///     good, as before.
+///
+/// The weight is their sum, capped at 1000. A good the culture's ground holds
+/// NOW is never preferred, whatever the profile says. With @p cultures null
+/// (or a culture with no coined profile) term 1 is absent and the table is
+/// exposure alone: a culture with no route then contributes nothing for a
+/// good -- an absence with no route yet is not a preference.
 std::vector<culture_good_preference> derive_culture_preference(
     const std::vector<region>& regions, const std::vector<contact>& contacts,
-    const std::vector<polity>& polities, int culture_count);
+    const std::vector<polity>& polities, int culture_count,
+    const std::vector<culture>* cultures = nullptr);
+
+/// The remembered lack a cradle that held NONE of a good carries (BL-1107),
+/// 0-1000 weight units: one contacted holder's worth. Falls linearly to 0 at
+/// the cradle mean.
+inline constexpr int culture_profile_lack_max_q = 250;
+
+/// The amenity lean's divisor (BL-1107): `amenity_share / 4`, so a window
+/// wholly under its amenity cover leans by one contacted holder's worth (250).
+inline constexpr int culture_profile_amenity_div = 4;
 
 // ---------------------------------------------------------------------------
 // The scarcity signal (BL-939) — EXPLORATION.md sec There is no price here,

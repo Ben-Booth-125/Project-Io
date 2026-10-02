@@ -5219,7 +5219,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // writes -- so the table is identical either side of the call.
             if (want_lean_on)
                 round_prefs = derive_culture_preference(ss.regions, out.contacts,
-                                                        out.polities, want_culture_count);
+                                                        out.polities, want_culture_count,
+                                                        cs ? &cs->cultures : nullptr);
 
             exploration_upkeep_spend upkeep_spend;
             // BL-955: the allocation reads the state's contacts (near-home
@@ -10120,7 +10121,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // fold, on the same inputs, that `make_industrialisation_output`
             // hands forward as `culture_preference`.
             const std::vector<culture_good_preference> close_prefs =
-                derive_culture_preference(ss.regions, out.contacts, out.polities, want_culture_count);
+                derive_culture_preference(ss.regions, out.contacts, out.polities, want_culture_count,
+                                          cs ? &cs->cultures : nullptr);
 
             constexpr int good_count = 4;
             const region_class goods[good_count] =
@@ -11492,7 +11494,8 @@ std::vector<want> derive_wants(const std::vector<region>& regions,
 
 std::vector<culture_good_preference> derive_culture_preference(
     const std::vector<region>& regions, const std::vector<contact>& contacts,
-    const std::vector<polity>& polities, int culture_count)
+    const std::vector<polity>& polities, int culture_count,
+    const std::vector<culture>* cultures)
 {
     // THE SAME FOUR WINDOWS `derive_wants` reads, in the same order — no new
     // threshold invented for a culture-grain reading of the same facts.
@@ -11501,6 +11504,78 @@ std::vector<culture_good_preference> derive_culture_preference(
         { region_class::farm, region_class::ore, region_class::energy, region_class::port };
 
     if (culture_count <= 0) return {};
+
+    // --- INPUT 1: THE GROUND PROFILE (BL-1107) ------------------------------
+    //
+    // What the culture's cradle held, at culture grain (COLONISATION.md sec
+    // The ground profile: "the profile is the first of those two inputs").
+    // Per culture and good, `profile_q` is the term this input adds: the
+    // remembered lack of a good the cradle held below the cradle mean, plus
+    // the amenity lean toward the good its country lived by. Static across
+    // the span -- a fact about where a people BEGAN -- so the LIVE half of the
+    // preference stays the ground-held test and the exposure below.
+    std::vector<std::array<int, good_count>> profile_q(static_cast<std::size_t>(culture_count));
+    for (auto& row : profile_q) row.fill(0);
+    if (cultures != nullptr)
+    {
+        const int n_read = std::min(culture_count, static_cast<int>(cultures->size()));
+        // THE MEAN OVER THE CRADLES, not over every culture: a daughter carries
+        // its cradle's profile whole, so a mean over every culture would weight
+        // each cradle by how often its people split. Integer, ascending id.
+        std::array<int64_t, good_count> sum{};
+        int64_t cradles = 0;
+        const auto raw_of = [](const ground_profile& gp, int g) -> int64_t {
+            switch (g)
+            {
+            case 0:  return std::max(gp.farm, 0);
+            case 1:  return std::max(gp.ore, 0);
+            case 2:  return std::max(gp.energy, 0);
+            default: return std::max(gp.water, 0);
+            }
+        };
+        for (int c = 0; c < n_read; ++c)
+        {
+            const culture& cu = (*cultures)[static_cast<std::size_t>(c)];
+            if (!cu.profile.coined() || cu.coined_from >= 0) continue;
+            ++cradles;
+            for (int g = 0; g < good_count; ++g) sum[static_cast<std::size_t>(g)] += raw_of(cu.profile, g);
+        }
+        // The amenity class -> the good its country lived by (TILES.md sec
+        // Amenity tiles): a wood is fuel, a grassy shore is a harbour, a wet
+        // valley is a granary. `open` leans toward nothing.
+        constexpr int amenity_good[4] = { -1, /*forest*/ 2, /*coastal grass*/ 3, /*valley marsh*/ 0 };
+        for (int c = 0; c < n_read && cradles > 0; ++c)
+        {
+            const culture& cu = (*cultures)[static_cast<std::size_t>(c)];
+            if (!cu.profile.coined() || cu.folded_into >= 0) continue;
+            auto& row = profile_q[static_cast<std::size_t>(c)];
+            for (int g = 0; g < good_count; ++g)
+            {
+                const std::size_t gi = static_cast<std::size_t>(g);
+                // `score_against`'s scale against the EXACT mean (BL-1041):
+                // raw * 500 * n / sum, capped at 1000; 0 where no cradle held any.
+                const int score = sum[gi] > 0
+                    ? static_cast<int>(clampi64((raw_of(cu.profile, g) * 500 * cradles) / sum[gi], 0, 1000))
+                    : 0;
+                if (score < 500)
+                    row[gi] += ((500 - score) * culture_profile_lack_max_q) / 500;
+            }
+            const int a = cu.profile.amenity;
+            if (a >= 0 && a < 4 && amenity_good[a] >= 0)
+                row[static_cast<std::size_t>(amenity_good[a])] +=
+                    clampi(cu.profile.amenity_share, 0, 1000) / culture_profile_amenity_div;
+        }
+    }
+    // A people STANDING ON GROUND: the plurality of at least one region. The
+    // profile term is read only for these -- a culture holding nothing is
+    // nobody's seat and nobody's market, and a table row for it would say
+    // nothing a reader could act on.
+    std::vector<uint8_t> on_ground(static_cast<std::size_t>(culture_count), 0u);
+    for (const region& r : regions)
+    {
+        const int pc = r.culture.id[0];
+        if (pc >= 0 && pc < culture_count) on_ground[static_cast<std::size_t>(pc)] = 1u;
+    }
 
     // CULTURE-GRAIN HOLDS: does at least one region where this culture is the
     // PLURALITY (`region::culture.id[0]`) sit dominant in this good? The same
@@ -11575,7 +11650,12 @@ std::vector<culture_good_preference> derive_culture_preference(
                     ++exposure;
                 }
             }
-            if (exposure == 0) continue; // a known absence with no route yet -- not a preference.
+            // INPUT 1 (BL-1107): the cradle's profile, for a people on ground.
+            const int from_profile = on_ground[static_cast<std::size_t>(c)]
+                ? profile_q[static_cast<std::size_t>(c)][gi] : 0;
+            // A known absence with no route yet and nothing in the cradle's
+            // memory -- not a preference.
+            if (exposure == 0 && from_profile <= 0) continue;
 
             culture_good_preference p;
             p.culture  = static_cast<int16_t>(c);
@@ -11584,8 +11664,8 @@ std::vector<culture_good_preference> derive_culture_preference(
             // where a fleet goes first" (EXPLORATION.md sec A good acquires
             // a cultural preference). Capped at 4 contacted holders so one
             // culture that has met everyone does not swamp the scale a
-            // sparser world reads on.
-            p.weight_q = static_cast<int16_t>(clampi(exposure * 250, 0, 1000));
+            // sparser world reads on; the profile term adds on the same scale.
+            p.weight_q = static_cast<int16_t>(clampi(exposure * 250 + from_profile, 0, 1000));
             out.push_back(p);
         }
     }
@@ -12274,7 +12354,8 @@ exploration_output make_exploration_output(const settlement_state&  ss,
     // the same derivations the Empire handoff and the sim itself use.
     o.wants              = derive_wants(o.regions, o.contacts, o.polities);
     o.culture_preference = derive_culture_preference(o.regions, o.contacts, o.polities,
-                                                     culture_count);
+                                                     culture_count,
+                                                     cs != nullptr ? &cs->cultures : nullptr);
 
     o.holdings            = derive_holdings(o.regions, o.polities);
     o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
