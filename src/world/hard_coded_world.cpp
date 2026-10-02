@@ -407,6 +407,19 @@ std::vector<std::string> polity_names_at_close(const std::vector<polity>& politi
     return names;
 }
 
+// BL-1159 -- THE REALMS' INDUSTRIAL CROSSINGS AT A SPAN'S CLOSE, on the names'
+// footing: indexed by POLITY id, dead realms included, `polity::industrial_year`
+// as the sim recorded it (`k_never_industrialised` where it never crossed). The
+// one timing a generated world carries; qualification reads it (POPULATION.md
+// § Qualification, "Seeded from history").
+std::vector<int64_t> polity_industrial_years_at_close(const std::vector<polity>& polities)
+{
+    std::vector<int64_t> years;
+    years.reserve(polities.size());
+    for (const polity& q : polities) years.push_back(q.industrial_year);
+    return years;
+}
+
 // BL-975/BL-1053 -- THE CHESTS AT A SPAN'S CLOSE, one rule for every close
 // world setup reads. Indexed by POLITY id: `region::treasury` summed over the
 // regions flying that polity's flag at the close -- the chest is a fact about
@@ -1573,6 +1586,8 @@ void run_empires(generation_cursor& c)
         kepler_grudges    = kepler_pass_one.grudges;
         kepler_grudge_cap = static_cast<int32_t>(hp.grudge_cap);
         kepler_polity_names = polity_names_at_close(kepler_pass_one.polities); // BL-1089
+        c.kepler_polity_industrial_years =
+            polity_industrial_years_at_close(kepler_pass_one.polities); // BL-1159
 
         // The sim narrates through the same history_event shape the other
         // generation passes use, so its wars join the world log without a
@@ -1789,6 +1804,8 @@ void run_exploration(generation_cursor& c)
         // `polity_treasuries_at_close`.
         kepler_polity_treasuries = polity_treasuries_at_close(kepler_exploration.regions);
         kepler_polity_names      = polity_names_at_close(kepler_exploration.polities); // BL-1089
+        c.kepler_polity_industrial_years =
+            polity_industrial_years_at_close(kepler_exploration.polities); // BL-1159
 
         if (fixture != nullptr)
             fixture->exploration_handoff = kepler_exploration;
@@ -2046,6 +2063,8 @@ void run_industrialisation(generation_cursor& c)
         kepler_grudge_cap        = static_cast<int32_t>(dp.grudge_cap);
         kepler_polity_treasuries = polity_treasuries_at_close(kepler_industrialisation.regions);
         kepler_polity_names      = polity_names_at_close(kepler_industrialisation.polities); // BL-1089
+        c.kepler_polity_industrial_years =
+            polity_industrial_years_at_close(kepler_industrialisation.polities); // BL-1159
 
         // BL-1149 (the review fix): a span run with no works table earns no
         // scale credit and moves no one. Said on every build, like the
@@ -2293,8 +2312,11 @@ void run_tail(generation_cursor& c)
     // regions settled during industrialisation, ideology from
     // industrialisation timing against neighbours. This overwrites the random
     // Pass 4 draw, which stays as the fallback for bodies with no settlement.
+    // BL-1159 (Ben, 2026-10-03): qualification reads the polity's own industrial
+    // crossing at the last span's close (POPULATION.md § Qualification).
     derive_national_character(kepler_settlement, kepler_creeds, w,
-                              kepler_nations, kepler_tiles, home_grid_width, home_grid_height);
+                              kepler_nations, kepler_tiles, home_grid_width, home_grid_height,
+                              &c.kepler_polity_industrial_years);
 
     // BL-898 — THE GRUDGES BITE. `derive_national_character` has just put the
     // nation index in `region::nation`, and `kepler_region_polity` holds what

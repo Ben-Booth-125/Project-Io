@@ -353,9 +353,11 @@ static void tier_census(const world& w, entity_id body, int counts[4])
 // THE RULE, ASKED INDEPENDENTLY (LOGISTICS.md § 4): a backbone link (tree or kept
 // loop) between two City+ centres in a nation at percentile >= 0.80 is a Highway.
 // From the trace alone: every such QUALIFYING link's land tiles must carry
-// road_level 3 on the shipped field (R2s-a), and the shipped worlds must carry a
-// Highway somewhere the rule qualifies one (R2s-b). If no shipped world qualifies
-// a link, R2s-b FAILS and the per-seed lines say why — never weakened to pass.
+// road_level 3 on the shipped field (R2s-a — a SELF-CONSISTENCY check: the trace is
+// the pass's own, so it confirms the field matches the pass's tier choice, not the
+// rule from outside), and some shipped seed must lay a qualifying link at Highway
+// (R2s-b — ancient-corridor Highway tiles never count). If no shipped world
+// qualifies a link, R2s-b FAILS and the per-seed lines say why — never weakened.
 struct shipped_highway_row
 {
     uint32_t seed = 0;
@@ -368,8 +370,14 @@ struct shipped_highway_row
     // The why: the qualification spread and where the multi-City nations stand in it.
     int    nations_at_gate = 0, majors_at_gate = 0, distinct_qual = 0;
     float  max_pct = 0.0f, max_qual = 0.0f, max_pct_two_major = 0.0f, max_qual_two_major = 0.0f;
+    int    pct_band[3] = { 0, 0, 0 };   // nations at pct < 0.40 / < 0.80 / >= 0.80
+    std::string qual_hist;               // "value x count" per distinct qualification
+    int    corp_focus[3] = { 0, 0, 0 }; // extraction / processing / trade
+    int    highway_ancient_only = 0;     // shipped Highway tiles the national lattice does not lay
     double build_s = 0.0;
 };
+
+static bool g_read_corps = false; // --corps: count the searched roster's focus too
 
 static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
 {
@@ -442,6 +450,36 @@ static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
             }
         }
         r.distinct_qual = static_cast<int>(distinct.size());
+        // The opening qualified fraction per nation, as a value histogram (few values),
+        // and the percentile bands the road gates read (< 0.40 Track, < 0.80 Road, Highway).
+        std::map<float, int> hist;
+        for (const auto& [nid, nc] : w.nations)
+        {
+            ++hist[nc.qualification];
+            const float p = pct[nid];
+            ++r.pct_band[p < 0.40f ? 0 : p < kGate ? 1 : 2];
+        }
+        char buf[48];
+        for (const auto& [q, n] : hist)
+        {
+            std::snprintf(buf, sizeof buf, "%s%.3fx%d", r.qual_hist.empty() ? "" : " ", q, n);
+            r.qual_hist += buf;
+        }
+    }
+    // Corporation focus counts (extraction / processing / trade). The roster is laid by
+    // the landscape search, which the base world has not run, so --corps builds a
+    // SECOND world through the search (apply_app_start_landscape) and counts its
+    // roster — a separate world, so the road reading above stays the generation's.
+    if (g_read_corps)
+    {
+        app_start_world o2;
+        build_app_base_world(lua, params, o2);
+        apply_app_start_landscape(o2);
+        for (const auto& [cid, cc] : o2.w.corporations)
+        {
+            const int f = static_cast<int>(cc.focus);
+            if (f >= 0 && f < 3) ++r.corp_focus[f];
+        }
     }
     for (const auto& [nid, m] : wt)
     {
@@ -477,6 +515,8 @@ static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
         if (tc.body != body) continue;
         const auto it = shipped_level.find(tid);
         if (it != shipped_level.end() && tc.road_level > it->second) ++r.above_shipped;
+        if (it != shipped_level.end() && it->second == 3 && tc.road_level < 3)
+            ++r.highway_ancient_only;
     }
 
     // The rule, from the trace: a qualifying link's land tiles are Highway on the
@@ -565,21 +605,32 @@ static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
                     " %.3f, best pct %.3f\n",
                     r.distinct_qual, r.max_qual, r.max_pct, r.nations_at_gate, r.majors_at_gate,
                     r.max_qual_two_major, r.max_pct_two_major);
+        std::printf("           spread: pct bands <0.40/<0.80/>=0.80 %d/%d/%d | Highway tiles national"
+                    " %d, ancient-only %d | corp focus ext/proc/trade %d/%d/%d (--corps) | qualification %s\n",
+                    r.pct_band[0], r.pct_band[1], r.pct_band[2], r.national_tiers[3],
+                    r.highway_ancient_only, r.corp_focus[0], r.corp_focus[1], r.corp_focus[2],
+                    r.qual_hist.c_str());
         std::fflush(stdout);
         qualifying    += r.qualifying;
         qualifying_ok += r.qualifying_at_highway;
         above         += r.above_shipped;
-        if (r.qualifying > 0 && r.shipped_tiers[3] > 0) ++seeds_qualifying_with_highway;
+        // BL-1159 review fix: a seed counts only when a QUALIFYING link itself is
+        // Highway, so ancient-corridor Highway tiles alone can never satisfy R2s-b.
+        if (r.qualifying_at_highway > 0) ++seeds_qualifying_with_highway;
     }
     std::printf("      (R2s pooled: qualifying links %d, at Highway %d; seeds carrying a qualifying"
                 " Highway %d of %zu; re-laid tiles above the shipped field %d)\n",
                 qualifying, qualifying_ok, seeds_qualifying_with_highway, seeds.size(), above);
     check(above == 0, "R2s0 the re-laid national lattice sits within the shipped field");
+    // R2s-a is a SELF-CONSISTENCY check, not proof of the rule: the qualifying set is
+    // read off the pass's own trace and re-derives the gate the pass applied, so it
+    // shows the stamped field agrees with the pass's own tier choice on those links.
     check(qualifying_ok == qualifying,
-          "R2s-a on the shipped worlds every qualifying link (two City+, pct >= 0.80) is Highway");
+          "R2s-a (self-consistency) every traced qualifying link (two City+, pct >= 0.80) is"
+          " Highway on the shipped field");
     check(seeds_qualifying_with_highway > 0,
-          "R2s-b the highway tier (road_level 3) is reached on the shipped worlds where the rule"
-          " qualifies one");
+          "R2s-b some shipped seed lays a QUALIFYING link at Highway (ancient-corridor Highways"
+          " do not count)");
 }
 
 int main(int argc, char** argv)
@@ -591,9 +642,10 @@ int main(int argc, char** argv)
     {
         const std::string s = argv[a];
         if (s == "--seeds" && a + 1 < argc) shipped_seeds = parse_seed_list(argv[++a]);
+        else if (s == "--corps") g_read_corps = true;
         else
         {
-            std::printf("usage: road_generation_harness [--seeds a,b,c]\n");
+            std::printf("usage: road_generation_harness [--seeds a,b,c] [--corps]\n");
             return 2;
         }
     }

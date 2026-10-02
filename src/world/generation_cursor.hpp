@@ -162,6 +162,14 @@ struct generation_cursor
     /// board printed. Empty when no span ran.
     std::vector<std::string> kepler_polity_names;
 
+    /// BL-1159: indexed by POLITY id, each polity's own industrial crossing year
+    /// (`polity::industrial_year`, `k_never_industrialised` for one that never
+    /// crossed) at the LAST span's close (`polity_industrial_years_at_close`),
+    /// replaced span by span on the same rule as the names above. Read once, by
+    /// `derive_national_character`'s qualification axis (POPULATION.md
+    /// § Qualification, "Seeded from history"). Empty when no span ran.
+    std::vector<int64_t> kepler_polity_industrial_years;
+
     /// The era ran (the Empires stage's gate): the Exploration span is nested in it.
     bool               era_ran = false;
     /// The sim's terrain view, built once at the Empires stage and read by all three spans.

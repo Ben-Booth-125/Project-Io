@@ -525,6 +525,7 @@ uint64_t cursor_state_digest(const generation_cursor& c)
     fold_i32(h, c.kepler_grudge_cap);
     fold_ints(h, c.kepler_polity_treasuries);
     fold_strs(h, c.kepler_polity_names);
+    fold_ints(h, c.kepler_polity_industrial_years); // BL-1159
     fold_ints(h, c.kepler_region_polity);
     fold_ints(h, c.capital_market_shells);
 
