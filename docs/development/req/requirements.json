@@ -7845,6 +7845,60 @@
      "result_metric": "Main cf2dc85c: world_determinism ALL PASS twice (786D425F7A58A1CB / 08222F6CDC07BFCA / off EB15108A7192A842); spawn_solvency, rival_military_seeding_harness, landscape_search_harness, save_roundtrip, world_cursor_equivalence pass; history_sim only R3a2/R3a3. The legacy arc moves (rivals armed there too, per MILITARY.md): a named re-bless cause."
     }
    ]
+  },
+  {
+   "brief": "fleets-project-power",
+   "title": "BL-1152 - A fleet bounds the army it carries, and a crossing its target's side out-projects never sails",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1152 - sprint 48 (Ben, NR-961, NR-965, 2026-09-27/10-01)",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: ocean_currents_harness P0-P10, 18 mutations"
+     ],
+     "requirement": "Capacity, mutual-defence projection by distance and current, out-projected crossings never sail, a refused crossing is never a candidate.",
+     "notes": "",
+     "result_metric": "c4b5027e, fe9cb980, e02f564c: the scorer prices the lifted army; embark at a coast that reaches the landing (fail closed); clipped men return to their regions; overflow and cost fixed (span time below the rule-off span)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review, fix round included.",
+     "notes": "",
+     "result_metric": "No break at 0; the uncapped-army scoring and the uncontested no-leg crossing fixed; rows strengthened."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "decision: Ben, the fleet constants forms"
+     ],
+     "requirement": "Ben sets the constants.",
+     "notes": "",
+     "result_metric": "Exploration age: 20 men a hull, halving 10 sea tiles, 50 hulls per 1,000 naval points (4f2fc181). Industrialisation: rule-off pending its call."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: gates on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": "Main 14babd92: world_determinism ALL PASS twice (C32FBDF09F66889A / DE8FDC4F8AB7658E / EB15108A7192A842); save_roundtrip, ocean_currents, sea_lane_stamp, world_cursor_equivalence pass; only R3b/R3d.1 and R3a2/R3a3."
+    }
+   ]
   }
  ]
 }
