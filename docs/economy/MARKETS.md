@@ -42,7 +42,8 @@ template base price for every good, the endemic field where it applies — and t
 **capital premium** over all of it: a capital is where a realm's court, treasury and demand
 concentrate, so goods cost more there. An unpriced market is not a neutral default: a good with no
 base price is never listed, so stock in its catchment could never be sold. Owner: BL-1066 (the
-player cannot build).
+player cannot build). A capital's market can still die by the causes below: one standing inside a
+larger market's reach folds into it like any other market, and the absorber keeps its own prices.
 
 **A market also emerges where trade CONCENTRATED, not from population alone** (Ben, 2026-09-03,
 the eight-phase reorder point 4: *"markets should begin to emerge towards the end of this
@@ -78,7 +79,10 @@ to another, idle and unbuilt. Three in-world causes remove them, and none is a c
 2. **Gravity fold.** A market inside a larger market's reach folds into it: trade goes where it
    concentrates. "Larger" is catchment population; "reach" is a traversal cost, calibrated so a
    1960 world carries roughly **20–40 markets, about one per major city**. That aim sets the
-   constant, measured on the curated seeds; the rule never enforces a count.
+   constant, measured on the curated seeds; the rule never enforces a count. The walk is largest
+   first, on catchments read once before any fold: each market still standing absorbs every
+   smaller one whose centre lies within reach of it (the cost of travel toward the larger), and a
+   market already absorbed absorbs nothing.
 3. **Conquest consolidates.** When a realm conquers the region its rival's market stands on, the
    conquered market is destroyed to consolidate the conqueror's strength (Ben, 2026-09-25). The
    history's markets are the survivors' markets, not a monument to every realm that ever stood.

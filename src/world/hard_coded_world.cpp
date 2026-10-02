@@ -2986,6 +2986,23 @@ void run_tail(generation_cursor& c)
                 for (const market_fold_record& r : twins.records)
                     if (shells.count(r.folded) != 0) ++report->shells_folded;
             }
+
+            // 2. GRAVITY FOLD. A market inside a larger market's reach folds
+            //    into it: trade goes where it concentrates. Larger is
+            //    catchment population; reach is a traversal cost, the one
+            //    calibrated constant `market_carving.gravity_reach`. A capital
+            //    shell folds like any market -- it is a market place, and the
+            //    rule is about where trade gathers, not whose court sits there.
+            const market_fold_tally gravity =
+                fold_markets_by_gravity(w, kepler, gen_cfg.market_carving.gravity_reach);
+            if (report != nullptr)
+            {
+                report->markets_folded_gravity  = gravity.folds;
+                report->market_fold_goods_after = gravity.inventory_after + gravity.pools_after;
+                report->market_fold_pop_after   = gravity.catchment_pop_after;
+                for (const market_fold_record& r : gravity.records)
+                    if (shells.count(r.folded) != 0) ++report->shells_folded;
+            }
         }
 
         // ------------------------------------------------------------------

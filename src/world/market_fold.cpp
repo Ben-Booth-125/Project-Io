@@ -3,6 +3,7 @@
 
 #include "market_fold.hpp"
 
+#include "logistics.hpp"
 #include "market_clearing.hpp"
 
 #include <algorithm>
@@ -142,6 +143,73 @@ market_fold_tally fold_twin_markets(world& w, entity_id body)
         if (fresh)
             continue;
         t.records.push_back(market_fold_record{ mid, it->second });
+    }
+    for (const market_fold_record& r : t.records)
+        fold_market_into(w, r.folded, r.into);
+
+    close_tally(t, w, body);
+    return t;
+}
+
+market_fold_tally fold_markets_by_gravity(world& w, entity_id body, float reach)
+{
+    market_fold_tally t;
+    open_tally(t, w, body);
+    if (!(reach > 0.0f))
+    {
+        close_tally(t, w, body);
+        return t;
+    }
+
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    const std::map<entity_id, int64_t> pop = catchment_population(w, body);
+
+    // Anchored markets only: an unanchored market has no place to stand in
+    // anyone's reach, and no reach of its own.
+    std::vector<entity_id> order;
+    std::map<entity_id, entity_id> market_on_tile; // centre tile -> market (twins already folded)
+    for (const entity_id mid : body_markets_ascending(w, body))
+    {
+        const entity_id centre = w.markets.at(mid).centre_tile;
+        if (w.tiles.find(centre) == w.tiles.end())
+            continue;
+        order.push_back(mid);
+        market_on_tile.emplace(centre, mid); // lowest id keeps a shared tile
+    }
+    const auto pop_of = [&](entity_id mid) -> int64_t {
+        const auto it = pop.find(mid);
+        return it != pop.end() ? it->second : 0;
+    };
+    // LARGEST FIRST: catchment population descending, ties to the lower id.
+    std::stable_sort(order.begin(), order.end(), [&](entity_id a, entity_id b) {
+        const int64_t pa = pop_of(a), pb = pop_of(b);
+        if (pa != pb) return pa > pb;
+        return a < b;
+    });
+    std::map<entity_id, std::size_t> rank;
+    for (std::size_t k = 0; k < order.size(); ++k)
+        rank.emplace(order[k], k);
+
+    std::map<entity_id, bool> folded;
+    for (const entity_id m : order)
+    {
+        if (folded[m])
+            continue; // absorbed by a larger market: it absorbs nothing
+        const std::size_t m_rank = rank.at(m);
+        const std::vector<std::pair<int, float>> field =
+            bounded_cost_to_tile(w, body, w.markets.at(m).centre_tile, reach);
+        for (const auto& [idx, cost] : field)
+        {
+            const entity_id tile = grid[static_cast<std::size_t>(idx)];
+            const auto it = market_on_tile.find(tile);
+            if (it == market_on_tile.end())
+                continue;
+            const entity_id x = it->second;
+            if (x == m || folded[x] || rank.at(x) < m_rank)
+                continue; // itself, already gone, or LARGER than m
+            folded[x] = true;
+            t.records.push_back(market_fold_record{ x, m });
+        }
     }
     for (const market_fold_record& r : t.records)
         fold_market_into(w, r.folded, r.into);

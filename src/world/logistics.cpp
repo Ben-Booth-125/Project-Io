@@ -263,6 +263,78 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
 
 } // namespace
 
+std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body,
+                                                        entity_id anchor_tile, float max_cost)
+{
+    std::vector<std::pair<int, float>> out;
+    const auto bit = w.bodies.find(body);
+    const auto ait = w.tiles.find(anchor_tile);
+    if (bit == w.bodies.end() || ait == w.tiles.end() || ait->second.body != body)
+        return out;
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+    if (gw <= 0 || gh <= 0)
+        return out;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (static_cast<int>(grid.size()) < gw * gh)
+        return out;
+
+    const auto tile_at = [&](int idx) -> const tile_component* {
+        const entity_id tid = grid[static_cast<std::size_t>(idx)];
+        if (tid == null_entity)
+            return nullptr;
+        const auto tit = w.tiles.find(tid);
+        return (tit != w.tiles.end()) ? &tit->second : nullptr;
+    };
+
+    // The same Dijkstra as flood_field_for, over the same directed edge, cut
+    // off at max_cost: a node is pushed only when its cost is within reach, so
+    // the walk visits the reach and nothing beyond it. Not cached.
+    const int total = gw * gh;
+    std::vector<float> dist(static_cast<std::size_t>(total), 1e30f);
+    std::vector<char>  settled(static_cast<std::size_t>(total), 0);
+    const int ac = ait->second.grid_x, ar = ait->second.grid_y;
+    dist[static_cast<std::size_t>(raster_idx(ac, ar, gw))] = 0.0f;
+    std::priority_queue<pq_entry, std::vector<pq_entry>, std::greater<pq_entry>> pq;
+    pq.push({ 0.0f, ac, ar });
+    while (!pq.empty())
+    {
+        const pq_entry cur = pq.top();
+        pq.pop();
+        const int idx = raster_idx(cur.col, cur.row, gw);
+        if (settled[static_cast<std::size_t>(idx)])
+            continue;
+        settled[static_cast<std::size_t>(idx)] = 1;
+        out.emplace_back(idx, dist[static_cast<std::size_t>(idx)]);
+
+        const tile_component* cur_tc = tile_at(idx);
+        if (!cur_tc)
+            continue;
+        const float cur_cost = tile_traversal_cost(*cur_tc);
+        for (int i = 0; i < 4; ++i)
+        {
+            const int nr = cur.row + k_flood_off_dr[i];
+            if (nr < 0 || nr >= gh)
+                continue;
+            const int nc = ((cur.col + k_flood_off_dc[i]) % gw + gw) % gw;
+            const int nidx = raster_idx(nc, nr, gw);
+            if (settled[static_cast<std::size_t>(nidx)])
+                continue;
+            const tile_component* n_tc = tile_at(nidx);
+            if (!n_tc)
+                continue;
+            const float nd = dist[static_cast<std::size_t>(idx)]
+                           + flood_edge_cost(cur_cost, *n_tc, nr, i);
+            if (nd <= max_cost && nd < dist[static_cast<std::size_t>(nidx)])
+            {
+                dist[static_cast<std::size_t>(nidx)] = nd;
+                pq.push({ nd, nc, nr });
+            }
+        }
+    }
+    return out;
+}
+
 const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_tile,
                                       entity_id dst_tile)
 {

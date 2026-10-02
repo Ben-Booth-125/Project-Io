@@ -67,6 +67,16 @@ const std::vector<entity_id>& body_tile_grid(world& w, entity_id body);
 const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_tile,
                                       entity_id dst_tile);
 
+/// Every cell of @p body whose travel cost TO @p anchor_tile is at most
+/// @p max_cost, as (raster index, cost) pairs in settle order (cost
+/// ascending). The same directed edge price `intra_body_path` reads
+/// (landform x road x river, cylinder wrap), so a cell's cost here equals
+/// intra_body_path(cell, anchor).cost wherever both are within reach. A
+/// bounded Dijkstra, NOT cached and touching no cache but the raster index
+/// (`body_tile_grid`). BL-1125: the gravity fold's reach.
+std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body,
+                                                        entity_id anchor_tile, float max_cost);
+
 // ---------------------------------------------------------------------------
 // Logistics reach (BL-323 S2 — the placement-side "breadth must cost something")
 // ---------------------------------------------------------------------------
