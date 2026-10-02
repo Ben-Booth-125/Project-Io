@@ -319,6 +319,10 @@ struct seed_record
     int     c13_joining_max_sites = 0;   ///< the most sites one province joins
     uint32_t c13_joining_max_id = 0;     ///< ...that province
     int     c13_joining_max_tiles = 0;   ///< ...and its land tiles
+    /// C14: water provinces on every body (BL-1156 review: the river cost is a
+    /// land rule, so these must not move with it), and a digest of their tiles.
+    int     water_coast = 0, water_lake = 0, water_ocean = 0;
+    uint64_t water_digest = 1469598103934665603ull;
     float c13_p90 = 0.0f;                       ///< this world's p90 of adjacent-land |dh|
     int   c13_river_bodies = 0, c13_steep_bodies = 0; ///< bodies carrying each class
     std::vector<std::string> c13_fail;          ///< one line per body failing C2a or C2b
@@ -778,6 +782,22 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
         build_province_partition(wc, w.provinces.seed, &r.part_stats);
     }
 
+    // --- C14 the water provinces (BL-1156 review) ---------------------------
+    // Counted per domain over every body, and folded (FNV-1a over each water
+    // province's id and tile list, in the partition's ascending order) so a
+    // re-partition of the same count is visible too.
+    for (const province& pr : w.provinces.provinces)
+    {
+        const province_kind k = province_kind_of(w, pr);
+        if (k == province_kind::land) continue;
+        if (k == province_kind::open_ocean) ++r.water_ocean;
+        else if (is_lake(w.tiles.at(pr.tiles.front()).substrate)) ++r.water_lake;
+        else ++r.water_coast;
+        const auto mix = [&](uint64_t v) { r.water_digest = (r.water_digest ^ v) * 1099511628211ull; };
+        mix(pr.id);
+        for (const entity_id t : pr.tiles) mix(t);
+    }
+
     // --- C13 the cost model on the shipped world (BL-1150 review) ----------
     // province_partition_harness C2a/C2b's classes, re-derived here from the
     // tiles: every adjacent pair of land tiles on one body, once, from its
@@ -1217,6 +1237,12 @@ int main(int argc, char** argv)
                 ratio(shr(pr_cross), shr(pr_plain)), ratio(shr(pr_river), shr(pr_plain)),
                 shr(pr_steep), pr_steep.n, ratio(shr(pr_steep), shr(pr_plain)), pr_joined, pr_sites,
                 pr_sites ? 100.0 * double(pr_joined) / double(pr_sites) : 0.0, c2a_red, recs.size());
+
+    std::printf("\n=== C14 water provinces, every body (BL-1156 review; reported) ===\n");
+    std::printf("seed  coastal  lake  open_ocean  water_digest\n");
+    for (const seed_record& r : recs)
+        std::printf("%4u  %7d  %4d  %10d  %016" PRIX64 "\n", r.seed, r.water_coast, r.water_lake,
+                    r.water_ocean, r.water_digest);
 
     std::printf("\n=== C9 the settle-spacing ladder row (BL-1132; spacing %d tiles) ===\n",
                 generation_settle_spacing_tiles);

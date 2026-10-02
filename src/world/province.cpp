@@ -216,9 +216,15 @@ int edge_cost_impl(uint32_t seed, entity_id a_id, const tile_component& a, entit
     // course tile, the step not one the river flows through — so crossing
     // from bank to bank costs it twice, and stepping along the course pays
     // nothing extra. Symmetric: both ends' course-ness and either side's bit.
+    // LAND COURSE TILES ONLY: the river's last step sets an inflow bit on the
+    // water tile it reaches (its mouth), and the ruling is about banks on land,
+    // so a mouth tile charges water-to-water steps nothing and the water
+    // domains partition exactly as before (BL-1156 review).
     const bool along = ((a.river_edges >> side) & 1u) != 0u
                        || ((b.river_edges >> opposite) & 1u) != 0u;
-    if (!along && (a.river_edges != 0u || b.river_edges != 0u))
+    const bool a_course = a.river_edges != 0u && !is_water(a.substrate);
+    const bool b_course = b.river_edges != 0u && !is_water(b.substrate);
+    if (!along && (a_course || b_course))
         c += k_province_river_edge_cost;
 
     const float dh = std::fabs(a.height - b.height);
