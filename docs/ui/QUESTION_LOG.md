@@ -374,13 +374,13 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 *Demanded by BL-520, BL-519 · `src/ui/hex_render.cpp`, `src/ui/body_surface_canvas.cpp` · id `tile_texture`*
 
-### Unit marker (Planetary canvas, province anchor tile)
+### Unit marker (Planetary canvas, the group's own tile)
 
 **Answers:** Where are my (and my rivals') forces standing, and whose are they?
 
-**Because:** Units had no on-canvas glyph at all before this (ICONS.md previously documented Unit as "(no glyph)"), reachable only by clicking the exact tile a unit stood on or cycling into it — a large province full of units was otherwise invisible on the map. BL-511 made a unit's command grain the PROVINCE (march_unit targets a province, not a tile), so the marker follows the same province-anchor convention the battle marker already established: drawn once per (province, owner) GROUP at the province's lowest-member-tile anchor, with a "+N" count badge for more than one unit in the group, rather than once per unit or per tile. The humanoid silhouette echoes the unit card's own placeholder glyph (glyph_soldier) so the canvas and the card read as one vocabulary. Carries a stub ring for contract-committed units (always false today; BL-573, a later wave of the same Sprint 16 batch, adds the real per-unit flag) so that later item needs no further UI plumbing change.
+**Because:** Units had no on-canvas glyph at all before this (ICONS.md previously documented Unit as "(no glyph)"), reachable only by clicking the exact tile a unit stood on or cycling into it — a large province full of units was otherwise invisible on the map. BL-511 made a unit's command grain the PROVINCE (march_unit targets a province, not a tile), so the marker groups at the province grain the battle marker already established: drawn once per (province, owner) GROUP, on the tile the group's lowest-id unit stands on (BL-1145 — the province's lowest-id tile, the first post, could lie hundreds of tiles from every unit once a province became a centre's whole ground, leaving an army on screen with no marker), with a "+N" count badge for more than one unit in the group, rather than once per unit or per tile. The humanoid silhouette echoes the unit card's own placeholder glyph (glyph_soldier) so the canvas and the card read as one vocabulary. Carries a stub ring for contract-committed units (always false today; BL-573, a later wave of the same Sprint 16 batch, adds the real per-unit flag) so that later item needs no further UI plumbing change.
 
-*Demanded by BL-575, BL-511 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/ui_state.hpp` · id `unit_marker`*
+*Demanded by BL-575, BL-511, BL-1145 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/ui_state.hpp` · id `unit_marker`*
 
 ### Selection band — the water tile variant (owner / domain centre column)
 

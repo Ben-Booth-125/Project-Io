@@ -420,6 +420,49 @@ std::map<uint32_t, province_anchor> province_anchors(const world& w)
     return out;
 }
 
+entity_id province_anchor_tile(const world& w, const province& pr)
+{
+    if (pr.tiles.empty())
+        return null_entity;
+
+    // The same per-tile sum `province_anchors` builds, narrowed to this
+    // province's tiles, in an ORDERED map so the scan below walks ascending
+    // tile id exactly as that function walks `pr.tiles`.
+    std::map<entity_id, int> scale_on_tile;
+    for (const auto& [centre_id, tile_id] : w.population_centre_tile)
+    {
+        if (w.provinces.province_of(tile_id) != pr.id)
+            continue;
+        if (!std::binary_search(pr.tiles.begin(), pr.tiles.end(), tile_id))
+            continue; // guards province id 0, which province_of also returns for "none"
+        const auto pit = w.population_centres.find(centre_id);
+        if (pit == w.population_centres.end())
+            continue;
+        scale_on_tile[tile_id] += pit->second.scale;
+    }
+
+    entity_id anchor       = null_entity;
+    int       anchor_scale = 0;
+    for (const auto& [tile, scale] : scale_on_tile) // ascending: strict > keeps the lowest id
+    {
+        if (scale > anchor_scale)
+        {
+            anchor_scale = scale;
+            anchor       = tile;
+        }
+    }
+    return (anchor != null_entity) ? anchor : pr.tiles.front(); // centreless: the lowest-id tile
+}
+
+entity_id province_anchor_tile(const std::map<uint32_t, province_anchor>& anchors,
+                               const province& pr)
+{
+    if (pr.tiles.empty())
+        return null_entity;
+    const auto it = anchors.find(pr.id);
+    return (it != anchors.end()) ? it->second.tile : pr.tiles.front(); // centreless: the lowest-id tile
+}
+
 void seed_province_holders(world& w)
 {
     w.province_holder.assign(w.provinces.provinces.size(), null_entity);

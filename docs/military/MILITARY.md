@@ -605,7 +605,10 @@ battle element.
 Nations own units. `unit_component::owner` accepts a nation entity exactly as it accepts a corp's —
 the field was never corp-typed. A garrison is seeded at generation, not hired: one in the nation's
 capital province, plus one in each border province it shares with its highest-grudge neighbour
-(`nation_score_terms.mean_grudge`). This joins the existing three unit writers (§ The unit model)
+(`nation_score_terms.mean_grudge`). A garrison stands on the capital itself in the capital's
+province and on the province's **anchor** — its highest summed centre scale — in a border province
+(BL-1145, a province's readers take its anchor); never on the province's lowest-id tile, which is
+its id rather than its place. This joins the existing three unit writers (§ The unit model)
 as a fourth, generation-time source, alongside the hard-coded stub, `seed_starting_military`, and
 `hire_unit`.
 

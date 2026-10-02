@@ -1464,21 +1464,25 @@ entity_id garrison_neighbour_tile(world& w, entity_id tile, int side)
 }
 
 /// Create the one static garrison unit for @p nation in @p province_id, on
-/// the province's own anchor tile (`province::tiles.front()`, which IS
-/// `province::id` by that struct's own contract — province.hpp). No-op on a
-/// province id the partition does not resolve (defensive; provinces are
-/// never empty by the partition's own contract, so this should not fire).
-void place_garrison(world& w, entity_id nation, uint32_t province_id, int count,
-                    uint16_t roster_row)
+/// @p post: the nation's capital tile when the capital stands in this
+/// province, otherwise the province's ANCHOR (`province_anchor_tile`, BL-1145 —
+/// a province's readers take its anchor, not its lowest tile). The lowest-id
+/// tile was the old post, and since BL-1150 a province's fill crosses the
+/// settled line, so that tile could be never-settled wilderness far from the
+/// centre the garrison holds. No-op on a province id the partition does not
+/// resolve (defensive; provinces are never empty by the partition's own
+/// contract, so this should not fire).
+void place_garrison(world& w, entity_id nation, uint32_t province_id, entity_id post,
+                    int count, uint16_t roster_row)
 {
     const province* pr = w.provinces.find(province_id);
-    if (pr == nullptr || pr->tiles.empty())
+    if (pr == nullptr || pr->tiles.empty() || post == null_entity)
         return;
 
     const entity_id u = w.create_entity();
     unit_component uc{};
     uc.owner                  = nation;               // a nation, not a corp — the fourth writer
-    uc.position                = pr->tiles.front();
+    uc.position                = post;
     uc.count                   = count;
     uc.type                    = roster_row;
     uc.supply_factor_permille  = 1000;
@@ -1499,6 +1503,10 @@ void seed_nation_garrisons(world& w, const nation_garrison_params& params)
 {
     if (w.nations.empty() || w.provinces.provinces.empty())
         return; // no nations, or called before the partition exists
+
+    // The anchors, derived once for every province (BL-1145): the post a
+    // garrison takes when its province does not hold the capital.
+    const std::map<uint32_t, province_anchor> anchors = province_anchors(w);
 
     // Ascending nation id — `w.nations` is an unordered_map.
     std::vector<entity_id> nation_ids;
@@ -1600,8 +1608,21 @@ void seed_nation_garrisons(world& w, const nation_garrison_params& params)
             }
         }
 
+        // --- The post: the capital, else the anchor (BL-1145) -----------------
+        // A centreless province (it can outlive its centre in play, NR-952 —
+        // never at generation, which centre_census C7 gates) falls back to its
+        // lowest-id tile inside `province_anchor_tile`, stated there.
         for (const uint32_t prov : target_provinces) // ascending: deterministic creation order
-            place_garrison(w, nid, prov, count, params.roster_row);
+        {
+            const province* pr = w.provinces.find(prov);
+            if (pr == nullptr)
+                continue;
+            const bool capital_here = nc.capital_tile != null_entity
+                && std::binary_search(pr->tiles.begin(), pr->tiles.end(), nc.capital_tile);
+            const entity_id post = capital_here ? nc.capital_tile
+                                                : province_anchor_tile(anchors, *pr);
+            place_garrison(w, nid, prov, post, count, params.roster_row);
+        }
     }
 }
 

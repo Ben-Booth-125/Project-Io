@@ -34,6 +34,7 @@ struct terrain_pick
     terrain_cover     cov     = terrain_cover::grass;
     std::uint8_t      density = 150u;
     terrain_landform  lf      = terrain_landform::plains;
+    entity_id         tile    = null_entity; ///< the picked tile (BL-1145: the card frames it)
     bool              found   = false;
 };
 
@@ -69,6 +70,7 @@ terrain_pick defender_ground(const world& w, const std::vector<entity_id>& defen
             best.cov      = tc.cover;
             best.density  = tc.cover_density;
             best.lf       = tc.landform;
+            best.tile     = tid;
             best.found    = true;
         }
     }
@@ -302,6 +304,11 @@ bool battle_ground(const world& w, const std::vector<entity_id>& defender_units,
         return false;
     sub = g.sub; cov = g.cov; density = g.density; lf = g.lf;
     return true;
+}
+
+entity_id battle_ground_tile(const world& w, const std::vector<entity_id>& defender_units)
+{
+    return defender_ground(w, defender_units).tile; // null_entity when not found
 }
 
 bool unit_in_battle(const world& w, entity_id unit)

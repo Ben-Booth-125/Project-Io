@@ -1724,6 +1724,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // and a march order's actual tile move only happens on a tick (already
     // caught by day_tick).
     static std::unordered_map<uint32_t, std::vector<unit_marker_summary>> province_units;
+    // BL-1145 (a province's readers take its anchor, not its lowest tile): the
+    // tile each (province, owner) unit group DRAWS on — its lowest-id unit's own
+    // tile, so the marker sits where the army stands — and the tile each
+    // province's battle glyph draws on, its ANCHOR (`province_anchor_tile`; the
+    // lowest-id tile only for a province with no centre). Keyed on the same
+    // stamp: a centre changes only on a tick, which day_tick catches.
+    static std::unordered_map<entity_id, std::vector<unit_marker_summary>> tile_units;
+    static std::unordered_map<uint32_t, entity_id> province_mark_tile;
     const body_frame_stamp marker_stamp = make_body_frame_stamp(w, state.active_body);
     if (!(marker_stamp == s_marker_stamp))
     {
@@ -1810,6 +1818,28 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     ++grp_it->count;
                 }
             }
+        }
+
+        // Each group draws on its sample (lowest-id) unit's own tile. A tile
+        // lies in exactly one province, so every group landing on a tile comes
+        // from ONE province's vector, in that vector's own (ascending-unit-id)
+        // order — the unordered walk of `province_units` cannot reorder them.
+        tile_units.clear();
+        for (const auto& [upid, groups] : province_units)
+            for (const unit_marker_summary& g : groups)
+            {
+                const auto uit = w.units.find(g.sample_unit);
+                if (uit != w.units.end())
+                    tile_units[uit->second.position].push_back(g);
+            }
+
+        // The battle glyph's tile per province of this body: its anchor.
+        province_mark_tile.clear();
+        {
+            const std::map<uint32_t, province_anchor> anchors = province_anchors(w);
+            for (const province& pv : w.provinces.provinces)
+                if (pv.body == state.active_body)
+                    province_mark_tile[pv.id] = province_anchor_tile(anchors, pv);
         }
     }
 
@@ -3787,8 +3817,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const uint32_t pid = w.provinces.province_of(id);
                 if (pid != 0)
                 {
-                    const province* pv = w.provinces.find(pid);
-                    if (pv != nullptr && !pv->tiles.empty() && pv->tiles.front() == id)
+                    const auto mt = province_mark_tile.find(pid);
+                    if (mt != province_mark_tile.end() && mt->second == id)
                     {
                         if (const active_battle* b = first_battle_in(w, pid))
                         {
@@ -3802,7 +3832,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
-            // UNIT MARKERS (BL-575). Same province-anchor convention as the
+            // UNIT MARKERS (BL-575). Grouped at the province grain like the
             // battle marker just above: drawn once per (province, owner)
             // GROUP, not once per unit or per tile — a unit's command grain is
             // the province (BL-511's march_unit retarget), so a large
@@ -3811,13 +3841,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // never sits directly under the battle glyph, which claims the
             // centre when a fight is live here — the two can both be true at
             // once, since a battle needs forces present.
+            //
+            // WHERE (BL-1145): on the group's lowest-id unit's OWN tile, not the
+            // province's lowest-id tile — in a province of a thousand tiles that
+            // tile can lie far from every unit in it, leaving an army on screen
+            // with no marker. Groups whose sample units share a tile spread
+            // side by side, as before.
             if (draw_r >= 6.0f && prov_id != 0)
             {
-                const province* pv = w.provinces.find(prov_id);
-                if (pv != nullptr && !pv->tiles.empty() && pv->tiles.front() == id)
                 {
-                    const auto pu_it = province_units.find(prov_id);
-                    if (pu_it != province_units.end() && !pu_it->second.empty())
+                    const auto pu_it = tile_units.find(id);
+                    if (pu_it != tile_units.end() && !pu_it->second.empty())
                     {
                         const std::vector<unit_marker_summary>& groups = pu_it->second;
                         const float ur      = std::max(2.5f, draw_r * 0.30f);
