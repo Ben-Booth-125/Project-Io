@@ -1083,12 +1083,13 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 48,
+   "sprint": 49,
    "written": "2026-09-25",
    "blocked_on": null,
    "parked": false,
    "requires": [
-    "BL-1133"
+    "BL-1133",
+    "BL-1163"
    ],
    "id": "BL-1139",
    "short_name": "CENTRES_ABANDONED_IN_PLAY",
@@ -1673,7 +1674,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 48,
+   "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
    "blocked_on": null,
@@ -1690,7 +1691,29 @@
     "src/world/economy_system.cpp",
     "tools/verify/centre_abandonment_census.cpp"
    ],
-   "design": "FOUND 2026-10-03 (BL-1139 lane, centre_abandonment_census, 16 seeds, shipped start + 12 settle + 400 play ticks): with abandonment OFF, every centre on seed 0 (786) and seed 10 (879) is declining by tick 412 and villages fall to ~1k heads; on seed 0 none declines at tick 132, so the decline sets in between ticks 132 and 412. With abandonment ON all 4,544 scale-1 centres are deleted. Ben (2026-10-03): BL-1139's recorded ids merged; the abandonment itself (2f719556 on worktree-agent-ae9978d9141f0dc73) is HELD until this is diagnosed and fixed. WORK: trace the growth pass's decline inputs per centre over ticks 100-450 (labour demand, food, migration, habitability, wages, the play-side ceiling vs generation's carried capacity -- BL-1137's capacity_carried is generation scratch only and its note warns play-side demography must read it before clamping); name the cause; report for Ben before fixing."
+   "design": "DIAGNOSED (2026-10-03, ba86ce09 centre_decline_trace): the body-wide growth gate (habitability >= 0.5 AND basket met_ratio >= 0.50, economy_system.cpp ~1757-1920) fails at tick ~80-100 and every centre sheds 4% / 10 ticks together. The basket (economy.lua population_growth) is a stale industrial basket (steel ~1% met, water ~10%, food ~22%) over ALL body demand; the gate passed only on oversupplied ore/petroleum/produce, and fell as background firms exited (196 -> 22 corps). Older than this sprint: at v0.1.26 it failed from tick 12. RULED (Ben, 2026-10-03): A+B -- the basket is household goods only (food, water, consumer goods), read against people's own demand, judged per market (POPULATION.md SETTLED). A short design pass settles the basket's contents first. Sprint 49. Unblocks BL-1139's abandonment.\n\nFOUND 2026-10-03 (BL-1139 lane, centre_abandonment_census, 16 seeds, shipped start + 12 settle + 400 play ticks): with abandonment OFF, every centre on seed 0 (786) and seed 10 (879) is declining by tick 412 and villages fall to ~1k heads; on seed 0 none declines at tick 132, so the decline sets in between ticks 132 and 412. With abandonment ON all 4,544 scale-1 centres are deleted. Ben (2026-10-03): BL-1139's recorded ids merged; the abandonment itself (2f719556 on worktree-agent-ae9978d9141f0dc73) is HELD until this is diagnosed and fixed. WORK: trace the growth pass's decline inputs per centre over ticks 100-450 (labour demand, food, migration, habitability, wages, the play-side ceiling vs generation's carried capacity -- BL-1137's capacity_carried is generation scratch only and its note warns play-side demography must read it before clamping); name the cause; report for Ben before fixing."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 49,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1164",
+   "short_name": "BACKGROUND_FIRM_ATTRITION",
+   "author": "Claude (the BL-1163 diagnosis, 2026-10-03)",
+   "category": "Economy",
+   "priority": "S",
+   "difficulty": 3,
+   "title": "Background firms exit until the economy is a ninth of its opening size: find why",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp"
+   ],
+   "design": "FOUND 2026-10-03 (BL-1163 lane, centre_decline_trace, seed 0 shipped start): corps 196 -> 22 and live buildings 536 -> 167 over 440 ticks, with or without the growth gate; the economy shrinks ~9x. Ben (2026-10-03): diagnose it as its own item next, measured first. WORK: trace exits per firm (cause: insolvency, idle buildings, no demand, upkeep; which recipes; which markets), over ticks 0-450 on seeds 0, 10, 28; say whether it predates sprint 48; report options before any fix. Sprint 49."
   }
  ]
 }

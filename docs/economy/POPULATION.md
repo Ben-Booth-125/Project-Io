@@ -242,6 +242,13 @@ promotion and decline) — sustained met supply, habitability, and population ab
 tier's threshold. Since centres anchor provinces, promotion changes the political map's value
 during play.
 
+**SETTLED (Ben, 2026-10-03): a centre grows on its people's own supply, judged at its market.** The
+supply that lets a centre grow, or makes it shrink, is a household basket — food, water and consumer
+goods — read against the people's own demand, not against every want on the body, and judged per
+market rather than once for the whole body. So a shortage is local and a player can see and answer it
+where it is, and one market's shortage never shrinks every centre on the world at once. What the
+basket holds, good by good, is settled before it is built.
+
 Decline is asymmetric by design: **passive failure only shrinks a centre — it never destroys
 one.** Outright destruction is a deliberate agent action (razing, in occupation), and it should
 be rare because the occupier almost always prefers to occupy. **This rule is play's.** In the
