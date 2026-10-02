@@ -34,6 +34,7 @@
 #include "world/hard_coded_world.hpp"
 #include "world/history_log.hpp"
 #include "world/logistics.hpp"
+#include "world/market_clearing.hpp"   // BL-1125: market_for_tile across the round trip
 #include "world/modifier_set.hpp"
 #include "world/nation_budget.hpp"
 #include "world/world.hpp"
@@ -771,6 +772,7 @@ int main()
             { "provinces", w.provinces.provinces.size(), loaded.provinces.provinces.size() },
             { "provinces.tile_province", w.provinces.tile_province.size(), loaded.provinces.tile_province.size() },
             { "exchanges", w.exchanges.size(), loaded.exchanges.size() },
+            { "folded_markets", w.folded_markets.size(), loaded.folded_markets.size() }, // BL-1125
         };
 
         bool all_match = true;
@@ -799,6 +801,25 @@ int main()
         check(loaded.player_entity == w.player_entity && loaded.star_body == w.star_body
                   && loaded.home_body == w.home_body,
               "P7 the well-known entities survive");
+
+        // BL-1125: the fold map is routing state, so the round trip must route
+        // every tile to the same market it routed to before the save.
+        {
+            std::size_t tiles = 0, differ = 0;
+            for (const auto& [tid, tc] : w.tiles)
+            {
+                ++tiles;
+                if (market_for_tile(w, tid) != market_for_tile(loaded, tid)) ++differ;
+            }
+            std::printf("     fold map: %zu folded market(s); %zu of %zu tiles route differently after the load\n",
+                        w.folded_markets.size(), differ, tiles);
+            // The row is vacuous on a world that folded nothing, so it says so.
+            check(!w.folded_markets.empty(),
+                  "P7 this world folds markets, so the fold-map row below is not vacuous");
+            check(differ == 0 && loaded.folded_markets.size() == w.folded_markets.size()
+                      && loaded.folded_markets == w.folded_markets,
+                  "P7 every tile routes to the same market after the round trip (the fold map survives)");
+        }
         check(loaded.next_entity_id() == w.next_entity_id()
                   && loaded.next_convoy_id == w.next_convoy_id
                   && loaded.next_order_id == w.next_order_id

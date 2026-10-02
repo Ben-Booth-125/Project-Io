@@ -67,6 +67,21 @@ const std::vector<entity_id>& body_tile_grid(world& w, entity_id body);
 const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_tile,
                                       entity_id dst_tile);
 
+/// Every cell of @p body whose travel cost TO @p anchor_tile is at most
+/// @p max_cost, as (raster index, cost) pairs in settle order (cost
+/// ascending). The same directed edge weights `intra_body_path`'s flood
+/// relaxes (landform x road x river, a water cell at the sea weight, cylinder
+/// wrap), so with @p land_only false a cell's cost here equals
+/// intra_body_path(cell, anchor).cost wherever both are within reach. That is
+/// a PATH cost, not a convoy's bill: a convoy also needs a port at both ends to
+/// cross water and is billed per mode. @p land_only true never enters a water
+/// cell (the anchor itself is always settled). A bounded Dijkstra, NOT cached
+/// and touching no cache but the raster index (`body_tile_grid`). BL-1125: the
+/// gravity fold's reach.
+std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body,
+                                                        entity_id anchor_tile, float max_cost,
+                                                        bool land_only);
+
 // ---------------------------------------------------------------------------
 // Logistics reach (BL-323 S2 — the placement-side "breadth must cost something")
 // ---------------------------------------------------------------------------

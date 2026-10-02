@@ -24,6 +24,25 @@ struct market_carving_params
     /// a commercially-contested territory toward fracture on top of raw
     /// geology. 0 = corp presence has no effect (the pre-BL-132 formula).
     float corp_presence_gain = 0.15f;
+    /// BL-1125 (markets can die), the GRAVITY FOLD's reach: a market whose
+    /// centre lies within this traversal cost of a larger market's centre
+    /// (travel toward the larger, over the edge weights intra_body_path's flood
+    /// relaxes: landform x road x river, water at the sea weight -- a path
+    /// cost, not a convoy's bill; water only between two ported centres, as a
+    /// convoy's sea leg requires) folds into it. A COST THRESHOLD, never a
+    /// count cap. CALIBRATED: set so a 1960 world
+    /// carries roughly 20-40 markets, about one per major city, measured on the
+    /// curated seeds (MARKETS.md § Market centres and seeding). 0 = no gravity
+    /// fold. Not authored in Lua: one named constant, here.
+    ///
+    /// MEASURED 2026-10-02 (tools/verify/market_gravity_ladder.cpp, the 16
+    /// curated seeds, rungs 0/6/8/10/12/14/16/20, with the port gate on water
+    /// and the catchment passing whole to the absorber): the median seed
+    /// carries 394 markets unfolded, 42 at 12, 34 at 14, 31 at 16, 26 at 20;
+    /// 16 is the rung with the most seeds inside 20-40 (15 of 16; seed 43
+    /// reads 17). Ungated water put 14 there instead -- the gate refuses most
+    /// of the folds across water, so the reach that hits the aim grew.
+    float gravity_reach = 16.0f;
 };
 
 /// Endemic-good distance pricing tunables (BL-191), authored in scripts/world_gen.lua

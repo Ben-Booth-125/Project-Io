@@ -779,6 +779,9 @@ void clear_derived_state(world& w)
     // The market index carries its own staleness stamps; zeroing them is what
     // makes the next `market_for_tile` rebuild rather than trust an empty index.
     w.body_market_index.clear();
+    w.body_folded_index.clear(); // BL-1125: rebuilt with the market index
+    w.body_market_sig.clear();   // BL-1125: likewise
+    w.body_route_index.clear();  // BL-1125: the catchment raster, rebuilt on first read
     w.body_market_index_count  = 0;
     w.body_market_index_cursor = 0; // not an id: the allocator cursor at build (BL-1079)
 
@@ -934,6 +937,17 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_vec(out, w.exchanges.entries, w_exchange);
     w_u32(out, static_cast<uint32_t>(w.exchanges.next));
     w_u64(out, static_cast<uint64_t>(w.exchanges.total));
+
+    // BL-1125 (world_save_version 29): the fold map -- every market folded at
+    // generation, by old id, with its body, centre and absorber. ROUTING STATE:
+    // `market_for_tile` reads it every tick, and it cannot be derived from the
+    // standing markets. A `std::map`, written ascending as held.
+    w_map(out, w.folded_markets, [](std::ostream& s, const entity_id& k) { w_id(s, k); },
+          [](std::ostream& s, const folded_market& f) {
+              w_id(s, f.body);
+              w_id(s, f.centre_tile);
+              w_id(s, f.into);
+          });
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1131,6 +1145,26 @@ bool read_world_snapshot(world& w, std::istream& in)
             return false;
         s.exchanges.next  = static_cast<std::size_t>(next_slot);
         s.exchanges.total = static_cast<std::size_t>(total);
+    }
+
+    // BL-1125 (v29): the fold map. Untrusted on the same footing as the ring
+    // above: a record must name a body, a tile on that body, and an absorber
+    // that is a STANDING market on that body, and its own id must not be a
+    // standing market -- the writer can produce none of those violations, and
+    // a record that broke one would route tiles to a market that is not there.
+    if (!r_map(in, s.folded_markets,
+               [](std::istream& st, entity_id& k) { return r_id(st, k) && k != null_entity; },
+               [](std::istream& st, folded_market& f) {
+                   return r_id(st, f.body) && r_id(st, f.centre_tile) && r_id(st, f.into);
+               }))
+        return false;
+    for (const auto& [fid, fm] : s.folded_markets)
+    {
+        if (s.markets.count(fid) != 0) return false;
+        const auto into = s.markets.find(fm.into);
+        if (into == s.markets.end() || into->second.body != fm.body) return false;
+        const auto tile = s.tiles.find(fm.centre_tile);
+        if (tile == s.tiles.end() || tile->second.body != fm.body) return false;
     }
 
     clear_derived_state(s);

@@ -17,6 +17,7 @@
 #include "logistics.hpp"        // BL-910: body_tile_grid, for the close's capital markets
 #include "sim_terrain_build.hpp" // build_sim_terrain for the sim's terrain view
 #include "law.hpp" // BL-343: seed_prototype_laws
+#include "market_fold.hpp"      // BL-1125: markets can die
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
 #include "population_generation.hpp"
@@ -38,6 +39,7 @@
 #include <limits>       // BL-1086: the planned-charter count, saturated into the carve's int
 #include <map>
 #include <random>
+#include <set>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -1605,6 +1607,8 @@ void run_empires(generation_cursor& c)
         {
             report->prehistory_battles   = hs.battles;
             report->prehistory_conquests = hs.conquests;
+            report->markets_destroyed_by_conquest[0] = hs.markets_destroyed; // BL-1125
+            report->markets_destroyed_regions[0] = hs.markets_destroyed_regions;
             report->prehistory_foundings = hs.foundings;
             report->prehistory_years     = hs.years;
             // NR-733: the ownership history itself, so the Ages view can
@@ -1827,6 +1831,8 @@ void run_exploration(generation_cursor& c)
             report->exploration_years     = kepler_exploration_hs.years;
             report->exploration_battles   = kepler_exploration_hs.battles;
             report->exploration_conquests = kepler_exploration_hs.conquests;
+            report->markets_destroyed_by_conquest[1] = kepler_exploration_hs.markets_destroyed; // BL-1125
+            report->markets_destroyed_regions[1] = kepler_exploration_hs.markets_destroyed_regions;
             report->exploration_foundings = kepler_exploration_hs.foundings;
             for (generation_report::body_entry& be : report->bodies)
                 if (be.id == kepler)
@@ -2062,6 +2068,8 @@ void run_industrialisation(generation_cursor& c)
             report->industrialisation_years     = kepler_industrialisation_hs.years;
             report->industrialisation_battles   = kepler_industrialisation_hs.battles;
             report->industrialisation_conquests = kepler_industrialisation_hs.conquests;
+            report->markets_destroyed_by_conquest[2] = kepler_industrialisation_hs.markets_destroyed; // BL-1125
+            report->markets_destroyed_regions[2] = kepler_industrialisation_hs.markets_destroyed_regions;
             report->industrialisation_foundings = kepler_industrialisation_hs.foundings;
             report->industrialisation_points_from_scale  = kepler_industrialisation_hs.industry_points_from_scale;
             report->industrialisation_stream_moved       = kepler_industrialisation_hs.urbanisation_heads_moved;
@@ -2910,6 +2918,11 @@ void run_tail(generation_cursor& c)
         };
 
         int markets_seeded = 0;
+        // BL-1125: the POPULATION tile each carve market was seeded from (its
+        // centre is the trade-flow proxy site, up to `proxy_radius` away). The
+        // gravity fold's port gate binds a market to a region through this
+        // tile, as the junction rule binds a centre (`centre_is_trade_junction`).
+        std::map<entity_id, entity_id> market_seed_tile;
         for (const entity_id cid : centre_ids)
         {
             const population_centre_component& pcc = w.population_centres.at(cid);
@@ -2944,7 +2957,9 @@ void run_tail(generation_cursor& c)
             market_component mc = kepler_market_template;
             mc.centre_tile = trade_flow_proxy_site(tile_it->second);
             mc.price       = mc.base_price; // start at canonical base
-            w.markets[w.create_entity()] = mc;
+            const entity_id carve_id = w.create_entity();
+            w.markets[carve_id] = mc;
+            market_seed_tile[carve_id] = tile_it->second;
             ++markets_seeded;
         }
         // Fallback: if no centre qualified, seed one unanchored market.
@@ -2953,6 +2968,81 @@ void run_tail(generation_cursor& c)
             market_component mc = kepler_market_template;
             mc.price = mc.base_price;
             w.markets[w.create_entity()] = mc;
+        }
+
+        // ------------------------------------------------------------------
+        // BL-1125 — MARKETS CAN DIE (MARKETS.md § Market centres and seeding).
+        // On the whole home-body set — the capital shells and the carve, after
+        // the junction rule has lowered every gate it lowers — so the rule
+        // removes from the set the emergence produced, never from a part.
+        // A folded market's catchment, inventory and pools pass to its
+        // absorber (market_fold.hpp).
+        //
+        // 1. TWINS FOLD. A market centred on the same tile as a lower-id one
+        //    folds into it: two centres whose best site is the same tile have
+        //    one market place, and a twin could never win a tile anyway
+        //    (catchment ties go to the lowest id).
+        {
+            const std::set<entity_id> shells(capital_market_shells.begin(),
+                                             capital_market_shells.end());
+            const market_fold_tally twins = fold_twin_markets(w, kepler);
+            if (report != nullptr)
+            {
+                report->markets_folded_twins     = twins.folds;
+                report->market_fold_goods_before = twins.inventory_before + twins.pools_before;
+                report->market_fold_goods_after  = twins.inventory_after + twins.pools_after;
+                report->market_fold_tiles_moved  = twins.catchment_tiles_moved;
+                report->market_fold_misrouted    = twins.catchment_misrouted;
+                for (const market_fold_record& r : twins.records)
+                    if (shells.count(r.folded) != 0) ++report->shells_folded;
+            }
+
+            // 2. GRAVITY FOLD. A market inside a larger market's reach folds
+            //    into it: trade goes where it concentrates. Larger is
+            //    catchment population; reach is a traversal cost, the one
+            //    calibrated constant `market_carving.gravity_reach`. A capital
+            //    shell folds like any market -- it is a market place, and the
+            //    rule is about where trade gathers, not whose court sits there.
+            //
+            //    A FOLD IS ONE A CONVOY COULD MAKE: a sea leg needs a port at
+            //    both ends (SUPPLY.md § Infrastructure gates), so the reach
+            //    crosses water only between two markets whose regions hold a
+            //    built port at the close (`region::port_stock_q`). A market's
+            //    region is the one `nearest_region` binds its POPULATION tile
+            //    to -- the tile the carve seeded it from, not its proxy centre,
+            //    which is exactly the binding the junction rule above uses. A
+            //    capital shell is centred on its region's own anchor, so its
+            //    centre IS that tile. Otherwise the reach is measured over land.
+            std::set<entity_id> port_centres;
+            for (const auto& [mid, mc] : w.markets)
+            {
+                if (mc.body != kepler) continue;
+                if (w.tiles.find(mc.centre_tile) == w.tiles.end()) continue;
+                const auto sit = market_seed_tile.find(mid);
+                const entity_id bind_tile = (sit != market_seed_tile.end()) ? sit->second : mc.centre_tile;
+                const auto tit = w.tiles.find(bind_tile);
+                if (tit == w.tiles.end()) continue;
+                const int ri = nearest_region(kepler_settlement, tit->second.grid_x,
+                                              tit->second.grid_y, home_grid_width);
+                if (ri >= 0 && ri < static_cast<int>(kepler_settlement.regions.size())
+                    && kepler_settlement.regions[static_cast<std::size_t>(ri)].port_stock_q > 0)
+                    port_centres.insert(mc.centre_tile);
+            }
+            if (report != nullptr)
+                report->ported_market_centres.assign(port_centres.begin(), port_centres.end());
+            const market_fold_tally gravity =
+                fold_markets_by_gravity(w, kepler, gen_cfg.market_carving.gravity_reach,
+                                        &port_centres);
+            if (report != nullptr)
+            {
+                report->markets_folded_gravity  = gravity.folds;
+                report->markets_folded_across_water = gravity.folds_across_water;
+                report->market_fold_goods_after = gravity.inventory_after + gravity.pools_after;
+                report->market_fold_tiles_moved += gravity.catchment_tiles_moved;
+                report->market_fold_misrouted   += gravity.catchment_misrouted;
+                for (const market_fold_record& r : gravity.records)
+                    if (shells.count(r.folded) != 0) ++report->shells_folded;
+            }
         }
 
         // ------------------------------------------------------------------

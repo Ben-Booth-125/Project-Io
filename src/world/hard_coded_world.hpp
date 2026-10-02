@@ -894,6 +894,37 @@ struct generation_report
     /// measure the whole era rather than this term.
     int64_t markets_from_trade   = 0;
 
+    // --- Markets that died at the carve (BL-1125, markets can die) ----------
+    //
+    // MARKETS.md § Market centres and seeding: twins fold, then the gravity
+    // fold, both on the whole home-body set after the junction rule. Write-only
+    // like every report field. The conservation pair is what the census checks:
+    // every unit of inventory and pooled goods a folded market held arrives in
+    // its absorber, so the body-wide totals agree before and after.
+    int64_t markets_folded_twins    = 0; ///< Twins folded into the lowest-id market on their tile.
+    int64_t markets_folded_gravity  = 0; ///< Folded into a larger market within reach.
+    int64_t shells_folded           = 0; ///< Of both, how many were capital shells.
+    double  market_fold_goods_before = 0.0; ///< Inventory + pools on the body before the folds.
+    double  market_fold_goods_after  = 0.0; ///< ...and after them.
+    /// The catchment half: tiles whose market folded, and of every tile on the
+    /// body, those NOT routed to their market's absorber after the folds (must
+    /// be 0 -- a folded market's catchment passes whole).
+    int64_t market_fold_tiles_moved  = 0;
+    int64_t market_fold_misrouted    = 0;
+    /// Gravity folds whose reach crossed water (both markets ported).
+    int64_t markets_folded_across_water = 0;
+    /// The centre tiles of the home markets the port gate counted as ported
+    /// (their seeding population tile's region holds a port), ascending.
+    std::vector<entity_id> ported_market_centres;
+    /// Markets destroyed by conquest in the history (BL-1125 cause 3), per
+    /// span -- [0] Empires (to 1200), [1] Exploration (to 1660), [2]
+    /// Industrialisation (to 1960): a capital market whose region a rival took.
+    /// [0] is STRUCTURALLY 0: no market is marked before the 1200 close, so
+    /// the Empires span has none to destroy.
+    int64_t markets_destroyed_by_conquest[3] = {0, 0, 0};
+    /// The regions those markets stood on, per span, in the order destroyed.
+    std::vector<int32_t> markets_destroyed_regions[3];
+
     // --- The carve ledger: what the carve counted as competitors (BL-1086) --
     //
     // The nation gate's competitor term (BL-132 change 3) reads, per nation, how

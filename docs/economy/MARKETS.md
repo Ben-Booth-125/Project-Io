@@ -42,7 +42,8 @@ template base price for every good, the endemic field where it applies — and t
 **capital premium** over all of it: a capital is where a realm's court, treasury and demand
 concentrate, so goods cost more there. An unpriced market is not a neutral default: a good with no
 base price is never listed, so stock in its catchment could never be sold. Owner: BL-1066 (the
-player cannot build).
+player cannot build). A capital's market can still die by the causes below: one standing inside a
+larger market's reach folds into it like any other market, and the absorber keeps its own prices.
 
 **A market also emerges where trade CONCENTRATED, not from population alone** (Ben, 2026-09-03,
 the eight-phase reorder point 4: *"markets should begin to emerge towards the end of this
@@ -78,8 +79,13 @@ to another, idle and unbuilt. Three in-world causes remove them, and none is a c
 2. **Gravity fold.** A market inside a larger market's reach folds into it: trade goes where it
    concentrates. "Larger" is catchment population; "reach" is a traversal cost, calibrated so a
    1960 world carries roughly **20–40 markets**, each serving a region of cities rather than one
-   apiece (Ben, 2026-10-03: the per-city phrasing dropped; capitals fold like any market). That aim sets the
-   constant, measured on the curated seeds; the rule never enforces a count.
+   apiece (Ben, 2026-10-03: the per-city phrasing dropped; capitals fold like any market). That aim
+   sets the constant, measured on the curated seeds; the rule never enforces a count. The walk is
+   largest first, on catchments read once before any fold: each market still standing absorbs every
+   smaller one whose centre lies within reach of it (the cost of travel toward the larger), and a
+   market already absorbed absorbs nothing. **A fold is one a convoy could make (Ben, 2026-10-03):**
+   the reach crosses water only between two centres whose regions hold a port, as a sea leg needs a
+   port at both ends; otherwise it is measured over land.
 3. **Conquest consolidates.** When a realm conquers the region its rival's market stands on, the
    conquered market is destroyed to consolidate the conqueror's strength (Ben, 2026-09-25). The
    history's markets are the survivors' markets, not a monument to every realm that ever stood.
@@ -94,7 +100,9 @@ ceiling the charter walk honours — so no roster is laid only to be discarded, 
 search, which scores the carve's markets, still runs after the carve.
 
 **Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
-(`market_for_tile`). **A corporation clears in every market it holds a pool in** (Ben, 2026-09-15):
+(`market_for_tile`), measured on the cylinder (the column distance wraps). A folded market's
+centre still counts: a tile nearest to it clears against the market that absorbed it, so a
+catchment passes to its absorber whole, never to a third market that happens to stand nearer. **A corporation clears in every market it holds a pool in** (Ben, 2026-09-15):
 goods pools are per `(corp, market)` (`PRODUCTION.md` § Stockpile and output flow), so a building
 sells into and buys from its own tile's catchment, and goods a convoy delivers sell at the market
 they were delivered to. The earlier body-aggregate rule — every sale routed through the corp's

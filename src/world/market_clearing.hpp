@@ -245,3 +245,8 @@ std::array<float, resource_count> processor_reservation(
 /// with no centre are ignored when an anchored one exists). Returns `null_entity`
 /// if the tile's body has no market.
 entity_id market_for_tile(const world& w, entity_id tile);
+
+/// BL-1125: the same answer as `market_for_tile`, computed by the full scan
+/// over the body's original centres every call (no catchment raster). For
+/// verification only -- the raster must route identically on every tile.
+entity_id market_for_tile_scan(const world& w, entity_id tile);
