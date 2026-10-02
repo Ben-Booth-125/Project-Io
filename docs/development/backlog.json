@@ -1435,7 +1435,7 @@
     "src/world/era_minus_one.cpp",
     "tools/verify/ocean_currents_harness.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-27, NR-961): EXPLORATION.md, the SETTLED paragraph under the stocks table; MILITARY_HISTORY.md carries a pointer. Spans: Exploration and Industrialisation (the Empires round keeps the band gate). (1) CAPACITY: a campaign that crosses water carries no more of its army than the fleet staged from its hub's port lifts (men per hull, one named constant). (2) DEFENDERS: the target realm and its mutual-defence partners (treaty_clause::mutual_defence). (3) REACH: a fleet's power falls with sea distance from its own ports, halving over a fixed run of sea tiles (one named constant), the distance priced by the currents. (4) STOPPED: where anywhere on the crossing's sea leg the defenders' projected power outweighs the attacker's fleet there, the crossing never sails; the attacker keeps army and fleet; the round's campaign is lost. MEASURE FIRST: crossings per span, their hubs' ports, the attacker's fleet at launch, mutual-defence pairs, how often a target has a defending fleet in reach; then build; then read both constants on ladders and the BL-1147 conversion again. Ben sets all three."
+   "design": "PROVISIONAL PICK (Ben, 2026-10-02, the fleet constants form, read on the ladder later voided by the review): men per hull 20, halving 10 sea tiles, conversion 50 hulls per 1,000 naval points. Confirmed against the re-run ladder after the review fixes; committed at those values unless that point is degenerate, in which case it returns to Ben.\n\nSETTLED (Ben, 2026-09-27, NR-961): EXPLORATION.md, the SETTLED paragraph under the stocks table; MILITARY_HISTORY.md carries a pointer. Spans: Exploration and Industrialisation (the Empires round keeps the band gate). (1) CAPACITY: a campaign that crosses water carries no more of its army than the fleet staged from its hub's port lifts (men per hull, one named constant). (2) DEFENDERS: the target realm and its mutual-defence partners (treaty_clause::mutual_defence). (3) REACH: a fleet's power falls with sea distance from its own ports, halving over a fixed run of sea tiles (one named constant), the distance priced by the currents. (4) STOPPED: where anywhere on the crossing's sea leg the defenders' projected power outweighs the attacker's fleet there, the crossing never sails; the attacker keeps army and fleet; the round's campaign is lost. MEASURE FIRST: crossings per span, their hubs' ports, the attacker's fleet at launch, mutual-defence pairs, how often a target has a defending fleet in reach; then build; then read both constants on ladders and the BL-1147 conversion again. Ben sets all three."
   },
   {
    "status": "designed",
@@ -1532,6 +1532,29 @@
     "tools/verify/centre_census.cpp"
    ],
    "design": "SETTLED (Ben, 2026-10-01, NR-962 B): PROVINCES.md, 'a river divides its banks'. Today the river bit sits on the step between a course tile and its downstream neighbour (river_generation.cpp ~223-230) and province.cpp ~212-213 charges +40 there, so the fill pays to travel along a river and crosses bank to bank free. BUILD: the fill pays the river cost to step onto or off a course across the flow (or an equivalent that makes the banks two sides); stepping along a course pays nothing extra. MEASURE FIRST, then after, on the 16 shipped seeds: the river:plain border ratio (1.19 on main), C13's per-seed river rows (red on 12, 37, 38), province counts and sizes. A row: river cost 0 must turn the river row red on the harness world AND the shipped seeds."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-10-02",
+   "requires": [
+    "BL-1152"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1157",
+   "short_name": "FLEET_UPKEEP_BITES",
+   "author": "Claude (sprint 48, the fleet constants form, 2026-10-02)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Fleet upkeep is re-read so keeping a navy is a real cost to a treasury",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "design": "Ben, 2026-10-02: backlog a re-read. On every BL-1147/BL-1152 ladder rung the navy bill stays under 0.05% of capital treasuries at 1300, so the stocks table's \"a fleet is a running cost, not a purchase\" does not bite. WORK: measure the navy bill against treasuries and against army upkeep per span at the set constants; find why it is small (the per-hull rate, the treasuries' scale); propose a measured rate for Ben -- never set to hit a count."
   }
  ]
 }
