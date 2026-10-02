@@ -137,6 +137,12 @@ entity_id nearest_market(const world& w, const std::vector<entity_id>& body_mark
     if (body_markets.size() == 1)
         return body_markets.front();
 
+    // BL-1127: the surface is a cylinder, so the column distance wraps — the
+    // same rule every other grid walk uses. Without it a tile by the seam
+    // routed to a centre on the far side of the map.
+    const auto bit = w.bodies.find(tile.body);
+    const long long gw = (bit != w.bodies.end()) ? bit->second.grid_width : 0;
+
     entity_id best      = null_entity;
     long long best_dist = 0;
     for (const entity_id mid : body_markets)
@@ -145,7 +151,9 @@ entity_id nearest_market(const world& w, const std::vector<entity_id>& body_mark
         const auto cit = w.tiles.find(centre);
         if (cit == w.tiles.end())
             continue; // unanchored — skip while an anchored market exists
-        const long long dx = cit->second.grid_x - tile.grid_x;
+        long long dx = cit->second.grid_x - tile.grid_x;
+        if (dx < 0) dx = -dx;
+        if (gw > 0 && dx > gw - dx) dx = gw - dx;
         const long long dy = cit->second.grid_y - tile.grid_y;
         const long long d  = dx * dx + dy * dy;
         if (best == null_entity || d < best_dist)
