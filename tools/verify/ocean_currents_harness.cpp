@@ -1335,6 +1335,12 @@ bool apply_set(history_sim_params& p, const std::string& name, int v)
     // BL-1152: the fleet's two constants.
     if (name == "fleet_men_per_hull")            { p.fleet_men_per_hull = v; return true; }
     if (name == "fleet_power_halving_tiles")     { p.fleet_power_halving_tiles = v; return true; }
+    // BL-1152 diagnosis: the navy stock's own dials, for measured proposals.
+    if (name == "navy_build_cost_q")             { p.navy_build_cost_q = v; return true; }
+    if (name == "navy_build_step_q")             { p.navy_build_step_q = v; return true; }
+    if (name == "navy_min_port_stock_q")         { p.navy_min_port_stock_q = v; return true; }
+    if (name == "navy_upkeep_per_1000_units_year_q") { p.navy_upkeep_per_1000_units_year_q = v; return true; }
+    if (name == "navy_decay_per_mille_year_q")   { p.navy_decay_per_mille_year_q = v; return true; }
     return false;
 }
 
@@ -1439,6 +1445,11 @@ struct span_read
     /// BL-1152: the fleet ledger (`history_sim_state::fleet`).
     int64_t fl_read = 0, fl_stopped = 0, fl_by_partner = 0, fl_unlifted = 0, fl_clipped = 0, fl_ashore = 0;
     int64_t fl_no_leg = 0, fl_abstained = 0, fl_seat_coast = 0, fl_exec_failed = 0;
+    /// BL-1152 diagnosis: the span's navy flow and the gate's staging, "nv":
+    /// [decayed hulls, picks hold/army/port/navy, not-eligible short of
+    /// treasury / of port / of both, eligible but outbid, unpaid bill rounds,
+    /// read from a hub with no built port / built, unlifted from no port / built]
+    int64_t nv[15] = {};
 };
 
 bool contact_known(const std::set<std::pair<int, int>>& known, int a, int b)
@@ -1538,6 +1549,13 @@ span_read read_span(const history_sim_state& hs, const std::set<std::pair<int, i
     s.fl_no_leg = hs.fleet.no_leg; s.fl_abstained = hs.fleet.partners_abstained;
     s.fl_seat_coast = hs.fleet.seat_coast_fleets;
     s.fl_exec_failed = hs.fleet.exec_failed;
+    s.nv[0] = hs.navy_hulls_decayed_trace;
+    for (int k = 0; k < 4; ++k) s.nv[1 + k] = hs.spend_pick_trace[k];
+    s.nv[5] = hs.navy_short_treasury_trace; s.nv[6] = hs.navy_short_port_trace; s.nv[7] = hs.navy_short_both_trace;
+    s.nv[8] = hs.navy_eligible_outbid_trace; s.nv[9] = hs.navy_upkeep_unpaid_rounds;
+    s.nv[10] = hs.fleet_read_by_hub_port[0]; s.nv[11] = hs.fleet_read_by_hub_port[1];
+    s.nv[12] = hs.fleet_unlifted_by_hub_port[0]; s.nv[13] = hs.fleet_unlifted_by_hub_port[1];
+    s.nv[14] = hs.navy_steps_bought;
     return s;
 }
 
@@ -2332,7 +2350,7 @@ void put_span(std::FILE* f, const char* key, const span_read& s)
                     "\"first_crossing_year\": %lld, \"fleets_close\": %lld, \"navy_close\": %lld, "
                     "\"navy_close_max\": %lld, \"navy_steps\": %lld, \"navy_upkeep_spent\": %lld, "
                     "\"fc\": [%lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld], "
-                    "\"fl\": [%lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld]}",
+                    "\"fl\": [%lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld]",
                  key, static_cast<long long>(s.battles), static_cast<long long>(s.wet_battles),
                  static_cast<long long>(s.neighbour), static_cast<long long>(s.frontier),
                  static_cast<long long>(s.ambiguous), static_cast<long long>(s.table),
@@ -2372,6 +2390,9 @@ void put_span(std::FILE* f, const char* key, const span_read& s)
                  static_cast<long long>(s.fl_clipped), static_cast<long long>(s.fl_ashore),
                  static_cast<long long>(s.fl_no_leg), static_cast<long long>(s.fl_abstained),
                  static_cast<long long>(s.fl_seat_coast), static_cast<long long>(s.fl_exec_failed));
+    std::fprintf(f, ", \"nv\": [");
+    for (int k = 0; k < 15; ++k) std::fprintf(f, "%s%lld", k ? ", " : "", static_cast<long long>(s.nv[k]));
+    std::fprintf(f, "]}");
 }
 
 void put_naval(std::FILE* f, const char* key, const naval_read& n)

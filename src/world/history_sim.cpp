@@ -1060,7 +1060,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                     const int64_t decay  = std::max<int64_t>(
                         (unpaid * params.navy_decay_per_mille_year_q * years_q) / 1000, 1);
                     q.navy_stock = clampi64(units - std::min(decay, units), 0, 1LL << 48);
-                    if (spend) ++spend->navy_unpaid;
+                    if (spend) { ++spend->navy_unpaid; spend->navy_hulls_decayed += std::min(decay, units); }
                 }
                 seat.treasury -= std::min(paid_sum, seat.treasury);
                 if (spend) spend->navy_upkeep += paid_sum;
@@ -1170,8 +1170,24 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         facts.levy_room           =
             (std::max<int64_t>(seat.manpower_stock, 0)
              * clampi(params.standing_army_levy_per_mille_q, 0, 1000)) / 1000;
-        const exploration_spend_option pick =
-            choose_exploration_spend(score_exploration_spend(params, facts));
+        const exploration_spend_scores pick_scores = score_exploration_spend(params, facts);
+        const exploration_spend_option pick = choose_exploration_spend(pick_scores);
+        if (spend != nullptr) // BL-1152 diagnosis, report only
+        {
+            const int k = pick == exploration_spend_option::army_step ? 1
+                        : pick == exploration_spend_option::port_step ? 2
+                        : pick == exploration_spend_option::navy_step ? 3 : 0;
+            ++spend->pick_counts[k];
+            if (!pick_scores.navy_eligible)
+            {
+                const bool t_short = facts.treasury < params.navy_build_cost_q;
+                const bool p_short = facts.port_stock_q < params.navy_min_port_stock_q;
+                if (t_short && p_short) ++spend->navy_short_both;
+                else if (t_short) ++spend->navy_short_treasury;
+                else if (p_short) ++spend->navy_short_port;
+            }
+            else if (pick != exploration_spend_option::navy_step) ++spend->navy_eligible_outbid;
+        }
         // PORT -- only ground carrying the endowment WINDOW can host one at
         // all; `port_q` is that window and is never itself spent.
         if (seat.port_q > 0)
@@ -4859,6 +4875,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.treasury_spent_on_navy_upkeep += upkeep_spend.navy_upkeep;
             out.army_upkeep_unpaid_rounds     += upkeep_spend.army_unpaid;
             out.navy_upkeep_unpaid_rounds     += upkeep_spend.navy_unpaid;
+            out.navy_hulls_decayed_trace      += upkeep_spend.navy_hulls_decayed;
+            for (int k = 0; k < 4; ++k) out.spend_pick_trace[k] += upkeep_spend.pick_counts[k];
+            out.navy_short_treasury_trace     += upkeep_spend.navy_short_treasury;
+            out.navy_short_port_trace         += upkeep_spend.navy_short_port;
+            out.navy_short_both_trace         += upkeep_spend.navy_short_both;
+            out.navy_eligible_outbid_trace    += upkeep_spend.navy_eligible_outbid;
             out.levy_heads_raised             += upkeep_spend.levy_raised;
             out.levy_heads_returned           += upkeep_spend.levy_returned;
             // BL-1041: the treasury paid into industry points on capitals.
@@ -6246,7 +6268,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (!dry && fleet_rule_on)
                     {
                         ++out.fleet.read;
+                        const int hub_port = ss.regions[static_cast<std::size_t>(hi)].port_stock_q > 0 ? 1 : 0;
+                        ++out.fleet_read_by_hub_port[hub_port]; // report only
                         const fleet_check fc = fleet_gate(hi, ti);
+                        if (fc.refusal == 1) ++out.fleet_unlifted_by_hub_port[hub_port]; // report only
                         out.fleet.partners_abstained += fc.abstained;
                         out.fleet.seat_coast_fleets  += fc.seat_coast;
                         if (fc.refusal == 1) { ++out.fleet.unlifted; continue; } // no fleet: no one sails

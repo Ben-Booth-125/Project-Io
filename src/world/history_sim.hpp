@@ -2679,6 +2679,14 @@ struct exploration_upkeep_spend
     int64_t navy_upkeep     = 0;
     int64_t army_unpaid     = 0; ///< polities whose army bill was not met in full
     int64_t navy_unpaid     = 0; ///< polities whose navy bill was not met in full
+    /// BL-1152 diagnosis, REPORT ONLY (read by nothing in the sim): hulls lost
+    /// to the unpaid bill's decay; the round's spend pick by option
+    /// (hold/army/port/navy); and, of the polity-rounds not navy-eligible, how
+    /// many fell short on the treasury, on the seat's built port, and on both.
+    int64_t navy_hulls_decayed = 0;
+    int64_t pick_counts[4]     = { 0, 0, 0, 0 };
+    int64_t navy_short_treasury = 0, navy_short_port = 0, navy_short_both = 0;
+    int64_t navy_eligible_outbid = 0; ///< navy-eligible, another option won
     /// BL-972: the LEVY. Heads drawn from a seat's `manpower_stock` by an
     /// army step this call, and heads returned to a region's pool by the
     /// unpaid decay this call.
@@ -4654,6 +4662,16 @@ struct history_sim_state
     int64_t treasury_spent_on_navy_upkeep = 0;
     int64_t army_upkeep_unpaid_rounds     = 0;
     int64_t navy_upkeep_unpaid_rounds     = 0;
+    /// BL-1152 diagnosis, REPORT ONLY: the upkeep's navy readout summed over
+    /// the span (`exploration_upkeep_spend`'s fields of the same names), and
+    /// the fleet gate's wet candidates by whether their staging hub has a
+    /// built port ([0] none, [1] built), all read and refused-for-no-fleet.
+    int64_t navy_hulls_decayed_trace = 0;
+    int64_t spend_pick_trace[4]      = { 0, 0, 0, 0 };
+    int64_t navy_short_treasury_trace = 0, navy_short_port_trace = 0, navy_short_both_trace = 0;
+    int64_t navy_eligible_outbid_trace = 0;
+    int64_t fleet_read_by_hub_port[2]     = { 0, 0 };
+    int64_t fleet_unlifted_by_hub_port[2] = { 0, 0 };
     /// BL-972: the LEVY -- heads drawn from seats' manpower pools by army
     /// steps, and heads sent home to a pool by the unpaid decay, all rounds.
     int64_t levy_heads_raised   = 0;
