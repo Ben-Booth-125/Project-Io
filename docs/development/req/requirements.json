@@ -6784,15 +6784,15 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1125 - sprint 48 (cut 2026-09-25, Ben's cut form)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-03",
+   "resolution": "merged d0db9927",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: a committed market census harness, 16 curated seeds, the flipped 1960 world"
      ],
@@ -6812,7 +6812,7 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: market_census on the 16 curated seeds"
      ],
@@ -6822,7 +6822,7 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: market_census, old -> new per seed"
      ],
@@ -6832,7 +6832,7 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: history_sim_harness or market_census's shell fate columns"
      ],
@@ -6842,13 +6842,23 @@
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold, author != reviewer)"
      ],
      "requirement": "A cold review of the merged change, fix round included, before the commit.",
      "notes": "",
      "result_metric": ""
+    },
+    {
+     "id": "RG",
+     "status": "complete",
+     "verification": [
+      "headless: gates on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": "Main d0db9927: world_determinism ALL PASS twice (3EE8DFAAA787E9D2 / C845D6D087EDC0B7 / F7A64F75026B029B); save_roundtrip, market_census (0 check failures), market_fold_fixture, world_cursor_equivalence, spawn_solvency, landscape_search_harness, haulage_measure, money_conservation pass; history_sim only R3a2/R3a3. Ben 2026-10-03: haulage accepted pending a shipped re-read (BL-1138); 20-40 without per-city; capitals fold; port gate, reach 16."
     }
    ]
   },
