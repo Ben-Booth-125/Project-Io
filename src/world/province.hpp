@@ -380,30 +380,39 @@ enum class province_kind : uint8_t
 
 struct province
 {
-    /// Stable derived identity: THE LOWEST ENTITY ID AMONG `tiles`.
+    /// Stable identity. DERIVED WHILE GENERATION DRAWS THE PARTITION, RECORDED
+    /// FOR THE PROVINCE'S LIFE ONCE GENERATION ENDS (Ben, 2026-09-27, NR-952;
+    /// PROVINCES.md § Two contracts; BL-1139, centres abandoned in play).
     ///
-    /// DERIVED, NEVER ALLOCATED (Ben, 2026-08-21, revising the allocated-id
-    /// answer). This dissolves the determinism hazard rather than guarding
-    /// against it — an id that is not handed out cannot be handed out in the
-    /// wrong order. Nothing new is serialised: no allocator state, no next-id
-    /// counter, no save-format surface. And it is unique by construction, since
-    /// every tile belongs to exactly one province.
+    /// AT BUILD: THE LOWEST ENTITY ID AMONG `tiles` — derived, never allocated
+    /// (Ben, 2026-08-21, revising the allocated-id answer), so an id that is not
+    /// handed out cannot be handed out in the wrong order, and it is unique by
+    /// construction because every tile belongs to exactly one province. While
+    /// generation redraws borders (the Era -1 sim, BL-518) a rebuilt partition
+    /// re-derives every id, and that is safe because nothing outside generation
+    /// holds one yet.
     ///
-    /// IT IS NEVER 0, because `null_entity` is 0 and no tile carries that id.
-    /// That makes `province_of`'s 0-for-absent return structurally safe rather
-    /// than merely unlikely — it was a real-id collision under the old block
-    /// layout, and is not one now.
+    /// IN PLAY: RECORDED, NOT DERIVED. A battle record, a march order,
+    /// `world::province_holder`'s positional alignment and a save all hold
+    /// this number, and in play a province can change shape — an abandoned
+    /// centre's province merges into a neighbour (POPULATION.md § Growth,
+    /// decline and razing; `abandon_population_centre`). The merge KEEPS the
+    /// survivor's id and removes the absorbed province from the run, so nothing
+    /// is renumbered and ascending order survives (a merge only removes). After
+    /// a merge the survivor's id is still ONE OF ITS TILES (its own lowest tile
+    /// at build, which a merge never removes), but no longer necessarily the
+    /// lowest: `tiles.front()` IS NOT THE ID once a merge has happened, and no
+    /// reader may treat it as one. `read_province_section` enforces exactly the
+    /// recorded contract: ids strictly ascending, each id a member of its own
+    /// tiles, tiles strictly ascending, no tile in two provinces.
     ///
-    /// The cost it carries: a derived id CHANGES when the province changes
-    /// shape. Acceptable because borders move during GENERATION ONLY — ids
-    /// churn while the Era -1 sim redraws them (BL-518) and are frozen before
-    /// anything outside generation can hold one. A battle record, a march order
-    /// or a save only ever sees the settled id.
+    /// IT IS NEVER 0 in a built partition, because `null_entity` is 0 and no
+    /// tile carries that id — so `province_of`'s 0-for-absent return is
+    /// structurally safe.
     ///
-    /// Ascending id order is therefore ascending lowest-member-tile order. It
-    /// is a stable spatial walk, but it is NO LONGER guaranteed body-major:
-    /// that was a property of the old body-rank bit field, and nothing depends
-    /// on it (`province::body` names the body explicitly).
+    /// Ascending id order is a stable spatial walk, but it is NOT guaranteed
+    /// body-major: that was a property of the old body-rank bit field, and
+    /// nothing depends on it (`province::body` names the body explicitly).
     uint32_t id = 0;
 
     /// The body every tile in this province sits on. A LAND province never
@@ -413,8 +422,9 @@ struct province
     /// never spans bodies and never touches land.)
     entity_id body = null_entity;
 
-    /// Member land tiles, ASCENDING entity id. Non-empty for every province in
-    /// a built partition — so `tiles.front()` IS `id`.
+    /// Member tiles, ASCENDING entity id. Non-empty for every province in a
+    /// built partition. At build `tiles.front()` equals `id`; after an in-play
+    /// merge it need not (see `id`), so read the id from `id`, never from here.
     std::vector<entity_id> tiles;
 };
 
@@ -877,8 +887,8 @@ std::map<uint32_t, province_anchor> province_anchors(const world& w);
 /// A province can outlive its centre in play (PROVINCES.md ruling 3, NR-952), and
 /// a water province never holds one, so the fallback is stated rather than
 /// hidden: with no centre standing in it, the LOWEST-ID member tile
-/// (`tiles.front()`, which is the id) — deterministic, and the only tile every
-/// province is guaranteed to carry. Returns `null_entity` only for an empty
+/// (`tiles.front()` — the id at build, though not necessarily after an in-play
+/// merge, `province::id`) — deterministic, and a tile every province carries. Returns `null_entity` only for an empty
 /// province (never built by the partition).
 ///
 /// The single-province form scans every centre once (O(centres)), cheap enough

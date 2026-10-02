@@ -1124,12 +1124,29 @@ bool read_province_section(province_partition& out, std::istream& in)
             if (!read_u32(in, pr.tiles[t]))
                 return false;
 
+        // THE RECORDED-ID CONTRACT (BL-1139; province.hpp § province::id). In
+        // play the id is recorded rather than derived, so the reader can no
+        // longer recompute it from the tiles — but it can still hold the
+        // stream to what every write path guarantees: member tiles strictly
+        // ascending, and the id one of them (a province's own lowest tile at
+        // build, which an in-play merge never removes). A stream that breaks
+        // either was not written by this code; refused whole.
+        for (uint32_t t = 1; t < tiles; ++t)
+            if (pr.tiles[t] <= pr.tiles[t - 1])
+                return false;
+        if (!std::binary_search(pr.tiles.begin(), pr.tiles.end(), static_cast<entity_id>(pr.id)))
+            return false;
+
         out.provinces.push_back(std::move(pr));
     }
 
+    // No tile in two provinces: the partition is a PARTITION, and a merge moves
+    // a tile rather than copying it. A duplicate would let `province_of` answer
+    // whichever province was read last.
     for (const province& pr : out.provinces)
         for (const entity_id t : pr.tiles)
-            out.tile_province[t] = pr.id;
+            if (!out.tile_province.emplace(t, pr.id).second)
+                return false;
 
     return true;
 }
