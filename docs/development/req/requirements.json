@@ -7684,33 +7684,33 @@
     },
     {
      "id": "R2",
-     "status": "failed",
+     "status": "complete",
      "verification": [
       "headless: spawn_solvency default (12 seeds)"
      ],
      "requirement": "The seat and the field stay solvent and acting.",
      "notes": "",
-     "result_metric": "R1-R3 pass; R4 \"the field still fields a standing force\" FAILS: rival units 1 -> 0 (seed 1's last unit). Not relaxed; the thinning predates this item (baseline ~17 a seed; 3 on 29b87817) -- filed as BL-1154 (rivals field no force)."
+     "result_metric": "R1-R3 pass; R4 \"the field still fields a standing force\" FAILS: rival units 1 -> 0 (seed 1's last unit). Not relaxed; the thinning predates this item (baseline ~17 a seed; 3 on 29b87817) -- filed as BL-1154 (rivals field no force). On main after the merge spawn_solvency ALL PASS."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold)"
      ],
      "requirement": "A cold review.",
      "notes": "",
-     "result_metric": "Review 2026-09-27: the budget-world cap correct (no tile holds two centres; the reason path consistent). HIGH: Pass 6 (the no-budget legacy path) was changed outside NR-960 -- the main session's own brief extended it; seed 28's legacy pin moved -> reverted to a flat 2 in the fix round. Also: the town row passes by construction (cfg.c = 3 fix), the anchor rule in three copies (one helper), stale comments. R4's cause traced -> NR-963."
+     "result_metric": "Review 2026-09-27: the budget-world cap correct (no tile holds two centres; the reason path consistent). HIGH: Pass 6 (the no-budget legacy path) was changed outside NR-960 -- the main session's own brief extended it; seed 28's legacy pin moved -> reverted to a flat 2 in the fix round. Also: the town row passes by construction (cfg.c = 3 fix), the anchor rule in three copies (one helper), stale comments. R4's cause traced -> NR-963. Fix round 97cb0cce: Pass 6 flat 2, legacy byte-identical, one helper province_anchors."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice, landscape_search_harness, legacy digests on main"
      ],
      "requirement": "Gated on main.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Main 6a/after the BL-1146 + BL-1153 merges: world_determinism ALL PASS twice (E005A311CEE6F037 / 1B6CF0A1CD1B6678 / C31DDE727D998BE7); save_roundtrip OK; sea_lane_stamp_harness, charter_refusal_probe, landscape_search_harness, spawn_solvency, world_cursor_equivalence ALL PASS; history_sim only R3a2/R3a3."
     }
    ]
   },
@@ -7738,23 +7738,23 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer agent (cold)"
      ],
      "requirement": "A cold review, fix round included.",
      "notes": "",
-     "result_metric": "Review 2026-09-27: the pick correct and deterministic. Defects: same-port legs laid as one-tile lanes and counted; the busier-end direction read from the record end, not the picked seat (braids under currents). Gaps: the realm snapshot unbound, a silent fallback, the column wrap untested. Fix round running."
+     "result_metric": "Review 2026-09-27: the pick correct and deterministic. Defects: same-port legs laid as one-tile lanes and counted; the busier-end direction read from the record end, not the picked seat (braids under currents). Gaps: the realm snapshot unbound, a silent fallback, the column wrap untested. Fix round running. Fix round 18442abe: same-port legs skipped, the busier end by port tile, the snapshot bound, loud fallback, wrap row; laid 377 of 446."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice, save_roundtrip, world_cursor_equivalence on main"
      ],
      "requirement": "Gated on main.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Main 6a/after the BL-1146 + BL-1153 merges: world_determinism ALL PASS twice (E005A311CEE6F037 / 1B6CF0A1CD1B6678 / C31DDE727D998BE7); save_roundtrip OK; sea_lane_stamp_harness, charter_refusal_probe, landscape_search_harness, spawn_solvency, world_cursor_equivalence ALL PASS; history_sim only R3a2/R3a3."
     }
    ]
   }
