@@ -201,6 +201,58 @@ domestication_package coin_package(const std::vector<terrain_substrate>& substra
                                    int gw, int gh, int col, int row,
                                    int window_radius);
 
+// ---------------------------------------------------------------------------
+// Amenity classes (BL-1107) — TILES.md § Amenity tiles
+// ---------------------------------------------------------------------------
+
+/// The amenity a tile's cover carries, independent of its deposits. TILES.md
+/// § Amenity tiles names the three high-amenity grounds; everything else is
+/// `open`, which is a real class (country with no high-amenity cover), not a
+/// sentinel. Stored on `ground_profile::amenity` as a plain integer.
+enum class amenity_class : uint8_t
+{
+    open          = 0, ///< No high-amenity cover.
+    forest        = 1, ///< Forest cover.
+    coastal_grass = 2, ///< Grass cover on the shoreline ring (water-adjacent).
+    valley_marsh  = 3, ///< Marsh cover in a valley landform.
+
+    count         = 4
+};
+
+inline constexpr int amenity_class_count = static_cast<int>(amenity_class::count);
+
+/// Classify one LAND tile's amenity, in the shape of `classify_farm_class`:
+/// pure, total, most-specific first. Water gets none (the caller must not ask;
+/// a water tile answers `open`). The three tests are TILES.md's three grounds
+/// verbatim and do not overlap, since each reads a different cover.
+amenity_class classify_amenity_class(terrain_substrate s, terrain_cover c,
+                                     terrain_landform lf, bool shoreline);
+
+/// The share a window's commonest high-amenity class must reach for the
+/// window to read as that class, per mille of its land cells. The package's
+/// own floor (`package_affinity_floor`), for the same reason: a class the
+/// window barely held is not the country its people knew.
+inline constexpr int amenity_class_floor = package_affinity_floor;
+
+/// One window's amenity reading: its class and the land share under it.
+struct amenity_reading
+{
+    amenity_class cls   = amenity_class::open;
+    int           share = 0; ///< Per mille of the window's land cells; 0 for `open`.
+    int           land  = 0; ///< Land cells read.
+};
+
+/// Read the amenity class of the square window of radius @p window_radius
+/// around (@p col, @p row) — the window `coin_package` reads, with the same
+/// east-west wrap and the same hex shoreline test. The commonest high-amenity
+/// class wins (ties to the lower enum value); under `amenity_class_floor` the
+/// window is `open`. Integer and RNG-free.
+amenity_reading read_window_amenity(const std::vector<terrain_substrate>& substrate,
+                                    const std::vector<terrain_cover>&     cover,
+                                    const std::vector<terrain_landform>&  landform,
+                                    int gw, int gh, int col, int row,
+                                    int window_radius);
+
 /// The floored union of two packages — what a daughter founded on ground
 /// marginal for A, beside a people carrying B, carries away.
 ///

@@ -1662,6 +1662,26 @@ struct history_sim_params
     /// scored utility with a richer input, same idiom as `w_fear_q`/`w_aggr_q`.
     int w_want_q = 0;
 
+    // --- BL-1107: the ground profile's two magnitudes ----------------------
+    // EXPLORATION.md sec A good acquires a cultural preference: the profile
+    // is the first of the preference's two inputs (`derive_culture_preference`
+    // says how it is read). Named and validated here so they can be read on a
+    // ladder before they are set (Ben, 2026-10-03); the defaults are the
+    // values the reader shipped with. REJECT, NEVER CLAMP
+    // (`culture_profile_params_valid`): a run whose two constants leave their
+    // domain reads NO profile term for the whole run and says so
+    // (`history_sim_state::culture_profile_params_rejected`).
+
+    /// The remembered lack a cradle that held NONE of a good carries, in
+    /// preference weight units (0-1000); falls linearly to 0 at the cradle
+    /// mean. Domain 0-1000; 0 switches the lack term off. 250 = one
+    /// contacted holder's worth of exposure.
+    int culture_profile_lack_max_q = 250;
+    /// The amenity lean is `amenity_share / culture_profile_amenity_div`
+    /// toward the good the cradle's amenity class lived by. Domain 1-1000;
+    /// 4 = a window wholly under its amenity cover leans by 250.
+    int culture_profile_amenity_div = 4;
+
     /// The grudge total, summed across D's aggrieved kin, that counts as FULL
     /// fear -- the denominator that turns an unbounded ledger sum into the
     /// 0-1000 currency every other lean in this file speaks.
@@ -4615,6 +4635,17 @@ struct history_sim_state
     /// priced, nothing moved. REJECTED, never clamped.
     bool    subjection_purchase_params_rejected = false;
 
+    /// BL-1107: `culture_profile_params_valid` said no at the run's open, so
+    /// the preference read NO profile term for the whole run (exposure
+    /// alone). REJECTED, never clamped.
+    bool    culture_profile_params_rejected = false;
+    /// BL-1107: the two profile magnitudes this run's preference was read
+    /// with (both 0 when rejected), carried so the span's handoff
+    /// (`make_exploration_output`) re-derives its close table on the same
+    /// footing the rounds did.
+    int     culture_profile_lack_max_q  = 250;
+    int     culture_profile_amenity_div = 4;
+
     /// BL-1097: sea legs noted this run, by site -- the wet campaign launch,
     /// the purchase crossing, the standing tribute-round traffic -- and how
     /// many legs crossed `sea_lane_tier1_uses` (each noting `sea_lane_opened`).
@@ -5488,13 +5519,40 @@ struct culture_good_preference
 /// `derive_wants` holds itself to. @p culture_count bounds which culture
 /// indices are read, same convention `pass_one_output::culture_count` sets.
 ///
-/// A culture with no plurality-held ground and no contacted polity holding a
-/// good it lacks contributes nothing for that good — an absence with no
-/// route yet is not a preference (EXPLORATION.md sec A good acquires a
-/// cultural preference: "derived... from what its route exposed it to").
+/// TWO INPUTS (EXPLORATION.md sec A good acquires a cultural preference; BL-1107):
+///
+///  1. THE GROUND PROFILE (@p cultures, `culture::profile`; COLONISATION.md sec
+///     The ground profile) -- what the culture's cradle held. Each of the four
+///     profile classes (farm, ore, energy, water -> port) is scored against
+///     the mean over the CRADLE cultures on `score_against`'s scale (500 at
+///     the mean; 500 for every cradle where no cradle held any); a good the
+///     cradle held below the mean carries a REMEMBERED LACK of up to
+///     @p lack_max_q (at a score of 0). The cradle's amenity class leans
+///     toward the good its country lived by (forest -> energy, coastal grass
+///     -> port, marsh in a valley -> farm), by `amenity_share / @p amenity_div`
+///     (no lean where @p amenity_div <= 0). The two magnitudes are
+///     `history_sim_params::culture_profile_lack_max_q` / `_amenity_div`; the
+///     defaults below are theirs. Read only for a living
+///     (unfolded) culture that is the plurality somewhere -- a people standing
+///     on ground, polity or none.
+///  2. ROUTE EXPOSURE -- 250 per distinct contacted foreign polity holding the
+///     good, as before.
+///
+/// The weight is their sum, capped at 1000. A good the culture's ground holds
+/// NOW is never preferred, whatever the profile says. With @p cultures null
+/// (or a culture with no coined profile) term 1 is absent and the table is
+/// exposure alone: a culture with no route then contributes nothing for a
+/// good -- an absence with no route yet is not a preference.
 std::vector<culture_good_preference> derive_culture_preference(
     const std::vector<region>& regions, const std::vector<contact>& contacts,
-    const std::vector<polity>& polities, int culture_count);
+    const std::vector<polity>& polities, int culture_count,
+    const std::vector<culture>* cultures = nullptr,
+    int lack_max_q = 250, int amenity_div = 4);
+
+/// BL-1107: the two profile magnitudes in their domains
+/// (`culture_profile_lack_max_q` 0-1000, `culture_profile_amenity_div`
+/// 1-1000). Out of domain, the run reads no profile term at all.
+bool culture_profile_params_valid(const history_sim_params& p);
 
 // ---------------------------------------------------------------------------
 // The scarcity signal (BL-939) — EXPLORATION.md sec There is no price here,

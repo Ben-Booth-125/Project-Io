@@ -374,6 +374,12 @@ history_sim_params exploration_sim_params(const world_params& params)
     // is the lean deciding rather than ranking.
     hp.w_want_q = 1000;
 
+    // BL-1107 — the ground profile's two magnitudes, off the descriptor
+    // (defaults equal the struct's), so a ladder over the shipped worlds
+    // moves both resumed spans together.
+    hp.culture_profile_lack_max_q  = params.culture_profile_lack_max_q;
+    hp.culture_profile_amenity_div = params.culture_profile_amenity_div;
+
     // Carried opening behaviour from the Empires round, unchanged: a founding
     // that arrives inside this span (there are none scheduled — the migration
     // ends long before 1200 — but the flag is a property of the WORLD's rule

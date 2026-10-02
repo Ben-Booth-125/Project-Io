@@ -298,7 +298,14 @@ bool touches_ocean(const world& w, const std::vector<entity_id>& ids,
 endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
                            int col, int row, int gw, int gh)
 {
-    const int win = std::max(3, gw / 45);
+    return survey_endowment_window(w, ids, col, row, gw, gh, std::max(3, gw / 45));
+}
+
+// BL-1107: the survey body, over a window of the caller's radius. The founding
+// survey above passes its own radius, so its arithmetic is exactly what it was.
+endowment survey_endowment_window(const world& w, const std::vector<entity_id>& ids,
+                                  int col, int row, int gw, int gh, int win)
+{
     float farm = 0.0f, ore = 0.0f, energy = 0.0f;
     int cells = 0, water = 0, forest = 0;
 
@@ -631,9 +638,16 @@ namespace
 /// Earth proper noun (.claude/rules/io-standing-rules.md § Terms & docs).
 culture derive_daughter_culture(const culture& parent, int parent_id, int8_t origin_class,
                                 uint32_t seed, int spawn_index, int64_t coined_year,
-                                bool crossed_water)
+                                bool crossed_water, const ground_profile& inherited_profile)
 {
     culture d = parent;                 // Pantheon, cradle and speech inherited whole.
+    // THE GROUND PROFILE IS INHERITED WHOLE (BL-1107; COLONISATION.md § The
+    // ground profile): a fact about where the people began, never re-read off
+    // the ground the daughter split on. Passed explicitly because a cradle
+    // parent is read off the const roster, which carries no profile yet; the
+    // caller resolves it (`cradle_prof` for a cradle, the parent's own field
+    // for a daughter).
+    d.profile = inherited_profile;
     // DESCENT (BL-865). The tree the migration builds is retained rather than
     // discarded, because kinship is what the empire phase reads for how alike
     // two peoples are (CIVILISATION.md § Culture relations).
@@ -895,6 +909,42 @@ settlement_state run_settlement(const planetology_state& pl,
                     col_lf [static_cast<std::size_t>(src0.tile)],
                     /*shoreline=*/false)));
 
+    // THE GROUND PROFILE (BL-1107; COLONISATION.md § The ground profile):
+    // beside the package, from the same window -- the deposits it holds, summed
+    // in the founding survey's four classes, and the amenity class its cover
+    // reads as (TILES.md § Amenity tiles). Coined once per cradle, no die.
+    // Kept per culture id here too, because the daughters below are derived
+    // from `cs.cultures`, which cannot carry it yet (it is const here; the
+    // caller copies `cradle_profile` back onto the roster).
+    std::vector<ground_profile> cradle_prof(cs.cultures.size());
+    for (const colonisation_source& src0 : col_sources)
+    {
+        if (src0.culture < 0 || static_cast<std::size_t>(src0.culture) >= cs.cultures.size()
+            || src0.tile < 0 || src0.tile >= total)
+            continue;
+        const int ccol = src0.tile % gw, crow = src0.tile / gw;
+        const endowment e = survey_endowment_window(w, tile_ids, ccol, crow, gw, gh,
+                                                    colonisation_cradle_window);
+        const amenity_reading am = read_window_amenity(col_sub, col_cov, col_lf, gw, gh,
+                                                       ccol, crow, colonisation_cradle_window);
+        ground_profile gp;
+        gp.farm          = e.farm;
+        gp.ore           = e.ore;
+        gp.energy        = e.energy;
+        gp.water         = e.water;
+        gp.amenity       = static_cast<int8_t>(am.cls);
+        gp.amenity_share = static_cast<int16_t>(am.share);
+        cradle_prof[static_cast<std::size_t>(src0.culture)] = gp;
+        out.cradle_profile.emplace_back(src0.culture, gp);
+    }
+    // The profile a daughter of @p parent_id inherits: a cradle's from the
+    // coining above, a daughter's from the field it already carries.
+    const auto inherited_profile = [&](int parent_id, const ::culture& par) -> ground_profile {
+        if (parent_id >= 0 && static_cast<std::size_t>(parent_id) < cradle_prof.size())
+            return cradle_prof[static_cast<std::size_t>(parent_id)];
+        return par.profile;
+    };
+
     // THE CRADLE IS ANNOUNCED (BL-1091): the people's own name off the roster
     // and the package just coined on its source, retained as pure outputs
     // beside the two records above. Written once, here, and read by nothing
@@ -982,7 +1032,8 @@ settlement_state run_settlement(const planetology_state& pl,
         culture daughter =
             derive_daughter_culture(*par, pid, static_cast<int8_t>(sp.origin_class),
                                     seed ^ 0xC0DAu, static_cast<int>(si),
-                                    sp.coined_year, sp.crossed_water);
+                                    sp.coined_year, sp.crossed_water,
+                                    inherited_profile(pid, *par));
         out.spawned_cultures.push_back(std::move(daughter));
     }
 
@@ -1156,7 +1207,8 @@ settlement_state run_settlement(const planetology_state& pl,
             if (par == nullptr) { out.spawned_cultures.push_back(culture{}); continue; }
             culture daughter = derive_daughter_culture(
                 *par, sp.parent, static_cast<int8_t>(sp.origin_class), seed ^ 0xC0DAu,
-                static_cast<int>(walk_spawns + si), sp.coined_year, sp.crossed_water);
+                static_cast<int>(walk_spawns + si), sp.coined_year, sp.crossed_water,
+                inherited_profile(sp.parent, *par));
             out.spawned_cultures.push_back(std::move(daughter));
         }
         // The regions that changed people take the daughter's shares and her
