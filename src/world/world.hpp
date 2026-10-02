@@ -270,6 +270,13 @@ struct world
     faithful_unordered_map<entity_id, building_component>  buildings;
     faithful_unordered_map<entity_id, stockpile_component> stockpiles;
     faithful_unordered_map<entity_id, market_component>    markets;
+    /// BL-1125 (markets can die): every market folded away at generation, by
+    /// its old id, ascending (`folded_market`). ROUTING STATE, saved: a tile
+    /// routes to its nearest original centre and a folded one hands it to its
+    /// absorber (`market_for_tile`), so the catchments a world was handed
+    /// survive a load. Written only by `fold_market_into`; empty on a body
+    /// whose markets never folded.
+    std::map<entity_id, folded_market>                     folded_markets;
     faithful_unordered_map<entity_id, unit_component>             units;
 
     /// Population centre entities keyed by their entity ID. Populated by
@@ -689,6 +696,9 @@ struct world
     mutable faithful_unordered_map<entity_id, std::vector<entity_id>> body_market_index;
     mutable std::size_t   body_market_index_count  = 0; ///< markets.size() at build.
     mutable std::uint32_t body_market_index_cursor = 0; ///< next_entity_id() at build.
+    /// BL-1125: body -> its FOLDED markets' ids, ascending; rebuilt with
+    /// `body_market_index` (same stamp; `fold_market_into` resets it).
+    mutable faithful_unordered_map<entity_id, std::vector<entity_id>> body_folded_index;
 
     /// Per-body population-centre index (BL-1050): body -> its centres in
     /// ASCENDING ID ORDER. The same derived cache as `body_market_index` above

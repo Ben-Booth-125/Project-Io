@@ -287,7 +287,15 @@ inline constexpr uint32_t world_save_magic =
 /// tile, so its second tile misreads; refused whole on the strict-equality contract,
 /// no migration (a pre-bump world stamped no lanes). Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 28;
+/// Bumped to 29 by BL-1125 (markets can die): `world::folded_markets`, the fold
+/// map `market_for_tile` routes through (a folded market's catchment passes to
+/// its absorber), is written as a new TRAILING section after the exchange ring.
+/// A v28 stream simply ends where this one continues; refused whole on the
+/// strict-equality contract. The reader refuses a record whose absorber is not
+/// a standing market on its body, whose centre is not a tile on its body, or
+/// whose own id is still a standing market. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 29;
 
 /// Write @p w as a complete world snapshot.
 ///

@@ -906,12 +906,21 @@ struct generation_report
     int64_t shells_folded           = 0; ///< Of both, how many were capital shells.
     double  market_fold_goods_before = 0.0; ///< Inventory + pools on the body before the folds.
     double  market_fold_goods_after  = 0.0; ///< ...and after them.
-    int64_t market_fold_pop_before   = 0;   ///< Catchment population routed before the folds.
-    int64_t market_fold_pop_after    = 0;   ///< ...and after them.
+    /// The catchment half: tiles whose market folded, and of every tile on the
+    /// body, those NOT routed to their market's absorber after the folds (must
+    /// be 0 -- a folded market's catchment passes whole).
+    int64_t market_fold_tiles_moved  = 0;
+    int64_t market_fold_misrouted    = 0;
+    /// Gravity folds whose reach crossed water (both centres ported).
+    int64_t markets_folded_across_water = 0;
     /// Markets destroyed by conquest in the history (BL-1125 cause 3), per
     /// span -- [0] Empires (to 1200), [1] Exploration (to 1660), [2]
     /// Industrialisation (to 1960): a capital market whose region a rival took.
+    /// [0] is STRUCTURALLY 0: no market is marked before the 1200 close, so
+    /// the Empires span has none to destroy.
     int64_t markets_destroyed_by_conquest[3] = {0, 0, 0};
+    /// The regions those markets stood on, per span, in the order destroyed.
+    std::vector<int32_t> markets_destroyed_regions[3];
 
     // --- The carve ledger: what the carve counted as competitors (BL-1086) --
     //

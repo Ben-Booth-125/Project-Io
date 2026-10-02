@@ -1608,6 +1608,7 @@ void run_empires(generation_cursor& c)
             report->prehistory_battles   = hs.battles;
             report->prehistory_conquests = hs.conquests;
             report->markets_destroyed_by_conquest[0] = hs.markets_destroyed; // BL-1125
+            report->markets_destroyed_regions[0] = hs.markets_destroyed_regions;
             report->prehistory_foundings = hs.foundings;
             report->prehistory_years     = hs.years;
             // NR-733: the ownership history itself, so the Ages view can
@@ -1831,6 +1832,7 @@ void run_exploration(generation_cursor& c)
             report->exploration_battles   = kepler_exploration_hs.battles;
             report->exploration_conquests = kepler_exploration_hs.conquests;
             report->markets_destroyed_by_conquest[1] = kepler_exploration_hs.markets_destroyed; // BL-1125
+            report->markets_destroyed_regions[1] = kepler_exploration_hs.markets_destroyed_regions;
             report->exploration_foundings = kepler_exploration_hs.foundings;
             for (generation_report::body_entry& be : report->bodies)
                 if (be.id == kepler)
@@ -2067,6 +2069,7 @@ void run_industrialisation(generation_cursor& c)
             report->industrialisation_battles   = kepler_industrialisation_hs.battles;
             report->industrialisation_conquests = kepler_industrialisation_hs.conquests;
             report->markets_destroyed_by_conquest[2] = kepler_industrialisation_hs.markets_destroyed; // BL-1125
+            report->markets_destroyed_regions[2] = kepler_industrialisation_hs.markets_destroyed_regions;
             report->industrialisation_foundings = kepler_industrialisation_hs.foundings;
             report->industrialisation_points_from_scale  = kepler_industrialisation_hs.industry_points_from_scale;
             report->industrialisation_stream_moved       = kepler_industrialisation_hs.urbanisation_heads_moved;
@@ -2981,8 +2984,8 @@ void run_tail(generation_cursor& c)
                 report->markets_folded_twins     = twins.folds;
                 report->market_fold_goods_before = twins.inventory_before + twins.pools_before;
                 report->market_fold_goods_after  = twins.inventory_after + twins.pools_after;
-                report->market_fold_pop_before   = twins.catchment_pop_before;
-                report->market_fold_pop_after    = twins.catchment_pop_after;
+                report->market_fold_tiles_moved  = twins.catchment_tiles_moved;
+                report->market_fold_misrouted    = twins.catchment_misrouted;
                 for (const market_fold_record& r : twins.records)
                     if (shells.count(r.folded) != 0) ++report->shells_folded;
             }
@@ -2993,13 +2996,35 @@ void run_tail(generation_cursor& c)
             //    calibrated constant `market_carving.gravity_reach`. A capital
             //    shell folds like any market -- it is a market place, and the
             //    rule is about where trade gathers, not whose court sits there.
+            //
+            //    A FOLD IS ONE A CONVOY COULD MAKE: a sea leg needs a port at
+            //    both ends (SUPPLY.md § Infrastructure gates), so the reach
+            //    crosses water only between two centres whose regions hold a
+            //    built port at the close (`region::port_stock_q`, the region
+            //    `nearest_region` binds the centre to -- the binding the
+            //    junction rule above uses); otherwise it is measured over land.
+            std::set<entity_id> port_centres;
+            for (const auto& [mid, mc] : w.markets)
+            {
+                if (mc.body != kepler) continue;
+                const auto tit = w.tiles.find(mc.centre_tile);
+                if (tit == w.tiles.end()) continue;
+                const int ri = nearest_region(kepler_settlement, tit->second.grid_x,
+                                              tit->second.grid_y, home_grid_width);
+                if (ri >= 0 && ri < static_cast<int>(kepler_settlement.regions.size())
+                    && kepler_settlement.regions[static_cast<std::size_t>(ri)].port_stock_q > 0)
+                    port_centres.insert(mc.centre_tile);
+            }
             const market_fold_tally gravity =
-                fold_markets_by_gravity(w, kepler, gen_cfg.market_carving.gravity_reach);
+                fold_markets_by_gravity(w, kepler, gen_cfg.market_carving.gravity_reach,
+                                        &port_centres);
             if (report != nullptr)
             {
                 report->markets_folded_gravity  = gravity.folds;
+                report->markets_folded_across_water = gravity.folds_across_water;
                 report->market_fold_goods_after = gravity.inventory_after + gravity.pools_after;
-                report->market_fold_pop_after   = gravity.catchment_pop_after;
+                report->market_fold_tiles_moved += gravity.catchment_tiles_moved;
+                report->market_fold_misrouted   += gravity.catchment_misrouted;
                 for (const market_fold_record& r : gravity.records)
                     if (shells.count(r.folded) != 0) ++report->shells_folded;
             }

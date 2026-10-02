@@ -4378,6 +4378,9 @@ struct history_sim_state
     /// destroyed because a rival took the region they stood on. Cleared at the
     /// conquest itself (`region::has_market`), so the close never spawns them.
     int64_t markets_destroyed = 0;
+    /// ...and the region each one stood on, in the order destroyed. A region is
+    /// destroyed at most once a span: the mark is set only at a close.
+    std::vector<int32_t> markets_destroyed_regions;
     int64_t foundings   = 0;
     /// BL-920 -- unorganised ground the ORGANISE verb actually took.
     int64_t organised          = 0;

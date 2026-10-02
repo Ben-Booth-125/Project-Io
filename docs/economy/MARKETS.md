@@ -82,7 +82,9 @@ to another, idle and unbuilt. Three in-world causes remove them, and none is a c
    constant, measured on the curated seeds; the rule never enforces a count. The walk is largest
    first, on catchments read once before any fold: each market still standing absorbs every
    smaller one whose centre lies within reach of it (the cost of travel toward the larger), and a
-   market already absorbed absorbs nothing.
+   market already absorbed absorbs nothing. A fold is one a convoy could make: the reach crosses
+   water only between two centres whose regions hold a port, as a sea leg needs a port at both
+   ends; otherwise it is measured over land.
 3. **Conquest consolidates.** When a realm conquers the region its rival's market stands on, the
    conquered market is destroyed to consolidate the conqueror's strength (Ben, 2026-09-25). The
    history's markets are the survivors' markets, not a monument to every realm that ever stood.
@@ -97,7 +99,9 @@ ceiling the charter walk honours — so no roster is laid only to be discarded, 
 search, which scores the carve's markets, still runs after the carve.
 
 **Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
-(`market_for_tile`). **A corporation clears in every market it holds a pool in** (Ben, 2026-09-15):
+(`market_for_tile`), measured on the cylinder (the column distance wraps). A folded market's
+centre still counts: a tile nearest to it clears against the market that absorbed it, so a
+catchment passes to its absorber whole, never to a third market that happens to stand nearer. **A corporation clears in every market it holds a pool in** (Ben, 2026-09-15):
 goods pools are per `(corp, market)` (`PRODUCTION.md` § Stockpile and output flow), so a building
 sells into and buys from its own tile's catchment, and goods a convoy delivers sell at the market
 they were delivered to. The earlier body-aggregate rule — every sale routed through the corp's

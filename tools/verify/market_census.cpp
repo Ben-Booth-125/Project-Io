@@ -170,6 +170,7 @@
 #include "world/survey_system.hpp"
 #include "world/world.hpp"
 #include "world_digest.hpp"
+#include "market_readings.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -564,8 +565,12 @@ struct seed_record
     int64_t folded_twins = 0, folded_gravity = 0;
     int64_t conquest_destroyed[3] = { 0, 0, 0 };
     double  goods_before = 0.0, goods_after = 0.0;
-    int64_t pop_before = 0, pop_after = 0;
-    int major_cities = 0, major_no_market = 0; ///< scale >= 4 centres; of them, no market centre within 8 tiles
+    int64_t tiles_moved = 0, misrouted = 0, across_water = 0;
+    int     folded_records = 0;
+    int     span_lost[3] = { 0, 0, 0 };      ///< marks set at a span's start and gone at its close
+    int     span_remarked[3] = { 0, 0, 0 };  ///< destroyed in the span, marked again at its close
+    bool    conquest_tie = true;             ///< I6: every lost mark is a recorded destruction
+    int major_cities = 0, major_no_market = 0; ///< k_major_city_scale+ centres; of them, no market within k_major_city_radius
     bool id_tile_match = false, price_agrees = false, count_agrees = false;
     int price_shell_votes = 0;
     int zero_tile = 0, colocated = 0;
@@ -838,8 +843,42 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
     for (int k = 0; k < 3; ++k) rec.conquest_destroyed[k] = out->report.markets_destroyed_by_conquest[k];
     rec.goods_before = out->report.market_fold_goods_before;
     rec.goods_after  = out->report.market_fold_goods_after;
-    rec.pop_before   = out->report.market_fold_pop_before;
-    rec.pop_after    = out->report.market_fold_pop_after;
+    rec.tiles_moved  = out->report.market_fold_tiles_moved;
+    rec.misrouted    = out->report.market_fold_misrouted;
+    rec.across_water = out->report.markets_folded_across_water;
+    // I6 -- THE CONQUEST TIE. Within a span a mark is only ever CLEARED (by
+    // conquest) and only SET at the close, so for each span: every region marked
+    // at its start and unmarked at its close is one the span recorded destroying,
+    // every recorded destruction stood on a region marked at the start, no region
+    // is destroyed twice, and lost + destroyed-then-remarked == destroyed.
+    {
+        const std::vector<region>* start[3] = { nullptr, &t1200, &t1660 };
+        const std::vector<region>* close[3] = { &t1200, &t1660, &t1960 };
+        for (int k = 0; k < 3; ++k)
+        {
+            const std::vector<int32_t>& d = out->report.markets_destroyed_regions[k];
+            std::set<int32_t> ds(d.begin(), d.end());
+            if (ds.size() != d.size()) rec.conquest_tie = false;
+            if (static_cast<int64_t>(d.size()) != rec.conquest_destroyed[k]) rec.conquest_tie = false;
+            if (start[k] == nullptr) { if (!d.empty()) rec.conquest_tie = false; continue; }
+            const std::vector<region>& a = *start[k];
+            const std::vector<region>& b = *close[k];
+            for (const int32_t ri : d)
+            {
+                const std::size_t u = static_cast<std::size_t>(ri);
+                if (ri < 0 || u >= a.size() || !a[u].has_market) { rec.conquest_tie = false; continue; }
+                if (u < b.size() && b[u].has_market) ++rec.span_remarked[k];
+            }
+            for (std::size_t u = 0; u < a.size(); ++u)
+                if (a[u].has_market && !(u < b.size() && b[u].has_market))
+                {
+                    ++rec.span_lost[k];
+                    if (ds.count(static_cast<int32_t>(u)) == 0) rec.conquest_tie = false;
+                }
+            if (rec.span_lost[k] + rec.span_remarked[k] != static_cast<int>(d.size()))
+                rec.conquest_tie = false;
+        }
+    }
 
     rec.carve = 0;
     for (std::size_t k = static_cast<std::size_t>(rec.shells); k < home_ids.size(); ++k)
@@ -872,12 +911,26 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
     }
 
     // -- catchment tiles, and the wrap diagnostic --
-    std::vector<std::pair<entity_id, const tile_component*>> centres; // anchored, ascending id
+    std::vector<std::pair<entity_id, const tile_component*>> centres; // standing, anchored, ascending id
     for (const entity_id mid : home_ids)
     {
         const auto cit = w.tiles.find(w.markets.at(mid).centre_tile);
         if (cit != w.tiles.end()) centres.emplace_back(mid, &cit->second);
     }
+    // BL-1125: the wrap diagnostic routes over the ORIGINAL centres -- standing
+    // and folded -- in ascending id; a folded winner routes to its absorber, as
+    // market_for_tile does. (`centres` above stays standing-only: the spacing
+    // rows below read it.)
+    std::vector<std::pair<entity_id, const tile_component*>> route_centres = centres;
+    for (const auto& [fid, fm] : w.folded_markets)
+    {
+        if (fm.body != home) continue;
+        const auto cit = w.tiles.find(fm.centre_tile);
+        if (cit != w.tiles.end()) route_centres.emplace_back(fid, &cit->second);
+    }
+    std::sort(route_centres.begin(), route_centres.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    rec.folded_records = static_cast<int>(w.folded_markets.size());
     for (std::size_t idx = 0; idx < grid.size(); ++idx)
     {
         const entity_id tid = grid[idx];
@@ -893,13 +946,18 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
         // The wrapped nearest (ties -> lowest id), against market_for_tile's unwrapped one.
         entity_id best = null_entity;
         long long best_d = 0;
-        for (const auto& [mid, ct] : centres)
+        for (const auto& [mid, ct] : route_centres)
         {
             long long dc = std::abs(ct->grid_x - tc.grid_x);
             if (dc > gw / 2) dc = gw - dc;
             const long long dr = ct->grid_y - tc.grid_y;
             const long long d  = dc * dc + dr * dr;
             if (best == null_entity || d < best_d) { best = mid; best_d = d; }
+        }
+        if (best != null_entity)
+        {
+            const auto fit = w.folded_markets.find(best);
+            if (fit != w.folded_markets.end()) best = fit->second.into;
         }
         if (best != null_entity && best != m) ++rec.seam_misroutes;
     }
@@ -915,16 +973,16 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
         if (rit == row_of.end()) continue;
         rec.rows[rit->second].pop_k += pcc.population;
         ++rec.rows[rit->second].centres;
-        // BL-1125: a MAJOR city (metropolis and up) with no market standing
-        // within 8 grid tiles of it -- the carve's own proxy radius.
-        if (pcc.scale >= 4)
+        // BL-1125: a MAJOR city (market_readings.hpp, shared with the ladder)
+        // with no market standing within k_major_city_radius grid tiles of it.
+        if (pcc.scale >= k_major_city_scale)
         {
             ++rec.major_cities;
             bool near = false;
             for (const entity_id mid : home_ids)
             {
                 const auto ct = w.tiles.find(w.markets.at(mid).centre_tile);
-                if (ct != w.tiles.end() && grid_dist(ct->second, tc->second, gw) <= 8.0) { near = true; break; }
+                if (ct != w.tiles.end() && grid_dist(ct->second, tc->second, gw) <= k_major_city_radius) { near = true; break; }
             }
             if (!near) ++rec.major_no_market;
         }
@@ -1116,21 +1174,28 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
     check(rec.fate[3] == 0, "I4", "every shell names a maker at the close that marked it");
     check(rec.index_unstable == 0, "I5", "every region of the 1200 and 1660 tables is the same place "
                                          "in the 1960 table (the region index is stable across the spans)");
-    std::printf("     BL-1125 deaths: conquest destroyed %" PRId64 " (Empires) %" PRId64 " (Exploration) %" PRId64
+    check(rec.conquest_tie, "I6", "conquest ties to the closes: per span, every mark lost is a recorded "
+                                  "destruction, and lost + re-marked == destroyed");
+    std::printf("     per span lost/re-marked: Exploration %d/%d, Industrialisation %d/%d\n",
+                rec.span_lost[1], rec.span_remarked[1], rec.span_lost[2], rec.span_remarked[2]);
+    std::printf("     BL-1125 deaths: conquest destroyed %" PRId64 " (Empires: structurally 0, nothing is marked before the 1200 close) %" PRId64 " (Exploration) %" PRId64
                 " (Industrialisation); marks set earlier and gone by 1960 %d | at the carve: twins folded %" PRId64
                 ", gravity folded %" PRId64 ", of them shells %d (of %d marked)\n",
                 rec.conquest_destroyed[0], rec.conquest_destroyed[1], rec.conquest_destroyed[2],
                 rec.marks_cleared, rec.folded_twins, rec.folded_gravity, rec.shells_folded, rec.shells_marked);
-    std::printf("     major cities (scale >= 4) %d, with no market centre within 8 tiles %d\n",
-                rec.major_cities, rec.major_no_market);
+    std::printf("     gravity folds across water (both centres ported): %" PRId64 "; fold records %d\n",
+                rec.across_water, rec.folded_records);
+    std::printf("     major cities (scale >= %d) %d, with no market centre within %.0f tiles %d\n",
+                k_major_city_scale, rec.major_cities, k_major_city_radius, rec.major_no_market);
+    check(rec.conquest_destroyed[0] == 0, "C0", "the Empires span destroys no market (structurally: none is marked before 1200)");
     {
         const double tol = 1e-6 * std::max(1.0, std::fabs(rec.goods_before));
-        char cb[200];
-        std::snprintf(cb, sizeof cb, "the folds conserve: goods (inventory + pools) %.3f -> %.3f, "
-                                     "catchment population %" PRId64 "k -> %" PRId64 "k",
-                      rec.goods_before, rec.goods_after, rec.pop_before, rec.pop_after);
-        check(std::fabs(rec.goods_after - rec.goods_before) <= tol && rec.pop_before == rec.pop_after,
-              "C1", cb);
+        char cb[240];
+        std::snprintf(cb, sizeof cb, "the folds pass the catchment whole: %" PRId64 " tiles moved with "
+                                     "their market, %" PRId64 " routed anywhere but their absorber; goods "
+                                     "(inventory + pools) %.3f -> %.3f",
+                      rec.tiles_moved, rec.misrouted, rec.goods_before, rec.goods_after);
+        check(std::fabs(rec.goods_after - rec.goods_before) <= tol && rec.misrouted == 0, "C1", cb);
     }
 
     {
@@ -1325,14 +1390,14 @@ int main(int argc, char** argv)
 
     std::printf("\n=== BL-1125 per seed: how markets died, conservation, major cities ===\n");
     std::printf("seed  markets  shells(marked)  conquest E/X/I   cleared  twins  gravity  shells-folded  "
-                "goods before->after        pop(k) before->after   major  no-mkt<=8\n");
+                "goods before->after        tiles moved->misrouted major  no-mkt\n");
     for (const seed_record& r : recs)
         std::printf("%4u  %7d  %6d(%5d)  %4" PRId64 "/%3" PRId64 "/%3" PRId64 "  %7d  %5" PRId64 "  %7" PRId64
                     "  %13d  %11.1f->%-11.1f  %9" PRId64 "->%-9" PRId64 "  %5d  %9d\n",
                     r.seed, r.home_markets, r.shells, r.shells_marked,
                     r.conquest_destroyed[0], r.conquest_destroyed[1], r.conquest_destroyed[2],
                     r.marks_cleared, r.folded_twins, r.folded_gravity, r.shells_folded,
-                    r.goods_before, r.goods_after, r.pop_before, r.pop_after,
+                    r.goods_before, r.goods_after, r.tiles_moved, r.misrouted,
                     r.major_cities, r.major_no_market);
 
     std::printf("\n=== M2 per seed: straddlers (home-body buildings over 2+ markets) and the search ===\n");

@@ -1039,6 +1039,20 @@ struct market_component
     std::array<float, resource_count> inventory = {};
 };
 
+/// BL-1125 (markets can die) — a market folded away at generation, kept as a
+/// ROUTING record only (MARKETS.md § Market centres and seeding: "a folded
+/// market's catchment passes to the market that absorbs it"). A tile routes to
+/// its nearest ORIGINAL market centre — standing and folded alike — and a
+/// folded one hands it to `into`, the standing market that absorbed it. `into`
+/// is always a standing market: a fold that absorbs an earlier absorber
+/// re-points every record that named it. Held in `world::folded_markets`.
+struct folded_market
+{
+    entity_id body        = null_entity;
+    entity_id centre_tile = null_entity;
+    entity_id into        = null_entity;
+};
+
 /// A standing sell order — the manual side of the market. Each economy tick the
 /// order lists up to `quantity` of `resource` from the (corp, body) pool for sale
 /// at no less than `floor_price` (the order clears at `max(resolved_price,

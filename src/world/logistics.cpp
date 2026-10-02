@@ -264,7 +264,8 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
 } // namespace
 
 std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body,
-                                                        entity_id anchor_tile, float max_cost)
+                                                        entity_id anchor_tile, float max_cost,
+                                                        bool land_only)
 {
     std::vector<std::pair<int, float>> out;
     const auto bit = w.bodies.find(body);
@@ -323,6 +324,8 @@ std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body
             const tile_component* n_tc = tile_at(nidx);
             if (!n_tc)
                 continue;
+            if (land_only && is_water(n_tc->substrate))
+                continue; // BL-1125: no water hop without a port at both ends
             const float nd = dist[static_cast<std::size_t>(idx)]
                            + flood_edge_cost(cur_cost, *n_tc, nr, i);
             if (nd <= max_cost && nd < dist[static_cast<std::size_t>(nidx)])

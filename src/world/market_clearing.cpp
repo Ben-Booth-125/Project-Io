@@ -118,23 +118,34 @@ const std::unordered_map<entity_id, std::vector<entity_id>>& markets_by_body(con
             map[mc.body].push_back(mid);
         for (auto& [body, ids] : map)
             std::sort(ids.begin(), ids.end());
+        // BL-1125: the folded markets, per body, ascending (std::map order).
+        auto& folded = w.body_folded_index;
+        folded.clear();
+        for (const auto& [fid, fm] : w.folded_markets)
+            folded[fm.body].push_back(fid);
         w.body_market_index_count  = w.markets.size();
         w.body_market_index_cursor = cursor;
     }
     return w.body_market_index;
 }
 
-/// Pick, from a body's markets, the one whose centre tile is nearest `tile`.
-/// One market → that market (anchored or not). Several → the nearest anchored
-/// centre by squared grid distance (ties → lowest id); an unanchored market is a
-/// candidate only if every market on the body is unanchored, in which case the
-/// lowest id wins.
+/// Pick, from a body's markets, the one whose catchment holds `tile`.
+/// One market and nothing folded → that market (anchored or not). Otherwise the
+/// nearest ORIGINAL centre by squared grid distance, column wrapped — standing
+/// markets and the body's folded ones alike (BL-1125), ties → lowest id — and a
+/// folded winner hands the tile to the market that absorbed it, so a folded
+/// market's catchment passes to its absorber whole (MARKETS.md § Market centres
+/// and seeding). An unanchored market is a candidate only if every market on the
+/// body is unanchored, in which case the lowest id wins.
 entity_id nearest_market(const world& w, const std::vector<entity_id>& body_markets,
                          const tile_component& tile)
 {
     if (body_markets.empty())
         return null_entity;
-    if (body_markets.size() == 1)
+    static const std::vector<entity_id> k_none;
+    const auto fit = w.body_folded_index.find(tile.body);
+    const std::vector<entity_id>& folded = (fit != w.body_folded_index.end()) ? fit->second : k_none;
+    if (body_markets.size() == 1 && folded.empty())
         return body_markets.front();
 
     // BL-1127: the surface is a cylinder, so the column distance wraps — the
@@ -143,26 +154,37 @@ entity_id nearest_market(const world& w, const std::vector<entity_id>& body_mark
     const auto bit = w.bodies.find(tile.body);
     const long long gw = (bit != w.bodies.end()) ? bit->second.grid_width : 0;
 
-    entity_id best      = null_entity;
-    long long best_dist = 0;
-    for (const entity_id mid : body_markets)
-    {
-        const entity_id centre = w.markets.at(mid).centre_tile;
+    entity_id best        = null_entity;
+    bool      best_folded = false;
+    long long best_dist   = 0;
+    const auto consider = [&](entity_id id, entity_id centre, bool is_folded) {
         const auto cit = w.tiles.find(centre);
         if (cit == w.tiles.end())
-            continue; // unanchored — skip while an anchored market exists
+            return; // unanchored — skip while an anchored market exists
         long long dx = cit->second.grid_x - tile.grid_x;
         if (dx < 0) dx = -dx;
         if (gw > 0 && dx > gw - dx) dx = gw - dx;
         const long long dy = cit->second.grid_y - tile.grid_y;
         const long long d  = dx * dx + dy * dy;
-        if (best == null_entity || d < best_dist)
+        // Strictly nearer, or equally near with a lower id: the two lists are
+        // walked separately, so the id tie-break is explicit.
+        if (best == null_entity || d < best_dist || (d == best_dist && id < best))
         {
-            best      = mid;
-            best_dist = d;
+            best        = id;
+            best_folded = is_folded;
+            best_dist   = d;
         }
+    };
+    for (const entity_id mid : body_markets)
+        consider(mid, w.markets.at(mid).centre_tile, false);
+    for (const entity_id fid : folded)
+    {
+        const folded_market& fm = w.folded_markets.at(fid);
+        consider(fid, fm.centre_tile, true);
     }
-    return best != null_entity ? best : body_markets.front(); // all unanchored
+    if (best == null_entity)
+        return body_markets.front(); // all unanchored
+    return best_folded ? w.folded_markets.at(best).into : best;
 }
 
 } // namespace

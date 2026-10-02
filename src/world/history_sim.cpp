@@ -8107,14 +8107,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // nearest market still standing. Ground nobody held (a
                     // prior owner < 0) is no rival's, and taking one's own
                     // ground back is no conquest of a market.
-                    auto consolidate_market = [&](region& rg, int prior_owner) {
+                    auto consolidate_market = [&](std::size_t ri, int prior_owner) {
+                        region& rg = ss.regions[ri];
                         if (!rg.has_market || prior_owner < 0 || prior_owner == q.id)
                             return;
                         rg.has_market = false;
                         for (int g = 0; g < 4; ++g) { rg.scarcity_q[g] = 0; rg.scarcity_raw_q[g] = 0; }
                         ++out.markets_destroyed;
+                        out.markets_destroyed_regions.push_back(static_cast<int32_t>(ri));
                     };
-                    consolidate_market(tgt, owner[ti]);
+                    consolidate_market(ti, owner[ti]);
 
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
@@ -8143,7 +8145,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             region& h = ss.regions[hi];
                             if (h.seat_region != static_cast<int>(ti)) continue;
                             touch_owner(owner[hi]); // BL-922: whoever held it
-                            consolidate_market(h, owner[hi]); // BL-1125: taken in this event too
+                            consolidate_market(hi, owner[hi]); // BL-1125: taken in this event too
                             owner[hi] = q.id;
                             h.nation  = q.id;
                             void_stale_standing_army(h); // BL-955

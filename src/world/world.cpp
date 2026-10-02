@@ -131,6 +131,14 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // BL-1125: the fold map routes every tick (market_for_tile) — std::map, ascending.
+    for (const auto& [fid, fm] : folded_markets)
+    {
+        fnv1a_u32(h, fid);
+        fnv1a_u32(h, fm.centre_tile);
+        fnv1a_u32(h, fm.into);
+    }
+
     // Corp/market goods pools (BL-1003) — std::map, already sorted by (corp, pool key).
     for (const auto& [key, sc] : corp_market_pools)
     {
