@@ -1555,6 +1555,29 @@
     "src/world/history_sim.cpp"
    ],
    "design": "Ben, 2026-10-02: backlog a re-read. On every BL-1147/BL-1152 ladder rung the navy bill stays under 0.05% of capital treasuries at 1300, so the stocks table's \"a fleet is a running cost, not a purchase\" does not bite. WORK: measure the navy bill against treasuries and against army upkeep per span at the set constants; find why it is small (the per-hull rate, the treasuries' scale); propose a measured rate for Ben -- never set to hit a count."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-10-02",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1158",
+   "short_name": "SLOPES_DIVIDE_WEAKLY",
+   "author": "Claude (sprint 48, the BL-1156 gate on main, 2026-10-02)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Steep slopes divide provinces no more than plain ground on some shipped worlds",
+   "authority_doc": "docs/generation/PROVINCES.md",
+   "files": [
+    "src/world/province.cpp",
+    "src/world/province.hpp",
+    "tools/verify/centre_census.cpp"
+   ],
+   "design": "FOUND 2026-10-02: centre_census C13 C2b (\"elevation difference divides\", PROVINCES.md ruling 2) is red on main on seed 46 (steep 19.18% vs plain 25.79%); before BL-1150 it was red on 46 and 43. Rivers now divide (BL-1156); slopes do not on every world. WORK: measure the steep:plain border ratio per seed and find why a p90 slope (one step at 40, k_province_height_cost 683) fails to divide on seed 46 -- the same along/across question the river had, or the p90 cut. Report for Ben before any re-tune."
   }
  ]
 }

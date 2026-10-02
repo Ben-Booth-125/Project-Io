@@ -7757,6 +7757,50 @@
      "result_metric": "Main 6a/after the BL-1146 + BL-1153 merges: world_determinism ALL PASS twice (E005A311CEE6F037 / 1B6CF0A1CD1B6678 / C31DDE727D998BE7); save_roundtrip OK; sea_lane_stamp_harness, charter_refusal_probe, landscape_search_harness, spawn_solvency, world_cursor_equivalence ALL PASS; history_sim only R3a2/R3a3."
     }
    ]
+  },
+  {
+   "brief": "rivers-divide-banks",
+   "title": "BL-1156 - A river divides its banks",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1156 - sprint 48 (Ben, NR-962 B, 2026-10-01)",
+   "batch": "sprint-48",
+   "resolved": "2026-10-02",
+   "resolution": "merged 555d164f",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: centre_census C13 on 16 shipped seeds; mutation river cost 0"
+     ],
+     "requirement": "The fill pays to cross a course on land; a river divides its banks.",
+     "notes": "",
+     "result_metric": "b68e1474 + 74b9f923: crossing/plain 1.01 -> 1.52; river row red 9 -> 0 seeds; cost 0 turns it red on the harness world and 13 of 16 shipped; both banks in one province 76.1% -> 51.1% of course tiles (no centre on the far bank); water partition byte-identical to main (C14)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review, fix round included.",
+     "notes": "",
+     "result_metric": "Land geometry correct and symmetric; the new C2a a real, stricter test; water-domain side effect fixed; the height comment corrected."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism twice, save_roundtrip, province_partition_harness, centre_census, history_sim_harness, world_cursor_equivalence on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": "Main 555d164f: world_determinism ALL PASS twice (786D425F7A58A1CB / 08222F6CDC07BFCA / 37B6059AC5803D6B); only R3a2/R3a3 and C13 C2b on seed 46 (pre-existing, BL-1158)."
+    }
+   ]
   }
  ]
 }
