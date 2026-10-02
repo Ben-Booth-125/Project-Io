@@ -2284,11 +2284,6 @@ void settle_urban_migrants(region& p, int64_t heads)
     p.capacity_carried = clampi64(p.capacity_carried + heads, -(1LL << 40), 1LL << 40);
 }
 
-bool region_stands_a_town(const region& p)
-{
-    return p.urban_population >= static_cast<int64_t>(k_population_for_scale[1]) * 1000;
-}
-
 namespace {
 
 /// The logistic term dP = r * P * (K - P) / K, all integer. EXACT, as it always

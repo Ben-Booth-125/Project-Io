@@ -273,7 +273,7 @@ int64_t employed_heads_of(const W& works, lua_state& lua, uint32_t mask)
 /// BL-1149 (the review fix): the Industrialisation span's scale credit, heads
 /// moved and inert rounds off the report, where the tree records them; -1 where
 /// it does not (a tree before the fix), so the census still builds there.
-struct span_industry { int64_t from_scale = -1, moved = -1, inert_rounds = -1; };
+struct span_industry { int64_t from_scale = -1, moved = -1, inert_rounds = -1, within = -1; };
 template <typename G>
 span_industry span_industry_of(const G& rep)
 {
@@ -285,6 +285,8 @@ span_industry span_industry_of(const G& rep)
         s.moved        = rep.industrialisation_stream_moved;
         s.inert_rounds = rep.industrialisation_scale_inert_rounds;
     }
+    if constexpr (requires { rep.industrialisation_stream_within; })
+        s.within = rep.industrialisation_stream_within;
     return s;
 }
 
@@ -378,6 +380,7 @@ struct seed_record
     // scale credit and moved heads; and the span must never have run inert.
     int64_t span_from_scale = -1;      ///< the span's scale credit (-1: not recorded by this tree)
     int64_t span_moved = -1;           ///< heads the stream moved (-1: not recorded)
+    int64_t span_within = -1;          ///< ...of which a centre took from its own countryside
     int64_t span_inert_rounds = -1;    ///< rounds run with no works table (-1: not recorded)
     int64_t held_employed = 0;         ///< heads the works of HELD regions employ
     int     works_rows = 0;            ///< rows in the loaded works table
@@ -640,6 +643,7 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
         r.span_from_scale   = si.from_scale;
         r.span_moved        = si.moved;
         r.span_inert_rounds = si.inert_rounds;
+        r.span_within       = si.within;
         r.works_rows        = static_cast<int>(out.works.size());
         for (const region& p : ss.regions)
             if (p.nation >= 0 && p.population > 0)
@@ -1542,7 +1546,7 @@ int main(int argc, char** argv)
     std::printf("\n=== C14 the works and the points (BL-1149; readings, and the wiring FAIL row) ===\n");
     std::printf("seed  points_close  rho_set  rho(p,urban)  rho(p,employed) | urban_centred  employed  "
                 "employed%% | migrants  receiving  top_decile%%  to_top_worked%% | span: from_scale  "
-                "moved  inert_rounds  held_employed  wiring | open_work_left  migrants_on_open%%\n");
+                "moved  inert_rounds  held_employed  wiring | open_work_left  migrants_on_open%% | within  along\n");
     for (const seed_record& r : recs)
     {
         char mig[24] = "n/a", top[16] = "n/a", worked[16] = "n/a";
@@ -1553,12 +1557,13 @@ int main(int argc, char** argv)
             std::snprintf(worked, sizeof worked, "%.1f", 100.0 * r.migrants_to_worked);
         }
         std::printf("%4u  %12" PRId64 "  %7d  %12.3f  %15.3f | %13" PRId64 "  %8" PRId64 "  %9.1f | "
-                    "%8s  %9d  %11s  %14s | %16" PRId64 "  %10" PRId64 "  %12" PRId64 "  %13" PRId64 "  %s | %14" PRId64 "  %17.1f\n",
+                    "%8s  %9d  %11s  %14s | %16" PRId64 "  %10" PRId64 "  %12" PRId64 "  %13" PRId64 "  %s | %14" PRId64 "  %17.1f | %10" PRId64 "  %10" PRId64 "\n",
                     r.seed, r.points_close, r.rho_regions, r.rho_points_urban, r.rho_points_employed,
                     r.heads_urban_centred, r.heads_employed, pct(r.heads_employed, r.heads_urban_centred),
                     mig, r.receiving, top, worked, r.span_from_scale, r.span_moved, r.span_inert_rounds,
                     r.held_employed, r.span_from_scale < 0 ? "n/a" : r.wiring_ok ? "ok" : "FAIL",
-                    r.open_work_left, 100.0 * r.migrants_on_open);
+                    r.open_work_left, 100.0 * r.migrants_on_open, r.span_within,
+                    (r.span_within >= 0 && r.span_moved >= 0) ? r.span_moved - r.span_within : -1);
         if (r.span_inert_rounds > 0)
             std::printf("      seed %u: Industrialisation scale credit inert: no works table (%" PRId64
                         " rounds)\n", r.seed, r.span_inert_rounds);

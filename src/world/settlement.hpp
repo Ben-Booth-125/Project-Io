@@ -1523,12 +1523,6 @@ int64_t take_countryside(region& p, int64_t heads);
 /// farm-fed people's ceiling is unchanged.
 void settle_urban_migrants(region& p, int64_t heads);
 
-/// True when region @p p is a TOWN OR LARGER in people — its urban heads at
-/// least the town rung (`k_population_for_scale[1]`, 50,000): the places the
-/// stream flows into ("the towns and cities that industrialise"). A place's
-/// size is its people, never its centre count.
-bool region_stands_a_town(const region& p);
-
 /// The manpower ceiling a region's CURRENT population can support — a
 /// bounded fraction (`manpower_ceiling`'s own constant), not additive, so a
 /// region cannot bank more than its living population could ever field.

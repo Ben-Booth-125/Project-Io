@@ -551,6 +551,36 @@ std::vector<int64_t> apportion_exact(int64_t total, const std::vector<int64_t>& 
 
 } // namespace
 
+std::vector<int> work_candidates(const std::vector<region>& regions, const std::vector<int>& held,
+                                 int capital, const history_sim_params& p, uint32_t polity_salt,
+                                 int64_t year)
+{
+    std::vector<int> out;
+    if (held.empty()) return out;
+    if (p.work_candidates_every_centre)
+    {
+        // The capital always; then every other held region standing a centre.
+        out.push_back(capital);
+        for (const int pi : held)
+        {
+            if (pi == capital || pi < 0 || static_cast<std::size_t>(pi) >= regions.size()) continue;
+            if (regions[static_cast<std::size_t>(pi)].centres > 0) out.push_back(pi);
+        }
+        return out;
+    }
+    const int slots = clampi(p.work_candidate_regions, 0, 8);
+    for (int slot = 0; slot < slots; ++slot)
+    {
+        if (slot == 0) { out.push_back(capital); continue; }
+        // Rotation is a hash of (polity, year, slot), not a counter: nothing is
+        // carried between rounds, so inserting or removing a decision cannot
+        // shift which region a later round looks at.
+        const uint32_t h = salt(polity_salt, static_cast<uint32_t>(year) * 977u + static_cast<uint32_t>(slot));
+        out.push_back(held[static_cast<std::size_t>(h % static_cast<uint32_t>(held.size()))]);
+    }
+    return out;
+}
+
 int64_t region_open_work(const region& r, int64_t employed_heads)
 {
     if (employed_heads <= 0) return 0;
@@ -649,6 +679,10 @@ urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
             if (share[k] <= 0) continue;
             settle_urban_migrants(regions[static_cast<std::size_t>(dests[k])], share[k]);
             out.destinations.push_back(dests[k]);
+            // What it took from its own countryside: members is ascending.
+            const auto at = std::lower_bound(members.begin(), members.end(), dests[k]);
+            if (at != members.end() && *at == dests[k])
+                out.moved_within += std::min(send[static_cast<std::size_t>(at - members.begin())], share[k]);
         }
         out.moved += pool;
     }
@@ -4747,7 +4781,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const industry_points_round pr =
                     accrue_industry_points(ss.regions, out.polities, params, step_years, works);
                 out.industry_points_from_scale += pr.credited;
-                if (works == nullptr) ++out.industry_scale_inert_rounds; // BL-1149: said, not silent
+                if (works == nullptr || works->size() == 0)
+                    ++out.industry_scale_inert_rounds; // BL-1149: said, not silent (null or empty)
                 out.industry_points_refused    += pr.refused;
 
                 // ---- BL-1099: WORKS CHARTERED, A RECORD-ONLY NOTE ------------
@@ -4880,6 +4915,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         ss.regions, owner, supply_neighbours,
                         [&](int a, int b) { return stream_lines.joined(ss.regions, a, b); }, open_work, step_years);
                     out.urbanisation_heads_moved += ur.moved;
+                    out.urbanisation_heads_within += ur.moved_within;
                     for (const int d : ur.destinations)
                         if (relay_rebate_of(ss.regions[static_cast<std::size_t>(d)])
                             != rebate_before[static_cast<std::size_t>(d)])
@@ -6951,33 +6987,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // value. It used to be re-derived here.
                 const roster_band band = mat_band;
 
-                const bool every_centre = params.work_candidates_every_centre;
-                const int  slots = every_centre ? n_held : clampi(params.work_candidate_regions, 0, 8);
-                for (int slot = 0; slot < slots; ++slot)
+                (void)n_held;
+                for (const int pi : work_candidates(ss.regions, held, q.capital, params, qs, y))
                 {
-                    int pi = -1;
-                    if (every_centre)
-                    {
-                        pi = held[static_cast<std::size_t>(slot)];
-                        if (pi < 0 || pi >= static_cast<int>(ss.regions.size())
-                            || ss.regions[static_cast<std::size_t>(pi)].centres <= 0)
-                            continue; // stands no centre: not a candidate
-                    }
-                    else if (slot == 0)
-                    {
-                        pi = q.capital;
-                    }
-                    else
-                    {
-                        // Rotation is a hash of (polity, year, slot), not a
-                        // counter: nothing is carried between rounds, so
-                        // inserting or removing a decision cannot shift which
-                        // region a later round looks at. Same reason the rest
-                        // of this file uses `salt` rather than a generator.
-                        const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 977u
-                                                    + static_cast<uint32_t>(slot));
-                        pi = held[static_cast<std::size_t>(h % static_cast<uint32_t>(n_held))];
-                    }
                     if (pi < 0 || pi >= static_cast<int>(ss.regions.size())) continue;
 
                     const region& bp = ss.regions[static_cast<std::size_t>(pi)];

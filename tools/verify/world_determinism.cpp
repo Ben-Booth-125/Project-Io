@@ -200,6 +200,7 @@ int main()
     lua.load("scripts/works.lua");
     g_works.load_from_lua(lua);
     std::printf("works table: %zu rows (scripts/works.lua)\n", g_works.size());
+    check(g_works.size() > 0, "the works table is loaded (the prehistory-ON worlds run the stream as it ships)");
 
     constexpr uint32_t seed_a = 0xABCDEF01u;
     constexpr uint32_t seed_b = 0x12345678u;

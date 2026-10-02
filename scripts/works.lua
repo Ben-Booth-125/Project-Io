@@ -37,11 +37,11 @@
 --           the industrial band alone x1-x8; all rows x4 picked):
 --             * a work that stores, moves or guards employs few (Granary 8,000,
 --               Way Station and Span Bridge 4,000; walls and forts 0);
---             * a work that makes or trades employs a quarter of a town
---               (Guild Quarter 80,000, Counting House 60,000, Deepwater Wharf
---               48,000, Powder Mill 40,000);
---             * the largest pre-industrial works employ a town (Naval Yard
---               120,000);
+--             * a work that makes or trades employs about a town's worth of
+--               heads (Guild Quarter 80,000, Counting House 60,000, Deepwater
+--               Wharf 48,000, Powder Mill 40,000; the town rung is 50,000);
+--             * the largest pre-industrial works employ a city's worth (Naval
+--               Yard 120,000);
 --             * an industrial works employs a city (Blast Works 480,000, Rail
 --               Head 320,000, Arsenal 240,000).
 --           So a fully built pre-industrial town (every classical and medieval

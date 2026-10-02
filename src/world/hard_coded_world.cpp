@@ -2064,6 +2064,7 @@ void run_industrialisation(generation_cursor& c)
             report->industrialisation_foundings = kepler_industrialisation_hs.foundings;
             report->industrialisation_points_from_scale  = kepler_industrialisation_hs.industry_points_from_scale;
             report->industrialisation_stream_moved       = kepler_industrialisation_hs.urbanisation_heads_moved;
+            report->industrialisation_stream_within      = kepler_industrialisation_hs.urbanisation_heads_within;
             report->industrialisation_scale_inert_rounds = kepler_industrialisation_hs.industry_scale_inert_rounds;
             for (generation_report::body_entry& be : report->bodies)
                 if (be.id == kepler)

@@ -4607,14 +4607,19 @@ struct history_sim_state
     int64_t industry_points_from_scale    = 0;
     int64_t industry_points_from_treasury = 0;
     /// BL-1149 (the review fix): decision rounds the scale accrual ran with NO
-    /// works table. With none, no work stands, so no region earns scale credit
-    /// and the urbanisation stream, which pulls by that credit, moves no one:
-    /// the whole span's migration is inert, and this says so rather than
-    /// leaving a quiet zero. 0 on every run the table was handed to.
+    /// works table, or an EMPTY one. With none, no work stands, so no region
+    /// earns scale credit and no work is open, so the urbanisation stream, whose
+    /// pull is open work, moves no one: the whole span's migration is inert,
+    /// and this says so rather than leaving a quiet zero. 0 on every run a
+    /// non-empty table was handed to.
     int64_t industry_scale_inert_rounds   = 0;
     /// BL-1137: heads the urbanisation stream moved over the run, every round
-    /// summed (`run_urbanisation_stream`). Report-only.
+    /// summed (`run_urbanisation_stream`). Report-only. Includes
+    /// `urbanisation_heads_within`.
     int64_t urbanisation_heads_moved      = 0;
+    /// ... of which a destination took from its OWN countryside (its works'
+    /// open work filled at home, a conversion, not a move along a corridor).
+    int64_t urbanisation_heads_within     = 0;
     /// ... and the TREASURY UNITS that conversion took out of capitals (the
     /// points above divided by `industry_points_per_treasury_unit`): the
     /// observable for how hard paying in draws on the round's other spend.
@@ -4908,7 +4913,11 @@ struct stream_land_lines
 /// One round of the urbanisation stream's outcome (`run_urbanisation_stream`).
 struct urbanisation_round
 {
-    int64_t          moved = 0;    ///< heads that left a countryside for a town this round
+    int64_t          moved = 0;    ///< heads that left a countryside for a centre this round
+    /// ... of which a destination took from its own countryside: the least of
+    /// what its countryside sent and what it received. The rest, `moved -
+    /// moved_within`, travelled along a held corridor.
+    int64_t          moved_within = 0;
     std::vector<int> destinations; ///< regions that took any, ascending
 };
 
@@ -4951,6 +4960,18 @@ urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
                                            const std::function<bool(int, int)>& linked,
                                            const std::vector<int64_t>& open_work,
                                            int step_years);
+
+/// BL-1155 (Ben, 2026-09-27; HISTORY.md sec The verb): the regions polity
+/// holdings @p held (ascending) scores `build_work` on this round, in order.
+/// With `work_candidates_every_centre`: the CAPITAL ALWAYS (a capital standing
+/// no centre still builds), then every other held region that stands a
+/// centre, in region order. Without it: `work_candidate_regions` slots, the
+/// capital and regions rotated through the holdings by a hash of (@p
+/// polity_salt, @p year, slot) -- the old bounded rule, unchanged. Scoring
+/// uses a strict `>`, so an earlier candidate wins a tie.
+std::vector<int> work_candidates(const std::vector<region>& regions, const std::vector<int>& held,
+                                 int capital, const history_sim_params& p, uint32_t polity_salt,
+                                 int64_t year);
 
 /// THE OPEN WORK a region's works offer (Ben, 2026-09-27; INDUSTRIALISATION.md
 /// Beat 2): the heads its works employ (@p employed_heads,

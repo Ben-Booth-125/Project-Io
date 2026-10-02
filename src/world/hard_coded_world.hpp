@@ -860,6 +860,7 @@ struct generation_report
     /// build that made it; a loaded game's report carries them zero.
     int64_t industrialisation_points_from_scale = 0;
     int64_t industrialisation_stream_moved      = 0;
+    int64_t industrialisation_stream_within     = 0; ///< ...of which filled from a centre's own countryside
     int64_t industrialisation_scale_inert_rounds = 0;
 
     // --- What the grudge record seeded (BL-898) -----------------------------

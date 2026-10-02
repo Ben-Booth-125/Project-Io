@@ -2136,7 +2136,7 @@ int main()
             lines.gh = sgh;
             const auto on_land = [&](int a, int b) { return lines.joined(w, a, b); };
             // The pull is OPEN WORK (Ben, 2026-09-27): jobs beyond the heads already there.
-            const std::vector<int64_t> credit = { 1000, 0, 0, 0, 0 }; // the foreign centre offers none: it would draw on its own countryside
+            const std::vector<int64_t> credit = { 1000, 0, 0, 500, 0 };
             int64_t people_before = 0, ceiling_before = 0;
             for (const region& r : w) { people_before += r.population; ceiling_before += region_ceiling(r); }
             const region colony = w[2], foreign = w[3], far_village = w[4];
@@ -2149,7 +2149,7 @@ int main()
                         static_cast<long long>(people_before), static_cast<long long>(people_after),
                         static_cast<long long>(ceiling_before), static_cast<long long>(ceiling_after),
                         static_cast<long long>(w[0].industrial_heads));
-            check(ur.moved > 0 && ur.destinations.size() == 1 && ur.destinations[0] == 0
+            check(ur.destinations.size() == 2 && ur.destinations[0] == 0 && ur.destinations[1] == 3
                   && people_after == people_before,
                   "BL1137s1 a stream round conserves the world's people (world total before = after)");
             check(ceiling_after == ceiling_before && w[1].capacity_carried < 0
@@ -2158,10 +2158,17 @@ int main()
             check(w[2].population == colony.population && w[2].capacity_carried == 0
                   && w[3].population == foreign.population && w[3].capacity_carried == 0,
                   "BL1137s2 the stream's line stays on land and in the realm: the colony over the strait "
-                  "and the foreign region send nobody");
+                  "and the foreign region send nobody across");
+            // Region 3, alone in its realm, fills its 500 jobs from its OWN
+            // countryside: what it gained is exactly what its countryside sent,
+            // counted as moved WITHIN a region, not along a corridor.
+            const int64_t sent3 = foreign.population - (w[3].population - w[3].industrial_heads);
+            check(w[3].industrial_heads == 500 && sent3 == 500 && ur.moved_within >= 500,
+                  "BL1137s2c a centre alone in its realm fills its open work from its own countryside, "
+                  "and that is counted as moved within, not along a corridor");
             check(w[4].population < far_village.population && w[4].capacity_carried < 0,
                   "BL1137s2b the line runs the SHORT way round the cylinder: the village over the wrap sends");
-            check(ur.moved == 1000 && w[0].industrial_heads == 1000,
+            check(w[0].industrial_heads == 1000 && ur.moved == 1500,
                   "BL1137s10 the pull is open work: a push past it sends only the 1,000 jobs the town offers");
         }
         // S11 OPEN WORK IS SHARED BY OPEN WORK, AND A FULL TOWN DRAWS NOBODY.
@@ -2352,6 +2359,74 @@ int main()
         accrue_industry_points(no_table, no_polities, ip, 10, nullptr);
         check(no_table[0].industry_points == 0,
               "BL1149f with no works table no work stands, so no region earns scale credit");
+    }
+
+    // ---------------------------------------------------------------------
+    // The BL-1137/1149/1155 review fixes (2026-10-02).
+    // ---------------------------------------------------------------------
+    {
+        // R-a BL-1155: the candidates. Realm holdings 2 (capital, NO centre),
+        // 4 (a centre), 5 (none), 7 (a centre). Every centre: the capital
+        // first, then 4 and 7 in region order; 5 is not scored. Off: the
+        // capital and rotated slots, the old rule.
+        std::vector<region> rr(8);
+        rr[4].centres = 1; rr[7].centres = 1;
+        const std::vector<int> held = { 2, 4, 5, 7 };
+        history_sim_params cp = params;
+        cp.work_candidates_every_centre = true;
+        const std::vector<int> every = work_candidates(rr, held, 2, cp, 99u, 1700);
+        cp.work_candidates_every_centre = false;
+        cp.work_candidate_regions = 2;
+        const std::vector<int> old = work_candidates(rr, held, 2, cp, 99u, 1700);
+        std::printf("      candidates: every centre {%s}; old rule %zu slots, capital %d\n",
+                    [&] { std::string s; for (int v : every) s += std::to_string(v) + " "; return s; }().c_str(),
+                    old.size(), old.empty() ? -1 : old[0]);
+        check(every == std::vector<int>({ 2, 4, 7 }),
+              "BL1155a every centred holding is a candidate, the capital always (even standing no centre), "
+              "a centreless non-capital one never, in walk order (the capital first, then region order)");
+        check(old.size() == 2 && old[0] == 2 && (old[1] == 2 || old[1] == 4 || old[1] == 5 || old[1] == 7),
+              "BL1155b with the switch off the old rule stands: the capital and one rotated holding");
+
+        // R-b NR-901 under NR-964: a polity whose centres' works employ nobody
+        // has no weighed region, so the treasury share has nowhere to land: an
+        // empty spread, which the upkeep reads as "converts nothing, the purse
+        // keeps the share" (the no_town branch).
+        std::vector<region> tp(3);
+        for (region& r : tp) { r.nation = 5; r.centres = 1; r.urban_population = 40000; r.works_built = 0b10; }
+        works_registry wn;
+        work_row wall; wall.name = "Wall"; wall.effect.defence_mod = 1; wall.employs = 0; wall.weight = 1;
+        work_row mill; mill.name = "Mill"; mill.effect.industrial_mod = 1; mill.employs = 9000; mill.weight = 1;
+        wn.add_row(mill); wn.add_row(wall);
+        std::vector<std::pair<int, int64_t>> spread;
+        const bool ok_none = industry_points_apportion_by_scale(tp, 5, 1000, spread, &wn);
+        const bool none_empty = spread.empty();
+        tp[1].works_built = 0b01; // one region's works now employ
+        const bool ok_one = industry_points_apportion_by_scale(tp, 5, 1000, spread, &wn);
+        check(ok_none && none_empty && ok_one && spread.size() == 1 && spread[0].first == 1
+              && spread[0].second == 1000,
+              "BL1149g a polity whose centres employ nobody converts nothing (NR-901 under NR-964); "
+              "once one employs, every point lands there");
+
+        // R-c two destinations with uneven remainders: neither receives more
+        // than its open work, and the shares sum to what was sent.
+        std::vector<region> u;
+        const auto mk = [](int col, int64_t pop, int64_t urban) {
+            region r; r.farm_q = 600; r.population = pop; r.urban_population = urban; r.centres = 1;
+            r.col = col; r.row = 2; return r; };
+        u.push_back(mk(3, 300000, 60000));
+        u.push_back(mk(4, 300000, 60000));
+        u.push_back(mk(5, region_carrying_capacity(600, 0), 30000));
+        const std::vector<int> uo = { 0, 0, 0 };
+        const std::vector<std::vector<int>> un = { { 1, 2 }, { 0, 2 }, { 0, 1 } };
+        const std::vector<int64_t> uopen = { 7000003, 5000001, 0 };
+        const urbanisation_round ur = run_urbanisation_stream(u, uo, un, [](int, int) { return true; }, uopen, 10);
+        std::printf("      uneven: moved %lld -> %lld / %lld (open 7000003 / 5000001)\n",
+                    static_cast<long long>(ur.moved), static_cast<long long>(u[0].industrial_heads),
+                    static_cast<long long>(u[1].industrial_heads));
+        check(ur.moved > 0 && u[0].industrial_heads <= 7000003 && u[1].industrial_heads <= 5000001
+              && u[0].industrial_heads + u[1].industrial_heads == ur.moved,
+              "BL1137s13 uneven remainders: no destination receives more than its open work, and the "
+              "shares sum to what was sent");
     }
 
     // --- M1  over-muster starves industry (BL-867) --------------------------
