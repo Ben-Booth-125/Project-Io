@@ -410,6 +410,13 @@ void fold_cultures(uint64_t& h, const std::vector<culture>& cs)
         fold_i32(h, c.sea_legs_q);
         fold_i32(h, c.parent);
         fold_i32(h, c.origin_farm_class);
+        // BL-1107: the ground profile, by content.
+        fold_i32(h, c.profile.farm);
+        fold_i32(h, c.profile.ore);
+        fold_i32(h, c.profile.energy);
+        fold_i32(h, c.profile.water);
+        fold_i32(h, c.profile.amenity);
+        fold_i32(h, c.profile.amenity_share);
         fold_i64(h, c.coined_year);
         fold_i32(h, c.coined_from);
         fold_i32(h, c.folded_into);

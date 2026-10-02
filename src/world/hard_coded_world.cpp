@@ -1193,6 +1193,12 @@ void run_culture(generation_cursor& c)
             if (cid >= 0 && cid < static_cast<int>(kepler_creeds.cultures.size()))
                 kepler_creeds.cultures[static_cast<std::size_t>(cid)].coined_year = year;
 
+        // The cradle cultures' ground profile (BL-1107), the same round-trip
+        // again. The daughters already carry theirs, inherited whole.
+        for (const auto& [cid, gp] : kepler_settlement.cradle_profile)
+            if (cid >= 0 && cid < static_cast<int>(kepler_creeds.cultures.size()))
+                kepler_creeds.cultures[static_cast<std::size_t>(cid)].profile = gp;
+
         // Fragmentation from contact (BL-852, resolving NR-808;
         // docs/generation/COLONISATION.md § Fragmentation comes from
         // contact). The tribal marches retired: `record_cultural_contact`

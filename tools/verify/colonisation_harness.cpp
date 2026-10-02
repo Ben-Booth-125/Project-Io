@@ -56,6 +56,7 @@
 #include "culture_footprint.hpp" // BL-968 step 1: the cultures that never hold ground
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -1766,6 +1767,89 @@ void case_boundary_fold(int seed_count, int span_years)
           "folded culture with no recorded lineage");
 }
 
+// ---------------------------------------------------------------------------
+// C18 — THE GROUND PROFILE (BL-1107; COLONISATION.md § The ground profile)
+// ---------------------------------------------------------------------------
+//
+// Every cradle coins a profile beside its package, from the same window, and a
+// daughter inherits it whole. Printed per cradle so the reading is visible;
+// asserted structurally: every culture carries a coined profile, and every
+// daughter's equals the profile of the culture it was coined from.
+
+void case_ground_profile(int seed_count, int span_years)
+{
+    std::printf("\n--- C18: does every people carry its cradle's ground profile? ----\n");
+    static const char* const amenity_names[amenity_class_count] =
+        { "open", "forest", "coastal grass", "valley marsh" };
+
+    int worlds = 0, worlds_coined = 0, worlds_inherited = 0;
+    for (int s = 0; s < seed_count; ++s)
+    {
+        world_params wp;
+        wp.seed = static_cast<uint32_t>(s);
+        wp.empires_start_year = -span_years;
+
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{}, nullptr, nullptr, &fx);
+        (void)w;
+        if (!fx.ran) continue;
+        ++worlds;
+
+        const std::vector<culture>& cs = fx.creeds.cultures;
+        int coined = 0, daughters = 0, inherited = 0, cradles = 0;
+        std::array<int, amenity_class_count> amen{};
+        for (std::size_t i = 0; i < cs.size(); ++i)
+        {
+            const culture& c = cs[i];
+            if (c.profile.coined()) ++coined;
+            if (c.coined_from < 0)
+            {
+                ++cradles;
+                const int a = c.profile.amenity;
+                if (a >= 0 && a < amenity_class_count) ++amen[static_cast<std::size_t>(a)];
+                std::printf("seed %u  cradle %2zu %-14s farm %5d ore %5d energy %5d water %4d  "
+                            "amenity %s (%d)\n",
+                            wp.seed, i, c.name.c_str(), c.profile.farm, c.profile.ore,
+                            c.profile.energy, c.profile.water,
+                            (a >= 0 && a < amenity_class_count) ? amenity_names[a] : "UNCOINED",
+                            c.profile.amenity_share);
+                continue;
+            }
+            ++daughters;
+            if (static_cast<std::size_t>(c.coined_from) < cs.size()
+                && cs[static_cast<std::size_t>(c.coined_from)].profile == c.profile)
+                ++inherited;
+        }
+        std::printf("seed %u  cultures %d  coined profile %d  cradles %d  daughters %d  "
+                    "inherit the parent's %d  amenity open/forest/coastal/marsh %d/%d/%d/%d\n",
+                    wp.seed, static_cast<int>(cs.size()), coined, cradles, daughters, inherited,
+                    amen[0], amen[1], amen[2], amen[3]);
+        if (coined == static_cast<int>(cs.size())) ++worlds_coined;
+        if (inherited == daughters) ++worlds_inherited;
+    }
+
+    // The classifier is TILES.md § Amenity tiles verbatim.
+    const terrain_substrate soil = terrain_substrate::sedimentary;
+    check(classify_amenity_class(soil, terrain_cover::forest, terrain_landform::plains, false)
+              == amenity_class::forest
+          && classify_amenity_class(soil, terrain_cover::grass, terrain_landform::plains, true)
+              == amenity_class::coastal_grass
+          && classify_amenity_class(soil, terrain_cover::grass, terrain_landform::plains, false)
+              == amenity_class::open
+          && classify_amenity_class(soil, terrain_cover::marsh, terrain_landform::valley, false)
+              == amenity_class::valley_marsh
+          && classify_amenity_class(soil, terrain_cover::marsh, terrain_landform::plains, false)
+              == amenity_class::open,
+          "C18c the amenity classes are TILES.md's three: forest, coastal grass, marsh in a valley");
+
+    if (worlds == 0) { check(false, "C18 no world ran - the case is vacuous"); return; }
+    check(worlds_coined == worlds,
+          "C18a EVERY CULTURE CARRIES A NON-EMPTY GROUND PROFILE (coined at its cradle)");
+    check(worlds_inherited == worlds,
+          "C18b EVERY DAUGHTER INHERITS ITS PARENT'S PROFILE WHOLE");
+}
+
 int main(int argc, char** argv)
 {
     const int seed_count = argc > 1 ? std::atoi(argv[1]) : 3;
@@ -1796,6 +1880,7 @@ int main(int argc, char** argv)
     case_settlement_seats(seed_count);
     case_split_census(seed_count, span_years);
     case_boundary_fold(seed_count, span_years);
+    case_ground_profile(seed_count, span_years);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;

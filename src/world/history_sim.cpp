@@ -11786,6 +11786,7 @@ namespace
             if (!culture_god_equal(a.pantheon[g], b.pantheon[g])) return false;
         return a.aggression_q == b.aggression_q && a.sea_legs_q == b.sea_legs_q
             && a.parent == b.parent && a.origin_farm_class == b.origin_farm_class
+            && a.profile == b.profile // BL-1107
             && a.coined_year == b.coined_year
             && a.coined_from == b.coined_from && a.folded_into == b.folded_into;
     }

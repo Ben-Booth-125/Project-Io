@@ -195,6 +195,67 @@ domestication_package coin_package(const std::vector<terrain_substrate>& substra
     return pkg;
 }
 
+// ---------------------------------------------------------------------------
+// Amenity classes (BL-1107)
+// ---------------------------------------------------------------------------
+
+amenity_class classify_amenity_class(terrain_substrate s, terrain_cover c,
+                                     terrain_landform lf, bool shoreline)
+{
+    if (is_water(s)) return amenity_class::open; // the caller must not ask
+    // TILES.md § Amenity tiles, one test per named ground. Each reads its own
+    // cover, so the order decides nothing; it is the doc's order.
+    if (c == terrain_cover::forest)                            return amenity_class::forest;
+    if (c == terrain_cover::grass && shoreline)                return amenity_class::coastal_grass;
+    if (c == terrain_cover::marsh && lf == terrain_landform::valley) return amenity_class::valley_marsh;
+    return amenity_class::open;
+}
+
+amenity_reading read_window_amenity(const std::vector<terrain_substrate>& substrate,
+                                    const std::vector<terrain_cover>&     cover,
+                                    const std::vector<terrain_landform>&  landform,
+                                    int gw, int gh, int col, int row,
+                                    int window_radius)
+{
+    amenity_reading out;
+    if (gw <= 0 || gh <= 0 || substrate.empty()) return out;
+
+    // The same walk `coin_package` takes: square window, east-west wrap, land
+    // cells only, the hex shoreline test.
+    std::array<int, amenity_class_count> seen{};
+    for (int dr = -window_radius; dr <= window_radius; ++dr)
+    {
+        const int r = row + dr;
+        if (r < 0 || r >= gh) continue;
+        for (int dc = -window_radius; dc <= window_radius; ++dc)
+        {
+            int c = (col + dc) % gw;
+            if (c < 0) c += gw;
+            const std::size_t i = static_cast<std::size_t>(r) * static_cast<std::size_t>(gw)
+                                + static_cast<std::size_t>(c);
+            if (i >= substrate.size() || is_water(substrate[i])) continue;
+            const terrain_cover    cv = i < cover.size()    ? cover[i]    : terrain_cover::none;
+            const terrain_landform lf = i < landform.size() ? landform[i] : terrain_landform::plains;
+            ++seen[static_cast<std::size_t>(classify_amenity_class(
+                substrate[i], cv, lf, touches_water(substrate, gw, gh, c, r)))];
+            ++out.land;
+        }
+    }
+    if (out.land == 0) return out;
+
+    // THE COMMONEST HIGH-AMENITY CLASS, ascending enum order so a tie goes to
+    // the lower value; `open` is never a candidate -- it is what the window is
+    // when none of the three reaches the floor.
+    int best = 0, best_n = 0;
+    for (int k = 1; k < amenity_class_count; ++k)
+        if (seen[static_cast<std::size_t>(k)] > best_n) { best = k; best_n = seen[static_cast<std::size_t>(k)]; }
+    const int share = static_cast<int>((static_cast<int64_t>(best_n) * 1000) / out.land);
+    if (best == 0 || share < amenity_class_floor) return out;
+    out.cls   = static_cast<amenity_class>(best);
+    out.share = share;
+    return out;
+}
+
 domestication_package cross_packages(const domestication_package& a,
                                      const domestication_package& b)
 {

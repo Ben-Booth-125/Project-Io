@@ -915,6 +915,15 @@ struct settlement_state
     /// directly, set where they are derived.
     std::vector<std::pair<int, int64_t>> cradle_coined_year;
 
+    /// The GROUND PROFILE each CRADLE culture was coined with, as (culture id,
+    /// profile) pairs (BL-1107; COLONISATION.md § The ground profile) — the
+    /// third record in `cradle_origin_class`'s round-trip, for the same
+    /// reason. Daughters carry theirs on the culture record directly,
+    /// inherited whole from the parent where they are derived. Not on the save
+    /// seam, like the two records above: the roster is regenerated from the
+    /// seed, never loaded.
+    std::vector<std::pair<int, ground_profile>> cradle_profile;
+
     /// THE CRADLE IS ANNOUNCED (BL-1091; Ben, 2026-09-24, rulings R12;
     /// COLONISATION.md § The domestication package). Each cradle culture's
     /// own NAME and the domestication PACKAGE its stream carried, as (culture
@@ -1075,6 +1084,12 @@ struct endowment
 /// then re-weighs. `ids` is the body's raster-order tile list.
 endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
                            int col, int row, int gw, int gh);
+
+/// BL-1107 — `survey_endowment` over a window of radius @p win rather than the
+/// founding survey's own (`max(3, gw / 45)`). The cradle's ground profile reads
+/// the package's window (`colonisation_cradle_window`) through it.
+endowment survey_endowment_window(const world& w, const std::vector<entity_id>& ids,
+                                  int col, int row, int gw, int gh, int win);
 
 /// BL-1051 — THE SPAN-OPEN SURVEY (INDUSTRY_TREE.md sec The scorer, "Forest is
 /// surveyed"). Survey EVERY region in @p regions once, over the window
