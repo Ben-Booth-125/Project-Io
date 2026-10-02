@@ -1257,7 +1257,7 @@
     "tools/verify/centre_census.cpp",
     "src/world/province.hpp"
    ],
-   "design": "SEQUENCE AMENDED (2026-09-27, the BL-1150 cold review): runs after BL-1150 (province fill crosses the settled line) too -- a capital's province can now reach into never-settled wilderness, so a garrison on tiles.front() (nation_generation.cpp ~1466-1481) can land there; the sustain coefficient k_province_buildings_per_sustain_unit (province.hpp ~651-683) was pinned to a world total BL-1150 moves (an absorbed hinterland's population factor can reach 2.0 where the old anchor island had 1.2) -- re-read it.\n\nFOUND 2026-09-26 by the BL-1133 cold review. Provinces now reach 1,315 tiles, and several readers still stand for a province by `tiles.front()`, its lowest-id tile: unit markers and the battle glyph draw only on that tile (body_surface_canvas.cpp ~3791, ~3817), so an army on screen can show no marker; garrisons are placed there (nation_generation.cpp ~1481) rather than at the capital; the battle card frames its neighbourhood round it (selection_panel.cpp ~2423). Battles resolve per province, so outcomes are unmoved, except where the garrison's tile is read.\n\nTHE WORK: (1) each reader takes the province's centre tile (its seed), or the unit's own tile where one exists; (2) centre_census C8 stops bucketing anchor-only provinces as villages, and C7's `unanchored` becomes a gate over the 16 seeds (every settled-land province holds a centre); (3) the stale comments on k_province_buildings_per_sustain_unit and province_section_max_tiles (province.hpp ~650-682, ~846-851) are re-read against the grown provinces. Runs after BL-1141 (centres deepen) lands, because the provinces change again. A UI requirement: a live click that a marker shows on an army in a large province."
+   "design": "RULED (Ben, 2026-10-03): border garrisons stand on their province's tile nearest the neighbour they guard; the capital garrison stands on the capital province's anchor centre.\n\nSEQUENCE AMENDED (2026-09-27, the BL-1150 cold review): runs after BL-1150 (province fill crosses the settled line) too -- a capital's province can now reach into never-settled wilderness, so a garrison on tiles.front() (nation_generation.cpp ~1466-1481) can land there; the sustain coefficient k_province_buildings_per_sustain_unit (province.hpp ~651-683) was pinned to a world total BL-1150 moves (an absorbed hinterland's population factor can reach 2.0 where the old anchor island had 1.2) -- re-read it.\n\nFOUND 2026-09-26 by the BL-1133 cold review. Provinces now reach 1,315 tiles, and several readers still stand for a province by `tiles.front()`, its lowest-id tile: unit markers and the battle glyph draw only on that tile (body_surface_canvas.cpp ~3791, ~3817), so an army on screen can show no marker; garrisons are placed there (nation_generation.cpp ~1481) rather than at the capital; the battle card frames its neighbourhood round it (selection_panel.cpp ~2423). Battles resolve per province, so outcomes are unmoved, except where the garrison's tile is read.\n\nTHE WORK: (1) each reader takes the province's centre tile (its seed), or the unit's own tile where one exists; (2) centre_census C8 stops bucketing anchor-only provinces as villages, and C7's `unanchored` becomes a gate over the 16 seeds (every settled-land province holds a centre); (3) the stale comments on k_province_buildings_per_sustain_unit and province_section_max_tiles (province.hpp ~650-682, ~846-851) are re-read against the grown provinces. Runs after BL-1141 (centres deepen) lands, because the provinces change again. A UI requirement: a live click that a marker shows on an army in a large province."
   },
   {
    "status": "designed",
@@ -1602,6 +1602,52 @@
     "src/world/road_generation.cpp"
    ],
    "design": "RULED (Ben, 2026-10-03): the Road cliff is accepted as the rule -- a tied pre-industrial block keeps its midpoint rank, and where it falls under 0.40 its roads stay Track. Haulage read before merge.\n\nRULED (Ben, 2026-10-03): qualification reads the polity's own industrial crossing year (q.industrial_year) on a generated world; measured first. POPULATION.md § Qualification.\n\nMEASURED (2026-10-03, 5aa6b7a9 + ea03e90e merged): shipped worlds carry Highway tiles only from the ancient-corridor works rule; the national rule qualifies 0 links on all 16 seeds, because every nation's qualification reads region::industrialised, which a generated world never sets (history_sim.cpp ~9080), so all tie at 0.05 (percentile 0.5, the all-tied shape). 13-37 nations a seed hold two or more City+; 35-179 City-City links laid. R2s-b red, put to Ben.\n\nFOUND 2026-10-03: road_generation_harness R2 (\"highway tier reachable\") is red on main a83e6188 and has been since BL-1141. It builds no_prehistory worlds, which run no industrial urbanisation, so a nation holds at most one City+ and a Highway (two City+ centres in one nation) never qualifies. The shipped worlds now carry ~2,700 cities pooled (BL-1137 at x4 jobs), so they may well carry Highways. WORK: read Highway tiles and City-City links per curated seed on the shipped path; move R2 to (or add) a shipped-world reading; if shipped worlds still lay no Highway, report why for Ben. Never weaken R2 to pass."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1160",
+   "short_name": "WANTS_WEIGHTED_BY_AGE",
+   "author": "Claude (Ben's question and form, 2026-10-03)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "What a good is worth wanting changes with the age, so industrial realms invade for coal and iron",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "src/world/era_minus_one.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-10-03): EXPLORATION.md § A want ranks a campaign, \"what a good is worth wanting changes with the age\". TODAY: the campaign prize leans by w_want_q (1000) x the decider's want for the target's dominant good (BL-953); the want is the seat market's scarcity -- flat for every good, 300 if the realm holds it somewhere, 700 if nowhere, plus a population term (history_sim.cpp ~823-846) -- times the culture preference. Industrialisation inherits it unchanged, so coal is no more wanted in 1900 than grain in 1300. BUILD: a per-age weight table per good (farm, ore, energy, port) scaling scarcity_raw_q (or the want), one row per span (Exploration identity, Industrialisation with energy and ore up); read on a ladder over the 16 seeds (campaign targets by dominant good, conquests of energy/ore regions, battles, subjections), Ben sets the weights. Not a new AI grant: it leans an existing input (same idiom as w_want_q). Sprint 49."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1161",
+   "short_name": "PROVINCE_ZERO_SENTINELS",
+   "author": "Claude (the BL-1145 cold review, 2026-10-03)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 1,
+   "title": "Province 0 is a real province: the sentinel tests that hide its markers and garrison are removed",
+   "authority_doc": "docs/generation/PROVINCES.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/world/nation_generation.cpp",
+    "src/world/battle_system.cpp"
+   ],
+   "design": "FOUND 2026-10-03 (the BL-1145 cold review): NR-412 says province id 0 is a real province and no seam may use 0 as a sentinel, yet the battle glyph (body_surface_canvas.cpp ~3818 pid != 0), unit markers (~3850 prov_id != 0, the upid == 0 skip), the capital garrison seeding (nation_generation.cpp ~1561 cap_prov != 0) and battle discovery (battle_system.cpp ~494 prov == 0) all treat 0 as \"no province\". So province 0 never shows a marker, never gets a capital garrison, and never hosts a discovered battle. WORK: replace each with the real absence test (province_of returning a not-found value, or an optional), add a row on a world whose province 0 holds units."
   }
  ]
 }
