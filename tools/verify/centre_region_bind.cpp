@@ -23,9 +23,18 @@
 //       identical (tile, scale) centre table; the campaign placement path draws
 //       no RNG at all.
 //
-// Exits non-zero on any FAIL. Links the generation TU superset (as
-// era_world_harness / world_audit):  node tools/verify/build_harness.js centre_region_bind
+// Exits non-zero on any FAIL.
+//
+// THE SHIPPED GENERATION INPUTS (BL-1149 review, 2026-10-01): every world is
+// built with the app's parsed world_gen.lua and works table
+// (`load_app_generation_inputs`), so the Industrialisation span's scale credit
+// and urbanisation stream run as they ship -- R2 reads their consequences.
+// Built Lua-free it ran them inert. Needs a live Lua state:
+//   bash tools/verify/build_lua_harness.sh centre_region_bind
+// Run from the repo root (it reads scripts/*.lua).
 
+#include "harness_params.hpp"   // load_app_generation_inputs: the app's config and works
+#include "scripting/lua_state.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/history_sim.hpp"
 #include "world/population_generation.hpp"
@@ -44,6 +53,10 @@
 namespace {
 
 int g_pass = 0, g_fail = 0;
+
+/// The app's generation inputs, loaded once (main) and read by every build.
+world_gen_config g_cfg;
+works_registry   g_works;
 
 void check(bool ok, const char* what)
 {
@@ -140,7 +153,7 @@ razed_tally sweep_seed(uint32_t seed, bool print_rows)
     wp.epoch_year = 1960;
 
     generation_report rep{};
-    world w = make_hard_coded_world(wp, &rep);
+    world w = make_hard_coded_world(wp, &rep, g_cfg, nullptr, &g_works);
     const generation_report::body_entry* be = home_entry(rep);
     if (be == nullptr) return t;
 
@@ -197,6 +210,10 @@ razed_tally sweep_seed(uint32_t seed, bool print_rows)
 
 int main()
 {
+    lua_state lua;
+    load_app_generation_inputs(lua, g_cfg, g_works);
+    check(g_works.size() > 0, "the works table is loaded (the stream runs as it ships)");
+
     // Seed ABCDEF01 — the seed BL-766's own urban baseline was measured on, so
     // the sim-grain figures printed here are directly comparable to it.
     world_params wp{};
@@ -204,8 +221,8 @@ int main()
     wp.epoch_year = 1960;
 
     generation_report rep_a{}, rep_b{};
-    world wa = make_hard_coded_world(wp, &rep_a);
-    world wb = make_hard_coded_world(wp, &rep_b);
+    world wa = make_hard_coded_world(wp, &rep_a, g_cfg, nullptr, &g_works);
+    world wb = make_hard_coded_world(wp, &rep_b, g_cfg, nullptr, &g_works);
 
     const auto* ka = home_entry(rep_a);
     const auto* kb = home_entry(rep_b);
@@ -603,7 +620,7 @@ int main()
     // (a) The WHOLE generation, twice: the centre table a player would see.
     {
         const std::vector<placed> full_a = centres_of(wb, kb->id, kb->settlement, gw);
-        world wb2 = make_hard_coded_world(wp, nullptr);
+        world wb2 = make_hard_coded_world(wp, nullptr, g_cfg, nullptr, &g_works);
         const std::vector<placed> full_b = centres_of(wb2, kb->id, kb->settlement, gw);
         bool identical = full_a.size() == full_b.size();
         for (std::size_t i = 0; identical && i < full_a.size(); ++i)
