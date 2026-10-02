@@ -8017,6 +8017,50 @@
      "result_metric": "Owed at the sprint's live walk (play build 22:42 2026-10-02)."
     }
    ]
+  },
+  {
+   "brief": "culture-ground-profile-reader",
+   "title": "BL-1107 - A culture carries its cradle's ground profile, and its preference reads it",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1107 - sprint 48",
+   "batch": "sprint-48",
+   "resolved": "2026-10-03",
+   "resolution": "merged 175ed49e",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: colonisation_harness C18, culture_preference_fixture P0-P6, culture_preference_census (16)"
+     ],
+     "requirement": "Every culture carries a non-empty profile, daughters inherit it, and the preference reads it (lack + amenity lean, ground-only).",
+     "notes": "",
+     "result_metric": "Cultures with a preference 224 -> 389 at 1660; shipped haulage +13.6% / +15.5% by window; Ben set lack 250 / divisor 4 from the ladder."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review, fix round included.",
+     "notes": "",
+     "result_metric": "The sum == 0 lack fixed; reader rows with mutations."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: gates on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": "Main 175ed49e (with BL-1139 part 1): world_determinism, save_roundtrip, province_partition_harness, colonisation_harness, culture_preference_fixture, world_cursor_equivalence, spawn_solvency, centre_census pass; only R3b/R3d.1 and R3a2/R3a3."
+    }
+   ]
   }
  ]
 }
