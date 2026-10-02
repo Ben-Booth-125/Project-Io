@@ -229,12 +229,6 @@ bool battle_ground(const world& w, const std::vector<entity_id>& defender_units,
                    terrain_substrate& sub, terrain_cover& cov, std::uint8_t& density,
                    terrain_landform& lf);
 
-/// The TILE `battle_ground` picks — the defender-side tile the fight anchors on,
-/// by the same rule — or `null_entity` if no defending unit resolves to a real
-/// tile. A read for the battle card (BL-1145), which frames the fight round
-/// where it is actually fought rather than round the province's lowest tile.
-entity_id battle_ground_tile(const world& w, const std::vector<entity_id>& defender_units);
-
 /// True iff @p unit is a participant in a live battle. The one `if` BL-470's
 /// march_unit dispatch left a named gap for: a unit in contact may not be given
 /// a new movement order, because walking away from a fight is a WITHDRAWAL with

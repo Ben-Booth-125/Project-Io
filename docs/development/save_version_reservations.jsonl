@@ -15,3 +15,4 @@
 {"version":22,"kind":"envelope","owner":"BL-1099/1100/1104 kinds 21-22 and body_entry::migration_timelapse (shares sprint 47's one envelope bump with BL-1083)","ts":"2026-09-25T04:00:00.000Z","branch":"worktree-wf_fc276234-6a2-1"}
 {"version":28,"kind":"world","owner":"BL-1098 SEA_LANE_TIER_STAMPED (tile_component::lane_level)","ts":"2026-09-26T00:55:25.999Z","branch":"worktree-agent-acc0cdbc7ceec74b6"}
 {"version":29,"kind":"world","owner":"BL-1125 markets can die (world::folded_markets, the fold map)","ts":"2026-10-02T16:09:31.584Z","branch":"worktree-agent-a813ded7b0eb1d30d"}
+{"version":30,"kind":"world","owner":"BL-1145 province front-tile readers (active_battle::ground_tile)","ts":"2026-10-02T20:24:19.307Z","branch":"worktree-agent-a608614e76f63983a"}

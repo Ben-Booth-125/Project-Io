@@ -306,11 +306,6 @@ bool battle_ground(const world& w, const std::vector<entity_id>& defender_units,
     return true;
 }
 
-entity_id battle_ground_tile(const world& w, const std::vector<entity_id>& defender_units)
-{
-    return defender_ground(w, defender_units).tile; // null_entity when not found
-}
-
 bool unit_in_battle(const world& w, entity_id unit)
 {
     for (const active_battle& b : w.battles)
@@ -450,6 +445,7 @@ bool open_battle(world& w, int tick, uint32_t province, entity_id attacker, enti
     nb.defender        = defender;
     nb.attacker_units   = attacker_units;
     nb.defender_units   = defender_units;
+    nb.ground_tile      = g.tile; // the ground the fight is ON, fixed at open (BL-1145 review)
     nb.state = begin_campaign_battle(
         id,
         atk_stack, doctrine_row{},
@@ -564,6 +560,7 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                 continue;
 
             const terrain_pick g = defender_ground(w, nb.defender_units);
+            nb.ground_tile = g.tile; // the ground the fight is ON, fixed at open (BL-1145 review)
 
             campaign_battle_identity id;
             id.attacker   = c.attacker;
