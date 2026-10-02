@@ -6933,13 +6933,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // strictly beat them, and `best_work_row` is only ever read on the
             // one path that just wrote it.
             //
-            // BOUNDED BY CONSTRUCTION, like the other four. Two candidate
-            // regions — the capital, and one rotated through the holdings by
-            // the year — rather than every holding. Scoring all of them would be
-            // O(held x rows) per polity per round inside a pass already costing
-            // ~23 s of a ~25 s world; the rotation still reaches every region
-            // over a run, because the round count (136 on the default ladder) is
-            // large against any one polity's holdings.
+            // BL-1155 (Ben, 2026-09-27; HISTORY.md sec The verb): EVERY REGION
+            // THE POLITY HOLDS THAT STANDS A CENTRE is a candidate, walked in
+            // region order (`held` is ascending), still one work a round and the
+            // same scorer. Two candidates -- the capital and one rotated region
+            // -- kept industry to about 110 of some 15,000 regions, because a
+            // work anywhere but the capital waited for the rotation to reach it.
+            // The bound is now the centres the polity holds: O(centres x rows)
+            // per polity per round, measured against the span times rather than
+            // assumed. `work_candidates_every_centre` false is the old bounded
+            // rule, kept as the switch's other reading.
             if (works != nullptr && works->size() > 0)
             {
                 // The materials band, derived ONCE above this round's verbs
@@ -6947,10 +6950,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // value. It used to be re-derived here.
                 const roster_band band = mat_band;
 
-                for (int slot = 0; slot < clampi(params.work_candidate_regions, 0, 8); ++slot)
+                const bool every_centre = params.work_candidates_every_centre;
+                const int  slots = every_centre ? n_held : clampi(params.work_candidate_regions, 0, 8);
+                for (int slot = 0; slot < slots; ++slot)
                 {
                     int pi = -1;
-                    if (slot == 0)
+                    if (every_centre)
+                    {
+                        pi = held[static_cast<std::size_t>(slot)];
+                        if (pi < 0 || pi >= static_cast<int>(ss.regions.size())
+                            || ss.regions[static_cast<std::size_t>(pi)].centres <= 0)
+                            continue; // stands no centre: not a candidate
+                    }
+                    else if (slot == 0)
                     {
                         pi = q.capital;
                     }

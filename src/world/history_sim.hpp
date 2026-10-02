@@ -1868,11 +1868,20 @@ struct history_sim_params
     /// which is what keeps BL-224's non-hegemony emergent.
     int work_reach_relief_cap_q = 800;
 
-    /// How many held regions a polity considers building on per round. Two:
-    /// its capital, and one rotated deterministically through its holdings.
-    /// Scoring every holding would be O(held x rows) inside a pass already
-    /// costing ~23 s of a ~25 s world; rotating spreads works across the empire
-    /// over a run without paying for a full scan every round.
+    /// BL-1155 (Ben, 2026-09-27; HISTORY.md sec The verb): EVERY REGION A POLITY
+    /// HOLDS THAT STANDS A CENTRE IS A CANDIDATE for `build_work`, still one work
+    /// a round and the same scorer, walked in region order. True everywhere by
+    /// default -- the rule as ruled applies in every span. False is the rule it
+    /// replaces, kept as the switch's other reading: `work_candidate_regions`
+    /// candidates, the capital plus ones rotated through the holdings by a hash
+    /// of (polity, year, slot). Each span's params carry their own value, so the
+    /// switch is per span.
+    bool work_candidates_every_centre = true;
+
+    /// With `work_candidates_every_centre` false: how many held regions a
+    /// polity considers building on per round. Two: its capital, and one
+    /// rotated deterministically through its holdings (the bounded rule that
+    /// kept industry to ~110 of ~15,000 regions on the curated seeds).
     int work_candidate_regions = 2;
 
     // --- BL-929: SUPPLY SITES BOUGHT FROM THE STOCKPILE ---------------------
