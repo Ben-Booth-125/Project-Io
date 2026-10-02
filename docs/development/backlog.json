@@ -1578,6 +1578,30 @@
     "tools/verify/centre_census.cpp"
    ],
    "design": "FOUND 2026-10-02: centre_census C13 C2b (\"elevation difference divides\", PROVINCES.md ruling 2) is red on main on seed 46 (steep 19.18% vs plain 25.79%); before BL-1150 it was red on 46 and 43. Rivers now divide (BL-1156); slopes do not on every world. WORK: measure the steep:plain border ratio per seed and find why a p90 slope (one step at 40, k_province_height_cost 683) fails to divide on seed 46 -- the same along/across question the river had, or the p90 cut. Report for Ben before any re-tune."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-10-03",
+   "requires": [
+    "BL-1137"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1159",
+   "short_name": "HIGHWAYS_ON_SHIPPED_WORLDS",
+   "author": "Claude (sprint 48, the BL-1137 gate on main, 2026-10-03)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "The Highway tier is read on the shipped worlds, and its harness row asks the world the player gets",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "tools/verify/road_generation_harness.cpp",
+    "src/world/road_generation.cpp"
+   ],
+   "design": "FOUND 2026-10-03: road_generation_harness R2 (\"highway tier reachable\") is red on main a83e6188 and has been since BL-1141. It builds no_prehistory worlds, which run no industrial urbanisation, so a nation holds at most one City+ and a Highway (two City+ centres in one nation) never qualifies. The shipped worlds now carry ~2,700 cities pooled (BL-1137 at x4 jobs), so they may well carry Highways. WORK: read Highway tiles and City-City links per curated seed on the shipped path; move R2 to (or add) a shipped-world reading; if shipped worlds still lay no Highway, report why for Ben. Never weaken R2 to pass."
   }
  ]
 }

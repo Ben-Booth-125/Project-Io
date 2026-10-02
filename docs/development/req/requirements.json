@@ -7404,11 +7404,11 @@
    "difficulty": 4,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1137 - sprint 48 (Ben at the live app 2026-09-25: more migration in the Industrialisation span; rebuilt on the deepen rule 2026-09-26)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-03",
+   "resolution": "merged a83e6188",
    "rows": [
     {
      "id": "R1",
@@ -7423,7 +7423,7 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice on main",
       "headless: history_sim_harness (R7 the runtime budget)"
@@ -7444,13 +7444,23 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "decision: Ben, on the population, urban share and points readings"
      ],
      "requirement": "Ben reads the stream's consequences before the re-bless names it.",
      "notes": "",
      "result_metric": ""
+    },
+    {
+     "id": "R9",
+     "status": "complete",
+     "verification": [
+      "headless: gates on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": "Main a83e6188: world_determinism ALL PASS twice (962AF7EC3ED3FC89 / A746B4E88612A54C / EB15108A7192A842); save_roundtrip, centre_census (C13/C14/C15 OK), spawn_solvency, landscape_search_harness, works_loader_check, world_cursor_equivalence pass; history_sim only R3a2/R3a3; road_generation_harness R2 red (its no-prehistory world; BL-1159). At x4: urban 25.6%, centres 13,392, 2,704 cities, heads moved 962.8M (489.8M along corridors)."
     }
    ]
   },
