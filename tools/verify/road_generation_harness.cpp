@@ -9,7 +9,17 @@
 //                   seed sweep — is asserted on a QUALIFIED regeneration (a
 //                   three-band qualification spread, the top third the most urban
 //                   nations; road_level reset, generate_roads re-run). No tile
-//                   ever carries a tier beyond Highway (ceiling).
+//                   ever carries a tier beyond Highway (ceiling). The Highway on
+//                   that regen is a PRINTED CONTROL since BL-1159: a no_prehistory
+//                   world runs no industrial urbanisation, so no nation holds two
+//                   City+ centres and no link can qualify.
+//   R2s shipped  — BL-1159: the Highway row asked of the SHIPPED worlds (the
+//                   app's world build with the works table, per curated seed;
+//                   needs a live Lua state and the repo root as cwd). The
+//                   national lattice is re-laid with its trace, and every link
+//                   the rule qualifies (two City+, percentile >= 0.80, computed
+//                   here) must be Highway on the shipped field; the shipped
+//                   worlds must carry one. `--seeds a,b,c` narrows the sweep.
 //   Q  differential — the same world regenerated at floor vs high qualification
 //                   produces measurably different lattices (BL-618's contract):
 //                   promoted tiers appear only on the qualified run, and the
@@ -46,10 +56,18 @@
 #include "harness_params.hpp"
 #include "world/world.hpp"
 
+#include "scripting/lua_state.hpp"
+
 #include <algorithm>
+#include <chrono>
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <fstream>
 #include <map>
 #include <set>
+#include <sstream>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -311,8 +329,285 @@ static void tier_census(const world& w, entity_id body, int counts[4])
     }
 }
 
-int main()
+// ---------------------------------------------------------------------------
+// R2s — THE HIGHWAY ROW ON THE SHIPPED WORLDS (BL-1159)
+// ---------------------------------------------------------------------------
+// The world the app builds: harness_params' build_app_base_world (the parsed
+// world_gen config and the works table handed to make_hard_coded_world, then
+// setup_world's writes and the recipe pass — centre_census's world). Only the
+// shipped arc runs industrial urbanisation, so only it grows a nation two City+
+// centres, which is what a Highway needs beyond the percentile gate.
+//
+// THE READING, per curated seed, on the home body:
+//   * the SHIPPED road field as generation left it — national lattice plus the
+//     ancient corridors stamped over it (LOGISTICS.md § 4a, max per tile);
+//   * City+ centres, nations holding >= 2, and how many of those sit at the
+//     Highway percentile (>= 0.80 of the world's nations, mid-rank on ties —
+//     computed HERE from w.nations, not read off the pass);
+//   * the national lattice re-laid on the same world with the pass's own stats
+//     and trace (road_level reset, caches dropped): City-City links laid, at the
+//     Highway tier, and its Highway tiles. The re-lay reads the pass's own inputs
+//     (the tiles, nations and centres generation left), so every tile it stamps
+//     must sit at or below the shipped field — R2s0, the consistency check.
+//
+// THE RULE, ASKED INDEPENDENTLY (LOGISTICS.md § 4): a backbone link (tree or kept
+// loop) between two City+ centres in a nation at percentile >= 0.80 is a Highway.
+// From the trace alone: every such QUALIFYING link's land tiles must carry
+// road_level 3 on the shipped field (R2s-a), and the shipped worlds must carry a
+// Highway somewhere the rule qualifies one (R2s-b). If no shipped world qualifies
+// a link, R2s-b FAILS and the per-seed lines say why — never weakened to pass.
+struct shipped_highway_row
 {
+    uint32_t seed = 0;
+    int    majors = 0, nations = 0, nations_two_major = 0, two_major_at_gate = 0;
+    int    links_two_major = 0, links_highway = 0;    // the pass's own stats (re-laid)
+    int    qualifying = 0, qualifying_at_highway = 0; // from the trace, the rule asked here
+    int    shipped_tiers[4]  = { 0, 0, 0, 0 };
+    int    national_tiers[4] = { 0, 0, 0, 0 };
+    int    above_shipped = 0;                         // re-laid tiles above the shipped field
+    // The why: the qualification spread and where the multi-City nations stand in it.
+    int    nations_at_gate = 0, majors_at_gate = 0, distinct_qual = 0;
+    float  max_pct = 0.0f, max_qual = 0.0f, max_pct_two_major = 0.0f, max_qual_two_major = 0.0f;
+    double build_s = 0.0;
+};
+
+static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
+{
+    shipped_highway_row r;
+    r.seed = seed;
+    world_params params{};
+    params.seed = seed;
+    app_start_world out;
+    const auto t0 = std::chrono::steady_clock::now(); // diagnostic wall time only
+    build_app_base_world(lua, params, out);
+    r.build_s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    world& w = out.w;
+    const entity_id body = w.home_body;
+
+    tier_census(w, body, r.shipped_tiers);
+    std::map<entity_id, std::uint8_t> shipped_level;
+    for (const auto& [tid, tc] : w.tiles)
+        if (tc.body == body) shipped_level[tid] = tc.road_level;
+
+    // Centre scale per tile (the highest standing there) and City+ per nation.
+    std::map<entity_id, int> scale_at;
+    for (const auto& [cid, tile] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tile);
+        const auto pit = w.population_centres.find(cid);
+        if (tit == w.tiles.end() || tit->second.body != body || pit == w.population_centres.end())
+            continue;
+        int& s = scale_at[tile];
+        s = std::max(s, static_cast<int>(pit->second.scale));
+    }
+    std::map<entity_id, std::pair<int, int>> wt;
+    urban_weight(w, body, wt);
+
+    // The percentile, mid-rank on ties, over every nation (LOGISTICS.md § 4).
+    std::map<entity_id, float> pct;
+    {
+        const int nn = static_cast<int>(w.nations.size());
+        for (const auto& [nid, nc] : w.nations)
+        {
+            int below = 0, tied = 0;
+            for (const auto& [nid2, nc2] : w.nations)
+            {
+                below += nc2.qualification < nc.qualification;
+                tied  += nc2.qualification == nc.qualification;
+            }
+            pct[nid] = nn > 0 ? (static_cast<float>(below) + 0.5f * static_cast<float>(tied))
+                                    / static_cast<float>(nn)
+                              : 0.0f;
+        }
+    }
+    constexpr float kGate = 0.80f; // LOGISTICS.md § 4: a Highway needs percentile >= 0.80
+    r.nations = static_cast<int>(w.nations.size());
+    // The why (BL-1159): the qualification spread, and where the multi-City nations
+    // stand in it.
+    {
+        std::set<float> distinct;
+        for (const auto& [nid, nc] : w.nations)
+        {
+            distinct.insert(nc.qualification);
+            if (pct[nid] >= kGate) ++r.nations_at_gate;
+            r.max_pct = std::max(r.max_pct, pct[nid]);
+            r.max_qual = std::max(r.max_qual, nc.qualification);
+            const auto it = wt.find(nid);
+            const int m = it != wt.end() ? it->second.first : 0;
+            if (pct[nid] >= kGate) r.majors_at_gate += m;
+            if (m >= 2)
+            {
+                r.max_pct_two_major = std::max(r.max_pct_two_major, pct[nid]);
+                r.max_qual_two_major = std::max(r.max_qual_two_major, nc.qualification);
+            }
+        }
+        r.distinct_qual = static_cast<int>(distinct.size());
+    }
+    for (const auto& [nid, m] : wt)
+    {
+        r.majors += m.first;
+        if (m.first >= 2 && nid != null_entity)
+        {
+            ++r.nations_two_major;
+            const auto pit = pct.find(nid);
+            if (pit != pct.end() && pit->second >= kGate) ++r.two_major_at_gate;
+        }
+    }
+
+    // Re-lay the national lattice with the pass's stats and trace. Generation lays it
+    // BEFORE the sea lanes are stamped (hard_coded_world.cpp, stamp_sea_lanes follows
+    // generate_roads), and a lane discounts water in tile_traversal_cost, so the
+    // lanes are lifted for the re-lay — or it prices straits on a cheaper sea than the
+    // pass saw and lays different routes (326 tiles over the shipped field, measured).
+    std::map<entity_id, std::uint8_t> lanes;
+    for (auto& [tid, tc] : w.tiles)
+        if (tc.body == body && tc.lane_level != 0)
+        {
+            lanes[tid]    = tc.lane_level;
+            tc.lane_level = 0;
+        }
+    road_generation_trace tr;
+    const road_generation_stats st = regen_roads_at_floor(w, body, kVillageSpurFloorHeads, &tr);
+    for (const auto& [tid, lvl] : lanes) w.tiles[tid].lane_level = lvl;
+    r.links_two_major = st.links_two_major;
+    r.links_highway   = st.links_highway;
+    tier_census(w, body, r.national_tiers);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body) continue;
+        const auto it = shipped_level.find(tid);
+        if (it != shipped_level.end() && tc.road_level > it->second) ++r.above_shipped;
+    }
+
+    // The rule, from the trace: a qualifying link's land tiles are Highway on the
+    // SHIPPED field.
+    auto scale_of = [&](entity_id t) {
+        const auto it = scale_at.find(t);
+        return it != scale_at.end() ? it->second : 0;
+    };
+    for (const auto& rt : tr.routes)
+    {
+        if (rt.k != road_generation_trace::kind::tree && rt.k != road_generation_trace::kind::loop)
+            continue;
+        if (scale_of(rt.from) < 3 || scale_of(rt.to) < 3) continue;
+        const auto pit = pct.find(rt.nation);
+        if (pit == pct.end() || pit->second < kGate) continue;
+        ++r.qualifying;
+        bool all = true;
+        int  land = 0;
+        for (const entity_id t : rt.path)
+        {
+            const auto tit = w.tiles.find(t);
+            if (tit == w.tiles.end() || is_water(tit->second.substrate)) continue;
+            ++land;
+            const auto sit = shipped_level.find(t);
+            if (sit == shipped_level.end() || sit->second != 3) all = false;
+        }
+        if (all && land > 0) ++r.qualifying_at_highway;
+    }
+    return r;
+}
+
+static std::vector<uint32_t> library_seeds(const char* path)
+{
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return {};
+    std::stringstream ss;
+    ss << in.rdbuf();
+    const std::string text = ss.str();
+    std::vector<uint32_t> out;
+    std::size_t pos = text.find("\"seeds\"");
+    if (pos == std::string::npos) return out;
+    const std::string key = "\"seed\"";
+    while ((pos = text.find(key, pos)) != std::string::npos)
+    {
+        pos += key.size();
+        std::size_t p = pos;
+        while (p < text.size() && (text[p] == ' ' || text[p] == ':' || text[p] == '\t')) ++p;
+        if (p < text.size() && text[p] >= '0' && text[p] <= '9')
+            out.push_back(static_cast<uint32_t>(std::strtoul(text.c_str() + p, nullptr, 10)));
+    }
+    return out;
+}
+
+static std::vector<uint32_t> parse_seed_list(const std::string& s)
+{
+    std::vector<uint32_t> out;
+    std::stringstream ss(s);
+    std::string tok;
+    while (std::getline(ss, tok, ','))
+        if (!tok.empty())
+            out.push_back(static_cast<uint32_t>(std::strtoul(tok.c_str(), nullptr, 10)));
+    return out;
+}
+
+static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
+{
+    std::printf("      (R2s the shipped worlds, harness_params' build_app_base_world, %zu seed(s))\n",
+                seeds.size());
+    std::printf("      seed | City+ | nations, >=2 City+, of them pct>=0.80 | City-City links"
+                " laid, at Highway | qualifying, at Highway shipped | Highway tiles shipped"
+                " (national) | t/r/h shipped | re-laid above shipped | build s\n");
+    std::fflush(stdout);
+    lua_state lua; // one long-lived state, as the app keeps m_lua
+    int qualifying = 0, qualifying_ok = 0, seeds_qualifying_with_highway = 0, above = 0;
+    for (const uint32_t seed : seeds)
+    {
+        const shipped_highway_row r = read_shipped_highways(lua, seed);
+        std::printf("      %4u | %5d | %3d, %3d, %3d | %5d, %5d | %4d, %4d | %6d (%6d) |"
+                    " %d/%d/%d | %d | %.1f\n",
+                    r.seed, r.majors, r.nations, r.nations_two_major, r.two_major_at_gate,
+                    r.links_two_major, r.links_highway, r.qualifying, r.qualifying_at_highway,
+                    r.shipped_tiers[3], r.national_tiers[3], r.shipped_tiers[1],
+                    r.shipped_tiers[2], r.shipped_tiers[3], r.above_shipped, r.build_s);
+        std::printf("           why: %d distinct qualification values, max %.3f (pct %.3f); %d nations"
+                    " at pct >= 0.80 holding %d City+ | the >=2-City+ nations: best qualification"
+                    " %.3f, best pct %.3f\n",
+                    r.distinct_qual, r.max_qual, r.max_pct, r.nations_at_gate, r.majors_at_gate,
+                    r.max_qual_two_major, r.max_pct_two_major);
+        std::fflush(stdout);
+        qualifying    += r.qualifying;
+        qualifying_ok += r.qualifying_at_highway;
+        above         += r.above_shipped;
+        if (r.qualifying > 0 && r.shipped_tiers[3] > 0) ++seeds_qualifying_with_highway;
+    }
+    std::printf("      (R2s pooled: qualifying links %d, at Highway %d; seeds carrying a qualifying"
+                " Highway %d of %zu; re-laid tiles above the shipped field %d)\n",
+                qualifying, qualifying_ok, seeds_qualifying_with_highway, seeds.size(), above);
+    check(above == 0, "R2s0 the re-laid national lattice sits within the shipped field");
+    check(qualifying_ok == qualifying,
+          "R2s-a on the shipped worlds every qualifying link (two City+, pct >= 0.80) is Highway");
+    check(seeds_qualifying_with_highway > 0,
+          "R2s-b the highway tier (road_level 3) is reached on the shipped worlds where the rule"
+          " qualifies one");
+}
+
+int main(int argc, char** argv)
+{
+    // BL-1159: the shipped-world Highway row's seeds — the curated library by default
+    // (read by relative path: run from the repo root), or --seeds a,b,c.
+    std::vector<uint32_t> shipped_seeds;
+    for (int a = 1; a < argc; ++a)
+    {
+        const std::string s = argv[a];
+        if (s == "--seeds" && a + 1 < argc) shipped_seeds = parse_seed_list(argv[++a]);
+        else
+        {
+            std::printf("usage: road_generation_harness [--seeds a,b,c]\n");
+            return 2;
+        }
+    }
+    if (shipped_seeds.empty())
+    {
+        shipped_seeds = library_seeds("docs/generation/seed_library.json");
+        if (shipped_seeds.empty())
+        {
+            std::printf("[FAIL] docs/generation/seed_library.json not found or carries no seeds"
+                        " (run from the repo root)\n");
+            return 1;
+        }
+    }
+
     world w = make_hard_coded_world(no_prehistory());
     const entity_id kepler = w.home_body;
     const auto bit = w.bodies.find(kepler);
@@ -410,7 +705,12 @@ int main()
         std::printf("      (qualified regen: road tier on %d of 8 seeds; highway on %d of 8, first at seed index %d)\n",
                     seeds_with_road, seeds_with_highway, first);
         check(seeds_with_road == 8, "R2 road tier (road_level 2) appears on every qualified seed");
-        check(seeds_with_highway > 0, "R2 highway tier (road_level 3) is reachable when qualified");
+        // BL-1159: A PRINTED CONTROL, NO LONGER THE ROW. A no_prehistory world runs no
+        // industrial urbanisation, so a nation holds at most one City+ and no link can be
+        // City-City (0 of 8 since BL-1141). The Highway row reads the SHIPPED worlds below.
+        std::printf("      (control, no-prehistory qualified regen: highway tier on %d of 8 -- "
+                    "not asserted; R2s reads the shipped worlds, BL-1159)\n",
+                    seeds_with_highway);
     }
     check(over_highway == 0, "R2 no tile exceeds the highway tier (road_level <= 3)");
 
@@ -633,6 +933,9 @@ int main()
         check(uni[0] == uni3[0] && uni[1] == uni3[1] && uni[2] == uni3[2] && uni[3] == uni3[3],
               "Q4 the regeneration instrument is deterministic (two uniform regens agree)");
     }
+
+    // R2s — the Highway row on the shipped worlds (BL-1159). Last: it is the slow part.
+    run_shipped_highway_rows(shipped_seeds);
 
     std::printf("%s (%d failure(s))\n", g_fail ? "ROAD GEN AUDIT FAILED" : "ROAD GEN AUDIT OK", g_fail);
     return g_fail ? 1 : 0;
