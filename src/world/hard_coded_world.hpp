@@ -237,6 +237,21 @@ struct world_params
     /// On the save seam with `industrialisation_span_enabled` (envelope 20).
     bool resume_seeds_corridor_tier = true;
 
+    /// BL-1107 — the ground profile's two magnitudes
+    /// (`history_sim_params::culture_profile_lack_max_q` / `_amenity_div`),
+    /// copied into BOTH resumed spans' params by `exploration_sim_params`
+    /// (Industrialisation's are built on Exploration's). Defaults are the
+    /// history_sim_params defaults. FIELDS HERE so an instrument can read
+    /// them on a ladder over the shipped worlds (Ben, 2026-10-03).
+    ///
+    /// NOT ON THE SAVE SEAM, deliberately for now, and flagged: the envelope's
+    /// descriptor would need a version bump shared with the sprint's other
+    /// lanes. At the defaults a saved descriptor rebuilds the identical
+    /// world; a world built with a non-default value is a tuning world and
+    /// does NOT round-trip through a save until the two join the envelope.
+    int culture_profile_lack_max_q  = 250;
+    int culture_profile_amenity_div = 4;
+
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a
     // *consequence* of its habitable land area and the minimum-viable-territory floor

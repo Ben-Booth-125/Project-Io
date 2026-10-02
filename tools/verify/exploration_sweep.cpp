@@ -819,6 +819,9 @@ int main(int argc, char** argv)
             else if (kv.first == "subjection_purchase_floor")  hp.subjection_purchase_floor  = kv.second;
             // BL-1097: the lane tier, for a tuning run.
             else if (kv.first == "sea_lane_tier1_uses")        hp.sea_lane_tier1_uses = static_cast<int>(kv.second);
+            // BL-1107: the ground profile's two magnitudes, read on a ladder.
+            else if (kv.first == "culture_profile_lack_max_q")  hp.culture_profile_lack_max_q  = static_cast<int>(kv.second);
+            else if (kv.first == "culture_profile_amenity_div") hp.culture_profile_amenity_div = static_cast<int>(kv.second);
             else { std::printf("unknown --set %s\n", kv.first.c_str()); std::exit(2); }
         }
     };
@@ -944,7 +947,9 @@ int main(int argc, char** argv)
             const auto prefs = derive_culture_preference(
                 fx.pre_exploration_settlement.regions, fx.pre_exploration_contacts,
                 fx.pre_exploration_polities, static_cast<int>(fx.pre_exploration_creeds.cultures.size()),
-                &fx.pre_exploration_creeds.cultures); // BL-1107: the profile too
+                &fx.pre_exploration_creeds.cultures, // BL-1107: the profile too, at the span's magnitudes
+                fx.exploration_params.culture_profile_lack_max_q,
+                fx.exploration_params.culture_profile_amenity_div);
             for (const auto& p : prefs) row.preference_weights.push_back(p.weight_q);
         }
 
@@ -1334,7 +1339,8 @@ int main(int argc, char** argv)
         // once, for reading 6's want-divergence count and reading 10's live line.
         const std::vector<culture_good_preference> live_prefs = derive_culture_preference(
             ss_copy.regions, traced.contacts, traced.polities,
-            static_cast<int>(cs_copy.cultures.size()), &cs_copy.cultures); // BL-1107: the profile too
+            static_cast<int>(cs_copy.cultures.size()), &cs_copy.cultures, // BL-1107: the profile too,
+            traced.culture_profile_lack_max_q, traced.culture_profile_amenity_div); // at the run's own magnitudes
         row.live_pref_entries_1660 = static_cast<int64_t>(live_prefs.size());
         const auto top_want = [&](int polity_id) {
             const region_class goods[4] = { region_class::farm, region_class::ore,

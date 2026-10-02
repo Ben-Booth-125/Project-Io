@@ -20,7 +20,9 @@
 //
 // Build (needs a live Lua state): bash tools/verify/build_lua_harness.sh culture_preference_census
 // Run from the repo root (it reads scripts/*.lua):
-//        build_gen/verify/culture_preference_census.exe [--seeds a,b,c]
+//        build_gen/verify/culture_preference_census.exe [--seeds a,b,c] [--lack N] [--amenity-div N]
+//        --lack / --amenity-div set world_params' two ground-profile magnitudes (a ladder
+//        reading; both default to the shipped values).
 //        (default: the 16 curated seeds of docs/generation/seed_library.json)
 // ---------------------------------------------------------------------------
 
@@ -143,8 +145,14 @@ void print_span(const char* label, const span_reading& r)
 int main(int argc, char** argv)
 {
     std::vector<uint32_t> seeds = { 46, 28, 11, 31, 40, 12, 37, 13, 41, 43, 32, 10, 25, 38, 9, 0 };
+    int lack_q = world_params{}.culture_profile_lack_max_q;      // --lack N (BL-1107 ladder)
+    int amenity_div = world_params{}.culture_profile_amenity_div; // --amenity-div N
     for (int i = 1; i < argc; ++i)
     {
+        if (std::strcmp(argv[i], "--lack") == 0 && i + 1 < argc)
+        { lack_q = std::atoi(argv[++i]); continue; }
+        if (std::strcmp(argv[i], "--amenity-div") == 0 && i + 1 < argc)
+        { amenity_div = std::atoi(argv[++i]); continue; }
         if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc)
         {
             seeds.clear();
@@ -170,12 +178,15 @@ int main(int argc, char** argv)
     std::printf("=== culture_preference_census (BL-1107) — %d seeds, config %s, works %zu ===\n",
                 static_cast<int>(seeds.size()), cfg.is_fallback ? "FALLBACK" : "world_gen.lua",
                 static_cast<std::size_t>(works.size()));
+    std::printf("profile magnitudes: lack ceiling %d, amenity divisor %d\n", lack_q, amenity_div);
     span_reading pool_e, pool_i;
     int profile_failures = 0;
     for (uint32_t seed : seeds)
     {
         world_params wp;
         wp.seed = seed;
+        wp.culture_profile_lack_max_q  = lack_q;      // BL-1107 ladder
+        wp.culture_profile_amenity_div = amenity_div;
         generation_report     rep;
         era_minus_one_fixture fx;
         const world w = make_hard_coded_world(wp, &rep, cfg, nullptr, &works, &fx);

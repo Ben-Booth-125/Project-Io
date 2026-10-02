@@ -200,6 +200,39 @@ int main()
               "P5b a tie between two amenity classes goes to the lower one (forest over valley marsh)");
     }
 
+    // P6 -- the two magnitudes are named params in a stated domain, and the
+    // reader takes them: the defaults are valid, every edge outside is
+    // rejected, and P4's world read at lack 500 doubles C's lack (36 -> 72)
+    // while lack 0 removes it.
+    {
+        history_sim_params p;
+        bool ok = culture_profile_params_valid(p)
+               && p.culture_profile_lack_max_q == 250 && p.culture_profile_amenity_div == 4;
+        p.culture_profile_lack_max_q = -1;   ok = ok && !culture_profile_params_valid(p);
+        p.culture_profile_lack_max_q = 1001; ok = ok && !culture_profile_params_valid(p);
+        p.culture_profile_lack_max_q = 1000; ok = ok && culture_profile_params_valid(p);
+        p.culture_profile_amenity_div = 0;    ok = ok && !culture_profile_params_valid(p);
+        p.culture_profile_amenity_div = 1001; ok = ok && !culture_profile_params_valid(p);
+
+        std::vector<culture> cs = { cradle(500, 0, 500, 500), cradle(500, 1000, 500, 500),
+                                    cradle(500, 400, 500, 500) };
+        std::vector<region> rs = { on(0, 0, region_class::none), on(1, 1, region_class::none),
+                                   on(2, 2, region_class::none) };
+        const auto t500 = derive_culture_preference(rs, {}, living(3), 3, &cs, 500, 4);
+        const auto t0   = derive_culture_preference(rs, {}, living(3), 3, &cs, 0, 4);
+        ok = ok && weight(t500, 2, region_class::ore) == 72 && weight(t0, 2, region_class::ore) == -1;
+
+        // The amenity divisor: a forest cradle wholly wooded leans energy by
+        // 1000/div, and the culture lacks no energy (every cradle equal).
+        cs[0].profile.amenity = static_cast<int8_t>(amenity_class::forest);
+        cs[0].profile.amenity_share = 1000;
+        const auto t_d2 = derive_culture_preference(rs, {}, living(3), 3, &cs, 0, 2);
+        const auto t_d8 = derive_culture_preference(rs, {}, living(3), 3, &cs, 0, 8);
+        ok = ok && weight(t_d2, 0, region_class::energy) == 500 && weight(t_d8, 0, region_class::energy) == 125;
+        check(ok, "P6  the lack ceiling and amenity divisor are validated params the reader takes "
+                  "(lack 500 -> 72, lack 0 -> none; div 2 -> 500, div 8 -> 125)");
+    }
+
     std::printf("\n=== culture_preference_fixture: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

@@ -941,6 +941,12 @@ bool subjection_purchase_params_valid(const history_sim_params& p)
         && p.subjection_purchase_floor  >= 0 && p.subjection_purchase_floor  <= (1LL << 48);
 }
 
+bool culture_profile_params_valid(const history_sim_params& p)
+{
+    return p.culture_profile_lack_max_q  >= 0 && p.culture_profile_lack_max_q  <= 1000
+        && p.culture_profile_amenity_div >= 1 && p.culture_profile_amenity_div <= 1000;
+}
+
 int64_t purchase_price_q(const region& native_seat, const history_sim_params& p)
 {
     // stock <= 2^48 (the treasury's own clamp) and rate <= 10^4 < 2^14, so
@@ -2319,6 +2325,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // says so -- rejected, never clamped. `subjection_verb` also refuses on
     // its own; this flag is the report.
     out.subjection_purchase_params_rejected = !subjection_purchase_params_valid(params);
+    // BL-1107: the profile's two magnitudes, judged once at the open. Out of
+    // domain, the whole run reads no profile term (lack 0, no amenity lean).
+    out.culture_profile_params_rejected = !culture_profile_params_valid(params);
+    out.culture_profile_lack_max_q  = out.culture_profile_params_rejected ? 0 : params.culture_profile_lack_max_q;
+    out.culture_profile_amenity_div = out.culture_profile_params_rejected ? 0 : params.culture_profile_amenity_div;
 
     // BL-1120 -- THE CURRENT FIELD, built once for this span from the terrain
     // it already runs on (EXPLORATION.md sec Currents are a force, not a
@@ -5220,7 +5231,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             if (want_lean_on)
                 round_prefs = derive_culture_preference(ss.regions, out.contacts,
                                                         out.polities, want_culture_count,
-                                                        cs ? &cs->cultures : nullptr);
+                                                        cs ? &cs->cultures : nullptr,
+                                                        out.culture_profile_lack_max_q,
+                                                        out.culture_profile_amenity_div);
 
             exploration_upkeep_spend upkeep_spend;
             // BL-955: the allocation reads the state's contacts (near-home
@@ -10122,7 +10135,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // hands forward as `culture_preference`.
             const std::vector<culture_good_preference> close_prefs =
                 derive_culture_preference(ss.regions, out.contacts, out.polities, want_culture_count,
-                                          cs ? &cs->cultures : nullptr);
+                                          cs ? &cs->cultures : nullptr,
+                                          out.culture_profile_lack_max_q,
+                                          out.culture_profile_amenity_div);
 
             constexpr int good_count = 4;
             const region_class goods[good_count] =
@@ -11495,7 +11510,7 @@ std::vector<want> derive_wants(const std::vector<region>& regions,
 std::vector<culture_good_preference> derive_culture_preference(
     const std::vector<region>& regions, const std::vector<contact>& contacts,
     const std::vector<polity>& polities, int culture_count,
-    const std::vector<culture>* cultures)
+    const std::vector<culture>* cultures, int lack_max_q, int amenity_div)
 {
     // THE SAME FOUR WINDOWS `derive_wants` reads, in the same order — no new
     // threshold invented for a culture-grain reading of the same facts.
@@ -11561,12 +11576,12 @@ std::vector<culture_good_preference> derive_culture_preference(
                     ? static_cast<int>(clampi64((raw_of(cu.profile, g) * 500 * cradles) / sum[gi], 0, 1000))
                     : 500;
                 if (score < 500)
-                    row[gi] += ((500 - score) * culture_profile_lack_max_q) / 500;
+                    row[gi] += ((500 - score) * clampi(lack_max_q, 0, 1000)) / 500;
             }
             const int a = cu.profile.amenity;
-            if (a >= 0 && a < 4 && amenity_good[a] >= 0)
+            if (amenity_div > 0 && a >= 0 && a < 4 && amenity_good[a] >= 0)
                 row[static_cast<std::size_t>(amenity_good[a])] +=
-                    clampi(cu.profile.amenity_share, 0, 1000) / culture_profile_amenity_div;
+                    clampi(cu.profile.amenity_share, 0, 1000) / amenity_div;
         }
     }
     // A people STANDING ON GROUND: the plurality of at least one region. The
@@ -12358,7 +12373,9 @@ exploration_output make_exploration_output(const settlement_state&  ss,
     o.wants              = derive_wants(o.regions, o.contacts, o.polities);
     o.culture_preference = derive_culture_preference(o.regions, o.contacts, o.polities,
                                                      culture_count,
-                                                     cs != nullptr ? &cs->cultures : nullptr);
+                                                     cs != nullptr ? &cs->cultures : nullptr,
+                                                     hs.culture_profile_lack_max_q,
+                                                     hs.culture_profile_amenity_div);
 
     o.holdings            = derive_holdings(o.regions, o.polities);
     o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
