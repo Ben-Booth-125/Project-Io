@@ -2166,10 +2166,37 @@ void close_history(generation_cursor& c)
                     if (rg.row < 0 || rg.row >= home_grid_height
                      || rg.col < 0 || rg.col >= home_grid_width)
                         continue;
-                    const entity_id anchor_tile =
+                    // A MARKET STANDS ON LAND (BL-1138 review): a region's anchor
+                    // may be coastal water (BL-777), and a market centred at sea is
+                    // one no road reaches. The shell stands on the land tile nearest
+                    // the anchor -- squared grid distance with the column wrap, ties
+                    // to the lower raster index -- and, on a body with no land at
+                    // all, on the anchor as before.
+                    entity_id anchor_tile =
                         grid[static_cast<std::size_t>(rg.row) * home_grid_width
                              + static_cast<std::size_t>(rg.col)];
                     if (anchor_tile == null_entity) continue;
+                    if (const auto ait = w.tiles.find(anchor_tile);
+                        ait != w.tiles.end() && is_water(ait->second.substrate))
+                    {
+                        long long best_d2 = -1;
+                        entity_id best = null_entity;
+                        for (int r = 0; r < home_grid_height; ++r)
+                            for (int cc = 0; cc < home_grid_width; ++cc)
+                            {
+                                const entity_id t = grid[static_cast<std::size_t>(r) * home_grid_width
+                                                         + static_cast<std::size_t>(cc)];
+                                if (t == null_entity) continue;
+                                const auto tit = w.tiles.find(t);
+                                if (tit == w.tiles.end() || is_water(tit->second.substrate)) continue;
+                                int dc = std::abs(cc - rg.col);
+                                dc = std::min(dc, home_grid_width - dc);
+                                const long long dr = r - rg.row;
+                                const long long d2 = static_cast<long long>(dc) * dc + dr * dr;
+                                if (best_d2 < 0 || d2 < best_d2) { best_d2 = d2; best = t; }
+                            }
+                        if (best != null_entity) anchor_tile = best;
+                    }
                     market_component mc;
                     mc.body        = kepler;
                     mc.centre_tile = anchor_tile;
@@ -2926,6 +2953,11 @@ void run_tail(generation_cursor& c)
                     const entity_id cand = kepler_tile_ids[
                         static_cast<std::size_t>(row * market_gw + col)];
                     if (cand == null_entity)
+                        continue;
+                    // A MARKET STANDS ON LAND (BL-1138 review): an offshore deposit
+                    // is never a centre -- no road reaches it.
+                    if (const auto cit = w.tiles.find(cand);
+                        cit == w.tiles.end() || is_water(cit->second.substrate))
                         continue;
                     const float d2 = static_cast<float>(dr * dr + dc * dc);
                     const float score = tile_richness(cand) / (1.0f + d2);
