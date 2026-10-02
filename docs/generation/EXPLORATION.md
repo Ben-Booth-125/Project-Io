@@ -603,6 +603,12 @@ relieves the wants a bound neighbour can meet without pointing the rest outward.
 decides between campaigns a polity could already win and reach; **where** it fights is decided by
 cost — treaties at home, ports abroad, and deterrence (§ The shape of the age).
 
+**SETTLED (Ben, 2026-10-03): what a good is worth wanting changes with the age.** A per-age weight
+table scales each good's want: in the Industrialisation span energy and ore weigh more than they
+did in the Exploration age, so an industrialising realm's campaigns lean toward coal and iron
+country. The want stays a lean on a winnable prize; the table changes which good leans it hardest.
+The weights are read on the curated seeds before they are set.
+
 ---
 
 ## The arms race reinforces peace near home and conflict far from it

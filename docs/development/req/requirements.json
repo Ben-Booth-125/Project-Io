@@ -7919,6 +7919,50 @@
      "result_metric": "Main 14babd92: world_determinism ALL PASS twice (C32FBDF09F66889A / DE8FDC4F8AB7658E / EB15108A7192A842); save_roundtrip, ocean_currents, sea_lane_stamp, world_cursor_equivalence pass; only R3b/R3d.1 and R3a2/R3a3."
     }
    ]
+  },
+  {
+   "brief": "highways-on-shipped-worlds",
+   "title": "BL-1159 - The Highway tier is read on the shipped worlds; qualification reads the polity crossing",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1159 - sprint 48 (2026-10-03)",
+   "batch": "sprint-48",
+   "resolved": "2026-10-03",
+   "resolution": "merged 205a1afa",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: road_generation_harness R2s0/R2s-a/R2s-b on 16 shipped seeds"
+     ],
+     "requirement": "A Highway is laid where the rule qualifies one on the shipped world.",
+     "notes": "",
+     "result_metric": "Qualification reads the polity crossing (Ben 2026-10-03): 209 qualifying links, all Highway, on 15 of 16 seeds; the tied pre-industrial block keeps its midpoint rank (the Road cliff, accepted); shipped haulage +1.0% / -1.4% by window."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review.",
+     "notes": "",
+     "result_metric": "Correct; R2s-b tied to national Highway links; R2s-a labelled self-consistency; POPULATION.md reworded."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: gates on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": "Main 205a1afa: world_determinism ALL PASS twice (C9160AAFA0B80182 / 608B9CFF2E21DF8D / F7A64F75026B029B); road_generation_harness OK (the Highway row green for the first time this sprint); save_roundtrip, world_cursor_equivalence, spawn_solvency, landscape_search_harness pass; history_sim only R3a2/R3a3."
+    }
+   ]
   }
  ]
 }
