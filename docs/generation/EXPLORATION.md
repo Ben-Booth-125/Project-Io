@@ -478,8 +478,8 @@ Industrialisation spans.** The Empires round stays gated by the military band al
 - **A fleet's power falls with sea distance from its own ports,** halving over a fixed run of sea
   tiles, and the distance is priced by the currents, so a fleet reaches less far against them.
 - **A crossing the defenders out-project never sails.** Where, anywhere along its sea leg, the
-  power the defenders project outweighs the attacker's fleet there, the campaign is lost for the
-  round, and the attacker keeps its army and its fleet. Nothing is fought and nothing dies: the
+  power the defenders project outweighs the attacker's fleet there, the crossing is not made,
+  and the attacker keeps its army and its fleet for another verb that round. Nothing is fought and nothing dies: the
   crossing is stopped before it moves.
 - **A crossing the rule would refuse is never a candidate (Ben, 2026-10-01, NR-965).** The fleet
   test is part of what makes a crossing legal, like every other gate on a verb, so a realm with no
