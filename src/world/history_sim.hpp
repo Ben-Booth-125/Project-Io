@@ -63,6 +63,7 @@
 #include <atomic>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -151,6 +152,7 @@ struct grudge;
 struct contact;
 struct history_corridor;
 struct ocean_current_field; // BL-1120/BL-1140: ocean_currents.hpp
+struct sea_field;           // BL-1152: ocean_currents.hpp
 struct dated_object;    // BL-1036's resume pointers, on the same footing.
 struct universal_creed; // (`civilisation` is complete already: creeds.hpp.)
 
@@ -2377,6 +2379,35 @@ struct history_sim_params
     /// measured dial a sweep may set on any span, and this is not.
     bool naval_points_convert_at_open = false;
 
+    // --- BL-1152: a fleet decides who crosses -------------------------------
+    // EXPLORATION.md, the SETTLED paragraph under the stocks table (Ben,
+    // 2026-09-27, NR-961): in the Exploration and Industrialisation spans a
+    // campaign that crosses water carries no more of its army than its fleet
+    // lifts, and a crossing its target's side out-projects at sea never
+    // sails. The Empires round keeps the band gate alone. READINGS TAKEN
+    // (BL-1152, flagged for Ben): the fleet embarks at the staging hub's
+    // coast whether or not a port is built there (ports stand at seats, and
+    // 88% of crossings launch from a hub with none); a defending fleet
+    // projects from its realm's built ports, or from its seat's coast where
+    // none stands; the attacker's fleet decays from the hub's coast by the
+    // same rule; a partner that holds non-aggression with the attacker
+    // abstains (`crossing_defenders`).
+
+    /// The spans' switch (`exploration_sim_params`; Industrialisation inherits
+    /// it). Off in the Empires round, whatever the two constants read.
+    bool fleet_decides_crossings = false;
+    /// MEN A HULL LIFTS: a wet campaign carries at most the attacker's
+    /// `navy_stock` x this; the rest stay ashore at the staging hub, and a
+    /// realm with no fleet lifts no one. 0 = no bound (this half off).
+    /// Domain [0, 1000000]; outside it the rule reads nothing and the run
+    /// says so (`history_sim_state::fleet_params_rejected`), never clamped.
+    int64_t fleet_men_per_hull = 0;
+    /// THE REACH: the still-water sea tiles over which a fleet's projected
+    /// power halves (`fleet_power_at`), the distance priced by the currents
+    /// (`sea_cost_field`). 0 = no projection (this half off). Domain
+    /// [0, 100000], judged with the one above.
+    int64_t fleet_power_halving_tiles = 0;
+
     // --- BL-934: colonies ----------------------------------------------------
     // EXPLORATION.md sec A colony is a subject, and it wants things of its own.
 
@@ -2648,6 +2679,14 @@ struct exploration_upkeep_spend
     int64_t navy_upkeep     = 0;
     int64_t army_unpaid     = 0; ///< polities whose army bill was not met in full
     int64_t navy_unpaid     = 0; ///< polities whose navy bill was not met in full
+    /// BL-1152 diagnosis, REPORT ONLY (read by nothing in the sim): hulls lost
+    /// to the unpaid bill's decay; the round's spend pick by option
+    /// (hold/army/port/navy); and, of the polity-rounds not navy-eligible, how
+    /// many fell short on the treasury, on the seat's built port, and on both.
+    int64_t navy_hulls_decayed = 0;
+    int64_t pick_counts[4]     = { 0, 0, 0, 0 };
+    int64_t navy_short_treasury = 0, navy_short_port = 0, navy_short_both = 0;
+    int64_t navy_eligible_outbid = 0; ///< navy-eligible, another option won
     /// BL-972: the LEVY. Heads drawn from a seat's `manpower_stock` by an
     /// army step this call, and heads returned to a region's pool by the
     /// unpaid decay this call.
@@ -3755,6 +3794,20 @@ struct battle_trace
     int  decisiveness   = 0;
     int  transfer_needed = 0;  ///< The bar decisiveness had to clear this time.
     bool conquered      = false;
+
+    // --- BL-1152: the fleets at a crossing's launch (trace only) ---------
+    // Written for every traced battle, read by nothing in the sim: what the
+    // fleet rule reads (EXPLORATION.md, the SETTLED paragraph under the stocks
+    // table), measured before it binds.
+    int      hub_port_q                 = 0; ///< the staging hub's built port (`port_stock_q`)
+    int64_t  attacker_navy              = 0; ///< the attacker's `navy_stock` at launch
+    int64_t  realm_navy                 = 0; ///< the target realm's `navy_stock` (0 where unowned)
+    int16_t  realm_partners             = 0; ///< the realm's living mutual-defence partners
+    int16_t  partners_with_fleet        = 0; ///< of them, holding any fleet
+    int16_t  partners_bound_to_attacker = 0; ///< of them, holding non-aggression with the attacker
+    int64_t  partner_navy               = 0; ///< the partners' fleets, summed
+    int64_t  army_carried               = 0; ///< the army the crossing sailed with (after any lift bound)
+    int64_t  scored_men                 = 0; ///< BL-1152 review: the army the scorer priced the odds on
 };
 
 /// ONE DECISION ROUND IN WHICH CAMPAIGN CLEARED ITS THRESHOLD — Sprint 28's
@@ -3998,6 +4051,50 @@ struct sea_leg_writer_row
 /// The writer column a sea-leg note lands in (`sea_leg_writer_row`).
 enum class sea_leg_writer : uint8_t { campaign = 0, purchase = 1, tribute = 2, trade = 3 };
 
+/// BL-1152 -- ONE CROSSING THAT NEVER SAILED: the defenders out-projected the
+/// attacker's fleet somewhere on its sea leg. Who tried, against whose realm
+/// and which region; the realm whose fleet projected the most power where it
+/// was stopped; both powers there (`fleet_power_at` units); and what the
+/// attacker still held, untouched -- the staging hub's army and its fleet.
+struct crossing_stop
+{
+    int32_t  year     = 0;
+    uint16_t attacker = 0;
+    uint16_t realm    = 0; ///< the target's realm
+    uint16_t stopper  = 0; ///< the realm whose fleet out-projected most (the realm or a partner)
+    uint16_t region   = 0; ///< the target region
+    uint16_t hub      = 0; ///< the staging hub
+    int64_t  attacker_power = 0, defender_power = 0;
+    int64_t  hub_army = 0, realm_army = 0, navy = 0; ///< the attacker's, left as they stood
+};
+
+/// BL-1152 -- WHAT THE FLEET DID TO THE SPAN'S CROSSINGS. The rule is a
+/// LEGALITY FILTER on the campaign verb (NR-965): a crossing it would refuse
+/// is never a candidate. So `read` counts wet (hub, target) CANDIDATES the
+/// rule examined; `stopped` the candidates it refused as out-projected (and of
+/// them `stopped_by_partner`, where the stopper is a mutual-defence partner
+/// rather than the realm); `unlifted` the candidates it refused because the
+/// attacker's fleet lifts no one (no fleet); `no_leg` the candidates it refused
+/// because no sea walk joins any of the hub's coast tiles to any of the
+/// target's -- not wet-capable, refused (fail closed). A refusal repeats each
+/// round the candidate stands. `exec_failed` (GUARD, BY CONSTRUCTION -- not a
+/// measurement): execute picks its staging hub through the same gate, so a
+/// chosen crossing it would refuse cannot occur; the counter exists only so a
+/// break in that construction is loud. `clipped`: sailed with fewer men than
+/// it gathered, `men_ashore` the difference, returned to the regions the
+/// muster drew them from; `partners_abstained`: partners bound by
+/// non-aggression to the attacker; `seat_coast_fleets`: defending fleets that
+/// projected from their seat's coast, having no built port (both per
+/// candidate examined). Carried in each span's handoff and the generation
+/// cursor. NOT SERIALISED.
+struct fleet_ledger
+{
+    int64_t read = 0, stopped = 0, stopped_by_partner = 0, unlifted = 0, clipped = 0, men_ashore = 0;
+    int64_t no_leg = 0, partners_abstained = 0, seat_coast_fleets = 0;
+    int64_t exec_failed = 0; ///< guard, by construction: reads 0
+    std::vector<crossing_stop> stops; ///< one per refused-as-out-projected candidate
+};
+
 struct history_sim_state
 {
     std::vector<polity> polities;
@@ -4041,6 +4138,11 @@ struct history_sim_state
     /// ([0] campaign -- a crossing onto the other's ground, [1] inherited
     /// from a conquered polity). The span's first-contact count.
     int64_t contacts_raised_trace[3] = {}; // BL-1142: [2] met by sea
+    /// BL-1152 (trace only): mutual-defence pairs standing at each decision
+    /// round's open, summed, and the rounds counted -- the mean is the pairs a
+    /// span keeps standing.
+    int64_t mutual_defence_pair_rounds_trace = 0;
+    int64_t mutual_defence_rounds_trace      = 0;
     /// Per contact class (as `campaign_class_trace`), over candidates that
     /// passed every gate and were scored: [0] count, and sums of [1] the
     /// ground's worth before odds (after `campaign_gain_q`), [2] `p_win_q`,
@@ -4524,6 +4626,10 @@ struct history_sim_state
     int64_t naval_fleets_opened    = 0;
     int64_t naval_hulls_opened     = 0;
     bool    naval_points_params_rejected = false;
+    /// BL-1152: the fleet's work on this span's crossings, and whether its
+    /// constants left their domain (rejected whole: the rule read nothing).
+    fleet_ledger fleet;
+    bool    fleet_params_rejected = false;
 
     /// BL-1120: how the wet campaigns LAUNCHED this run ran against the
     /// current field -- with it (alignment > 0), against it (< 0) or across
@@ -4556,6 +4662,16 @@ struct history_sim_state
     int64_t treasury_spent_on_navy_upkeep = 0;
     int64_t army_upkeep_unpaid_rounds     = 0;
     int64_t navy_upkeep_unpaid_rounds     = 0;
+    /// BL-1152 diagnosis, REPORT ONLY: the upkeep's navy readout summed over
+    /// the span (`exploration_upkeep_spend`'s fields of the same names), and
+    /// the fleet gate's wet candidates by whether their staging hub has a
+    /// built port ([0] none, [1] built), all read and refused-for-no-fleet.
+    int64_t navy_hulls_decayed_trace = 0;
+    int64_t spend_pick_trace[4]      = { 0, 0, 0, 0 };
+    int64_t navy_short_treasury_trace = 0, navy_short_port_trace = 0, navy_short_both_trace = 0;
+    int64_t navy_eligible_outbid_trace = 0;
+    int64_t fleet_read_by_hub_port[2]     = { 0, 0 };
+    int64_t fleet_unlifted_by_hub_port[2] = { 0, 0 };
     /// BL-972: the LEVY -- heads drawn from seats' manpower pools by army
     /// steps, and heads sent home to a pool by the unpaid decay, all rounds.
     int64_t levy_heads_raised   = 0;
@@ -5301,6 +5417,88 @@ int trade_sea_volume_q(const trade_context& ctx, const std::vector<region>& regi
 /// the break re-score both read it, off the same recorded class.
 int treaty_far_penalty_for(const history_sim_params& p, bool met_across_water);
 
+/// BL-1152 -- ONE REALM DEFENDING A CROSSING AT SEA: its fleet, and the sea
+/// tiles it projects from (sorted, distinct). `seat_coast` marks a fleet with
+/// no built port, projecting from its seat's coast.
+struct fleet_defender
+{
+    int              polity = -1;
+    int64_t          navy   = 0;
+    std::vector<int> ports;
+    bool             seat_coast = false;
+};
+
+/// The defenders of a crossing against @p realm by @p attacker: the realm
+/// itself and every living polity holding a `treaty_clause::mutual_defence`
+/// clause with it, each with a fleet (`navy_stock` > 0). A partner that ALSO
+/// holds `non_aggression` with the attacker ABSTAINS -- it is bound not to
+/// fight the attacker -- and is counted in @p abstained. Each projects from
+/// its BUILT PORTS (every region it holds, `region::nation`, with
+/// `port_stock_q` > 0, at the nearest sea tile within @p radius); a fleet with
+/// no built port projects from its SEAT'S COAST (its capital's nearest sea
+/// tile). Sorted by polity id. Empty for @p realm < 0.
+std::vector<fleet_defender> crossing_defenders(const history_sim_state& s, const std::vector<region>& regions,
+                                               int realm, int attacker,
+                                               const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                               int radius, int64_t* abstained);
+
+/// BL-1152 -- IS A CROSSING OUT-PROJECTED AT SEA? The leg is the sea walk from
+/// @p hub_tile (the attacker's staging coast) to @p landing_tile (the target's
+/// coast), priced with the current. At each tile of it, in walk order, the
+/// attacker's power is its fleet decayed from the hub's coast and the
+/// defenders' is the SUM of their fleets decayed from their own ports
+/// (`fleet_power_at`, one halving distance). The first tile where the
+/// defenders' power outweighs the attacker's stops the crossing; `stopper` is
+/// the defender projecting the most there (ties to the lower id). No leg, no
+/// defender with a fleet, or @p halving_tiles <= 0: never stopped.
+struct crossing_verdict
+{
+    bool    leg       = false; ///< a sea walk joined the two coasts
+    bool    stopped   = false;
+    int     stopper   = -1;
+    int     stop_tile = -1;
+    int64_t attacker_power = 0, defender_power = 0; ///< at the stop tile
+    int     leg_tiles = 0;
+};
+/// The sea fields the fleet gate reads, memoised for the SPAN. Each is keyed
+/// by exactly what it is a function of -- a staging coast tile, or a
+/// defender's sorted port tiles -- over a sea mask and a current field that do
+/// not move in a span, so an entry can never go stale and no answer depends on
+/// whether it is found or rebuilt. Bounded first-in-first-out (`cap_*`, set by
+/// the sim from the grid's size); eviction changes cost, never a result.
+struct fleet_field_cache
+{
+    std::vector<std::pair<int, std::shared_ptr<const sea_field>>> hub; ///< (coast tile, field + walk)
+    std::vector<std::pair<std::vector<int>, std::shared_ptr<const std::vector<int64_t>>>> ports;
+    std::size_t cap_hub = 32, cap_ports = 64;
+    int64_t built_hub = 0, built_ports = 0, hits = 0; ///< cost readout only
+};
+crossing_verdict judge_crossing(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                const ocean_current_field* currents, int weight_q, int64_t halving_tiles,
+                                int hub_tile, int landing_tile, int64_t attacker_navy,
+                                const std::vector<fleet_defender>& defenders,
+                                fleet_field_cache* cache = nullptr);
+
+/// BL-1152 review -- THE COASTS A CROSSING SAILS BETWEEN. @p comp labels each
+/// sea tile's water (`sea_components`); @p hub_ring and @p tgt_ring are the
+/// staging region's and the target's coast tiles in ring order
+/// (`sea_tiles_by_ring`). The landing is the first target tile whose water any
+/// hub tile shares, the embarkation the first hub tile in that water. False
+/// (no leg: the crossing is not wet-capable) when no water joins them.
+bool fleet_coasts(const std::vector<int>& comp, const std::vector<int>& hub_ring, const std::vector<int>& tgt_ring,
+                  int* hub_tile, int* landing);
+
+/// BL-1152 review -- @p total split in proportion to @p weights (each >= 0),
+/// floors first, the remainder one each to the largest remainders, ties to the
+/// lower @p index (a region index per weight). Sums to @p total whenever any
+/// weight is positive; integer and exact over a 128-bit product.
+std::vector<int64_t> split_by_largest_remainder(int64_t total, const std::vector<int64_t>& weights,
+                                                const std::vector<int>& index);
+
+/// BL-1152 -- the men a fleet lifts: `navy x men_per_hull` (0 with no
+/// fleet), or -1 = unbounded where @p men_per_hull <= 0.
+int64_t fleet_lift_capacity(int64_t navy, int64_t men_per_hull);
+
 /// BL-1147 (review) -- WHICH REGIONS' CELLS TOUCH THE SEA, kept incrementally.
 /// A region's cell is the settlement partition's (the tiles nearest its
 /// anchor, Chebyshev with columns wrapping, ties to the lower region index --
@@ -5744,6 +5942,10 @@ struct exploration_output
     /// for them. Copied from `history_sim_state`, never re-derived.
     int64_t provinces_bought            = 0;
     int64_t treasury_spent_on_purchases = 0;
+
+    /// BL-1152 -- the span's fleet ledger (`history_sim_state::fleet`), copied:
+    /// the crossings the fleet stopped, by whom, and the men it left ashore.
+    fleet_ledger fleet;
 
     /// BL-1036 -- the civilisation and universal-creed records this span's
     /// run held at its close, in index order: the tables the carried

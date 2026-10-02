@@ -159,3 +159,67 @@ std::vector<int32_t> landmass_labels(const std::vector<terrain_substrate>& subst
 /// two tiles carries, ties to the lower label, a count over a fixed window
 /// so no walk order reaches it. -1 out of range or with no ground that near.
 int32_t landmass_at(const std::vector<int32_t>& labels, int gw, int gh, int col, int row);
+
+// ---------------------------------------------------------------------------
+// THE SEA'S OWN WALK (BL-1098's lane walker, shared since BL-1152). A Dijkstra
+// over the SEA tiles (`is_sea`: ocean and coast; a lake is not the ocean) on
+// FOUR CARDINAL STEPS, columns wrapping and rows not -- the grid every
+// traversal reader walks. Each step costs 1000 x the leg cost
+// (`ocean_current_leg_cost_q`) of the step's direction against the ENTERED
+// tile's ocean-region current at @p weight_q, at least 1 -- so still water is
+// 1000 a tile. The frontier is ordered on the pair (cost, raster index), which
+// is unique, so every tie resolves the same way on every machine. @p sea is
+// one byte per tile, raster order, 1 on sea; @p currents null or @p weight_q 0
+// is still water.
+// ---------------------------------------------------------------------------
+
+/// The nearest sea tile to (@p col, @p row) within @p radius (Chebyshev,
+/// columns wrapping), ring by ring, ties to the lower raster index; -1 if none.
+int nearest_sea_tile(const std::vector<std::uint8_t>& sea, int gw, int gh, int col, int row, int radius);
+
+/// The walk from raster index @p from to @p to, both sea tiles: the path in
+/// walk order, both ends included; empty when no water joins them.
+std::vector<int> sea_walk(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                          const ocean_current_field* currents, int weight_q, int from, int to);
+
+/// The cost of the cheapest walk from any of @p sources to every tile, by the
+/// same steps (a multi-source Dijkstra); INT64_MAX where no water reaches.
+/// Sources off the sea, or out of range, are skipped.
+std::vector<int64_t> sea_cost_field(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                    const ocean_current_field* currents, int weight_q,
+                                    const std::vector<int>& sources);
+
+/// BL-1152 -- every sea tile within @p radius of (@p col, @p row), in the order
+/// `nearest_sea_tile` ranks them: ring by ring outward (Chebyshev, columns
+/// wrapping), inside a ring by raster index. Its first entry is
+/// `nearest_sea_tile`'s answer.
+std::vector<int> sea_tiles_by_ring(const std::vector<std::uint8_t>& sea, int gw, int gh, int col, int row,
+                                   int radius);
+
+/// BL-1152 -- which body of water each tile is in, by the walk's own four
+/// cardinal steps (columns wrapping, rows not): a label per tile, -1 off the
+/// sea, labels numbered in raster order of each body's first tile. Two sea
+/// tiles have a walk between them exactly when their labels match.
+std::vector<int> sea_components(const std::vector<std::uint8_t>& sea, int gw, int gh);
+
+/// BL-1152 -- `sea_cost_field` from one source, with the walk's predecessor
+/// per tile, so a walk to any tile reads off it (`sea_path_on`) without a
+/// second search. The path to a tile is the one `sea_walk` returns: a settled
+/// tile's predecessor never changes after it settles.
+struct sea_field
+{
+    std::vector<int64_t> dist;
+    std::vector<int>     prev;
+};
+sea_field sea_field_from(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                         const ocean_current_field* currents, int weight_q, int source);
+/// The walk from @p f's source to @p to, in walk order; empty if unreached.
+std::vector<int> sea_path_on(const sea_field& f, int to);
+
+/// BL-1152 -- A FLEET'S POWER AT SEA, @p cost from its port (a
+/// `sea_cost_field` reading): `navy x 1024`, halved every @p halving_tiles
+/// still-water tiles (x 1000 cost units), linear within a halving -- so a
+/// fleet reaches less far against the current, which prices the distance.
+/// 0 with no fleet, out of reach (INT64_MAX), or with @p halving_tiles <= 0.
+/// Integer throughout; the scale (1024) is only resolution.
+int64_t fleet_power_at(int64_t navy, int64_t cost, int64_t halving_tiles);
