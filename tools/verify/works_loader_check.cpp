@@ -77,10 +77,10 @@ int main()
         const std::string msg = load_with(nullptr, r, threw);
         check(!threw && r.size() > 0, "scripts/works.lua loads" + (threw ? " -- " + msg : std::string()));
         const int granary = r.id_of("Granary"), blast = r.id_of("Blast Works"), wall = r.id_of("Wall Circuit");
-        check(granary >= 0 && r.row_at(static_cast<std::size_t>(granary))->employs == 2000
-                  && blast >= 0 && r.row_at(static_cast<std::size_t>(blast))->employs == 120000
+        check(granary >= 0 && r.row_at(static_cast<std::size_t>(granary))->employs == 8000
+                  && blast >= 0 && r.row_at(static_cast<std::size_t>(blast))->employs == 480000
                   && wall >= 0 && r.row_at(static_cast<std::size_t>(wall))->employs == 0,
-              "rows carry the heads they were authored with (Granary 2,000, Blast Works 120,000, Wall Circuit 0)");
+              "rows carry the heads they were authored with (Granary 8,000, Blast Works 480,000, Wall Circuit 0)");
     }
 
     // --- W2-W5, W7: the refusals -------------------------------------------
