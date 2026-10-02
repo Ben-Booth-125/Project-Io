@@ -7963,6 +7963,60 @@
      "result_metric": "Main 205a1afa: world_determinism ALL PASS twice (C9160AAFA0B80182 / 608B9CFF2E21DF8D / F7A64F75026B029B); road_generation_harness OK (the Highway row green for the first time this sprint); save_roundtrip, world_cursor_equivalence, spawn_solvency, landscape_search_harness pass; history_sim only R3a2/R3a3."
     }
    ]
+  },
+  {
+   "brief": "province-front-tile-readers",
+   "title": "BL-1145 - A province's readers take its anchor, not its lowest tile",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1145 - sprint 48",
+   "batch": "sprint-48",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "RA",
+     "status": "complete",
+     "verification": [
+      "headless: centre_census C7 FAIL, C16/C16b; garrison_border_probe; save_roundtrip P6"
+     ],
+     "requirement": "Readers take the anchor; border garrisons face their border; the capital garrison stands on the capital province's anchor; the battle card reads the battle's own ground (save v30).",
+     "notes": "",
+     "result_metric": "7d8bd45d + 8f706eec, merged 5e44897d: 0 garrisons off post; the nation-AI threat term within 2% of main (was -37%)."
+    },
+    {
+     "id": "RB",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review.",
+     "notes": "",
+     "result_metric": "Border-force loss, the capital seed tile, battle_ground_tile re-derivation, C16 assertions -- fixed."
+    },
+    {
+     "id": "RC",
+     "status": "complete",
+     "verification": [
+      "headless: gates on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": "Main 5e44897d: world_determinism ALL PASS twice; save_roundtrip, centre_census, world_cursor_equivalence, spawn_solvency, garrison_border_probe pass; history_sim only R3a2/R3a3."
+    },
+    {
+     "id": "RD",
+     "status": "pending",
+     "verification": [
+      "visual: live click"
+     ],
+     "requirement": "A marker shows on an army in a large province.",
+     "notes": "",
+     "result_metric": "Owed at the sprint's live walk (play build 22:42 2026-10-02)."
+    }
+   ]
   }
  ]
 }
