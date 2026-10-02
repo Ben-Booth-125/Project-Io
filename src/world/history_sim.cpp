@@ -11553,10 +11553,13 @@ std::vector<culture_good_preference> derive_culture_preference(
             {
                 const std::size_t gi = static_cast<std::size_t>(g);
                 // `score_against`'s scale against the EXACT mean (BL-1041):
-                // raw * 500 * n / sum, capped at 1000; 0 where no cradle held any.
+                // raw * 500 * n / sum, capped at 1000. Where NO cradle held
+                // any, every cradle sits AT the mean (all equal at zero), so
+                // the score is 500 and there is no lack: a good no people
+                // ever knew is nobody's remembered absence.
                 const int score = sum[gi] > 0
                     ? static_cast<int>(clampi64((raw_of(cu.profile, g) * 500 * cradles) / sum[gi], 0, 1000))
-                    : 0;
+                    : 500;
                 if (score < 500)
                     row[gi] += ((500 - score) * culture_profile_lack_max_q) / 500;
             }
