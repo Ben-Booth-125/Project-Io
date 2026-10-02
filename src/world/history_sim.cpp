@@ -602,7 +602,8 @@ urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
         for (int m : members)
         {
             const region& r = regions[static_cast<std::size_t>(m)];
-            if (r.population <= 0 || !region_stands_a_town(r)) continue;
+            // Any centre with open work (Ben, 2026-10-02), not towns only.
+            if (r.population <= 0 || r.centres <= 0) continue;
             const int64_t ow = (static_cast<std::size_t>(m) < open_work.size())
                                    ? open_work[static_cast<std::size_t>(m)] : 0;
             if (ow <= 0) continue;

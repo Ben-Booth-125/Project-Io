@@ -2136,7 +2136,7 @@ int main()
             lines.gh = sgh;
             const auto on_land = [&](int a, int b) { return lines.joined(w, a, b); };
             // The pull is OPEN WORK (Ben, 2026-09-27): jobs beyond the heads already there.
-            const std::vector<int64_t> credit = { 1000, 0, 0, 500, 0 };
+            const std::vector<int64_t> credit = { 1000, 0, 0, 0, 0 }; // the foreign centre offers none: it would draw on its own countryside
             int64_t people_before = 0, ceiling_before = 0;
             for (const region& r : w) { people_before += r.population; ceiling_before += region_ceiling(r); }
             const region colony = w[2], foreign = w[3], far_village = w[4];
@@ -2183,6 +2183,20 @@ int main()
                         static_cast<long long>(w[1].industrial_heads), static_cast<long long>(ur.moved));
             check(w[0].industrial_heads == 3000 && w[1].industrial_heads == 0 && ur.moved == 3000,
                   "BL1137s11 a destination takes at most its open work, and a town whose works are full draws nobody");
+            // S12 ANY CENTRE WITH OPEN WORK DRAWS (Ben, 2026-10-02): a village of
+            // 20,000 urban heads whose works hire 5,000 more takes them; a region
+            // standing no centre takes nobody, whatever its open work.
+            std::vector<region> v;
+            v.push_back(at(make_region(600, 200000, 20000), 3, 2));           // the village, a centre
+            v.push_back(at(make_region(600, ceiling_of(600), 30000), 4, 2));  // a pushing countryside
+            v.push_back(at(make_region(600, 200000, 5000), 5, 2));            // no centre
+            v[2].centres = 0;
+            const std::vector<int> vown = { 0, 0, 0 };
+            const std::vector<std::vector<int>> vnbr = { { 1, 2 }, { 0, 2 }, { 0, 1 } };
+            const std::vector<int64_t> vopen = { 5000, 0, 4000 };
+            run_urbanisation_stream(v, vown, vnbr, [](int, int) { return true; }, vopen, 10);
+            check(v[0].industrial_heads == 5000 && v[2].industrial_heads == 0,
+                  "BL1137s12 any centre with open work draws the stream (a village too); ground with no centre draws nobody");
             region full = make_region(800, 300000, 60000);
             check(region_open_work(full, 80000) == 20000 && region_open_work(full, 50000) == 0
                   && region_open_work(full, 0) == 0,

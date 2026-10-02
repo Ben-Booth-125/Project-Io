@@ -4922,10 +4922,11 @@ struct urbanisation_round
 ///   that @p linked accepts (the sim passes a line that stays on land, so the
 ///   supply graph's reach across a strait is not a road people walk). People
 ///   move only inside one piece.
-///   THE DESTINATIONS. The piece's regions of at least a town's people
-///   (`region_stands_a_town`) whose works offer OPEN WORK (@p open_work > 0:
-///   the heads its works employ beyond the urban heads already there,
-///   `region_open_work`).
+///   THE DESTINATIONS. The piece's regions that hold a centre and whose works
+///   offer OPEN WORK (@p open_work > 0: the heads its works employ beyond the
+///   urban heads already there, `region_open_work`). ANY CENTRE, not towns only
+///   (Ben, 2026-10-02; INDUSTRIALISATION.md Beat 2): a village whose works hire
+///   takes people and grows into a town.
 ///   THE PUSH. Every region of the piece would send its countryside at
 ///   `urbanisation_outflow` over @p step_years.
 ///   THE PULL IS OPEN WORK (Ben, 2026-09-27; INDUSTRIALISATION.md Beat 2: "a
