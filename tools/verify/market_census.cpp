@@ -1080,7 +1080,7 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
     std::printf("[seat] corp %u%s\n", seat.seated, seat.floor_unmet ? "  (FLOOR UNMET)" : "");
 
     std::printf("[M1] home body %u (%s): %d markets = %d capital shells + %d carve%s"
-                "   | of the carve, junction-lowered (report.markets_from_trade): %" PRId64
+                "   | junction-lowered at the carve, before the folds (report.markets_from_trade): %" PRId64
                 "   | corridors %" PRId64 ", junction regions %" PRId64 "\n",
                 home, hb.name.c_str(), rec.home_markets, rec.shells, rec.carve,
                 rec.unanchored ? " + unanchored fallback" : "",
@@ -1383,10 +1383,11 @@ int main(int argc, char** argv)
             }
         }
         const double n = static_cast<double>(std::max<std::size_t>(1, recs.size()));
-        std::printf("  markets %lld (%.1f a seed): shells %lld (%.1f%%), carve %lld (%.1f%%), of the carve "
-                    "junction-lowered %lld (%.1f%% of the carve)\n",
-                    mk, mk / n, sh, mk ? 100.0 * sh / mk : 0.0, cv, mk ? 100.0 * cv / mk : 0.0, jn,
-                    cv ? 100.0 * jn / cv : 0.0);
+        // BL-1125: the junction count is the carve's, taken BEFORE the folds,
+        // so it is no longer a share of the carve that stands.
+        std::printf("  markets %lld (%.1f a seed): shells %lld (%.1f%%), carve %lld (%.1f%%); "
+                    "junction-lowered at the carve, before the folds, %lld\n",
+                    mk, mk / n, sh, mk ? 100.0 * sh / mk : 0.0, cv, mk ? 100.0 * cv / mk : 0.0, jn);
         std::printf("  shells marked at 1200 %lld, 1660 %lld, 1960 %lld\n", c12, c16, c19);
         std::printf("  shell fate at 1960: maker holds %lld, maker alive capital elsewhere %lld, maker "
                     "dead %lld; of the lost %lld: no living capital %lld, a successor's %lld\n",
