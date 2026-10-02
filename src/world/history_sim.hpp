@@ -557,7 +557,8 @@ struct history_sim_params
     //   treasury and lands as points, `industry_points_per_treasury_unit` to
     //   the unit. RULED a consequence (Ben, 2026-09-18): no polity scores it,
     //   so it is no verb. The points SPREAD over the polity's held regions
-    //   that stand centres, by urban scale (`industry_points_apportion_by_scale`;
+    //   that stand centres, by the heads their works employ (NR-964, amending
+    //   NR-897's urban scale; `industry_points_apportion_by_scale`;
     //   BL-1056, Ben 2026-09-19, NR-897): a treasury builds its realm's works
     //   where its people are. A realm with no held centre carrying heads
     //   converts NOTHING (NR-901, Ben 2026-09-19): no debit, no credit, the
@@ -2736,7 +2737,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                             exploration_upkeep_spend*              spend = nullptr,
                             const std::vector<dated_object>*       treaties = nullptr,
                             std::vector<trade_flow>*               flows_out = nullptr,
-                            const exploration_spend_context*       spend_ctx = nullptr);
+                            const exploration_spend_context*       spend_ctx = nullptr,
+                            const works_registry*                  works = nullptr);
 
 // ---------------------------------------------------------------------------
 // Actors
@@ -3549,8 +3551,16 @@ inline constexpr int64_t industry_points_apportion_heads_max = 1LL << 32;
 /// @p out is empty and the result true: the caller converts NOTHING (NR-901,
 /// Ben 2026-09-19 -- a polity that holds no town has nowhere for its works to
 /// stand, so its treasury keeps the round's share).
+///
+/// AMENDED (Ben, 2026-10-01, NR-964): the weight is the heads the region's
+/// works EMPLOY -- min(urban heads, `works_registry::employed_heads_mask` of
+/// `works_built`) off @p works -- not its urban heads, so the treasury's points
+/// follow the works as the scale credit's do. A polity whose centred regions
+/// employ nobody (or no table at all) has no weighed region: it converts
+/// nothing, NR-901's rule.
 bool industry_points_apportion_by_scale(const std::vector<region>& regions, int holder, int64_t credit,
-                                        std::vector<std::pair<int, int64_t>>& out);
+                                        std::vector<std::pair<int, int64_t>>& out,
+                                        const works_registry* works);
 
 /// What one round's scale accrual did.
 struct industry_points_round

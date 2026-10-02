@@ -1064,7 +1064,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                             exploration_upkeep_spend*              spend,
                             const std::vector<dated_object>*       treaties,
                             std::vector<trade_flow>*               flows_out,
-                            const exploration_spend_context*       spend_ctx)
+                            const exploration_spend_context*       spend_ctx,
+                            const works_registry*                  works)
 {
     // BL-939 -- the demand half, refreshed on the same round-level cadence
     // the treasury's own earn runs on: a market's signal is a fact about
@@ -1346,9 +1347,11 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // never taxed a second time. The share LEAVES the treasury (a
         // conversion, not a copy); the scored purchase below reads what is left.
         // BL-1056 (RULED, Ben 2026-09-19, NR-897): the points SPREAD over the
-        // polity's held regions that stand centres, in proportion to their
-        // urban scale, by integer largest-remainder apportionment -- a treasury
-        // builds its realm's works where its people are. Landing them all on
+        // polity's held regions that stand centres by integer largest-remainder
+        // apportionment, in proportion to the heads their works employ (AMENDED,
+        // Ben 2026-10-01, NR-964: it was their urban scale) -- a treasury builds
+        // where its works are. A realm whose centres employ nobody converts
+        // nothing (NR-901, below). Landing them all on
         // the capital's region let one region hold up to 65% of a world's
         // points. The capital still leads where it is the largest centre.
         // NR-901 (RULED, Ben 2026-09-19, option A): A POLITY THAT HOLDS NO TOWN
@@ -1374,7 +1377,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             {
                 const int64_t credit = paid_in * params.industry_points_per_treasury_unit;
                 std::vector<std::pair<int, int64_t>> spread;
-                bool refuse = !industry_points_apportion_by_scale(regions, q.id, credit, spread);
+                bool refuse = !industry_points_apportion_by_scale(regions, q.id, credit, spread, works);
                 // NR-901: no town, no conversion. Not a refusal (nothing was out
                 // of domain) and not a debit: the purse keeps the share.
                 const bool no_town = !refuse && spread.empty();
@@ -4916,7 +4919,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // into `out.trade_flows` (never accumulated).
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
                                    params, y, step_years, &upkeep_spend,
-                                   &out.dated_objects, &out.trade_flows, &spend_ctx);
+                                   &out.dated_objects, &out.trade_flows, &spend_ctx, works);
             note_trade_legs(); // BL-1140: the round's trade across water, the fourth writer
             out.treasury_spent_on_ports           += upkeep_spend.ports;
             out.treasury_spent_on_navies          += upkeep_spend.navies;
@@ -10392,7 +10395,8 @@ int64_t industry_points_scale_credit(const region& r, int industrial_q,
 }
 
 bool industry_points_apportion_by_scale(const std::vector<region>& regions, int holder, int64_t credit,
-                                        std::vector<std::pair<int, int64_t>>& out)
+                                        std::vector<std::pair<int, int64_t>>& out,
+                                        const works_registry* works)
 {
     // BL-1056 (Ben, 2026-09-19, NR-897). LARGEST REMAINDER, EXACT: region i's
     // share is credit * w_i / W; it takes the floor, and the credit the floors
@@ -10408,9 +10412,13 @@ bool industry_points_apportion_by_scale(const std::vector<region>& regions, int 
         const region& r = regions[i];
         if (r.nation != holder || r.centres <= 0 || r.urban_population <= 0) continue;
         if (r.urban_population > industry_points_urban_heads_max) { out.clear(); return false; }
-        total += r.urban_population;
+        // NR-964: the heads its works employ (none without a table).
+        const int64_t employed = (works != nullptr) ? works->employed_heads_mask(r.works_built) : 0;
+        const int64_t w = std::min(r.urban_population, employed);
+        if (w <= 0) continue;
+        total += w;
         if (total > industry_points_apportion_heads_max) { out.clear(); return false; }
-        out.emplace_back(static_cast<int>(i), r.urban_population); // the weight, for now
+        out.emplace_back(static_cast<int>(i), w); // the weight, for now
     }
     if (out.empty()) return true;
 
