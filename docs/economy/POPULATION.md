@@ -441,7 +441,10 @@ avoids per-centre bookkeeping the prototype does not need.
   a deeper facility costs qualified heads, not only credits.
 - **Seeded from history.** A region's Era −1 industrialisation timing — the same scalar that
   sets corp focus (`docs/generation/CORPORATION_GENERATION.md` § Pass 2) — aggregates into the
-  nation's opening fraction: early industrialisers open qualified, late ones raw.
+  nation's opening fraction: early industrialisers open qualified, late ones raw. **On a generated
+  world the timing read is the polity's own industrial crossing year (Ben, 2026-10-03)**, the one the
+  sim records; the regional furnace flags are never lit there, so reading them left every nation tied
+  at the floor and no Highway ever qualified.
 - **Scales generated infrastructure.** A low-qualification nation generates fewer, lower-tier
   roads (`docs/economy/LOGISTICS.md` § Roads; BL-618, roads scale with qualification).
 - **Moves with people.** Migration carries qualification — brain drain is real (§ Migration).

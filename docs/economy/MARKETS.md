@@ -77,7 +77,8 @@ to another, idle and unbuilt. Three in-world causes remove them, and none is a c
    anyway, since catchment ties go to the lowest id.
 2. **Gravity fold.** A market inside a larger market's reach folds into it: trade goes where it
    concentrates. "Larger" is catchment population; "reach" is a traversal cost, calibrated so a
-   1960 world carries roughly **20–40 markets, about one per major city**. That aim sets the
+   1960 world carries roughly **20–40 markets**, each serving a region of cities rather than one
+   apiece (Ben, 2026-10-03: the per-city phrasing dropped; capitals fold like any market). That aim sets the
    constant, measured on the curated seeds; the rule never enforces a count.
 3. **Conquest consolidates.** When a realm conquers the region its rival's market stands on, the
    conquered market is destroyed to consolidate the conqueror's strength (Ben, 2026-09-25). The
