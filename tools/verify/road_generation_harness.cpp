@@ -353,9 +353,11 @@ static void tier_census(const world& w, entity_id body, int counts[4])
 // THE RULE, ASKED INDEPENDENTLY (LOGISTICS.md § 4): a backbone link (tree or kept
 // loop) between two City+ centres in a nation at percentile >= 0.80 is a Highway.
 // From the trace alone: every such QUALIFYING link's land tiles must carry
-// road_level 3 on the shipped field (R2s-a), and the shipped worlds must carry a
-// Highway somewhere the rule qualifies one (R2s-b). If no shipped world qualifies
-// a link, R2s-b FAILS and the per-seed lines say why — never weakened to pass.
+// road_level 3 on the shipped field (R2s-a — a SELF-CONSISTENCY check: the trace is
+// the pass's own, so it confirms the field matches the pass's tier choice, not the
+// rule from outside), and some shipped seed must lay a qualifying link at Highway
+// (R2s-b — ancient-corridor Highway tiles never count). If no shipped world
+// qualifies a link, R2s-b FAILS and the per-seed lines say why — never weakened.
 struct shipped_highway_row
 {
     uint32_t seed = 0;
@@ -612,17 +614,23 @@ static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
         qualifying    += r.qualifying;
         qualifying_ok += r.qualifying_at_highway;
         above         += r.above_shipped;
-        if (r.qualifying > 0 && r.shipped_tiers[3] > 0) ++seeds_qualifying_with_highway;
+        // BL-1159 review fix: a seed counts only when a QUALIFYING link itself is
+        // Highway, so ancient-corridor Highway tiles alone can never satisfy R2s-b.
+        if (r.qualifying_at_highway > 0) ++seeds_qualifying_with_highway;
     }
     std::printf("      (R2s pooled: qualifying links %d, at Highway %d; seeds carrying a qualifying"
                 " Highway %d of %zu; re-laid tiles above the shipped field %d)\n",
                 qualifying, qualifying_ok, seeds_qualifying_with_highway, seeds.size(), above);
     check(above == 0, "R2s0 the re-laid national lattice sits within the shipped field");
+    // R2s-a is a SELF-CONSISTENCY check, not proof of the rule: the qualifying set is
+    // read off the pass's own trace and re-derives the gate the pass applied, so it
+    // shows the stamped field agrees with the pass's own tier choice on those links.
     check(qualifying_ok == qualifying,
-          "R2s-a on the shipped worlds every qualifying link (two City+, pct >= 0.80) is Highway");
+          "R2s-a (self-consistency) every traced qualifying link (two City+, pct >= 0.80) is"
+          " Highway on the shipped field");
     check(seeds_qualifying_with_highway > 0,
-          "R2s-b the highway tier (road_level 3) is reached on the shipped worlds where the rule"
-          " qualifies one");
+          "R2s-b some shipped seed lays a QUALIFYING link at Highway (ancient-corridor Highways"
+          " do not count)");
 }
 
 int main(int argc, char** argv)

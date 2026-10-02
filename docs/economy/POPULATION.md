@@ -439,12 +439,17 @@ avoids per-centre bookkeeping the prototype does not need.
   requires that many **qualified** workers from the pool alongside ordinary labour; the
   qualified pool is the scarcer one, and is what gates organically scaling building levels —
   a deeper facility costs qualified heads, not only credits.
-- **Seeded from history.** A region's Era −1 industrialisation timing — the same scalar that
-  sets corp focus (`docs/generation/CORPORATION_GENERATION.md` § Pass 2) — aggregates into the
-  nation's opening fraction: early industrialisers open qualified, late ones raw. **On a generated
-  world the timing read is the polity's own industrial crossing year (Ben, 2026-10-03)**, the one the
-  sim records; the regional furnace flags are never lit there, so reading them left every nation tied
-  at the floor and no Highway ever qualified.
+- **Seeded from history.** Era −1 industrialisation timing aggregates into the nation's opening
+  fraction: early industrialisers open qualified, late ones raw. **On a generated world the timing
+  read is the polity's own industrial crossing year (Ben, 2026-10-03)**, the one the sim records:
+  the earliest crossing among the polities holding the nation's regions sets the base, and the
+  share of its regions held by a polity that crossed adds breadth; a polity that never crossed
+  reads as never industrialised. The regional furnace flags are never lit on a generated world,
+  so reading them would tie every nation at the floor and no Highway would ever qualify.
+  **Corp focus reads a different scalar** (`docs/generation/CORPORATION_GENERATION.md` § Pass 2):
+  a region's own furnace year against the world median of those years — on a generated world
+  that median is 0, so focus takes its never-industrialised rung while qualification reads the
+  polity crossing.
 - **Scales generated infrastructure.** A low-qualification nation generates fewer, lower-tier
   roads (`docs/economy/LOGISTICS.md` § Roads; BL-618, roads scale with qualification).
 - **Moves with people.** Migration carries qualification — brain drain is real (§ Migration).
