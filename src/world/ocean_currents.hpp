@@ -189,6 +189,33 @@ std::vector<int64_t> sea_cost_field(const std::vector<std::uint8_t>& sea, int gw
                                     const ocean_current_field* currents, int weight_q,
                                     const std::vector<int>& sources);
 
+/// BL-1152 -- every sea tile within @p radius of (@p col, @p row), in the order
+/// `nearest_sea_tile` ranks them: ring by ring outward (Chebyshev, columns
+/// wrapping), inside a ring by raster index. Its first entry is
+/// `nearest_sea_tile`'s answer.
+std::vector<int> sea_tiles_by_ring(const std::vector<std::uint8_t>& sea, int gw, int gh, int col, int row,
+                                   int radius);
+
+/// BL-1152 -- which body of water each tile is in, by the walk's own four
+/// cardinal steps (columns wrapping, rows not): a label per tile, -1 off the
+/// sea, labels numbered in raster order of each body's first tile. Two sea
+/// tiles have a walk between them exactly when their labels match.
+std::vector<int> sea_components(const std::vector<std::uint8_t>& sea, int gw, int gh);
+
+/// BL-1152 -- `sea_cost_field` from one source, with the walk's predecessor
+/// per tile, so a walk to any tile reads off it (`sea_path_on`) without a
+/// second search. The path to a tile is the one `sea_walk` returns: a settled
+/// tile's predecessor never changes after it settles.
+struct sea_field
+{
+    std::vector<int64_t> dist;
+    std::vector<int>     prev;
+};
+sea_field sea_field_from(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                         const ocean_current_field* currents, int weight_q, int source);
+/// The walk from @p f's source to @p to, in walk order; empty if unreached.
+std::vector<int> sea_path_on(const sea_field& f, int to);
+
 /// BL-1152 -- A FLEET'S POWER AT SEA, @p cost from its port (a
 /// `sea_cost_field` reading): `navy x 1024`, halved every @p halving_tiles
 /// still-water tiles (x 1000 cost units), linear within a halving -- so a

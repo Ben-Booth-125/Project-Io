@@ -441,6 +441,103 @@ std::vector<int> sea_walk(const std::vector<std::uint8_t>& sea, int gw, int gh,
     return path;
 }
 
+std::vector<int> sea_tiles_by_ring(const std::vector<std::uint8_t>& sea, int gw, int gh, int col, int row,
+                                   int radius)
+{
+    std::vector<int> out;
+    if (gw <= 0 || gh <= 0 || sea.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return out;
+    if (col < 0 || row < 0 || col >= gw || row >= gh)
+        return out;
+    for (int r = 0; r <= radius; ++r)
+    {
+        std::vector<int> ring;
+        for (int dr = -r; dr <= r; ++dr)
+        {
+            const int rr = row + dr;
+            if (rr < 0 || rr >= gh)
+                continue;
+            for (int dc = -r; dc <= r; ++dc)
+            {
+                if (std::max(std::abs(dc), std::abs(dr)) != r)
+                    continue;
+                const int cc = ((col + dc) % gw + gw) % gw;
+                const int idx = rr * gw + cc;
+                if (sea[static_cast<std::size_t>(idx)])
+                    ring.push_back(idx);
+            }
+        }
+        std::sort(ring.begin(), ring.end());
+        ring.erase(std::unique(ring.begin(), ring.end()), ring.end()); // a wrapped ring can meet itself
+        for (const int t : ring)
+            if (std::find(out.begin(), out.end(), t) == out.end())
+                out.push_back(t);
+    }
+    return out;
+}
+
+std::vector<int> sea_components(const std::vector<std::uint8_t>& sea, int gw, int gh)
+{
+    std::vector<int> comp;
+    const int n = gw * gh;
+    if (gw <= 0 || gh <= 0 || sea.size() != static_cast<std::size_t>(n))
+        return comp;
+    comp.assign(static_cast<std::size_t>(n), -1);
+    int label = 0;
+    std::vector<int> stack;
+    for (int s = 0; s < n; ++s)
+    {
+        if (!sea[static_cast<std::size_t>(s)] || comp[static_cast<std::size_t>(s)] >= 0)
+            continue;
+        comp[static_cast<std::size_t>(s)] = label;
+        stack.assign(1, s);
+        while (!stack.empty())
+        {
+            const int u = stack.back();
+            stack.pop_back();
+            const int uc = u % gw, ur = u / gw;
+            constexpr int kDc[4] = { 0, 0, -1, 1 };
+            constexpr int kDr[4] = { -1, 1, 0, 0 };
+            for (int k = 0; k < 4; ++k)
+            {
+                const int vr = ur + kDr[k];
+                if (vr < 0 || vr >= gh)
+                    continue;
+                const int vc = ((uc + kDc[k]) % gw + gw) % gw;
+                const int v = vr * gw + vc;
+                if (!sea[static_cast<std::size_t>(v)] || comp[static_cast<std::size_t>(v)] >= 0)
+                    continue;
+                comp[static_cast<std::size_t>(v)] = label;
+                stack.push_back(v);
+            }
+        }
+        ++label;
+    }
+    return comp;
+}
+
+sea_field sea_field_from(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                         const ocean_current_field* currents, int weight_q, int source)
+{
+    sea_field f;
+    if (gw <= 0 || gh <= 0 || sea.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return f;
+    sea_dijkstra(sea, gw, gh, currents, weight_q, { source }, -1, f.dist, &f.prev);
+    return f;
+}
+
+std::vector<int> sea_path_on(const sea_field& f, int to)
+{
+    std::vector<int> path;
+    if (to < 0 || static_cast<std::size_t>(to) >= f.dist.size()
+        || f.dist[static_cast<std::size_t>(to)] == std::numeric_limits<int64_t>::max())
+        return path;
+    for (int t = to; t >= 0; t = f.prev[static_cast<std::size_t>(t)])
+        path.push_back(t);
+    std::reverse(path.begin(), path.end());
+    return path;
+}
+
 std::vector<int64_t> sea_cost_field(const std::vector<std::uint8_t>& sea, int gw, int gh,
                                     const ocean_current_field* currents, int weight_q,
                                     const std::vector<int>& sources)
@@ -462,8 +559,12 @@ int64_t fleet_power_at(int64_t navy, int64_t cost, int64_t halving_tiles)
     const int64_t r = cost % half;
     const int64_t base = std::min<int64_t>(navy, int64_t{1} << 40) * 1024;
     const int64_t p = base >> k;
-    // Linear within the halving: from p at its start to p/2 at its end.
-    return p - (p * r) / (2 * half);
+    // Linear within the halving: from p at its start to p/2 at its end. The
+    // product p * r can pass int64 inside the domain (p < 2^51, r < 10^8), so
+    // floor(p * r / D) is taken as (p / D) * r + floor((p % D) * r / D), exact
+    // and in range: p % D < D <= 2 x 10^8, so (p % D) * r < 2 x 10^16.
+    const int64_t D = 2 * half;
+    return p - ((p / D) * r + ((p % D) * r) / D);
 }
 
 uint64_t ocean_current_digest(const ocean_current_field& f)

@@ -1568,27 +1568,55 @@ crossing_verdict judge_crossing(const std::vector<std::uint8_t>& sea, int gw, in
 {
     crossing_verdict v;
     if (hub_tile < 0 || landing_tile < 0) return v;
-    const std::vector<int> leg = sea_walk(sea, gw, gh, currents, weight_q, hub_tile, landing_tile);
+    // The cheap exits first: with no halving, or no defending fleet, nothing
+    // can contest the crossing and no field is built.
+    if (halving_tiles <= 0 || defenders.empty())
+    {
+        v.leg = true; // the caller matched the two coasts' waters
+        return v;
+    }
+    // The hub's field carries the walk's predecessors, so the leg is read
+    // off it (the same path `sea_walk` returns) with no second search.
+    std::shared_ptr<const sea_field> hubf;
+    if (cache != nullptr)
+        for (const auto& e : cache->hub)
+            if (e.first == hub_tile) { hubf = e.second; ++cache->hits; break; }
+    if (!hubf)
+    {
+        hubf = std::make_shared<const sea_field>(sea_field_from(sea, gw, gh, currents, weight_q, hub_tile));
+        if (cache != nullptr)
+        {
+            if (cache->hub.size() >= cache->cap_hub && !cache->hub.empty()) cache->hub.erase(cache->hub.begin());
+            cache->hub.push_back({ hub_tile, hubf });
+            ++cache->built_hub;
+        }
+    }
+    const std::vector<int> leg = sea_path_on(*hubf, landing_tile);
     if (leg.empty()) return v;
     v.leg = true;
     v.leg_tiles = static_cast<int>(leg.size());
-    if (halving_tiles <= 0 || defenders.empty()) return v;
-    // A memo lookup: the field is the same integers whether built here or
-    // found in the turn's cache (linear scan; a turn reads a handful).
-    const auto field = [&](std::vector<std::pair<int, std::vector<int64_t>>>* memo, int key,
-                           const std::vector<int>& sources) -> std::vector<int64_t> {
-        if (memo != nullptr)
-            for (const auto& e : *memo) if (e.first == key) return e.second;
-        std::vector<int64_t> f = sea_cost_field(sea, gw, gh, currents, weight_q, sources);
-        if (memo != nullptr) memo->push_back({ key, f });
-        return f;
-    };
-    const std::vector<int64_t> from_hub =
-        field(cache != nullptr ? &cache->from_tile : nullptr, hub_tile, { hub_tile });
-    std::vector<std::vector<int64_t>> from_def;
+    std::vector<std::shared_ptr<const std::vector<int64_t>>> from_def;
     from_def.reserve(defenders.size());
     for (const fleet_defender& d : defenders)
-        from_def.push_back(field(cache != nullptr ? &cache->from_polity : nullptr, d.polity, d.ports));
+    {
+        std::shared_ptr<const std::vector<int64_t>> f;
+        if (cache != nullptr)
+            for (const auto& e : cache->ports)
+                if (e.first == d.ports) { f = e.second; ++cache->hits; break; }
+        if (!f)
+        {
+            f = std::make_shared<const std::vector<int64_t>>(sea_cost_field(sea, gw, gh, currents, weight_q, d.ports));
+            if (cache != nullptr)
+            {
+                if (cache->ports.size() >= cache->cap_ports && !cache->ports.empty())
+                    cache->ports.erase(cache->ports.begin());
+                cache->ports.push_back({ d.ports, f });
+                ++cache->built_ports;
+            }
+        }
+        from_def.push_back(std::move(f));
+    }
+    const std::vector<int64_t>& from_hub = hubf->dist;
     for (const int t : leg)
     {
         const std::size_t ti = static_cast<std::size_t>(t);
@@ -1597,7 +1625,7 @@ crossing_verdict judge_crossing(const std::vector<std::uint8_t>& sea, int gw, in
         int best_id = -1;
         for (std::size_t k = 0; k < defenders.size(); ++k)
         {
-            const int64_t pk = fleet_power_at(defenders[k].navy, from_def[k][ti], halving_tiles);
+            const int64_t pk = fleet_power_at(defenders[k].navy, (*from_def[k])[ti], halving_tiles);
             def += pk;
             if (pk > best) { best = pk; best_id = defenders[k].polity; } // defenders are id-sorted
         }
@@ -1612,6 +1640,75 @@ crossing_verdict judge_crossing(const std::vector<std::uint8_t>& sea, int gw, in
         }
     }
     return v;
+}
+
+namespace
+{
+/// floor(@p a x @p b / @p d) and its remainder, exact over the 128-bit
+/// product (a, b >= 0, 0 < d <= 2^62, the quotient within int64): integer
+/// throughout, the same on every compiler.
+void mul_div_floor(uint64_t a, uint64_t b, uint64_t d, uint64_t& q, uint64_t& r)
+{
+    const uint64_t al = a & 0xFFFFFFFFull, ah = a >> 32, bl = b & 0xFFFFFFFFull, bh = b >> 32;
+    const uint64_t p0 = al * bl, p1 = al * bh, p2 = ah * bl, p3 = ah * bh;
+    const uint64_t mid = (p0 >> 32) + (p1 & 0xFFFFFFFFull) + (p2 & 0xFFFFFFFFull);
+    const uint64_t lo  = (p0 & 0xFFFFFFFFull) | (mid << 32);
+    const uint64_t hi  = p3 + (p1 >> 32) + (p2 >> 32) + (mid >> 32);
+    q = 0; r = 0;
+    for (int i = 127; i >= 0; --i)
+    {
+        const uint64_t bit = i >= 64 ? (hi >> (i - 64)) & 1u : (lo >> i) & 1u;
+        r = (r << 1) | bit;
+        if (r >= d) { r -= d; if (i < 64) q |= (uint64_t{1} << i); }
+    }
+}
+} // namespace
+
+bool fleet_coasts(const std::vector<int>& comp, const std::vector<int>& hub_ring, const std::vector<int>& tgt_ring,
+                  int* hub_tile, int* landing)
+{
+    for (const int lt : tgt_ring)
+    {
+        if (lt < 0 || static_cast<std::size_t>(lt) >= comp.size() || comp[static_cast<std::size_t>(lt)] < 0) continue;
+        const int w = comp[static_cast<std::size_t>(lt)];
+        for (const int ht : hub_ring)
+        {
+            if (ht < 0 || static_cast<std::size_t>(ht) >= comp.size()) continue;
+            if (comp[static_cast<std::size_t>(ht)] == w)
+            {
+                if (hub_tile != nullptr) *hub_tile = ht;
+                if (landing != nullptr) *landing = lt;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+std::vector<int64_t> split_by_largest_remainder(int64_t total, const std::vector<int64_t>& weights,
+                                                const std::vector<int>& index)
+{
+    std::vector<int64_t> out(weights.size(), 0);
+    int64_t W = 0;
+    for (const int64_t w : weights) W += w > 0 ? w : 0;
+    if (total <= 0 || W <= 0) return out;
+    std::vector<std::pair<uint64_t, std::size_t>> rem; // (remainder, position)
+    int64_t given = 0;
+    for (std::size_t k = 0; k < weights.size(); ++k)
+    {
+        if (weights[k] <= 0) continue;
+        uint64_t q = 0, r = 0;
+        mul_div_floor(static_cast<uint64_t>(total), static_cast<uint64_t>(weights[k]), static_cast<uint64_t>(W), q, r);
+        out[k] = static_cast<int64_t>(q);
+        given += out[k];
+        rem.push_back({ r, k });
+    }
+    std::sort(rem.begin(), rem.end(), [&](const auto& x, const auto& y) {
+        if (x.first != y.first) return x.first > y.first;           // largest remainder first
+        return index[x.second] < index[y.second];                    // ties to the lower region index
+    });
+    for (std::size_t j = 0; given < total && j < rem.size(); ++j, ++given) ++out[rem[j].second];
+    return out;
 }
 
 int64_t fleet_lift_capacity(int64_t navy, int64_t men_per_hull)
@@ -1968,6 +2065,35 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // A seat's coast: its nearest sea tile within the lane stamp's port radius
     // (road_generation.hpp kSeaLanePortRadius, the sim's own neighbour radius).
     constexpr int kFleetCoastRadius = 9;
+    // BL-1152 review: which water each sea tile is in, so the gate embarks at
+    // a coast tile whose water reaches the target's; each region's coast tiles
+    // in ring order, built on first use (a region's tile never moves); and
+    // the sea-field memo, kept for the span (content-keyed: never stale).
+    std::vector<int> fleet_comp;
+    std::vector<std::vector<int>> fleet_ring;
+    std::vector<std::uint8_t> fleet_ring_built;
+    fleet_field_cache fleet_fields;
+    if (fleet_rule_on)
+    {
+        fleet_comp = sea_components(fleet_sea, gw, gh);
+        const std::size_t n = std::max<std::size_t>(1, static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh));
+        fleet_fields.cap_hub   = std::clamp<std::size_t>((std::size_t{48} << 20) / (12 * n), 4, 256);
+        fleet_fields.cap_ports = std::clamp<std::size_t>((std::size_t{48} << 20) / (8 * n), 4, 512);
+    }
+    const auto fleet_ring_of = [&](std::size_t ri) -> const std::vector<int>& {
+        if (fleet_ring.size() < ss.regions.size())
+        {
+            fleet_ring.resize(ss.regions.size());
+            fleet_ring_built.resize(ss.regions.size(), 0);
+        }
+        if (!fleet_ring_built[ri])
+        {
+            fleet_ring[ri] = sea_tiles_by_ring(fleet_sea, gw, gh, ss.regions[ri].col, ss.regions[ri].row,
+                                               kFleetCoastRadius);
+            fleet_ring_built[ri] = 1;
+        }
+        return fleet_ring[ri];
+    };
     const std::vector<int32_t> landmass =
         (terrain.substrate != nullptr)
             ? landmass_labels(*terrain.substrate, gw, gh)
@@ -5842,12 +5968,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // so the survivors keep their paid status in proportion wherever
             // they end the campaign. Always 0 in the Empire span.
             int64_t committed_standing = 0;
+            // BL-1152 review: what a COMMITTED gather drew from each region --
+            // (region, heads, paid heads) -- so men a fleet cannot lift go back
+            // where they came from.
+            struct army_draw { int region; int64_t men; int64_t paid; };
+            std::vector<army_draw> committed_draws;
             const auto gather_army = [&](int hub, bool commit) -> int64_t {
                 const std::size_t hs = static_cast<std::size_t>(hub);
                 int64_t total = ss.regions[hs].army_stock;
                 if (total <= 0) return 0; // BL-835: a hub with no army stages nothing.
                 if (commit)
+                {
+                    committed_draws.clear();
                     committed_standing = draw_army_with_standing(ss.regions[hs], total); // the whole hub
+                    committed_draws.push_back({ hub, total, committed_standing });
+                }
 
                 for (int hi : held)
                 {
@@ -5861,7 +5996,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (take <= 0) continue;
                     total += take;
                     if (commit)
-                        committed_standing += draw_army_with_standing(ss.regions[hii], take);
+                    {
+                        const int64_t paid = draw_army_with_standing(ss.regions[hii], take);
+                        committed_standing += paid;
+                        committed_draws.push_back({ hi, take, paid });
+                    }
                 }
                 // Paid heads marched can never exceed the men marched.
                 if (commit && committed_standing > total) committed_standing = total;
@@ -5904,6 +6043,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // run is byte-identical with tracing on or off.
             int      best_p_win_q = 0;
             int      best_hub     = -1;
+            int64_t  best_scored_men = 0; // BL-1152 review, trace only
             int      best_dclass  = 0; // BL-950 diagnostic, trace only.
             // Sprint 28 lane A instrumentation, ALSO READ ONLY BY THE TRACE.
             // The best Campaign score that cleared `campaign_threshold_q` this
@@ -5956,44 +6096,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // year in which the ledger moves. The scan order is the sorted
             // (from, to) order of `out.grudges`, so the sum is a property of
             // the integers in the table and not of any container's layout.
-            // BL-1152 / NR-965 -- THE FLEET GATE. Whether the fleet rule lets a
-            // wet crossing from @p hub sail against region @p ti: 0 it may,
-            // 1 the attacker's fleet lifts no one (no fleet, under a lift
-            // bound), 2 the target's realm and its mutual-defence partners
-            // out-project the attacker's fleet somewhere on the leg. Asked
-            // where candidates are listed, so a refused crossing is never a
-            // candidate (a LEGALITY test, like the water gate and the treaty
-            // gate -- not a scorer term), and again where execute picks its
-            // staging hub, so it cannot launch one the scorer would refuse.
-            // The sea fields it reads are memoised for this polity's turn.
-            fleet_field_cache fleet_cache;
-            struct fleet_check { int refusal = 0; crossing_verdict v; int64_t abstained = 0; int64_t seat_coast = 0; };
-            const auto fleet_gate = [&](int hub, std::size_t ti) -> fleet_check
-            {
-                fleet_check c;
-                if (params.fleet_men_per_hull > 0
-                 && fleet_lift_capacity(q.navy_stock, params.fleet_men_per_hull) <= 0)
-                {
-                    c.refusal = 1;
-                    return c;
-                }
-                if (params.fleet_power_halving_tiles > 0)
-                {
-                    const region& hr = ss.regions[static_cast<std::size_t>(hub)];
-                    const region& tr = ss.regions[ti];
-                    const int hub_tile = nearest_sea_tile(fleet_sea, gw, gh, hr.col, hr.row, kFleetCoastRadius);
-                    const int landing  = nearest_sea_tile(fleet_sea, gw, gh, tr.col, tr.row, kFleetCoastRadius);
-                    const std::vector<fleet_defender> defenders =
-                        crossing_defenders(out, ss.regions, owner[ti], q.id, fleet_sea, gw, gh,
-                                           kFleetCoastRadius, &c.abstained);
-                    for (const fleet_defender& d : defenders) if (d.seat_coast) ++c.seat_coast;
-                    c.v = judge_crossing(fleet_sea, gw, gh, currents_on ? &currents : nullptr,
-                                         params.sea_current_weight_q, params.fleet_power_halving_tiles,
-                                         hub_tile, landing, q.navy_stock, defenders, &fleet_cache);
-                    if (c.v.stopped) c.refusal = 2;
-                }
-                return c;
-            };
             std::vector<int> fear_cache;
             const auto fear_here = [&](int target) -> int
             {
@@ -6006,6 +6108,68 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 int& slot = fear_cache[static_cast<std::size_t>(target)];
                 if (slot < 0) slot = fear_of_next_q(out, params, q.id, target);
                 return slot;
+            };
+
+            // BL-1152 / NR-965 -- THE FLEET GATE. Whether the fleet rule lets a
+            // wet crossing from @p hub sail against region @p ti: 0 it may,
+            // 1 the attacker's fleet lifts no one (no fleet, under a lift
+            // bound), 2 the target's realm and its mutual-defence partners
+            // out-project the attacker's fleet somewhere on the leg, 3 no sea
+            // joins the hub's coast to the target's (not wet-capable: refused,
+            // fail closed). Asked where candidates are listed, so a refused
+            // crossing is never a candidate (a LEGALITY test, like the water
+            // gate and the treaty gate -- not a scorer term), and again where
+            // execute picks its staging hub, so it cannot launch one the
+            // scorer would refuse.
+            //
+            // THE COASTS. The landing is the target's first coast tile (ring
+            // order, ties to the lower raster index) whose water any of the
+            // hub's coast tiles shares; the embarkation is the hub's first
+            // coast tile in that water. A hub whose nearest sea is a lake no
+            // longer reads as an uncontested crossing.
+            //
+            // The defenders are read once per (realm) for this polity's turn
+            // (`fleet_defenders_turn`, dropped at launch, when the world moves).
+            struct fleet_check { int refusal = 0; crossing_verdict v; int64_t abstained = 0; int64_t seat_coast = 0; };
+            struct defenders_entry { int realm; std::vector<fleet_defender> d; int64_t abstained; };
+            std::vector<defenders_entry> fleet_defenders_turn;
+            const auto fleet_gate = [&](int hub, std::size_t ti) -> fleet_check
+            {
+                fleet_check c;
+                if (params.fleet_men_per_hull > 0
+                 && fleet_lift_capacity(q.navy_stock, params.fleet_men_per_hull) <= 0)
+                {
+                    c.refusal = 1;
+                    return c;
+                }
+                const std::vector<int>& hub_ring = fleet_ring_of(static_cast<std::size_t>(hub));
+                const std::vector<int>& tgt_ring = fleet_ring_of(ti);
+                int hub_tile = -1, landing = -1;
+                if (!fleet_coasts(fleet_comp, hub_ring, tgt_ring, &hub_tile, &landing)) { c.refusal = 3; return c; }
+                if (params.fleet_power_halving_tiles > 0)
+                {
+                    const int realm = owner[ti];
+                    const defenders_entry* de = nullptr;
+                    for (const defenders_entry& e : fleet_defenders_turn) if (e.realm == realm) { de = &e; break; }
+                    if (de == nullptr)
+                    {
+                        defenders_entry e;
+                        e.realm = realm;
+                        e.abstained = 0;
+                        e.d = crossing_defenders(out, ss.regions, realm, q.id, fleet_sea, gw, gh,
+                                                 kFleetCoastRadius, &e.abstained);
+                        fleet_defenders_turn.push_back(std::move(e));
+                        de = &fleet_defenders_turn.back();
+                    }
+                    c.abstained = de->abstained;
+                    for (const fleet_defender& d : de->d) if (d.seat_coast) ++c.seat_coast;
+                    c.v = judge_crossing(fleet_sea, gw, gh, currents_on ? &currents : nullptr,
+                                         params.sea_current_weight_q, params.fleet_power_halving_tiles,
+                                         hub_tile, landing, q.navy_stock, de->d, &fleet_fields);
+                    if (!c.v.leg) { c.refusal = 3; return c; } // matched waters always walk; a guard
+                    if (c.v.stopped) c.refusal = 2;
+                }
+                return c;
             };
 
             // -- Campaign --------------------------------------------------
@@ -6085,9 +6249,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const fleet_check fc = fleet_gate(hi, ti);
                         out.fleet.partners_abstained += fc.abstained;
                         out.fleet.seat_coast_fleets  += fc.seat_coast;
-                        if (params.fleet_power_halving_tiles > 0 && fc.refusal != 1 && !fc.v.leg)
-                            ++out.fleet.no_leg;
                         if (fc.refusal == 1) { ++out.fleet.unlifted; continue; } // no fleet: no one sails
+                        if (fc.refusal == 3) { ++out.fleet.no_leg; continue; }   // no sea joins the coasts
                         if (fc.refusal == 2)
                         {
                             ++out.fleet.stopped;
@@ -6271,7 +6434,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // scores the force it can actually put on the objective,
                     // which is the sharpened question the item asks for: not
                     // "can I take this" but "can I get an army there".
-                    const int64_t atk_men = hub_army;
+                    //
+                    // BL-1152 review -- AND THE ARMY THE FLEET CAN LIFT. A wet
+                    // crossing under a lift bound sails with at most the lift,
+                    // so the odds are priced on that, by the same function
+                    // execute clips with: one rule, read twice.
+                    const int64_t atk_men =
+                        (!dry && fleet_rule_on && params.fleet_men_per_hull > 0)
+                            ? std::min(hub_army, fleet_lift_capacity(q.navy_stock, params.fleet_men_per_hull))
+                            : hub_army;
                     const int64_t atk_est = (atk_men * supply_here / 1000)
                                           * clampi(q.cohesion_q, 1, 1000) / 1000;
                     const int64_t def_est = def_men > 0 ? def_men : 1;
@@ -6544,6 +6715,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             best_score = s; best_verb = sim_verb::campaign;
                             best_target = static_cast<int>(ti); best_winter = winter;
                             best_p_win_q = p_win_q; best_hub = hi; // trace only
+                            best_scored_men = atk_men;             // trace only
                             best_dclass = dclass;                  // trace only
                         }
                     }
@@ -7069,7 +7241,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (params.fleet_men_per_hull > 0)
                         lift_cap = fleet_lift_capacity(q.navy_stock, params.fleet_men_per_hull);
                 }
-                fleet_cache = fleet_field_cache{}; // the world moves from here on
+                fleet_defenders_turn.clear(); // the world moves from here on
 
                 // BL-835 — THE FIELD ARMY MARCHES, AND IT LEAVES. The staging
                 // holding's whole garrison goes; `home.army_stock` is zero
@@ -7086,20 +7258,40 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 int64_t raised = gather_army(src, /*commit=*/true);
                 if (raised <= 0) break;
                 // BL-1152 -- THE FLEET BOUNDS THE ARMY IT CARRIES. What it cannot
-                // lift stays ashore at the staging hub, where the column formed,
-                // its paid heads in proportion.
+                // lift never left: it goes back to the regions the muster drew
+                // it from, in proportion to what each gave (largest remainder,
+                // ties to the lower region index), and their paid heads with it
+                // in proportion to the paid heads each gave.
                 if (lift_cap >= 0 && raised > lift_cap)
                 {
                     const int64_t ashore = raised - lift_cap;
-                    const int64_t paid_ashore = raised > 0
-                        ? (std::min(committed_standing, raised) * ashore) / raised : 0;
-                    committed_standing -= paid_ashore;
-                    home.army_stock = clampi64(home.army_stock + ashore, 0, 1LL << 40);
-                    if (paid_ashore > 0)
+                    std::vector<int64_t> men_w, paid_w;
+                    std::vector<int> idx;
+                    int64_t paid_drawn = 0;
+                    for (const army_draw& d : committed_draws)
                     {
-                        const int64_t home_paid = standing_army_heads(home);
-                        home.standing_army       = std::min(home_paid + paid_ashore, home.army_stock);
-                        home.standing_army_owner = q.id;
+                        men_w.push_back(d.men); paid_w.push_back(d.paid); idx.push_back(d.region);
+                        paid_drawn += d.paid;
+                    }
+                    uint64_t paid_q = 0, paid_r = 0; // floor(paid x ashore / raised), exact
+                    mul_div_floor(static_cast<uint64_t>(std::min(committed_standing, raised)),
+                                  static_cast<uint64_t>(ashore), static_cast<uint64_t>(raised), paid_q, paid_r);
+                    const int64_t paid_ashore = static_cast<int64_t>(paid_q);
+                    const std::vector<int64_t> men_back  = split_by_largest_remainder(ashore, men_w, idx);
+                    const std::vector<int64_t> paid_back = paid_drawn > 0
+                        ? split_by_largest_remainder(paid_ashore, paid_w, idx) : std::vector<int64_t>(idx.size(), 0);
+                    committed_standing -= paid_ashore;
+                    for (std::size_t k = 0; k < committed_draws.size(); ++k)
+                    {
+                        region& back = ss.regions[static_cast<std::size_t>(idx[k])];
+                        if (men_back[k] <= 0) continue;
+                        const int64_t paid_before = standing_army_heads(back);
+                        back.army_stock = clampi64(back.army_stock + men_back[k], 0, 1LL << 40);
+                        if (paid_back[k] > 0)
+                        {
+                            back.standing_army       = std::min(paid_before + paid_back[k], back.army_stock);
+                            back.standing_army_owner = q.id;
+                        }
                     }
                     raised = lift_cap;
                     ++out.fleet.clipped;
@@ -7395,6 +7587,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     bt.defender = static_cast<uint16_t>(dq ? dq->id : 0);
                     bt.region   = static_cast<uint16_t>(ti);
                     bt.p_win_q    = best_p_win_q;
+                    bt.scored_men = best_scored_men;
                     bt.scored_hub = best_hub;
                     bt.winter     = best_winter;
                     bt.exec_hub          = src;

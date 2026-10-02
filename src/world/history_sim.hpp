@@ -63,6 +63,7 @@
 #include <atomic>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -151,6 +152,7 @@ struct grudge;
 struct contact;
 struct history_corridor;
 struct ocean_current_field; // BL-1120/BL-1140: ocean_currents.hpp
+struct sea_field;           // BL-1152: ocean_currents.hpp
 struct dated_object;    // BL-1036's resume pointers, on the same footing.
 struct universal_creed; // (`civilisation` is complete already: creeds.hpp.)
 
@@ -3797,6 +3799,7 @@ struct battle_trace
     int16_t  partners_bound_to_attacker = 0; ///< of them, holding non-aggression with the attacker
     int64_t  partner_navy               = 0; ///< the partners' fleets, summed
     int64_t  army_carried               = 0; ///< the army the crossing sailed with (after any lift bound)
+    int64_t  scored_men                 = 0; ///< BL-1152 review: the army the scorer priced the odds on
 };
 
 /// ONE DECISION ROUND IN WHICH CAMPAIGN CLEARED ITS THRESHOLD — Sprint 28's
@@ -4063,13 +4066,15 @@ struct crossing_stop
 /// rule examined; `stopped` the candidates it refused as out-projected (and of
 /// them `stopped_by_partner`, where the stopper is a mutual-defence partner
 /// rather than the realm); `unlifted` the candidates it refused because the
-/// attacker's fleet lifts no one (no fleet). A refusal repeats each round the
-/// candidate stands. `exec_failed`: crossings CHOSEN and then refused when
-/// launched -- the failing crossings the filter exists to remove; it reads 0
-/// unless execute's staging hub could disagree with the filter's.
-/// `clipped`: sailed with fewer men than it gathered, `men_ashore` the
-/// difference; `no_leg`: no sea walk joined the hub's coast to the target's,
-/// so nothing contested it; `partners_abstained`: partners bound by
+/// attacker's fleet lifts no one (no fleet); `no_leg` the candidates it refused
+/// because no sea walk joins any of the hub's coast tiles to any of the
+/// target's -- not wet-capable, refused (fail closed). A refusal repeats each
+/// round the candidate stands. `exec_failed` (GUARD, BY CONSTRUCTION -- not a
+/// measurement): execute picks its staging hub through the same gate, so a
+/// chosen crossing it would refuse cannot occur; the counter exists only so a
+/// break in that construction is loud. `clipped`: sailed with fewer men than
+/// it gathered, `men_ashore` the difference, returned to the regions the
+/// muster drew them from; `partners_abstained`: partners bound by
 /// non-aggression to the attacker; `seat_coast_fleets`: defending fleets that
 /// projected from their seat's coast, having no built port (both per
 /// candidate examined). Carried in each span's handoff and the generation
@@ -4078,7 +4083,7 @@ struct fleet_ledger
 {
     int64_t read = 0, stopped = 0, stopped_by_partner = 0, unlifted = 0, clipped = 0, men_ashore = 0;
     int64_t no_leg = 0, partners_abstained = 0, seat_coast_fleets = 0;
-    int64_t exec_failed = 0;
+    int64_t exec_failed = 0; ///< guard, by construction: reads 0
     std::vector<crossing_stop> stops; ///< one per refused-as-out-projected candidate
 };
 
@@ -5437,20 +5442,40 @@ struct crossing_verdict
     int64_t attacker_power = 0, defender_power = 0; ///< at the stop tile
     int     leg_tiles = 0;
 };
-/// The sea-cost fields a polity's turn reads more than once: from a staging
-/// coast, and from a defender's ports. Valid only while the world stands still
-/// -- one polity's scoring and the launch that follows it -- so the sim builds
-/// one per polity turn and drops it. A pure memo: no answer depends on it.
+/// The sea fields the fleet gate reads, memoised for the SPAN. Each is keyed
+/// by exactly what it is a function of -- a staging coast tile, or a
+/// defender's sorted port tiles -- over a sea mask and a current field that do
+/// not move in a span, so an entry can never go stale and no answer depends on
+/// whether it is found or rebuilt. Bounded first-in-first-out (`cap_*`, set by
+/// the sim from the grid's size); eviction changes cost, never a result.
 struct fleet_field_cache
 {
-    std::vector<std::pair<int, std::vector<int64_t>>> from_tile;   ///< (hub tile, field)
-    std::vector<std::pair<int, std::vector<int64_t>>> from_polity; ///< (defender id, field)
+    std::vector<std::pair<int, std::shared_ptr<const sea_field>>> hub; ///< (coast tile, field + walk)
+    std::vector<std::pair<std::vector<int>, std::shared_ptr<const std::vector<int64_t>>>> ports;
+    std::size_t cap_hub = 32, cap_ports = 64;
+    int64_t built_hub = 0, built_ports = 0, hits = 0; ///< cost readout only
 };
 crossing_verdict judge_crossing(const std::vector<std::uint8_t>& sea, int gw, int gh,
                                 const ocean_current_field* currents, int weight_q, int64_t halving_tiles,
                                 int hub_tile, int landing_tile, int64_t attacker_navy,
                                 const std::vector<fleet_defender>& defenders,
                                 fleet_field_cache* cache = nullptr);
+
+/// BL-1152 review -- THE COASTS A CROSSING SAILS BETWEEN. @p comp labels each
+/// sea tile's water (`sea_components`); @p hub_ring and @p tgt_ring are the
+/// staging region's and the target's coast tiles in ring order
+/// (`sea_tiles_by_ring`). The landing is the first target tile whose water any
+/// hub tile shares, the embarkation the first hub tile in that water. False
+/// (no leg: the crossing is not wet-capable) when no water joins them.
+bool fleet_coasts(const std::vector<int>& comp, const std::vector<int>& hub_ring, const std::vector<int>& tgt_ring,
+                  int* hub_tile, int* landing);
+
+/// BL-1152 review -- @p total split in proportion to @p weights (each >= 0),
+/// floors first, the remainder one each to the largest remainders, ties to the
+/// lower @p index (a region index per weight). Sums to @p total whenever any
+/// weight is positive; integer and exact over a 128-bit product.
+std::vector<int64_t> split_by_largest_remainder(int64_t total, const std::vector<int64_t>& weights,
+                                                const std::vector<int>& index);
 
 /// BL-1152 -- the men a fleet lifts: `navy x men_per_hull` (0 with no
 /// fleet), or -1 = unbounded where @p men_per_hull <= 0.

@@ -860,7 +860,7 @@ creed_state strait_creeds()
 /// constants set; the upkeep neither bills nor builds a fleet, so the
 /// attacker's fleet at the close is the one it opened with.
 history_sim_state run_strait(const far_world& w, int64_t men_per_hull, int64_t halving_tiles, bool trace = true,
-                             settlement_state* out_ss = nullptr)
+                             settlement_state* out_ss = nullptr, int current_weight_q = -1)
 {
     history_sim_params p = exploration_sim_params(world_params{});
     p.start_year = 1700;
@@ -872,6 +872,7 @@ history_sim_state run_strait(const far_world& w, int64_t men_per_hull, int64_t h
     p.fleet_power_halving_tiles = halving_tiles;
     p.navy_upkeep_per_1000_units_year_q = 0;
     p.navy_build_cost_q = int64_t{1} << 40;
+    if (current_weight_q >= 0) p.sea_current_weight_q = current_weight_q;
     p.resume_polities      = &w.polities;
     p.resume_contacts      = &w.contacts;
     p.resume_dated_objects = &w.objects;
@@ -925,23 +926,43 @@ void fleet_rows()
     }
     check(open_wet == 1 && open_men > 1000, "P0  (fixture) polity 0 crosses the strait once in the year, in force");
 
-    // P1 at sea: 100 hulls at 10 men a hull carry exactly 1,000 men.
+    // P1 at sea: 100 hulls at 440 men a hull carry exactly 44,000 of the
+    // 44,409 the muster gathers -- enough that the scorer, pricing the 44,000
+    // (P7), still launches it.
+    constexpr int64_t kLiftMph = 440, kLift = 100 * kLiftMph;
     settlement_state lifted_ss;
-    const history_sim_state lifted = run_strait(make_strait_world(100, 5000, true, false), 10, 0, true, &lifted_ss);
-    int64_t lifted_men = -1, lifted_hub_army = -1;
+    const history_sim_state lifted = run_strait(make_strait_world(100, 5000, true, false), kLiftMph, 0, true, &lifted_ss);
+    // The muster drew the column from the seat (region 0, 60,000 standing) and
+    // the coastal water (region 3, the hub, 5): what the fleet cannot lift goes
+    // back to each in proportion -- nearly all to the seat, not to the hub.
+    int64_t lifted_men = -1, lifted_hub = -1, lifted_scored = -1, open_scored = -1;
+    int lifted_p = -1, open_p = -1;
     for (const battle_trace& bt : lifted.battle_traces)
         if (!bt.exec_dry && bt.attacker == 0)
-        {
-            lifted_men = bt.army_carried;
-            if (bt.exec_hub >= 0 && static_cast<std::size_t>(bt.exec_hub) < lifted_ss.regions.size())
-                lifted_hub_army = lifted_ss.regions[static_cast<std::size_t>(bt.exec_hub)].army_stock;
-        }
-    std::printf("      100 hulls x 10 men: carried %lld, clipped %lld, left ashore %lld; the hub's army at the close %lld\n",
+        { lifted_men = bt.army_carried; lifted_hub = bt.exec_hub; lifted_scored = bt.scored_men; lifted_p = bt.p_win_q; }
+    for (const battle_trace& bt : open.battle_traces)
+        if (!bt.exec_dry && bt.attacker == 0) { open_scored = bt.scored_men; open_p = bt.p_win_q; }
+    const int64_t seat_close = lifted_ss.regions.size() > 3 ? lifted_ss.regions[0].army_stock : -1;
+    const int64_t hub_close  = (lifted_hub >= 0 && static_cast<std::size_t>(lifted_hub) < lifted_ss.regions.size())
+                             ? lifted_ss.regions[static_cast<std::size_t>(lifted_hub)].army_stock : -1;
+    std::printf("      100 hulls x 440 men: carried %lld, clipped %lld, left ashore %lld; at the close the seat holds %lld,"
+                " the hub (region %lld) %lld\n",
                 static_cast<long long>(lifted_men), static_cast<long long>(lifted.fleet.clipped),
-                static_cast<long long>(lifted.fleet.men_ashore), static_cast<long long>(lifted_hub_army));
-    check(lifted_men == 1000 && lifted.fleet.clipped == 1 && lifted.fleet.men_ashore == open_men - 1000
-          && lifted_hub_army >= lifted.fleet.men_ashore,
-          "P1  a crossing carries exactly its fleet's lift; the rest stay ashore, counted");
+                static_cast<long long>(lifted.fleet.men_ashore), static_cast<long long>(seat_close),
+                static_cast<long long>(lifted_hub), static_cast<long long>(hub_close));
+    std::printf("      (lift ledger: read %lld, unlifted %lld, no leg %lld, chosen %lld, scored %lld, best rejected score %lld)\n",
+                static_cast<long long>(lifted.fleet.read), static_cast<long long>(lifted.fleet.unlifted),
+                static_cast<long long>(lifted.fleet.no_leg), static_cast<long long>(lifted.campaign_chosen),
+                static_cast<long long>(lifted.campaign_scored), static_cast<long long>(lifted.class_score_trace[1][1]));
+    check(lifted_men == kLift && lifted.fleet.clipped == 1 && lifted.fleet.men_ashore == open_men - kLift
+          && lifted_hub == 3 && seat_close >= lifted.fleet.men_ashore - 10 && hub_close >= 0 && hub_close <= kLift + 10,
+          "P1  a crossing carries exactly its fleet's lift; the rest go back to the regions the muster drew them from");
+    // P7 (review): the scorer prices the army the fleet lifts, by the same
+    // function execute clips with -- not the uncapped column.
+    std::printf("      the odds were scored on %lld men (p_win %d) under the lift, %lld (p_win %d) without it\n",
+                static_cast<long long>(lifted_scored), lifted_p, static_cast<long long>(open_scored), open_p);
+    check(lifted_scored == kLift && open_scored == open_men && lifted_p < open_p,
+          "P7  a capped crossing is scored with its lifted army: the odds read the men it will carry");
     // NR-965: the fleet gate is a legality filter, so a fleetless realm is
     // never OFFERED the crossing -- refused where candidates are listed,
     // never chosen, and never a failing crossing at launch.
@@ -949,13 +970,16 @@ void fleet_rows()
     std::printf("      no fleet, 10 men a hull: candidates refused %lld, chosen %lld, failing crossings %lld, battles %lld\n",
                 static_cast<long long>(no_fleet.fleet.unlifted), static_cast<long long>(no_fleet.campaign_chosen),
                 static_cast<long long>(no_fleet.fleet.exec_failed), static_cast<long long>(no_fleet.battles));
-    check(no_fleet.fleet.unlifted >= 1 && no_fleet.campaign_chosen == 0 && no_fleet.fleet.exec_failed == 0
-          && no_fleet.battles == 0,
-          "P1  a fleetless realm is never offered a crossing it cannot lift: refused as a candidate, never chosen, failing crossings 0 (NR-965)");
+    check(no_fleet.fleet.unlifted >= 1 && no_fleet.campaign_scored == 0 && no_fleet.campaign_chosen == 0
+          && no_fleet.fleet.exec_failed == 0 && no_fleet.battles == 0,
+          "P1  a fleetless realm is never offered a crossing it cannot lift: refused as a candidate, never scored or chosen (launch refusals 0: guard, by construction) (NR-965)");
 
     // P2: the partner's fleet in reach stops the crossing; out of reach it does not.
     const history_sim_state near = run_strait(make_strait_world(100, 5000, true, false), 0, 40);
-    const history_sim_state far  = run_strait(make_strait_world(100, 5000, true, false), 0, 1);
+    // Out of reach, provably: still water (no current to carry a walk round the
+    // world), a halving of one tile, and the partner's ports 25+ tiles from any
+    // tile of either hub's leg -- its 5,000 x 1024 halved 23 times is 0.
+    const history_sim_state far  = run_strait(make_strait_world(100, 5000, true, false), 0, 1, true, nullptr, 0);
     for (const history_sim_state* hp : { &near, &far })
     {
         std::printf("      (%s: read %lld, chosen %lld, by-partner %lld, exec-failed %lld; stops:", hp == &near ? "near" : "far",
@@ -988,12 +1012,10 @@ void fleet_rows()
         return n;
     };
     check(stops_by(near, 0, -1) == 2 && stops_by(near, 0, 2) == 2 && near.battles == 0
-          && near.campaign_chosen == 0 && near.fleet.exec_failed == 0,
+          && near.campaign_chosen == 0 && near.fleet.exec_failed == 0 /* guard, by construction */,
           "P2  a partner's fleet in reach stops the crossing before it sails (stopped by the partner, nothing fought)");
-    // Out of reach of the near hub's leg (the seat's longer one still meets
-    // the partner's power at a halving of one tile -- both fleets decay alike).
-    check(stops_by(far, 0, -1) < stops_by(near, 0, -1) && wet_by(far, 0) == 1 && far.fleet.exec_failed == 0,
-          "P2  ... and out of reach it does not: the crossing sails and is fought");
+    check(stops_by(far, 0, -1) == 0 && wet_by(far, 0) == 1,
+          "P2  ... and out of reach it does not: no candidate of the attacker's is stopped, and the crossing sails and is fought");
 
     // P4: the stopped crossing left the attacker's army and fleet as they stood.
     // A two-year span, captured at the top of 1701: the 1700 round (the only
@@ -1029,7 +1051,7 @@ void fleet_rows()
         check(ok && hs.fleet.stops[0].realm_army > 1000 && hub_close == hs.fleet.stops[0].hub_army
               && realm_close == hs.fleet.stops[0].realm_army
               && navy_close == hs.fleet.stops[0].navy && navy_close == 100 && hs.battles == 0,
-              "P4  a stopped crossing leaves the attacker's army and fleet untouched: nothing drawn, nothing fought");
+              "P4  (guard) a refused crossing leaves the attacker's army and fleet untouched: nothing drawn, nothing fought");
     }
 
     // P5: a fleet with no mutual-defence clause never defends; a partner at
@@ -1041,9 +1063,29 @@ void fleet_rows()
                 static_cast<long long>(unbound.fleet.stopped), static_cast<long long>(unbound.battles),
                 static_cast<long long>(peace.fleet.stopped), static_cast<long long>(peace.fleet.partners_abstained),
                 static_cast<long long>(peace.battles));
-    check(unbound.fleet.stopped == 0 && unbound.battles >= 1,
-          "P5  a fleet with no mutual-defence clause with the target never defends it");
-    check(peace.fleet.stopped == 0 && peace.fleet.partners_abstained >= 1 && peace.battles >= 1,
+    // Read per attacker -- polity 0's candidates only -- so the rows do not
+    // depend on whether polity 1's counter-crossing is examined before or after
+    // polity 0 takes its ground; and the rule asserted directly on each world.
+    std::vector<std::uint8_t> strait_sea;
+    {
+        const far_world w = make_strait_world(100, 5000, false, false);
+        for (const terrain_substrate& t : w.ground) strait_sea.push_back(is_sea(t) ? 1 : 0);
+    }
+    const auto defends = [&](const far_world& w, int realm, int attacker, int who) {
+        history_sim_state st;
+        st.polities = w.polities;
+        st.dated_objects = w.objects;
+        for (const fleet_defender& d : crossing_defenders(st, w.ss.regions, realm, attacker, strait_sea,
+                                                          far_world::gw, far_world::gh, 9, nullptr))
+            if (d.polity == who) return true;
+        return false;
+    };
+    const bool unbound_defends = defends(make_strait_world(100, 5000, false, false), 1, 0, 2);
+    const bool peace_defends   = defends(make_strait_world(100, 5000, true, true), 1, 0, 2);
+    const bool bound_defends   = defends(make_strait_world(100, 5000, true, false), 1, 0, 2);
+    check(!unbound_defends && bound_defends && stops_by(unbound, 0, -1) == 0 && wet_by(unbound, 0) == 1,
+          "P5  a fleet with no mutual-defence clause with the target never defends it (and polity 0's crossing sails)");
+    check(!peace_defends && stops_by(peace, 0, -1) == 0 && peace.fleet.partners_abstained >= 1 && wet_by(peace, 0) == 1,
           "P5  a partner bound to the attacker by non-aggression abstains (reading, BL-1152)");
 
     // P3: the current shortens a fleet's reach against it. The water world
@@ -1116,6 +1158,49 @@ void fleet_rows()
                     static_cast<long long>(abst), ds.empty() ? -1 : (ds[0].seat_coast ? 1 : 0));
         check(has1 && has2 && !has3 && !has4 && abst == 1 && ds.size() == 2,
               "P6  the defenders are the realm and its mutual-defence partners; a partner at peace with the attacker abstains");
+    }
+
+    // P8 (review): the power's linear step cannot overflow inside the domain.
+    // A fleet of 2^40 hulls (p = 2^50) one tile short of a 100,000-tile halving:
+    // p x r is 2^50 x 99,999,999, past int64; the exact answer (Python big
+    // integers) is 562,949,959,050,812.
+    {
+        const int64_t got = fleet_power_at(int64_t{1} << 40, 99999999, 100000);
+        std::printf("      2^40 hulls at 99,999,999 of a 10^8 halving: %lld\n", static_cast<long long>(got));
+        check(got == 562949959050812LL, "P8  the linear step is exact at the top of the domain (no int64 overflow)");
+    }
+
+    // P9 (review): the crossing embarks where the sea reaches the landing. A
+    // hub whose lowest-index coast tile is a lake (water 1) and whose next is
+    // the ocean (water 0); the target's coast is ocean. The old pick -- the
+    // nearest tile -- embarked on the lake, found no walk, and so was never
+    // contested. And with no shared water at all there is no leg: refused.
+    {
+        std::vector<int> comp(40, -1);
+        comp[3] = 1;            // the hub's lake
+        comp[7] = 0;            // the hub's ocean coast
+        comp[20] = 0;           // the target's ocean coast
+        comp[30] = 2;           // a sea that touches neither
+        int hub_tile = -1, landing = -1;
+        const bool joined = fleet_coasts(comp, { 3, 7 }, { 20 }, &hub_tile, &landing);
+        int h2 = -1, l2 = -1;
+        const bool none = fleet_coasts(comp, { 3, 7 }, { 30 }, &h2, &l2);
+        std::printf("      embark %d land %d (joined %d); against a sea neither shares: joined %d\n",
+                    hub_tile, landing, joined ? 1 : 0, none ? 1 : 0);
+        check(joined && hub_tile == 7 && landing == 20 && !none,
+              "P9  the crossing embarks at the hub's coast tile whose water reaches the landing; no shared water is no leg (refused)");
+    }
+
+    // P10 (review): men a fleet cannot lift go back in proportion to what each
+    // region gave, largest remainder, ties to the lower region index.
+    {
+        const std::vector<int64_t> a = split_by_largest_remainder(10, { 1, 1, 1 }, { 5, 2, 9 });
+        const std::vector<int64_t> b = split_by_largest_remainder(43409, { 5, 44404 }, { 3, 0 });
+        std::printf("      10 over three equal draws (regions 5, 2, 9): %lld/%lld/%lld; 43,409 over 5 and 44,404: %lld/%lld\n",
+                    static_cast<long long>(a[0]), static_cast<long long>(a[1]), static_cast<long long>(a[2]),
+                    static_cast<long long>(b[0]), static_cast<long long>(b[1]));
+        check(a[0] == 3 && a[1] == 4 && a[2] == 3 && b[0] == 5 && b[1] == 43404,
+              "P10 the return is proportional, largest remainder first, ties to the lower region index, and sums exactly");
     }
 }
 
