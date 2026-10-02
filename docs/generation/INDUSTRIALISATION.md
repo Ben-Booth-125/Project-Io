@@ -555,8 +555,8 @@ treasury unit. **SETTLED (Ben, 2026-09-27): a head earns scale credit only where
 it — the works, not the crowd.** Each work a region holds employs a stated number of heads, authored
 on its row of the works table, and the centre-scale input counts the region's urban heads up to what
 its works employ; the heads beyond them are a crowd and earn nothing. So points follow the works a
-city built, and the stream's pull, which reads points, draws people toward work rather than toward a
-crowd. Without it the stream moved people in proportion to the urban heads a city already had and
+city built, and the stream draws people toward open work rather than toward a crowd (Beat 2).
+Without it the stream moved people in proportion to the urban heads a city already had and
 then paid them scale credit for arriving, and the points read headcount by another name. **A polity that holds no town converts nothing (Ben, 2026-09-19, NR-901):** there is
 nowhere for its works to stand, so its treasury keeps the round's share rather than paying for
 points on townless ground that no campaign centre can receive. **Points on a region whose towns
