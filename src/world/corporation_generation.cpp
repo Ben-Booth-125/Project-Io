@@ -1504,6 +1504,15 @@ void arm_corporation(world& w, entity_id corp)
     seed_starting_military(w, corp, occupied);
 }
 
+void move_seat_force(world& w, entity_id previous, entity_id corp)
+{
+    if (previous == corp)
+        return;
+    disarm_corporation(w, corp);
+    if (previous != null_entity)
+        arm_corporation(w, previous);
+}
+
 void disarm_corporation(world& w, entity_id corp)
 {
     auto it = w.corporations.find(corp);

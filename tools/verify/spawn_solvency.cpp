@@ -431,6 +431,8 @@ struct seed_result
     int    field_holdings_open = 0;
     int    field_holdings_close = 0;
     int    rival_units = 0, rival_heads = 0;
+    int    rivals_armed = 0;      ///< rivals holding a military base at close (BL-1154: one seeded unit each)
+    int    rival_max_units = 0;   ///< the most units any one rival holds (the hire cap is 3)
     output_probe probe;
     bool   filed_ok = true;       ///< every corp filed, and flows reconstruct the net
 };
@@ -583,7 +585,15 @@ seed_result run_seed(uint32_t seed, lua_state& lua, bool prehistory)
             {
                 out.rival_units += f->second.first;
                 out.rival_heads += f->second.second;
+                out.rival_max_units = std::max(out.rival_max_units, f->second.first);
             }
+            for (const entity_id bid : cc.assets)
+                if (const auto bit = w.buildings.find(bid);
+                    bit != w.buildings.end() && bit->second.type == building_type::military_base)
+                {
+                    ++out.rivals_armed;
+                    break;
+                }
             if (cc.balance > 0.0f)
                 ++out.rivals_solvent;
             rival_balances.push_back(cc.balance);
@@ -949,9 +959,11 @@ int main(int argc, char** argv)
     // ---------------------------------------------------------------------
     std::printf("\n=== R4  THE BACKGROUND FIELD SURVIVES ===\n");
     int total_rivals = 0, total_solvent = 0, holdings_open = 0, holdings_close = 0;
-    int total_rival_units = 0, total_rival_heads = 0;
+    int total_rival_units = 0, total_rival_heads = 0, total_armed = 0, max_units = 0;
     for (const seed_result& r : rows)
     {
+        total_armed       += r.rivals_armed;
+        max_units          = std::max(max_units, r.rival_max_units);
         total_rivals      += r.rivals;
         total_solvent     += r.rivals_solvent;
         holdings_open     += r.field_holdings_open;
@@ -971,6 +983,13 @@ int main(int argc, char** argv)
     std::printf("  rival standing force: %d units / %d heads   "
                 "[pre-BL-635 baseline: %.1f units per seed]\n",
                 total_rival_units, total_rival_heads, k_baseline_rival_units_per_seed);
+    // BL-1154 review: since rivals start armed (one seeded unit each), the units
+    // standing are not evidence of hiring. HIRED = units less one seeded unit per
+    // armed rival (a seeded unit lost in battle makes this an undercount, never
+    // an overcount).
+    const int hired = total_rival_units - total_armed;
+    std::printf("  rivals armed at close: %d; units HIRED in the settle: %d; the most units any "
+                "one rival holds: %d (the hire cap is 3)\n", total_armed, hired, max_units);
 
     // R4's requirement reads "solvent enough to KEEP ACTING, so the seed's data
     // is not poisoned by dead corps" — it is a test that the fix did not starve
@@ -983,8 +1002,9 @@ int main(int argc, char** argv)
           total_rivals > 0 && solvent_pct >= k_baseline_rival_solvent_pct - 1.0, "R4",
           "the fix did not starve the field — rival solvency is at or above its "
           "pre-BL-635 baseline");
-    check(total_rival_units > 0, "R4",
-          "the field still fields a standing force (rivals can still afford to hire)");
+    check(hired > 0, "R4",
+          "the field still fields a standing force (rivals can still afford to HIRE: "
+          "units beyond the one each armed rival was seeded with)");
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES ABOVE",
                 g_failures, g_failures == 1 ? "" : "s");

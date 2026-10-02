@@ -83,6 +83,10 @@ double seat_landscape_score(const world& w, const landscape_score& landscape,
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())
             continue;
+        // BL-1154 review: a military base is not a holding the seat keeps (the
+        // seat opens unarmed, `move_seat_force`), so it is never scored.
+        if (bit->second.type == building_type::military_base)
+            continue;
         if (w.tiles.find(bit->second.tile) == w.tiles.end())
             continue;
         ++sited;
@@ -158,6 +162,10 @@ spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& l
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())
+                continue;
+            // BL-1154 review: the menu ranks what the seat will HOLD, and the
+            // seat opens unarmed — a rival's muster base is not counted.
+            if (bit->second.type == building_type::military_base)
                 continue;
             if (bit->second.type == building_type::processing_facility)
                 c.has_processor = true;
@@ -280,11 +288,7 @@ bool repoint_player(world& w, entity_id corp)
     // pick was not; when the seat moves, the new seat's opening force goes and
     // the corporation it leaves takes the one every rival has. Deterministic and
     // draw-free: the seeding is a nearest-valid-tile search.
-    if (previous != corp)
-    {
-        disarm_corporation(w, corp);
-        arm_corporation(w, previous);
-    }
+    move_seat_force(w, previous, corp);   // the rule the pick path shares
     return true;
 }
 

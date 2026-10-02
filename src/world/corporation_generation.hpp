@@ -166,7 +166,20 @@ int remove_specialist_roster(world& w);
 /// Generation arms the rivals where it charters (`generate_corporations`,
 /// `charter_web_from_budget`); `repoint_player` (spawn_seat.cpp) disarms the
 /// seat when the Begin pick moves it, and arms the corporation it leaves.
+///   * `move_seat_force`: THE ONE SEAT-MOVE RULE, used by both ways a seat is
+///     taken — the draw (`repoint_player`, spawn_seat.cpp) and the pick
+///     (`corp_verb::take_seat`, corp_command.cpp). When the seat moves from
+///     @p previous to @p corp, @p corp is disarmed and @p previous armed; a
+///     no-op when they are the same corporation.
+///
+/// WHEN IT RUNS, AND WHAT THAT MEANS: the seat is taken at Begin, AFTER the
+/// twelve-tick settle, so this is not "as if generation". The corporation the
+/// seat leaves is armed then: a base on the nearest valid tile to its HQ on the
+/// world as it stands, and a unit, both with NEW entity ids; it never hired in
+/// the settle (it was the provisional player). The seat's own units and bases go
+/// with their ids. Accepted (BL-1154 review, 2026-10-02).
 bool corporation_has_opening_force(const world& w, entity_id corp);
+void move_seat_force(world& w, entity_id previous, entity_id corp);
 void arm_rivals(world& w);
 void arm_corporation(world& w, entity_id corp);
 void disarm_corporation(world& w, entity_id corp);
