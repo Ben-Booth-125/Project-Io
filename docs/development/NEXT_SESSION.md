@@ -1,58 +1,58 @@
 # Sprint 48 running handoff — the world moves forward (OPEN)
 
-Updated 2026-09-27, session wound down early (tokens). Read this, then `REFINED.md` § Sprint 48
-(wave 3 and wave 3b list the chains) and the sprint 48 row in `sprints.json`.
+Updated 2026-10-02, wound down for the night. Read this, then `REFINED.md` § Sprint 48 (waves 3
+and 3b) and the sprint 48 row in `sprints.json`.
 
-## Main
+## Main (all merged items gated there)
 
-Last CODE merge gated: 572a0afb (the sea fixes) — world_determinism 0C8A42270888B95C twice. Since
-then main carries only docs and stores (the rulings below). Known failures on main: history_sim
-R3a2/R3a3; exploration_sim R3b/R3d.1 (pins, re-bless); logistics T7-T10 (BL-1131); **new:**
-road_generation_harness R2 "Highway reachable" (red since BL-1141 left 148 cities; re-read when
-BL-1137 lands, noted on it); sea_lane_stamp_harness 16-seed "lays at least one lane" on seed 28
-(earns none; pre-existing).
+Merged and gated this session: BL-1150 (province fill crosses the settled line), BL-1146 (firm cap
+scales with the centre; Pass 6 flat), BL-1153 (lane port at a coastal seat), BL-1156 (rivers divide
+their banks), BL-1154 (rivals start armed; the seat opens unarmed), NR-959 + BL-1152 (fleets bound
+their army and project power; 20 men a hull / halving 10 / conversion 50 in the Exploration age;
+the Industrialisation age rule-off). Last gate: 14babd92, world_determinism C32FBDF09F66889A.
 
-## Rulings taken 2026-09-27 (all in their docs)
+Known failures on main: history_sim R3a2/R3a3; exploration_sim R3b/R3d.1 (pins, re-bless);
+logistics T7-T10 (BL-1131); road_generation_harness R2 Highway (re-read when BL-1137 lands);
+sea_lane_stamp 16-seed seed 28 lays no lane; centre_census C13 C2b slope on seed 46 (BL-1158);
+legacy `--digest-check` (pins predate BL-1130-1133; rivals now armed on the legacy arc too).
 
-NR-952 no ruins, a province's id recorded for play (reading taken: stable id at generation's end;
-say if meant otherwise) · NR-953 A · NR-954 B the fill crosses the settled line · NR-955 B lane port
-at a coastal seat · NR-956 A · NR-957 B carve counts firms and specialists · NR-958 A · NR-959 B sea
-far-penalty 300 · NR-960 B firm cap 2 per rung (budget world ONLY) · NR-961 fleets bound their army
-and are stopped by out-projecting defenders (target + mutual-defence partners) · scale credit reads
-employed heads · the stream's pull is open work · works survive a sack · every centre-holding region
-is a build candidate · the stream rate is picked from a re-run ladder.
+## The one branch NOT merged
 
-## Branches NOT merged (each: finish fix round -> merge -> gate on main -> record)
+`worktree-agent-ad3922191c20849ad` (centres): BL-1137 rebuild, BL-1149 (scale credit from works,
+x4 employs, Ben's rung), the open-work pull, any centre with open work draws, NR-964 treasury by
+employed heads, BL-1155 (every centre a work candidate), world_determinism and centre_region_bind on
+the works table. Tip af836f93 was ready; a tail-review FIX ROUND was running at wind-down (capital
+always a work candidate — a reading taken, Ben may overturn; rows for BL-1155, NR-901, two
+destinations; s1 restored; heads moved split corridor vs own-region; stale comments; seed_library
+--check). Its last report gives the commit. NEXT: merge -> gate (world_determinism is now a Lua
+build) -> re-read road_generation_harness R2.
 
-| Lane | Branch `worktree-agent-…` | Items | State | Next |
-|---|---|---|---|---|
-| Centres | `ad3922191c20849ad` | BL-1137 rebuild (dccf7e05, d79e0c81), BL-1149 (ec5f2308 + fixes e5edc241) | BL-1149 fixes DONE (works-table determinism 24/24 boundaries, wiring row proven, loader rows). Not merged with main since 091401ad. Drafts NOT applied, copied untracked into that worktree's `.drafts/`: openwork_src.py (the pull), bl1155_src.py. Open: centre_region_bind builds without the works table, so its stream is inert -- load it | then: the open-work pull, BL-1155 (every centre a work candidate; read "every span" vs "Industrialisation only"), re-run the 6/9/12/18 ladder -> Ben picks -> merge |
-| Provinces | `a810ef485bc200aef` | BL-1150 (adc45b16 + fixes 67118846) | READY: centre_census C13 checks rivers per body on the 16 shipped seeds, red on 3 (12, 37, 38; main: 1) for NR-962 -- an expected red | merge + gate |
-| Firm cap | `aee7aacb8b39cd83b` | BL-1146 (c6670be9 + fixes 97cb0cce) | READY: Pass 6 flat 2 again, legacy byte-identical to main on the 7 rows compared; one helper `province_anchors` (province.cpp); refused 6.0% -> 3.1% | merge + gate; re-read the firm census after BL-1150; spawn_solvency R4 red (NR-963). NOTE: `--digest-check --arc legacy` exits 1 on main too -- the pins predate BL-1130-1133 (re-bless) |
-| Lane ports | `af645cfdcf963a520` | BL-1153 (80381678 + fixes 18442abe) | READY: laid 327 -> 377 of 446 (unlaid: 58 coastless realms, 5 same-port skipped, 6 unreachable); braids 0; degree keyed by port tile; mutations red | merge + gate |
-| Sea | `acc0cdbc7ceec74b6` | NR-959 (300, c83d459f), BL-1152 (fleets project power, c4b5027e) | built behind a switch, both constants 0 (digests unchanged); P0-P6 rows with mutations; NOT cold-reviewed | measured: 88-90% of wet crossings launch from a hub with no built port, 69-77% with no fleet; ~165 mutual-defence pairs a seed. Readings taken: embark at the hub's coast, defenders project from built ports else the seat's coast, a non-aggression partner stays out. Next: NR-965, the ladders (a 14-seed partial pass in scratchpad lane-sea), span-time cost, a cold review |
+Readings at x4: urban 26.0%, centres 13,374 (341-1,207 a seed), 2,908 cities, employed 87.7%,
+points per world 49.6M, C15 16/16, pre-1660 moved only by BL-1155.
 
-Each lane's final report is in this session's transcript; every branch is cold-reviewed except
-BL-1152. Merge world-movers in this order: BL-1150, BL-1146, BL-1153, then BL-1137+1149 at Ben's
-rung, then BL-1152.
+## Rulings since 2026-10-01 (in their docs)
+
+NR-962 rivers divide banks · NR-963 rivals armed · NR-964 treasury by employed heads · NR-965 a
+refused crossing is not a candidate · the pull is open work, any centre with open work draws, rate
+12 · works employ x4 · the ~500 aim retired: a world carries what its forces leave (~850) · fleets
+20/10/50 in the Exploration age; the industrial age rule-off until BL-1157.
 
 ## Then
 
 BL-1125 (market folds) on the thinned world -> BL-1138 (roads pull to markets) -> NR-944 re-read ->
-BL-1145 (after BL-1150) -> BL-1107 -> BL-1139 (abandonment in play, recorded ids) -> BL-1151 (seat
-menu re-anchored) -> the one re-bless (every cause named) -> the live walk. Centres: BL-1150 alone
-takes 22,550 -> 13,599 pooled (~850 a seed); re-read the ~500 aim with BL-1137.
+BL-1145 -> BL-1107 -> BL-1139 (abandonment in play, recorded ids) -> BL-1151 (seat menu
+re-anchored) -> the one re-bless (every cause named: BL-1130..1156, rivals armed on legacy, the
+fleet rule, works x4) -> the live walk. Filed, not in the sprint: BL-1157 (fleet upkeep and
+rebuilding; then industrial fleet values), BL-1158 (slopes divide weakly).
 
 ## Open for Ben
 
-NR-962 (rivers divide banks?), NR-963 (rivals start armed?), NR-964 (the treasury spread by
-employed heads?), NR-965 (the campaign scorer cannot see the fleet rule). The rate rung after the re-run ladder. Recommendations in each entry.
+Nothing in the queue. The capital-always reading on BL-1155 is his to confirm.
 
 ## Hazards this sprint taught
 
-- Brief a ruling at its stated scope: widening "both sites" moved a pinned legacy row (BL-1146).
-- A re-scoped test that went red when the change landed is a finding, not a fix (BL-1150 rivers).
-- Lua-free harnesses build no works table: the stream and scale credit are inert there.
-- Worktrees start stale (147-150 commits behind): every lane must fast-forward before measuring.
-- TaskStop can leave a gate script running; new output folder per rerun. Five lanes on one PC:
-  timings indicative. Main-session build: `scratchpad/main_session_build_rel.bat`.
+- Brief a ruling at its stated scope (BL-1146's Pass 6). A re-scoped red test is a finding.
+- Lua-free harnesses see no works table; world_determinism now builds Lua (build_lua_harness.sh).
+- Requirement group names can collide with archived groups; check before pushing a group.
+- A `git merge` can fail on a transient lock with a clean tree; retry once and read the message.
+- Worktrees start stale; every lane merges main first. New gate folder per run.

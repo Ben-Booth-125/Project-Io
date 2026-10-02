@@ -435,10 +435,23 @@ history_sim_params exploration_sim_params(const world_params& params)
     hp.sea_current_cargo_loss_q = 500;
 
     // BL-1147 -- THE FLEET THE EMPIRE AGE CARRIES: navy hulls per 1000 naval
-    // points at this span's open. 0, TODAY'S WORLD, pending Ben's pick off the
-    // measured ladder (BL-1147's report); a rung set here is the one change.
-    hp.naval_points_navy_per_1000   = 0;
+    // points at this span's open. 50 (Ben, 2026-10-02, option D), read off
+    // BL-1152's review-fixed 16-seed ladder at 20 men a hull and a halving of
+    // 10 sea tiles: Exploration's wet crossings 958 sailed against 1,174 with
+    // the rule off, 11 of 16 seeds first crossing by 1220, the navy bill
+    // 0.0068% of treasuries at 1300.
+    hp.naval_points_navy_per_1000   = 50;
     hp.naval_points_convert_at_open = true; // the open where the deeds become fleets
+
+    // BL-1152 -- A FLEET DECIDES WHO CROSSES (EXPLORATION.md, the SETTLED
+    // paragraph under the stocks table; Ben, 2026-09-27, NR-961). Ben's
+    // constants for the Exploration age (2026-10-02, option D): a hull lifts
+    // 20 men, and a fleet's power halves over 10 sea tiles. The
+    // Industrialisation span inherits this block and sets both back to 0
+    // (`industrialisation_sim_params`), so its crossings stay band-gated.
+    hp.fleet_decides_crossings   = true;
+    hp.fleet_men_per_hull        = 20;
+    hp.fleet_power_halving_tiles = 10;
 
     return hp;
 }
@@ -512,20 +525,24 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // near pair's without the alarm. "Met across water" is the class the
     // pair's contact recorded at the meeting, never its seats read again.
     //
-    // 0, AND THAT IS THE PLATEAU, NOT A TARGET. MEASURED on the 16 curated seeds
-    // (2026-09-26, four-way landmasses, meeting on the sea line alone, the
-    // penalty read off the recorded class): far cross-water pairs bound at 1960
-    // read 0 at 700 and 500, 10 at 450, 191 at 400, then 530 / 526 / 518 at
-    // 350 / 300 / 0, with 492-523 pairs met by sea at every rung; down the
-    // same ladder the span's subjections read 96 / 96 / 95 / 62 / 56 / 43 / 56
-    // and its battles 9,266 / 9,266 / 9,215 / 8,920 / 8,670 / 8,657 / 8,520.
-    // Above 450 the penalty forbids every such binding; at or below 350 it
-    // decides none of them and the pair's own facts do. A value inside the
-    // 450-350 band would be the dial choosing the count; 0 is the reading
-    // where it chooses nothing. Without BL-1142 at all (no meeting, the land's
-    // 700, no loss) no far pair across water binds.
+    // 300 (Ben, 2026-09-27, NR-959 B; INDUSTRIALISATION.md sec Far pairs bind
+    // across water): the far penalty a pair that met across water reads,
+    // against a land pair's 700 -- where the pair's own aggression, grudges and
+    // trade decide whether it binds, so the number does not choose the count,
+    // and distance still reads across water. The re-run ladder it was chosen
+    // from (16 curated seeds, 2026-09-26, four-way landmasses, meeting on the
+    // sea line alone, the penalty read off the recorded class; PRE-FIX-ROUND
+    // numbers, before the wet-corridor and coastal-deed fixes): far cross-water
+    // pairs bound at 1960 read 0 at 700 and 500, 10 at 450, 191 at 400, then
+    // 530 / 526 / 518 at 350 / 300 / 0 -- 526 bound at 300 against 518 at 0 --
+    // with 492-523 pairs met by sea at every rung; down the same ladder the
+    // span's subjections read 96 / 96 / 95 / 62 / 56 / 43 / 56 and its battles
+    // 9,266 / 9,266 / 9,215 / 8,920 / 8,670 / 8,657 / 8,520. Above 450 the
+    // penalty forbids every such binding; at or below 350 it decides none of
+    // them and the pair's own facts do. Without BL-1142 at all (no meeting,
+    // the land's 700, no loss) no far pair across water binds.
     hp.far_pairs_meet_by_sea    = true;
-    hp.treaty_far_sea_penalty_q = 0;
+    hp.treaty_far_sea_penalty_q = 300;
 
     // BL-1147: THE CONVERSION IS THE EXPLORATION OPEN'S ALONE. This span's
     // polities already sail the fleet 1200 carried (it crossed the 1660
@@ -533,6 +550,15 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // Empires age's deeds twice. The span flag is the guard, whatever rate
     // this span inherits or a sweep sets.
     hp.naval_points_convert_at_open = false;
+
+    // BL-1152 (Ben, 2026-10-02, option D): THE FLEET RULE IS EXPLORATION'S FOR
+    // NOW. At 20 / 10 / 50 this span's realms field too few fleets -- on the
+    // review-fixed ladder six seeds first crossed between 1720 and 1868 and two
+    // never did -- so its crossings stay gated by the band alone until Ben
+    // rules on why (BL-1152's diagnosis). Both constants 0 = the rule reads
+    // nothing here.
+    hp.fleet_men_per_hull        = 0;
+    hp.fleet_power_halving_tiles = 0;
 
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).

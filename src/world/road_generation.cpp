@@ -979,124 +979,16 @@ void stamp_history_roads(world& w, entity_id body,
 
 int sea_lane_port(const std::vector<std::uint8_t>& sea, int gw, int gh, int col, int row, int radius)
 {
-    if (gw <= 0 || gh <= 0 || sea.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
-        return -1;
-    if (col < 0 || row < 0 || col >= gw || row >= gh)
-        return -1;
-    // Ring by ring outward, so the first ring holding any sea is the nearest; inside
-    // it the lowest raster index wins, which no scan order can change.
-    for (int r = 0; r <= radius; ++r)
-    {
-        int best = -1;
-        for (int dr = -r; dr <= r; ++dr)
-        {
-            const int rr = row + dr;
-            if (rr < 0 || rr >= gh)
-                continue;
-            for (int dc = -r; dc <= r; ++dc)
-            {
-                if (std::max(std::abs(dc), std::abs(dr)) != r)
-                    continue; // the ring's rim only
-                const int cc = ((col + dc) % gw + gw) % gw;
-                const int idx = rr * gw + cc;
-                if (sea[static_cast<std::size_t>(idx)] && (best < 0 || idx < best))
-                    best = idx;
-            }
-        }
-        if (best >= 0)
-            return best;
-    }
-    return -1;
+    // BL-1152: the walker and the port rule live in ocean_currents.cpp now, where
+    // the Era -1 sim's fleets read them too -- one walker, byte for byte.
+    return nearest_sea_tile(sea, gw, gh, col, row, radius);
 }
 
 std::vector<int> sea_lane_walk(const std::vector<std::uint8_t>& sea, int gw, int gh,
                                const ocean_current_field* currents, int weight_q,
                                int from, int to)
 {
-    std::vector<int> path;
-    const int n = gw * gh;
-    if (gw <= 0 || gh <= 0 || sea.size() != static_cast<std::size_t>(n))
-        return path;
-    if (from < 0 || to < 0 || from >= n || to >= n || !sea[static_cast<std::size_t>(from)]
-        || !sea[static_cast<std::size_t>(to)])
-        return path;
-    if (from == to)
-    {
-        path.push_back(from);
-        return path;
-    }
-    const bool priced = currents != nullptr && !currents->empty() && weight_q > 0
-                     && currents->gw == gw && currents->gh == gh;
-
-    // Dijkstra on (cost, raster index): the pair is unique, so the frontier's order,
-    // and with it every tie between equal-cost routes, is a property of the integers.
-    constexpr int64_t kInf = std::numeric_limits<int64_t>::max();
-    std::vector<int64_t> dist(static_cast<std::size_t>(n), kInf);
-    std::vector<int>     prev(static_cast<std::size_t>(n), -1);
-    using node = std::pair<int64_t, int>;
-    std::priority_queue<node, std::vector<node>, std::greater<node>> frontier;
-    dist[static_cast<std::size_t>(from)] = 0;
-    frontier.push({0, from});
-    while (!frontier.empty())
-    {
-        const node top = frontier.top();
-        frontier.pop();
-        const int u = top.second;
-        if (top.first > dist[static_cast<std::size_t>(u)])
-            continue; // a superseded entry
-        if (u == to)
-            break;
-        const int uc = u % gw, ur = u / gw;
-        // FOUR CARDINAL STEPS, columns wrapping and rows not -- the pathfinder's own
-        // grid (logistics.cpp, LOGISTICS.md sec 2). A lane walked eight ways leaves
-        // no two laned tiles side by side on a diagonal, so a four-way traveller
-        // rides it at about x0.75 instead of x0.50; walked on the traveller's grid,
-        // every step of the lane is a step the traveller can take.
-        constexpr int kStepDc[4] = { 0, 0, -1, 1 };
-        constexpr int kStepDr[4] = { -1, 1, 0, 0 };
-        for (int k4 = 0; k4 < 4; ++k4)
-        {
-            const int dc = kStepDc[k4], dr = kStepDr[k4];
-            const int vr = ur + dr;
-            if (vr < 0 || vr >= gh)
-                continue; // rows do not wrap
-            const int vc = ((uc + dc) % gw + gw) % gw;
-            const int v = vr * gw + vc;
-            if (!sea[static_cast<std::size_t>(v)])
-                continue; // water only
-            constexpr int64_t len = 1000;
-            int64_t step = len;
-            if (priced)
-            {
-                // The step's direction (east = dc, north = -dr) against the entered
-                // tile's ocean-region current, per mille of a full current along it.
-                const std::size_t k = static_cast<std::size_t>(currents->region_of(vc, vr));
-                const int64_t dot = static_cast<int64_t>(currents->east_q[k]) * dc
-                                  + static_cast<int64_t>(currents->north_q[k]) * (-dr);
-                const int align = static_cast<int>(std::clamp<int64_t>(dot, -1000, 1000));
-                step = (len * ocean_current_leg_cost_q(weight_q, align)) / 1000;
-                if (step < 1)
-                    step = 1; // no step is ever free
-            }
-            const int64_t cand = dist[static_cast<std::size_t>(u)] + step;
-            if (cand < dist[static_cast<std::size_t>(v)])
-            {
-                dist[static_cast<std::size_t>(v)] = cand;
-                prev[static_cast<std::size_t>(v)] = u;
-                frontier.push({cand, v});
-            }
-        }
-    }
-    if (dist[static_cast<std::size_t>(to)] == kInf)
-        return path;
-    for (int t = to; t >= 0; t = prev[static_cast<std::size_t>(t)])
-    {
-        path.push_back(t);
-        if (t == from)
-            break;
-    }
-    std::reverse(path.begin(), path.end());
-    return path;
+    return sea_walk(sea, gw, gh, currents, weight_q, from, to);
 }
 
 namespace {

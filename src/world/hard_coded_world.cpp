@@ -1988,6 +1988,7 @@ void run_industrialisation(generation_cursor& c)
         // and against the stop year it was asked to reach (BL-1053).
         const industrialisation_output kepler_industrialisation = make_industrialisation_output(
             kepler_settlement, kepler_industrialisation_hs, &kepler_creeds);
+        c.fleet_1960 = kepler_industrialisation.fleet; // BL-1152: the cursor carries the 1960 ledger
         {
             std::string why;
             if (!industrialisation_output_valid(kepler_industrialisation, &why, &kepler_creeds,
