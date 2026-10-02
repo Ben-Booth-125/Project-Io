@@ -680,13 +680,15 @@ void w_battle(std::ostream& o, const active_battle& b)
     w_ids(o, b.defender_units);
     w_battle_state(o, b.state);
     w_enum(o, b.withdraw_requested);
+    w_id(o, b.ground_tile); // BL-1145 review: world_save_version 30
 }
 
 bool r_battle(std::istream& i, active_battle& b)
 {
     return r_u32(i, b.province) && r_id(i, b.attacker) && r_id(i, b.defender)
         && r_ids(i, b.attacker_units) && r_ids(i, b.defender_units)
-        && r_battle_state(i, b.state) && r_enum(i, b.withdraw_requested, max_withdraw);
+        && r_battle_state(i, b.state) && r_enum(i, b.withdraw_requested, max_withdraw)
+        && r_id(i, b.ground_tile);
 }
 
 // ---------------------------------------------------------------------------

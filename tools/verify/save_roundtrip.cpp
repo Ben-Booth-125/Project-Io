@@ -676,6 +676,7 @@ int main()
         ab.defender       = id.defender;
         ab.attacker_units = { 101, 102 };
         ab.defender_units = { 201 };
+        ab.ground_tile    = 777; // BL-1145 review (world_save_version 30): the ground, stored at open
         ab.state = begin_campaign_battle(id, att, doctrine_row{}, def, doctrine_row{},
                                          terrain_substrate::sedimentary, terrain_cover::grass,
                                          150u, terrain_landform::plains, season::summer,
@@ -703,6 +704,8 @@ int main()
                       && r.defender == ab.defender && r.attacker_units == ab.attacker_units
                       && r.defender_units == ab.defender_units,
                   "P6 the battle's identity and unit membership survive");
+            check(r.ground_tile == ab.ground_tile,
+                  "P6 the battle's ground tile survives (BL-1145 review, world_save_version 30)");
             check(r.state.rng_state == ab.state.rng_state
                       && r.state.stream_seed == ab.state.stream_seed
                       && r.state.rounds_fought == ab.state.rounds_fought,

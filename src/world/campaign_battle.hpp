@@ -255,6 +255,17 @@ struct active_battle
     std::vector<entity_id> attacker_units;
     std::vector<entity_id> defender_units;
 
+    /// The ground the fight is ON: the defender-side tile whose terrain the
+    /// resolver was handed at open (battle_system.cpp `defender_ground`, ruling
+    /// 2 — highest terrain_defence, ties to the lowest tile id). STORED at open
+    /// rather than re-derived, because the units it was picked from move and
+    /// die while the terrain the battle reads does not (BL-1145 review): the
+    /// battle card frames this tile. `null_entity` only if no defending unit
+    /// resolved to a real tile — never for a battle discovery opens, whose
+    /// units all stand in the province.
+    /// Saved (world_save_version 30).
+    entity_id ground_tile = null_entity;
+
     /// The resolver's own state: strengths, the stream, rounds fought, and the
     /// per-round trace. Held whole rather than copied field-by-field so the
     /// campaign resolver stays the single source of what a round does.

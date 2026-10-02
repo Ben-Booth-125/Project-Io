@@ -57,7 +57,11 @@
 //       size distribution in land tiles (median, p90, max), overall and by
 //       the ANCHOR's scale — the anchor being the highest summed centre scale
 //       standing in the province, ties to the lowest tile id, exactly as
-//       `seed_province_holders` derives it. C7b reads the anchor-only
+//       `seed_province_holders` derives it — C8 over SEEDED provinces only,
+//       so an anchor-only island never reads as a village's ground (BL-1145).
+//       C7's `unanchored` is a FAIL row (BL-1145): at generation every land
+//       province on the settled home body holds a centre (PROVINCES.md
+//       ruling 3; one can outlive it only in play, NR-952). C7b reads the anchor-only
 //       provinces (the uncentred islands) on their own, with WHY each is left
 //       (BL-1150): touching its own nation's land (the retired settlement
 //       lock's islands), a nation lock, water, or no nation at all.
@@ -89,7 +93,10 @@
 // the instrument's own honesty check (a world with no settlement record, or no
 // carved centre, would make every fit row vacuous), THE CAP (BL-1130 review
 // fix) — the rule's own invariant on the saved sim record, not a density —
-// THE SPACING (C10), and THE COST MODEL ON THE SHIPPED WORLDS (C13).
+// THE SPACING (C10), THE COST MODEL ON THE SHIPPED WORLDS (C13), and THE
+// PROVINCE ANCHOR (C7 `unanchored`, BL-1145), and THE GARRISON POSTS (C16b; Ben,
+// 2026-10-03: the capital province on its anchor centre, a border province on its
+// tile facing the guarded neighbour). C16 reads them against the lowest-id tile.
 //
 //     * THE COST MODEL ON THE SHIPPED WORLDS (C13; BL-1150 review) —
 //       province_partition_harness C2a/C2b, per body and like for like, on the
@@ -148,6 +155,9 @@
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
 #include "world/hex_neighbors.hpp"
+#include "world/logistics.hpp"          // BL-1145 review: body_tile_grid (C16's facing test)
+#include "world/nation_ai.hpp"          // BL-1145 review: nation_highest_grudge_neighbour (C16)
+#include "world/nation_generation.hpp"  // BL-1145 review: garrison_border_post (C16)
 #include "world/placement_rules.hpp"
 #include "world/era_minus_one.hpp"         // BL-1132: generation_settle_spacing_tiles
 #include "world/population_generation.hpp"
@@ -325,6 +335,30 @@ double spearman(const std::vector<int64_t>& a, const std::vector<int64_t>& b)
     return (saa > 0 && sbb > 0) ? sab / std::sqrt(saa * sbb) : 0.0;
 }
 
+/// True iff a hex neighbour of @p tile is another nation's ground — the test
+/// nation_ai.cpp build_force applies before it reads a unit as border force.
+bool touches_foreign(world& w, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end()) return false;
+    const auto bit = w.bodies.find(tit->second.body);
+    if (bit == w.bodies.end()) return false;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, tit->second.body);
+    const auto own_it = w.tile_to_nation.find(tile);
+    const entity_id own = own_it == w.tile_to_nation.end() ? null_entity : own_it->second;
+    for (int side = 0; side < 6; ++side)
+    {
+        const hex_neighbors::coord c = hex_neighbors::neighbour(tit->second.grid_x, tit->second.grid_y, side);
+        if (c.gy < 0 || c.gy >= gh) continue;
+        const std::size_t idx = static_cast<std::size_t>(c.gy) * gw + (((c.gx % gw) + gw) % gw);
+        if (idx >= grid.size() || grid[idx] == null_entity) continue;
+        const auto nit = w.tile_to_nation.find(grid[idx]);
+        if (nit != w.tile_to_nation.end() && nit->second != own) return true;
+    }
+    return false;
+}
+
 std::vector<uint32_t> parse_seed_list(const std::string& s)
 {
     std::vector<uint32_t> out;
@@ -455,7 +489,21 @@ struct seed_record
     int why_own_nation = 0, why_unowned = 0, why_nation_lock = 0, why_water = 0;
     std::vector<int> anchor_only_sizes; ///< land tiles per anchor-only province
     std::vector<int> sizes;      ///< land tiles per province
-    std::vector<int> sizes_by_anchor[5]; ///< ...split by the anchor's scale (1-5)
+    std::vector<int> sizes_by_anchor[5]; ///< ...split by the anchor's scale (1-5), SEEDED provinces only (BL-1145)
+    /// C16 (BL-1145, a province's readers take its anchor): the nation
+    /// garrisons over every body, read against the rule they replaced — the
+    /// province's lowest-id tile. `moved`: the garrison stands off that tile.
+    /// `*_unsettled`: the tile is ground the colonisation never settled.
+    int nat_garrisons = 0, garrisons_at_capital = 0, garrisons_moved = 0;
+    int garrison_old_unsettled = 0, garrison_new_unsettled = 0;
+    int garrison_on_centre = 0;  ///< ...whose post hosts a centre (else the centreless fallback)
+    int garrison_in_water = 0;   ///< ...in a water province (no centre: the lowest-id fallback)
+    int garrison_left_wild = 0;  ///< lowest tile never-settled, post settled
+    int garrison_into_wild = 0;  ///< lowest tile settled, post never-settled
+    int garrison_capital_rule = 0;  ///< garrisons posted by the capital rule (the anchor centre)
+    int garrison_border_rule = 0;   ///< ...by the border rule (facing the guarded neighbour)
+    int garrison_border_facing = 0; ///< border-rule garrisons whose tile touches a foreign nation
+    int garrison_off_post = 0;      ///< garrisons NOT on the post the rule names (FAIL if > 0)
     /// The partition's own ledger, read off a rebuild ON A COPY from the stored
     /// seed (province_partition_harness P6: the rebuild IS the shipped
     /// partition): uncentred islands, and centre singletons absorbed.
@@ -1016,7 +1064,60 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
             if (centres_here == 0) { ++r.unanchored; continue; }
             const int n = static_cast<int>(pr.tiles.size());
             r.sizes.push_back(n);
+            // BL-1145: an anchor-only province (an uncentred island, C7b) is
+            // NOT a village's ground — its scale-1 anchor was founded to hold
+            // it, not grown from — so it is read in C7b and kept out of C8's
+            // village column, which reads the fill's ordering by scale.
+            if (seeds_here == 0) continue;
             r.sizes_by_anchor[std::clamp(anchor_scale, 1, 5) - 1].push_back(n);
+        }
+
+        // --- C16 the garrisons' posts (BL-1145) -------------------------------
+        // The home body only, like every province row here: `tile_settled` is
+        // the home body's colonisation record.
+        for (const auto& [uid, u] : w.units)
+        {
+            const auto nit = w.nations.find(u.owner);
+            if (nit == w.nations.end() || u.position == null_entity) continue;
+            const auto ptit = w.tiles.find(u.position);
+            if (ptit == w.tiles.end() || ptit->second.body != body) continue;
+            const province* pr = w.provinces.find(w.provinces.province_of(u.position));
+            if (pr == nullptr || pr->tiles.empty()) continue;
+            ++r.nat_garrisons;
+            if (province_kind_of(w, *pr) != province_kind::land) ++r.garrison_in_water;
+            if (u.position == nit->second.capital_tile) ++r.garrisons_at_capital;
+            if (centres_on_tile.count(u.position) != 0) ++r.garrison_on_centre;
+            const entity_id old_post = pr->tiles.front();
+            if (u.position != old_post) ++r.garrisons_moved;
+            const bool old_wild = w.tile_settled.count(old_post) == 0;
+            const bool new_wild = w.tile_settled.count(u.position) == 0;
+            if (old_wild) ++r.garrison_old_unsettled;
+            if (new_wild) ++r.garrison_new_unsettled;
+            if (old_wild && !new_wild) ++r.garrison_left_wild;
+            if (!old_wild && new_wild) ++r.garrison_into_wild;
+
+            // THE RULE, ASSERTED (Ben, 2026-10-03; a FAIL row): the capital
+            // province's garrison on its anchor centre, every other on its
+            // border post facing the highest-grudge neighbour — the same
+            // functions seed_nation_garrisons posts with.
+            const nation_component& nc = nit->second;
+            const uint32_t cap_prov = (nc.capital_tile != null_entity)
+                                    ? w.provinces.province_of(nc.capital_tile) : 0u;
+            entity_id post = null_entity;
+            if (pr->id == cap_prov)
+            {
+                post = province_anchor_tile(w, *pr);
+                ++r.garrison_capital_rule;
+            }
+            else
+            {
+                const entity_id guarded = nation_highest_grudge_neighbour(w, u.owner, nation_ai_params{});
+                post = garrison_border_post(out.w, *pr, guarded);
+                if (post == null_entity) post = province_anchor_tile(w, *pr);
+                ++r.garrison_border_rule;
+                if (touches_foreign(out.w, u.position)) ++r.garrison_border_facing;
+            }
+            if (u.position != post) ++r.garrison_off_post;
         }
         world wc = w; // read-only over the census world: the rebuild runs on a copy
         build_province_partition(wc, w.provinces.seed, &r.part_stats);
@@ -1434,6 +1535,40 @@ int main(int argc, char** argv)
     }
     std::printf("\n");
 
+    std::printf("\n=== C16 the nation garrisons' posts on the home body (BL-1145; Ben 2026-10-03: the capital anchor, else the border post;"
+                " C16b asserts) ===\n");
+    std::printf("seed  garrisons  in_water  at_capital  on_centre  off_lowest_tile | lowest_tile_unsettled"
+                "  post_unsettled  left_wild  into_wild\n");
+    {
+        int64_t g = 0, wt = 0, cap = 0, oc = 0, mv = 0, ou = 0, nu = 0, lw = 0, iw = 0;
+        for (const seed_record& r : recs)
+        {
+            std::printf("%4u  %9d  %8d  %10d  %9d  %15d | %21d  %14d  %9d  %9d\n", r.seed,
+                        r.nat_garrisons, r.garrison_in_water, r.garrisons_at_capital,
+                        r.garrison_on_centre, r.garrisons_moved, r.garrison_old_unsettled,
+                        r.garrison_new_unsettled, r.garrison_left_wild, r.garrison_into_wild);
+            g += r.nat_garrisons; wt += r.garrison_in_water; cap += r.garrisons_at_capital;
+            oc += r.garrison_on_centre; mv += r.garrisons_moved; ou += r.garrison_old_unsettled;
+            nu += r.garrison_new_unsettled; lw += r.garrison_left_wild; iw += r.garrison_into_wild;
+        }
+        std::printf(" ALL  %9" PRId64 "  %8" PRId64 "  %10" PRId64 "  %9" PRId64 "  %15" PRId64 " | %21" PRId64
+                    "  %14" PRId64 "  %9" PRId64 "  %9" PRId64 "\n", g, wt, cap, oc, mv, ou, nu, lw, iw);
+    }
+    std::printf("C16b the rule (Ben, 2026-10-03; a FAIL row): capital province -> its anchor centre,"
+                " border province -> its tile facing the guarded neighbour\n");
+    std::printf("seed  capital_rule  border_rule  border_facing  off_post\n");
+    {
+        int64_t cr = 0, br = 0, bf = 0, op = 0;
+        for (const seed_record& r : recs)
+        {
+            std::printf("%4u  %12d  %11d  %13d  %8d\n", r.seed, r.garrison_capital_rule,
+                        r.garrison_border_rule, r.garrison_border_facing, r.garrison_off_post);
+            cr += r.garrison_capital_rule; br += r.garrison_border_rule;
+            bf += r.garrison_border_facing; op += r.garrison_off_post;
+        }
+        std::printf(" ALL  %12" PRId64 "  %11" PRId64 "  %13" PRId64 "  %8" PRId64 "\n", cr, br, bf, op);
+    }
+
     std::printf("\n=== C13 the cost model on the shipped worlds (province_partition_harness C2a/C2b,"
                 " per body, like for like; BL-1150 review, BL-1156) ===\n");
     std::printf("home body: border share of each edge class and its ratio to plain. CROSS = a step onto or"
@@ -1584,6 +1719,8 @@ int main(int argc, char** argv)
         if (!r.ledger_ok) ++fails;
         if (!r.wiring_ok) ++fails;
         if (!r.c13_fail.empty()) ++fails;
+        if (r.unanchored != 0) ++fails; // C7, BL-1145: every settled-land province holds a centre
+        if (r.garrison_off_post != 0) ++fails; // C16b, Ben 2026-10-03: every garrison on its post
     }
     // POPULATION.md § Generation: "a 1960 world aims at roughly 500 centres" --
     // an aim the forces are calibrated against, never a count any rule
@@ -1640,19 +1777,31 @@ int main(int argc, char** argv)
         // divide. Ben's call against the numbers (NR-962), never a tolerance.
         for (const std::string& f : r.c13_fail)
             std::printf("FAIL  seed %u: C13 %s\n", r.seed, f.c_str());
+        // BL-1145, the anchor asserted (PROVINCES.md ruling 3): at generation
+        // every land province on the settled home body holds a centre. A
+        // province can outlive its centre only IN PLAY (NR-952).
+        if (r.unanchored != 0)
+            std::printf("FAIL  seed %u: C7 %d of %d land provinces on the home body hold no centre "
+                        "at generation\n", r.seed, r.unanchored, r.land_provinces);
+        // Ben, 2026-10-03: a garrison stands where the rule posts it.
+        if (r.garrison_off_post != 0)
+            std::printf("FAIL  seed %u: C16b %d of %d garrisons stand off the post the rule names "
+                        "(capital anchor / border post)\n", r.seed, r.garrison_off_post, r.nat_garrisons);
     }
     int c13_seeds = 0, other_fails = 0;
     for (const seed_record& r : recs)
     {
         if (!r.c13_fail.empty()) ++c13_seeds;
-        if (!r.ok || !r.cap_ok || !r.spacing_ok || !r.ledger_ok || !r.wiring_ok) ++other_fails;
+        if (!r.ok || !r.cap_ok || !r.spacing_ok || !r.ledger_ok || !r.wiring_ok
+            || r.unanchored != 0 || r.garrison_off_post != 0) ++other_fails;
     }
     if (fails == 0)
-        std::printf("\ncentre_census: OK (the cap, the spacing, the cost model, the conservation ledger and the works wiring hold; no density is"
-                    " asserted)\n");
+        std::printf("\ncentre_census: OK (the cap, the spacing, the cost model, the conservation ledger, the works wiring,"
+                    " the province anchor and the garrison posts hold; no density is asserted)\n");
     else
         std::printf("\ncentre_census: FAIL (see the FAIL rows: %d seed(s) fail C13, the cost model;"
-                    " %d fail the honesty check, the cap, the spacing, the ledger or the wiring)\n",
+                    " %d fail the honesty check, the cap, the spacing, the ledger, the wiring or the"
+                    " C7 anchor / C16b garrison post)\n",
                     c13_seeds, other_fails);
     return fails == 0 ? 0 : 1;
 }

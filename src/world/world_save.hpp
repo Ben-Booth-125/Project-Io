@@ -295,7 +295,15 @@ inline constexpr uint32_t world_save_magic =
 /// a standing market on its body, whose centre is not a tile on its body, or
 /// whose own id is still a standing market. Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 29;
+/// Bumped to 30 by BL-1145 (a province's readers take its anchor; the review
+/// fix): the battle record gains one id at its tail, after `withdraw_requested`
+/// -- `active_battle::ground_tile`, the defender tile the resolver read its
+/// terrain from at open, which the battle card frames. A v29 stream with a
+/// live battle is eight bytes short per battle, so its next record misreads;
+/// refused whole on the strict-equality contract, no migration (a pre-bump
+/// battle recorded no ground). Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 30;
 
 /// Write @p w as a complete world snapshot.
 ///

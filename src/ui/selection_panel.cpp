@@ -2414,13 +2414,24 @@ void draw_battle_selection(world& w, ui_state& ui)
     // The province's hexes drawn large, with each participating unit a marker on
     // its OWN tile — positions are real, because ruling 1 kept them: the province
     // frames the fight, it does not pool the forces into it.
+    //
+    // FRAMED ROUND THE GROUND THE FIGHT IS ON (BL-1145): the battle's own
+    // `ground_tile`, the defender tile the resolver read its terrain from,
+    // stored at open — so the frame is the battle's, and does not wander as the
+    // units it was picked from move or die. Falls back (a record with none) to
+    // the province anchor (`province_anchor_tile`, itself falling back to the
+    // lowest-id tile when no centre stands there) — never the lowest-id tile
+    // first, which in a province of a thousand tiles frames empty country.
     if (const province* pv = w.provinces.find(b.province); pv && !pv->tiles.empty())
     {
+        entity_id frame = b.ground_tile;
+        if (frame == null_entity || w.tiles.find(frame) == w.tiles.end())
+            frame = province_anchor_tile(w, *pv);
         const float avail = ImGui::GetContentRegionAvail().x;
         const float h     = std::min(avail * 0.55f, 220.0f);
         ImVec2 origin = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        draw_tile_neighbourhood(dl, w, pv->tiles.front(), origin, ImVec2(avail, h), 2);
+        draw_tile_neighbourhood(dl, w, frame, origin, ImVec2(avail, h), 2);
         ImGui::Dummy(ImVec2(avail, h));
     }
 

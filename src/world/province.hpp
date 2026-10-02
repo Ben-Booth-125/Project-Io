@@ -633,8 +633,11 @@ int province_edge_cost(const world& w, uint32_t seed, entity_id a, entity_id b, 
 //     bare habitability, a Highway tile gets twice it.
 //   * POPULATION is the province-level multiplier, 1 + SUM(centre scale) / 5,
 //     again over the scale's own defined domain (1 = village .. 5 = metropolis,
-//     population_centre_component). A province with a metropolis sustains twice
-//     what the same empty land would.
+//     population_centre_component). A province with ONE metropolis sustains
+//     twice what the same empty land would; the sum is over every centre in
+//     the province and is not capped, so since provinces became a centre's
+//     whole ground (BL-1133, BL-1150) a province holding several centres can
+//     pass 2 — the domain bounds each centre's scale, not the sum.
 //
 // Every band above is read off a domain the codebase already defines. That
 // leaves exactly ONE free scalar — `k_province_buildings_per_sustain_unit` —
@@ -688,6 +691,23 @@ inline constexpr float k_population_scale_max = 5.0f;
 ///
 /// Re-pin by running `province_capacity_probe`, which prints the ratio and its
 /// spread on every run for exactly this purpose.
+///
+/// RE-READ 2026-10-02 (BL-1145) — THE ANCHOR HAS MOVED; NOT RE-PINNED, Ben's
+/// call. The world total it was pinned to moved with the partition: provinces
+/// are now a centre's whole ground (BL-1133, BL-1150), so far fewer of them each
+/// carry a larger population factor. `province_capacity_probe 8`, same seeds
+/// 0-7, same instrument:
+///
+///   seed 0  7.7076      seed 4  8.6828
+///   seed 1  6.5421      seed 5  7.0146
+///   seed 2  9.3589      seed 6  7.4423
+///   seed 3 10.5468      seed 7  9.0301
+///
+///   aggregate 8.0256, spread 6.5421 .. 10.5468 (46.87% of the mean)
+///
+/// So at 12.6468 the ceilings total 157.58% of the pooled per-tile capacity —
+/// no longer a redistribution of it. Still binding on nothing: 5,631 buildings
+/// against 1,433,325 ceiling slots (0.393%).
 inline constexpr float k_province_buildings_per_sustain_unit = 12.6468f;
 
 /// The heuristic's working, kept whole so the probe can report each term rather
@@ -847,6 +867,29 @@ struct province_anchor
 };
 std::map<uint32_t, province_anchor> province_anchors(const world& w);
 
+/// THE TILE THAT STANDS FOR A PROVINCE (BL-1145, a province's readers take its
+/// anchor). Where a reader needs ONE tile for a whole province — a marker on the
+/// map, a garrison's post, a card's frame — it takes the province's ANCHOR
+/// (`province_anchors`' pick, the same derivation), never `tiles.front()`: the
+/// lowest-id tile is the province's id, not its place, and in a province of a
+/// thousand tiles it can sit at the far edge in never-settled country.
+///
+/// A province can outlive its centre in play (PROVINCES.md ruling 3, NR-952), and
+/// a water province never holds one, so the fallback is stated rather than
+/// hidden: with no centre standing in it, the LOWEST-ID member tile
+/// (`tiles.front()`, which is the id) — deterministic, and the only tile every
+/// province is guaranteed to carry. Returns `null_entity` only for an empty
+/// province (never built by the partition).
+///
+/// The single-province form scans every centre once (O(centres)), cheap enough
+/// for a card drawn every frame; the map form reads a `province_anchors` result a
+/// caller already holds, for a pass over many provinces. The two agree by
+/// construction: same sum per tile, same strictly-greater scan in ascending tile
+/// order.
+entity_id province_anchor_tile(const world& w, const province& pr);
+entity_id province_anchor_tile(const std::map<uint32_t, province_anchor>& anchors,
+                               const province& pr);
+
 /// The current holder of the province with id @p province_id, or `null_entity`
 /// if there is no such province or no holder is recorded. O(log n): binary
 /// search for the province (mirroring `province_partition::find`), then a
@@ -876,12 +919,15 @@ inline constexpr uint32_t province_section_version = 1;
 /// against a corrupt or malicious length prefix.
 inline constexpr uint32_t province_section_max_provinces = 1u << 24;
 
-/// Sanity ceiling on one province's declared tile count. A built province is a
-/// handful of tiles — `k_province_max_tiles` (12) is the PREFERRED size and the
-/// clamp growth obeys, `k_province_hard_cap_tiles` (20) is the absolute bound,
-/// and the floor is whatever land was there — so this is orders of magnitude
-/// clear of all three. It stays generous rather than tight to either constant so
-/// a future algorithm change is a format-compatible one.
+/// Sanity ceiling on one province's declared tile count. RE-READ 2026-10-02
+/// (BL-1145): `k_province_max_tiles` (12) and `k_province_hard_cap_tiles` (20)
+/// bound only the water domains and an unsettled body's hinterland now; on
+/// settled land the fill is unclamped (PROVINCES.md ruling 4) and a centre's
+/// province reaches 2,541 tiles on the shipped worlds (centre_census C7, the 16
+/// curated seeds: seed 28; every other seed's largest is under 1,000). 65,536 is
+/// still ~25x clear of that.
+/// It stays generous rather than tight so a future algorithm change is a
+/// format-compatible one.
 inline constexpr uint32_t province_section_max_tiles = 1u << 16;
 
 /// Append @p p to @p out as: magic, version, seed, province count, then per
