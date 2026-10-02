@@ -707,7 +707,7 @@ reason Empires refused one.
 pulls by the jobs its works offer beyond the heads already there, so people go where jobs are
 unfilled, and a city whose works are full stops drawing. Points could not carry this: a city's points
 stop at the heads its works employ, so a crowded city pulled like a full town and its arrivals earned
-nothing. The campaign carries wages; open work is the nearest thing the sim holds.
+nothing. The campaign carries wages; open work is the nearest thing the sim holds. **Any centre with open work draws (Ben, 2026-10-02):** a village whose works hire takes migrants and grows into a town, rather than the stream reaching only towns. With towns alone the stream moved almost no one, because the open work sat in villages.
 
 ### Beat 3 — Decolonisation, and wars over empire
 
