@@ -234,7 +234,8 @@ inline constexpr std::int32_t k_stockpile_density_ceiling = 120;
 
 /// The spend @p sb is charged at: its own DERIVED firm price (BL-1064), the
 /// ruled `sqrt_capital` cap rule under the constants above, window 4, the
-/// province cap on (§ 1: "the per-province cap stays at 2 on a budget world").
+/// province cap on (§ 1: the per-province cap scales with the province's centre,
+/// two firms per rung — BL-1146, Ben 2026-09-27, NR-960, superseding the flat 2).
 /// On an empty or rejected budget the price is 0 — never read, since an empty
 /// budget takes the legacy branch before any spend param is.
 charter_spend_params stockpile_charter_spend(const stockpile_budget& sb);

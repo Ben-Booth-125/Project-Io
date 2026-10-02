@@ -1200,20 +1200,28 @@ int main()
 
     {
         struct tally { std::size_t n = 0, border = 0; };
-        struct classes { tally river, steep, plain, all; };
+        // BL-1156 (a river divides its banks; Ben, 2026-10-01, NR-962 B): the
+        // river edge C2a asserts is the CROSSING — a step onto or off a course
+        // sideways (one end a course tile, the step not along the flow), the
+        // step the cost model charges. `river` (ALONG a course, the river bit)
+        // is reported beside it. Plain ground is neither, and below p90.
+        struct classes { tally river, cross, steep, plain, all; };
         classes pooled;
         std::map<entity_id, classes> by_body; // ordered: the rows print in body order
         for (const land_edge& e : edges)
         {
             const bool is_border = part.province_of(e.a) != part.province_of(e.b);
+            const bool cross     = !e.river && (w.tiles.at(e.a).river_edges != 0
+                                                || w.tiles.at(e.b).river_edges != 0);
             const auto bump      = [&](tally& t) { ++t.n; if (is_border) ++t.border; };
             classes& b = by_body[w.tiles.at(e.a).body];
             for (classes* c : { &pooled, &b })
             {
                 bump(c->all);
                 if (e.river)                   bump(c->river);
+                if (cross)                     bump(c->cross);
                 if (e.dh >= p90_dh)            bump(c->steep);
-                if (!e.river && e.dh < p90_dh) bump(c->plain);
+                if (!e.river && !cross && e.dh < p90_dh) bump(c->plain);
             }
         }
         const auto pctf = [](const tally& t) {
@@ -1221,10 +1229,10 @@ int main()
         };
         std::printf("  C2  border share by edge class — all %.2f%% (%zu edges)\n",
                     pctf(pooled.all), pooled.all.n);
-        std::printf("      pooled over bodies (REPORTED): river %6.2f%% (%zu)   steep(>=p90)"
-                    " %6.2f%% (%zu)   plain %6.2f%% (%zu)\n",
-                    pctf(pooled.river), pooled.river.n, pctf(pooled.steep), pooled.steep.n,
-                    pctf(pooled.plain), pooled.plain.n);
+        std::printf("      pooled over bodies (REPORTED): crossing %6.2f%% (%zu)   along %6.2f%% (%zu)"
+                    "   steep(>=p90) %6.2f%% (%zu)   plain %6.2f%% (%zu)\n",
+                    pctf(pooled.cross), pooled.cross.n, pctf(pooled.river), pooled.river.n,
+                    pctf(pooled.steep), pooled.steep.n, pctf(pooled.plain), pooled.plain.n);
 
         // The two claims the ruling makes about what a boundary IS, asserted
         // LIKE FOR LIKE: on every body carrying the edge class, against the
@@ -1246,14 +1254,20 @@ int main()
         bool        rivers_divide = true, slopes_divide = true;
         for (const auto& [bid, c] : by_body)
         {
-            std::printf("      body %u%s: river %6.2f%% (%zu)   steep %6.2f%% (%zu)   plain"
-                        " %6.2f%% (%zu)\n",
-                        bid, covered_bodies.count(bid) ? " (covered)" : "", pctf(c.river),
-                        c.river.n, pctf(c.steep), c.steep.n, pctf(c.plain), c.plain.n);
-            if (c.river.n > 0)
+            std::printf("      body %u%s: crossing %6.2f%% (%zu)   along %6.2f%% (%zu)   steep %6.2f%%"
+                        " (%zu)   plain %6.2f%% (%zu)\n",
+                        bid, covered_bodies.count(bid) ? " (covered)" : "", pctf(c.cross),
+                        c.cross.n, pctf(c.river), c.river.n, pctf(c.steep), c.steep.n,
+                        pctf(c.plain), c.plain.n);
+            if (c.cross.n > 0)
             {
                 ++river_bodies;
-                if (!(pctf(c.river) > pctf(c.plain)))
+                // Against plain ground AND against the step along the course.
+                // The second is the control: both classes touch a course, so
+                // both share the confound that centres stand on rivers, and only
+                // the cost model's geometry separates them (BL-1156: at river
+                // cost 0 a crossing is a border no more often than travel along).
+                if (!(pctf(c.cross) > pctf(c.plain)) || !(pctf(c.cross) > pctf(c.river)))
                     rivers_divide = false;
             }
             if (c.steep.n > 0)
@@ -1289,8 +1303,9 @@ int main()
             }
         }
         check(river_bodies > 0 && rivers_divide,
-              "C2a on every body with rivers, a river edge is a border more often than that"
-              " body's plain ground (rivers divide; like for like since BL-1150)");
+              "C2a on every body with rivers, a step across a course is a border more often than"
+              " that body's plain ground and than a step along the course (a river divides its"
+              " banks, BL-1156; like for like)");
         check(steep_bodies > 0 && slopes_divide,
               "C2b on every body with steep edges, a steep edge is a border more often than"
               " that body's plain ground (elevation divides; like for like since BL-1150)");

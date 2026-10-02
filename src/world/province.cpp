@@ -209,7 +209,22 @@ int edge_cost_impl(uint32_t seed, entity_id a_id, const tile_component& a, entit
 
     int c = k_province_edge_base_cost;
 
-    if (((a.river_edges >> side) & 1u) != 0u || ((b.river_edges >> opposite) & 1u) != 0u)
+    // A RIVER DIVIDES ITS BANKS (Ben, 2026-10-01, NR-962 B; BL-1156). A river
+    // is a run of course tiles (`river_edges != 0`) joined by the steps its
+    // bits mark, from each course tile to the next downstream. The fill pays
+    // the river's cost to step ONTO or OFF a course sideways — one end a
+    // course tile, the step not one the river flows through — so crossing
+    // from bank to bank costs it twice, and stepping along the course pays
+    // nothing extra. Symmetric: both ends' course-ness and either side's bit.
+    // LAND COURSE TILES ONLY: the river's last step sets an inflow bit on the
+    // water tile it reaches (its mouth), and the ruling is about banks on land,
+    // so a mouth tile charges water-to-water steps nothing and the water
+    // domains partition exactly as before (BL-1156 review).
+    const bool along = ((a.river_edges >> side) & 1u) != 0u
+                       || ((b.river_edges >> opposite) & 1u) != 0u;
+    const bool a_course = a.river_edges != 0u && !is_water(a.substrate);
+    const bool b_course = b.river_edges != 0u && !is_water(b.substrate);
+    if (!along && (a_course || b_course))
         c += k_province_river_edge_cost;
 
     const float dh = std::fabs(a.height - b.height);
@@ -367,17 +382,10 @@ province_kind province_kind_of(const world& w, uint32_t id)
 // The province holder (BL-569, province holder)
 // ---------------------------------------------------------------------------
 
-void seed_province_holders(world& w)
+std::map<uint32_t, province_anchor> province_anchors(const world& w)
 {
-    w.province_holder.assign(w.provinces.provinces.size(), null_entity);
-
-    // BL-611 (province centre anchor): the ANCHOR is the political decider —
-    // the province's nation is its anchor centre's nation, and taking the
-    // centre takes the province (BL-567's mechanism). The anchor is DERIVED,
-    // never stored: the highest summed centre scale standing in the province,
-    // ties to the lowest tile id — so it cannot desynchronise from the
-    // centres it describes. Gathered into an ORDERED map so no unordered
-    // iteration order reaches the pick.
+    // Gathered into an ORDERED map so no unordered iteration order reaches the
+    // pick: the scales of every centre standing on a tile, summed.
     std::map<entity_id, int> centre_scale_by_tile;
     for (const auto& [centre_id, tile_id] : w.population_centre_tile)
     {
@@ -387,12 +395,9 @@ void seed_province_holders(world& w)
         centre_scale_by_tile[tile_id] += pit->second.scale;
     }
 
-    for (std::size_t i = 0; i < w.provinces.provinces.size(); ++i)
+    std::map<uint32_t, province_anchor> out;
+    for (const province& pr : w.provinces.provinces)
     {
-        const province& pr = w.provinces.provinces[i];
-        if (province_kind_of(w, pr) != province_kind::land)
-            continue; // no_entity for a non-land province (already the default)
-
         // The anchor pick: walk `pr.tiles` in its own ascending order (the
         // partition's contract) with a strictly-greater scan, so the lowest
         // tile id to reach a given scale wins ties for free.
@@ -410,8 +415,34 @@ void seed_province_holders(world& w)
             }
         }
         if (anchor != null_entity)
+            out[pr.id] = province_anchor{ anchor, anchor_scale };
+    }
+    return out;
+}
+
+void seed_province_holders(world& w)
+{
+    w.province_holder.assign(w.provinces.provinces.size(), null_entity);
+
+    // BL-611 (province centre anchor): the ANCHOR is the political decider —
+    // the province's nation is its anchor centre's nation, and taking the
+    // centre takes the province (BL-567's mechanism). The anchor is DERIVED,
+    // never stored: the highest summed centre scale standing in the province,
+    // ties to the lowest tile id — so it cannot desynchronise from the
+    // centres it describes. ONE DERIVATION (`province_anchors`, shared since
+    // the BL-1146 review with the charter budget's per-province cap).
+    const std::map<uint32_t, province_anchor> anchors = province_anchors(w);
+
+    for (std::size_t i = 0; i < w.provinces.provinces.size(); ++i)
+    {
+        const province& pr = w.provinces.provinces[i];
+        if (province_kind_of(w, pr) != province_kind::land)
+            continue; // no_entity for a non-land province (already the default)
+
+        const auto ait = anchors.find(pr.id);
+        if (ait != anchors.end())
         {
-            const auto nit = w.tile_to_nation.find(anchor);
+            const auto nit = w.tile_to_nation.find(ait->second.tile);
             w.province_holder[i] =
                 (nit == w.tile_to_nation.end()) ? null_entity : nit->second;
             continue;

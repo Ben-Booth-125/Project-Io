@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -251,8 +252,12 @@ inline constexpr std::size_t k_sea_province_soft_target = 42;
 /// changing it rescales the whole model rather than shifting one term.
 inline constexpr int k_province_edge_base_cost = 10;
 
-/// Crossing a river edge (`tile_component::river_edges`, a per-side bitmask —
-/// already the right shape for a border). Four times plain ground: a river is
+/// Crossing a river: charged on a step ONTO or OFF a LAND course tile
+/// (`tile_component::river_edges != 0`; a river's water mouth charges nothing,
+/// so the water domains are unaffected) that is not a step the river flows
+/// through (Ben, 2026-10-01, NR-962 B; BL-1156, a river divides its banks), so
+/// bank to bank pays it twice and travel along a course pays nothing extra.
+/// Four times plain ground: a river is
 /// the strongest single boundary signal the terrain offers, and this is the
 /// anchor the elevation coefficient is then pinned AGAINST rather than a
 /// number chosen on its own.
@@ -273,8 +278,11 @@ inline constexpr int k_province_river_edge_cost = 40;
 ///   implied k = k_province_river_edge_cost / p90 = 40 / 0.0586 = 682.7
 ///
 /// The value below is that implied coefficient, rounded. What it makes true, in
-/// the terms the ruling is written in: the steepest tenth of edges are borders
-/// as strong as rivers, the median edge (0.0186 -> 13) costs a shade over plain
+/// the terms the ruling is written in: PER STEP, a p90 gradient costs what one
+/// step onto or off a river course costs (40). Since BL-1156 (a river divides
+/// its banks) a crossing from bank to bank is TWO such steps, so crossing a
+/// river costs twice a p90 slope; the pin is per step and was not re-tuned.
+/// The median edge (0.0186 -> 13) costs a shade over plain
 /// ground, and a cliff (p99, 0.1406 -> 96) is nearly impassable to growth.
 ///
 /// It is measured on TERRAIN ALONE, so re-pinning it does not chase its own
@@ -814,6 +822,30 @@ private:
 ///          `tile_to_nation` is already populated; `province_holder` is
 ///          replaced.
 void seed_province_holders(world& w);
+
+/// THE PROVINCE ANCHOR, ONE DERIVATION (BL-611; shared since the BL-1146 review,
+/// 2026-09-27). A province's anchor is the tile carrying the highest SUMMED
+/// centre scale standing in it — the scales of every `population_centres` entry
+/// whose `population_centre_tile` is that tile, added — ties to the LOWEST tile
+/// id; a province with no centre (no tile with a positive sum) has none. Derived
+/// on the spot, never stored.
+///
+/// THE ONE PLACE IT IS COMPUTED: `seed_province_holders` (the holder is the
+/// anchor's nation), the charter budget's per-province firm cap (the cap is 2 x
+/// the anchor's scale rung, BL-1146 — `province_centre_rungs`,
+/// corporation_generation.hpp) and the instruments that report it read this, so
+/// the three cannot drift apart.
+///
+/// Every province in `w.provinces.provinces`, land or not, walked in its own
+/// ascending `province::tiles` order (the partition's contract) with a
+/// strictly-greater scan over an ordered per-tile sum, so no unordered
+/// container's layout reaches the pick. Keyed by province id.
+struct province_anchor
+{
+    entity_id tile  = null_entity;   ///< the anchor tile
+    int       scale = 0;             ///< the summed centre scale standing on it (> 0)
+};
+std::map<uint32_t, province_anchor> province_anchors(const world& w);
 
 /// The current holder of the province with id @p province_id, or `null_entity`
 /// if there is no such province or no holder is recorded. O(log n): binary

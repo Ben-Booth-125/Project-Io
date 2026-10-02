@@ -1099,9 +1099,29 @@ std::vector<int> sea_lane_walk(const std::vector<std::uint8_t>& sea, int gw, int
     return path;
 }
 
+namespace {
+
+/// The sim's own region measure, restated on the flattened node: `region_distance`
+/// (history_sim.cpp) -- Chebyshev between the two seats, columns wrapping because the
+/// map is a cylinder, rows not. Restated rather than called because the stamp holds
+/// `history_road_node`s, not `region`s; sea_lane_stamp_harness binds the pick against
+/// `region_distance` itself.
+int sea_lane_seat_distance(const history_road_node& a, const history_road_node& b, int gw)
+{
+    int dc = a.col - b.col;
+    if (dc < 0) dc = -dc;
+    if (gw > 0 && dc > gw / 2) dc = gw - dc;
+    int dr = a.row - b.row;
+    if (dr < 0) dr = -dr;
+    return dc > dr ? dc : dr;
+}
+
+} // namespace
+
 void stamp_sea_lanes(world& w, entity_id body,
                      const std::vector<history_road_node>& nodes,
                      const std::vector<sea_leg>&           legs,
+                     const std::vector<int>&               region_realm,
                      int lane_tier_uses, int current_weight_q, int rotation_sense,
                      sea_lane_stats* stats, sea_lane_trace* trace)
 {
@@ -1136,10 +1156,9 @@ void stamp_sea_lanes(world& w, entity_id body,
             ? build_ocean_currents(substrate, gw, gh, rotation_sense)
             : ocean_current_field{};
 
-    // The earned lanes, both seats on the body, and how many of them touch each seat
-    // (the busier-end direction rule). `legs` arrives sorted by (a, b).
+    // The earned lanes: at the tier, two distinct ends, both seats on the body.
+    // `legs` arrives sorted by (a, b).
     std::vector<const sea_leg*> earned;
-    std::map<int, int> degree;
     for (const sea_leg& l : legs)
     {
         if (l.uses < lane_tier_uses || l.a == l.b)
@@ -1152,28 +1171,159 @@ void stamp_sea_lanes(world& w, entity_id body,
          || nb.col < 0 || nb.row < 0 || nb.col >= gw || nb.row >= gh)
             continue;
         earned.push_back(&l);
-        ++degree[l.a];
-        ++degree[l.b];
     }
     st.earned = static_cast<int>(earned.size());
 
+    // A REALM'S PORT IS ITS NEAREST COASTAL REGION'S SEAT (BL-1153; LOGISTICS.md
+    // § 4b, NR-955 B). Each region's own port is looked up once and kept; each
+    // realm's regions are listed once, ascending, so the nearest coastal one is a
+    // walk over a vector in index order and a tie falls to the lower region by
+    // construction. Lookups are lazy: only a realm with an inland lane end is
+    // ever searched.
+    //
+    // `region_realm` is parallel to `nodes` by contract, and the caller is where a
+    // mis-sized table is caught and raised (hard_coded_world.cpp, the lane site). A
+    // region the table does not reach is read as NO REALM HANDED -- its own reason,
+    // never an unheld seat -- so a short table can neither index out of bounds nor
+    // hide as a fact of the history.
+    const std::size_t region_count = nodes.size();
+    constexpr int kNoRealmHanded = -2;
+    const auto realm_of = [&](int ri) -> int {
+        return static_cast<std::size_t>(ri) < region_realm.size()
+                   ? region_realm[static_cast<std::size_t>(ri)] : kNoRealmHanded;
+    };
+    std::vector<int> own_port(region_count, -2); // -2: not looked up yet
+    const auto port_of = [&](int ri) -> int {
+        int& p = own_port[static_cast<std::size_t>(ri)];
+        if (p == -2)
+        {
+            const history_road_node& n = nodes[static_cast<std::size_t>(ri)];
+            p = sea_lane_port(sea, gw, gh, n.col, n.row, kSeaLanePortRadius);
+        }
+        return p;
+    };
+    std::map<int, std::vector<int>> realm_regions; // realm -> its regions, ascending
+    for (std::size_t ri = 0; ri < region_count; ++ri)
+        if (realm_of(static_cast<int>(ri)) >= 0)
+            realm_regions[realm_of(static_cast<int>(ri))].push_back(static_cast<int>(ri));
+
+    // Where one lane end's port comes from: the region whose seat it is taken at
+    // (the end itself, or its realm's nearest coastal region), or a reason there is
+    // none. Memoised per region -- a seat that ends several lanes resolves once.
+    enum class end_fail : std::uint8_t { none, no_realms, unheld, no_coast };
+    struct end_pick { int seat = -1; int port = -1; end_fail fail = end_fail::none; };
+    std::map<int, end_pick> picked;
+    const auto pick_end = [&](int ri) -> end_pick {
+        const auto hit = picked.find(ri);
+        if (hit != picked.end())
+            return hit->second;
+        end_pick e;
+        const int realm = realm_of(ri);
+        if (port_of(ri) >= 0)
+        {
+            e.seat = ri;
+            e.port = port_of(ri);
+        }
+        else if (realm == kNoRealmHanded)
+            e.fail = end_fail::no_realms;
+        else if (realm < 0)
+            e.fail = end_fail::unheld;
+        else
+        {
+            const history_road_node& from = nodes[static_cast<std::size_t>(ri)];
+            // `ri` is held (realm >= 0), so its realm is listed: it lists `ri` itself.
+            const std::vector<int>& mine = realm_regions.find(realm)->second;
+            int best_d = std::numeric_limits<int>::max();
+            for (const int rj : mine)
+            {
+                if (port_of(rj) < 0)
+                    continue; // inland too
+                const int d = sea_lane_seat_distance(from, nodes[static_cast<std::size_t>(rj)], gw);
+                if (d < best_d) // strict: ascending walk, so a tie keeps the lower region
+                {
+                    best_d = d;
+                    e.seat = rj;
+                }
+            }
+            if (e.seat < 0)
+                e.fail = end_fail::no_coast;
+            else
+                e.port = port_of(e.seat);
+        }
+        picked.emplace(ri, e);
+        return e;
+    };
+
+    // PASS 1 -- every earned leg's two ports, and the legs that reach the walk.
+    // A leg with an end that has no port is counted by the reason (a missing realm
+    // table outranks an unheld seat, which outranks a coastless realm, so the split
+    // never depends on which end is read first). A leg whose TWO ENDS LAND ON ONE
+    // PORT TILE lays nothing, as the § 4a road stamp skips a corridor whose two
+    // ends are one tile: there is no water between them to lay a lane on.
+    struct leg_ends { const sea_leg* leg; end_pick a, b; };
+    std::vector<leg_ends> walkable;
+    walkable.reserve(earned.size());
     for (const sea_leg* lp : earned)
     {
-        const sea_leg& l = *lp;
-        const bool toward_a = degree[l.a] > degree[l.b];
-        const int from_region = toward_a ? l.b : l.a;
-        const int to_region   = toward_a ? l.a : l.b;
-        const history_road_node& nf = nodes[static_cast<std::size_t>(from_region)];
-        const history_road_node& nt = nodes[static_cast<std::size_t>(to_region)];
-        const int from_port = sea_lane_port(sea, gw, gh, nf.col, nf.row, kSeaLanePortRadius);
-        const int to_port   = sea_lane_port(sea, gw, gh, nt.col, nt.row, kSeaLanePortRadius);
-        if (from_port < 0 || to_port < 0)
+        const end_pick ea = pick_end(lp->a);
+        const end_pick eb = pick_end(lp->b);
+        if (ea.fail != end_fail::none || eb.fail != end_fail::none)
         {
             ++st.no_port;
+            if (ea.fail == end_fail::no_realms || eb.fail == end_fail::no_realms)
+                ++st.no_port_no_realms;
+            else if (ea.fail == end_fail::unheld || eb.fail == end_fail::unheld)
+                ++st.no_port_unheld;
+            else
+                ++st.no_port_no_coast;
             continue;
         }
-        std::vector<int> path = sea_lane_walk(sea, gw, gh, currents.empty() ? nullptr : &currents,
-                                              current_weight_q, from_port, to_port);
+        if (ea.port == eb.port)
+        {
+            ++st.same_port;
+            continue;
+        }
+        if (ea.seat != lp->a) ++st.moved_ends;
+        if (eb.seat != lp->b) ++st.moved_ends;
+        walkable.push_back(leg_ends{ lp, ea, eb });
+    }
+
+    // THE BUSIER END IS THE PORT THE LANE LANDS ON, counted AFTER the moves: the
+    // record carries no direction, so a lane is walked toward the port tile more
+    // walkable lanes touch -- the § 4a road stamp's rule, which keys its degree by
+    // the tile a road lands on, not by the region that recorded it. Keyed by the
+    // port TILE rather than the picked seat, because two seats may share one port
+    // and a direction read off seats could then walk one port pair both ways (two
+    // different paths with the current on: a braid). A TIE WALKS FROM THE LOWER
+    // RASTER INDEX, so the direction is a pure function of the port pair and the
+    // degree table, and one port pair is never walked both ways.
+    std::map<int, int> degree; // port tile -> walkable lanes landing on it
+    for (const leg_ends& le : walkable)
+    {
+        ++degree[le.a.port];
+        ++degree[le.b.port];
+    }
+
+    // PASS 2 -- walk and stamp. A directed port pair walked once is not walked
+    // again: the walk is a pure function of its two ends, so a second leg between
+    // the same ports would find the same path.
+    std::map<std::pair<int, int>, std::vector<int>> walked;
+    for (const leg_ends& le : walkable)
+    {
+        const sea_leg& l = *le.leg;
+        const int da = degree[le.a.port];
+        const int db = degree[le.b.port];
+        const bool from_a = (da != db) ? (da < db) : (le.a.port < le.b.port);
+        const end_pick& ef = from_a ? le.a : le.b;
+        const end_pick& et = from_a ? le.b : le.a;
+        const int from_port = ef.port;
+        const int to_port   = et.port;
+        const std::pair<int, int> key{ from_port, to_port };
+        auto wit = walked.find(key);
+        if (wit == walked.end())
+            wit = walked.emplace(key, sea_lane_walk(sea, gw, gh, currents.empty() ? nullptr : &currents,
+                                                    current_weight_q, from_port, to_port)).first;
+        const std::vector<int>& path = wit->second;
         if (path.empty())
         {
             ++st.unreachable;
@@ -1196,7 +1346,9 @@ void stamp_sea_lanes(world& w, entity_id body,
             tl.uses = l.uses;
             tl.from_port = from_port;
             tl.to_port = to_port;
-            tl.path = std::move(path);
+            tl.from_seat = ef.seat;
+            tl.to_seat = et.seat;
+            tl.path = path;
             trace->lanes.push_back(std::move(tl));
         }
     }

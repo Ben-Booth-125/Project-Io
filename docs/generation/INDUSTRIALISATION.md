@@ -544,7 +544,9 @@ points. No polity scores it, so it adds no verb to the grant register (`../ai/AI
 It is also the one input that is neither headcount nor fixed ground: points from scale and fuel
 alone would be headcount by another name, which § 1 forbids. **SETTLED (Ben, 2026-09-19, NR-897):
 the points spread over the polity's regions that hold centres, in proportion to their urban
-scale** — a treasury builds its realm's works where its people are. The capital still leads
+scale** — a treasury builds its realm's works where its people are. **AMENDED (Ben, 2026-10-01,
+NR-964): in proportion to the heads their works employ**, so every point, the treasury's and the
+scale credit's alike, follows the works rather than the crowd. The capital still leads
 because it is usually the largest centre. Landing them all on the capital's own region let one
 region hold up to 65% of a world's points, so charters would have followed capitals, not cities.
 The constants stand: 1000 points per million employed urban heads per year; fuel factor
@@ -705,7 +707,7 @@ reason Empires refused one.
 pulls by the jobs its works offer beyond the heads already there, so people go where jobs are
 unfilled, and a city whose works are full stops drawing. Points could not carry this: a city's points
 stop at the heads its works employ, so a crowded city pulled like a full town and its arrivals earned
-nothing. The campaign carries wages; open work is the nearest thing the sim holds.
+nothing. The campaign carries wages; open work is the nearest thing the sim holds. **Any centre with open work draws (Ben, 2026-10-02):** a village whose works hire takes migrants and grows into a town, rather than the stream reaching only towns. With towns alone the stream moved almost no one, because the open work sat in villages.
 
 ### Beat 3 — Decolonisation, and wars over empire
 
