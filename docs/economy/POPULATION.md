@@ -86,10 +86,11 @@ RNG anywhere on the path:
   the hierarchy divides them into villages and towns. **A settled place is worth at least a
   village (Ben, 2026-09-25):** a region that stands a settlement counts as one however few its
   heads, and its heads count above that.
-  **A 1960 world aims at roughly 500 centres (Ben, 2026-09-25)** — about a dozen for each
-  market, most land open country between them. It is the aim the forces are calibrated against
-  (settle spacing, consolidation, industrial urbanisation, abandonment), measured on the curated
-  seeds, never a count any rule enforces.
+  **A 1960 world carries what its forces leave, about 850 centres on the curated seeds (Ben,
+  2026-10-02, superseding the 2026-09-25 aim of roughly 500):** settle spacing, consolidation,
+  one centre a region, the fill crossing the settled line, industrial urbanisation and abandonment
+  are what set it, and the count follows each world's land (about 340 to 1,200 a world). It is a
+  reading, never a count any rule enforces.
 - **The sack destroys.** A conquest costs the taken region's cities a multiple of what it
   costs its countryside, because a sack falls on the walls and not the fields. Centres fall to
   what the surviving heads can stand up, and **a razing is counted in people (Ben, 2026-09-25)**:

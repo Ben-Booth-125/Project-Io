@@ -4,6 +4,7 @@
 
 #include "condition_set.hpp" // BL-350: request_quote's embargo decline condition
 #include "construction.hpp"
+#include "corporation_generation.hpp" // BL-1154: move_seat_force (take_seat)
 #include "economy_system.hpp" // BL-430: try_switch_recipe, the shared recipe-switch gate
 #include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set); intra_body_path (BL-470)
 // BL-470 included placement_rules.hpp here for is_water_tile, march_unit's old
@@ -1954,10 +1955,14 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // is not a seat anybody chose.
             if (w.corporations.at(cmd.corp).is_background)
                 return corp_command_result::rejected_invalid;
+            const entity_id previous = w.player_entity;
             for (auto& [id, cc] : w.corporations)
                 cc.is_player = false;
             w.corporations.at(cmd.corp).is_player = true;
             w.player_entity                        = cmd.corp;
+            // BL-1154: the seat opens unarmed, whichever way it is taken — the
+            // same rule as the draw (`move_seat_force`).
+            move_seat_force(w, previous, cmd.corp);
             return corp_command_result::applied;
         }
     }

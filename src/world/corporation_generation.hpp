@@ -153,6 +153,37 @@ std::vector<entity_id> generate_corporations(
 /// @return The number of corporations removed.
 int remove_specialist_roster(world& w);
 
+/// BL-1154 (Ben, 2026-10-01, NR-963 A; MILITARY.md § "BL-476 rivals start
+/// armed") — THE OPENING FORCE: rivals start armed, the seat opens unarmed.
+///   * `arm_rivals`: every non-background corporation but `w.player_entity`
+///     without a military base gets one beside its HQ and a 50-head unit
+///     (`seed_starting_military`), in ascending corporation id. Background
+///     firms stay unarmed. Draws no randomness.
+///   * `arm_corporation`: the same for one corporation (no-op for a background
+///     firm or one already armed).
+///   * `disarm_corporation`: removes a corporation's units and military bases
+///     (buildings, stockpiles and asset entries), ascending id.
+/// Generation arms the rivals where it charters (`generate_corporations`,
+/// `charter_web_from_budget`); `repoint_player` (spawn_seat.cpp) disarms the
+/// seat when the Begin pick moves it, and arms the corporation it leaves.
+///   * `move_seat_force`: THE ONE SEAT-MOVE RULE, used by both ways a seat is
+///     taken — the draw (`repoint_player`, spawn_seat.cpp) and the pick
+///     (`corp_verb::take_seat`, corp_command.cpp). When the seat moves from
+///     @p previous to @p corp, @p corp is disarmed and @p previous armed; a
+///     no-op when they are the same corporation.
+///
+/// WHEN IT RUNS, AND WHAT THAT MEANS: the seat is taken at Begin, AFTER the
+/// twelve-tick settle, so this is not "as if generation". The corporation the
+/// seat leaves is armed then: a base on the nearest valid tile to its HQ on the
+/// world as it stands, and a unit, both with NEW entity ids; it never hired in
+/// the settle (it was the provisional player). The seat's own units and bases go
+/// with their ids. Accepted (BL-1154 review, 2026-10-02).
+bool corporation_has_opening_force(const world& w, entity_id corp);
+void move_seat_force(world& w, entity_id previous, entity_id corp);
+void arm_rivals(world& w);
+void arm_corporation(world& w, entity_id corp);
+void disarm_corporation(world& w, entity_id corp);
+
 /// BL-1032 — CHARTER THE WEB FROM A PER-CENTRE BUDGET (INDUSTRIALISATION.md § 1;
 /// CORPORATION_GENERATION.md Pass 1 and Pass 6, both AMENDED FORWARD). Lays
 /// specialists AND background firms around the population centres @p budget
