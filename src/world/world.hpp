@@ -699,6 +699,16 @@ struct world
     /// BL-1125: body -> its FOLDED markets' ids, ascending; rebuilt with
     /// `body_market_index` (same stamp; `fold_market_into` resets it).
     mutable faithful_unordered_map<entity_id, std::vector<entity_id>> body_folded_index;
+    /// BL-1125: body -> a digest of what routing reads on it (its standing
+    /// markets' ids and centres, its folded markets' ids, centres and
+    /// absorbers), recomputed with `body_market_index`. The route raster below
+    /// rebuilds only when this moves, so an unrelated entity creation (which
+    /// restamps the index) costs O(markets), never a re-route of every tile.
+    mutable faithful_unordered_map<entity_id, std::uint64_t> body_market_sig;
+    /// BL-1125: body -> its catchment raster (`body_route_cache`), so
+    /// `market_for_tile` is O(1) in play. Derived, never saved; cleared by
+    /// clear_derived_state.
+    mutable faithful_unordered_map<entity_id, body_route_cache> body_route_index;
 
     /// Per-body population-centre index (BL-1050): body -> its centres in
     /// ASCENDING ID ORDER. The same derived cache as `body_market_index` above

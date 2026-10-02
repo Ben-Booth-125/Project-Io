@@ -1051,6 +1051,24 @@ struct folded_market
     entity_id body        = null_entity;
     entity_id centre_tile = null_entity;
     entity_id into        = null_entity;
+
+    bool operator==(const folded_market& o) const
+    {
+        return body == o.body && centre_tile == o.centre_tile && into == o.into;
+    }
+};
+
+/// BL-1125 — a body's catchment raster: the market every tile routes to, in
+/// raster order (grid_y * grid_width + grid_x). A DERIVED CACHE behind
+/// `market_for_tile`, never saved: a pure function of the body's standing
+/// markets' centres and its fold map, rebuilt whenever `sig` (a digest of
+/// exactly those) no longer matches.
+struct body_route_cache
+{
+    std::uint64_t          sig = 0;
+    int                    gw  = 0;
+    int                    gh  = 0;
+    std::vector<entity_id> route;
 };
 
 /// A standing sell order — the manual side of the market. Each economy tick the

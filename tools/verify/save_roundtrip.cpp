@@ -813,7 +813,11 @@ int main()
             }
             std::printf("     fold map: %zu folded market(s); %zu of %zu tiles route differently after the load\n",
                         w.folded_markets.size(), differ, tiles);
-            check(differ == 0 && loaded.folded_markets.size() == w.folded_markets.size(),
+            // The row is vacuous on a world that folded nothing, so it says so.
+            check(!w.folded_markets.empty(),
+                  "P7 this world folds markets, so the fold-map row below is not vacuous");
+            check(differ == 0 && loaded.folded_markets.size() == w.folded_markets.size()
+                      && loaded.folded_markets == w.folded_markets,
                   "P7 every tile routes to the same market after the round trip (the fold map survives)");
         }
         check(loaded.next_entity_id() == w.next_entity_id()

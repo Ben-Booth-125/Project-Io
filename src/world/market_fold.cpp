@@ -176,6 +176,8 @@ void fold_market_into(world& w, entity_id folded, entity_id into)
     // outright anyway so no read can see the folded id as standing.
     w.body_market_index.clear();
     w.body_folded_index.clear();
+    w.body_market_sig.clear();
+    w.body_route_index.clear();
     w.body_market_index_count = std::numeric_limits<std::size_t>::max();
 }
 

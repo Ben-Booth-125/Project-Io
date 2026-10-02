@@ -25,7 +25,7 @@
 //     MARKET ROUTES TO ITS ABSORBER (`market_fold_tally::catchment_misrouted`
 //     is 0);
 //   * the water gate: folds whose reach crossed water, under the port gate the
-//     carve applies, and -- at the committed reach -- with water ungated, so
+//     carve applies (its own ported set, from generation_report::ported_market_centres), and -- at the committed reach -- with water ungated, so
 //     the gate's effect is a number;
 //   * MAJOR cities (market_readings.hpp: scale >= k_major_city_scale) and how
 //     many have no market centre within k_major_city_radius grid tiles.
@@ -71,26 +71,6 @@
 
 namespace {
 
-/// The carve's port gate, restated on the finished world: the centre tiles of
-/// home markets whose region (`nearest_region`, the binding the carve uses)
-/// holds a built port at the close.
-std::set<entity_id> port_centres_of(const world& w, entity_id home)
-{
-    std::set<entity_id> out;
-    if (w.gen_settlement == nullptr) return out;
-    const int gw = w.bodies.at(home).grid_width;
-    for (const auto& [mid, mc] : w.markets)
-    {
-        if (mc.body != home) continue;
-        const auto tit = w.tiles.find(mc.centre_tile);
-        if (tit == w.tiles.end()) continue;
-        const int ri = nearest_region(*w.gen_settlement, tit->second.grid_x, tit->second.grid_y, gw);
-        if (ri >= 0 && ri < static_cast<int>(w.gen_settlement->regions.size())
-            && w.gen_settlement->regions[static_cast<std::size_t>(ri)].port_stock_q > 0)
-            out.insert(mc.centre_tile);
-    }
-    return out;
-}
 
 std::vector<uint32_t> library_seeds(const char* path)
 {
@@ -259,7 +239,9 @@ int main(int argc, char** argv)
         generation_report rep;
         world base = make_hard_coded_world(p, &rep, cfg, /*progress=*/nullptr, &works);
         const entity_id home = base.home_body;
-        const std::set<entity_id> ports = port_centres_of(base, home);
+        // The carve's own port set, as it computed it (bound by each market's
+        // seeding population tile), carried on the report.
+        const std::set<entity_id> ports(rep.ported_market_centres.begin(), rep.ported_market_centres.end());
         {
             int hist[6] = { 0, 0, 0, 0, 0, 0 };
             for (const auto& [cid, pcc] : base.population_centres)

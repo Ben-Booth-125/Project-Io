@@ -780,6 +780,8 @@ void clear_derived_state(world& w)
     // makes the next `market_for_tile` rebuild rather than trust an empty index.
     w.body_market_index.clear();
     w.body_folded_index.clear(); // BL-1125: rebuilt with the market index
+    w.body_market_sig.clear();   // BL-1125: likewise
+    w.body_route_index.clear();  // BL-1125: the catchment raster, rebuilt on first read
     w.body_market_index_count  = 0;
     w.body_market_index_cursor = 0; // not an id: the allocator cursor at build (BL-1079)
 

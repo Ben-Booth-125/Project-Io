@@ -2918,6 +2918,11 @@ void run_tail(generation_cursor& c)
         };
 
         int markets_seeded = 0;
+        // BL-1125: the POPULATION tile each carve market was seeded from (its
+        // centre is the trade-flow proxy site, up to `proxy_radius` away). The
+        // gravity fold's port gate binds a market to a region through this
+        // tile, as the junction rule binds a centre (`centre_is_trade_junction`).
+        std::map<entity_id, entity_id> market_seed_tile;
         for (const entity_id cid : centre_ids)
         {
             const population_centre_component& pcc = w.population_centres.at(cid);
@@ -2952,7 +2957,9 @@ void run_tail(generation_cursor& c)
             market_component mc = kepler_market_template;
             mc.centre_tile = trade_flow_proxy_site(tile_it->second);
             mc.price       = mc.base_price; // start at canonical base
-            w.markets[w.create_entity()] = mc;
+            const entity_id carve_id = w.create_entity();
+            w.markets[carve_id] = mc;
+            market_seed_tile[carve_id] = tile_it->second;
             ++markets_seeded;
         }
         // Fallback: if no centre qualified, seed one unanchored market.
@@ -2999,15 +3006,21 @@ void run_tail(generation_cursor& c)
             //
             //    A FOLD IS ONE A CONVOY COULD MAKE: a sea leg needs a port at
             //    both ends (SUPPLY.md § Infrastructure gates), so the reach
-            //    crosses water only between two centres whose regions hold a
-            //    built port at the close (`region::port_stock_q`, the region
-            //    `nearest_region` binds the centre to -- the binding the
-            //    junction rule above uses); otherwise it is measured over land.
+            //    crosses water only between two markets whose regions hold a
+            //    built port at the close (`region::port_stock_q`). A market's
+            //    region is the one `nearest_region` binds its POPULATION tile
+            //    to -- the tile the carve seeded it from, not its proxy centre,
+            //    which is exactly the binding the junction rule above uses. A
+            //    capital shell is centred on its region's own anchor, so its
+            //    centre IS that tile. Otherwise the reach is measured over land.
             std::set<entity_id> port_centres;
             for (const auto& [mid, mc] : w.markets)
             {
                 if (mc.body != kepler) continue;
-                const auto tit = w.tiles.find(mc.centre_tile);
+                if (w.tiles.find(mc.centre_tile) == w.tiles.end()) continue;
+                const auto sit = market_seed_tile.find(mid);
+                const entity_id bind_tile = (sit != market_seed_tile.end()) ? sit->second : mc.centre_tile;
+                const auto tit = w.tiles.find(bind_tile);
                 if (tit == w.tiles.end()) continue;
                 const int ri = nearest_region(kepler_settlement, tit->second.grid_x,
                                               tit->second.grid_y, home_grid_width);
@@ -3015,6 +3028,8 @@ void run_tail(generation_cursor& c)
                     && kepler_settlement.regions[static_cast<std::size_t>(ri)].port_stock_q > 0)
                     port_centres.insert(mc.centre_tile);
             }
+            if (report != nullptr)
+                report->ported_market_centres.assign(port_centres.begin(), port_centres.end());
             const market_fold_tally gravity =
                 fold_markets_by_gravity(w, kepler, gen_cfg.market_carving.gravity_reach,
                                         &port_centres);

@@ -123,6 +123,37 @@ const std::unordered_map<entity_id, std::vector<entity_id>>& markets_by_body(con
         folded.clear();
         for (const auto& [fid, fm] : w.folded_markets)
             folded[fm.body].push_back(fid);
+        // BL-1125: what routing on each body reads, digested (FNV-1a over a
+        // fixed order: standing ascending, then folded ascending), so the
+        // catchment raster rebuilds only when routing itself could change.
+        auto& sig = w.body_market_sig;
+        sig.clear();
+        const auto mix = [](std::uint64_t& h, std::uint64_t v) {
+            for (int b = 0; b < 8; ++b) { h ^= (v >> (8 * b)) & 0xFFu; h *= 1099511628211ull; }
+        };
+        for (const auto& [body, ids] : map)
+        {
+            std::uint64_t h = 1469598103934665603ull;
+            for (const entity_id mid : ids)
+            {
+                mix(h, mid);
+                mix(h, w.markets.at(mid).centre_tile);
+            }
+            sig[body] = h;
+        }
+        for (const auto& [body, ids] : folded)
+        {
+            std::uint64_t h = sig.count(body) ? sig[body] : 1469598103934665603ull;
+            mix(h, 0xF01DEDull);
+            for (const entity_id fid : ids)
+            {
+                const folded_market& fm = w.folded_markets.at(fid);
+                mix(h, fid);
+                mix(h, fm.centre_tile);
+                mix(h, fm.into);
+            }
+            sig[body] = h;
+        }
         w.body_market_index_count  = w.markets.size();
         w.body_market_index_cursor = cursor;
     }
@@ -282,7 +313,7 @@ entity_id buy_order_market(
 
 } // namespace
 
-entity_id market_for_tile(const world& w, entity_id tile)
+entity_id market_for_tile_scan(const world& w, entity_id tile)
 {
     const auto tit = w.tiles.find(tile);
     if (tit == w.tiles.end())
@@ -292,6 +323,58 @@ entity_id market_for_tile(const world& w, entity_id tile)
     if (it == by_body.end())
         return null_entity;
     return nearest_market(w, it->second, tit->second);
+}
+
+entity_id market_for_tile(const world& w, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return null_entity;
+    const tile_component& tc = tit->second;
+    const auto& by_body = markets_by_body(w);
+    const auto it = by_body.find(tc.body);
+    if (it == by_body.end())
+        return null_entity;
+    const std::vector<entity_id>& ms = it->second;
+    const auto fit = w.body_folded_index.find(tc.body);
+    const bool any_folded = fit != w.body_folded_index.end() && !fit->second.empty();
+    if (ms.size() == 1 && !any_folded)
+        return ms.front(); // one market, nothing folded: no raster needed
+
+    // BL-1125: THE CATCHMENT RASTER, O(1) per call. Built by the very scan it
+    // replaces (`nearest_market`, every tile of the body once) and rebuilt only
+    // when the body's routing digest moves -- a market created or folded, a
+    // centre or an absorber changed. The NR-915 hot path (pool_key_for_tile per
+    // asset per priced leg) reads here.
+    const auto sit = w.body_market_sig.find(tc.body);
+    const std::uint64_t sig = (sit != w.body_market_sig.end()) ? sit->second : 0;
+    body_route_cache& rc = w.body_route_index[tc.body];
+    if (rc.route.empty() || rc.sig != sig)
+    {
+        const auto bit = w.bodies.find(tc.body);
+        rc.gw = (bit != w.bodies.end()) ? bit->second.grid_width  : 0;
+        rc.gh = (bit != w.bodies.end()) ? bit->second.grid_height : 0;
+        rc.route.assign(static_cast<std::size_t>(std::max(0, rc.gw))
+                            * static_cast<std::size_t>(std::max(0, rc.gh)), null_entity);
+        // Each cell's answer depends only on its own tile, so the hash-map
+        // walk order cannot reach the result.
+        for (const auto& [tid, t] : w.tiles)
+        {
+            if (t.body != tc.body) continue;
+            if (t.grid_x < 0 || t.grid_x >= rc.gw || t.grid_y < 0 || t.grid_y >= rc.gh) continue;
+            rc.route[static_cast<std::size_t>(t.grid_y) * static_cast<std::size_t>(rc.gw)
+                     + static_cast<std::size_t>(t.grid_x)] = nearest_market(w, ms, t);
+        }
+        rc.sig = sig;
+    }
+    if (tc.grid_x >= 0 && tc.grid_x < rc.gw && tc.grid_y >= 0 && tc.grid_y < rc.gh)
+    {
+        const entity_id r = rc.route[static_cast<std::size_t>(tc.grid_y) * static_cast<std::size_t>(rc.gw)
+                                     + static_cast<std::size_t>(tc.grid_x)];
+        if (r != null_entity)
+            return r;
+    }
+    return nearest_market(w, ms, tc); // off-raster tile: the scan itself
 }
 
 // --- Goods-pool keys (BL-1003, PRODUCTION.md § Stockpile and output flow) ---

@@ -911,8 +911,11 @@ struct generation_report
     /// be 0 -- a folded market's catchment passes whole).
     int64_t market_fold_tiles_moved  = 0;
     int64_t market_fold_misrouted    = 0;
-    /// Gravity folds whose reach crossed water (both centres ported).
+    /// Gravity folds whose reach crossed water (both markets ported).
     int64_t markets_folded_across_water = 0;
+    /// The centre tiles of the home markets the port gate counted as ported
+    /// (their seeding population tile's region holds a port), ascending.
+    std::vector<entity_id> ported_market_centres;
     /// Markets destroyed by conquest in the history (BL-1125 cause 3), per
     /// span -- [0] Empires (to 1200), [1] Exploration (to 1660), [2]
     /// Industrialisation (to 1960): a capital market whose region a rival took.

@@ -578,6 +578,7 @@ struct seed_record
     int carve_under_shell = 0, carve_under_carve = 0, shell_under_shell = 0;
     int zero_tile_shadowed = 0;        ///< zero-tile markets that are shadowed twins
     int seam_misroutes = 0, home_tiles = 0;
+    int raster_mismatch = 0; ///< R1: tiles the catchment raster routes unlike the scan
     int idle_play = 0, idle_play_shell = 0, idle_play_carve = 0;
     int idle_settle = 0, idle_both = 0;
     int no_building = 0, no_building_idle = 0;
@@ -938,6 +939,7 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
         const tile_component& tc = w.tiles.at(tid);
         ++rec.home_tiles;
         const entity_id m = market_for_tile(w, tid);
+        if (market_for_tile_scan(w, tid) != m) ++rec.raster_mismatch; // R1
         const auto rit = row_of.find(m);
         if (rit == row_of.end()) continue;
         market_row& r = rec.rows[rit->second];
@@ -1191,7 +1193,11 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
     {
         const double tol = 1e-6 * std::max(1.0, std::fabs(rec.goods_before));
         char cb[240];
-        std::snprintf(cb, sizeof cb, "the folds pass the catchment whole: %" PRId64 " tiles moved with "
+        // A PLUMBING CHECK, said as one: the fold pass compares market_for_tile
+        // with itself before and after, so this proves the fold map is written
+        // and read back through routing, and that goods move with the fold. It
+        // is not independent evidence that a catchment passes -- R2 below is.
+        std::snprintf(cb, sizeof cb, "the fold map is written and read: %" PRId64 " tiles moved with "
                                      "their market, %" PRId64 " routed anywhere but their absorber; goods "
                                      "(inventory + pools) %.3f -> %.3f",
                       rec.tiles_moved, rec.misrouted, rec.goods_before, rec.goods_after);
@@ -1222,6 +1228,19 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
                     rec.carve_under_carve, rec.shell_under_shell);
         std::printf("    tiles the wrapped (physical) nearest centre would route elsewhere than "
                     "market_for_tile: %d of %d\n", rec.seam_misroutes, rec.home_tiles);
+    }
+    {
+        char rb[200];
+        std::snprintf(rb, sizeof rb, "the catchment raster routes as the scan does: %d of %d tiles differ",
+                      rec.raster_mismatch, rec.home_tiles);
+        check(rec.raster_mismatch == 0, "R1", rb);
+        // THE INDEPENDENT ROUTING CHECK: this harness's own wrapped-nearest over
+        // every ORIGINAL centre (standing and folded) and its own read of the
+        // fold map, against market_for_tile.
+        std::snprintf(rb, sizeof rb, "independent routing (own wrapped nearest over original centres, "
+                                     "then the fold map) agrees with market_for_tile: %d of %d differ",
+                      rec.seam_misroutes, rec.home_tiles);
+        check(rec.seam_misroutes == 0, "R2", rb);
     }
     std::printf("    CLEARS NOTHING over the first play year (%d ticks): %d of %d (%.1f%%)"
                 "  — shells %d/%d, carve %d/%d\n",
