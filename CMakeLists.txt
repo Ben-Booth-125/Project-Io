@@ -1457,6 +1457,7 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # ADDED 2026-09-25 (BL-1130). The same four scripts and the seed library by
     # relative path, for the same reason.
     centre_census
+    road_generation_harness # BL-1159: R2s builds the shipped worlds (scripts/*.lua, the seed library)
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})
