@@ -420,7 +420,7 @@
     "src/world/creeds.hpp",
     "src/world/creeds.cpp"
    ],
-   "design": "WIDENED (Ben, the delegated-decision form, 2026-09-25, NR-926 overturned): the profile gets its READER this item -- derive_culture_preference (EXPLORATION.md § A good acquires a cultural preference) reads it as the first of its two inputs, which needs an amenity classifier over cover first (TILES.md § Amenity tiles). A sim beat now, not record-only: read the preference tables on the 16 seeds before and after, and take its re-bless.\n\nCARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nFILED (Ben's note, 2026-09-24: \"materials shaped culture, and even primitive cultures can gain a preference towards certain amenities\"; record-only this sprint, no consumer — delegated reading, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R24). Stretch in sprint 47: built if BL-1084's cursor lands early.\n\nTHE WORK. Beside the package at the cradle (settlement.cpp:859-875), a ground profile read off the cradle window's tiles: a survey_endowment-shaped sum over deposits plus an amenity class of cover (forest, coastal grass, marsh-in-valley per TILES.md; a classify function in the shape of classify_farm_class — no amenity field exists today), stored on culture beside origin_farm_class (creeds.hpp:145), inherited through derive_daughter_culture (creeds.cpp:630-641). Its later reader is derive_culture_preference (history_sim.hpp:4637). Digests unmoved while nothing reads it.\n\nDONE WHEN. Every culture on the 16 seeds carries a non-empty profile, daughters inherit their parent's, and the profile is printed per cradle by colonisation_harness."
+   "design": "RULED (Ben, 2026-10-03): keep the amenity mapping (forest->energy, coastal grass->port, valley marsh->farm); both magnitudes become named params read on a small ladder before they are set; only cultures standing on ground carry the profile. EXPLORATION.md § A good acquires a cultural preference.\n\nWIDENED (Ben, the delegated-decision form, 2026-09-25, NR-926 overturned): the profile gets its READER this item -- derive_culture_preference (EXPLORATION.md § A good acquires a cultural preference) reads it as the first of its two inputs, which needs an amenity classifier over cover first (TILES.md § Amenity tiles). A sim beat now, not record-only: read the preference tables on the 16 seeds before and after, and take its re-bless.\n\nCARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nFILED (Ben's note, 2026-09-24: \"materials shaped culture, and even primitive cultures can gain a preference towards certain amenities\"; record-only this sprint, no consumer — delegated reading, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R24). Stretch in sprint 47: built if BL-1084's cursor lands early.\n\nTHE WORK. Beside the package at the cradle (settlement.cpp:859-875), a ground profile read off the cradle window's tiles: a survey_endowment-shaped sum over deposits plus an amenity class of cover (forest, coastal grass, marsh-in-valley per TILES.md; a classify function in the shape of classify_farm_class — no amenity field exists today), stored on culture beside origin_farm_class (creeds.hpp:145), inherited through derive_daughter_culture (creeds.cpp:630-641). Its later reader is derive_culture_preference (history_sim.hpp:4637). Digests unmoved while nothing reads it.\n\nDONE WHEN. Every culture on the 16 seeds carries a non-empty profile, daughters inherit their parent's, and the profile is printed per cradle by colonisation_harness."
   },
   {
    "status": "designed",
@@ -1648,6 +1648,27 @@
     "src/world/battle_system.cpp"
    ],
    "design": "FOUND 2026-10-03 (the BL-1145 cold review): NR-412 says province id 0 is a real province and no seam may use 0 as a sentinel, yet the battle glyph (body_surface_canvas.cpp ~3818 pid != 0), unit markers (~3850 prov_id != 0, the upid == 0 skip), the capital garrison seeding (nation_generation.cpp ~1561 cap_prov != 0) and battle discovery (battle_system.cpp ~494 prov == 0) all treat 0 as \"no province\". So province 0 never shows a marker, never gets a capital garrison, and never hosts a discovered battle. WORK: replace each with the real absence test (province_of returning a not-found value, or an optional), add a row on a world whose province 0 holds units."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-03",
+   "requires": [
+    "BL-1107"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1162",
+   "short_name": "AMENITY_GOODS_CONSUMED",
+   "author": "Ben (2026-10-03, the culture ground form note); filed by Claude",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 4,
+   "title": "Amenities and the goods people consume through the ages, distinct from commercial products, carry a culture's preference",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [],
+   "design": "BEN'S NOTE (2026-10-03, keeping BL-1107's mapping for now): \"I was considering amenities and goods that people consume through ages, rather than more commercial products.\" Today a cultural preference weights only the four abstract goods (farm, ore, energy, port), so a cradle's amenity must map onto a commercial good (forest -> energy). The idea: a small set of consumed amenity goods -- the things a people eats, drinks, wears and burns across the ages -- that preference attaches to, distinct from the industrial goods. DESIGN FIRST (a design session with Ben): which goods, how they map to TILES.md amenity classes, how they enter the want and trade, and how they hand over to the campaign's named resources. Not built until designed."
   }
  ]
 }

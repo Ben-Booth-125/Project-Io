@@ -573,6 +573,14 @@ preference for a good follows from what its ground never held and what its route
 the same two inputs the want table already uses, read at culture grain instead of polity grain. A
 people that walked past a good and never held it is the people that pays most for it.
 
+**SETTLED (Ben, 2026-10-03): the cradle's ground is remembered.** Beside exposure, a culture's
+preference reads its cradle's ground profile (`COLONISATION.md` § The ground profile), inherited by
+every daughter: a good the cradle held below the cradles' mean is remembered as a lack, and a strong
+amenity in the cradle leans its people toward one good — forest toward energy, coastal grass toward
+port, valley marsh toward farm. Only a culture that is the plurality of some region carries the
+profile into a preference, since a people with no ground has nowhere to want from. The size of both
+terms is a named parameter, read on the curated seeds before it is set.
+
 **What the preference does in this phase is weight a want, not set a price.** The want table
 (`CIVILISATION.md` § The directed want) is directed and unpriced; preference makes some directed
 wants *stronger* than others, which is enough to rank where a fleet goes first. Turning a weight
