@@ -41,7 +41,9 @@
 // bodies, laws, provinces and pools — none of which the fold reads (it reads
 // market centres, population centres and traversal cost, all fixed by then). So
 // a rung's count here is the carve's count at that reach; market_census on the
-// committed constant is the confirmation through the real path.
+// committed constant is the confirmation through the real path. The one thing
+// generation writes after the fold that the fold WOULD read is the market roads
+// (BL-1138, road_generation.hpp), and those are undone before any rung folds.
 //
 // Build:  bash tools/verify/build_lua_harness.sh market_gravity_ladder
 // Run (repo root): ./build_gen/verify/market_gravity_ladder.exe
@@ -238,6 +240,12 @@ int main(int argc, char** argv)
         cfg.market_carving.gravity_reach = 0.0f; // the base: twins and conquest only
         generation_report rep;
         world base = make_hard_coded_world(p, &rep, cfg, /*progress=*/nullptr, &works);
+        // BL-1138: generation lays the market roads AFTER the folds, for the markets
+        // that survive them -- here, with the fold off, for the unfolded set. The
+        // shipped fold reads the network as it stood BEFORE that pass, so the pass's
+        // raises are undone (its trace records each one) and every rung folds on the
+        // network the carve's own fold read.
+        undo_market_roads(base, rep.market_road_links);
         const entity_id home = base.home_body;
         // The carve's own port set, as it computed it (bound by each market's
         // seeding population tile), carried on the report.

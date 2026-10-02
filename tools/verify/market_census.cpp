@@ -725,8 +725,28 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
         const region& rg = t1960[i];
         if (!rg.has_market) continue;
         if (rg.row < 0 || rg.row >= gh || rg.col < 0 || rg.col >= gw) { ++rec.has_market_offgrid; continue; }
-        const entity_id a = grid[static_cast<std::size_t>(rg.row) * gw + rg.col];
+        entity_id a = grid[static_cast<std::size_t>(rg.row) * gw + rg.col];
         if (a == null_entity) { ++rec.has_market_offgrid; continue; }
+        // A MARKET STANDS ON LAND (BL-1138 review): a water anchor's shell stands on
+        // the nearest land tile — squared grid distance, column wrap, ties to the
+        // lower raster index — asked here from the grid, not from generation.
+        if (is_water(w.tiles.at(a).substrate))
+        {
+            long long best_d2 = -1;
+            entity_id best = null_entity;
+            for (int r = 0; r < gh; ++r)
+                for (int cc = 0; cc < gw; ++cc)
+                {
+                    const entity_id t = grid[static_cast<std::size_t>(r) * gw + cc];
+                    if (t == null_entity || is_water(w.tiles.at(t).substrate)) continue;
+                    int dc = std::abs(cc - rg.col);
+                    dc = std::min(dc, gw - dc);
+                    const long long dr = r - rg.row;
+                    const long long d2 = static_cast<long long>(dc) * dc + dr * dr;
+                    if (best_d2 < 0 || d2 < best_d2) { best_d2 = d2; best = t; }
+                }
+            if (best != null_entity) a = best;
+        }
         shell_region.push_back(static_cast<int>(i));
         shell_anchor.push_back(a);
     }
@@ -1165,7 +1185,8 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
                 "successor's capital\n",
                 rec.fate[1] + rec.fate[2], rec.lost_living_capital, rec.lost_successor);
     check(rec.id_tile_match, "I1", "the lowest-id home markets sit, in order, on the has_market "
-                                   "regions' anchor tiles (shells spawn before the carve)");
+                                   "regions' anchor tiles, or the nearest land tile to a water anchor"
+                                   " (shells spawn before the carve)");
     char buf[160];
     std::snprintf(buf, sizeof buf, "the price vote agrees market for market (%d voted shell, "
                                    "premium x%.2f on every non-endemic good)",

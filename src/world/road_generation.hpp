@@ -202,59 +202,55 @@ void generate_roads(world& w, entity_id body, generation_progress* progress = nu
 // Roads pull toward markets (BL-1138; Ben, 2026-09-25; NR-950)
 // ---------------------------------------------------------------------------
 //
-// LOGISTICS.md § 4, "Roads pull toward markets". Two pulls, read after the market
-// folds (BL-1125) leave the home body its final markets:
+// LOGISTICS.md Â§ 4, "Roads pull toward markets". Read after the market folds
+// (BL-1125) leave the home body its final markets, as one pass over the laid network
+// (the national lattice and the ancient corridors):
 //
-//   WITHIN A NATION — every market centre is on the backbone, and a town's road is
-//   weighed by how much nearer it brings the town to its market.
-//     1. JOIN. A market centre whose tile is not joined by road to a town of its
-//        nation (the nation holding the centre tile) lays one link, along its
-//        direct route, to the nearest tile that is. Tier: the backbone's Town+
-//        rule under the percentile gate (Road at >= 0.40, else Track).
-//     2. PULL. Each town is weighed toward the market its tile clears at (its
-//        catchment, `market_for_tile`) when that market's centre lies in the same
-//        nation. A town whose network route to its market fails the detour test
-//        (more than kDetourRatio x the direct route) is a candidate; its weight is
-//        the GAIN, network route minus direct route — how much nearer the link
-//        brings it. Per market, the heaviest candidate is laid first, the network
-//        re-read, and the walk repeats until no town fails the test, so a link
-//        laid for one town serves its neighbours and two spokes are never laid
-//        side by side. Tier: `edge_tier` of the two ends (the market end counts as
-//        the scale of the centre standing on its tile, else Town).
+//   0. NEIGHBOURS FIRST. The trunk's pairs are chosen on the network as the pass
+//      finds it: each market centre's kMarketTrunkNeighbours nearest centres by
+//      direct route, unioned over both ends (NR-950's delegated reading: a
+//      Delaunay-like set, never all pairs). A pair is priced from a LAND end; a pair
+//      no land end can price (both centres off land, or no route) is unpriced and
+//      dropped.
+//   1. JOIN â€” every market centre on its nation's own backbone. A centre whose nation
+//      (the nation holding its tile) has towns, and which no road of that nation joins
+//      to one of them, lays one link to the nearest roaded tile of that nation that is
+//      joined, along the cheapest route over the nation's OWN land (and the straits
+//      between) — a join over foreign ground would leave it off its own backbone. A road of another nation never counts â€”
+//      border links are Tracks ending on a town or a spurring village, not part of a
+//      backbone. A centre whose nation holds no town (or no nation holds) has no
+//      backbone to join: it is counted, never joined elsewhere. Tier: the backbone's
+//      Town+ rule under the percentile gate (`edge_tier`).
+//   2. PULL â€” a town weighed by how much nearer the link brings it to its market (the
+//      market its tile clears at, when that market's centre lies in the town's own
+//      nation). A town whose network route fails the detour test (more than
+//      kDetourRatio x the direct route) is a candidate, weighted by the GAIN, network
+//      route minus direct route; per market the heaviest is laid first, the network
+//      re-read, and the walk repeats until none fails, so one spoke serves its
+//      neighbours. Tier: `edge_tier` of the two ends. NOT rationed by the percentile
+//      (a reading, LOGISTICS.md Â§ 4).
+//   3. TRUNK â€” the pairs, cheapest first by their price at step 0; the detour test,
+//      re-read at the pair's turn, refuses a pair the network already serves. Tier:
+//      `edge_tier` of the two market ends at the LOWER of their two nations'
+//      percentiles (Ben, 2026-10-03: where a nation falls under 0.40 its roads stay
+//      Track â€” newer than NR-950's "trunk at Road").
 //
-//   ACROSS MARKETS — a TRUNK joins each market centre to its neighbouring market
-//   centres, nations and borders ignored. The neighbours (NR-950's delegated
-//   reading) are each centre's kMarketTrunkNeighbours nearest centres by direct
-//   route cost, unioned over both ends: a Delaunay-like set, never all pairs. The
-//   pairs are walked cheapest-first, and the detour test still refuses a pair the
-//   network already serves; a laid trunk joins the network at once. Tier: ROAD,
-//   whatever the gates read (a Highway it crosses keeps its tier; the stamp takes
-//   the max).
+// ONE COST MODEL (LOGISTICS.md Â§ 1). Every route is priced with `tile_traversal_cost`
+// on the field as it stands (landform or sea weight x road x lane), in integer
+// millionths per cell; an edge costs the sum of its two cells. The DIRECT route walks
+// any land and any shore-water run of at most three cells (a strait, the road stamp's
+// crossing rule), never open ocean; the NETWORK route walks the same but only roaded
+// land â€” the road network as a convoy prices it, any nation's roads included. A link
+// is laid along the direct route, so it reuses the roads that already shorten it. The
+// river discount, which is directed, is not read: these routes are symmetric.
 //
-// THE COSTS ARE THE DETOUR TEST'S, ON THE RASTER. The national pass reads its test on
-// the town graph it is building; this pass runs over a laid network (the national
-// lattice and the ancient corridors), so it reads the same test on the road raster.
-// Both routes are priced in ROAD-FREE integer cost (milli-units of the landform
-// weight; a water cell at the sea weight), so the comparison is unit for unit:
-//   * the DIRECT route walks any land cell and any shore-water run of at most
-//     three cells (a strait: the road stamp's own crossing rule), never open ocean;
-//   * the NETWORK route walks only roaded land cells and the same strait runs (a
-//     road leaves its crossing unstamped, so a strait is where the network bridges).
-// Edge cost is the sum of the two cells' weights (twice the mean, so integer and
-// symmetric: a route costs the same both ways, so a pair has one direct cost). Every
-// link is stamped along its DIRECT route, so a link laid is exactly the route the
-// test priced. River and lane discounts are not read: a road is laid by land.
+// AFTER THE FOLDS, AND IT CANNOT LOOP. The gravity fold read traversal cost before
+// this pass ran, and a catchment is grid-nearest (`market_for_tile`), so the roads
+// laid here move no catchment and no fold.
 //
-// AFTER THE FOLDS, AS ITS OWN PASS, AND IT CANNOT LOOP. Markets are carved and
-// folded in the tail's Finishing step, after `generate_roads` and the ancient stamp;
-// the gravity fold reads traversal cost, so it priced its reach on the network as
-// the national and ancient passes left it, and this pass lays only after it has
-// decided. A catchment is the nearest centre by GRID distance (`market_for_tile`),
-// never by traversal cost, so the roads this pass lays move no catchment and no fold.
-//
-// Deterministic: markets walk in ascending id, towns in ascending tile, pairs in
-// (cost, lo id, hi id); every Dijkstra orders its frontier on (cost, state index) and
-// the costs are integers. Purely additive (the stamp takes the max).
+// Deterministic: markets in ascending id, towns in ascending tile, pairs in (price, lo
+// id, hi id); every Dijkstra orders its frontier on (cost, state index) over integer
+// costs. Purely additive (the stamp takes the max).
 
 /// How many nearest market centres each centre's trunk reaches toward (NR-950).
 inline constexpr int kMarketTrunkNeighbours = 3;
@@ -264,23 +260,22 @@ struct market_road_stats
 {
     int markets               = 0; ///< anchored markets on the body
     int markets_unowned       = 0; ///< of them, centred on a tile no nation holds
-    int off_backbone_before   = 0; ///< markets whose centre no road joins to a town of its nation
+    int off_backbone_before   = 0; ///< centres no road of their nation joins to its towns
     int off_backbone_after    = 0; ///< ...after the pass
+    int no_backbone           = 0; ///< of the markets, whose nation holds no town (or none holds)
     int joins_laid            = 0;
-    int joins_failed          = 0; ///< no joined tile reachable by land and strait
-    /// Of them, a centre standing on water (the carve's proxy site or a capital shell's anchor):
-    /// seed 28's, inspected, had water on every side beyond a strait's reach, so no road reaches it.
-    int joins_failed_at_sea   = 0;
+    int joins_failed          = 0; ///< a backbone exists, but no route over the nation's own land and straits reaches it
     int towns                 = 0; ///< towns on the body
     int towns_in_nation       = 0; ///< of them, whose market's centre lies in their nation
     int pull_candidates       = 0; ///< towns failing the detour test on the first reading
     int pull_laid             = 0;
     int trunk_pairs           = 0; ///< neighbour pairs, unioned
-    int trunk_short           = 0; ///< markets with fewer than K centres reachable by land and strait
+    int trunk_unpriced        = 0; ///< of them, no land end prices them: dropped
     int trunk_refused         = 0; ///< pairs the detour test refused (a serviceable route exists)
-    int trunk_laid            = 0;
+    int trunk_laid            = 0; ///< laid, with a land tile on the route
+    int trunk_empty           = 0; ///< admitted, but the route held no land tile: nothing laid
     int tiles_raised          = 0; ///< distinct land tiles whose road_level the pass raised
-    long long walks           = 0; ///< whole-body Dijkstra walks the pass ran (its cost)
+    long long walks           = 0; ///< Dijkstra walks the pass ran (its cost)
 };
 
 /// Every link one call considered, whole, for a harness. WRITE-ONLY.
@@ -290,20 +285,24 @@ struct market_road_trace
     struct link
     {
         kind         k        = kind::trunk;
-        entity_id    from     = null_entity; ///< tile: the market centre (join, trunk lo) or the town (pull)
-        entity_id    to       = null_entity; ///< tile: the joined tile (join), the market centre (pull), trunk hi
+        entity_id    from     = null_entity; ///< tile the route starts on: the centre (join), the town (pull), the pricing (land) end (trunk)
+        entity_id    to       = null_entity; ///< tile it ends on: the joined tile (join), the centre (pull), the other end (trunk)
         entity_id    market_a = null_entity; ///< the market (join, pull); the lower-id market (trunk)
         entity_id    market_b = null_entity; ///< trunk: the higher-id market
-        std::int64_t direct_q  = 0;          ///< direct route cost (road-free, milli)
-        std::int64_t network_q = 0;          ///< network route cost at the test (-1: none)
+        std::int64_t pair_q    = -1;         ///< trunk: the pair's price at step 0 (-1: unpriced)
+        std::int64_t direct_q  = -1;         ///< direct route cost at the test (-1: none)
+        std::int64_t network_q = -1;         ///< network route cost at the test (-1: none within the bound)
         bool         laid      = false;
         std::uint8_t tier      = 0;
+        /// How many `raises` had happened when this link was tested: undoing the raises
+        /// from the end down to this index gives the field the test read.
+        std::size_t  raises_before = 0;
         std::vector<entity_id> path;         ///< the direct route, from -> to (laid links only)
     };
     std::vector<link> links;
-    /// (tile, road_level before the pass) for every tile the pass raised, in the order
-    /// first raised: restoring them gives the field exactly as the pass found it.
-    std::vector<std::pair<entity_id, std::uint8_t>> prior;
+    /// Every raise the pass made, in order: (tile, road_level before the raise). Undoing
+    /// them all, last first, gives the field exactly as the pass found it.
+    std::vector<std::pair<entity_id, std::uint8_t>> raises;
 };
 
 /// Lay the market pulls and the trunk on @p body (see above). Generation calls it
@@ -311,12 +310,10 @@ struct market_road_trace
 void lay_market_roads(world& w, entity_id body, market_road_stats* stats = nullptr,
                       market_road_trace* trace = nullptr);
 
-/// The road-free cost field `lay_market_roads` prices with, from @p from_tile to every
-/// cell of @p body (raster index grid_y*gw + grid_x; -1 = unreachable). @p roads_only
-/// restricts land to roaded cells (the NETWORK route); false walks any land (the
-/// DIRECT route). Exposed for road_generation_harness's independent rows.
-std::vector<std::int64_t> market_road_cost_field(world& w, entity_id body, entity_id from_tile,
-                                                 bool roads_only);
+/// Undo every raise @p trace recorded, last first: the road field as `lay_market_roads`
+/// found it. Drops the logistics caches. For instruments reading the pre-pass network
+/// (market_gravity_ladder folds on it; road_generation_harness reads "before").
+void undo_market_roads(world& w, const market_road_trace& trace);
 
 // ---------------------------------------------------------------------------
 // Ancient roads, STAMPED FROM the history (BL-768)

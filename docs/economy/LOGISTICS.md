@@ -182,19 +182,32 @@ world its tens of markets (`MARKETS.md` § Market centres and seeding). **Within
 network is drawn toward its market centres: every market centre is on the backbone, and a town's
 road is weighed by how much nearer it brings the town to its market. **Across markets** a trunk
 joins each market centre to its neighbouring market centres, over a border where the neighbour
-lies across one, so a larger trade has a road to travel beyond its own catchment; the trunk is
-laid at Road tier or above and the detour test still refuses a trunk link a serviceable route
-already gives. The trunk's shape (which neighbours, and the tier) is a delegated reading, NR-950,
-measured on the curated seeds: each market centre's **three nearest** market centres by direct
-route, unioned over both ends (a Delaunay-like set, never all pairs), walked cheapest-first, at
-**Road**. Both pulls run as their own pass after the folds, over the laid network, so they read
-the detour test on the road raster rather than the town graph: the direct route walks any land
-and strait, the network's route only roaded land and strait, both priced road-free, and every
-link is laid along the direct route it was priced on. A market centre joins the backbone of the
-nation holding it, or, where that nation holds no town, the nearest backbone there is. A town's
-weight toward its market is the gain, network route less direct route; per market the heaviest
-town failing the test is joined first and the network re-read, so one spoke serves its
-neighbours. Catchments are grid-nearest, so these roads move no catchment and no fold.
+lies across one, so a larger trade has a road to travel beyond its own catchment; the trunk
+takes the lattice's own tier gates (Road or above where the gate allows; Ben, 2026-10-03: where a
+nation falls under 0.40 its roads stay Track, the newer ruling over the trunk's "at Road"), and the
+detour test still refuses a trunk link a serviceable route already gives. The trunk's neighbours
+are a delegated reading, NR-950: each market centre's **three nearest** market centres by direct
+route, unioned over both ends (a Delaunay-like set, never all pairs), chosen on the network as the
+pass finds it and walked cheapest-first; a pair is priced from a land end, and a pair no land end
+can price is dropped.
+
+The two pulls are one pass after the folds, over the laid network. **A market centre
+joins its own nation's backbone**: the network it must reach is its nation's own roads from its
+nation's towns, never another nation's (a border link is a Track between two networks, not part of
+either backbone), and the join runs over the nation's own land. A market whose nation holds no
+town has no backbone and stays off it, counted.
+**One cost model** (§ 1): every route is priced with `tile_traversal_cost` on the field as it
+stands. The **direct route** walks any land and any strait of up to three shore-water cells, never
+open ocean; every link is laid along it, so it reuses the roads that already shorten it. Catchments
+are grid-nearest, so these roads move no catchment and no fold.
+
+Three readings, taken without a ruling and open to one: a trunk link's tier is the gate at the
+**lower** of its two nations' percentiles; **the network route** is the same walk over
+roaded land only, any nation's roads included (the road network as a convoy prices it; the river
+discount, which is directed, is not read); and **the pull is not rationed** by the qualification
+percentile, as detour loops are. A town's weight toward its market is the gain, network route less
+direct route; per market the heaviest town failing the test is joined first and the network
+re-read, so one spoke serves its neighbours.
 
 **Villages join locally, not as lattice members** (BL-620, road generation scales to density):
 **only a village at or above a size floor lays a spur (Ben, 2026-09-25)**, and the floor is
