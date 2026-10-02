@@ -252,8 +252,12 @@ inline constexpr std::size_t k_sea_province_soft_target = 42;
 /// changing it rescales the whole model rather than shifting one term.
 inline constexpr int k_province_edge_base_cost = 10;
 
-/// Crossing a river edge (`tile_component::river_edges`, a per-side bitmask —
-/// already the right shape for a border). Four times plain ground: a river is
+/// Crossing a river: charged on a step ONTO or OFF a LAND course tile
+/// (`tile_component::river_edges != 0`; a river's water mouth charges nothing,
+/// so the water domains are unaffected) that is not a step the river flows
+/// through (Ben, 2026-10-01, NR-962 B; BL-1156, a river divides its banks), so
+/// bank to bank pays it twice and travel along a course pays nothing extra.
+/// Four times plain ground: a river is
 /// the strongest single boundary signal the terrain offers, and this is the
 /// anchor the elevation coefficient is then pinned AGAINST rather than a
 /// number chosen on its own.
@@ -274,8 +278,11 @@ inline constexpr int k_province_river_edge_cost = 40;
 ///   implied k = k_province_river_edge_cost / p90 = 40 / 0.0586 = 682.7
 ///
 /// The value below is that implied coefficient, rounded. What it makes true, in
-/// the terms the ruling is written in: the steepest tenth of edges are borders
-/// as strong as rivers, the median edge (0.0186 -> 13) costs a shade over plain
+/// the terms the ruling is written in: PER STEP, a p90 gradient costs what one
+/// step onto or off a river course costs (40). Since BL-1156 (a river divides
+/// its banks) a crossing from bank to bank is TWO such steps, so crossing a
+/// river costs twice a p90 slope; the pin is per step and was not re-tuned.
+/// The median edge (0.0186 -> 13) costs a shade over plain
 /// ground, and a cliff (p99, 0.1406 -> 96) is nearly impassable to growth.
 ///
 /// It is measured on TERRAIN ALONE, so re-pinning it does not chase its own
