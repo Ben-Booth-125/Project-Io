@@ -7801,6 +7801,50 @@
      "result_metric": "Main 555d164f: world_determinism ALL PASS twice (786D425F7A58A1CB / 08222F6CDC07BFCA / 37B6059AC5803D6B); only R3a2/R3a3 and C13 C2b on seed 46 (pre-existing, BL-1158)."
     }
    ]
+  },
+  {
+   "brief": "rivals-start-armed-again",
+   "title": "BL-1154 - The rivals start armed; the seat opens unarmed",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1154 - sprint 48 (Ben, NR-963 A, 2026-10-01)",
+   "batch": "sprint-48",
+   "resolved": "2026-10-02",
+   "resolution": "merged cf2dc85c",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: spawn_solvency (12 seeds), rival_military_seeding_harness R0/R0b"
+     ],
+     "requirement": "Every rival opens with a base and a unit; the seat, drawn or picked, opens with none; background firms unarmed.",
+     "notes": "",
+     "result_metric": "ae65e193 + 168afa68: 1,113 rivals armed; 1,553 units hired in the settle (cap 3 holds); rivals solvent 88.5% -> 71.5%; R4 reads hired units; the seat ranking excludes military bases; the seat draw changes."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold)"
+     ],
+     "requirement": "A cold review, fix round included.",
+     "notes": "",
+     "result_metric": "The pick path armed the seat (fixed: move_seat_force on both paths); R0 rewritten; bases out of the ranking; R4 by construction fixed."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: gates on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": "Main cf2dc85c: world_determinism ALL PASS twice (786D425F7A58A1CB / 08222F6CDC07BFCA / off EB15108A7192A842); spawn_solvency, rival_military_seeding_harness, landscape_search_harness, save_roundtrip, world_cursor_equivalence pass; history_sim only R3a2/R3a3. The legacy arc moves (rivals armed there too, per MILITARY.md): a named re-bless cause."
+    }
+   ]
   }
  ]
 }
