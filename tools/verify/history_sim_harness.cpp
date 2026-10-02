@@ -2135,6 +2135,7 @@ int main()
             lines.gw = sgw;
             lines.gh = sgh;
             const auto on_land = [&](int a, int b) { return lines.joined(w, a, b); };
+            // The pull is OPEN WORK (Ben, 2026-09-27): jobs beyond the heads already there.
             const std::vector<int64_t> credit = { 1000, 0, 0, 500, 0 };
             int64_t people_before = 0, ceiling_before = 0;
             for (const region& r : w) { people_before += r.population; ceiling_before += region_ceiling(r); }
@@ -2160,6 +2161,32 @@ int main()
                   "and the foreign region send nobody");
             check(w[4].population < far_village.population && w[4].capacity_carried < 0,
                   "BL1137s2b the line runs the SHORT way round the cylinder: the village over the wrap sends");
+            check(ur.moved == 1000 && w[0].industrial_heads == 1000,
+                  "BL1137s10 the pull is open work: a push past it sends only the 1,000 jobs the town offers");
+        }
+        // S11 OPEN WORK IS SHARED BY OPEN WORK, AND A FULL TOWN DRAWS NOBODY.
+        // Two towns of one realm: A offers 3,000 jobs, B none (its works full);
+        // a village at its ceiling pushes far more. A takes exactly 3,000, B
+        // nothing, and the open work a region's works leave is employed minus urban.
+        {
+            std::vector<region> w;
+            w.push_back(at(make_region(800, 300000, 60000), 3, 2));           // A
+            w.push_back(at(make_region(800, 300000, 60000), 5, 2));           // B
+            w.push_back(at(make_region(600, ceiling_of(600), 30000), 6, 2));  // the village
+            const std::vector<int> own = { 0, 0, 0 };
+            const std::vector<std::vector<int>> nbr = { { 1, 2 }, { 0, 2 }, { 0, 1 } };
+            const std::vector<int64_t> open = { 3000, 0, 0 };
+            const urbanisation_round ur =
+                run_urbanisation_stream(w, own, nbr, [](int, int) { return true; }, open, 10);
+            std::printf("      open work: A took %lld, B took %lld, moved %lld\n",
+                        static_cast<long long>(w[0].industrial_heads),
+                        static_cast<long long>(w[1].industrial_heads), static_cast<long long>(ur.moved));
+            check(w[0].industrial_heads == 3000 && w[1].industrial_heads == 0 && ur.moved == 3000,
+                  "BL1137s11 a destination takes at most its open work, and a town whose works are full draws nobody");
+            region full = make_region(800, 300000, 60000);
+            check(region_open_work(full, 80000) == 20000 && region_open_work(full, 50000) == 0
+                  && region_open_work(full, 0) == 0,
+                  "BL1137s11b open work is the heads a region's works employ beyond its urban heads, never below zero");
         }
         // S7 THE LINE ITSELF, and its memo. The same cylinder: the strait
         // refuses, the wrap walks, the line is symmetric, a repeated or

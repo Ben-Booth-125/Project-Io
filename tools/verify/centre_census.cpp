@@ -370,6 +370,8 @@ struct seed_record
     int     receiving = 0;             ///< regions holding any
     double  migrants_top_decile = 0.0; ///< share held by the top tenth of receiving regions
     double  migrants_to_worked = 0.0;  ///< share on the top tenth of centred regions by employed heads
+    int64_t open_work_left = 0;        ///< jobs the works of living centred regions leave unfilled at the close
+    double  migrants_on_open = 0.0;    ///< share of standing migrants on regions with open work left
     // BL-1149 review fix — THE WIRING, ASSERTED (FAIL rows). With the works
     // table loaded, a world whose held works employ anyone must have earned
     // scale credit and moved heads; and the span must never have run inert.
@@ -655,6 +657,9 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
             }
             if (p.population > 0 && p.centres > 0)
             {
+                const int64_t open = e > p.urban_population ? e - p.urban_population : 0;
+                r.open_work_left += open;
+                if (open > 0 && ind > 0) r.migrants_on_open += static_cast<double>(ind);
                 r.heads_urban_centred += p.urban_population;
                 r.heads_employed += std::min(p.urban_population, e);
                 by_employed.push_back({ e, std::max<int64_t>(ind, 0) });
@@ -680,6 +685,7 @@ seed_record run_seed(lua_state& lua, uint32_t seed, const std::string& map_dir)
             int64_t worked = 0;
             for (std::size_t k = 0; k < wtop && k < by_employed.size(); ++k) worked += by_employed[k].second;
             r.migrants_to_worked = mig_total > 0 ? static_cast<double>(worked) / mig_total : 0.0;
+            r.migrants_on_open   = mig_total > 0 ? r.migrants_on_open / static_cast<double>(mig_total) : 0.0;
         }
     }
 
@@ -1442,7 +1448,7 @@ int main(int argc, char** argv)
     std::printf("\n=== C14 the works and the points (BL-1149; readings, and the wiring FAIL row) ===\n");
     std::printf("seed  points_close  rho_set  rho(p,urban)  rho(p,employed) | urban_centred  employed  "
                 "employed%% | migrants  receiving  top_decile%%  to_top_worked%% | span: from_scale  "
-                "moved  inert_rounds  held_employed  wiring\n");
+                "moved  inert_rounds  held_employed  wiring | open_work_left  migrants_on_open%%\n");
     for (const seed_record& r : recs)
     {
         char mig[24] = "n/a", top[16] = "n/a", worked[16] = "n/a";
@@ -1453,11 +1459,12 @@ int main(int argc, char** argv)
             std::snprintf(worked, sizeof worked, "%.1f", 100.0 * r.migrants_to_worked);
         }
         std::printf("%4u  %12" PRId64 "  %7d  %12.3f  %15.3f | %13" PRId64 "  %8" PRId64 "  %9.1f | "
-                    "%8s  %9d  %11s  %14s | %16" PRId64 "  %10" PRId64 "  %12" PRId64 "  %13" PRId64 "  %s\n",
+                    "%8s  %9d  %11s  %14s | %16" PRId64 "  %10" PRId64 "  %12" PRId64 "  %13" PRId64 "  %s | %14" PRId64 "  %17.1f\n",
                     r.seed, r.points_close, r.rho_regions, r.rho_points_urban, r.rho_points_employed,
                     r.heads_urban_centred, r.heads_employed, pct(r.heads_employed, r.heads_urban_centred),
                     mig, r.receiving, top, worked, r.span_from_scale, r.span_moved, r.span_inert_rounds,
-                    r.held_employed, r.span_from_scale < 0 ? "n/a" : r.wiring_ok ? "ok" : "FAIL");
+                    r.held_employed, r.span_from_scale < 0 ? "n/a" : r.wiring_ok ? "ok" : "FAIL",
+                    r.open_work_left, 100.0 * r.migrants_on_open);
         if (r.span_inert_rounds > 0)
             std::printf("      seed %u: Industrialisation scale credit inert: no works table (%" PRId64
                         " rounds)\n", r.seed, r.span_inert_rounds);

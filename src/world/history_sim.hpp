@@ -4904,15 +4904,23 @@ struct urbanisation_round
 ///   supply graph's reach across a strait is not a road people walk). People
 ///   move only inside one piece.
 ///   THE DESTINATIONS. The piece's regions of at least a town's people
-///   (`region_stands_a_town`) with industry-point output this round
-///   (@p credit > 0).
-///   THE PUSH. Every region of the piece sends its countryside at
+///   (`region_stands_a_town`) whose works offer OPEN WORK (@p open_work > 0:
+///   the heads its works employ beyond the urban heads already there,
+///   `region_open_work`).
+///   THE PUSH. Every region of the piece would send its countryside at
 ///   `urbanisation_outflow` over @p step_years.
-///   THE PULL. The piece's pooled migrants are shared over its destinations in
-///   proportion to their @p credit (largest remainder, exact, ties to the lower
-///   region index), and land as industrial heads (`settle_urban_migrants`).
+///   THE PULL IS OPEN WORK (Ben, 2026-09-27; INDUSTRIALISATION.md Beat 2: "a
+///   destination pulls by the jobs its works offer beyond the heads already
+///   there ... a city whose works are full stops drawing"). The piece's
+///   destinations take at most the open work they offer, so the countryside
+///   sends what they can take: when the push is larger, each countryside sends
+///   its share of the open work in proportion to its push. The migrants are
+///   shared over the destinations in proportion to their open work, so none
+///   receives more than it offers, and land as industrial heads
+///   (`settle_urban_migrants`). Both splits are largest remainder, exact, ties
+///   to the lower region index.
 ///
-/// A piece with no industrialising town sends nobody. CONSERVING (NR-958): every
+/// A piece with no open work sends nobody. CONSERVING (NR-958): every
 /// head is taken whole from a countryside with its ceiling (`take_countryside`)
 /// and landed whole in a town with it, so the world's people and its carrying
 /// capacity are both unchanged by the round. Pure and deterministic over its
@@ -4921,8 +4929,14 @@ urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
                                            const std::vector<int>& owner,
                                            const std::vector<std::vector<int>>& neighbours,
                                            const std::function<bool(int, int)>& linked,
-                                           const std::vector<int64_t>& credit,
+                                           const std::vector<int64_t>& open_work,
                                            int step_years);
+
+/// THE OPEN WORK a region's works offer (Ben, 2026-09-27; INDUSTRIALISATION.md
+/// Beat 2): the heads its works employ (@p employed_heads,
+/// `works_registry::employed_heads_mask` of `works_built`) beyond the urban
+/// heads already there, never below zero. The urbanisation stream's pull.
+int64_t region_open_work(const region& r, int64_t employed_heads);
 
 /// Years between decision rounds at calendar year @p y, read from @p p's band
 /// table. Returns the first band whose `until_year` exceeds @p y, falling back

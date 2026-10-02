@@ -487,11 +487,82 @@ bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>
     return true;
 }
 
+namespace {
+
+/// floor(a * b / c) and (a * b) % c, EXACT, for 0 <= a, b < 2^62 and
+/// 0 < c < 2^62: the 128-bit product in two 64-bit halves, then a bitwise long
+/// division (the quotient fits 64 bits whenever a * b / c does, which every
+/// caller below guarantees by dividing by a total at least one factor's size).
+/// Integer throughout, so the apportionment is exact at any headcount.
+void mul_div_exact(uint64_t a, uint64_t b, uint64_t c, uint64_t& q, uint64_t& r)
+{
+    const uint64_t a_lo = a & 0xFFFFFFFFull, a_hi = a >> 32;
+    const uint64_t b_lo = b & 0xFFFFFFFFull, b_hi = b >> 32;
+    const uint64_t p0 = a_lo * b_lo, p1 = a_lo * b_hi, p2 = a_hi * b_lo, p3 = a_hi * b_hi;
+    const uint64_t mid = (p0 >> 32) + (p1 & 0xFFFFFFFFull) + (p2 & 0xFFFFFFFFull);
+    const uint64_t lo  = (p0 & 0xFFFFFFFFull) | (mid << 32);
+    const uint64_t hi  = p3 + (p1 >> 32) + (p2 >> 32) + (mid >> 32);
+    q = 0;
+    uint64_t rem = 0;
+    for (int i = 127; i >= 0; --i)
+    {
+        const uint64_t bit = (i >= 64) ? ((hi >> (i - 64)) & 1u) : ((lo >> i) & 1u);
+        rem = (rem << 1) | bit; // rem < 2c < 2^63: never overflows
+        if (rem >= c)
+        {
+            rem -= c;
+            if (i < 64) q |= (uint64_t{1} << i);
+        }
+    }
+    r = rem;
+}
+
+/// Share @p total over @p weights by LARGEST REMAINDER, exactly: each takes the
+/// floor of total * w / W, and what the floors leave goes one each to the
+/// largest remainders, ties to the lower index (the weights are in ascending
+/// region order). The shares sum to @p total. 0 <= total, each weight and their
+/// sum are below 2^62, and W > 0.
+std::vector<int64_t> apportion_exact(int64_t total, const std::vector<int64_t>& weights, int64_t W)
+{
+    std::vector<int64_t> share(weights.size(), 0);
+    std::vector<uint64_t> rem(weights.size(), 0);
+    int64_t given = 0;
+    for (std::size_t k = 0; k < weights.size(); ++k)
+    {
+        uint64_t q = 0, r = 0;
+        mul_div_exact(static_cast<uint64_t>(total), static_cast<uint64_t>(weights[k]),
+                      static_cast<uint64_t>(W), q, r);
+        share[k] = static_cast<int64_t>(q);
+        rem[k]   = r;
+        given   += share[k];
+    }
+    int64_t left = total - given; // 0 <= left < weights.size()
+    if (left > 0)
+    {
+        std::vector<std::size_t> order(weights.size());
+        for (std::size_t k = 0; k < order.size(); ++k) order[k] = k;
+        std::stable_sort(order.begin(), order.end(),
+                         [&rem](std::size_t a, std::size_t b) { return rem[a] > rem[b]; });
+        for (std::size_t k = 0; k < order.size() && left > 0; ++k, --left)
+            ++share[order[k]];
+    }
+    return share;
+}
+
+} // namespace
+
+int64_t region_open_work(const region& r, int64_t employed_heads)
+{
+    if (employed_heads <= 0) return 0;
+    const int64_t urban = r.urban_population > 0 ? r.urban_population : 0;
+    return employed_heads > urban ? employed_heads - urban : 0;
+}
+
 urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
                                            const std::vector<int>& owner,
                                            const std::vector<std::vector<int>>& neighbours,
                                            const std::function<bool(int, int)>& linked,
-                                           const std::vector<int64_t>& credit,
+                                           const std::vector<int64_t>& open_work,
                                            int step_years)
 {
     urbanisation_round out;
@@ -499,7 +570,7 @@ urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
     if (step_years <= 0 || n == 0) return out;
     std::vector<int> piece(n, -1);
     std::vector<int> members, dests;
-    std::vector<int64_t> pull;
+    std::vector<int64_t> pull, want;
     for (std::size_t start = 0; start < n; ++start)
     {
         const int q = (start < owner.size()) ? owner[start] : -1;
@@ -524,64 +595,54 @@ urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
         }
         std::sort(members.begin(), members.end()); // ascending: a total order
 
-        // THE DESTINATIONS, and their pull.
+        // THE DESTINATIONS, and the open work each offers (the pull).
         dests.clear();
         pull.clear();
-        int64_t pull_total = 0;
+        int64_t open_total = 0;
         for (int m : members)
         {
             const region& r = regions[static_cast<std::size_t>(m)];
             if (r.population <= 0 || !region_stands_a_town(r)) continue;
-            const int64_t c = (static_cast<std::size_t>(m) < credit.size())
-                                  ? credit[static_cast<std::size_t>(m)] : 0;
-            if (c <= 0) continue;
-            // A weight, saturated at 2^30 a region (a round's credit past a
-            // billion points in one region is beyond anything the span makes).
+            const int64_t ow = (static_cast<std::size_t>(m) < open_work.size())
+                                   ? open_work[static_cast<std::size_t>(m)] : 0;
+            if (ow <= 0) continue;
+            // Open work is at most a region's employed heads, under 2^31
+            // (`work_employs_max`); held there so the totals below stay in domain.
             dests.push_back(m);
-            pull.push_back(std::min<int64_t>(c, 1LL << 30));
-            pull_total += pull.back();
+            pull.push_back(std::min<int64_t>(ow, 1LL << 31));
+            open_total += pull.back();
         }
-        if (dests.empty() || pull_total <= 0) continue;
-        // Weights kept under 2^31 in total, so the apportionment's products
-        // stay inside int64; halving every weight keeps their proportions.
-        // Never taken at any credit the span produces.
-        while (pull_total >= (1LL << 31))
-        {
-            pull_total = 0;
-            for (int64_t& v : pull) { v = std::max<int64_t>(1, v >> 1); pull_total += v; }
-        }
+        if (dests.empty() || open_total <= 0) continue;
 
-        // THE PUSH: every countryside of the piece, with the ceiling it carries.
-        int64_t pool = 0;
-        for (int m : members)
+        // THE PUSH: what every countryside of the piece would send, held to what
+        // `take_countryside` would take from it, so a send is always taken whole.
+        want.assign(members.size(), 0);
+        int64_t want_total = 0;
+        for (std::size_t k = 0; k < members.size(); ++k)
         {
-            region& r = regions[static_cast<std::size_t>(m)];
-            pool += take_countryside(r, urbanisation_outflow(r, step_years));
+            const region& r = regions[static_cast<std::size_t>(members[k])];
+            const int64_t countryside = std::max<int64_t>(r.population - r.urban_population, 0);
+            const int64_t farm_fed    = std::max<int64_t>(r.population - r.industrial_heads, 0);
+            want[k] = std::clamp<int64_t>(urbanisation_outflow(r, step_years), 0,
+                                          std::min(countryside, farm_fed));
+            want_total += want[k];
         }
+        if (want_total <= 0) continue;
+
+        // ...UP TO THE OPEN WORK: the destinations take no more than they offer,
+        // so a push past it sends each countryside its share of the open work.
+        const int64_t send_total = std::min(want_total, open_total);
+        const std::vector<int64_t> send =
+            (send_total < want_total) ? apportion_exact(send_total, want, want_total) : want;
+        int64_t pool = 0;
+        for (std::size_t k = 0; k < members.size(); ++k)
+            pool += take_countryside(regions[static_cast<std::size_t>(members[k])], send[k]);
         if (pool <= 0) continue;
 
-        // THE PULL. Largest remainder, exact: pool = sum of shares
-        // (part < pull_total < 2^31 and a weight < 2^31, so part * pull < 2^62).
-        const int64_t whole = pool / pull_total, part = pool % pull_total;
-        std::vector<int64_t> share(dests.size(), 0), rem(dests.size(), 0);
-        int64_t given = 0;
-        for (std::size_t k = 0; k < dests.size(); ++k)
-        {
-            const int64_t num = part * pull[k];
-            share[k] = whole * pull[k] + num / pull_total;
-            rem[k]   = num % pull_total;
-            given   += share[k];
-        }
-        int64_t left = pool - given; // 0 <= left < dests.size()
-        if (left > 0)
-        {
-            std::vector<std::size_t> order(dests.size());
-            for (std::size_t k = 0; k < order.size(); ++k) order[k] = k;
-            std::stable_sort(order.begin(), order.end(),
-                             [&rem](std::size_t a, std::size_t b) { return rem[a] > rem[b]; });
-            for (std::size_t k = 0; k < order.size() && left > 0; ++k, --left)
-                ++share[order[k]];
-        }
+        // THE PULL: the migrants shared by open work. pool <= open_total, so no
+        // destination's share passes its own open work (a floor of pool * ow /
+        // total is under ow, and a remainder's one more stays within it).
+        const std::vector<int64_t> share = apportion_exact(pool, pull, open_total);
         for (std::size_t k = 0; k < dests.size(); ++k)
         {
             if (share[k] <= 0) continue;
@@ -4679,12 +4740,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
             else
             {
                 const scoped_ns prof_points(prof.ns_industry_points); // report-only
-                // BL-1137: the stock before this round's accrual, so the
-                // urbanisation stream below reads each town's OUTPUT this
-                // round (its pull) as the accrual's own credit.
-                std::vector<int64_t> urb_points_before(ss.regions.size(), 0);
-                for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
-                    urb_points_before[ri] = ss.regions[ri].industry_points;
                 const industry_points_round pr =
                     accrue_industry_points(ss.regions, out.polities, params, step_years, works);
                 out.industry_points_from_scale += pr.credited;
@@ -4788,8 +4843,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // same switch and open year as the points themselves, so every
                 // other span is untouched. `run_urbanisation_stream` is the rule
                 // (history_sim.hpp); the sim hands it the realm map, the supply
-                // corridors with a line that stays on land, and this round's
-                // credit.
+                // corridors with a line that stays on land, and the open work
+                // each region's works offer (Ben, 2026-09-27: the pull is open
+                // work, not points -- a city whose works are full stops drawing).
                 //
                 // A MIGRANT CARRIES ITS FOOD WITH IT (NR-958): each head leaves
                 // its countryside with one head of ceiling and lands with it, so
@@ -4802,9 +4858,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // ways) and hands its points to the realm's nearest centre.
                 {
                     const std::size_t n = ss.regions.size();
-                    std::vector<int64_t> credit(n, 0);
-                    for (std::size_t ri = 0; ri < n && ri < urb_points_before.size(); ++ri)
-                        credit[ri] = ss.regions[ri].industry_points - urb_points_before[ri];
+                    // THE PULL IS OPEN WORK (Ben, 2026-09-27): the heads each
+                    // region's works employ beyond its urban heads. No works
+                    // table, no work stands and none is open: the stream is
+                    // inert (counted, `industry_scale_inert_rounds`).
+                    std::vector<int64_t> open_work(n, 0);
+                    if (works != nullptr)
+                        for (std::size_t ri = 0; ri < n; ++ri)
+                            open_work[ri] = region_open_work(ss.regions[ri],
+                                                             works->employed_heads_mask(ss.regions[ri].works_built));
                     // The reach cache watches the rebate (BL-1130 review fix):
                     // only a destination's heads move, so only they are read.
                     std::vector<int> rebate_before(n, 0);
@@ -4812,7 +4874,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         rebate_before[ri] = relay_rebate_of(ss.regions[ri]);
                     const urbanisation_round ur = run_urbanisation_stream(
                         ss.regions, owner, supply_neighbours,
-                        [&](int a, int b) { return stream_lines.joined(ss.regions, a, b); }, credit, step_years);
+                        [&](int a, int b) { return stream_lines.joined(ss.regions, a, b); }, open_work, step_years);
                     out.urbanisation_heads_moved += ur.moved;
                     for (const int d : ur.destinations)
                         if (relay_rebate_of(ss.regions[static_cast<std::size_t>(d)])
