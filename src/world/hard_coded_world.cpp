@@ -17,6 +17,7 @@
 #include "logistics.hpp"        // BL-910: body_tile_grid, for the close's capital markets
 #include "sim_terrain_build.hpp" // build_sim_terrain for the sim's terrain view
 #include "law.hpp" // BL-343: seed_prototype_laws
+#include "market_fold.hpp"      // BL-1125: markets can die
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
 #include "population_generation.hpp"
@@ -38,6 +39,7 @@
 #include <limits>       // BL-1086: the planned-charter count, saturated into the carve's int
 #include <map>
 #include <random>
+#include <set>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -2953,6 +2955,34 @@ void run_tail(generation_cursor& c)
             market_component mc = kepler_market_template;
             mc.price = mc.base_price;
             w.markets[w.create_entity()] = mc;
+        }
+
+        // ------------------------------------------------------------------
+        // BL-1125 — MARKETS CAN DIE (MARKETS.md § Market centres and seeding).
+        // On the whole home-body set — the capital shells and the carve, after
+        // the junction rule has lowered every gate it lowers — so the rule
+        // removes from the set the emergence produced, never from a part.
+        // A folded market's catchment, inventory and pools pass to its
+        // absorber (market_fold.hpp).
+        //
+        // 1. TWINS FOLD. A market centred on the same tile as a lower-id one
+        //    folds into it: two centres whose best site is the same tile have
+        //    one market place, and a twin could never win a tile anyway
+        //    (catchment ties go to the lowest id).
+        {
+            const std::set<entity_id> shells(capital_market_shells.begin(),
+                                             capital_market_shells.end());
+            const market_fold_tally twins = fold_twin_markets(w, kepler);
+            if (report != nullptr)
+            {
+                report->markets_folded_twins     = twins.folds;
+                report->market_fold_goods_before = twins.inventory_before + twins.pools_before;
+                report->market_fold_goods_after  = twins.inventory_after + twins.pools_after;
+                report->market_fold_pop_before   = twins.catchment_pop_before;
+                report->market_fold_pop_after    = twins.catchment_pop_after;
+                for (const market_fold_record& r : twins.records)
+                    if (shells.count(r.folded) != 0) ++report->shells_folded;
+            }
         }
 
         // ------------------------------------------------------------------

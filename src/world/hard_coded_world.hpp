@@ -894,6 +894,24 @@ struct generation_report
     /// measure the whole era rather than this term.
     int64_t markets_from_trade   = 0;
 
+    // --- Markets that died at the carve (BL-1125, markets can die) ----------
+    //
+    // MARKETS.md § Market centres and seeding: twins fold, then the gravity
+    // fold, both on the whole home-body set after the junction rule. Write-only
+    // like every report field. The conservation pair is what the census checks:
+    // every unit of inventory and pooled goods a folded market held arrives in
+    // its absorber, so the body-wide totals agree before and after.
+    int64_t markets_folded_twins    = 0; ///< Twins folded into the lowest-id market on their tile.
+    int64_t markets_folded_gravity  = 0; ///< Folded into a larger market within reach.
+    int64_t shells_folded           = 0; ///< Of both, how many were capital shells.
+    double  market_fold_goods_before = 0.0; ///< Inventory + pools on the body before the folds.
+    double  market_fold_goods_after  = 0.0; ///< ...and after them.
+    int64_t market_fold_pop_before   = 0;   ///< Catchment population routed before the folds.
+    int64_t market_fold_pop_after    = 0;   ///< ...and after them.
+    /// Markets destroyed by conquest in the history (BL-1125 cause 3), summed
+    /// over the spans that ran: a capital market whose region a rival took.
+    int64_t markets_destroyed_by_conquest = 0;
+
     // --- The carve ledger: what the carve counted as competitors (BL-1086) --
     //
     // The nation gate's competitor term (BL-132 change 3) reads, per nation, how
