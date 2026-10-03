@@ -2014,6 +2014,27 @@
     "src/world/history_sim.hpp"
    ],
    "design": "works_event_fraction_q = 2000 was pinned on readings taken under the world price (3233 notes, 894 of 1297 charters dated). Under the reach price far landmasses note more and start cheaper, so the NR-940 early clustering may worsen there. Re-measure with industry_concentration DATING on the 16 library seeds and record the readings beside the pin; report, do not retune silently."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1179",
+   "short_name": "SHELF_SPOILAGE",
+   "author": "Claude (Ben's shelf glut form, 2026-10-03)",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "A market's shelf spoils, so a glut the buyer of last resort took on drains away",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/market_clearing.cpp"
+   ],
+   "design": "BEN (2026-10-03): backlogged in favour of the k-tick cap on the shelf's share of supply. The market buys every surplus as buyer of last resort, so inventory only grows; counted whole as supply it floored prices (1/1/11 firms on seeds 0/10/28). Spoilage treats the cause: design which goods spoil, at what rate, who loses the value, and whether the k cap then retires. Design first."
   }
  ]
 }
