@@ -126,8 +126,19 @@ drawn **and not bid for**, so its want leaves the price and the price can ease: 
 building goes short and takes the shortfall rule, a processor runs on what its pool holds, a
 construction site pauses for want of that material (construction capacity over the ceiling
 stretches the build instead, as an empty yard does), and a nation buys elsewhere or not at all.
-What a draw is billed is only what the shelf gave. Because the shelf is supply in the price law
-(MARKETS.md § Price resolution), a draw beside a stocked shelf does not price itself out of it.
+What a draw is billed is only what the shelf gave.
+
+**The cost of listings-only supply, stated (k = 0 until shelf spoilage, Ben 2026-10-03).** While
+the shelf does not count as supply (MARKETS.md § Price resolution), a draw on a market nobody lists
+into prices itself out of a full shelf: its own want is demand against zero supply, the price
+resolves from 1.5× toward the 10× cap (5.75× in one tick), the draw is then over the ceiling and
+does not bid, and the price eases back under it over three ticks. Measured on a unit and on a
+processor beside a full shelf (`unit_upkeep` U13, `fair_price_ceiling` M5): each is fed **one tick
+in four** — 3 of 12 — never more than three ticks running without. The processor runs at a quarter
+of its capacity. The unit's supply factor nets −50 per four-tick cycle and walks down to a floor
+cycle of 100, 50, 0, 0: an army fed only from such a shelf ends near zero strength. A market that
+is also being listed into does not pulse this way, since its listings are supply. The cost is
+accepted until spoilage (BL-1179) lets a shelf count without its glut flooring prices.
 A ceiling of zero switches the rule off, and off means what each draw did before it: upkeep never
 buys; processors, construction and the nations buy whatever the shelf holds.
 

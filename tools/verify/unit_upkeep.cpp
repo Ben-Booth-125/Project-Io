@@ -935,6 +935,100 @@ void u12_fed_every_tick_beside_a_full_shelf()
         u12_at(k);
 }
 
+// ---------------------------------------------------------------------------
+// U13 — BL-1172 KNOWN COST OF k = 0: A UNIT BESIDE A FULL SHELF PULSES
+// ---------------------------------------------------------------------------
+// NOT A STATEMENT THAT THE PATTERN IS RIGHT. Ben's ruling (2026-10-03,
+// MARKETS.md § Price resolution): supply is listings only — k = 0 — until shelf
+// spoilage (BL-1179) lets a glut drain, because every k above 0 left fewer
+// firms. The price of that ruling is this pattern, measured and bounded here so
+// it can only get BETTER unnoticed, never worse: U12's scenario (twelve ticks,
+// a unit beside a 100-unit shelf, nobody listing) at the SHIPPED k = 0.
+//
+// MEASURED TRACE (posted price as x base, outcome, supply factor after):
+//   t1 1.50x met 700 | t2 5.75x refused 650 | t3 3.38x refused 600 | t4 2.19x refused 550
+//    t5 1.59x met 650 | t6 5.80x refused 600 | t7 3.40x refused 550 | t8 2.20x refused 500
+//    t9 1.60x met 600 | t10 5.80x refused 550 | t11 3.40x refused 500 | t12 2.20x refused 450
+//    => fed 3 of 12, never more than 3 ticks running refused, lowest 450.
+//    Carried to tick 48: fed 12 of 48; each 4-tick cycle nets -50 permille
+//    (+100 on the met tick, -50 x 3 refused): over ticks 37-48 it falls
+//    from 250 to 0, and from there it cycles 100, 50, 0, 0 for good — a unit
+//    fed only from a shelf nobody lists into starves to (near) zero strength.
+//
+// Why: with no listing, its own want is demand against zero supply, so the
+// price resolves toward 10x (1.5x -> 5.75x); over the 2x ceiling the unit does
+// not bid, the price eases back over three ticks (EMA toward base), and it
+// buys again. FINANCE.md § Standing-force upkeep states this as k = 0's cost.
+
+void u13_known_cost_at_k0()
+{
+    std::printf("\n-- U13: BL-1172 KNOWN COST at k = 0 — a unit beside a full shelf, no listing --\n");
+
+    constexpr float base     = 43.0f;
+    constexpr float per_head = 0.1f;
+    constexpr int   heads    = 10;
+
+    fixture f = make_fixture();
+    const entity_id u = add_unit(f, ROW_LEVY, heads, f.base, 600);
+    const entity_id mid = f.w.create_entity();
+    {
+        market_component mc{};
+        mc.body        = f.body;
+        mc.centre_tile = f.tile;
+        mc.base_price[ORD] = base;
+        mc.price[ORD]      = base * 1.5f;
+        mc.inventory[ORD]  = 100.0f;
+        f.w.markets[mid] = mc;
+    }
+    recipe_registry reg = registry_with_upkeep(0.0f, per_head, /*decay*/ 50, /*recovery*/ 100);
+    {
+        price_band_params pb;
+        pb.floor_mult = 0.25f; pb.ceil_mult = 10.0f; pb.reservation_mult = k_shipped_reservation;
+        pb.shelf_supply_ticks = 0.0f; // the shipped k (Ben, 2026-10-03)
+        reg.set_price_band(pb);
+    }
+
+    int fed = 0, longest_gap = 0, gap = 0, min_sf = 1000;
+    for (int tick = 0; tick < 12; ++tick)
+    {
+        const float posted = f.w.markets.at(mid).price[ORD];
+        economy_report rep;
+        const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
+        clear_markets(f.w, reg, rep);
+        const int sf = f.w.units.at(u).supply_factor_permille;
+        const bool met = (t.unmet == 0);
+        std::printf("     tick %2d  posted %5.2fx  %s  supply %4d\n", tick + 1, posted / base,
+                    met ? "met    " : "refused", sf);
+        if (met) { ++fed; gap = 0; } else { ++gap; longest_gap = std::max(longest_gap, gap); }
+        min_sf = std::min(min_sf, sf);
+    }
+    std::printf("     fed %d of 12, longest run refused %d, lowest supply %d\n", fed, longest_gap, min_sf);
+    check(fed >= 3, "U13 KNOWN COST (k = 0): fed at least 3 of 12 ticks beside a full shelf");
+    check(longest_gap <= 3, "U13 KNOWN COST (k = 0): never refused more than 3 ticks running");
+    check(min_sf >= 450, "U13 KNOWN COST (k = 0): supply never falls below 450");
+
+    // The same run carried on to tick 48: the cycle repeats (one met tick in
+    // four), and each cycle nets -50 permille, so the factor walks down to the
+    // cycle's floor (100, 50, 0, 0) and stays. Bounded at its measured value.
+    int fed_long = fed, end_min = 1000, end_max = 0;
+    for (int tick = 12; tick < 48; ++tick)
+    {
+        economy_report rep;
+        const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
+        clear_markets(f.w, reg, rep);
+        fed_long += (t.unmet == 0) ? 1 : 0;
+        if (tick >= 36)
+        {
+            end_min = std::min(end_min, f.w.units.at(u).supply_factor_permille);
+            end_max = std::max(end_max, f.w.units.at(u).supply_factor_permille);
+        }
+    }
+    std::printf("     to tick 48: fed %d of 48; supply over ticks 37-48 cycles %d..%d\n",
+                fed_long, end_min, end_max);
+    check(fed_long >= 12 && end_max >= 250,
+          "U13 KNOWN COST (k = 0): over 48 ticks fed at least 12, and the late cycle peaks at 250 or more");
+}
+
 } // namespace
 
 int main()
@@ -954,6 +1048,7 @@ int main()
     u10_a_shelf_draw_pays_the_posted_price();
     u11_one_good_over_one_under();
     u12_fed_every_tick_beside_a_full_shelf();
+    u13_known_cost_at_k0();
 
     std::printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

@@ -571,6 +571,54 @@ void m_multi_tick()
         m_at(k);
 }
 
+// ---------------------------------------------------------------------------
+// M5 — BL-1172 KNOWN COST OF k = 0: A PROCESSOR BESIDE A FULL SHELF PULSES
+// ---------------------------------------------------------------------------
+// NOT A STATEMENT THAT THE PATTERN IS RIGHT. Ben's ruling (2026-10-03,
+// MARKETS.md § Price resolution): supply is listings only — k = 0 — until shelf
+// spoilage (BL-1179) lets a glut drain. The price of that ruling, measured and
+// bounded so it can only get better unnoticed: M1's scenario (a processor, no
+// pool, a 1000-unit iron shelf nobody lists into) at the SHIPPED k = 0.
+//
+// MEASURED TRACE (posted iron price as x base, iron bought, steel made):
+//   t1 1.50x 8 bought, 4 steel | t2 5.75x idle | t3 3.38x idle | t4 2.19x idle
+//    t5 1.59x 8 / 4 | t6 5.80x idle | t7 3.40x idle | t8 2.20x idle
+//    t9 1.60x 8 / 4 | t10 5.80x idle | t11 3.40x idle | t12 2.20x idle
+//    => runs 3 of 12 (one tick in four), never idle more than 3 running:
+//    a quarter of its capacity beside a shelf that could feed it every tick.
+//
+// Why: its own want is demand against zero listed supply, so the price
+// resolves toward 10x; over the 2x ceiling it neither bids nor buys and runs
+// on its (empty) pool, the price eases back over the next ticks, and it buys
+// again. FINANCE.md § Standing-force upkeep states this as k = 0's cost.
+
+void m5_known_cost_at_k0()
+{
+    std::printf("\n--- M5  KNOWN COST at k = 0: a processor beside a full shelf, no listing ---\n");
+    uint16_t sid = 0;
+    recipe_registry reg = make_registry(k_shipped_reservation, sid, /*shelf_ticks: shipped*/ 0.0f);
+    scene s = make_scene(k_iron_base * 1.5f, k_steel_base, 1000.0f);
+    const entity_id b = add_processor(s, sid, s.tile);
+    const entity_id c = add_corp(s, b, 0.0f);
+    int ran = 0, gap = 0, longest_gap = 0;
+    for (int t = 0; t < 12; ++t)
+    {
+        const float posted = s.w.markets.at(s.market).price[ri(IRON)];
+        economy_report rep = run_economy_step(s.w, reg);
+        const float bought = fill_of(rep, c, s.market, IRON);
+        const float made   = output_of(rep, b);
+        std::printf("     tick %2d  posted %5.2fx  bought %4.1f  steel %4.1f\n", t + 1,
+                    posted / k_iron_base, bought, made > 0.0f ? made : 0.0f);
+        if (made > 0.0f) { ++ran; gap = 0; } else { ++gap; longest_gap = std::max(longest_gap, gap); }
+        clear_markets(s.w, reg, rep);
+    }
+    std::printf("     ran %d of 12, longest run idle %d\n", ran, longest_gap);
+    check(ran >= 3, "M5 KNOWN COST (k = 0): the processor runs at least 3 of 12 ticks beside a full shelf",
+          ran, 3);
+    check(longest_gap <= 3, "M5 KNOWN COST (k = 0): never idle more than 3 ticks running",
+          longest_gap, 3);
+}
+
 } // namespace
 
 int main()
@@ -580,6 +628,7 @@ int main()
     c_construction();
     s_shared_shelf();
     m_multi_tick();
+    m5_known_cost_at_k0();
     std::printf("\n%s — %d failure(s)\n", g_failures == 0 ? "PASS" : "FAIL", g_failures);
     return g_failures == 0 ? 0 : 1;
 }
