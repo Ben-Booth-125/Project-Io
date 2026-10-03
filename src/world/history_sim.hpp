@@ -2384,16 +2384,22 @@ struct history_sim_params
     /// at 700 (the default, = the land penalty) nothing changes.
     int treaty_far_sea_penalty_q = 700;
 
-    /// BL-1171 -- A FAR PAIR READS THE SEA'S PENALTY ONLY WHERE A FLEET REACHES
-    /// (EXPLORATION.md sec The colonial tie is a sea lane, SETTLED 2026-10-03).
+    /// BL-1171 -- A FAR PAIR READS THE SEA'S PENALTY ONLY WHERE THE SELLER'S
+    /// FLEET OUT-PROJECTS THE PARTNER'S AT THE PARTNER'S PORT (EXPLORATION.md
+    /// sec The colonial tie is a sea lane, SETTLED and ruled 2026-10-03).
     /// With this on, a far pair that met across water reads
-    /// `treaty_far_sea_penalty_q` only while one side's fleet reaches the
-    /// other's port: `fleet_power_at(navy, cost, fleet_power_halving_tiles)`
-    /// at the partner seat's coast tile, walked from its own seat's coast tile
-    /// over the sea priced with the current, is at least
-    /// `far_sea_bind_min_fleet_power`. Elsewhere the pair reads the land's
-    /// `treaty_far_penalty_q`. Formation and the break re-score read it alike,
-    /// so a fleet that decays out of reach loosens the binding it made. Reads
+    /// `treaty_far_sea_penalty_q` only while one side (the seller) has, at the
+    /// other's seat coast tile, `fleet_power_at(navy, cost,
+    /// fleet_power_halving_tiles)` -- walked from its own seat's coast tile
+    /// over the sea priced with the current -- of at least
+    /// `far_sea_bind_min_fleet_power` AND at least the partner side's power on
+    /// that tile: `judge_crossing`'s defender comparison, the defenders being
+    /// `crossing_defenders(partner, seller)` (the partner and its
+    /// mutual-defence partners with a fleet, each from its own ports, less any
+    /// bound to the seller by non-aggression), a tie to the seller. Elsewhere
+    /// the pair reads the land's `treaty_far_penalty_q`. Formation and the
+    /// break re-score read it alike, so a fleet that decays or is out-built
+    /// loosens the binding it made. Reads
     /// nothing unless the fleet rule is on with a halving above 0 (then every
     /// pair met across water reads the sea penalty, as BL-1142 rules). Off by
     /// default; the Exploration span's own.
@@ -4785,8 +4791,9 @@ struct history_sim_state
     int64_t treaties_formed_across_water  = 0;
     int64_t far_treaties_formed_across_water = 0;
     /// BL-1171: far-pair penalty reads (formation and the break re-score, per
-    /// round) of a pair met across water that no fleet of either side reached,
-    /// so it read the land's penalty. Diagnostic; nothing reads it.
+    /// round) of a pair met across water where neither side's fleet
+    /// out-projected the other's at its port, so it read the land's penalty.
+    /// Diagnostic; nothing reads it.
     int64_t far_pairs_out_of_fleet_reach  = 0;
     /// BL-1147: at a resumed open whose conversion is on, the naval points the
     /// LIVING polities carried into fleets, the points held by polities

@@ -703,6 +703,18 @@ void far_pair_rows()
     check(f7.treaties_formed == 1 && f7.far_treaties_formed_across_water == 1 && bound(f7)
           && f7.far_pairs_out_of_fleet_reach == 0,
           "F7  ... and the same pair binds where one side's fleet reaches the other's port");
+    // F8 (BL-1171, Ben 2026-10-03): reach is OUT-PROJECTING. Both sides sail
+    // fleets of 5000: each is strongest at its own port (no distance there),
+    // so whichever side sells, its fleet at the partner's port is out-projected
+    // by the partner's own, and the pair reads the land's penalty -- where F7's
+    // fleet, met by no fleet at the partner's port, binds.
+    far_world w8 = w6;
+    w8.polities[0].navy_stock = 5000;
+    w8.polities[1].navy_stock = 5000;
+    const history_sim_state f8 = run_far(w8, 700, 0, 0, true);
+    say("F8 the same pair, BOTH sides sailing a fleet of 5000:", f8);
+    check(f8.treaties_formed == 0 && !bound(f8) && f8.far_pairs_out_of_fleet_reach > 0,
+          "F8  a seller whose fleet is out-projected at the partner's port by the partner's own does not bind");
 }
 
 // ---------------------------------------------------------------------------
@@ -2026,9 +2038,14 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
         check(dp.treaty_far_sea_penalty_q >= dp.treaty_far_penalty_q || !dp.far_pairs_meet_by_sea
               || hi.far_treaties_formed_across_water > 0,
               "W9  and far pairs across water bind");
-        check(fx.exploration_params.far_pairs_meet_by_sea == false
-              && fx.exploration_state.contacts_met_by_sea == 0,
-              "W9  meeting by sea is the Industrialisation span's alone: Exploration meets no one by sea");
+        // BL-1171 (Ben, 2026-10-03): Exploration meets by sea too where its
+        // params say so; the row reads the span's own switch either way.
+        check(fx.exploration_params.far_pairs_meet_by_sea
+                  ? fx.exploration_state.contacts_met_by_sea > 0
+                  : fx.exploration_state.contacts_met_by_sea == 0,
+              fx.exploration_params.far_pairs_meet_by_sea
+                  ? "W9  Exploration, meeting by sea on, meets realms across water by sea"
+                  : "W9  Exploration, meeting by sea off, meets no one by sea");
         check(dp.sea_current_cargo_loss_q <= 0 || hi.sea_trade_cargo_lost_q > 0,
               "W9  with a loss set, the Industrialisation span's trades across water lose cargo against the current");
         // The Exploration span's loss is PRINTED above, not bound: it is lost

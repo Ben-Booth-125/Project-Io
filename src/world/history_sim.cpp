@@ -2440,15 +2440,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
     std::vector<std::vector<int>> fleet_ring;
     std::vector<std::uint8_t> fleet_ring_built;
     fleet_field_cache fleet_fields;
-    // BL-1171 -- A FAR PAIR READS THE SEA'S PENALTY WHERE A FLEET REACHES. The
-    // rule reads the fleet's own power curve, so it needs the fleet rule on
-    // with a halving; otherwise it reads nothing and BL-1142 stands as ruled.
-    // The cost field from each seat's coast tile is memoised for the span,
-    // keyed by the tile (content: the sea never moves), cleared whole when it
+    // BL-1171 -- A FAR PAIR READS THE SEA'S PENALTY WHERE THE SELLER'S FLEET
+    // OUT-PROJECTS THE PARTNER'S. The rule reads the fleet's own power curve,
+    // so it needs the fleet rule on with a halving; otherwise it reads nothing
+    // and BL-1142 stands as ruled. The cost field from each source set (a
+    // seat's coast tile, a defender's ports) is memoised for the span, keyed
+    // by the tiles (content: the sea never moves), cleared whole when it
     // grows past a bound -- which moves the cost of the read, never its answer.
     const bool far_reach_rule_on = params.far_sea_bind_needs_fleet_reach && fleet_rule_on
                                 && params.fleet_power_halving_tiles > 0;
-    std::map<int, std::vector<int64_t>> far_reach_fields;
+    std::map<std::vector<int>, std::vector<int64_t>> far_reach_fields;
     if (fleet_rule_on)
     {
         fleet_comp = sea_components(fleet_sea, gw, gh);
@@ -5412,13 +5413,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 return t;
             }();
 
-            // BL-1171 -- WHETHER ONE SIDE'S FLEET REACHES THE OTHER'S PORT, read
-            // off this round's opening stocks (the same facts formation and the
-            // break re-score read): the seller's fleet sails from its seat's
-            // coast tile to the partner seat's, priced with the current, and
-            // reaches when its power there (`fleet_power_at`, halving over the
-            // fleet's own tiles) is at least the stated minimum. Either side's
-            // fleet will do -- either side can be the seller.
+            // BL-1171 -- WHETHER THE SELLER'S FLEET OUT-PROJECTS THE PARTNER'S AT
+            // THE PARTNER'S PORT (Ben, 2026-10-03), read off the live stocks
+            // formation and the break re-score read. The seller's fleet sails
+            // from its seat's coast tile to the partner seat's, priced with the
+            // current, and its power there (`fleet_power_at`, halving over the
+            // fleet's own tiles) must be at least the stated minimum AND at least
+            // the power the partner's side projects onto that same tile. The
+            // partner's side is `judge_crossing`'s defenders, read by the same
+            // `crossing_defenders`: the partner and its mutual-defence partners
+            // with a fleet, each from its own ports (its seat's coast where it
+            // built none), less any partner bound to the seller by
+            // non-aggression. The comparison is judge_crossing's (the defenders'
+            // sum against the attacker's power, a tie to the attacker), taken at
+            // the one tile the trade lands on rather than along a leg. Either
+            // side can be the seller, so either side's fleet will do.
             const auto seat_coast_tile = [&](int pid) -> int {
                 if (pid < 0 || static_cast<std::size_t>(pid) >= out.polities.size()) return -1;
                 const int cap = out.polities[static_cast<std::size_t>(pid)].capital;
@@ -5426,28 +5435,38 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const region& seat = ss.regions[static_cast<std::size_t>(cap)];
                 return nearest_sea_tile(fleet_sea, gw, gh, seat.col, seat.row, kFleetCoastRadius);
             };
-            const auto fleet_reaches = [&](int x, int y) -> bool {
-                const polity& px = out.polities[static_cast<std::size_t>(x)];
-                if (!px.alive || px.navy_stock <= 0) return false;
-                const int from = seat_coast_tile(x), to = seat_coast_tile(y);
-                if (from < 0 || to < 0) return false;
+            const auto reach_field = [&](const std::vector<int>& from) -> const std::vector<int64_t>& {
                 auto it = far_reach_fields.find(from);
                 if (it == far_reach_fields.end())
                 {
                     if (far_reach_fields.size() >= 128) far_reach_fields.clear();
                     it = far_reach_fields.emplace(from, sea_cost_field(fleet_sea, gw, gh,
-                             currents_on ? &currents : nullptr, params.sea_current_weight_q, { from })).first;
+                             currents_on ? &currents : nullptr, params.sea_current_weight_q, from)).first;
                 }
-                const int64_t power = fleet_power_at(px.navy_stock, it->second[static_cast<std::size_t>(to)],
+                return it->second;
+            };
+            const auto fleet_out_projects = [&](int x, int y) -> bool {
+                const polity& px = out.polities[static_cast<std::size_t>(x)];
+                if (!px.alive || px.navy_stock <= 0) return false;
+                const int from = seat_coast_tile(x), to = seat_coast_tile(y);
+                if (from < 0 || to < 0) return false;
+                const std::size_t ti = static_cast<std::size_t>(to);
+                const int64_t power = fleet_power_at(px.navy_stock, reach_field({ from })[ti],
                                                      params.fleet_power_halving_tiles);
-                return power > 0 && power >= params.far_sea_bind_min_fleet_power;
+                if (power <= 0 || power < params.far_sea_bind_min_fleet_power) return false;
+                const std::vector<fleet_defender> defenders =
+                    crossing_defenders(out, ss.regions, y, x, fleet_sea, gw, gh, kFleetCoastRadius, nullptr);
+                int64_t def = 0;
+                for (const fleet_defender& d : defenders)
+                    def += fleet_power_at(d.navy, reach_field(d.ports)[ti], params.fleet_power_halving_tiles);
+                return def <= power;
             };
             // The class a pair reads its far penalty by: met across water, and
-            // (with the rule on) a fleet that reaches.
+            // (with the rule on) one side's fleet out-projecting the other's.
             const auto sea_far_class = [&](int a, int b, bool met_across_water) -> bool {
                 if (!met_across_water) return false;
                 if (!far_reach_rule_on) return true;
-                const bool reach = fleet_reaches(a, b) || fleet_reaches(b, a);
+                const bool reach = fleet_out_projects(a, b) || fleet_out_projects(b, a);
                 if (!reach) ++out.far_pairs_out_of_fleet_reach;
                 return reach;
             };
