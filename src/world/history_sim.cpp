@@ -2491,6 +2491,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // grows past a bound -- which moves the cost of the read, never its answer.
     const bool far_reach_rule_on = params.far_sea_bind_needs_fleet_reach && fleet_rule_on
                                 && params.fleet_power_halving_tiles > 0;
+    // BL-1171: meeting by sea reads the same comparison, on the same terms.
+    const bool far_meet_rule_on = params.far_sea_meet_needs_fleet_out_projection && fleet_rule_on
+                               && params.fleet_power_halving_tiles > 0;
     std::map<std::vector<int>, std::vector<int64_t>> far_reach_fields;
     if (fleet_rule_on)
     {
@@ -5564,6 +5567,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             open = trade_sea_volume_q(treaty_trade_ctx, ss.regions, out.polities, ia, ib, g) > 0
                                 || trade_sea_volume_q(treaty_trade_ctx, ss.regions, out.polities, ib, ia, g) > 0;
                         if (!open) continue;
+                        // BL-1171 -- MEETING BY SEA IS GATED TOO (Ben,
+                        // 2026-10-03): the pair meets only where one side's
+                        // fleet out-projects the other's at its port -- the
+                        // binding's own comparison (`fleet_out_projects`),
+                        // read after the cheap tests and the trade, so only
+                        // an open pair pays for it.
+                        if (far_meet_rule_on && !fleet_out_projects(ia, ib) && !fleet_out_projects(ib, ia))
+                        {
+                            ++out.far_meetings_out_of_fleet_reach;
+                            continue;
+                        }
                         raise_contact(ia, ib, contact_kind::trade, pa.capital, y);
                         ++out.contacts_met_by_sea;
                     }

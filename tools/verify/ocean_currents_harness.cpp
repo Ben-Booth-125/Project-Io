@@ -607,7 +607,8 @@ far_world make_far_world(int seat1_col, int old_seat_col, bool across_water, boo
 
 /// One decision round (1700) of Exploration's params resumed on @p w, at the
 /// given land and sea far penalties and cargo loss.
-history_sim_state run_far(const far_world& w, int land_pen, int sea_pen, int loss = 0, bool reach_rule = false)
+history_sim_state run_far(const far_world& w, int land_pen, int sea_pen, int loss = 0, bool reach_rule = false,
+                          bool meet_gate = true)
 {
     history_sim_params p = exploration_sim_params(world_params{});
     p.start_year = 1700;
@@ -621,6 +622,8 @@ history_sim_state run_far(const far_world& w, int land_pen, int sea_pen, int los
     p.sea_current_cargo_loss_q = loss;
     // F1-F5 read the class rule alone (BL-1142); F6-F7 turn the fleet's reach on.
     p.far_sea_bind_needs_fleet_reach = reach_rule;
+    // F13 (BL-1171): meeting by sea gated by the same comparison; shipped on.
+    p.far_sea_meet_needs_fleet_out_projection = meet_gate;
     p.resume_polities      = &w.polities;
     p.resume_contacts      = &w.contacts;
     p.resume_dated_objects = &w.objects;
@@ -715,6 +718,43 @@ void far_pair_rows()
     say("F8 the same pair, BOTH sides sailing a fleet of 5000:", f8);
     check(f8.treaties_formed == 0 && !bound(f8) && f8.far_pairs_out_of_fleet_reach > 0,
           "F8  a seller whose fleet is out-projected at the partner's port by the partner's own does not bind");
+
+    // F13 (BL-1171, Ben 2026-10-03): MEETING BY SEA IS GATED TOO. Two realms on
+    // two islands, never met, both seats with a built port, polity 0
+    // farm-dominant and polity 1 ore-dominant (each wants the other's good):
+    // a trade by sea is open whenever one of them sails. With the gate on,
+    // polity 0 alone sailing 5000 meets polity 1; both sailing 5000, each is
+    // out-projected at the other's port by its own fleet and no contact is
+    // made; the control -- both sailing, the gate off -- meets.
+    {
+        const auto strangers = [](int64_t navy0, int64_t navy1) {
+            far_world w = make_far_world(36, -1, true, false);
+            w.contacts.clear();
+            w.ss.regions[0].dominant = region_class::farm;
+            w.ss.regions[1].dominant = region_class::ore;
+            w.ss.regions[0].port_q = 500; // the window a port needs (none: no port, ever)
+            w.ss.regions[1].port_q = 500;
+            w.ss.regions[0].port_stock_q = 1000;
+            w.ss.regions[1].port_stock_q = 1000;
+            w.polities[0].navy_stock = navy0;
+            w.polities[1].navy_stock = navy1;
+            return w;
+        };
+        const auto met = [](const history_sim_state& hs) { return has_contact(hs, 0, 1); };
+        const history_sim_state one  = run_far(strangers(5000, 0), 700, 300, 0, true, true);
+        const history_sim_state both = run_far(strangers(5000, 5000), 700, 300, 0, true, true);
+        const history_sim_state ctrl = run_far(strangers(5000, 5000), 700, 300, 0, true, false);
+        std::printf("      F13 met by sea: one fleet %lld (refused %lld); both fleets, gate on %lld (refused %lld);"
+                    " both fleets, gate off %lld\n",
+                    static_cast<long long>(one.contacts_met_by_sea), static_cast<long long>(one.far_meetings_out_of_fleet_reach),
+                    static_cast<long long>(both.contacts_met_by_sea), static_cast<long long>(both.far_meetings_out_of_fleet_reach),
+                    static_cast<long long>(ctrl.contacts_met_by_sea));
+        check(one.contacts_met_by_sea == 1 && met(one) && one.far_meetings_out_of_fleet_reach == 0,
+              "F13 realms across water meet where one side's fleet out-projects the other's at its port");
+        check(both.contacts_met_by_sea == 0 && !met(both) && both.far_meetings_out_of_fleet_reach > 0
+              && ctrl.contacts_met_by_sea == 1 && met(ctrl),
+              "F13 ... and never meet where neither does (the same pair meets with the gate off)");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1356,6 +1396,7 @@ bool apply_set(history_sim_params& p, const std::string& name, int v)
     if (name == "far_pairs_meet_by_sea")         { p.far_pairs_meet_by_sea = v != 0; return true; }
     // BL-1171: the fleet-reach rule and the one-landmass road.
     if (name == "far_sea_bind_needs_fleet_reach") { p.far_sea_bind_needs_fleet_reach = v != 0; return true; }
+    if (name == "far_sea_meet_needs_fleet_out_projection") { p.far_sea_meet_needs_fleet_out_projection = v != 0; return true; }
     if (name == "far_sea_bind_min_fleet_power")  { p.far_sea_bind_min_fleet_power = v; return true; }
     if (name == "trade_road_joins_one_landmass") { p.trade_road_joins_one_landmass = v != 0; return true; }
     if (name == "treaty_far_sea_penalty_q")      { p.treaty_far_sea_penalty_q = v; return true; }

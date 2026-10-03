@@ -2408,6 +2408,20 @@ struct history_sim_params
     /// counts as reaching. 1: any power at all.
     int64_t far_sea_bind_min_fleet_power   = 1;
 
+    /// BL-1171 -- MEETING BY SEA IS GATED TOO (EXPLORATION.md sec The colonial
+    /// tie is a sea lane; Ben, 2026-10-03). With this on (and
+    /// `far_pairs_meet_by_sea`), two realms across water whose trade by sea is
+    /// open MEET only where one side's fleet out-projects the other's at its
+    /// port -- the very comparison `far_sea_bind_needs_fleet_reach` reads for
+    /// binding (the side's power at the other's seat coast tile, at least
+    /// `far_sea_bind_min_fleet_power` and at least what the other side and
+    /// its mutual-defence partners project there; a tie to the side sailing).
+    /// A contact the sea forbids is never made, rather than made and left
+    /// unbound. Reads nothing unless the fleet rule is on with a halving above
+    /// 0 (then every open pair meets, as BL-1142 rules). Off by default; the
+    /// Exploration span's own.
+    bool far_sea_meet_needs_fleet_out_projection = false;
+
     /// BL-1171 -- GOODS BETWEEN LANDMASSES GO BY SEA (EXPLORATION.md sec The
     /// colonial tie is a sea lane, SETTLED 2026-10-03). With this on, a trade
     /// whose two seats stand on different landmasses (`landmass_at`) reads no
@@ -4798,6 +4812,11 @@ struct history_sim_state
     /// out-projected the other's at its port, so it read the land's penalty.
     /// Diagnostic; nothing reads it.
     int64_t far_pairs_out_of_fleet_reach  = 0;
+    /// BL-1171: pairs across water whose trade by sea was open but which did
+    /// NOT meet that round because neither side's fleet out-projected the
+    /// other's at its port (`far_sea_meet_needs_fleet_out_projection`), summed
+    /// over rounds (a pair refused in many rounds counts each). Diagnostic.
+    int64_t far_meetings_out_of_fleet_reach = 0;
     /// BL-1171 DIAGNOSTICS (write-only; nothing reads them). What the road
     /// rule (`trade_road_joins_one_landmass`) took from the round's flows,
     /// summed over rounds, per directed pair and good BEFORE the want and
