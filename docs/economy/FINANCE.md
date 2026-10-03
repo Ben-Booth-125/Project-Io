@@ -93,9 +93,20 @@ goods do not arrive the unit *weakens* rather than vanishing. The unit's
 `supply_factor_permille` takes the same subtraction whether (a) it is beyond the reach
 field (the out-of-supply decay of BL-325, reach as the placement constraint) or (b) its
 draw went unmet. Same subtraction, same reason; a met draw and a unit in reach recover
-it. Deterministic scalar arithmetic, no RNG. Because the supply factor feeds
+it. **The subtraction stops at the unit's supply share** (BL-1172, fair-price upkeep): out of
+reach the share is zero, and a short draw's share is the mean over its goods of the fraction
+actually met, in integer per-mille. A unit fed half its draw therefore settles at half
+strength rather than starving to nothing, and climbs back toward its share from below.
+Deterministic integer arithmetic, no RNG. Because the supply factor feeds
 `unit_strength` and the combat adapter, an unsupplied army is measurably weaker **in the
 resolver**, not merely more expensive.
+
+**The reservation price is a price paid, not only a price checked.** It is
+`price_band.reservation_mult` (2.0 — twice what a good is worth at an even market: dear, but a
+price a supplied market reaches, where the 10× cap is the signal of a good nobody makes). The draw decides against last tick's price, and its own bid can
+resolve this tick's price far above it. So the upkeep part of a fill is billed at no more
+than reservation × base. Its goods cost then falls with what it bought, never above that
+ceiling.
 
 The pass also carries **orphan cleanup**: `demolish_building` erases the building, the
 corp asset and the building stockpile but never touches `w.units`, so without it

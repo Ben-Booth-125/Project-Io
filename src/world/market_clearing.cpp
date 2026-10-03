@@ -1426,13 +1426,37 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     }
 
     // --- Auto-demand clearing: expenditure at ref_price ---
+    // BL-1172: the UPKEEP part of a fill (`report.upkeep_purchases`, a subset of
+    // the entry's qty) is billed at no more than the buyer's reservation price,
+    // reservation_mult x base. The draw decided to buy against LAST tick's price
+    // (it runs before this resolution exists); its own bid can resolve the price
+    // far above the ceiling it checked, and a buyer who would not pay that price
+    // does not pay it. The rest of the fill (construction, processor inputs) is
+    // billed at ref_price exactly as before. `res_mult <= 0` never buys, so the
+    // register is empty and this is the old loop.
+    const float res_mult = reg.price_band().reservation_mult;
     for (const auto_buy_entry& be : auto_buys)
     {
-        flows[be.corp].expenditure += be.qty * ref_price[be.market][be.r];
+        const float ref = ref_price[be.market][be.r];
+        float upkeep_qty = 0.0f;
+        if (const auto uit = report.upkeep_purchases.find(std::make_pair(be.corp, be.market));
+            uit != report.upkeep_purchases.end())
+            upkeep_qty = std::clamp(uit->second[be.r], 0.0f, be.qty);
+        const float other_qty = be.qty - upkeep_qty;
+        const float ceiling   = w.markets.at(be.market).base_price[be.r] * res_mult;
+        const float upkeep_px = std::min(ref, ceiling);
+
+        flows[be.corp].expenditure += other_qty * ref + upkeep_qty * upkeep_px;
         // Row 2 of 4: the mirror of row 1 — the market is the SELLER, so this is
         // the buy side of a player's history (what I bought, at what price).
-        record_exchange(be.market, be.r, be.qty, ref_price[be.market][be.r],
-                        null_entity, be.corp);
+        // An upkeep fill billed below ref is its own row at the price it paid.
+        if (upkeep_qty > 0.0f && upkeep_px < ref)
+        {
+            record_exchange(be.market, be.r, other_qty, ref, null_entity, be.corp);
+            record_exchange(be.market, be.r, upkeep_qty, upkeep_px, null_entity, be.corp);
+        }
+        else
+            record_exchange(be.market, be.r, be.qty, ref, null_entity, be.corp);
     }
 
     // --- Explicit order-book matching (player sell vs player buy) ---

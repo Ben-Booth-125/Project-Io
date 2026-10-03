@@ -1354,50 +1354,44 @@ economy = {
     -- It is the exact mirror of the seller's floor_price (BL-386): both sides
     -- may decline a trade, neither may dictate one.
     --
-    -- MEASURED, NOT GUESSED. tools/verify/demand_census.cpp R3 reports the
-    -- mean resolved price as a multiple of base, per resource, per band, over
-    -- every market that prices it. Seed 0, 80-tick warm start, shipped spawn:
+    -- BL-1172 (Ben, 2026-10-03): "an army eats what its owner can buy at a
+    -- FAIR price" (FINANCE.md § Standing-force upkeep). The ceiling is no
+    -- longer derived to ADMIT what the draws were buying; it says what a
+    -- buyer will pay, and above it the draw goes short and the shortfall rule
+    -- weakens the unit IN PROPORTION to what it got. The old derivation
+    -- (8.63 < mult < 10 -> 9.0, set so the dearest ration market still
+    -- filled) is exactly what let upkeep goods be bought at ~3.5x (rations)
+    -- and ~6x (ordnance) base and wind the field up (BL-1164, firm_attrition_
+    -- trace: 211 -> 25 corps by tick 462 on seed 0).
     --
-    --   LOWER BOUND — it must ADMIT what the live draws actually buy. The only
-    --   goods draw live at shipped rates is unit upkeep, and its dearest good
-    --   is food_rations: 7.788x base in the ancient band (14 markets, ceiled in
-    --   8) and 8.629x in the industrial (9 markets, ceiled in 5). A ceiling
-    --   below 8.63 declines the food draw in the band where it is dearest, so
-    --   every unit's draw goes unmet — which is exactly the mechanism that took
-    --   operating firms 227 -> 19 when BL-641 turned building upkeep on. The
-    --   bound is the INDUSTRIAL figure, not the ancient one.
+    --   reservation_mult = 2.0: a buyer pays up to TWICE what a good is worth
+    --   at an even market (base). Dear, but a price a market that is being
+    --   supplied reaches; dearer is heading for ceil_mult (10x), the signal
+    --   of a good nobody makes (MARKETS.md § Price resolution), and paying
+    --   that is the insolvency the ruling exists to stop. Only 2.0 was
+    --   measured; it is a first cut, and the trace is the tool to move it.
     --
-    --   UPPER BOUND — it must DECLINE the cap. A resource pegged at ceil_mult
-    --   is a generation-calibration signal (MARKETS.md § Price resolution),
-    --   not a legitimate purchase, and a reservation equal to the cap declines
-    --   nothing at all: the rule would be inert the day it landed.
+    -- AND IT IS A PRICE PAID, not only a price checked. The draw decides
+    -- against LAST tick's price; its own bid can resolve this tick's far
+    -- higher (ordnance: checked <= 2x, billed ~3.7-5.4x). clear_markets bills
+    -- the upkeep part of a fill at min(resolved, reservation x base)
+    -- (economy_report::upkeep_purchases) - a buyer who would not pay that
+    -- price does not. Measured (seeds 0/10/28, shipped start): ordnance paid
+    -- ~272-288 against a 155.8 base, rations ~23-31 against 13.6 (a
+    -- market's own base carries its distance/capital premium above that).
     --
-    --     8.63  <  reservation_mult  <  10.0   ->  9.0
+    -- Read by every goods draw, building upkeep's power included (one rule
+    -- for every goods draw); nothing else buys through this ceiling.
     --
-    -- WHAT 9.0 ACTUALLY REFUSES, measured on the same run. Ancient: ceramics
-    -- (9.240x, ceiled in 12 of 14) and leather (9.968x, 13 of 14). Industrial:
-    -- consumer_goods (9.082x), silicon (9.377x), alloys (9.666x), ree_alloy
-    -- (9.867x) and electronics (9.986x). Every one of those is among its
-    -- band's most-ceiled rows — the goods nothing in the world makes — and all
-    -- 21 other priced goods are admitted. That is the rule doing its job: a
-    -- starving building does not bid a good to its cap chasing a shortfall no
-    -- amount of credits can fix.
-    --
-    -- A CONSEQUENCE WORTH EXPECTING, not a defect: a good that nobody supplies
-    -- OSCILLATES around this ceiling. Demand with zero supply resolves to
-    -- base x ceil_mult, which is above the reservation, so the next tick's draw
-    -- declines and the EMA pulls the price back down until it bids again. The
-    -- price settles near reservation_mult — high enough that a rival scoring
-    -- the building which supplies it can see the gap, which is the whole point.
-    --
-    -- RE-DERIVE RATHER THAN TRUST. Re-run demand_census and read the R3 table
-    -- whenever base_price, ceil_mult, or either upkeep basket changes — all
-    -- three move the two bounds above.
+    -- RE-MEASURE RATHER THAN TRUST. Whenever base_price, ceil_mult or either
+    -- upkeep basket changes, re-read demand_census R3 (what each good prices
+    -- at) and firm_attrition_trace (what upkeep goods are PAID, and who
+    -- survives) before moving this number.
     -- ===================================================================
     price_band = {
         floor_mult       = 0.25, -- lowest a price may fall, x base_price
         ceil_mult        = 10.0, -- highest a price may rise, x base_price (derived; see above)
-        reservation_mult = 9.0,  -- BL-654: a goods draw declines to buy above this (derived; see above)
+        reservation_mult = 2.0,  -- BL-654/BL-1172: a goods draw declines to buy above this (a fair price; see above)
     },
 
     -- ===================================================================
