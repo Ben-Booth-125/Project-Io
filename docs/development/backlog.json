@@ -1756,6 +1756,28 @@
     "tools/verify/industrialisation_sim_harness.cpp"
    ],
    "design": "FOUND 2026-10-03 (the re-bless lane): the harness halts at its BL-1056 self-check (2), \"NOT REFUSED\", since NR-964 (the treasury share by employed heads), so the fingerprint check after it never runs. WORK: re-state the self-check for the employed-heads spread (never weakened to pass), then confirm the fingerprint check runs and passes."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1167",
+   "short_name": "ICON_GOLDENS_WORLD_DEPENDENT",
+   "author": "Claude (the sprint 48 re-bless)",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "The icon-silhouette goldens draw generated world, so every world change turns them red",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "scripts/verify/icon_silhouettes.lua",
+    "scripts/verify/golden/"
+   ],
+   "design": "FOUND 2026-10-03: DEVELOPMENT_PRACTICES.md keeps a curated golden set of surfaces that draw NO generated world content (NR-237), and names the icon_silhouettes pair as that set. But both captures show the generated map, a corporation, a tile panel and the nav rail; they last blessed 2026-06-17 and read 48.7% differing at the sprint 48 re-bless (refreshed in the re-bless commit). WORK: make the check world-independent (a fixed fixture surface that draws only the icon set), or remove the pair from the golden set and keep it capture-only. Ben's call between the two."
   }
  ]
 }
