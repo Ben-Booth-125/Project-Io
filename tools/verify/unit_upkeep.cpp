@@ -162,6 +162,12 @@ bool near(float a, float b, float eps = 1e-3f) { return std::fabs(a - b) <= eps;
 /// place prices either side of it.
 constexpr float k_shipped_reservation = 2.0f;
 
+/// The SHIPPED shelf share of supply, in ticks of demand (scripts/economy.lua
+/// `price_band.shelf_supply_ticks`, BL-1172 — a first cut, Ben to set).
+/// Restated, not loaded; the multi-tick rows also run at every k of the sweep.
+constexpr float k_shipped_shelf_ticks = 4.0f;
+constexpr float k_shelf_tick_sweep[] = {1.0f, 2.0f, 4.0f, 8.0f, 16.0f};
+
 // ---------------------------------------------------------------------------
 
 void roster_anchors()
@@ -715,6 +721,7 @@ void u10_a_shelf_draw_pays_the_posted_price()
         pb.floor_mult       = 0.25f;
         pb.ceil_mult        = 10.0f;
         pb.reservation_mult = k_shipped_reservation;
+        pb.shelf_supply_ticks = k_shipped_shelf_ticks;
         reg.set_price_band(pb);
         return reg;
     };
@@ -819,6 +826,7 @@ void u11_one_good_over_one_under()
         reg.set_military(mp);
         price_band_params pb;
         pb.floor_mult = 0.25f; pb.ceil_mult = 10.0f; pb.reservation_mult = k_shipped_reservation;
+        pb.shelf_supply_ticks = k_shipped_shelf_ticks;
         reg.set_price_band(pb);
     }
 
@@ -862,9 +870,9 @@ void u11_one_good_over_one_under()
 // draw -> clear on a market nobody lists into, and every draw is met, every
 // posted price is at or under the ceiling, the supply factor only climbs.
 
-void u12_fed_every_tick_beside_a_full_shelf()
+void u12_at(float k)
 {
-    std::printf("\n-- U12: BL-1172, twelve ticks beside a full shelf with no listing --\n");
+    std::printf("   k = %.0f ticks of demand:\n", k);
 
     constexpr float base     = 43.0f;
     constexpr float per_head = 0.1f;
@@ -887,6 +895,7 @@ void u12_fed_every_tick_beside_a_full_shelf()
     {
         price_band_params pb;
         pb.floor_mult = 0.25f; pb.ceil_mult = 10.0f; pb.reservation_mult = k_shipped_reservation;
+        pb.shelf_supply_ticks = k;
         reg.set_price_band(pb);
     }
 
@@ -917,6 +926,13 @@ void u12_fed_every_tick_beside_a_full_shelf()
     check(near(spent, expect, 1e-2f), "U12 every tick billed need x that tick's posted price");
     check(near(f.w.markets.at(mid).inventory[ORD], 100.0f - 12.0f * need),
           "U12 the shelf gave up exactly twelve ticks of need");
+}
+
+void u12_fed_every_tick_beside_a_full_shelf()
+{
+    std::printf("\n-- U12: BL-1172, twelve ticks beside a full shelf with no listing, at every k --\n");
+    for (const float k : k_shelf_tick_sweep)
+        u12_at(k);
 }
 
 } // namespace

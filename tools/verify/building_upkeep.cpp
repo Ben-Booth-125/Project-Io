@@ -77,6 +77,11 @@ std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 /// prices either side of it.
 constexpr float k_shipped_reservation = 2.0f;
 
+/// The SHIPPED shelf share of supply, in ticks of demand (scripts/economy.lua
+/// `price_band.shelf_supply_ticks`, BL-1172 — a first cut, Ben to set).
+/// Restated, not loaded.
+constexpr float k_shipped_shelf_ticks = 4.0f;
+
 /// The fixture: ONE body, ONE corp, and however many buildings the caller asks
 /// for on it, all sharing the corp's single pool. That sharing is the whole point
 /// — it is what makes the visit order observable.
@@ -494,6 +499,7 @@ recipe_registry registry_with_reservation(resource_type good, float qty, float r
     pb.floor_mult       = 0.25f;
     pb.ceil_mult        = 10.0f;
     pb.reservation_mult = reservation;
+    pb.shelf_supply_ticks = k_shipped_shelf_ticks;
     reg.set_price_band(pb);
     return reg;
 }

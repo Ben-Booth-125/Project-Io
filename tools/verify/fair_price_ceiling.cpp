@@ -67,6 +67,12 @@ std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 /// this harness reads no Lua. Prices are placed at 1.5x and 2.5x base around it.
 constexpr float k_shipped_reservation = 2.0f;
 
+/// The SHIPPED shelf share of supply, in ticks of demand (scripts/economy.lua
+/// `price_band.shelf_supply_ticks`, BL-1172 — a first cut, Ben to set).
+/// Restated, not loaded; the multi-tick rows also run at every k of the sweep.
+constexpr float k_shipped_shelf_ticks = 4.0f;
+constexpr float k_shelf_tick_sweep[] = {1.0f, 2.0f, 4.0f, 8.0f, 16.0f};
+
 constexpr resource_type IRON  = resource_type::iron_ore;
 constexpr resource_type STEEL = resource_type::steel;
 constexpr float k_iron_base  = 2.5f;
@@ -151,7 +157,8 @@ entity_id add_processor(scene& s, uint16_t recipe_id, entity_id tile)
 /// Processor: steel from 2 iron a batch, base_rate 8 x workforce 0.5 = 4
 /// batches, so a full run needs 8 iron. Construction of a processing facility
 /// costs 24 steel over 3 ticks (8 a tick).
-recipe_registry make_registry(float reservation, uint16_t& steel_id)
+recipe_registry make_registry(float reservation, uint16_t& steel_id,
+                              float shelf_ticks = k_shipped_shelf_ticks)
 {
     recipe_registry reg;
     reg.set_thresholds(/*t_full=*/1.0f, /*t_idle=*/0.2f);
@@ -170,6 +177,7 @@ recipe_registry make_registry(float reservation, uint16_t& steel_id)
     steel_id = reg.add_recipe(steel);
     price_band_params pb;
     pb.floor_mult = 0.25f; pb.ceil_mult = 10.0f; pb.reservation_mult = reservation;
+    pb.shelf_supply_ticks = shelf_ticks;
     reg.set_price_band(pb);
     return reg;
 }
@@ -443,15 +451,15 @@ entity_id add_site(scene& s, entity_id tile)
     return b;
 }
 
-void m_multi_tick()
+void m_at(float k)
 {
-    std::printf("\n--- M  ten ticks: shelf-only markets keep buying; over the ceiling nothing bids ---\n");
+    std::printf("   k = %.0f ticks of demand:\n", k);
     constexpr int ticks = 10;
 
     // M1: a processor on a shelf-only iron market (nobody lists iron), under.
     {
         uint16_t sid = 0;
-        recipe_registry reg = make_registry(k_shipped_reservation, sid);
+        recipe_registry reg = make_registry(k_shipped_reservation, sid, k);
         scene s = make_scene(k_iron_base * 1.5f, k_steel_base, 1000.0f);
         const entity_id b = add_processor(s, sid, s.tile);
         const entity_id c = add_corp(s, b, 0.0f);
@@ -474,7 +482,7 @@ void m_multi_tick()
     // M2: a construction site on a shelf-only steel market, under.
     {
         uint16_t sid = 0;
-        recipe_registry reg = make_registry(k_shipped_reservation, sid);
+        recipe_registry reg = make_registry(k_shipped_reservation, sid, k);
         lengthen_build(reg);
         scene s = make_scene(k_iron_base, k_steel_base * 1.5f, 1000.0f);
         const entity_id b = add_site(s, s.tile);
@@ -500,7 +508,7 @@ void m_multi_tick()
     // the price the tick resolves is lower than the one it saw.
     {
         uint16_t sid = 0;
-        recipe_registry reg = make_registry(k_shipped_reservation, sid);
+        recipe_registry reg = make_registry(k_shipped_reservation, sid, k);
         scene s = make_scene(k_iron_base * 2.5f, k_steel_base, 0.0f);
         const entity_id b = add_processor(s, sid, s.tile);
         const entity_id c = add_corp(s, b, 0.0f);
@@ -528,7 +536,7 @@ void m_multi_tick()
     // M4: a construction site over the ceiling on an EMPTY steel shelf.
     {
         uint16_t sid = 0;
-        recipe_registry reg = make_registry(k_shipped_reservation, sid);
+        recipe_registry reg = make_registry(k_shipped_reservation, sid, k);
         lengthen_build(reg);
         scene s = make_scene(k_iron_base, k_steel_base * 2.5f, 0.0f);
         const entity_id b = add_site(s, s.tile);
@@ -554,6 +562,13 @@ void m_multi_tick()
         check(rose_after_over == 0, "M4 ... and the price eases after every tick it sat over", rose_after_over, 0);
         check(s.w.buildings.at(b).ticks_remaining == 30, "M4 an empty shelf never advances the build");
     }
+}
+
+void m_multi_tick()
+{
+    std::printf("\n--- M  ten ticks: shelf-only markets keep buying; over the ceiling nothing bids; at every k ---\n");
+    for (const float k : k_shelf_tick_sweep)
+        m_at(k);
 }
 
 } // namespace

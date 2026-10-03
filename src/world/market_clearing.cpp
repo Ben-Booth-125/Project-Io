@@ -1395,16 +1395,17 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 
     // --- Reference prices from accumulated supply/demand ---
     // Computed once, before any clearing, so all income/expenditure uses the same price.
-    // BL-1172: supply here is the listings PLUS the standing shelf
-    // (`pricing_supply`), read now — after the tick's draws, before the
-    // auto-surplus loop below credits this clear's listings to the shelf.
+    // BL-1172: supply here is the listings PLUS the shelf's share, at most k
+    // ticks of this tick's demand (`pricing_supply`), read now — after the
+    // tick's draws and this tick's demand phase, before the auto-surplus loop
+    // below credits this clear's listings to the shelf.
     std::unordered_map<entity_id, std::array<float, resource_count>> ref_price;
     for (const auto& [mid, mc] : w.markets)
     {
         ref_price[mid] = {};
         for (std::size_t r = 0; r < resource_count; ++r)
             ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r],
-                                              pricing_supply(mc, r), mc.demand[r],
+                                              pricing_supply(mc, r, reg.price_band().shelf_supply_ticks), mc.demand[r],
                                               reg.price_band().floor_mult,
                                               reg.price_band().ceil_mult);
     }

@@ -397,6 +397,17 @@ struct price_band_params
     /// reservation equal to the ceiling would decline nothing and the rule
     /// would be inert. See docs/economy/MARKETS.md § Settled: a short pool BUYS.
     float reservation_mult = 0.0f;
+
+    /// BL-1172 — HOW MUCH OF THE SHELF IS SUPPLY, in ticks of demand
+    /// (MARKETS.md § Price resolution, Ben 2026-10-03: "the shelf's share of
+    /// supply is at most what the market's demand would take off it within k
+    /// ticks, min(inventory, k x demand)"). Read by `pricing_supply`
+    /// (market_clearing.hpp) for both callers of the price law.
+    ///
+    /// ZERO (or below) MEANS THE SHELF IS NOT SUPPLY — listings only, the price
+    /// law before the ruling — and it is the default, so a hand-built registry
+    /// keeps the law it was written against.
+    float shelf_supply_ticks = 0.0f;
 };
 
 /// BL-708 — what makes a good a GRID GOOD, as authored data.

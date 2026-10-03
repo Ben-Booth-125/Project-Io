@@ -230,25 +230,40 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 float price_target(float base, float supply, float demand,
                    float price_floor_mult, float price_ceil_mult);
 
-/// BL-1172 — THE SHELF IS SUPPLY (MARKETS.md § Price resolution, Ben
-/// 2026-10-03): the supply the price law reads for good `r` on `m` is the
-/// listings recorded in `supply` PLUS the stock standing on the shelf
-/// (`inventory`). Every caller of `price_target` passes this, never `supply`
-/// alone: clearing's resolution and dispatch's haul sizing
-/// (`dispatch_absorbable`) aim at the same law.
+/// BL-1172 — THE SHELF IS SUPPLY, AS FAR AS IT CAN SELL (MARKETS.md § Price
+/// resolution, Ben 2026-10-03): the supply the price law reads for good `r`
+/// on `m` is the listings recorded in `supply` PLUS the shelf's share,
+/// `min(inventory, k x demand)` with k = `price_band_params::
+/// shelf_supply_ticks` — the stock this market's demand would take off the
+/// shelf within k ticks. A shelf larger than that is a glut, and counting it
+/// whole floors the market's prices (measured: the field fell to 1/1/11 firms
+/// on seeds 0/10/28). k <= 0 is listings only, the law before the ruling.
+/// Every caller of `price_target` passes this, never `supply` alone:
+/// clearing's resolution and dispatch's haul sizing (`dispatch_absorbable`)
+/// aim at the same law.
 ///
-/// WHICH INVENTORY. Read where each caller reads it, and both read the same
-/// moment of the tick: clearing resolves after the tick's draws (upkeep,
-/// processors, construction, the nations' purchases of the previous step are
-/// all off the shelf) and before this clear credits its own listings to the
-/// shelf — so a listing counts once, as a listing, in the tick it is made, and
-/// as shelf from the next tick until it is drawn. Dispatch sizes in the same
-/// tick, after the draws and before that clear. `supply` there is last clear's
-/// listings (it is reset at the top of clear_markets), as it always was.
-/// Negative figures read as zero. Pure.
-inline float pricing_supply(const market_component& m, std::size_t r)
+/// WHICH INVENTORY, WHICH DEMAND. Each is read off `m` as it stands when the
+/// caller asks, and both callers ask at the same point of the tick: after the
+/// tick's draws, before clearing credits this clear's listings to the shelf —
+/// so a listing counts once, as a listing, in the tick it is made, and as
+/// shelf from the next tick until it is drawn.
+///   * clear_markets resolves after its demand phase, so `demand` is THIS
+///     tick's full register: every channel's want, after the no-bid rule (a
+///     draw over the fair-price ceiling never entered it), population,
+///     background, endemic, interbody and standing buy orders.
+///   * dispatch runs before that clear, so `demand` is still the LAST clear's
+///     register (clearing zeroes it only at its own top) — the same D it
+///     already sizes a haul against, paired here as it always was with the
+///     last clear's listings.
+/// Negative figures read as zero. Pure; deterministic.
+inline float pricing_supply(const market_component& m, std::size_t r, float shelf_supply_ticks)
 {
-    return std::max(0.0f, m.supply[r]) + std::max(0.0f, m.inventory[r]);
+    const float listed = std::max(0.0f, m.supply[r]);
+    if (!(shelf_supply_ticks > 0.0f))
+        return listed;
+    const float shelf = std::max(0.0f, m.inventory[r]);
+    const float sells = shelf_supply_ticks * std::max(0.0f, m.demand[r]);
+    return listed + std::min(shelf, sells);
 }
 
 /// Input reservation a corporation needs to keep in ONE goods pool to feed a
