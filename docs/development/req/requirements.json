@@ -6614,14 +6614,14 @@
     },
     {
      "id": "R5",
-     "status": "failed",
+     "status": "complete",
      "verification": [
       "headless: gen_step_costs --finish, seeds 0 and 28, Release",
       "live: Ben's walk, round 6"
      ],
      "requirement": "Round 6's whole tail lands within 35 s of the round's arrival on seeds 0 and 28 in Release (shared with BL-1117, settle tick one).",
      "notes": "",
-     "result_metric": "QUIET reading 2026-09-25 22:00 (main 11c71365, Release, nothing else running; gen_step_costs --finish 0 28 twice, runs agree within 1%). From round 6's arrival = the Industrialisation span + the tail build (borders, roads, companies, finishing, the old-road stamp) + the finish (search + settle). Seed 0: 2.6 + ~10.2 + 17.3 + 17.9 = ~48 s -- MISSES 35 s by ~13 s. Seed 28: 0.4 + ~6.5 + 12.0 + 11.9 = ~31 s -- inside. Roads are no longer the cost (seed 0 roads 5.3 s, old-road stamp 1.4 s; settle tick 1 2.4 s, was 38.5 s). What remains: the landscape search (13 evaluations, 17 s) and the corporations' strategy step (1.3-1.7 s on every settle tick). Re-read after BL-1130 (centres consolidate) thins the charter budget's 8,828 centres; the remaining levers are design calls."
+     "result_metric": "QUIET RE-READ 2026-10-03 (main 3ebddd7d, gen_step_costs --finish, nothing else running): round 6 tail = post-era + search + settle -- seed 0: 4.6 + 2.6 + 3.2 = 10.4 s; seed 28: 2.1 + 2.1 + 2.5 = 6.7 s. Inside the 35 s target (it read ~48 s on seed 0 earlier this sprint, before two-thread search, the roads speed-up and the thinned world). Earlier reading: QUIET reading 2026-09-25 22:00 (main 11c71365, Release, nothing else running; gen_step_costs --finish 0 28 twice, runs agree within 1%). From round 6's arrival = the Industrialisation span + the tail build (borders, roads, companies, finishing, the old-road stamp) + the finish (search + settle). Seed 0: 2.6 + ~10.2 + 17.3 + 17.9 = ~48 s -- MISSES 35 s by ~13 s. Seed 28: 0.4 + ~6.5 + 12.0 + 11.9 = ~31 s -- inside. Roads are no longer the cost (seed 0 roads 5.3 s, old-road stamp 1.4 s; settle tick 1 2.4 s, was 38.5 s). What remains: the landscape search (13 evaluations, 17 s) and the corporations' strategy step (1.3-1.7 s on every settle tick). Re-read after BL-1130 (centres consolidate) thins the charter budget's 8,828 centres; the remaining levers are design calls."
     },
     {
      "id": "R6",
