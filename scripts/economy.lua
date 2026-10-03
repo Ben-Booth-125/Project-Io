@@ -1392,12 +1392,12 @@ economy = {
         reservation_mult = 2.0,  -- BL-654/BL-1172: a goods draw declines to buy above this (a fair price; see above)
         -- BL-1172 (Ben, 2026-10-03, MARKETS.md § Price resolution): the shelf
         -- counts as supply only as far as it can sell — min(inventory, k x
-        -- demand), k in econ ticks (one tick is a quarter, so 4 is a year of
-        -- this market's demand). FIRST CUT, BEN TO SET: 4 is provisional; the
-        -- k sweep (1/2/4/8/16 on
-        -- seeds 0/10/28, firm_attrition_trace + demand_census + haulage) is
-        -- the table he picks from. 0 = listings only (the law before).
-        shelf_supply_ticks = 4,
+        -- demand), k in econ ticks (one tick is a quarter). k = 0 UNTIL SHELF
+        -- SPOILAGE (BL-1179) LANDS (Ben, 2026-10-03): every k above 0 left fewer
+        -- firms than listings-only supply, because a glut the market cannot
+        -- shed floors prices; the k table (seeds 0/10/28) is in MARKETS.md.
+        -- 0 = listings only. The k > 0 path stays built and tested.
+        shelf_supply_ticks = 0,
     },
 
     -- ===================================================================
