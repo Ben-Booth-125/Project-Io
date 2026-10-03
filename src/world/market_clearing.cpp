@@ -1398,7 +1398,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // BL-1172: supply here is the listings PLUS the shelf's share, at most k
     // ticks of this tick's demand (`pricing_supply`), read now — after the
     // tick's draws and this tick's demand phase, before the auto-surplus loop
-    // below credits this clear's listings to the shelf.
+    // below credits this clear's listings to the shelf. (The shipped k is 0 —
+    // listings only — until shelf spoilage, BL-1179.)
     std::unordered_map<entity_id, std::array<float, resource_count>> ref_price;
     for (const auto& [mid, mc] : w.markets)
     {

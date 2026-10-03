@@ -882,7 +882,8 @@ float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id 
         return 0.0f;
     // BL-1172: the SAME supply the price law resolves on — listings plus the
     // shelf's share, k ticks of demand at most (`pricing_supply`,
-    // market_clearing.hpp; here the last clear's demand, as D below is).
+    // market_clearing.hpp; here the last clear's demand, as D below is). The
+    // shipped k is 0 — listings only — until shelf spoilage, BL-1179.
     const float S = pricing_supply(dm, r, reg.price_band().shelf_supply_ticks);
     const float D = dm.demand[r];
     if (S <= 0.0f)

@@ -229,9 +229,9 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
 7. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
    explicit buy book (`max_price`, optional `preferred_seller`).
 8. **Reference prices** — computed once from the accumulated demand and the supply the price law
-   reads — this tick's listings plus the stock standing on the shelf after the tick's draws
-   (§ Price resolution, below) — so every
-   sale this tick uses the same price.
+   reads — this tick's listings plus the shelf's share, at most k ticks of demand off the stock
+   standing after the tick's draws (k = 0 until shelf spoilage, BL-1179; § Price resolution,
+   below) — so every sale this tick uses the same price.
 9. **Auto clearing** — auto-surplus sells at the reference price (**perfect counterparty**: the
    sell side is unconditional — see § Real market inventory); auto-demand is billed at the
    **posted price** — the price standing on the shelf when it was drawn in step 6, the one the
@@ -907,9 +907,11 @@ target = base_price × √(demand / supply)     — damped elasticity
 price  = prior + 0.5 × (target − prior)       — EMA smoothing
 ```
 
-**The shelf is supply (Ben, 2026-10-03):** `supply` is this tick's listings plus the stock
-standing on the market's shelf (`inventory`). A market fed only by deliveries is not a market with
-nothing to sell, so its own buyers cannot drive its price to the ceiling against a full shelf.
+**The shelf is supply (Ben, 2026-10-03):** `supply` is this tick's listings plus the shelf's share
+of the stock standing on the market's shelf (`inventory`) — at most k ticks of demand, and k = 0
+until shelf spoilage (BL-1179), below. A market fed only by deliveries is not a market with
+nothing to sell, so at k > 0 its own buyers cannot drive its price to the ceiling against a full
+shelf.
 **The shelf counts only as far as it can sell (Ben, 2026-10-03):** the shelf's share of `supply` is
 at most what the market's demand would take off it within k ticks, `min(inventory, k × demand)`.
 Counted whole, a market that buys every surplus as the buyer of last resort grows a glut that
