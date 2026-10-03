@@ -18,8 +18,13 @@
 //   W1  every background firm's starting_capital AND balance equal
 //       0.25 x sum(pool qty x base) over its pools (relative tolerance 1e-4).
 //   W2  the field is really funded: at least one background firm opens > 0.
-//   W3  the player's corporation is not a background firm, and opens on its
-//       own capital — balance == starting_capital, no working capital on top.
+//   W3  SPECIALISTS KEEP base_capital: every non-background corporation (the
+//       seat among them) opens on `compute_capital`'s band — base_capital x
+//       [1 - variance, (1 + variance) x 1.15], read from corporation_params'
+//       own defaults — with balance == starting_capital, and NOT at the
+//       working-capital figure its own stock would price to. A rule that
+//       handed specialists working capital (instead of, or on top of,
+//       base_capital) fails one of the three.
 //
 // Build: bash tools/verify/build_lua_harness.sh working_capital --run
 // Args:  --seeds a,b,c (default 0)   --full (prehistory on; default off, fast)
@@ -27,6 +32,7 @@
 #include "scripting/lua_state.hpp"
 #include "harness_params.hpp"
 #include "world/components.hpp"
+#include "world/corporation_generation.hpp"
 #include "world/world.hpp"
 
 #include <cmath>
@@ -117,18 +123,46 @@ void run_seed(lua_state& lua, uint32_t seed, bool full)
     check(wrong == 0, "W1 every background firm opens with 0.25 x its stock at base, balance and starting_capital alike");
     check(funded > 0, "W2 the field is funded: background firms open above zero");
 
-    const auto pit = w.corporations.find(w.player_entity);
-    check(pit != w.corporations.end(), "W3 the start seats a player corporation");
-    if (pit != w.corporations.end())
+    // W3 — specialists keep base_capital.
+    const corporation_params cp{};
+    const double lo = cp.base_capital * (1.0 - cp.wealth_variance);
+    const double hi = cp.base_capital * (1.0 + cp.wealth_variance) * 1.15;
+    int specialists = 0, out_of_band = 0, drifted = 0, priced_as_wc = 0, stocked = 0;
+    for (const auto& [cid, cc] : w.corporations)
     {
-        const corporation_component& pc = pit->second;
-        std::printf("  player corp %u: starting %.1f balance %.1f background %d\n",
-                    static_cast<unsigned>(w.player_entity), pc.starting_capital, pc.balance,
-                    pc.is_background ? 1 : 0);
-        check(!pc.is_background, "W3 the player's corporation is not a background firm, so no working capital");
-        check(std::fabs(pc.balance - pc.starting_capital) <= 1e-3f,
-              "W3 ... and opens on its own capital alone, nothing minted on top");
+        if (cc.is_background)
+            continue;
+        ++specialists;
+        if (cc.starting_capital < lo - 1e-3 || cc.starting_capital > hi + 1e-3)
+            ++out_of_band;
+        if (std::fabs(cc.balance - cc.starting_capital) > 1e-3f)
+            ++drifted;
+        double value = 0.0;
+        for (const auto& [key, pool] : w.corp_market_pools)
+        {
+            if (key.first != cid)
+                continue;
+            if (const market_component* m = pricing_market(w, key.second))
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (pool.quantities[r] > 0.0f && m->base_price[r] > 0.0f)
+                        value += static_cast<double>(pool.quantities[r]) * m->base_price[r];
+        }
+        if (value > 0.0)
+        {
+            ++stocked;
+            if (std::fabs(cc.starting_capital - value * k_fraction) <= std::max(1e-3, value * k_fraction * 1e-4))
+                ++priced_as_wc;
+        }
     }
+    std::printf("  specialists %d (stocked %d); base_capital band [%.0f, %.0f]; seat %u\n",
+                specialists, stocked, lo, hi, static_cast<unsigned>(w.player_entity));
+    check(specialists > 0 && stocked > 0, "W3 the start charters specialists holding stock (the row is not vacuous)");
+    check(out_of_band == 0, "W3 every specialist opens inside base_capital's band");
+    check(drifted == 0, "W3 ... with balance == starting_capital: nothing minted on top");
+    check(priced_as_wc == 0, "W3 ... and none at the working-capital figure its stock would price to");
+    const auto pit = w.corporations.find(w.player_entity);
+    check(pit != w.corporations.end() && !pit->second.is_background,
+          "W3 the seat is a specialist, so the rows above cover it");
 }
 
 } // namespace
