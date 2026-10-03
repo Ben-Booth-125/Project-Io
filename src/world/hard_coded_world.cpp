@@ -2605,7 +2605,9 @@ void run_tail(generation_cursor& c)
         for (const region& p : kepler_settlement.regions)
             road_nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
         enter_step(c, 15); // BL-1072: a step of its own, 4-7 s in Release
-        stamp_history_roads(w, kepler, road_nodes, kepler_corridors, progress);
+        stamp_history_roads(w, kepler, road_nodes, kepler_corridors, progress,
+                            report != nullptr ? &report->history_roads : nullptr,
+                            report != nullptr ? &report->history_road_links : nullptr);
     }
 
     // SEA LANES, STAMPED FROM THE LANE RECORD (BL-1098; LOGISTICS.md § 4b). Every

@@ -584,6 +584,9 @@ struct history_lapse
     /// own `road_promoted` events — see `lapse_road_seg`. Empty on the Culture
     /// round, which has nothing behind it and promotes nothing.
     std::vector<lapse_road_seg> road_segs;
+    /// Corridors the bake dropped because their straight line bridges more than
+    /// `kMaxCrossingTiles` water tiles (the bridge cap; Ben, 2026-10-03).
+    int road_segs_over_cap = 0;
 
     /// BL-1134 (roads carried across rounds; Ben, 2026-09-25, walking round 6:
     /// "we lost every road between Exploration and Industrialisation";

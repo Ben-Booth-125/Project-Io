@@ -1978,6 +1978,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             keys[std::to_string(p.first) + "-" + std::to_string(p.second)] = true;
         out["count"]   = static_cast<int>(drawn.size());
         out["carried"] = static_cast<int>(h.road_carry.size());
+        out["over_cap"] = h.road_segs_over_cap; // the bridge cap: corridors not drawn
         out["keys"]    = keys;
         return out;
     });

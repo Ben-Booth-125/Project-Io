@@ -99,6 +99,22 @@ inline constexpr double kDetourRatio = 2.0;
 /// village, the pre-BL-1119 behaviour.
 inline constexpr long long kVillageSpurFloorHeads = 40000;
 
+/// THE BRIDGE CAP (Ben, 2026-10-03, playing the build: "bridges can cross a further
+/// distance than I expected -- let's put a cap on that"; he ruled two). The longest
+/// contiguous run of water tiles any road may cross: a strait of at most this many
+/// SHORE cells (`coast` or lake, never open `ocean`), LOGISTICS.md § 4. Every writer
+/// of `road_level` honours it -- the national lattice, tree, spurs and border links
+/// (stamp_edge), the ancient corridors (stamp_history_roads, through stamp_edge), and
+/// the market joins, pulls and trunk (lay_market_roads' walk) -- and the wizard
+/// lapse never draws a road corridor across a longer run. Was three (Sprint B2 /
+/// BL-516), which let a bridge span three open tiles of channel.
+inline constexpr int kMaxCrossingTiles = 2;
+
+/// The longest contiguous run of WATER tiles (any kind) along @p path, in tiles.
+/// The one measure the cap is read against; exposed so a harness asks it of every
+/// laid route from outside.
+int longest_water_run(const world& w, const std::vector<entity_id>& path);
+
 /// A village's size for the spur floor, in heads — see kVillageSpurFloorHeads.
 long long village_spur_size(const world& w, entity_id centre);
 
@@ -128,6 +144,11 @@ struct road_generation_stats
     int majors               = 0; ///< centres at scale >= 3 (City+) on the body
     int links_two_major      = 0; ///< backbone links laid (tree or kept loop) between two City+
     int links_highway        = 0; ///< of them, laid at the Highway tier (percentile-gated)
+    /// Routes refused because a water run on them is longer than kMaxCrossingTiles (the
+    /// bridge cap): town-pair candidates dropped, spur candidates and border links refused.
+    int candidates_long_crossing = 0;
+    int spurs_long_crossing      = 0;
+    int border_long_crossing     = 0;
     /// The loading bar's plan (BL-1072), in the units `report_sub` counts: one per
     /// backbone town PAIR, one per spurring village, kBorderUnitsPerNation per nation.
     long long units_backbone = 0;
@@ -165,6 +186,24 @@ struct history_road_stats
     int       laid        = 0; ///< of them, stamped (reachable, no open-sea crossing)
     int       destinations = 0; ///< distinct tiles the corridors were priced TOWARD
     long long floods      = 0; ///< whole-body flood fields built by the call
+    /// Of the corridors not laid, refused because a water run on the route is longer
+    /// than kMaxCrossingTiles (the bridge cap) -- the rest crossed open ocean or were
+    /// unreachable.
+    int       refused_long_crossing = 0;
+};
+
+/// Every corridor one `stamp_history_roads` call LAID, whole (the bridge-cap row reads
+/// each route's water runs from outside). WRITE-ONLY, like the stats.
+struct history_road_trace
+{
+    struct route
+    {
+        entity_id from = null_entity; ///< the tile the corridor was priced from
+        entity_id to   = null_entity; ///< the tile it was priced toward (the busier end)
+        std::uint8_t tier = 0;
+        std::vector<entity_id> path;  ///< the whole route laid, water tiles included
+    };
+    std::vector<route> routes;
 };
 
 /// BL-1119 round 3: every route one `generate_roads` call LAID, whole, for a harness to
@@ -382,7 +421,8 @@ void stamp_history_roads(world& w, entity_id body,
                          const std::vector<history_road_node>& nodes,
                          const std::vector<history_corridor>&  corridors,
                          generation_progress* progress = nullptr, // BL-1072: per corridor
-                         history_road_stats* stats = nullptr);    // BL-1119 round 4, write-only
+                         history_road_stats* stats = nullptr,     // BL-1119 round 4, write-only
+                         history_road_trace* trace = nullptr);    // the bridge cap's row, write-only
 
 // ---------------------------------------------------------------------------
 // Sea lanes, STAMPED FROM the lane record (BL-1098)

@@ -218,6 +218,39 @@ bool lapse_corridor_over_water(const std::vector<uint8_t>& band, int gw, int gh,
     return total > 0 && water * 2 > total;
 }
 
+/// THE BRIDGE CAP ON THE LAPSE'S ROADS (Ben, 2026-10-03: "bridges can cross a
+/// further distance than I expected -- let's put a cap on that"; two tiles). A
+/// lapse road is a corridor drawn STRAIGHT from anchor to anchor, with no tile
+/// chain, so nothing upstream stops its line crossing a bay or a strait the
+/// stamped road (which caps every crossing at `kMaxCrossingTiles`) would never
+/// bridge. This walks the line in tile units (a tile spans [col, col + 1)) and
+/// returns the longest run of consecutive WATER tiles it passes over, in
+/// distinct tiles; the bake drops a corridor whose run exceeds the cap rather
+/// than drawing a bridge the world does not carry.
+int lapse_line_water_run(const std::vector<uint8_t>& band, int gw, int gh,
+                         float c0, float r0, float c1, float r1)
+{
+    if (band.empty() || gw <= 0 || gh <= 0) return 0;
+    const float dc = c1 - c0, dr = r1 - r0;
+    const int steps = std::max(1, static_cast<int>(std::ceil(std::sqrt(dc * dc + dr * dr) * 20.0f)));
+    int run = 0, longest = 0;
+    long long last = -1;
+    for (int i = 0; i <= steps; ++i)
+    {
+        const float t = static_cast<float>(i) / static_cast<float>(steps);
+        const int row = static_cast<int>(std::floor(r0 + dr * t));
+        int col = static_cast<int>(std::floor(c0 + dc * t)) % gw;
+        if (col < 0) col += gw;
+        if (row < 0 || row >= gh) continue;
+        const long long cell = static_cast<long long>(row) * gw + col;
+        if (cell == last) continue;
+        last = cell;
+        if (band[static_cast<std::size_t>(cell)] == 0xFFu) longest = std::max(longest, ++run);
+        else run = 0;
+    }
+    return longest;
+}
+
 /// Is the point (@p c, @p r), in TILE units (a tile spans [col, col + 1)), on
 /// a sea tile of @p sea? Columns fold back into range (a lane's path is
 /// unwrapped along its walk); rows off the map are not sea.
@@ -1237,6 +1270,22 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
                                      ix, iy))
                 seg.bridges.push_back({ix, iy});
         }
+    }
+    // The bridge cap (Ben, 2026-10-03; `lapse_line_water_run` above): a corridor
+    // whose straight line would bridge more than `kMaxCrossingTiles` of water is
+    // not drawn. SKIPPED, not re-routed -- the corridor has only its two anchors,
+    // and the stamped world road it stands for went round by land or was never
+    // laid. Geometry only: the hand-over (`lapse_roads_at_close`) reads the carry
+    // and the events, so a skipped corridor still carries to the next round.
+    {
+        const std::size_t before = h.road_segs.size();
+        h.road_segs.erase(std::remove_if(h.road_segs.begin(), h.road_segs.end(),
+                                         [&](const lapse_road_seg& s) {
+                                             return lapse_line_water_run(band, gw, gh, s.c0, s.r0,
+                                                                         s.c1, s.r1) > kMaxCrossingTiles;
+                                         }),
+                          h.road_segs.end());
+        h.road_segs_over_cap = static_cast<int>(before - h.road_segs.size());
     }
 
     // --- Amicable cross-border trade corridors (BL-925), baked once --------
