@@ -898,7 +898,7 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
     {
         std::vector<budget_claim> scratch;
         const std::vector<space_purchase> intents = derive_space_programme_claims(
-            w, w.nation_budgets, reg.space_programme(), scratch);
+            w, w.nation_budgets, reg.space_programme(), reg.price_band().reservation_mult, scratch);
         for (const space_purchase& sp : intents)
             out.state_pl[static_cast<std::size_t>(sp.resource)] +=
                 static_cast<double>(sp.quantity);
@@ -910,7 +910,7 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
     {
         std::vector<budget_claim> scratch;
         const std::vector<network_purchase> intents = derive_network_upkeep_claims(
-            w, w.nation_budgets, reg.network_upkeep(), scratch);
+            w, w.nation_budgets, reg.network_upkeep(), reg.price_band().reservation_mult, scratch);
         for (const network_purchase& np : intents)
             out.infra_pl[static_cast<std::size_t>(np.resource)] +=
                 static_cast<double>(np.quantity);

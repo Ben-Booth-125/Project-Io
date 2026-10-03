@@ -1039,6 +1039,44 @@ struct market_component
     std::array<float, resource_count> inventory = {};
 };
 
+/// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands
+/// on the shelf while the tick's draws are made — the last clearing's price,
+/// or the base price on a market that has never resolved one. Every shelf draw
+/// is DECIDED against it and BILLED at it (FINANCE.md § Standing-force upkeep,
+/// Ben 2026-10-03: "A draw pays the posted price"). `market_component::price`
+/// is written only at the end of `clear_markets`, so the price a draw saw is
+/// the price clearing bills, whichever pass drew.
+///
+/// Lives beside `market_component` because every buyer reads it: the economy
+/// step's draws, `clear_markets`, the nations' purchases and the scorer's
+/// input check (corp_ai.cpp) — one rule, one definition.
+inline float posted_price(const market_component& m, std::size_t r)
+{
+    return (m.price[r] > 0.0f) ? m.price[r] : m.base_price[r];
+}
+
+/// BL-1172 — THE FAIR-PRICE CEILING, one rule for every goods draw (FINANCE.md
+/// § Standing-force upkeep, Ben 2026-10-03: "unit and building upkeep, processor
+/// inputs and construction alike buy only at or under it, and a draw over it
+/// does not bid either"; nations' network upkeep and space programme too).
+/// True when a draw may buy good `r` off `m`'s shelf — and, where it is false,
+/// the draw registers no want for it either: it is priced (`base > 0` — unpriced is
+/// unbuyable, the ceiling being 0) and its posted price is at or under
+/// `reservation_mult x base`. `reservation_mult <= 0` is the authored OFF
+/// switch, and OFF means what each draw did before the ceiling existed:
+/// upkeep (`off_buys = false`) never buys; processor inputs, construction and
+/// a nation's network upkeep and space programme (`off_buys = true`) buy
+/// whatever the shelf holds.
+inline bool shelf_admits(const market_component& m, std::size_t r, float reservation_mult,
+                         bool off_buys)
+{
+    if (reservation_mult <= 0.0f)
+        return off_buys;
+    const float base = m.base_price[r];
+    return base > 0.0f && posted_price(m, r) <= base * reservation_mult;
+}
+
+
 /// BL-1125 (markets can die) — a market folded away at generation, kept as a
 /// ROUTING record only (MARKETS.md § Market centres and seeding: "a folded
 /// market's catchment passes to the market that absorbs it"). A tile routes to
@@ -1888,11 +1926,13 @@ struct exchange_record
     resource_type resource   = resource_type::iron_ore;
     /// How much left the seller's pool (or reached the buyer's).
     float         quantity   = 0.0f;
-    /// The price CLEARING RESOLVED, never the floor the order carried. An order
-    /// is honoured *at* clearing, so what a seller asked and what they got are
-    /// different numbers and only one of them is the trade: the three auto paths
-    /// transact at the resolved reference price, and a matched trade transacts at
-    /// the price its match executed on.
+    /// The price the exchange was MADE at, never the floor or cap an order
+    /// carried. An order is honoured *at* clearing, so what a seller asked and
+    /// what they got are different numbers and only one of them is the trade:
+    /// the two auto SALE paths transact at the resolved reference price; the
+    /// auto-demand path (a shelf draw) at the POSTED price it was decided and
+    /// billed at (BL-1172, `posted_price`); and a matched trade at the price its
+    /// match executed on.
     float         unit_price = 0.0f;
     /// The two counterparties. Either may be a background firm — and either may
     /// be `null_entity`, which means THE MARKET ITSELF rather than "unknown":

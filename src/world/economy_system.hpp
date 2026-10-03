@@ -147,36 +147,6 @@ struct agency_event
     int       value      = 0;           ///< workforce_set: new target; road_placed: tier; order_*: resource id.
 };
 
-/// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands
-/// on the shelf while the tick's draws are made — the last clearing's price,
-/// or the base price on a market that has never resolved one. Every shelf draw
-/// is DECIDED against it and BILLED at it (FINANCE.md § Standing-force upkeep,
-/// Ben 2026-10-03: "A draw pays the posted price"). `market_component::price`
-/// is written only at the end of `clear_markets`, so the price a draw saw is
-/// the price clearing bills, whichever pass drew.
-inline float posted_price(const market_component& m, std::size_t r)
-{
-    return (m.price[r] > 0.0f) ? m.price[r] : m.base_price[r];
-}
-
-/// BL-1172 — THE FAIR-PRICE CEILING, one rule for every goods draw (FINANCE.md
-/// § Standing-force upkeep, Ben 2026-10-03: "unit and building upkeep, processor
-/// inputs and construction alike buy only at or under it"). True when a draw may
-/// buy good `r` off `m`'s shelf: it is priced (`base > 0` — unpriced is
-/// unbuyable, the ceiling being 0) and its posted price is at or under
-/// `reservation_mult x base`. `reservation_mult <= 0` is the authored OFF
-/// switch, and OFF means what each draw did before the ceiling existed:
-/// upkeep (`off_buys = false`) never buys; processor inputs and construction
-/// (`off_buys = true`) buy whatever the shelf holds.
-inline bool shelf_admits(const market_component& m, std::size_t r, float reservation_mult,
-                         bool off_buys)
-{
-    if (reservation_mult <= 0.0f)
-        return off_buys;
-    const float base = m.base_price[r];
-    return base > 0.0f && posted_price(m, r) <= base * reservation_mult;
-}
-
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
 /// expenditure downstream (market_clearing.hpp / budget_system.hpp).

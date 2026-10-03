@@ -54,6 +54,7 @@ struct network_size
 std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
                                                            const std::map<entity_id, nation_budget>& budgets,
                                                            const network_upkeep_params& p,
+                                                           float reservation_mult,
                                                            std::vector<budget_claim>& claims)
 {
     std::vector<network_purchase> out;
@@ -234,6 +235,11 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
                         const market_component& mc = w.markets.at(mid);
                         if (!(mc.base_price[ri] > 0.0f))
                             continue; // untradeable there: no price basis
+                        // BL-1172: the same fair-price ceiling every goods
+                        // draw obeys (Ben, 2026-10-03) — a shelf posted over
+                        // it is not on offer to the state either.
+                        if (!shelf_admits(mc, ri, reservation_mult, /*off_buys=*/true))
+                            continue;
                         float avail = mc.inventory[ri];
                         const auto mrit = mkt_reserved.find(std::make_pair(mid, ri));
                         if (mrit != mkt_reserved.end())
@@ -249,7 +255,7 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
                     continue; // no pool AND no inventory anywhere: nothing to buy
 
                 const market_component& mc = w.markets.at(best_mkt);
-                const float unit = mc.price[ri] > 0.0f ? mc.price[ri] : mc.base_price[ri];
+                const float unit = posted_price(mc, ri); // BL-1172: the posted price
                 if (!std::isfinite(unit) || !(unit > 0.0f))
                     continue;
 
