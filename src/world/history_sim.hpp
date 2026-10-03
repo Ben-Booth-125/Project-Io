@@ -617,6 +617,41 @@ struct history_sim_params
     /// is not starved; a quarter is paid into the works.
     int     industry_points_treasury_share_q = 250;
 
+    /// BL-1169 -- A CROWDED HEARTLAND YIELDS LESS (INDUSTRIALISATION.md sec
+    /// Industry spreads beyond its heartland; Ben, 2026-10-03). Each region a
+    /// treasury conversion lands on converts its share at K / (K + crowding),
+    /// crowding being the points already standing on it per thousand heads its
+    /// works employ (`industry_points_crowding_q`), so a heartland's lead
+    /// stops compounding and the next-best ground catches up. The whole
+    /// treasury units withheld STAY IN THE PURSE (the debit falls by them;
+    /// `history_sim_state::treasury_kept_by_crowding`). K is the crowding at
+    /// which a region converts half its share. Points exist only from
+    /// `industry_open_year`, so the brake is inert before it.
+    ///
+    /// 0 = OFF, the identity (no factor applied; every output bit for bit the
+    /// unbraked run). Domain 0..`industry_points_crowding_k_max` (10^9);
+    /// outside it the run converts nothing and says so
+    /// (`industry_points_params_valid`) -- rejected, never clamped.
+    ///
+    /// UNSET, read on a 16-seed ladder before it is pinned. Measured
+    /// 2026-10-03 at K off: receiving regions' crowding at 1800 / 1900 / 1955
+    /// runs median 279 / 411 / 499, p90 1,120 / 1,375 / 1,621, max ~25k-62k,
+    /// while the treasury's points land at a share-weighted median of
+    /// 878 / 1,159 / 1,243 and p90 15,900 / 19,913 / 8,031 -- the crowded
+    /// regions take the bulk of the conversion.
+    ///
+    /// THE LADDER (16 curated seeds, 2026-10-03; off / 16000 / 4000 / 1000):
+    /// treasury points over the library 710M / 647M / 561M / 430M (scale
+    /// credit flat at 266M); median lead-nation share of points 0.106 /
+    /// 0.099 / 0.087 / 0.077; median top-landmass share 0.839 / 0.854 /
+    /// 0.850 / 0.838 (geography, which the brake does not move); far rival
+    /// at >= 25% of the leader 14 / 14 / 14 / 14 of 16; Industrialisation
+    /// battles 8073 / 8063 / 8068 / 8048, conquests 6751 / 6740 / 6688 /
+    /// 6657; pre-1660 spans identical at every rung; urban 25.46-25.48%;
+    /// markets 429-432; C15 16/16 at every rung. Off is bit-identical to the
+    /// unbraked run.
+    int64_t industry_points_crowding_k = 0;
+
     /// BL-1099 -- WORKS CHARTERED, A RECORD-ONLY NOTE (INDUSTRIALISATION.md sec
     /// Beat 1 "Works chartered"; Ben, 2026-09-24, R15; STARTUP.md sec Round 6).
     /// After each round's accrual, a region with centres whose `industry_points`
@@ -2740,6 +2775,8 @@ struct exploration_upkeep_spend
     int64_t industry_points_paid_in  = 0;
     int64_t industry_treasury_debited = 0;
     int64_t industry_points_refused  = 0;
+    /// BL-1169: treasury units the crowding brake kept in the purse this call.
+    int64_t industry_treasury_kept_by_crowding = 0;
 };
 
 struct history_sim_state;       // defined further down
@@ -3629,6 +3666,35 @@ inline constexpr int64_t industry_points_apportion_heads_max = 1LL << 32;
 bool industry_points_apportion_by_scale(const std::vector<region>& regions, int holder, int64_t credit,
                                         std::vector<std::pair<int, int64_t>>& out,
                                         const works_registry* works);
+
+/// BL-1169: the largest crowding `industry_points_crowding_k` may be set to.
+inline constexpr int64_t industry_points_crowding_k_max = 1000000000LL;
+/// BL-1169: where `industry_points_crowding_q` saturates. EXACT, not a clamp:
+/// at or past it the brake's factor K x 10^6 / (K + crowding) is 0 for every
+/// K in domain (K x 10^6 <= 10^15 < 2^50), as it is at the true value.
+inline constexpr int64_t industry_points_crowding_saturation_q = 1LL << 50;
+
+/// BL-1169 (Ben, 2026-10-03; INDUSTRIALISATION.md sec Industry spreads beyond
+/// its heartland): HOW CROWDED a region's works are -- the industry points
+/// standing on it per THOUSAND heads its works employ (min(urban heads,
+/// `works_registry::employed_heads_mask` of `works_built`)). The works the
+/// stock stands for, over the labour that works them: capital per worker.
+/// -1 when the region employs nobody or its stock is out of domain.
+int64_t industry_points_crowding_q(const region& r, const works_registry* works);
+
+/// BL-1169: THE BRAKE on one treasury conversion. Each row of @p spread (the
+/// apportion's output) is rescaled to its share x K / (K + crowding), in
+/// parts per million, exact integer. The points the brake withholds are
+/// returned to the caller in WHOLE treasury units (@p points_per_unit points
+/// each), which stay in the purse; the sub-unit residue converts on the least
+/// crowded receiver (ties to the lower row), so no point is deleted and
+/// sum(spread) + units x points_per_unit equals the credit apportioned.
+/// Returns the units kept, or -1 (a row out of domain, or @p k outside
+/// 1..`industry_points_crowding_k_max`): the caller refuses the conversion.
+int64_t industry_points_crowd_brake(const std::vector<region>& regions,
+                                    std::vector<std::pair<int, int64_t>>& spread,
+                                    int64_t k, int64_t points_per_unit,
+                                    const works_registry* works);
 
 /// What one round's scale accrual did.
 struct industry_points_round
@@ -4778,6 +4844,11 @@ struct history_sim_state
     /// points above divided by `industry_points_per_treasury_unit`): the
     /// observable for how hard paying in draws on the round's other spend.
     int64_t treasury_spent_on_industry    = 0;
+    /// BL-1169: TREASURY UNITS the crowding brake left in capitals' purses
+    /// (`history_sim_params::industry_points_crowding_k`): the round's share
+    /// a crowded receiver did not convert, kept, never deleted. Report-only,
+    /// in no digest; 0 with the brake off.
+    int64_t treasury_kept_by_crowding     = 0;
     /// Credits REFUSED rather than truncated: a region whose stock would pass
     /// `industry_points_ceiling`, or whose urban headcount left the accrual's
     /// stated domain. Must be 0; nothing moves on a refusal.
