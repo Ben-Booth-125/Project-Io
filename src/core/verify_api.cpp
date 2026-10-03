@@ -945,6 +945,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("set_border_band", [this](bool on) {
         m_ui.dbg_hide_border_band = !on;
     });
+    // A multiplier on the Planetary road / sea-lane stroke widths, so a capture
+    // script can frame a width pick at several widths in one run (2026-10-03).
+    // Rejected (returns false, nothing changed) outside (0, 4] or non-finite.
+    v.set_function("set_route_width_scale", [this](double s) {
+        if (!std::isfinite(s) || s <= 0.0 || s > 4.0) return false;
+        m_ui.dbg_route_width_scale = static_cast<float>(s);
+        return true;
+    });
     // Drive the Resource/Market/Scarcity lens-local selector headlessly so a golden
     // can pick the displayed good.
     v.set_function("set_lens_resource", [this](const std::string& name) {

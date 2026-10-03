@@ -246,6 +246,17 @@ struct lapse_lane_seg
     float c0 = 0.0f, r0 = 0.0f; ///< Region A's anchor tile centre.
     float c1 = 0.0f, r1 = 0.0f; ///< Region B's anchor tile centre.
     int32_t year_open = 0;      ///< The year the leg's uses crossed the lane tier.
+
+    /// THE LANE'S SEA PATH (Ben, 2026-10-03: "sea lanes should always go over
+    /// ocean, never over ground"): the tile centres of the water-only walk the
+    /// campaign stamp lays (`sea_lane_port` + `sea_lane_walk`, LOGISTICS.md
+    /// sec 4b), port to port, in TILE units, columns unwrapped along the walk
+    /// so a seam-crossing lane is one continuous run (it may sit outside
+    /// [0, grid_w); the draw strokes a shifted copy). The lane is DRAWN along
+    /// this chain, smoothed, never between the anchors. Empty when the stamp
+    /// would lay nothing (no port in reach, one port, no water joining them):
+    /// such a lane draws nothing, as it lays nothing on the campaign map.
+    std::vector<float> path_c, path_r;
 };
 
 /// ONE KIN ARROW (BL-1092; Ben, 2026-09-24, rulings R11; COLONISATION.md sec

@@ -336,6 +336,19 @@ ImU32 fog_dim(ImU32 c, float vision)
     return (dim & ~(0xFFu << IM_COL32_A_SHIFT)) | (alpha << IM_COL32_A_SHIFT);
 }
 
+/// ROUTE STROKE WIDTHS, one named constant per tier (RENDERING.md § Roads and sea
+/// lanes; Ben, 2026-10-03: "make them thinner"). Each is the stroke width as a fraction
+/// of the drawn hex circumradius, which is floored at 10 px before it is applied so
+/// the tiers stay apart on the whole-grid view. Half the widths the straight-segment
+/// roads used (0.12 / 0.18 / 0.24); the 1 : 1.5 : 2 ladder between the tiers is kept,
+/// so Track, Road and Highway still read as three weights.
+constexpr float k_road_width_track   = 0.06f;
+constexpr float k_road_width_road    = 0.09f;
+constexpr float k_road_width_highway = 0.12f;
+/// A sea lane's one rung (LOGISTICS.md § 4b): a soft band a little under a Highway,
+/// told apart from the road ladder by its sea blue rather than by weight.
+constexpr float k_lane_width         = 0.10f;
+
 /// Building silhouette radius as a fraction of the hex circumradius. The silhouette
 /// scales to the hex rather than being a small pin on it; the value leaves the
 /// lower-right corner free for the owner emblem tag and keeps the widest glyph (the
@@ -3237,43 +3250,57 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
-            // Road network (BL-146/BL-172 generated + BL-147/BL-172 player-placed). Always-on
-            // under every lens (roads are terrain, not an overlay). BL-172 span/symmetry fix:
-            // each roaded tile draws its OWN half of every shared road edge — from its centre to
-            // the MIDPOINT of the centre-to-neighbour line — toward each roaded, survey-revealed
-            // cardinal neighbour (the 4 directions the intra-body A* actually traverses; ocean is
-            // never roaded, so "land" is implicit). Two roaded tiles' halves meet exactly at the
-            // shared-edge midpoint = one continuous span, identical whichever tile is "from", and
-            // the survey fog clips cleanly (a masked neighbour draws nothing). A small centre cap
-            // rounds junctions and keeps an isolated / just-placed road tile visible. Styled by
-            // THIS tile's tier — Track(1) thin/dim, Road(2) medium, Highway(3) thick/bright — so a
-            // tier change reads as a taper at the midpoint. Seam-crossing edges shift one period.
+            // ROADS AND SEA LANES AS SMOOTH CURVES (Ben, 2026-10-03: "render [roads] as
+            // curves rather than lines, and make them thinner"; "sea lanes should always go
+            // over ocean, never over ground"; RENDERING.md § Roads and sea lanes). Both are
+            // tile fields on the cardinal grid the traversal walk uses, so both draw the same
+            // way: a tile joined to exactly TWO network neighbours draws ONE quadratic from
+            // the midpoint of the first shared edge, through its own centre as the control
+            // point, to the midpoint of the second. Consecutive tiles' curves meet at those
+            // midpoints along the centre-to-centre line, so the run is tangent-continuous —
+            // the quadratic B-spline of the tile-centre chain — and each curve stays inside
+            // the triangle (midpoint, centre, midpoint), so a lane never leaves the sea tiles
+            // it was stamped on. A junction pairs its neighbours into through-curves (most
+            // opposite first); an end, or a three-way junction's odd branch, is a straight
+            // spoke, so a fork still reads as a fork. The half-edge symmetry of
+            // BL-172 is unchanged: the halves still meet at the shared midpoint, and each
+            // half takes its own edge's fog (BL-185, max of the pair).
             //
-            // BL-185: roads dim with the intra-body reach fog, through the same fog_dim wash
-            // the lens fill takes, so an unreached road recedes with the ground under it rather
-            // than reading as brightly as one on your own corridor. A road edge spans two tiles,
-            // so the pair's vision is combined with MAX — a road is lit if EITHER end is reached.
-            // Max is the choice for two reasons: it is SYMMETRIC, so both tiles' halves fog to the
-            // same value and the span stays one continuous weight (the BL-172 no-from/to-asymmetry
-            // property the geometry already guarantees); and reach is a flood outward from where
-            // the player operates, so an edge touching a reached tile is inside that reach — a
-            // corridor's roads should not darken one hop early at its rim. Survey (BL-067) still
-            // owns genuinely unrevealed tiles; this is only the commercial-reach fog.
-            if (tile.road_level > 0)
+            // At the coarse LOD (draw_r <= 7 px) the curve is invisible at a few pixels a
+            // tile, so the quadratic is drawn as its two straight chords.
+            // Is (col, row) on the network? Raw field, columns wrapping, rows not — the
+            // rung test below reads it, and must read the same from either end.
+            const auto on_network = [&](auto level_of, int col, int row) -> bool
             {
-                ImU32 col; float thick;
-                switch (tile.road_level)
-                {
-                    case 1:  col = IM_COL32(175, 158, 120, 205); thick = std::max(1.2f, draw_r * 0.12f); break;
-                    case 2:  col = IM_COL32(205, 188, 140, 225); thick = std::max(1.8f, draw_r * 0.18f); break;
-                    default: col = IM_COL32(225, 205, 150, 238); thick = std::max(2.4f, draw_r * 0.24f); break;
-                }
-
-                // The junction cap takes the brightest edge meeting at this centre, so it
-                // never reads as a dark blot on the end of a lit span.
-                float cap_vision = vision;
-
+                if (row < 0 || row >= gh)
+                    return false;
+                col %= gw;
+                if (col < 0)
+                    col += gw;
+                const entity_id id_at = tile_at_rc(col, row);
+                if (id_at == null_entity)
+                    return false;
+                const auto it = w.tiles.find(id_at);
+                return it != w.tiles.end() && level_of(it->second) != 0;
+            };
+            // @p skip_rungs: a link between two tiles that BOTH run straight through
+            // along the other axis is a RUNG between two parallel runs, not a route —
+            // two lanes laid on adjacent rows touch tile to tile, and drawing every
+            // touch hatched the sea between them. Symmetric (the same test from either
+            // end), so the half-edges still meet. A crossing is kept: the cross run's
+            // tile does not run straight through along the other axis. Lanes only; a
+            // road lattice's rungs are real roads.
+            const auto draw_network = [&](auto level_of, ImU32 col, float thick, bool skip_rungs)
+            {
                 static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
+                const auto through = [&](int c, int r, bool horizontal) {
+                    return horizontal
+                        ? (on_network(level_of, c + 1, r) && on_network(level_of, c - 1, r))
+                        : (on_network(level_of, c, r + 1) && on_network(level_of, c, r - 1));
+                };
+                ImVec2 mids[4];
+                float  vis[4];
+                int    deg = 0;
                 for (int n = 0; n < 4; ++n)
                 {
                     const int nrow = tile.grid_y + card_off[n][1];
@@ -3288,27 +3315,139 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     if (nb_id == null_entity)
                         continue;
                     const auto nb_tile_it = w.tiles.find(nb_id);
-                    if (nb_tile_it == w.tiles.end() || nb_tile_it->second.road_level == 0)
+                    if (nb_tile_it == w.tiles.end() || level_of(nb_tile_it->second) == 0)
                         continue;
                     if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
                         continue; // BL-408: god view draws into the masked region too
+                    if (skip_rungs)
+                    {
+                        const bool other_axis_horizontal = (n >= 2); // a row step's rung runs E-W
+                        if (through(tile.grid_x, tile.grid_y, other_axis_horizontal)
+                            && through(ncol, nrow, other_axis_horizontal))
+                            continue;
+                    }
 
                     ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
                     nb_sc.x += static_cast<float>(k) * period_px;
                     if (raw_col >= gw)      nb_sc.x += period_px; // east across the cylinder seam
                     else if (raw_col < 0)   nb_sc.x -= period_px; // west across the seam
 
-                    // This tile's half only: centre -> shared-edge midpoint (the neighbour draws
-                    // its half, and the two meet — continuous and symmetric, no "from vs to").
-                    const ImVec2 mid = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
-                    const float edge_vision = std::max(vision, tile_vision(nb_id));
-                    cap_vision = std::max(cap_vision, edge_vision);
-                    dl->AddLine({cx, cy}, mid, fog_dim(col, edge_vision), thick);
+                    mids[deg] = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
+                    vis[deg]  = std::max(vision, tile_vision(nb_id));
+                    ++deg;
                 }
-                // Centre cap: rounds junctions and keeps a lone / just-placed road tile visible.
-                dl->AddCircleFilled({cx, cy}, std::max(1.5f, thick * 0.75f),
+
+                // The junction cap takes the brightest edge meeting at this centre, so it
+                // never reads as a dark blot on the end of a lit span.
+                float cap_vision = vision;
+                for (int i = 0; i < deg; ++i)
+                    cap_vision = std::max(cap_vision, vis[i]);
+
+                // One quadratic mids[a] -> (centre) -> mids[b], split at its apex so each
+                // half carries its own edge's fog. Apex = (ma + 2c + mb) / 4; each half's
+                // control is the midpoint of its end and the centre.
+                const auto curve = [&](int a, int b) -> ImVec2
+                {
+                    const ImVec2 apex = {(mids[a].x + 2.0f * cx + mids[b].x) * 0.25f,
+                                         (mids[a].y + 2.0f * cy + mids[b].y) * 0.25f};
+                    for (const int i : {a, b})
+                    {
+                        const ImU32 ec = fog_dim(col, vis[i]);
+                        if (coarse_fill)
+                        {
+                            dl->AddLine(mids[i], apex, ec, thick);
+                            continue;
+                        }
+                        const ImVec2 ctl = {(mids[i].x + cx) * 0.5f, (mids[i].y + cy) * 0.5f};
+                        dl->AddBezierQuadratic(mids[i], ctl, apex, ec, thick, 6);
+                    }
+                    // A round joint at the apex hides the seam between the two halves.
+                    dl->AddCircleFilled(apex, thick * 0.5f, fog_dim(col, std::max(vis[a], vis[b])));
+                    return apex;
+                };
+
+                // THROUGH-ROUTES. The neighbours pair off, most-opposite first (the pair
+                // whose directions from the centre have the most negative dot product),
+                // and each pair is one curve — so a junction reads as two crossing runs,
+                // not a star of spokes, and a dense city lattice curves as a run does.
+                // Deterministic: ties keep the first pair in the fixed E, W, S, N order.
+                bool   used[4] = {false, false, false, false};
+                ImVec2 hub     = {cx, cy}; // where an odd branch joins: the last curve's apex
+                for (int left = deg; left >= 2; left -= 2)
+                {
+                    int   pa = -1, pb = -1;
+                    float best = 2.0f;
+                    for (int i = 0; i < deg; ++i)
+                    {
+                        if (used[i]) continue;
+                        for (int j = i + 1; j < deg; ++j)
+                        {
+                            if (used[j]) continue;
+                            const float ax = mids[i].x - cx, ay = mids[i].y - cy;
+                            const float bx = mids[j].x - cx, by = mids[j].y - cy;
+                            const float la = std::sqrt(ax * ax + ay * ay), lb = std::sqrt(bx * bx + by * by);
+                            const float d  = (la > 0.0f && lb > 0.0f) ? (ax * bx + ay * by) / (la * lb) : 1.0f;
+                            if (d < best) { best = d; pa = i; pb = j; }
+                        }
+                    }
+                    if (pa < 0) break;
+                    used[pa] = used[pb] = true;
+                    hub = curve(pa, pb);
+                }
+
+                // An end (one neighbour, or none: a lone / just-placed tile), or a
+                // three-way junction's odd branch: a straight spoke from the hub — the
+                // centre, or the through-curve's apex so the branch meets the curve —
+                // to its shared-edge midpoint, with a cap that rounds the join and keeps
+                // a lone tile visible. Four neighbours pair off whole and need neither.
+                if (deg == 2 || deg == 4)
+                    return;
+                for (int i = 0; i < deg; ++i)
+                    if (!used[i])
+                        dl->AddLine(hub, mids[i], fog_dim(col, vis[i]), thick);
+                dl->AddCircleFilled(hub, std::max(1.0f, thick * 0.75f),
                                     fog_dim(col, cap_vision));
+            };
+
+            // Road network (BL-146/BL-172 generated + BL-147/BL-172 player-placed). Always-on
+            // under every lens (roads are terrain, not an overlay), drawn only toward roaded,
+            // survey-revealed cardinal neighbours (the 4 directions the intra-body A* actually
+            // traverses; ocean is never roaded, so "land" is implicit). Styled by THIS tile's
+            // tier — Track(1) thin/dim, Road(2) medium, Highway(3) thick/bright — so a tier
+            // change reads as a taper at the midpoint. The width is ONE named constant per
+            // tier (k_road_width_*: the stroke as a fraction of the drawn hex radius, which is
+            // floored at 10 px so the tiers stay apart on the whole-grid view).
+            //
+            // BL-185: roads dim with the intra-body reach fog, through the same fog_dim wash
+            // the lens fill takes, so an unreached road recedes with the ground under it rather
+            // than reading as brightly as one on your own corridor. A road edge spans two tiles,
+            // so the pair's vision is combined with MAX — a road is lit if EITHER end is reached.
+            // Max is the choice for two reasons: it is SYMMETRIC, so both tiles' halves fog to the
+            // same value and the span stays one continuous weight (the BL-172 no-from/to-asymmetry
+            // property the geometry already guarantees); and reach is a flood outward from where
+            // the player operates, so an edge touching a reached tile is inside that reach — a
+            // corridor's roads should not darken one hop early at its rim. Survey (BL-067) still
+            // owns genuinely unrevealed tiles; this is only the commercial-reach fog.
+            const float route_r = std::max(10.0f, draw_r) * state.dbg_route_width_scale;
+            if (tile.road_level > 0)
+            {
+                ImU32 col; float thick;
+                switch (tile.road_level)
+                {
+                    case 1:  col = IM_COL32(175, 158, 120, 205); thick = route_r * k_road_width_track;   break;
+                    case 2:  col = IM_COL32(205, 188, 140, 225); thick = route_r * k_road_width_road;    break;
+                    default: col = IM_COL32(225, 205, 150, 238); thick = route_r * k_road_width_highway; break;
+                }
+                draw_network([](const tile_component& t) { return t.road_level; }, col, thick, false);
             }
+
+            // Sea lanes (BL-1098, LOGISTICS.md § 4b): the stamped `lane_level` field, drawn
+            // along the lane's own water tiles — never between its ends — as the same smooth
+            // curve, in the soft sea blue the wizard's lapse draws a lane in. Always-on like
+            // roads: a lane is part of the network a convoy rides, not an overlay.
+            if (tile.lane_level > 0)
+                draw_network([](const tile_component& t) { return t.lane_level; },
+                             IM_COL32(140, 200, 245, 190), route_r * k_lane_width, true);
 
             // Rivers (BL-170 data; this render is new, 2026-08-02). Always-on terrain like
             // roads. Drawn ONCE per edge from the UPSTREAM tile only — river_downstream bit

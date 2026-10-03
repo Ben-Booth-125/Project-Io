@@ -297,10 +297,15 @@ record, and the span is unmoved by any of it.
 - **The lane.** A sea leg used often enough to open a lane (the sea-lane tier,
   [`EXPLORATION.md`](../generation/EXPLORATION.md)) bakes a persistent **lane line**, distinct
   from a tie: a tie runs between two polities and goes when the bond does; a lane runs between
-  two shores and stays. **The lane is drawn as a bowed arc (Ben, 2026-09-25, picked at the live
-  app from three forms):** a soft sea-blue band bent away from the straight capital-to-capital
-  line, because most lanes run the same line as a colonial tie and a straight band hid under it;
-  the tie keeps the straight dashed line, the lane curves off it. A corridor the treasury promotes to Post Road pulses once along its
+  two shores and stays. **The lane is a soft, gently curved sea-blue band (Ben, 2026-09-25,
+  picked at the live app from three forms)**, because most lanes run the same line as a colonial
+  tie and a straight band hid under it; the tie keeps the straight dashed line, the lane curves
+  off it. **The lane follows its sea path (Ben, 2026-10-03: "sea lanes should always go over
+  ocean, never over ground"):** it is drawn along the water-only walk the campaign stamp lays
+  ([`LOGISTICS.md`](../economy/LOGISTICS.md) § 4b), port to port, smoothed on the water and
+  never across a land tile — not bowed between the two seats, which crossed whatever land lay
+  between them. A lane whose ends find no water joining them draws nothing, as it lays nothing
+  ([`RENDERING.md`](RENDERING.md) § Roads and sea lanes). A corridor the treasury promotes to Post Road pulses once along its
   length, as it does on round 6.
 
 **Round 6 — Industrialisation.** The span **1660 → 1960 CE**, three hundred years, and its

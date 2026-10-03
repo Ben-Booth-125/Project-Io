@@ -61,7 +61,7 @@ untouched by construction):
 | **Hillshade relief** | `height` (BL-517's continuous field) | Slope lighting from a fixed sun azimuth — the exaggerated topographic read that carried panel C |
 | **Biome brushes** | `cover` × `cover_density` | Authored painterly stamps (forest canopy, scrub, marsh…) scattered by density, hash-seeded from grid coordinates |
 | **Water & rivers** | water substrates, `river_edges` + flow | Sea, lakes, and carved river courses with bank treatment |
-| **Roads** | `road_level` | The road lattice painted into the ground at tier weight |
+| **Roads and sea lanes** | `road_level`, `lane_level` | The road lattice and the stamped lanes, smooth curves along their own tiles at the named tier widths (§ Roads and sea lanes) |
 | **Installations** | buildings, settlements | § Installations below |
 | **Near-future grade** | — (a colour pass) | Desaturation, cool cast, distance haze — **a separable final pass**, tunable without re-authoring any brush |
 
@@ -145,6 +145,39 @@ Consequences the design accepts and answers:
   (ground/chrome layer contract) sharpest open call.
 - A structure stamp may **overhang its tile** (chimneys, towers); stamps compose in
   row order like every other pass.
+
+### Roads and sea lanes — smooth curves on their own tiles
+
+Ben, 2026-10-03, playing the build: *"render [roads] as curves rather than lines,
+and make them thinner"*; *"sea lanes should always go over ocean, never over
+ground"*. Roads (`road_level`) and sea lanes (`lane_level`, [LOGISTICS.md](../economy/LOGISTICS.md)
+§ 4b) are both tile fields on the four-cardinal grid the traversal walk uses, and
+both draw by one rule:
+
+- **A route is drawn along its own tiles, never between its ends.** A lane is drawn
+  only on the sea tiles it was stamped on, so it can never cross land; the wizard's
+  lapse draws a lane along the same water-only walk the stamp lays, port to port
+  ([STARTUP.md](STARTUP.md) § Round 5, "The lane").
+- **The line is a smooth curve through the tile chain.** A tile joined to two
+  neighbours draws one quadratic from one shared-edge midpoint to the other, with
+  its own centre as the control point: consecutive tiles meet tangent-continuous at
+  the midpoints (the quadratic B-spline of the tile-centre chain), and each curve
+  stays inside its own tile's corner. A junction pairs its neighbours into
+  through-curves, most opposite first; an end, or a three-way junction's odd branch,
+  is a straight spoke, so a fork still reads as a fork. Two lanes laid on adjacent
+  rows touch tile to tile; a link between two tiles that both run straight through
+  along the other axis is a **rung**, not a route, and a lane does not draw it (a
+  road lattice's rungs are real roads and are drawn). On the lapse's small map
+  the walk's staircase is first string-pulled over the water, then corner-cut, every
+  cut checked against the sea.
+- **One named width per tier**, as a fraction of the drawn hex radius (floored at a
+  10 px radius so the tiers stay apart on the whole-grid view): **Track 0.06, Road
+  0.09, Highway 0.12** — the 1 : 1.5 : 2 ladder — and the **sea lane 0.10**, told
+  from the road ladder by its sea blue rather than its weight.
+- **LOD:** at the coarse fill (drawn radius ≤ 7 px) a curve is drawn as its two
+  chords; the shape is invisible at a few pixels a tile.
+- Both are **always-on**, under every lens, and dim with the reach fog and stop at
+  the survey mask as roads always have.
 
 ### Ambient animation
 
