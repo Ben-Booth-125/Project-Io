@@ -1135,6 +1135,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             trade_ctx.road_joins_one_landmass = params.trade_road_joins_one_landmass; // BL-1171
             trade_ctx.cargo_loss_q  = spend_ctx->cargo_loss_q;
             trade_ctx.cargo_lost    = spend_ctx->cargo_lost_out;
+            trade_ctx.road_rule_lost = spend_ctx->road_rule_lost_out; // BL-1171 diagnostic
         }
         flows = compute_trade_flows(trade_ctx, regions, polities, *treaties);
     }
@@ -2233,6 +2234,26 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
             int land_q = 0, sea_q = 0, align = 0;
             const bool lines = trade_lines(ctx, regions, polities, e[0], e[1], land_q, sea_q, align);
             const uint8_t by_sea = (lines && sea_q > land_q) ? 1 : 0;
+            // BL-1171 DIAGNOSTIC (write-only): what the road rule took from
+            // this directed pair -- the raw land line's volume over the sea
+            // line's, per good, before any sharing. Reads nothing back.
+            if (lines && ctx.road_rule_lost != nullptr && land_q == 0)
+            {
+                const int raw_land = trade_land_line_q(ctx, e[0], e[1]);
+                if (raw_land > sea_q)
+                {
+                    const polity& ps = polities[static_cast<std::size_t>(e[0])];
+                    const int slot = sea_q > 0 ? 2 : (ps.navy_stock <= 0 ? 0 : 1);
+                    for (int g = 0; g < 4; ++g)
+                    {
+                        int want_q = 0, holding_q = 0;
+                        trade_want_holding(ctx, regions, polities, e[0], e[1], g, want_q, holding_q);
+                        if (want_q <= 0 || holding_q <= 0) continue;
+                        const int cap = std::min(want_q, holding_q);
+                        ctx.road_rule_lost[slot] += std::min(cap, raw_land) - std::min(cap, sea_q);
+                    }
+                }
+            }
             for (int g = 0; g < 4; ++g)
             {
                 const int v = trade_flow_volume_q(ctx, regions, polities, e[0], e[1], g);
@@ -5291,12 +5312,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
             spend_ctx.seat_landmass  = landmass.empty() ? nullptr : &seat_landmass;
             spend_ctx.cargo_loss_q   = cargo_loss_q; // judged in domain at the open
             spend_ctx.cargo_lost_out = &out.sea_trade_cargo_lost_q;
+            int64_t road_rule_lost[3] = {0, 0, 0}; // BL-1171 diagnostic
+            spend_ctx.road_rule_lost_out = road_rule_lost;
             // BL-954: the state's treaties open this round's flows, rebuilt
             // into `out.trade_flows` (never accumulated).
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
                                    params, y, step_years, &upkeep_spend,
                                    &out.dated_objects, &out.trade_flows, &spend_ctx, works);
             note_trade_legs(); // BL-1140: the round's trade across water, the fourth writer
+            out.road_rule_lost_no_navy_q  += road_rule_lost[0]; // BL-1171 diagnostic
+            out.road_rule_lost_no_port_q  += road_rule_lost[1];
+            out.road_rule_lost_narrowed_q += road_rule_lost[2];
             out.treasury_spent_on_ports           += upkeep_spend.ports;
             out.treasury_spent_on_navies          += upkeep_spend.navies;
             out.treasury_spent_on_standing_armies += upkeep_spend.standing_armies;
@@ -5695,6 +5721,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (!polity_holds_exploration_sea_legs(arriving)) continue; // THE NODE, never a rank
                     if (arriving.capital < 0
                      || static_cast<std::size_t>(arriving.capital) >= ss.regions.size()) continue;
+                    ++out.subjection_arrivals_walked; // BL-1171 diagnostic
 
                     // BL-953 -- COLLECT, THEN RANK. Every native passing the
                     // same eligibility tests as before is gathered with the
@@ -5705,14 +5732,23 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // same want"). With the lean off every want is 0 and the
                     // pick is the lowest eligible id -- the old id-order walk.
                     std::vector<std::pair<int, int>> eligible_natives;
+                    // BL-1171 DIAGNOSTIC (write-only): which single test stood
+                    // between this arriving power and a native -- a native
+                    // failing exactly one of the overlord / treasury / sphere
+                    // tests (reach and contact passed).
+                    bool sole_blocked[3] = {false, false, false};
                     for (std::size_t ni = 0; ni < pc; ++ni)
                     {
                         if (ni == ai) continue;
                         polity& native = out.polities[ni];
-                        if (!native.alive || native.overlord >= 0) continue;
+                        if (!native.alive) continue;
                         if (native.capital < 0
                          || static_cast<std::size_t>(native.capital) >= ss.regions.size()) continue;
                         if (!has_contact(out, arriving.id, native.id)) continue;
+                        // The overlord test, read here rather than first: every
+                        // test in this walk is a side-effect-free `continue`, so
+                        // the order decides nothing but what the diagnostic sees.
+                        const bool is_subject = native.overlord >= 0;
 
                         // The two cheap scalar tests run BEFORE the O(P)
                         // sphere-of-claim scan below. Every test here is a
@@ -5731,8 +5767,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
                         const int64_t native_treasury =
                             ss.regions[static_cast<std::size_t>(native.capital)].treasury;
-                        if (arriving_treasury < native_treasury + params.subjection_treasury_margin_q)
-                            continue;
+                        const bool treasury_short =
+                            arriving_treasury < native_treasury + params.subjection_treasury_margin_q;
+                        if (is_subject && treasury_short) continue; // two tests fail: nothing to read
 
                         // SPHERE OF CLAIM: non-interference over a native
                         // polity's ground BETWEEN THE TWO TREATY PARTIES --
@@ -5750,7 +5787,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             if (has_contact(out, static_cast<int>(oi), native.id))
                                 sphere_blocked = true;
                         }
-                        if (sphere_blocked) continue;
+                        if (is_subject || treasury_short || sphere_blocked)
+                        {
+                            const int fails = (is_subject ? 1 : 0) + (treasury_short ? 1 : 0) + (sphere_blocked ? 1 : 0);
+                            if (fails == 1)
+                            {
+                                const int k = is_subject ? 0 : (treasury_short ? 1 : 2);
+                                sole_blocked[k] = true;
+                                ++(k == 0 ? out.subjection_native_sole_overlord
+                                          : k == 1 ? out.subjection_native_sole_treasury
+                                                   : out.subjection_native_sole_sphere);
+                            }
+                            continue;
+                        }
 
                         const int want_q = want_lean_on
                             ? polity_good_want_q(ss.regions, out.polities, round_prefs, arriving.id,
@@ -5759,6 +5808,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         eligible_natives.push_back({static_cast<int>(ni), want_q});
                     }
 
+                    if (eligible_natives.empty()) // BL-1171 diagnostic
+                    {
+                        ++out.subjection_arrivals_none_eligible;
+                        if (sole_blocked[0]) ++out.subjection_arrivals_freed_by_overlord;
+                        if (sole_blocked[1]) ++out.subjection_arrivals_freed_by_treasury;
+                        if (sole_blocked[2]) ++out.subjection_arrivals_freed_by_sphere;
+                    }
                     const int chosen = choose_subjection_native(eligible_natives);
                     if (chosen >= 0)
                     {

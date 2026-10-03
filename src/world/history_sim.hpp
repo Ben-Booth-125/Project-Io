@@ -2847,6 +2847,9 @@ struct exploration_spend_context
     const std::vector<int32_t>*                 seat_landmass  = nullptr;
     int                                         cargo_loss_q   = 0;
     int64_t*                                    cargo_lost_out = nullptr;
+    /// BL-1171 diagnostic: where set, the round's flows add what the road
+    /// rule took from them (`trade_context::road_rule_lost`). Write-only.
+    int64_t*                                    road_rule_lost_out = nullptr;
 };
 
 ///
@@ -4795,6 +4798,33 @@ struct history_sim_state
     /// out-projected the other's at its port, so it read the land's penalty.
     /// Diagnostic; nothing reads it.
     int64_t far_pairs_out_of_fleet_reach  = 0;
+    /// BL-1171 DIAGNOSTICS (write-only; nothing reads them). What the road
+    /// rule (`trade_road_joins_one_landmass`) took from the round's flows,
+    /// summed over rounds, per directed pair and good BEFORE the want and
+    /// holding are shared (an attribution of the line, not of what
+    /// arrived): the volume the raw land line would have carried over the
+    /// sea line where the sea line is 0 because the seller holds no navy,
+    /// where it is 0 because a seat has no built port (the seller holds a
+    /// navy), and where the sea line runs but narrower than the road.
+    int64_t road_rule_lost_no_navy_q  = 0;
+    int64_t road_rule_lost_no_port_q  = 0;
+    int64_t road_rule_lost_narrowed_q = 0;
+    /// BL-1171 DIAGNOSTICS (write-only): why the subjection walk bound no
+    /// one, summed over rounds. The arriving powers walked (alive, free,
+    /// holding the sea-leg node) and of them those left with no eligible
+    /// native. Per contacted native in reach, the ones failing EXACTLY ONE of
+    /// the three remaining tests -- already a subject; a seat treasury plus
+    /// the margin the arriving seat's does not cover; held off by a
+    /// sphere-of-claim partner -- and, per arriving power left with none, whether
+    /// lifting that one test alone would have left it a native to bind.
+    int64_t subjection_arrivals_walked           = 0;
+    int64_t subjection_arrivals_none_eligible    = 0;
+    int64_t subjection_native_sole_overlord      = 0;
+    int64_t subjection_native_sole_treasury      = 0;
+    int64_t subjection_native_sole_sphere        = 0;
+    int64_t subjection_arrivals_freed_by_overlord = 0;
+    int64_t subjection_arrivals_freed_by_treasury = 0;
+    int64_t subjection_arrivals_freed_by_sphere   = 0;
     /// BL-1147: at a resumed open whose conversion is on, the naval points the
     /// LIVING polities carried into fleets, the points held by polities
     /// already dead (which carry nothing), the fleets opened and their hulls;
@@ -5748,6 +5778,10 @@ struct trade_context
     const std::vector<int32_t>* seat_landmass = nullptr;
     int                         cargo_loss_q  = 0;
     int64_t*                    cargo_lost    = nullptr;
+    /// BL-1171 diagnostic: where set, `compute_trade_flows` adds to [0] / [1]
+    /// / [2] the volume the road rule took (no navy / no port / narrowed;
+    /// `history_sim_state::road_rule_lost_*`). Write-only; never read.
+    int64_t*                    road_rule_lost = nullptr;
 
     /// BL-1171 (`history_sim_params::trade_road_joins_one_landmass`): with
     /// `seat_landmass` set, a pair whose seats stand on different landmasses
