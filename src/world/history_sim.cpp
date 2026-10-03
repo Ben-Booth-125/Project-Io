@@ -2264,7 +2264,13 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
                 if (raw_land > sea_q)
                 {
                     const polity& ps = polities[static_cast<std::size_t>(e[0])];
-                    const int slot = sea_q > 0 ? 2 : (ps.navy_stock <= 0 ? 0 : 1);
+                    const polity& pb = polities[static_cast<std::size_t>(e[1])];
+                    // A sea line of 0 with a navy and both ports built is one the
+                    // current's pricing floored: its own slot (3), never "no port".
+                    const int ports = std::min(
+                        regions[static_cast<std::size_t>(ps.capital)].port_stock_q,
+                        regions[static_cast<std::size_t>(pb.capital)].port_stock_q);
+                    const int slot = sea_q > 0 ? 2 : ps.navy_stock <= 0 ? 0 : ports > 0 ? 3 : 1;
                     for (int g = 0; g < 4; ++g)
                     {
                         int want_q = 0, holding_q = 0;
@@ -5377,7 +5383,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             spend_ctx.seat_landmass  = landmass.empty() ? nullptr : &seat_landmass;
             spend_ctx.cargo_loss_q   = cargo_loss_q; // judged in domain at the open
             spend_ctx.cargo_lost_out = &out.sea_trade_cargo_lost_q;
-            int64_t road_rule_lost[3] = {0, 0, 0}; // BL-1171 diagnostic
+            int64_t road_rule_lost[4] = {0, 0, 0, 0}; // BL-1171 diagnostic
             spend_ctx.road_rule_lost_out = road_rule_lost;
             // BL-954: the state's treaties open this round's flows, rebuilt
             // into `out.trade_flows` (never accumulated).
@@ -5388,6 +5394,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.road_rule_lost_no_navy_q  += road_rule_lost[0]; // BL-1171 diagnostic
             out.road_rule_lost_no_port_q  += road_rule_lost[1];
             out.road_rule_lost_narrowed_q += road_rule_lost[2];
+            out.road_rule_lost_by_current_q += road_rule_lost[3];
             out.treasury_spent_on_ports           += upkeep_spend.ports;
             out.treasury_spent_on_navies          += upkeep_spend.navies;
             out.treasury_spent_on_standing_armies += upkeep_spend.standing_armies;

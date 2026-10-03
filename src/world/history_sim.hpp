@@ -4832,6 +4832,9 @@ struct history_sim_state
     int64_t road_rule_lost_no_navy_q  = 0;
     int64_t road_rule_lost_no_port_q  = 0;
     int64_t road_rule_lost_narrowed_q = 0;
+    /// ... and where the sea line is 0 though the seller holds a navy and both
+    /// seats hold a built port: the current's pricing floored it.
+    int64_t road_rule_lost_by_current_q = 0;
     /// BL-1171 DIAGNOSTICS (write-only): why the subjection walk bound no
     /// one, summed over rounds. The arriving powers walked (alive, free,
     /// holding the sea-leg node) and of them those left with no eligible
@@ -5802,8 +5805,9 @@ struct trade_context
     int                         cargo_loss_q  = 0;
     int64_t*                    cargo_lost    = nullptr;
     /// BL-1171 diagnostic: where set, `compute_trade_flows` adds to [0] / [1]
-    /// / [2] the volume the road rule took (no navy / no port / narrowed;
-    /// `history_sim_state::road_rule_lost_*`). Write-only; never read.
+    /// / [2] / [3] the volume the road rule took (no navy / no port / narrowed /
+    /// floored to 0 by the current; `history_sim_state::road_rule_lost_*`).
+    /// Four slots. Write-only; never read.
     int64_t*                    road_rule_lost = nullptr;
 
     /// BL-1171 (`history_sim_params::trade_road_joins_one_landmass`): with
