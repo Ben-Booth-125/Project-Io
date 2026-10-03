@@ -770,6 +770,53 @@ void far_pair_rows()
               "F12 a partner's mutual-defence ally out-projecting the seller at the partner's port stops the binding (unbound without the clause)");
     }
 
+    // F14 (BL-1171 review): THE TREATY'S TRADE VALUE READS THE ROAD RULE IN
+    // STILL WATER TOO. Polity 1's seat is on East (36) but it still holds the
+    // West ground it left (19), joined to polity 0's seat by a dry corridor: a
+    // land line between seats on two landmasses. Polity 0 is farm ground and
+    // wants ore, polity 1 ore ground and wants farm; no ports, no fleets, so no
+    // sea line. Met in 1300 (far), both penalties 500: a binding is worth
+    // 1000 - 150 - 500 = 350 before trade -- under the bar (400) -- and over it
+    // only with the trade a road would carry. Currents off (weight 0): with the
+    // road rule the treaty context gives the pair no road, so it does not bind;
+    // the control, the rule off, binds on the road.
+    {
+        far_world w = make_far_world(36, 19, true, false);
+        w.ss.regions[0].dominant = region_class::farm;
+        w.ss.regions[1].dominant = region_class::ore;
+        w.ss.regions[2].dominant = region_class::ore;
+        history_corridor road;
+        road.a = 0; road.b = 2; road.uses = 40; road.tier = 1; road.wet = 0;
+        const std::vector<history_corridor> corridors = { road };
+        const auto run_still = [&](bool rule) {
+            history_sim_params p = exploration_sim_params(world_params{});
+            p.start_year = 1700;
+            p.stop_year  = 1704;
+            p.tick_bands[0]   = { p.stop_year, 4 };
+            p.tick_band_count = 1;
+            p.trace_battles   = false;
+            p.treaty_far_penalty_q     = 500;
+            p.treaty_far_sea_penalty_q = 500;
+            p.sea_current_weight_q     = 0; // still water: no field is built
+            p.trade_road_joins_one_landmass = rule;
+            p.resume_polities      = &w.polities;
+            p.resume_contacts      = &w.contacts;
+            p.resume_dated_objects = &w.objects;
+            p.resume_corridors     = &corridors;
+            settlement_state ss = w.ss;
+            sim_terrain_view view;
+            view.substrate = &w.ground;
+            return run_history_sim(ss, nullptr, view, far_world::gw, far_world::gh, p, 4242u);
+        };
+        const history_sim_state on  = run_still(true);
+        const history_sim_state off = run_still(false);
+        say("F14 still water, a road across landmasses, road rule on:", on);
+        say("F14 control -- the same, road rule off:", off);
+        check(!bound(on) && on.treaties_formed == 0 && bound(off) && off.treaties_formed == 1,
+              "F14 in still water the treaty's trade value gives no road between seats on two landmasses"
+              " (the control, rule off, binds on it)");
+    }
+
     // F13 (BL-1171, Ben 2026-10-03): MEETING BY SEA IS GATED TOO. Two realms on
     // two islands, never met, both seats with a built port, polity 0
     // farm-dominant and polity 1 ore-dominant (each wants the other's good):
