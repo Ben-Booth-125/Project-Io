@@ -388,8 +388,10 @@ long lanes the age is remembered for. **A bridged strait still parts two landmas
 (Ben, 2026-10-03):** a road may bridge at most two water tiles (`../economy/LOGISTICS.md`), but
 goods between seats on either shore sail all the same; the landmass is land connectivity alone. **Meeting by sea is gated too (Ben, 2026-10-03):** realms
 across water first meet only where one side's fleet out-projects the other's at its port — the same
-comparison binding faces — so a contact the sea forbids is never made, rather than made and left
-unbound. Measured on the curated seeds before it is set.
+comparison binding faces — so a contact the sea forbids is never made by sailing, rather than made
+and left unbound. **Conquest inherits what the conquered knew (Ben, 2026-10-03):** a realm that
+takes a polity's last region takes its contacts with it, overseas ones included, without the fleet
+gate; the pair is met, but binding it still needs the fleet comparison. Measured on the curated seeds before it is set.
 
 *(Folded from `../research/COLONIAL_ERA.md` on 2026-09-16, NR-884.)*
 
