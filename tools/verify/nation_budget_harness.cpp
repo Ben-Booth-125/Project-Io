@@ -1491,6 +1491,28 @@ int main()
                   "programme buy nothing off the shelf; at it, the lump is bought "
                   "at the posted price");
         }
+
+        // R7o (BL-1172, "yes, every draw"): the corp-pool path too. A pool
+        // holds a whole lump of components posted at 9x base: no intent, the
+        // pool intact. At 2x (the ceiling) the same pool supplies the lump.
+        {
+            space_fixture s = make_space_fixture(100.0f, 0.0f);
+            s.params.propellant_lump = 0.0f;
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_comp] = 1.0f;
+            mc.price[k_comp]      = 9.0f;
+            std::vector<space_purchase> over = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, /*reservation_mult*/ 2.0f, s.f.claims);
+            const bool refused = over.empty() && s.f.claims.empty();
+            s.f.claims.clear();
+            mc.price[k_comp] = 2.0f;
+            std::vector<space_purchase> at = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, /*reservation_mult*/ 2.0f, s.f.claims);
+            check(refused && at.size() == 1 && at[0].supplier == s.f.corp_1 &&
+                  same(at[0].credits, 16.0f),
+                  "R7o (BL-1172) a corp pool's components posted at 9x are refused; "
+                  "at the ceiling the pool supplies the lump at the posted price");
+        }
     }
 
     // --- R9: network upkeep (BL-643) ----------------------------------------
@@ -1913,6 +1935,36 @@ int main()
                   same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 8.0f * 32.0f),
                   "R9m (BL-1172) over eight ticks the network buys stone at its "
                   "posted 2.0 (at the ceiling) and never the timber posted over it");
+        }
+
+        // R9n (BL-1172, Ben 2026-10-03: the ceiling governs EVERY draw, "yes,
+        // every draw" — the corp-pool path as well as the shelf fallback).
+        // Pools hold stone and timber; stone posts at 9x its base (over the 2x
+        // ceiling), timber at 2x (at it). The network buys the timber out of
+        // the pool, and refuses the stone: no intent, the pool's stone intact.
+        {
+            net_fixture s = make_net_fixture(100.0f, 100.0f);
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_stone]  = 1.0f;
+            mc.price[k_stone]       = 9.0f;
+            mc.base_price[k_timber] = 2.0f;
+            mc.price[k_timber]      = 4.0f;
+            std::vector<network_purchase> intents = derive_network_upkeep_claims(
+                s.f.w, s.f.budgets, s.params, /*reservation_mult*/ 2.0f, s.f.claims);
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_network_purchases(s.f.w, intents, t);
+            const auto& pool = s.f.w.corp_market_pools.at(
+                std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)));
+            bool stone_intent = false;
+            for (const network_purchase& np : intents)
+                stone_intent = stone_intent || np.resource == resource_type::stone;
+            check(!stone_intent && intents.size() == 1 &&
+                  intents[0].resource == resource_type::timber &&
+                  intents[0].supplier == s.f.corp_1 && intents[0].completed &&
+                  same(pool.quantities[k_stone], 100.0f),
+                  "R9n (BL-1172) a corp pool's stone posted at 9x is refused "
+                  "(pool untouched); its timber at the ceiling is bought");
         }
     }
 

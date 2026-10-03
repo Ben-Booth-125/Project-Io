@@ -38,7 +38,22 @@ float unit_price_at(const world& w, entity_id pool_key, std::size_t ri)
     if (mid == null_entity)
         return 0.0f;
     const market_component& mc = w.markets.at(mid);
-    return mc.price[ri] > 0.0f ? mc.price[ri] : mc.base_price[ri];
+    return posted_price(mc, ri); // BL-1172: the posted price, the one rule
+}
+
+/// BL-1172 (Ben, 2026-10-03: the ceiling governs EVERY draw — "yes, every
+/// draw"): may the state buy good @p ri out of a corp pool keyed @p pool_key?
+/// The pool is priced at its market (`unit_price_at`'s market), so the same
+/// fair-price ceiling the shelf fallback obeys applies to it: posted price at
+/// or under `reservation_mult x base`. A pool with no market to price it is
+/// left to `unit_price_at`, which refuses it at zero. 0 = no ceiling.
+bool pool_price_admitted(const world& w, entity_id pool_key, std::size_t ri, float reservation_mult)
+{
+    const entity_id mid = (w.markets.find(pool_key) != w.markets.end())
+        ? pool_key : lowest_market_on_body(w, pool_key);
+    if (mid == null_entity)
+        return true;
+    return shelf_admits(w.markets.at(mid), ri, reservation_mult, /*off_buys=*/true);
 }
 
 } // namespace
@@ -143,6 +158,10 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
                     continue;
                 if (body == null_entity)
                     continue; // the claim's subject must survive the gather check
+                // BL-1172: a pool priced over the fair-price ceiling at its
+                // market is not a candidate (every draw, pool and shelf alike).
+                if (!pool_price_admitted(w, key.second, ri, reservation_mult))
+                    continue;
                 float avail = pool.quantities[ri];
                 const auto rit = reserved.find(std::make_tuple(corp, key.second, ri));
                 if (rit != reserved.end())

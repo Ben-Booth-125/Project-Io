@@ -85,8 +85,9 @@ and a unit beside a full shelf is never refused by a price its own want drove up
 ceiling governs every goods draw (Ben, 2026-10-03):** unit and building upkeep, processor inputs
 and construction alike buy only at or under it, and a draw over it does not bid either, so its
 want leaves the price and the price can ease back. **Nations' draws too (Ben, 2026-10-03):** a
-nation's network upkeep and its space programme draw a shelf under the same ceiling and the same
-posted price. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
+nation's network upkeep and its space programme draw under the same ceiling and the same posted
+price — every draw, whether out of a corporation's pool (priced at its market) or off a market's
+shelf. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
 actually charged (rations ~3.5x and ordnance ~6x their base) against a hire price near 120, and
 standing-force upkeep was what wound most of the field up.
 
@@ -137,7 +138,9 @@ processor beside a full shelf (`unit_upkeep` U13, `fair_price_ceiling` M5): each
 in four** — 3 of 12 — never more than three ticks running without. The processor runs at a quarter
 of its capacity. The unit's supply factor nets −50 per four-tick cycle and walks down to a floor
 cycle of 100, 50, 0, 0: an army fed only from such a shelf ends near zero strength. A market that
-is also being listed into does not pulse this way, since its listings are supply. The cost is
+is also being listed into at a rate near its demand does not pulse this way, since its listings
+are supply; thin listings do not save it (0.1 listed against a demand of 1 still resolves 1.5× to
+2.33×, over the ceiling). The cost is
 accepted until spoilage (BL-1179) lets a shelf count without its glut flooring prices.
 A ceiling of zero switches the rule off, and off means what each draw did before it: upkeep never
 buys; processors, construction and the nations buy whatever the shelf holds.
