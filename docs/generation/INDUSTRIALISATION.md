@@ -709,6 +709,30 @@ unfilled, and a city whose works are full stops drawing. Points could not carry 
 stop at the heads its works employ, so a crowded city pulled like a full town and its arrivals earned
 nothing. The campaign carries wages; open work is the nearest thing the sim holds. **Any centre with open work draws (Ben, 2026-10-02):** a village whose works hire takes migrants and grows into a town, rather than the stream reaching only towns. With towns alone the stream moved almost no one, because the open work sat in villages.
 
+### Industry spreads beyond its heartland
+
+**SET (Ben, 2026-10-03):** *"There should at least be a large rival far away. This prevents the
+player from simply choosing the favourite to win, and being totally free of competition from a
+unified front on the rest of the planet."* And: *"We should be trying to make exploration into
+industrialisation create something like America. We don't see these crowded heartlands conquer and
+exploit polities far away."*
+
+**SETTLED (Ben, 2026-10-03): a charter is priced by the capital in its own trade reach.** A
+centre's charters are priced as a share of the stock within its trade reach — its landmass, or its
+market's catchment — not of the whole world's. Capital is dear where it is scarce and cheap where it
+is all that is around, so a far landmass with little capital still charters its own firms rather
+than being priced out by a richer continent's stock.
+
+**SETTLED (Ben, 2026-10-03): a crowded heartland yields less.** A treasury's points convert at a
+lower rate where a region's works already crowd its labour and land (works per employed head), so a
+heartland's lead stops compounding on itself and the next-best ground catches up. Its size is a
+named parameter, read on the curated seeds before it is set.
+
+**PROPOSED (Ben's direction, 2026-10-03): crowded heartlands reach overseas.** A heartland short of
+ground and long on people and capital colonises and exploits distant polities, and what it plants
+grows: a settler colony that industrialises becomes the distant rival of the age, and may break away
+(Beat 3). The mechanism is designed before it is built.
+
 ### Beat 3 — Decolonisation, and wars over empire
 
 **SET (Ben, 2026-09-15):** *"Large wars are fought over the notion of empire, and the ability to
@@ -880,6 +904,7 @@ Readings taken at **1960 CE** over a **seed spread**, never per world — the di
 | **World war** | Present in some worlds and absent in others — never all, never none |
 | **War dead** | Every war lowers population somewhere; no region emptied by one |
 | **Catastrophe lean** | Worlds that fought a world war open with higher aggregate Alarm against Ceiling than worlds that did not |
+| **A rival far away** (Ben, 2026-10-03) | The strongest industrial nation has a rival on another landmass, or a quarter of the world away, holding at least a quarter of its industry points — so the player is never handed a favourite free of competition |
 
 **A reading is a requirement, not a target.** A seed that refuses one is a legitimate world; a
 spread that refuses one is a phase that did not do its job.

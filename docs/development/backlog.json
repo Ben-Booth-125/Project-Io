@@ -1409,7 +1409,7 @@
     "src/world/corporation_generation.cpp",
     "tools/verify/stockpile_budget_check.cpp"
    ],
-   "design": "DOC AND CODE DISAGREE (found 2026-09-26): CORPORATION_GENERATION.md says a specialist's price is anchored to the seat menu, 'the median library world offers about as many seats as a world with no budget' (NR-907, NR-910; the 650 divisor was pinned for that). On main the median world charters 81.5 specialists (61-111 a seed), and the BL-1137 rebuild barely moves it (88), because the price rises with the stock. The anchor was pinned on a world that no longer exists (before BL-1130/1133/1141). WORK: re-read the seat curve (stockpile_budget_check --seat-curve) after BL-1137 and BL-1146 land, and re-pin the divisor to the doc's target, measured, never clamped to a count. If no divisor reaches it without starving the web, report that for Ben rather than forcing it."
+   "design": "FOLDED INTO BL-1168 (charter priced by trade reach), which must re-anchor the seat menu anyway (2026-10-03).\n\nDOC AND CODE DISAGREE (found 2026-09-26): CORPORATION_GENERATION.md says a specialist's price is anchored to the seat menu, 'the median library world offers about as many seats as a world with no budget' (NR-907, NR-910; the 650 divisor was pinned for that). On main the median world charters 81.5 specialists (61-111 a seed), and the BL-1137 rebuild barely moves it (88), because the price rises with the stock. The anchor was pinned on a world that no longer exists (before BL-1130/1133/1141). WORK: re-read the seat curve (stockpile_budget_check --seat-curve) after BL-1137 and BL-1146 land, and re-pin the divisor to the doc's target, measured, never clamped to a count. If no divisor reaches it without starving the web, report that for Ben rather than forcing it."
   },
   {
    "status": "designed",
@@ -1696,7 +1696,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 49,
+   "sprint": 48,
    "written": "2026-10-03",
    "requires": [],
    "blocked_on": null,
@@ -1713,7 +1713,7 @@
     "src/world/economy_system.cpp",
     "src/world/corp_ai.cpp"
    ],
-   "design": "FOUND 2026-10-03 (BL-1163 lane, centre_decline_trace, seed 0 shipped start): corps 196 -> 22 and live buildings 536 -> 167 over 440 ticks, with or without the growth gate; the economy shrinks ~9x. Ben (2026-10-03): diagnose it as its own item next, measured first. WORK: trace exits per firm (cause: insolvency, idle buildings, no demand, upkeep; which recipes; which markets), over ticks 0-450 on seeds 0, 10, 28; say whether it predates sprint 48; report options before any fix. Sprint 49."
+   "design": "PULLED INTO SPRINT 48 (Ben, 2026-10-03): rivals exiting until no competition is left is part of the compounding he felt in play.\n\nFOUND 2026-10-03 (BL-1163 lane, centre_decline_trace, seed 0 shipped start): corps 196 -> 22 and live buildings 536 -> 167 over 440 ticks, with or without the growth gate; the economy shrinks ~9x. Ben (2026-10-03): diagnose it as its own item next, measured first. WORK: trace exits per firm (cause: insolvency, idle buildings, no demand, upkeep; which recipes; which markets), over ticks 0-450 on seeds 0, 10, 28; say whether it predates sprint 48; report options before any fix. Sprint 49."
   },
   {
    "status": "designed",
@@ -1778,6 +1778,70 @@
     "scripts/verify/golden/"
    ],
    "design": "FOUND 2026-10-03: DEVELOPMENT_PRACTICES.md keeps a curated golden set of surfaces that draw NO generated world content (NR-237), and names the icon_silhouettes pair as that set. But both captures show the generated map, a corporation, a tile panel and the nav rail; they last blessed 2026-06-17 and read 48.7% differing at the sprint 48 re-bless (refreshed in the re-bless commit). WORK: make the check world-independent (a fixed fixture surface that draws only the icon set), or remove the pair from the golden set and keep it capture-only. Ben's call between the two."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1168",
+   "short_name": "CHARTER_PRICED_BY_TRADE_REACH",
+   "author": "Claude (Ben's distant-rival form, 2026-10-03)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A charter is priced by the capital in its own trade reach, so a far landmass charters its own firms",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "src/world/stockpile_budget.cpp",
+    "src/world/corporation_generation.cpp",
+    "tools/verify/industry_concentration.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-10-03): INDUSTRIALISATION.md § Industry spreads beyond its heartland. Today one world-wide price, spent richest-first, adds 5-23 points to the top landmass's share (industry_concentration, 80079d80). Measured on the budget only: off-top centres able to afford a seat go 9: 7->132, 43: 9->100, 0: 29->165, 41: 4->36. BUILD: price a centre's charters by the stock in its trade reach (its landmass; say if market catchment reads better); the seat menu grows 2-3x, so re-anchor the specialist price to the seat-menu target in the same item (folds in BL-1151, seat menu re-anchored). Read industry_concentration before/after, and the A rival far away judged property (>= 25%). No effect on one-landmass worlds by design."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 48,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1169",
+   "short_name": "CROWDED_HEARTLAND_YIELDS_LESS",
+   "author": "Claude (Ben's distant-rival form, 2026-10-03)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A crowded heartland converts its treasury into industry at a lower rate, so its lead stops compounding",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/industry_concentration.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-10-03): INDUSTRIALISATION.md § Industry spreads beyond its heartland, a crowded heartland yields less. Treasury conversion is 70-99% of each leader's points; scale credit is near-flat. BUILD (measured first): in the treasury apportion loop (history_sim.cpp ~1446), points per unit fall with the region's works per employed head; one named parameter read on a ladder for Ben. Read industry_concentration (top-landmass share, the far-rival property) and the history counters before/after."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 48,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1170",
+   "short_name": "HEARTLANDS_REACH_OVERSEAS",
+   "author": "Claude (Ben's distant-rival form, 2026-10-03)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "Crowded heartlands colonise and exploit distant polities, and a settler colony can grow into the age's distant rival",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [],
+   "design": "BEN'S DIRECTION (2026-10-03): \"make exploration into industrialisation create something like America. We don't see these crowded heartlands conquer and exploit polities far away.\" INDUSTRIALISATION.md § Industry spreads beyond its heartland (PROPOSED). DESIGN FIRST with Ben, reading the sea lane's Exploration diagnosis (why few long lanes) and BL-1152's fleets: which push (land shortage, population, capital) sends a heartland overseas; colony vs conquest vs settlement; how a colony's people and works grow; how it breaks away (Beat 3). Measure how often heartlands hold overseas ground at 1660 and 1960 today."
   }
  ]
 }
