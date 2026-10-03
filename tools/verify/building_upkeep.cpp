@@ -785,10 +785,11 @@ void r9_no_wire_no_draw()
 // governs every goods draw, building upkeep's included, and "a draw from a
 // market's shelf is decided and billed at the price that stood when it was
 // made — the price it checked against the ceiling — with one exchange row at
-// that price". The shelf posts 1.5x base. (a) Shelf only: the draw's own want
-// resolves the price to 5.75x base — and the building is billed 1.5x and not
-// refused. (b) A seller listing plenty: the price resolves low — and the
-// building still pays 1.5x.
+// that price". The shelf posts 1.5x base. (a) Shelf only: the building is
+// billed 1.5x, and the standing shelf — supply, by MARKETS.md § Price
+// resolution (Ben, 2026-10-03) — keeps its own want from driving the price over
+// the ceiling. (b) A seller listing plenty: the price resolves elsewhere — and
+// the building still pays 1.5x.
 void r10_a_shelf_draw_pays_the_posted_price()
 {
     std::printf("\n--- R10  BL-1172: a shelf draw pays the posted price ---\n");
@@ -806,7 +807,7 @@ void r10_a_shelf_draw_pays_the_posted_price()
         return n;
     };
 
-    // --- R10a: shelf only — resolved over the ceiling, billed at posted ------
+    // --- R10a: shelf only — billed at posted, the shelf holds the price down --
     {
         fixture f;
         f.build(1, building_type::extraction_site);
@@ -819,11 +820,11 @@ void r10_a_shelf_draw_pays_the_posted_price()
 
         const auto flows = clear_markets(f.w, reg, rep);
         const float resolved = f.w.markets.at(mid).price[ri(good)];
-        check(resolved > base * k_shipped_reservation,
-              "R10a the draw's own want resolved the price OVER the ceiling (shelf only)");
+        check(resolved <= base * k_shipped_reservation && std::fabs(resolved - posted) > 1e-3f,
+              "R10a the standing shelf is supply: the draw's own want leaves the price at or under the ceiling");
         const auto fit = flows.find(f.corp);
         check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * posted,
-                   "R10a billed need x POSTED: not refused, and not the resolved price");
+                   "R10a billed need x POSTED, not the resolved price");
         float q, px;
         check(buyer_rows(f, q, px) == 1, "R10a exactly one exchange row for the fill");
         check_near(px, posted, "R10a ... at the posted price");

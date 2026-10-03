@@ -856,8 +856,8 @@ float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id 
     // the market can absorb supply up to the S* at which p_target(S*) ==
     // landed. Inside the band, base x sqrt(D / S*) = landed gives
     //     S* = D x (base / landed)^2,
-    // and what is left to absorb is S* - S, S being LAST clear's supply (what
-    // the market already gets). At the band's edges:
+    // and what is left to absorb is S* - S, S being LAST clear's listings plus
+    // the shelf standing now (`pricing_supply` — what the market already has). At the band's edges:
     //   * landed below floor x base: the target never falls to the landed
     //     cost however much is listed, so there is no finite S* — unbounded
     //     (the caller's surplus caps the send);
@@ -879,7 +879,9 @@ float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id 
     const float base = dm.base_price[r];
     if (base <= 0.0f)
         return 0.0f;
-    const float S = dm.supply[r];
+    // BL-1172: the SAME supply the price law resolves on — listings plus the
+    // standing shelf (`pricing_supply`, market_clearing.hpp).
+    const float S = pricing_supply(dm, r);
     const float D = dm.demand[r];
     if (S <= 0.0f)
         return std::max(0.0f, D - S);

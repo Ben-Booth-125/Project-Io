@@ -2,6 +2,8 @@
 
 #include "components.hpp"
 #include "economy_system.hpp"
+
+#include <algorithm>
 #include "recipe_registry.hpp"
 #include "world.hpp"
 
@@ -227,6 +229,27 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 /// (the eased price lags, and a size read off it overshoots every tick).
 float price_target(float base, float supply, float demand,
                    float price_floor_mult, float price_ceil_mult);
+
+/// BL-1172 — THE SHELF IS SUPPLY (MARKETS.md § Price resolution, Ben
+/// 2026-10-03): the supply the price law reads for good `r` on `m` is the
+/// listings recorded in `supply` PLUS the stock standing on the shelf
+/// (`inventory`). Every caller of `price_target` passes this, never `supply`
+/// alone: clearing's resolution and dispatch's haul sizing
+/// (`dispatch_absorbable`) aim at the same law.
+///
+/// WHICH INVENTORY. Read where each caller reads it, and both read the same
+/// moment of the tick: clearing resolves after the tick's draws (upkeep,
+/// processors, construction, the nations' purchases of the previous step are
+/// all off the shelf) and before this clear credits its own listings to the
+/// shelf — so a listing counts once, as a listing, in the tick it is made, and
+/// as shelf from the next tick until it is drawn. Dispatch sizes in the same
+/// tick, after the draws and before that clear. `supply` there is last clear's
+/// listings (it is reset at the top of clear_markets), as it always was.
+/// Negative figures read as zero. Pure.
+inline float pricing_supply(const market_component& m, std::size_t r)
+{
+    return std::max(0.0f, m.supply[r]) + std::max(0.0f, m.inventory[r]);
+}
 
 /// Input reservation a corporation needs to keep in ONE goods pool to feed a
 /// full run of the processors that draw that pool next tick — so it sells only

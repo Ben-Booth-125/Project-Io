@@ -1395,13 +1395,16 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 
     // --- Reference prices from accumulated supply/demand ---
     // Computed once, before any clearing, so all income/expenditure uses the same price.
+    // BL-1172: supply here is the listings PLUS the standing shelf
+    // (`pricing_supply`), read now — after the tick's draws, before the
+    // auto-surplus loop below credits this clear's listings to the shelf.
     std::unordered_map<entity_id, std::array<float, resource_count>> ref_price;
     for (const auto& [mid, mc] : w.markets)
     {
         ref_price[mid] = {};
         for (std::size_t r = 0; r < resource_count; ++r)
             ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r],
-                                              mc.supply[r], mc.demand[r],
+                                              pricing_supply(mc, r), mc.demand[r],
                                               reg.price_band().floor_mult,
                                               reg.price_band().ceil_mult);
     }
@@ -1431,10 +1434,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // BL-1172 (FINANCE.md § Standing-force upkeep, Ben 2026-10-03): "a draw from
     // a market's shelf is decided and billed at the price that stood when it was
     // made — the price it checked against the ceiling — with one exchange row at
-    // that price". Every fill here is a shelf draw made this tick — upkeep,
-    // processor inputs, construction — and every one of them checked
-    // `posted_price` against the fair-price ceiling before drawing
-    // (`shelf_admits`). `market_component::price` is not written until the end
+    // that price". Every fill here is a quantity a draw took off a market's
+    // shelf this tick — upkeep, processor inputs, construction — each capped by
+    // what the shelf held, and each checked `posted_price` against the
+    // fair-price ceiling before drawing (`shelf_admits`). A body-level key (no
+    // market) never reaches here (skipped where auto_buys is built). `market_component::price` is not written until the end
     // of this pass, so `posted_price` read here IS the price each draw saw. The
     // shelf's seller is the market, whose suppliers were paid when they listed
     // (row 1 above), so billing the posted price leaves no unpaid gap. Read

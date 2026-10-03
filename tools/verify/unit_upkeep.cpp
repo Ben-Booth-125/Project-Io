@@ -681,10 +681,11 @@ void u9_half_fed_settles_at_half()
 // up."
 //
 // The shelf posts 1.5x base (under the 2x ceiling). (a) SHELF ONLY, no listing
-// this tick: the unit's own want resolves the price to 5.75x base, far over the
-// ceiling — and the unit still buys, at 1.5x. (b) A seller listing plenty: the
-// price resolves low, and the unit still pays the 1.5x it agreed to, not the
-// resolved price.
+// this tick: the unit buys at 1.5x, and — the shelf being supply (MARKETS.md
+// § Price resolution, Ben 2026-10-03) — its own want does not drive the price
+// over the ceiling against the 99.5 still standing there. (b) A seller listing
+// plenty: the price resolves elsewhere, and the unit still pays the 1.5x it
+// agreed to, not the resolved price. U12 runs (a) for twelve ticks.
 
 void u10_a_shelf_draw_pays_the_posted_price()
 {
@@ -725,7 +726,7 @@ void u10_a_shelf_draw_pays_the_posted_price()
         return n;
     };
 
-    // --- (a) shelf only: the want drives the price over the ceiling; it still buys
+    // --- (a) shelf only: it buys at posted, and the shelf holds the price down
     {
         fixture f = make_fixture();
         const entity_id u   = add_unit(f, ROW_LEVY, heads, f.base, 600);
@@ -738,12 +739,12 @@ void u10_a_shelf_draw_pays_the_posted_price()
         check(t.unmet == 0, "U10a the shelf covered the rest: the draw is met, and the tally says so");
         const auto flows = clear_markets(f.w, reg, rep);
         const float resolved = f.w.markets.at(mid).price[ORD];
-        check(resolved > base * k_shipped_reservation,
-              "U10a its own want resolved the price OVER the ceiling (shelf only, no listing)");
+        check(resolved <= base * k_shipped_reservation && !near(resolved, posted),
+              "U10a the standing shelf is supply: its own want leaves the price at or under the ceiling");
         const auto fit = flows.find(f.corp);
         const float spent = (fit == flows.end()) ? 0.0f : fit->second.expenditure;
         check(near(spent, need * 0.5f * posted),
-              "U10a ... and it is billed at the POSTED 1.5x, not refused and not the resolved price");
+              "U10a ... and it is billed at the POSTED 1.5x, not the resolved price");
         float q, lo, hi;
         check(buyer_rows(f, q, lo, hi) == 1 && near(q, need * 0.5f) && near(lo, posted) && near(hi, posted),
               "U10a one exchange row, the shelf fill, at the posted price");
@@ -850,6 +851,74 @@ void u11_one_good_over_one_under()
           "U11 held half-fed, the unit settles at exactly 500");
 }
 
+// ---------------------------------------------------------------------------
+// U12 — BL-1172: A UNIT BESIDE A FULL SHELF STAYS FED, TICK AFTER TICK
+// ---------------------------------------------------------------------------
+// The multi-tick defect the cold review found: with the shelf left out of the
+// price law, a unit's own tick-1 want resolved a shelf-only market to 5.75x
+// base, over the ceiling, so it went without on tick 2 and the price eased back
+// over three — fed one tick in four. With the shelf as supply (MARKETS.md
+// § Price resolution, Ben 2026-10-03) it is fed EVERY tick: twelve ticks of
+// draw -> clear on a market nobody lists into, and every draw is met, every
+// posted price is at or under the ceiling, the supply factor only climbs.
+
+void u12_fed_every_tick_beside_a_full_shelf()
+{
+    std::printf("\n-- U12: BL-1172, twelve ticks beside a full shelf with no listing --\n");
+
+    constexpr float base     = 43.0f;
+    constexpr float per_head = 0.1f;
+    constexpr int   heads    = 10;
+    constexpr float need     = per_head * heads;
+
+    fixture f = make_fixture();
+    const entity_id u = add_unit(f, ROW_LEVY, heads, f.base, 600);
+    const entity_id mid = f.w.create_entity();
+    {
+        market_component mc{};
+        mc.body        = f.body;
+        mc.centre_tile = f.tile;
+        mc.base_price[ORD] = base;
+        mc.price[ORD]      = base * 1.5f;
+        mc.inventory[ORD]  = 100.0f;
+        f.w.markets[mid] = mc;
+    }
+    recipe_registry reg = registry_with_upkeep(0.0f, per_head, /*decay*/ 50, /*recovery*/ 100);
+    {
+        price_band_params pb;
+        pb.floor_mult = 0.25f; pb.ceil_mult = 10.0f; pb.reservation_mult = k_shipped_reservation;
+        reg.set_price_band(pb);
+    }
+
+    int unmet_ticks = 0, over_ticks = 0, falls = 0;
+    int prev = f.w.units.at(u).supply_factor_permille;
+    float spent = 0.0f, expect = 0.0f;
+    for (int tick = 0; tick < 12; ++tick)
+    {
+        const float posted = f.w.markets.at(mid).price[ORD];
+        if (posted > base * k_shipped_reservation)
+            ++over_ticks;
+        economy_report rep;
+        const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
+        unmet_ticks += t.unmet;
+        const auto flows = clear_markets(f.w, reg, rep);
+        if (const auto it = flows.find(f.corp); it != flows.end())
+            spent += it->second.expenditure;
+        expect += need * posted;
+        const int sf = f.w.units.at(u).supply_factor_permille;
+        if (sf < prev)
+            ++falls;
+        prev = sf;
+    }
+    check(unmet_ticks == 0, "U12 every one of twelve draws is met (no one-in-four pulse)");
+    check(over_ticks == 0, "U12 the posted price never rises over the ceiling");
+    check(falls == 0 && f.w.units.at(u).supply_factor_permille == 1000,
+          "U12 the supply factor only climbs, to full strength");
+    check(near(spent, expect, 1e-2f), "U12 every tick billed need x that tick's posted price");
+    check(near(f.w.markets.at(mid).inventory[ORD], 100.0f - 12.0f * need),
+          "U12 the shelf gave up exactly twelve ticks of need");
+}
+
 } // namespace
 
 int main()
@@ -868,6 +937,7 @@ int main()
     u9_half_fed_settles_at_half();
     u10_a_shelf_draw_pays_the_posted_price();
     u11_one_good_over_one_under();
+    u12_fed_every_tick_beside_a_full_shelf();
 
     std::printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
