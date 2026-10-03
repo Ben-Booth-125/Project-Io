@@ -300,6 +300,15 @@ how many firm charters a world's stock buys, which is its density and so its tic
 against live-play cost. Each knob has one job; a divisor tuned to the seat menu would leave density
 with no knob at all.
 
+**PROPOSED (2026-10-03, BL-1168 folding BL-1151; Ben to ratify): under the reach price the charters
+carry the anchor.** Priced by its trade reach, the median library world affords a specialist at about
+158 centres at two charters, against a no-budget world of 8 (the shipped arc's span-on fallback
+world; the span-off legacy roster opens 12). The divisor alone would need about 36 to reach it, and
+there the web starves — 14 to 80 background firms where 650 fills the 120 ceiling. So NR-908's own
+knob takes it: **44 charters**, the first whole number at which the median library world opens the
+no-budget world's 8 seats, with the divisor held at 650 for live-play cost. The spread runs 1 to 29
+seats; a world of one landmass whose capital towers offers one.
+
 **SETTLED (Ben, 2026-09-21, NR-910): the pins.** A specialist costs **two** firm charters. The
 charter count moves in whole charters, which is too coarse to land the anchor on its own, so the
 divisor takes the last step, inside the band live-play cost allows: it is **the divisor at which

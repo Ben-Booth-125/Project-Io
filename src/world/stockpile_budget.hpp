@@ -311,7 +311,22 @@ std::vector<std::int64_t> stockpile_region_reach(const world& w, const std::vect
 /// coarse to land the anchor on their own — at the divisor that runs the legacy
 /// tick, three open a median of about four seats and two about thirteen — so the
 /// divisor takes the last step (above).
-inline constexpr std::int32_t k_stockpile_specialist_firm_charters = 2;
+///
+/// RE-ANCHORED TO 44 (BL-1168 folding BL-1151, 2026-10-03; Ben to ratify — it
+/// moves NR-910's pin of two). The rule is NR-908's: this knob answers the seat
+/// menu, the divisor answers live-play cost. The anchor is the NO-BUDGET world
+/// of the shipped arc (the span on, no budget: the world NR-910's fallback
+/// lays), whose library median is 8 seats (16 seeds; the span-off legacy
+/// roster's is 12). Read on the reach price (`stockpile_budget_check
+/// --seat-curve`, landmass reach, d = 650), the median library world's
+/// affording centres run 158.5 / 50 / 17.5 / 12 / 10 / 9 / 8 at m = 2 / 8 / 24
+/// / 32 / 38 / 42 / 44 — 44 is the first whole charter at the anchor. THE
+/// DIVISOR COULD NOT TAKE IT: at m = 2 the anchor needs d near 36, and there the
+/// web starves — 14 to 80 background firms where d = 650 fills the 120 ceiling
+/// (player_seed_sweep --charter-cost, seeds 0, 12, 28, 46). The spread stays
+/// accepted (NR-910): 1 to 29 seats, the one-seat world a single landmass
+/// whose capital towers (seed 11).
+inline constexpr std::int32_t k_stockpile_specialist_firm_charters = 44;
 /// The per-good cap's floor and the square root's base c: 8, Pass 6's legacy
 /// per-good cap (Ben, 2026-09-21, NR-910), so a body at the legacy firm spend
 /// keeps the legacy cap (`charter_sqrt_per_good_cap`: cap(B_ref) == c).
