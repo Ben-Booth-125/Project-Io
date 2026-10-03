@@ -2388,6 +2388,54 @@ struct history_sim_params
     /// at 700 (the default, = the land penalty) nothing changes.
     int treaty_far_sea_penalty_q = 700;
 
+    /// BL-1171 -- A FAR PAIR READS THE SEA'S PENALTY ONLY WHERE THE SELLER'S
+    /// FLEET OUT-PROJECTS THE PARTNER'S AT THE PARTNER'S PORT (EXPLORATION.md
+    /// sec The colonial tie is a sea lane, SETTLED and ruled 2026-10-03).
+    /// With this on, a far pair that met across water reads
+    /// `treaty_far_sea_penalty_q` only while one side (the seller) has, at the
+    /// other's seat coast tile, `fleet_power_at(navy, cost,
+    /// fleet_power_halving_tiles)` -- walked from its own seat's coast tile
+    /// over the sea priced with the current -- of at least
+    /// `far_sea_bind_min_fleet_power` AND at least the partner side's power on
+    /// that tile: `judge_crossing`'s defender comparison, the defenders being
+    /// `crossing_defenders(partner, seller)` (the partner and its
+    /// mutual-defence partners with a fleet, each from its own ports, less any
+    /// bound to the seller by non-aggression), a tie to the seller. Elsewhere
+    /// the pair reads the land's `treaty_far_penalty_q`. Formation and the
+    /// break re-score read it alike, so a fleet that decays or is out-built
+    /// loosens the binding it made. Reads
+    /// nothing unless the fleet rule is on with a halving above 0 (then every
+    /// pair met across water reads the sea penalty, as BL-1142 rules). Off by
+    /// default; the Exploration span's own.
+    bool    far_sea_bind_needs_fleet_reach = false;
+    /// The power (`fleet_power_at` units: 1024 = one hull at its port) that
+    /// counts as reaching. 1: any power at all.
+    int64_t far_sea_bind_min_fleet_power   = 1;
+
+    /// BL-1171 -- MEETING BY SEA IS GATED TOO (EXPLORATION.md sec The colonial
+    /// tie is a sea lane; Ben, 2026-10-03). With this on (and
+    /// `far_pairs_meet_by_sea`), two realms across water whose trade by sea is
+    /// open MEET only where one side's fleet out-projects the other's at its
+    /// port -- the very comparison `far_sea_bind_needs_fleet_reach` reads for
+    /// binding (the side's power at the other's seat coast tile, at least
+    /// `far_sea_bind_min_fleet_power` and at least what the other side and
+    /// its mutual-defence partners project there; a tie to the side sailing).
+    /// A contact the sea forbids is never made BY SAILING, rather than made and
+    /// left unbound; conquest's inheritance (`extinguish_polity`) still passes
+    /// the conquered's contacts on, ungated (Ben, 2026-10-03: conquest inherits
+    /// what the conquered knew). Reads nothing unless the fleet rule is on with a halving above
+    /// 0 (then every open pair meets, as BL-1142 rules). Off by default; the
+    /// Exploration span's own.
+    bool far_sea_meet_needs_fleet_out_projection = false;
+
+    /// BL-1171 -- GOODS BETWEEN LANDMASSES GO BY SEA (EXPLORATION.md sec The
+    /// colonial tie is a sea lane, SETTLED 2026-10-03). With this on, a trade
+    /// whose two seats stand on different landmasses (`landmass_at`) reads no
+    /// land line: a road carries goods only between seats on one landmass, so
+    /// such a trade sails (the seller's navy, both seats' ports) or does not
+    /// move. Needs the seats' landmasses (a span on terrain). Off by default.
+    bool trade_road_joins_one_landmass = false;
+
     /// A LEG RUN AGAINST ITS CURRENT DELIVERS LESS (EXPLORATION.md sec
     /// Currents, "Where currents bite"; BL-1142). Per mille: a trade between
     /// realms on different landmasses WHOSE GOODS THE SEA CARRIES (its sea
@@ -2819,6 +2867,9 @@ struct exploration_spend_context
     const std::vector<int32_t>*                 seat_landmass  = nullptr;
     int                                         cargo_loss_q   = 0;
     int64_t*                                    cargo_lost_out = nullptr;
+    /// BL-1171 diagnostic: where set, the round's flows add what the road
+    /// rule took from them (`trade_context::road_rule_lost`). Write-only.
+    int64_t*                                    road_rule_lost_out = nullptr;
 };
 
 ///
@@ -4762,6 +4813,46 @@ struct history_sim_state
     int64_t contacts_met_by_sea           = 0;
     int64_t treaties_formed_across_water  = 0;
     int64_t far_treaties_formed_across_water = 0;
+    /// BL-1171: far-pair penalty reads (formation and the break re-score, per
+    /// round) of a pair met across water where neither side's fleet
+    /// out-projected the other's at its port, so it read the land's penalty.
+    /// Diagnostic; nothing reads it.
+    int64_t far_pairs_out_of_fleet_reach  = 0;
+    /// BL-1171: pairs across water whose trade by sea was open but which did
+    /// NOT meet that round because neither side's fleet out-projected the
+    /// other's at its port (`far_sea_meet_needs_fleet_out_projection`), summed
+    /// over rounds (a pair refused in many rounds counts each). Diagnostic.
+    int64_t far_meetings_out_of_fleet_reach = 0;
+    /// BL-1171 DIAGNOSTICS (write-only; nothing reads them). What the road
+    /// rule (`trade_road_joins_one_landmass`) took from the round's flows,
+    /// summed over rounds, per directed pair and good BEFORE the want and
+    /// holding are shared (an attribution of the line, not of what
+    /// arrived): the volume the raw land line would have carried over the
+    /// sea line where the sea line is 0 because the seller holds no navy,
+    /// where it is 0 because a seat has no built port (the seller holds a
+    /// navy), and where the sea line runs but narrower than the road.
+    int64_t road_rule_lost_no_navy_q  = 0;
+    int64_t road_rule_lost_no_port_q  = 0;
+    int64_t road_rule_lost_narrowed_q = 0;
+    /// ... and where the sea line is 0 though the seller holds a navy and both
+    /// seats hold a built port: the current's pricing floored it.
+    int64_t road_rule_lost_by_current_q = 0;
+    /// BL-1171 DIAGNOSTICS (write-only): why the subjection walk bound no
+    /// one, summed over rounds. The arriving powers walked (alive, free,
+    /// holding the sea-leg node) and of them those left with no eligible
+    /// native. Per contacted native in reach, the ones failing EXACTLY ONE of
+    /// the three remaining tests -- already a subject; a seat treasury plus
+    /// the margin the arriving seat's does not cover; held off by a
+    /// sphere-of-claim partner -- and, per arriving power left with none, whether
+    /// lifting that one test alone would have left it a native to bind.
+    int64_t subjection_arrivals_walked           = 0;
+    int64_t subjection_arrivals_none_eligible    = 0;
+    int64_t subjection_native_sole_overlord      = 0;
+    int64_t subjection_native_sole_treasury      = 0;
+    int64_t subjection_native_sole_sphere        = 0;
+    int64_t subjection_arrivals_freed_by_overlord = 0;
+    int64_t subjection_arrivals_freed_by_treasury = 0;
+    int64_t subjection_arrivals_freed_by_sphere   = 0;
     /// BL-1147: at a resumed open whose conversion is on, the naval points the
     /// LIVING polities carried into fleets, the points held by polities
     /// already dead (which carry nothing), the fleets opened and their hulls;
@@ -5715,6 +5806,16 @@ struct trade_context
     const std::vector<int32_t>* seat_landmass = nullptr;
     int                         cargo_loss_q  = 0;
     int64_t*                    cargo_lost    = nullptr;
+    /// BL-1171 diagnostic: where set, `compute_trade_flows` adds to [0] / [1]
+    /// / [2] / [3] the volume the road rule took (no navy / no port / narrowed /
+    /// floored to 0 by the current; `history_sim_state::road_rule_lost_*`).
+    /// Four slots. Write-only; never read.
+    int64_t*                    road_rule_lost = nullptr;
+
+    /// BL-1171 (`history_sim_params::trade_road_joins_one_landmass`): with
+    /// `seat_landmass` set, a pair whose seats stand on different landmasses
+    /// reads no land line -- a road joins seats on one landmass only.
+    bool road_joins_one_landmass = false;
 };
 
 trade_context build_trade_context(const std::vector<region>&           regions,

@@ -497,6 +497,10 @@ inline constexpr int kSeaLanePortRadius = 9;
 /// lanes into one port share their water near it and fan out far from it. 500 is
 /// the lane's own traversal discount (x 0.50, LOGISTICS.md § 4b): the stamp reads
 /// a laid lane as a traveller does. 1000 is no reuse: every lane walked alone.
+/// A TRUNK IS SHARED ONLY WITH THE CURRENT (Ben, 2026-10-03): the discount applies
+/// to a step that does not run against the entered tile's current
+/// (`sea_walk_laned`); upstream the walk pays the full step, so a busy trunk never
+/// carries a later lane against the water.
 inline constexpr int kSeaLaneReuseCostQ = 500;
 
 /// What one `stamp_sea_lanes` call did. WRITE-ONLY.

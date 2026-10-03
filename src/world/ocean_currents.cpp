@@ -391,6 +391,7 @@ void sea_dijkstra(const std::vector<std::uint8_t>& sea, int gw, int gh,
                 continue; // water only
             constexpr int64_t len = 1000;
             int64_t step = len;
+            int align = 0; // still water: no current along the step
             if (priced)
             {
                 // The step's direction (east = dc, north = -dr) against the entered
@@ -398,12 +399,21 @@ void sea_dijkstra(const std::vector<std::uint8_t>& sea, int gw, int gh,
                 const std::size_t k = static_cast<std::size_t>(currents->region_of(vc, vr));
                 const int64_t dot = static_cast<int64_t>(currents->east_q[k]) * dc
                                   + static_cast<int64_t>(currents->north_q[k]) * (-dr);
-                const int align = static_cast<int>(std::clamp<int64_t>(dot, -1000, 1000));
+                align = static_cast<int>(std::clamp<int64_t>(dot, -1000, 1000));
                 step = (len * ocean_current_leg_cost_q(weight_q, align)) / 1000;
                 if (step < 1)
                     step = 1; // no step is ever free
             }
-            if (reuse && (*laned)[static_cast<std::size_t>(v)])
+            // A TRUNK IS SHARED ONLY WITH THE CURRENT (LOGISTICS.md sec 4b, Ben
+            // 2026-10-03): the laned discount applies to a step that does not run
+            // AGAINST the entered tile's current -- the same alignment that priced
+            // the step, read once. Against it (align < 0) the walk pays the full
+            // priced step, trunk or not, so a busy trunk never carries a later
+            // lane upstream. At the boundary the discount stands: a step across
+            // the current or through slack water (align exactly 0), and every step
+            // of an unpriced walk (no field, or weight 0: still water), is not
+            // upstream of anything. Integers only, so the walk stays deterministic.
+            if (reuse && align >= 0 && (*laned)[static_cast<std::size_t>(v)])
             {
                 step = (step * laned_cost_q) / 1000;
                 if (step < 1)

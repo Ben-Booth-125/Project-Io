@@ -31,6 +31,9 @@
 //   T2  a reuse cost of 1000 (no discount) is the plain stamp: every lane the
 //       plain walk, the field their union
 //   T3  the busiest lane is walked first, whatever order the record arrives in
+//   T4  a trunk is shared only with the current (LOGISTICS.md sec 4b, Ben
+//       2026-10-03): a later walk rides an earlier lane's discount downstream
+//       and pays the full step upstream, where it keeps to its own water
 //   W0  the realms handed the stamp are the last close's region owners
 //   W1  on a generated 1960 world lanes are stamped (count reported), only on
 //       sea tiles, and no road lies on water (the road lens has none to draw);
@@ -540,6 +543,54 @@ void trunk_rows()
     const bool first = !on.tr.lanes.empty() && on.tr.lanes.front().a == 0 && on.tr.lanes.front().b == 2;
     check(first && on2 && on2->path == sea_lane_walk(sea, gw, gh, nullptr, 0, on2->from_port, on2->to_port),
           "T3  the busiest lane is walked first, on empty water, whatever order the record arrives in");
+
+    // T4: A TRUNK IS SHARED ONLY WITH THE CURRENT. Water 30 x 12 (land down the
+    // first and last columns, so nothing wraps) under one
+    // current running due east at full strength (every ocean region 1000 east),
+    // an earlier lane laid along row 2, and a later walk between (2,3) and (27,3)
+    // on the row beside it, at the shipped weight and reuse. Downstream (east)
+    // the trunk's discount pays for the step across onto it: the walk rides row 2
+    // (500 + 25 x 250 + 1000 = 7,750 against 25 x 500 = 12,500 on its own row).
+    // Upstream (west) the trunk offers no discount -- a discounted trunk would
+    // cost 500 + 25 x 750 + 1000 = 20,250 against 37,500 on its own row, and take
+    // it -- so the walk keeps to row 3 and is the unlaned walk exactly.
+    {
+        constexpr int tw = 30, th = 12;
+        std::vector<uint8_t> tsea(static_cast<std::size_t>(tw) * th, 1);
+        // Land down columns 0 and 29, so the columns' wrap offers no way round.
+        for (int r = 0; r < th; ++r)
+        {
+            tsea[static_cast<std::size_t>(r * tw)] = 0;
+            tsea[static_cast<std::size_t>(r * tw + tw - 1)] = 0;
+        }
+        ocean_current_field f;
+        f.gw = tw; f.gh = th; f.cell = ocean_current_cell_tiles;
+        f.cells_w = (tw + f.cell - 1) / f.cell;
+        f.cells_h = (th + f.cell - 1) / f.cell;
+        f.sea = tsea;
+        const std::size_t nreg = static_cast<std::size_t>(f.cells_w) * f.cells_h;
+        f.east_q.assign(nreg, 1000);
+        f.north_q.assign(nreg, 0);
+        f.sea_tiles.assign(nreg, static_cast<uint16_t>(f.cell * f.cell));
+        std::vector<uint8_t> laned(tsea.size(), 0);
+        for (int c = 1; c < tw - 1; ++c) laned[static_cast<std::size_t>(2 * tw + c)] = 1;
+        const int w3 = 3 * tw + 2, e3 = 3 * tw + 27;
+        const int wq = exploration_sim_params(world_params{}).sea_current_weight_q;
+        const std::vector<int> down = sea_walk_laned(tsea, tw, th, &f, wq, &laned, kSeaLaneReuseCostQ, w3, e3);
+        const std::vector<int> up   = sea_walk_laned(tsea, tw, th, &f, wq, &laned, kSeaLaneReuseCostQ, e3, w3);
+        const std::vector<int> up_alone = sea_walk_laned(tsea, tw, th, &f, wq, nullptr, 1000, e3, w3);
+        int down_on = 0, up_on = 0;
+        for (const int t : down) if (laned[static_cast<std::size_t>(t)]) ++down_on;
+        for (const int t : up) if (laned[static_cast<std::size_t>(t)]) ++up_on;
+        std::printf("      T4 one current due east, a trunk on row 2, weight %d: downstream %zu tiles (%d on the trunk);"
+                    " upstream %zu tiles (%d on the trunk), the unlaned upstream walk %zu tiles\n",
+                    wq, down.size(), down_on, up.size(), up_on, up_alone.size());
+        std::fflush(stdout);
+        check(down_on >= 20 && walk_is_honest(down, tsea, tw),
+              "T4  downstream, a later lane rides an earlier trunk's discount with the current");
+        check(!up.empty() && up_on == 0 && up == up_alone,
+              "T4  upstream it takes no discount: it keeps to its own water, the unlaned walk exactly");
+    }
 }
 
 // ---------------------------------------------------------------------------
