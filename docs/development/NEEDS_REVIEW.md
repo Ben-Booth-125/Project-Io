@@ -24,13 +24,26 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*69 entries — 0 open, 69 resolved.*
+*70 entries — 1 open, 69 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-966 — NOVEL WORK: a both-trees shape probe for re-blesses (rebless_shape_probe)
+*novel-work · raised 2026-10-03 · from the sprint 48 re-bless lane*
+
+tools/verify/rebless_shape_probe.cpp measures the world's shape (centres, scales, provinces, markets, roads, wars, sea, firms, seats, haulage) on two source trees so a re-bless can be described in shape, as DELIVERY.md asks. It is new tooling with no saved skill. Also new this sprint with no skill: culture_preference_census, centre_abandonment_census, centre_decline_trace, garrison_border_probe, market_gravity_ladder.
+
+**Why it matters.** Tool creation is skill creation (CLAUDE.md); a skill wrapper needs your permission.
+
+- A: wrap rebless_shape_probe as a re-bless skill (the one each sprint's re-bless uses)
+- B: leave them as ad hoc tools in tools/verify
+- C: other
+
+> **Recommendation:** A for rebless_shape_probe; B for the rest.
+
+*Files: `tools/verify/rebless_shape_probe.cpp`*
 
 ---
 

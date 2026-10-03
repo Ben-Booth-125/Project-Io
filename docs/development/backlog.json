@@ -1714,6 +1714,48 @@
     "src/world/corp_ai.cpp"
    ],
    "design": "FOUND 2026-10-03 (BL-1163 lane, centre_decline_trace, seed 0 shipped start): corps 196 -> 22 and live buildings 536 -> 167 over 440 ticks, with or without the growth gate; the economy shrinks ~9x. Ben (2026-10-03): diagnose it as its own item next, measured first. WORK: trace exits per firm (cause: insolvency, idle buildings, no demand, upkeep; which recipes; which markets), over ticks 0-450 on seeds 0, 10, 28; say whether it predates sprint 48; report options before any fix. Sprint 49."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 49,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1165",
+   "short_name": "REBLESS_UNTRACED_MOVEMENTS",
+   "author": "Claude (the sprint 48 re-bless, authorised by Ben 2026-10-03)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Trace the three movements the sprint 48 re-bless could not attribute: population halved, haulage fell, nation units fell",
+   "authority_doc": "docs/development/drafts/sprint-48-rebless.md",
+   "files": [
+    "tools/verify/rebless_shape_probe.cpp"
+   ],
+   "design": "Ben authorised the sprint 48 re-bless (2026-10-03, merged 179615b8) with three untraced movements filed here: (1) world population 12.19B -> 6.27B (likeliest BL-1130/1132, the doubled war); (2) shipped haulage (--far-trade) 16,327 / 14,729 -> 14,434 / 11,917 per year (-11.6% / -19.1%), rising on 8 seeds and falling on 8, though every item that read it alone reported a rise or no change (likeliest BL-1125's folds); (3) nation units 414,404 -> 167,110. WORK: bisect each across the sprint's merge commits with rebless_shape_probe (v0.1.26 e50ab81c -> a899bb2a), name the cause, and report for Ben whether each is wanted."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 49,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1166",
+   "short_name": "IND_HARNESS_SELF_CHECK_STALE",
+   "author": "Claude (the sprint 48 re-bless lane)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 1,
+   "title": "industrialisation_sim_harness stops at a stale BL-1056 self-check, so its library-fingerprint check never runs",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "tools/verify/industrialisation_sim_harness.cpp"
+   ],
+   "design": "FOUND 2026-10-03 (the re-bless lane): the harness halts at its BL-1056 self-check (2), \"NOT REFUSED\", since NR-964 (the treasury share by employed heads), so the fingerprint check after it never runs. WORK: re-state the self-check for the employed-heads spread (never weakened to pass), then confirm the fingerprint check runs and passes."
   }
  ]
 }

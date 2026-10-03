@@ -1532,6 +1532,26 @@
    ],
    "resolution": "RULED (Ben, 2026-10-01, the open calls form): A: a crossing the fleet rule would refuse is not a candidate -- a legality filter, like every other verb gate, not a scorer term. EXPLORATION.md; BL-1152 builds it.",
    "resolved": "2026-10-01"
+  },
+  {
+   "id": "NR-966",
+   "title": "NOVEL WORK: a both-trees shape probe for re-blesses (rebless_shape_probe)",
+   "raised": "2026-10-03",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "the sprint 48 re-bless lane",
+   "what": "tools/verify/rebless_shape_probe.cpp measures the world's shape (centres, scales, provinces, markets, roads, wars, sea, firms, seats, haulage) on two source trees so a re-bless can be described in shape, as DELIVERY.md asks. It is new tooling with no saved skill. Also new this sprint with no skill: culture_preference_census, centre_abandonment_census, centre_decline_trace, garrison_border_probe, market_gravity_ladder.",
+   "why_it_matters": "Tool creation is skill creation (CLAUDE.md); a skill wrapper needs your permission.",
+   "options": [
+    "A: wrap rebless_shape_probe as a re-bless skill (the one each sprint's re-bless uses)",
+    "B: leave them as ad hoc tools in tools/verify",
+    "C: other"
+   ],
+   "recommendation": "A for rebless_shape_probe; B for the rest.",
+   "files": [
+    "tools/verify/rebless_shape_probe.cpp"
+   ],
+   "resolution": null
   }
  ]
 }
