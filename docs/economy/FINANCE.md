@@ -224,7 +224,10 @@ the cut: *"it's not fun to see an inevitable loss."* Paired with a
 non-zero opening capital (`corporation_params::base_capital`, 400), which is the buffer that stops
 a survivable bad quarter starting the spiral at all. **Every firm opens with it (Ben, 2026-10-03):**
 a background firm opens with working capital priced from its opening stock, not at zero, so the
-buffer exists for the whole field and not only for the seat and the specialists. The constant is the single
+buffer exists for the whole field and not only for the seat and the specialists. The rule: cash is
+one quarter of the stock's value, each good at its base price in the market the stock is pooled in
+(`k_background_working_capital_of_stock`, `corporation_generation.cpp`). Base, never the live price,
+so an opening position is priced by worth rather than by the first tick's scarcity. The constant is the single
 source of truth: the live loop and the `econ_bankruptcy` harness read the same value.
 Interest is a pure function of balance × rate — deterministic. Design: BL-073 (debt
 interest).
