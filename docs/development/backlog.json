@@ -2035,6 +2035,28 @@
     "src/world/market_clearing.cpp"
    ],
    "design": "BEN (2026-10-03): backlogged in favour of the k-tick cap on the shelf's share of supply. The market buys every surplus as buyer of last resort, so inventory only grows; counted whole as supply it floored prices (1/1/11 firms on seeds 0/10/28). Spoilage treats the cause: design which goods spoil, at what rate, who loses the value, and whether the k cap then retires. Design first."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1180",
+   "short_name": "CONSTRUCTION_RATE_PANEL_DRIFT",
+   "author": "Claude (BL-1172 cold review, 2026-10-03)",
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "The construction panels predict the build rate the tick will actually take",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/ui/construction_panel.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "design": "construction_panel.cpp:60 and selection_panel.cpp:267 predict a site's rate from m->supply[r]. The tick draws from shelf inventory gated by the fair-price ceiling (shelf_admits, components.hpp), pauses a build on a material posted over the ceiling, and stretches it on capacity over the ceiling (FINANCE.md, Ben 2026-10-03). The panels already missed the inventory read and the stretch rule; the ceiling widens the gap, so a paused build can show progress. Read the tick's own expression rather than a second copy. Needs a live click to verify."
   }
  ]
 }
