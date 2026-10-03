@@ -2397,11 +2397,22 @@ namespace {
 /// caller's shortfall rule takes it unchanged: the building SCALES ITS OUTPUT
 /// DOWN (`building_supply_scalar`), it is not idled — the lights go dim, not out.
 ///
+/// BL-1172 — THE SUPPLY SHARE. `met_permille`, when non-null, receives how much
+/// of the draw was actually met (pool plus market fill), as the MEAN over the
+/// goods the draw names of each good's met fraction, in integer per-mille
+/// (truncated). Each good counts once, unweighted by price, so the share says
+/// "how much of what it needs it got", not "how much it spent"; a fully met
+/// draw is exactly 1000, and a grid good on an unreached tile is 0 for that
+/// good. The unit pass reads it to weaken a short-fed army IN PROPORTION to its
+/// supply share (FINANCE.md § Standing-force upkeep); the building pass passes
+/// null and is unchanged.
+///
 /// Deterministic: resource index order, no RNG, no container-order dependence.
 /// `tile_reach_cost` is a const read off a field the caller warms.
 bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& report,
                        entity_id corp, entity_id body, entity_id tile,
-                       const std::array<float, resource_count>& need)
+                       const std::array<float, resource_count>& need,
+                       int* met_permille = nullptr)
 {
     // BL-1003: the draw is from the pool of the TILE's market — the shelf the
     // buyer stands at — or the body-level pool on a market-less body, and the
@@ -2434,13 +2445,16 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
     std::array<float, resource_count>* want   = nullptr;
     std::array<float, resource_count>* bought = nullptr;
     std::array<float, resource_count>* upk    = nullptr;
+    std::array<float, resource_count>* upb    = nullptr; // BL-1172: upkeep fill mirror
 
     bool unmet = false;
+    int share_sum = 0, share_goods = 0; // BL-1172: per-good met per-mille, summed
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         const float required = need[r];
         if (required <= 0.0f)
             continue;
+        ++share_goods;
 
         // BL-708: a grid good on an unreached tile draws NOTHING — not from the
         // pool, not from the shelf. The whole requirement falls through as
@@ -2448,7 +2462,7 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
         if (grid.grid(r) && !connected)
         {
             unmet = true;
-            continue;
+            continue; // contributes 0 to the share
         }
 
         const float have = std::max(0.0f, pool.quantities[r]);
@@ -2484,8 +2498,12 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
                     {
                         m->inventory[r] -= drawn;
                         if (bought == nullptr)
+                        {
                             bought = &report.purchases[std::make_pair(corp, pool_key)];
+                            upb    = &report.upkeep_purchases[std::make_pair(corp, pool_key)];
+                        }
                         (*bought)[r] += drawn; // the FILL: this is what is billed
+                        (*upb)[r]    += drawn; // ...and the part billed at most at the ceiling
                         shortfall -= drawn;
                     }
                 }
@@ -2493,8 +2511,18 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
         }
 
         if (shortfall > 0.0f)
+        {
             unmet = true;
+            // Met fraction of THIS good, truncated to per-mille: the one place a
+            // float becomes the integer the supply factor is steered by.
+            const float met = std::clamp((required - shortfall) / required, 0.0f, 1.0f);
+            share_sum += static_cast<int>(met * 1000.0f);
+        }
+        else
+            share_sum += 1000;
     }
+    if (met_permille != nullptr)
+        *met_permille = (share_goods > 0) ? share_sum / share_goods : 1000;
     return unmet;
 }
 
@@ -2578,7 +2606,11 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
         }
         const entity_id body = tit->second.body;
 
-        bool unsupplied = false;
+        // BL-1172: the supply factor's TARGET, per-mille. A met draw in reach
+        // steers it to 1000; out of reach steers it to 0; a short draw steers it
+        // to the share of the draw actually met, so an army fed half its rations
+        // settles at half strength rather than starving to nothing.
+        int target_permille = 1000;
 
         // --- 2a. Trigger (a): beyond the reach field (BL-325 S3) --------------
         // Opt-in: a non-positive limit disables the trigger AND, with it, the
@@ -2591,7 +2623,7 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
             // and a NaN both read as out of supply; rc < 0 is "not computed".
             if (rc < 0.0f || !(rc <= up.out_of_supply_reach))
             {
-                unsupplied = true;
+                target_permille = 0;
                 ++out.out_of_reach;
             }
         }
@@ -2605,20 +2637,27 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
             // unit's local market and paid for, unless the good prices above the
             // buyer's reservation ceiling — in which case the unit goes without
             // and the decay rule below does exactly what it always did.
-            if (draw_goods_or_bid(w, reg, report, u.owner, body, u.position, d.goods))
+            int share = 1000;
+            if (draw_goods_or_bid(w, reg, report, u.owner, body, u.position, d.goods, &share))
             {
-                unsupplied = true;
+                target_permille = std::min(target_permille, share);
                 ++out.unmet;
             }
         }
 
         // --- 3. The decay rule: ONE subtraction, TWO triggers ------------------
-        if (unsupplied)
+        // BL-1172: the subtraction and the recovery are unchanged in size; what
+        // changed is where they stop. An unsupplied unit loses
+        // `supply_decay_permille` a tick down to its target (0 out of reach, the
+        // met share on a short draw), and a unit below its target regains
+        // `supply_recovery_permille` a tick up to it. Integer, no RNG. A wholly
+        // unmet draw has target 0, which is the pre-BL-1172 rule exactly.
+        if (u.supply_factor_permille > target_permille)
             u.supply_factor_permille =
-                std::max(0, u.supply_factor_permille - up.supply_decay_permille);
+                std::max(target_permille, u.supply_factor_permille - up.supply_decay_permille);
         else
             u.supply_factor_permille =
-                std::min(1000, u.supply_factor_permille + up.supply_recovery_permille);
+                std::min(target_permille, u.supply_factor_permille + up.supply_recovery_permille);
 
         ++out.units;
     }
