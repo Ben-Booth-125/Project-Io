@@ -373,6 +373,14 @@ grudge, a taste and a sea lane.
 
 ## The colonial tie is a sea lane, and the map reads it
 
+**SETTLED (Ben, 2026-10-03, overturning NR-888 for this age): the Exploration age grounds
+international trade.** Far realms across water meet and bind in this age, not only in
+Industrialisation — but only where the seller's fleet can reach the partner's port, its power
+halving over sea distance as a fleet's does (§ the stocks table), so navies decide how many far
+pairs trade, not a dial. **Goods between landmasses go by sea:** a road carries goods only between
+seats on one landmass, so trade between landmasses rides a fleet, writes sea lanes, and grounds the
+long lanes the age is remembered for. Measured on the curated seeds before it is set.
+
 *(Folded from `../research/COLONIAL_ERA.md` on 2026-09-16, NR-884.)*
 
 **A tie is a force on the map, never a preference inside an actor.** An earlier design seeded the

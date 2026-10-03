@@ -679,8 +679,9 @@ a frozen network.
 Emigration's line needs contact, far trade (property 7) needs relationships between distant
 polities, and a world war spreads only through bindings that reach across the map. So this phase
 raises contact and binds far pairs itself — through trade, migration and alliance — rather than
-inheriting a treaty graph that never reached past the old neighbourhood. Exploration is not
-revisited for it. **Far pairs bind across water, not only across a border (Ben, 2026-09-26;
+inheriting a treaty graph that never reached past the old neighbourhood. *Exploration was not
+revisited for it until Ben's 2026-10-03 ruling* (`EXPLORATION.md` § The colonial tie is a sea lane):
+far realms across water now meet and bind there too, where a fleet reaches. **Far pairs bind across water, not only across a border (Ben, 2026-09-26;
 BL-1142, far pairs across water):** the binding reaches realms on other landmasses, so the
 inter-continental trade the sea lanes carry is common rather than a handful of pairs — seven realm
 pairs on six of sixteen curated worlds before it. **A far pair across water reads a penalty of 300
