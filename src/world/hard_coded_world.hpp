@@ -917,6 +917,13 @@ struct generation_report
     /// The centre tiles of the home markets the port gate counted as ported
     /// (their seeding population tile's region holds a port), ascending.
     std::vector<entity_id> ported_market_centres;
+    /// Every capital shell spawned (BL-910), in spawn order, with its REGION ANCHOR
+    /// tile (BL-1138 review: a shell on a water anchor stands on land, so its centre
+    /// is no longer its anchor; the anchor is what binds it to its region).
+    std::vector<std::pair<entity_id, entity_id>> capital_shell_anchors;
+    /// Of them, shells whose region and whole polity held no land, stood on the
+    /// nearest land of anyone's (BL-1138 review): a polity seated wholly at sea.
+    int64_t capital_shells_off_realm = 0;
 
     // --- Roads pull toward markets (BL-1138; LOGISTICS.md § 4) --------------
     // What `lay_market_roads` did on the home body, after the folds. Write-only.

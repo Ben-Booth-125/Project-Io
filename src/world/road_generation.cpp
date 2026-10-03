@@ -107,33 +107,6 @@ std::uint8_t edge_tier(int scale_a, int scale_b, float percentile)
     return kTrack;
 }
 
-/// BL-621: each nation's qualification PERCENTILE among the world's nations, mid-rank on
-/// ties — (count below + half the tied group) / N — over ascending nation ids. All-tied
-/// -> 0.5 each. The ONE formula the road gates read (generate_roads, lay_market_roads).
-std::map<entity_id, float> road_qualification_percentiles(const world& w)
-{
-    std::map<entity_id, float> out;
-    std::vector<std::pair<entity_id, float>> qs;
-    for (const auto& [nid, nc] : w.nations)
-        qs.push_back({ nid, nc.qualification });
-    std::sort(qs.begin(), qs.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
-    const int nn = static_cast<int>(qs.size());
-    for (const auto& [nid, q] : qs)
-    {
-        int below = 0, tied = 0;
-        for (const auto& [nid2, q2] : qs)
-        {
-            below += q2 < q;
-            tied  += q2 == q;
-        }
-        out[nid] = nn > 0 ? (static_cast<float>(below) + 0.5f * static_cast<float>(tied))
-                                / static_cast<float>(nn)
-                          : 0.0f;
-    }
-    return out;
-}
-
 constexpr float kUnreachable = std::numeric_limits<float>::max();
 
 /// A road node: one population centre on the body, tagged with its nation, scale and
@@ -283,6 +256,33 @@ double network_route_cost(const std::vector<std::vector<std::pair<int, double>>>
 }
 
 } // namespace
+
+/// BL-621: each nation's qualification PERCENTILE among the world's nations, mid-rank on
+/// ties — (count below + half the tied group) / N — over ascending nation ids. All-tied
+/// -> 0.5 each. The ONE formula the road gates read (generate_roads, lay_market_roads).
+std::map<entity_id, float> road_qualification_percentiles(const world& w)
+{
+    std::map<entity_id, float> out;
+    std::vector<std::pair<entity_id, float>> qs;
+    for (const auto& [nid, nc] : w.nations)
+        qs.push_back({ nid, nc.qualification });
+    std::sort(qs.begin(), qs.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    const int nn = static_cast<int>(qs.size());
+    for (const auto& [nid, q] : qs)
+    {
+        int below = 0, tied = 0;
+        for (const auto& [nid2, q2] : qs)
+        {
+            below += q2 < q;
+            tied  += q2 == q;
+        }
+        out[nid] = nn > 0 ? (static_cast<float>(below) + 0.5f * static_cast<float>(tied))
+                                / static_cast<float>(nn)
+                          : 0.0f;
+    }
+    return out;
+}
 
 long long village_spur_size(const world& w, entity_id centre)
 {
@@ -982,14 +982,14 @@ void stamp_history_roads(world& w, entity_id body,
 }
 
 // ---------------------------------------------------------------------------
-// Roads pull toward markets (BL-1138) â€” road_generation.hpp Â§ the same title
+// Roads pull toward markets (BL-1138) — road_generation.hpp § the same title
 // ---------------------------------------------------------------------------
 
 namespace {
 
 constexpr std::int64_t kNoCost = -1;
 
-/// A cell's weight in the pass's integer unit: `tile_traversal_cost` (LOGISTICS.md Â§ 1,
+/// A cell's weight in the pass's integer unit: `tile_traversal_cost` (LOGISTICS.md § 1,
 /// the one weight function) in millionths, rounded.
 std::int64_t market_cell_weight(const tile_component& tc)
 {
@@ -1238,9 +1238,14 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
     };
 
     std::set<entity_id> raised;
-    // Stamp a route at @p level (land cells only, max on overlap). Returns the land cells
-    // on the route: a route with none lays nothing.
-    auto stamp = [&](const std::vector<int>& cells, std::uint8_t level, std::vector<entity_id>* path) {
+    // Stamp a route at @p level (land cells only, max on overlap). EACH TILE TAKES THE TIER
+    // OF THE NATION WHOSE LAND IT CROSSES (Ben, 2026-10-03): a tile's level is the link's,
+    // capped by the gate at the percentile of the nation holding the tile (`edge_tier` of
+    // the link's two end scales @p sa / @p sb), so a sub-0.40 nation's ground stays Track
+    // and unowned land (percentile 0) reads Track. Returns the land cells on the route: a
+    // route with none lays nothing.
+    auto stamp = [&](const std::vector<int>& cells, std::uint8_t link_level, int sa, int sb,
+                     std::vector<entity_id>* path) {
         int land = 0;
         for (const int c : cells)
         {
@@ -1252,6 +1257,8 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
             const auto tit = w.tiles.find(t);
             if (tit == w.tiles.end()) continue;
             tile_component& tc = tit->second;
+            const std::uint8_t level =
+                std::min(link_level, edge_tier(sa, sb, pct_of(g.nation[ci])));
             if (tc.road_level >= level) continue;
             if (trace != nullptr) trace->raises.push_back({ t, tc.road_level });
             raised.insert(t);
@@ -1323,7 +1330,7 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
     }
     st.trunk_pairs = static_cast<int>(pairs.size());
 
-    // 1. JOIN â€” every market centre on its nation's own backbone.
+    // 1. JOIN — every market centre on its nation's own backbone.
     for (const mkt& m : markets)
     {
         if (!has_backbone(m.nation)) continue; // counted in no_backbone: nothing to join
@@ -1358,13 +1365,13 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
         l.direct_q = mw.cell_cost(hit);
         l.tier = edge_tier(m.scale, kMidScale, pct_of(m.nation));
         const std::vector<int> route = mw.path_to(hit);
-        l.laid = stamp(route, l.tier, trace != nullptr ? &l.path : nullptr) > 0;
+        l.laid = stamp(route, l.tier, m.scale, kMidScale, trace != nullptr ? &l.path : nullptr) > 0;
         if (l.laid) ++st.joins_laid;
         else        ++st.joins_failed;
         if (trace != nullptr) trace->links.push_back(std::move(l));
     }
 
-    // 2. PULL â€” a town weighed by how much nearer the link brings it to its market.
+    // 2. PULL — a town weighed by how much nearer the link brings it to its market.
     std::map<entity_id, std::size_t> market_index;
     for (std::size_t i = 0; i < markets.size(); ++i) market_index[markets[i].id] = i;
     std::vector<std::vector<std::size_t>> pull_towns(markets.size());
@@ -1415,7 +1422,20 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
                 }
             }
             first = false;
-            if (best < 0) break;
+            if (best < 0)
+            {
+                // The market's pull walk is over: no town of it fails the test now.
+                if (trace != nullptr)
+                {
+                    market_road_trace::link e;
+                    e.k = market_road_trace::kind::pull_settled;
+                    e.market_a = m.id;
+                    e.to = m.tile;
+                    e.raises_before = raises_now();
+                    trace->links.push_back(std::move(e));
+                }
+                break;
+            }
             settled[static_cast<std::size_t>(best)] = 1;
             const town& t = towns[pull_towns[i][static_cast<std::size_t>(best)]];
             market_road_trace::link l;
@@ -1429,13 +1449,13 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
             l.tier = edge_tier(t.scale, m.scale, pct_of(t.nation));
             std::vector<int> route = direct.path_to(t.cell);
             std::reverse(route.begin(), route.end()); // town -> market
-            l.laid = stamp(route, l.tier, trace != nullptr ? &l.path : nullptr) > 0;
+            l.laid = stamp(route, l.tier, t.scale, m.scale, trace != nullptr ? &l.path : nullptr) > 0;
             if (l.laid) ++st.pull_laid;
             if (trace != nullptr) trace->links.push_back(std::move(l));
         }
     }
 
-    // 3. TRUNK â€” cheapest first; the detour test re-read at each pair's turn.
+    // 3. TRUNK — cheapest first; the detour test re-read at each pair's turn.
     std::sort(pairs.begin(), pairs.end(), [&](const pair_c& x, const pair_c& y) {
         const bool xu = x.d == kNoCost, yu = y.d == kNoCost;
         if (xu != yu) return !xu;
@@ -1482,7 +1502,8 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
             continue;
         }
         l.tier = edge_tier(from.scale, to.scale, std::min(pct_of(from.nation), pct_of(to.nation)));
-        l.laid = stamp(direct.path_to(to.cell), l.tier, trace != nullptr ? &l.path : nullptr) > 0;
+        l.laid = stamp(direct.path_to(to.cell), l.tier, from.scale, to.scale,
+                       trace != nullptr ? &l.path : nullptr) > 0;
         if (l.laid) ++st.trunk_laid;
         else        ++st.trunk_empty;
         if (trace != nullptr) trace->links.push_back(std::move(l));

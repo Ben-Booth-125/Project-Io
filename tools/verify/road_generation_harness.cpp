@@ -59,6 +59,7 @@
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/logistics.hpp" // invalidate_logistics_caches
+#include "world/market_clearing.hpp" // market_for_tile: a town's market (R6f)
 #include "world/road_generation.hpp"
 #include "harness_params.hpp"
 #include "world/world.hpp"
@@ -72,6 +73,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <set>
 #include <sstream>
@@ -367,13 +369,13 @@ static void tier_census(const world& w, entity_id body, int counts[4])
 // (R2s-b — ancient-corridor Highway tiles never count). If no shipped world
 // qualifies a link, R2s-b FAILS and the per-seed lines say why — never weakened.
 // ---------------------------------------------------------------------------
-// R6 â€” ROADS PULL TOWARD MARKETS (BL-1138; LOGISTICS.md Â§ 4), on the shipped worlds
+// R6 — ROADS PULL TOWARD MARKETS (BL-1138; LOGISTICS.md § 4), on the shipped worlds
 // ---------------------------------------------------------------------------
 // Read on the same shipped world R2s builds, before its re-lay. The pass's trace
 // records every raise it made (tile, level before), so the field at any moment of
-// the pass â€” before it, at each link's test, after it â€” is rebuilt here exactly.
+// the pass — before it, at each link's test, after it — is rebuilt here exactly.
 // Every row is asked with THIS FILE'S OWN WALKER (h_walk below), never the pass's:
-// the cost contract is LOGISTICS.md Â§ 1's one weight function, tile_traversal_cost,
+// the cost contract is LOGISTICS.md § 1's one weight function, tile_traversal_cost,
 // in integer millionths per cell, an edge the sum of its two cells, straits of at
 // most three shore-water cells, open ocean never entered.
 //   R6a every market centre is on its nation's own backbone (its nation's roads and
@@ -488,6 +490,12 @@ struct market_road_row
     int trunk_bad = 0;              // R6b: pairs whose test or stamp disagrees
     int trunk_stamped = 0;          // R6d: laid trunk links actually stamped
     int neighbour_mismatch = 0;     // R6c
+    int tier_bad = 0;               // R6e: laid trunks whose tier is not the rule's, or not stamped at it
+    int cliff_tiles = 0;            // R6g: tiles the pass raised on sub-0.40 or unowned land
+    int cliff_bad = 0;              // R6g: of them, left above Track by the pass
+    int pull_tests = 0;             // R6f: pull links and pull-walk ends checked
+    int pull_order_bad = 0;         // R6f: a pull laid while a heavier town of its market failed
+    int pull_unserved = 0;          // R6f: towns still failing the test when their market's walk ended
     double median_cost_before = 0.0, median_cost_after = 0.0; // trunk pairs, intra_body_path
     std::vector<std::string> notes; // one line per exemption or failure
 };
@@ -522,8 +530,9 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
         return it != w.tile_to_nation.end() ? it->second : null_entity;
     };
     std::map<entity_id, std::vector<int>> town_cells; // nation -> its towns' cells
+    std::map<entity_id, int> scale_at;                // the highest centre scale per tile
+    std::vector<std::pair<entity_id, entity_id>> town_list; // (tile, nation), ascending tile
     {
-        std::map<entity_id, int> scale_at;
         for (const auto& [cid, tile] : w.population_centre_tile)
         {
             const auto tit = w.tiles.find(tile);
@@ -534,7 +543,11 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
             sc = std::max(sc, static_cast<int>(pit->second.scale));
         }
         for (const auto& [t, sc] : scale_at)
-            if (sc >= 2 && nation_at(t) != null_entity) town_cells[nation_at(t)].push_back(cell(t));
+            if (sc >= 2 && nation_at(t) != null_entity)
+            {
+                town_cells[nation_at(t)].push_back(cell(t));
+                town_list.push_back({ t, nation_at(t) });
+            }
     }
 
     // --- The shipped field: R6a, and the laid trunks' tiers. -------------------------
@@ -591,10 +604,77 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
             const tile_component& tc = w.tiles.at(t);
             if (is_water(tc.substrate)) continue;
             ++land;
-            if (tc.road_level < l.tier) ok = false;
+            if (tc.road_level < 1) ok = false; // stamped; the tier per tile is R6e's
         }
         laid_ok[i] = (ok && land > 0) ? 1 : 0;
         if (laid_ok[i]) ++r.trunk_stamped;
+    }
+    // R6e — THE TIER, FROM OUTSIDE THE PASS (LOGISTICS.md § 4's gates): a market end
+    // reads the highest centre scale on its tile, at least a Town; the percentile is the
+    // lower of the two ends' nations' (road_qualification_percentiles; unowned reads 0).
+    // Highway: both ends City+ and pct >= 0.80; Road: a Town+ end and pct >= 0.40; else
+    // Track. Every land tile of the laid route carries at least that tier.
+    {
+        const std::map<entity_id, float> pct = road_qualification_percentiles(w);
+        auto pct_of = [&](entity_id n) {
+            const auto it = pct.find(n);
+            return it != pct.end() ? it->second : 0.0f;
+        };
+        auto end_scale = [&](entity_id t) {
+            const auto it = scale_at.find(t);
+            return std::max(2, it != scale_at.end() ? it->second : 0);
+        };
+        for (const auto& l : tr.links)
+        {
+            if (l.k != market_road_trace::kind::trunk || !l.laid) continue;
+            const int sa = end_scale(l.from), sb = end_scale(l.to);
+            const float q = std::min(pct_of(nation_at(l.from)), pct_of(nation_at(l.to)));
+            const std::uint8_t want = (sa >= 3 && sb >= 3 && q >= 0.80f) ? 3
+                                    : ((sa >= 2 || sb >= 2) && q >= 0.40f) ? 2 : 1;
+            bool ok = l.tier == want;
+            for (const entity_id t : l.path)
+            {
+                const tile_component& tc = w.tiles.at(t);
+                if (is_water(tc.substrate)) continue;
+                // Each tile at the gate of the nation whose land it crosses (Ben, 2026-10-03).
+                const float qt = pct_of(nation_at(t));
+                const std::uint8_t cap = (sa >= 3 && sb >= 3 && qt >= 0.80f) ? 3
+                                       : ((sa >= 2 || sb >= 2) && qt >= 0.40f) ? 2 : 1;
+                if (tc.road_level < std::min(want, cap)) ok = false;
+            }
+            if (!ok)
+            {
+                ++r.tier_bad;
+                char buf[160];
+                std::snprintf(buf, sizeof buf, "trunk %u-%u tier %d, the rule's %d (pct %.3f)",
+                              static_cast<unsigned>(l.market_a), static_cast<unsigned>(l.market_b),
+                              static_cast<int>(l.tier), static_cast<int>(want), static_cast<double>(q));
+                r.notes.push_back(buf);
+            }
+        }
+    }
+
+    // R6g — THE ROAD CLIFF, PER TILE (Ben, 2026-10-03): every raise the pass made on the
+    // land of a nation under the Road gate (0.40), or on unowned land, leaves it at Track.
+    {
+        const std::map<entity_id, float> pct = road_qualification_percentiles(w);
+        std::map<entity_id, std::uint8_t> level_after; // the last raise per tile wins
+        for (const auto& [t, before] : tr.raises) level_after[t] = 0;
+        for (const auto& [t, lvl] : level_after) level_after[t] = w.tiles.at(t).road_level;
+        std::map<entity_id, std::uint8_t> prior_level;
+        for (const auto& [t, before] : tr.raises)
+            if (prior_level.count(t) == 0) prior_level[t] = before;
+        for (const auto& [t, after] : level_after)
+        {
+            const entity_id n = nation_at(t);
+            const auto it = pct.find(n);
+            const float q = (n != null_entity && it != pct.end()) ? it->second : 0.0f;
+            if (q >= 0.40f) continue;
+            // The pass raised this tile; above Track is only legitimate when it was already
+            // above Track before the pass (a national or ancient road it found there).
+            if (after > 1 && after > prior_level[t]) ++r.cliff_bad;
+            ++r.cliff_tiles;
+        }
     }
 
     // The trunk pairs, and the median traversal cost over them (intra_body_path).
@@ -656,7 +736,8 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
         for (const auto& p : theirs) if (mine.count(p) == 0)   ++r.neighbour_mismatch;
     }
 
-    // --- R6b: replay the raises forward, testing each trunk pair at its own field. ---
+    // --- R6b / R6f: replay the raises forward, testing each step at its own field. ---
+    std::map<entity_id, std::set<entity_id>> pulled; // market -> towns already pulled to it
     std::size_t applied = 0;
     bool dirty = false;
     for (std::size_t i = 0; i < tr.links.size(); ++i)
@@ -667,6 +748,56 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
             w.tiles.at(tr.raises[applied].first).road_level = after_level[applied];
             ++applied;
             dirty = true;
+        }
+        if (l.k == market_road_trace::kind::pull || l.k == market_road_trace::kind::pull_settled)
+        {
+            // R6f — THE PULL, at the field this step read. The market's towns: in its
+            // catchment, in its centre's nation, not on its tile, not yet pulled.
+            if (dirty) { g = h_build(w, body); dirty = false; }
+            const entity_id mid = l.market_a;
+            const entity_id mt  = centre_of[mid];
+            const entity_id mn  = nation_at(mt);
+            const int mc = cell(mt);
+            const std::vector<std::int64_t> dfield = h_walk(g, mc, false, null_entity);
+            const std::vector<std::int64_t> nfield = h_walk(g, mc, true, null_entity);
+            std::int64_t max_gain = -1;
+            int failing = 0;
+            std::int64_t laid_gain = -1;
+            for (const auto& [tt, tn] : town_list)
+            {
+                if (tn != mn || cell(tt) == mc || market_for_tile(w, tt) != mid) continue;
+                if (pulled[mid].count(tt) != 0 && tt != l.from) continue;
+                const std::int64_t d = dfield[static_cast<std::size_t>(cell(tt))];
+                if (d < 0) continue;
+                const std::int64_t n = nfield[static_cast<std::size_t>(cell(tt))];
+                if (n >= 0 && n <= 2 * d) continue;
+                ++failing;
+                const std::int64_t gain = n < 0 ? std::numeric_limits<std::int64_t>::max() : n - d;
+                if (tt == l.from) laid_gain = gain;
+                max_gain = std::max(max_gain, gain);
+            }
+            ++r.pull_tests;
+            char buf[160];
+            if (l.k == market_road_trace::kind::pull)
+            {
+                pulled[mid].insert(l.from);
+                if (laid_gain < 0 || laid_gain != max_gain)
+                {
+                    ++r.pull_order_bad;
+                    std::snprintf(buf, sizeof buf, "pull to market %u: laid gain %lld, heaviest %lld",
+                                  static_cast<unsigned>(mid), static_cast<long long>(laid_gain),
+                                  static_cast<long long>(max_gain));
+                    r.notes.push_back(buf);
+                }
+            }
+            else if (failing > 0)
+            {
+                r.pull_unserved += failing;
+                std::snprintf(buf, sizeof buf, "market %u: %d town(s) still fail the detour test",
+                              static_cast<unsigned>(mid), failing);
+                r.notes.push_back(buf);
+            }
+            continue;
         }
         if (l.k != market_road_trace::kind::trunk) continue;
         if (dirty) { g = h_build(w, body); dirty = false; }
@@ -965,7 +1096,7 @@ static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
                 qualifying, qualifying_ok, seeds_qualifying_with_highway, seeds.size(), above);
     check(above == 0, "R2s0 the re-laid national lattice sits within the shipped field");
 
-    // R6 â€” roads pull toward markets (BL-1138), per seed then pooled.
+    // R6 — roads pull toward markets (BL-1138), per seed then pooled.
     std::printf("      (R6 roads pull toward markets, BL-1138; K = %d neighbours, detour ratio %.2f)\n",
                 kMarketTrunkNeighbours, kDetourRatio);
     std::printf("      seed | markets | off before/after (here; no backbone, no route) | joins laid/failed |"
@@ -974,6 +1105,9 @@ static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
     long long off_b = 0, off_a = 0, off_here = 0, ex_nb = 0, ex_nr = 0, unexcused = 0;
     long long joins = 0, joins_failed = 0, pulls = 0, pull_c = 0;
     long long tp = 0, tun = 0, tl = 0, tref = 0, tstamped = 0, bad = 0, mism = 0;
+    long long tier_bad = 0, pull_tests = 0, pull_order_bad = 0, pull_unserved = 0;
+    long long cliff_tiles = 0, cliff_bad = 0;
+    int seeds_count_mismatch = 0;
     long long tb[4] = { 0, 0, 0, 0 }, ta[4] = { 0, 0, 0, 0 };
     std::vector<double> med_b, med_a;
     for (std::size_t i = 0; i < mrows.size(); ++i)
@@ -997,6 +1131,10 @@ static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
         tp += m.st.trunk_pairs; tun += m.st.trunk_unpriced; tl += m.st.trunk_laid;
         tref += m.st.trunk_refused; tstamped += m.trunk_stamped; bad += m.trunk_bad;
         mism += m.neighbour_mismatch;
+        tier_bad += m.tier_bad; pull_tests += m.pull_tests;
+        cliff_tiles += m.cliff_tiles; cliff_bad += m.cliff_bad;
+        pull_order_bad += m.pull_order_bad; pull_unserved += m.pull_unserved;
+        if (m.off_here != m.st.off_backbone_after) ++seeds_count_mismatch;
         for (int k = 1; k < 4; ++k) { tb[k] += m.tiers_before[k]; ta[k] += m.tiers_after[k]; }
         med_b.push_back(m.median_cost_before); med_a.push_back(m.median_cost_after);
     }
@@ -1011,7 +1149,22 @@ static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
     check(unexcused == 0,
           "R6a every market centre is on its nation's own backbone, per market (exempt, each listed:"
           " a nation holding no town, or no route over its own land and straits to its towns)");
-    check(off_here == off_a, "R6a' the pass's off-backbone count equals this harness's own walker's");
+    std::printf("      (R6e tier: %lld laid trunk(s) off the rule | R6f pull: %lld steps checked, %lld"
+                " out of order, %lld town(s) left failing | R6a' seeds disagreeing %d)\n",
+                tier_bad, pull_tests, pull_order_bad, pull_unserved, seeds_count_mismatch);
+    check(seeds_count_mismatch == 0,
+          "R6a' per seed, the pass's off-backbone count equals this harness's own walker's");
+    check(tier_bad == 0,
+          "R6e every laid trunk's tier is the gate at the lower of its two nations' percentiles"
+          " (re-derived here), and its route is stamped at it");
+    std::printf("      (R6g the Road cliff per tile: %lld tile(s) raised on sub-0.40 or unowned land,"
+                " %lld left above Track)\n", cliff_tiles, cliff_bad);
+    check(cliff_bad == 0,
+          "R6g no join, pull or trunk tile the pass raised on a sub-0.40 nation's land (or unowned"
+          " land) is above Track (Ben, 2026-10-03)");
+    check(pull_tests > 0 && pull_order_bad == 0 && pull_unserved == 0,
+          "R6f pulls were laid heaviest-first, and when a market's pull walk ended no town of it"
+          " failed the detour test toward it");
     check(bad == 0,
           "R6b each trunk pair, at the field its test read: refused only when served within twice its"
           " direct route, laid only when not, with a non-empty stamped route at its tier");

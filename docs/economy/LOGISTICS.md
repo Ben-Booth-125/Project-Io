@@ -184,7 +184,10 @@ road is weighed by how much nearer it brings the town to its market. **Across ma
 joins each market centre to its neighbouring market centres, over a border where the neighbour
 lies across one, so a larger trade has a road to travel beyond its own catchment; the trunk
 takes the lattice's own tier gates (Road or above where the gate allows; Ben, 2026-10-03: where a
-nation falls under 0.40 its roads stay Track, the newer ruling over the trunk's "at Road"), and the
+nation falls under 0.40 its roads stay Track, the newer ruling over the trunk's "at Road"). **Each
+tile of a trunk or pull takes the tier of the nation whose land it crosses** (Ben, 2026-10-03), so
+a sub-0.40 nation's ground stays Track and unowned land reads Track: the Road cliff holds
+everywhere. The
 detour test still refuses a trunk link a serviceable route already gives. The trunk's neighbours
 are a delegated reading, NR-950: each market centre's **three nearest** market centres by direct
 route, unioned over both ends (a Delaunay-like set, never all pairs), chosen on the network as the
@@ -201,7 +204,7 @@ stands. The **direct route** walks any land and any strait of up to three shore-
 open ocean; every link is laid along it, so it reuses the roads that already shorten it. Catchments
 are grid-nearest, so these roads move no catchment and no fold.
 
-Three readings, taken without a ruling and open to one: a trunk link's tier is the gate at the
+Three readings, accepted by Ben (2026-10-03) and kept as readings: a trunk link's tier is the gate at the
 **lower** of its two nations' percentiles; **the network route** is the same walk over
 roaded land only, any nation's roads included (the road network as a convoy prices it; the river
 discount, which is directed, is not read); and **the pull is not rationed** by the qualification

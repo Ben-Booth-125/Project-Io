@@ -2160,41 +2160,80 @@ void close_history(generation_cursor& c)
             const std::vector<entity_id>& grid = body_tile_grid(w, kepler);
             if (static_cast<int>(grid.size()) >= home_grid_width * home_grid_height)
             {
-                for (const region& rg : kepler_settlement.regions)
+                // Each land cell's region (`nearest_region`), built on the first
+                // water anchor and only then: most worlds never need it.
+                std::vector<int> cell_region;
+                for (std::size_t ri = 0; ri < kepler_settlement.regions.size(); ++ri)
                 {
+                    const region& rg = kepler_settlement.regions[ri];
                     if (!rg.has_market) continue;
                     if (rg.row < 0 || rg.row >= home_grid_height
                      || rg.col < 0 || rg.col >= home_grid_width)
                         continue;
                     // A MARKET STANDS ON LAND (BL-1138 review): a region's anchor
                     // may be coastal water (BL-777), and a market centred at sea is
-                    // one no road reaches. The shell stands on the land tile nearest
-                    // the anchor -- squared grid distance with the column wrap, ties
-                    // to the lower raster index -- and, on a body with no land at
-                    // all, on the anchor as before.
-                    entity_id anchor_tile =
+                    // one no road reaches. The shell stands on the nearest land tile
+                    // OF ITS OWN REGION (the cells `nearest_region` gives it), else
+                    // the nearest land of its own polity's regions (`region::nation`
+                    // names the polity until the nations are derived) -- squared
+                    // grid distance with the column wrap, ties to the lower raster
+                    // index -- and, where neither holds land, on the nearest land
+                    // tile there is (counted). The ANCHOR stays its binding: the fold's port gate
+                    // reads the shell's region through it (`c.capital_shell_anchor`).
+                    const entity_id region_anchor =
                         grid[static_cast<std::size_t>(rg.row) * home_grid_width
                              + static_cast<std::size_t>(rg.col)];
-                    if (anchor_tile == null_entity) continue;
+                    if (region_anchor == null_entity) continue;
+                    entity_id anchor_tile = region_anchor;
                     if (const auto ait = w.tiles.find(anchor_tile);
                         ait != w.tiles.end() && is_water(ait->second.substrate))
                     {
-                        long long best_d2 = -1;
-                        entity_id best = null_entity;
-                        for (int r = 0; r < home_grid_height; ++r)
-                            for (int cc = 0; cc < home_grid_width; ++cc)
+                        const std::size_t ncell =
+                            static_cast<std::size_t>(home_grid_width) * home_grid_height;
+                        if (cell_region.empty())
+                        {
+                            cell_region.assign(ncell, -1);
+                            for (std::size_t ci = 0; ci < ncell; ++ci)
                             {
-                                const entity_id t = grid[static_cast<std::size_t>(r) * home_grid_width
-                                                         + static_cast<std::size_t>(cc)];
-                                if (t == null_entity) continue;
-                                const auto tit = w.tiles.find(t);
+                                const auto tit = w.tiles.find(grid[ci]);
                                 if (tit == w.tiles.end() || is_water(tit->second.substrate)) continue;
+                                cell_region[ci] = nearest_region(kepler_settlement,
+                                    static_cast<int>(ci % home_grid_width),
+                                    static_cast<int>(ci / home_grid_width), home_grid_width);
+                            }
+                        }
+                        auto nearest_land = [&](auto admits) {
+                            long long best_d2 = -1;
+                            entity_id best = null_entity;
+                            for (std::size_t ci = 0; ci < ncell; ++ci)
+                            {
+                                if (cell_region[ci] < 0 || !admits(cell_region[ci])) continue;
+                                const int cc = static_cast<int>(ci % home_grid_width);
+                                const int r  = static_cast<int>(ci / home_grid_width);
                                 int dc = std::abs(cc - rg.col);
                                 dc = std::min(dc, home_grid_width - dc);
                                 const long long dr = r - rg.row;
                                 const long long d2 = static_cast<long long>(dc) * dc + dr * dr;
-                                if (best_d2 < 0 || d2 < best_d2) { best_d2 = d2; best = t; }
+                                if (best_d2 < 0 || d2 < best_d2) { best_d2 = d2; best = grid[ci]; }
                             }
+                            return best;
+                        };
+                        const int own = static_cast<int>(ri);
+                        entity_id best = nearest_land([&](int cr) { return cr == own; });
+                        if (best == null_entity && rg.nation >= 0)
+                            best = nearest_land([&](int cr) {
+                                return kepler_settlement.regions[static_cast<std::size_t>(cr)].nation
+                                       == rg.nation;
+                            });
+                        // A polity whose every region is seated at sea holds no land
+                        // of its own to stand on; the market place is then the nearest
+                        // land there is, and counted, so the case is never silent.
+                        if (best == null_entity)
+                        {
+                            best = nearest_land([](int) { return true; });
+                            if (best != null_entity && c.report != nullptr)
+                                ++c.report->capital_shells_off_realm;
+                        }
                         if (best != null_entity) anchor_tile = best;
                     }
                     market_component mc;
@@ -2203,6 +2242,7 @@ void close_history(generation_cursor& c)
                     const entity_id shell_id = w.create_entity();
                     w.markets[shell_id] = mc;
                     capital_market_shells.push_back(shell_id);
+                    c.capital_shell_anchor.push_back(region_anchor);
                 }
             }
         }
@@ -2977,6 +3017,14 @@ void run_tail(generation_cursor& c)
         // gravity fold's port gate binds a market to a region through this
         // tile, as the junction rule binds a centre (`centre_is_trade_junction`).
         std::map<entity_id, entity_id> market_seed_tile;
+        // A capital shell binds through its REGION'S ANCHOR, recorded at its spawn:
+        // a shell moved off a water anchor onto land must still bind its own region.
+        for (std::size_t k = 0; k < capital_market_shells.size() && k < c.capital_shell_anchor.size(); ++k)
+        {
+            market_seed_tile[capital_market_shells[k]] = c.capital_shell_anchor[k];
+            if (report != nullptr)
+                report->capital_shell_anchors.push_back({ capital_market_shells[k], c.capital_shell_anchor[k] });
+        }
         for (const entity_id cid : centre_ids)
         {
             const population_centre_component& pcc = w.population_centres.at(cid);
@@ -3065,8 +3113,9 @@ void run_tail(generation_cursor& c)
             //    region is the one `nearest_region` binds its POPULATION tile
             //    to -- the tile the carve seeded it from, not its proxy centre,
             //    which is exactly the binding the junction rule above uses. A
-            //    capital shell is centred on its region's own anchor, so its
-            //    centre IS that tile. Otherwise the reach is measured over land.
+            //    capital shell binds through its region's own anchor, recorded at
+            //    its spawn (its centre may have moved off a water anchor onto
+            //    land). Otherwise the reach is measured over land.
             std::set<entity_id> port_centres;
             for (const auto& [mid, mc] : w.markets)
             {
@@ -3104,10 +3153,10 @@ void run_tail(generation_cursor& c)
         // the folds, because the markets are carved and folded only now, three
         // steps after `generate_roads` and the ancient stamp: this is the first
         // point the final market set exists. Its own pass over the laid
-        // network: every market centre joined to its nation's backbone, each
-        // town's road weighed toward its market, and a Road-tier trunk between
-        // neighbouring market centres, the detour test refusing what the
-        // network already serves (road_generation.hpp § Roads pull toward
+        // network: every market centre joined to its nation's own backbone,
+        // each town's road weighed toward its market, and a trunk between
+        // neighbouring market centres at the lattice's tier gates, the detour
+        // test refusing what the network already serves (road_generation.hpp § Roads pull toward
         // markets). The fold above priced its reach on the network as it stood
         // before this pass and has decided; catchments are grid-nearest, never
         // traversal cost, so nothing this pass lays moves a catchment or a fold.
