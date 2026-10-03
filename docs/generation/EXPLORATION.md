@@ -377,8 +377,11 @@ grudge, a taste and a sea lane.
 international trade.** Far realms across water meet and bind in this age, not only in
 Industrialisation — but only where the seller's fleet can reach the partner's port, its power
 halving over sea distance as a fleet's does (§ the stocks table), so navies decide how many far
-pairs trade, not a dial. **Goods between landmasses go by sea:** a road carries goods only between
-seats on one landmass, so trade between landmasses rides a fleet, writes sea lanes, and grounds the
+pairs trade, not a dial. **Reach means out-projecting (Ben, 2026-10-03):** the seller binds a far
+partner only where its fleet out-projects the partner's own fleet at the partner's port — the same
+defender comparison a crossing faces — because a fleet keeps some power for a long way and mere
+reach gated almost nothing. **Goods between landmasses go by sea, in every span (Ben, 2026-10-03):**
+a road carries goods only between seats on one landmass, so trade between landmasses rides a fleet, writes sea lanes, and grounds the
 long lanes the age is remembered for. Measured on the curated seeds before it is set.
 
 *(Folded from `../research/COLONIAL_ERA.md` on 2026-09-16, NR-884.)*
