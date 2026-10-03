@@ -382,7 +382,10 @@ partner only where its fleet out-projects the partner's own fleet at the partner
 defender comparison a crossing faces — because a fleet keeps some power for a long way and mere
 reach gated almost nothing. **Goods between landmasses go by sea, in every span (Ben, 2026-10-03):**
 a road carries goods only between seats on one landmass, so trade between landmasses rides a fleet, writes sea lanes, and grounds the
-long lanes the age is remembered for. Measured on the curated seeds before it is set.
+long lanes the age is remembered for. **Meeting by sea is gated too (Ben, 2026-10-03):** realms
+across water first meet only where one side's fleet out-projects the other's at its port — the same
+comparison binding faces — so a contact the sea forbids is never made, rather than made and left
+unbound. Measured on the curated seeds before it is set.
 
 *(Folded from `../research/COLONIAL_ERA.md` on 2026-09-16, NR-884.)*
 
