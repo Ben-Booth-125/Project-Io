@@ -29,6 +29,7 @@
 
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
+#include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
@@ -69,6 +70,12 @@ void check_near(float got, float want, const char* what, float tol = 1e-3f)
 }
 
 std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
+
+/// The SHIPPED reservation multiple (scripts/economy.lua `price_band.
+/// reservation_mult`, BL-1172 "a fair price"). Restated, not loaded — this
+/// harness reads no Lua — so a retune moves it here too; the rows only place
+/// prices either side of it.
+constexpr float k_shipped_reservation = 2.0f;
 
 /// The fixture: ONE body, ONE corp, and however many buildings the caller asks
 /// for on it, all sharing the corp's single pool. That sharing is the whole point
@@ -521,8 +528,8 @@ void r7_the_reservation_ceiling()
     {
         fixture f;
         f.build(1, building_type::extraction_site);
-        add_market(f, good, base, base * 5.0f, /*inventory*/ 10.0f); // 5x base, under 9x
-        recipe_registry reg = registry_with_reservation(good, need, 9.0f);
+        add_market(f, good, base, base * 1.5f, /*inventory*/ 10.0f); // 1.5x base, under 2x
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
 
         economy_report rep;
         const int before = f.w.buildings.at(f.buildings[0]).supply_factor_permille;
@@ -545,8 +552,8 @@ void r7_the_reservation_ceiling()
     {
         fixture f;
         f.build(1, building_type::extraction_site);
-        add_market(f, good, base, base * 9.5f, /*inventory*/ 10.0f); // 9.5x base, over 9x
-        recipe_registry reg = registry_with_reservation(good, need, 9.0f);
+        add_market(f, good, base, base * 2.5f, /*inventory*/ 10.0f); // 2.5x base, over 2x
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
 
         economy_report rep;
         const int before = f.w.buildings.at(f.buildings[0]).supply_factor_permille;
@@ -570,8 +577,8 @@ void r7_the_reservation_ceiling()
     {
         fixture f;
         f.build(1, building_type::extraction_site);
-        add_market(f, good, base, base * 2.0f, /*inventory*/ 0.2f); // shelf < need
-        recipe_registry reg = registry_with_reservation(good, need, 9.0f);
+        add_market(f, good, base, base * 1.5f, /*inventory*/ 0.2f); // shelf < need
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
 
         economy_report rep;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
@@ -590,7 +597,7 @@ void r7_the_reservation_ceiling()
         fixture f;
         f.build(1, building_type::extraction_site);
         add_market(f, good, base, base, /*inventory*/ 10.0f);
-        recipe_registry reg = registry_with_reservation(good, need, 9.0f);
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
         f.pool().quantities[ri(good)] = need * 0.4f;
 
         economy_report rep;
@@ -608,7 +615,7 @@ void r7_the_reservation_ceiling()
         fixture f;
         f.build(1, building_type::extraction_site);
         add_market(f, good, /*base*/ 0.0f, /*price*/ 0.0f, /*inventory*/ 10.0f);
-        recipe_registry reg = registry_with_reservation(good, need, 9.0f);
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
 
         economy_report rep;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
@@ -771,6 +778,99 @@ void r9_no_wire_no_draw()
     }
 }
 
+// ---------------------------------------------------------------------------
+// R10 — BL-1172: CLEARING BUYS ONLY WHAT CLEARS AT OR UNDER THE CEILING
+// ---------------------------------------------------------------------------
+// FINANCE.md § Standing-force upkeep (Ben, 2026-10-03): the same ceiling
+// governs every goods draw, building upkeep's included, and "a unit buys only
+// the part of its need that clears at or under the ceiling, and pays the
+// clearing price for it; it is never billed below the price its sellers were
+// paid". The draw bids against last tick's price (1.5x base, under the 2x
+// ceiling); clearing resolves its own bid's price. (a) No seller: it resolves
+// to 1.5b + 0.5 x (10b - 1.5b) = 5.75b, over the ceiling — the fill is not
+// bought, and the building takes the shortfall rule. (b) A seller listing
+// plenty: it resolves under, and the fill is bought at the resolved price.
+void r10_clearing_refuses_above_the_ceiling()
+{
+    std::printf("\n--- R10  BL-1172: clearing buys upkeep only at or under the ceiling ---\n");
+
+    constexpr resource_type good = resource_type::tools;
+    constexpr float need  = 0.5f;
+    constexpr float base  = 4.0f;
+    constexpr float shelf = 10.0f;
+
+    auto buyer_rows = [&](const fixture& f, float& qty, float& px) {
+        int n = 0; qty = 0.0f; px = -1.0f;
+        for (const exchange_record& e : f.w.exchanges.entries)
+            if (e.buyer == f.corp && e.resource == good) { ++n; qty += e.quantity; px = e.unit_price; }
+        return n;
+    };
+
+    // --- R10a: resolved OVER the ceiling — not bought, not billed ----------
+    {
+        fixture f;
+        f.build(1, building_type::extraction_site);
+        const entity_id mid = add_market(f, good, base, base * 1.5f, shelf);
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
+        const float balance_before = f.w.corporations.at(f.corp).balance;
+
+        economy_report rep;
+        run_building_upkeep(f.w, reg, rep);
+        check_near(fill_of(rep, f.corp, mid, good), need,
+                   "R10a the draw took its shortfall off the shelf against last tick's price");
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000,
+              "R10a ... and, covered for now, did not weaken");
+
+        const auto flows = clear_markets(f.w, reg, rep);
+        const float ref = f.w.markets.at(mid).price[ri(good)];
+        check(ref > base * k_shipped_reservation,
+              "R10a the price its bid resolved to sits OVER the ceiling (5.75x base)");
+        const auto fit = flows.find(f.corp);
+        check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, 0.0f,
+                   "R10a the refused fill is billed NOTHING");
+        check_near(f.w.markets.at(mid).inventory[ri(good)], shelf,
+                   "R10a the refused fill is back on the shelf");
+        check_near(f.w.corporations.at(f.corp).balance, balance_before,
+                   "R10a clearing moved no money for it");
+        float q, px;
+        check(buyer_rows(f, q, px) == 0, "R10a no exchange row records a trade that did not happen");
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 950,
+              "R10a the building takes the shortfall rule instead (1000 -> 950)");
+    }
+
+    // --- R10b: resolved at or under the ceiling — bought at the resolved price
+    {
+        fixture f;
+        f.build(1, building_type::extraction_site);
+        const entity_id mid = add_market(f, good, base, base * 1.5f, shelf);
+        const entity_id seller = f.w.create_entity();
+        corporation_component sc;
+        sc.name = "Seller";
+        f.w.corporations[seller] = sc;
+        f.w.pool_at(seller, mid).quantities[ri(good)] = 20.0f;
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
+
+        economy_report rep;
+        run_building_upkeep(f.w, reg, rep);
+        const auto flows = clear_markets(f.w, reg, rep);
+        const float ref = f.w.markets.at(mid).price[ri(good)];
+        check(ref <= base * k_shipped_reservation, "R10b the price resolves at or under the ceiling");
+        check_near(flows.at(f.corp).expenditure, need * ref,
+                   "R10b the fill is billed at the RESOLVED price, need x ref");
+        float q, px;
+        const int n = buyer_rows(f, q, px);
+        check(n == 1, "R10b exactly one exchange row for the fill");
+        check_near(q, need, "R10b ... carrying the whole fill");
+        check_near(px, ref, "R10b ... at the resolved price");
+        float seller_px = -1.0f;
+        for (const exchange_record& e : f.w.exchanges.entries)
+            if (e.seller == seller) seller_px = e.unit_price;
+        check_near(seller_px, ref, "R10b the same price its seller was paid — never billed below it");
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000,
+              "R10b a bought fill stands: the building does not weaken");
+    }
+}
+
 int main()
 {
     std::printf("building_upkeep — BL-641, requirement group `building-upkeep-goods` R1-R3, R6;\n");
@@ -786,6 +886,7 @@ int main()
     r7_the_reservation_ceiling();
     r8_the_floor();
     r9_no_wire_no_draw();
+    r10_clearing_refuses_above_the_ceiling();
 
     std::printf("\n%s — %d failure(s)\n", g_failures == 0 ? "PASS" : "FAIL", g_failures);
     return g_failures == 0 ? 0 : 1;

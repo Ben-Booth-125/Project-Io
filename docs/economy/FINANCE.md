@@ -105,12 +105,15 @@ Deterministic integer arithmetic, no RNG. Because the supply factor feeds
 `unit_strength` and the combat adapter, an unsupplied army is measurably weaker **in the
 resolver**, not merely more expensive.
 
-**The reservation price is a price paid, not only a price checked.** It is
+**The ceiling is checked twice: once at the draw, once at the price that clears.** It is
 `price_band.reservation_mult` (2.0 — twice what a good is worth at an even market: dear, but a
-price a supplied market reaches, where the 10× cap is the signal of a good nobody makes). The draw decides against last tick's price, and its own bid can
-resolve this tick's price far above it. So the upkeep part of a fill is billed at no more
-than reservation × base. Its goods cost then falls with what it bought, never above that
-ceiling.
+price a supplied market reaches, where the 10× cap is the signal of a good nobody makes). The
+draw decides against last tick's price, and its own bid can resolve this tick's price far above
+it. Where the price that clears sits above the ceiling, the upkeep part of the fill is not
+bought: it goes back on the shelf, nothing is billed and no exchange is recorded, and the
+drawing unit or building takes its supply step as if that part never arrived. What is bought
+is billed at the clearing price, the price its sellers were paid. The refusal belongs to the
+market and the good, so every buyer's upkeep fill of that good there is refused alike.
 
 The pass also carries **orphan cleanup**: `demolish_building` erases the building, the
 corp asset and the building stockpile but never touches `w.units`, so without it

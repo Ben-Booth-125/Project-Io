@@ -1371,14 +1371,14 @@ economy = {
     --   that is the insolvency the ruling exists to stop. Only 2.0 was
     --   measured; it is a first cut, and the trace is the tool to move it.
     --
-    -- AND IT IS A PRICE PAID, not only a price checked. The draw decides
+    -- AND IT IS CHECKED AGAIN AT THE PRICE THAT CLEARS. The draw decides
     -- against LAST tick's price; its own bid can resolve this tick's far
-    -- higher (ordnance: checked <= 2x, billed ~3.7-5.4x). clear_markets bills
-    -- the upkeep part of a fill at min(resolved, reservation x base)
-    -- (economy_report::upkeep_purchases) - a buyer who would not pay that
-    -- price does not. Measured (seeds 0/10/28, shipped start): ordnance paid
-    -- ~272-288 against a 155.8 base, rations ~23-31 against 13.6 (a
-    -- market's own base carries its distance/capital premium above that).
+    -- higher. Where clear_markets resolves a good over this ceiling, the
+    -- upkeep part of the fill (economy_report::upkeep_purchases) is NOT
+    -- BOUGHT: back on the shelf, unbilled, no exchange row, and the drawing
+    -- unit or building steps as if it never arrived (settle_refused_upkeep).
+    -- What is bought is billed at the resolved price, never below what its
+    -- sellers were paid (FINANCE.md, Ben 2026-10-03).
     --
     -- Read by every goods draw, building upkeep's power included (one rule
     -- for every goods draw); nothing else buys through this ceiling.
