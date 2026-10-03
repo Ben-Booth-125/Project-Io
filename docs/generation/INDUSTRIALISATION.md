@@ -628,8 +628,10 @@ its dating; its record-only clause ("points are not debited") is overturned.
 **Works chartered: the moment a city's stock crosses a charter's price (Ben, 2026-09-24).** A firm
 is chartered at the epoch, from a centre's stockpile (§ 1); the span shows *when* the capital that
 charters it was built. After each year's accrual, when a region's accumulated industry points cross
-the next multiple of a fraction *f* of the RUNNING charter price — the world's stock so far over
-the charter divisor (§ 1), so a crossing is read against the price the close's own price grows
+the next multiple of a fraction *f* of the RUNNING charter price — the stock so far within the
+region's own trade reach (its landmass, the reach the close prices by: § Industry spreads beyond its
+heartland; the world's stock where a region has none) over the charter divisor (§ 1), so a crossing
+is read against the price the close's own price grows
 into, never against a constant and never against the 1960 price applied backwards (NR-907) — a
 *works chartered* note fires for that region, capped per region per round. It fires on the same
 switches that let the span record industry points at all — the industry-point switch, from the
