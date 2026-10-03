@@ -74,8 +74,8 @@ retuning, so the equipment-to-wage ratio the roster is anchored on survives.
 rations and ordnance are bought at most at their reservation price; above it the unit draws less
 and fights weaker, so a supply shortage weakens an army rather than bankrupting the firm that keeps
 it. **"Draws less" is literal (Ben, 2026-10-03):** a unit buys only the part of its need that
-clears at or under the ceiling, and pays the clearing price for it; it is never billed below the
-price its sellers were paid, so no fill is subsidised and no money appears from nowhere. **What
+is offered at or under the ceiling, and pays for it at the posted price (below); no fill is
+subsidised and no money appears from nowhere. **What
 the owner can afford is the ceiling alone (Ben, 2026-10-03):** the draw reads the price, not the
 owner's balance. **A draw pays the posted price (Ben, 2026-10-03):** a
 draw from a market's shelf is decided and billed at the price that stood when it was made — the
@@ -117,16 +117,19 @@ resolver**, not merely more expensive.
 **The ceiling is checked once, at the posted price, and the draw pays that price.** The ceiling
 is `price_band.reservation_mult` (2.0 — twice what a good is worth at an even market: dear, but a
 price a supplied market reaches, where the 10× cap is the signal of a good nobody makes). Every
-goods draw from a shelf — unit and building upkeep, processor inputs, construction — reads the
-posted price, the price the last clearing left standing (base, on a market that has never
-resolved one), takes the good only where that price is at or under the ceiling, and is billed at
-it, with one exchange row at that price. The price the tick goes on to resolve, which the draw's
-own want helped drive, is never what the draw pays. Above the ceiling the good is not drawn: a
-unit or building goes short and takes the shortfall rule, a processor runs on what its pool
-holds, and a construction site pauses for want of that material (construction capacity over the
-ceiling stretches the build instead, as an empty yard does). A ceiling of zero switches the rule
-off, and off means what each draw did before it: upkeep never buys, processors and construction
-buy whatever the shelf holds.
+goods draw from a shelf — unit and building upkeep, processor inputs, construction, and a
+nation's network upkeep and space programme — reads the posted price, the price the last clearing
+left standing (base, on a market that has never resolved one), takes the good only where that
+price is at or under the ceiling, and is billed at it, with one exchange row at that price. The
+price the tick goes on to resolve is never what the draw pays. Above the ceiling the good is not
+drawn **and not bid for**, so its want leaves the price and the price can ease: a unit or
+building goes short and takes the shortfall rule, a processor runs on what its pool holds, a
+construction site pauses for want of that material (construction capacity over the ceiling
+stretches the build instead, as an empty yard does), and a nation buys elsewhere or not at all.
+What a draw is billed is only what the shelf gave. Because the shelf is supply in the price law
+(MARKETS.md § Price resolution), a draw beside a stocked shelf does not price itself out of it.
+A ceiling of zero switches the rule off, and off means what each draw did before it: upkeep never
+buys; processors, construction and the nations buy whatever the shelf holds.
 
 The pass also carries **orphan cleanup**: `demolish_building` erases the building, the
 corp asset and the building stockpile but never touches `w.units`, so without it

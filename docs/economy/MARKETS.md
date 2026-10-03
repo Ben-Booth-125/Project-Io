@@ -228,7 +228,9 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
    inventory).
 7. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
    explicit buy book (`max_price`, optional `preferred_seller`).
-8. **Reference prices** — computed once from the accumulated supply/demand (below), so every
+8. **Reference prices** — computed once from the accumulated demand and the supply the price law
+   reads — this tick's listings plus the stock standing on the shelf after the tick's draws
+   (§ Price resolution, below) — so every
    sale this tick uses the same price.
 9. **Auto clearing** — auto-surplus sells at the reference price (**perfect counterparty**: the
    sell side is unconditional — see § Real market inventory); auto-demand is billed at the
@@ -433,7 +435,9 @@ chasing a shortfall it cannot fix.
 
 The ceiling belongs to the **price band's** authored family (`floor_mult` / `ceil_mult`,
 § Price resolution) rather than to upkeep, because it is a statement about what a good is worth
-paying, not about who is buying. Its value is measured, not guessed.
+paying, not about who is buying. Its value (2.0) is a first cut, set by ruling rather than
+derived; `firm_attrition_trace` and `demand_census` are the instruments that move it
+(`scripts/economy.lua` carries the reasoning).
 
 Every remaining channel inherits this question and is checked against it **before** it is built:
 BL-643 (infrastructure), BL-644 (state), BL-645 (research), BL-646 (conflict).
@@ -762,15 +766,16 @@ One row per exchange, appended by the clearing tick, ring-capped the way the plo
 | `market` | Which board. The surface is per-market. |
 | `resource` | What moved. |
 | `quantity` | How much. |
-| `unit_price` | The price clearing resolved, not the floor the order carried — an order is honoured *at clearing*, so what the seller asked and what they got are different numbers and only one of them is the trade. |
+| `unit_price` | The price the exchange was made at, not the floor or cap an order carried — an order is honoured *at clearing*, so what the seller asked and what they got are different numbers and only one of them is the trade. A sale to the market is made at the resolved price; a draw off the shelf at the **posted** price it was decided and billed at ([FINANCE.md](FINANCE.md) § Standing-force upkeep); a matched trade at the price its match executed on. |
 | `seller`, `buyer` | The two corps. Either may be a background firm — and either may be **absent**, which means the market itself and not an unknown party (see below). |
 
 **One side is often the MARKET, and a reader must say so rather than blank the row.** Only the
 matched order-book path (§ Where the order book lives) has a real corp on both sides, and that path
 is dormant in play while the buy side has no emitter. The three paths that carry the volume trade
 against the market as counterparty of last resort: a corp's auto-surplus is *sold to the market*, a
-processor's input draw is *bought from the market*, and an unmatched standing sell auto-clears *to
-the market* at the resolved price. Those exchanges are real — goods moved, cash moved — so they are
+consumer's shelf draw (a processor's input, a site's material, an upkeep draw) is *bought from the
+market* at the posted price, and an unmatched standing sell auto-clears *to the market* at the
+resolved price. Those exchanges are real — goods moved, cash moved — so they are
 recorded, with the absent side left empty. A surface renders that side as the market; treating it as
 missing data would hide most of the history the record exists to keep.
 
