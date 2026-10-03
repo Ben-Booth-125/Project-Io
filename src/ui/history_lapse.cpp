@@ -13,6 +13,8 @@
 #include "world/hex_neighbors.hpp" // the odd-r side offsets the river bits are keyed by
 #include "world/era_minus_one.hpp" // exploration_sim_params: the span's decision band, the renewal slack (BL-1095)
 #include "world/history_sim.hpp"   // history_sim_params::treaty_term_years, the term an arc stands for (BL-1095)
+#include "world/ocean_currents.hpp"  // the current field a lane's walk is priced with
+#include "world/road_generation.hpp" // sea_lane_port / sea_lane_walk: the lane's sea path, the stamp's own walk
 
 #include <imgui.h>
 
@@ -21,6 +23,8 @@
 #include <cstdio>
 #include <deque>
 #include <iterator>
+#include <limits>
+#include <map>
 
 namespace ui {
 
@@ -212,6 +216,102 @@ bool lapse_corridor_over_water(const std::vector<uint8_t>& band, int gw, int gh,
         if (band[static_cast<std::size_t>(r * gw + c)] == 0xFFu) ++water;
     }
     return total > 0 && water * 2 > total;
+}
+
+/// Is the point (@p c, @p r), in TILE units (a tile spans [col, col + 1)), on
+/// a sea tile of @p sea? Columns fold back into range (a lane's path is
+/// unwrapped along its walk); rows off the map are not sea.
+bool lapse_point_on_sea(const std::vector<std::uint8_t>& sea, int gw, int gh, float c, float r)
+{
+    const int row = static_cast<int>(std::floor(r));
+    if (row < 0 || row >= gh) return false;
+    int col = static_cast<int>(std::floor(c)) % gw;
+    if (col < 0) col += gw;
+    return sea[static_cast<std::size_t>(row) * gw + col] != 0;
+}
+
+/// Does the straight run @p a -> @p b stay on the sea, sampled every tenth of
+/// a tile? With @p clear > 0 each sample's four points that far off it must
+/// be sea too, so a band of that half-width keeps off the shore.
+bool lapse_run_on_sea(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                      ImVec2 a, ImVec2 b, float clear)
+{
+    const float dx = b.x - a.x, dy = b.y - a.y;
+    const int steps = std::max(1, static_cast<int>(std::ceil(std::sqrt(dx * dx + dy * dy) * 10.0f)));
+    for (int i = 0; i <= steps; ++i)
+    {
+        const float t = static_cast<float>(i) / static_cast<float>(steps);
+        const float c = a.x + dx * t, r = a.y + dy * t;
+        if (!lapse_point_on_sea(sea, gw, gh, c, r)) return false;
+        if (clear > 0.0f
+            && (!lapse_point_on_sea(sea, gw, gh, c + clear, r) || !lapse_point_on_sea(sea, gw, gh, c - clear, r)
+             || !lapse_point_on_sea(sea, gw, gh, c, r + clear) || !lapse_point_on_sea(sea, gw, gh, c, r - clear)))
+            return false;
+    }
+    return true;
+}
+
+/// A LANE'S DRAWN LINE, from the tile-centre chain of its water-only walk (Ben,
+/// 2026-10-03: "sea lanes should always go over ocean, never over ground"). The
+/// walk takes four cardinal steps, so its chain is a staircase of long straight
+/// runs and right-angle turns; drawn as it stands it reads as a box, not a lane.
+/// Two passes make it the smooth, gently curved band Ben picked (2026-09-25):
+///
+///  1. STRING-PULL over the water: from each kept point, jump to the farthest
+///     later point the straight run to which stays on the sea with a third of a
+///     tile of clearance (`lapse_run_on_sea`), looking at most 48 points ahead.
+///     The adjacent point is always reachable, its run lying inside two sea
+///     tiles, so the pass never fails -- at worst it keeps the chain.
+///  2. CHAIKIN corner-cutting, three rounds, CHECKED: each cut that would
+///     carry the line onto land keeps its corner instead.
+///
+/// Every segment of the result is therefore on the sea, the ends are the two
+/// port tiles' centres, and nothing here reads the record: it is the ground
+/// and the walk, drawn.
+std::vector<ImVec2> lapse_smooth_sea_path(const std::vector<ImVec2>& chain,
+                                          const std::vector<std::uint8_t>& sea, int gw, int gh)
+{
+    if (chain.size() < 3) return chain;
+    constexpr float k_clear     = 0.33f;
+    constexpr std::size_t k_look = 48;
+
+    std::vector<ImVec2> pulled;
+    pulled.push_back(chain.front());
+    std::size_t i = 0;
+    while (i + 1 < chain.size())
+    {
+        std::size_t best = i + 1;
+        const std::size_t far = std::min(chain.size() - 1, i + k_look);
+        for (std::size_t j = far; j > i + 1; --j)
+            if (lapse_run_on_sea(sea, gw, gh, chain[i], chain[j], k_clear)) { best = j; break; }
+        pulled.push_back(chain[best]);
+        i = best;
+    }
+
+    std::vector<ImVec2> a = pulled, b;
+    for (int round = 0; round < 3 && a.size() >= 3; ++round)
+    {
+        b.clear();
+        b.reserve(a.size() * 2);
+        b.push_back(a.front());
+        for (std::size_t k = 0; k + 1 < a.size(); ++k)
+        {
+            const ImVec2 p = a[k], q = a[k + 1];
+            const ImVec2 near_p = {0.75f * p.x + 0.25f * q.x, 0.75f * p.y + 0.25f * q.y};
+            const ImVec2 near_q = {0.25f * p.x + 0.75f * q.x, 0.25f * p.y + 0.75f * q.y};
+            // The cut across corner p runs from the last point laid (on the run
+            // into p) to near_p (on the run out of it). If it would cross land,
+            // keep the corner: both legs then lie on runs already on the sea.
+            // The first run has no corner at its start (the port is kept).
+            if (k > 0 && !lapse_run_on_sea(sea, gw, gh, b.back(), near_p, 0.0f))
+                b.push_back(p);
+            b.push_back(near_p);
+            b.push_back(near_q);
+        }
+        b.push_back(a.back());
+        a.swap(b);
+    }
+    return a;
 }
 
 /// BL-917 / BL-1134: apply a record's `road_promoted` events to a road network
@@ -509,7 +609,10 @@ void paint_trade_line(ImDrawList* dl, ImVec2 a, ImVec2 b, float scale, int alpha
 /// dashes; the tie keeps the straight line and the lane curves off it. South,
 /// because treaty arcs bow north and the two arcs must never meet. Opaque
 /// enough to read on its own, since it no longer lies under the tie.
-/// Returns the primitives drawn.
+/// 2026-10-03: the MAP no longer draws this chord-bowed arc -- a lane is laid
+/// on its sea path (`paint_lane_path`), which a straight chord between seats
+/// never was. The legend swatch keeps it, a short curved stroke being what a
+/// smoothed sea path reads as. Returns the primitives drawn.
 int paint_lane(ImDrawList* dl, ImVec2 a, ImVec2 b, float scale)
 {
     const float w = std::max(5.0f, scale * 1.4f);
@@ -533,6 +636,26 @@ int paint_lane(ImDrawList* dl, ImVec2 a, ImVec2 b, float scale)
                   v * v * a.y + 2.0f * v * u * c.y + u * u * b.y};
     }
     dl->AddPolyline(pts, segs + 1, with_alpha(col_sea_lane, 130), ImDrawFlags_None, w);
+    return 1;
+}
+
+/// THE LANE'S BAND WIDTH ON ITS SEA PATH, in pixels at @p scale (pixels per
+/// tile). Under a tile wide: its half-width (0.4) is about the clearance the
+/// path keeps off the shore (`lapse_smooth_sea_path`, 0.33), so the band stays
+/// on the water. The floor keeps a lane legible on the smallest pane.
+float lane_path_width(float scale) { return std::max(3.0f, scale * 0.8f); }
+
+/// ONE SEA LANE ALONG ITS SEA PATH (Ben, 2026-10-03: "sea lanes should always
+/// go over ocean, never over ground"). @p pts are the screen points of the
+/// lane's drawn line, already smoothed on the water at the bake
+/// (`lapse_smooth_sea_path`). The FORM is the one Ben picked on 2026-09-25 --
+/// a soft sea-blue band, gently curved -- laid on the water instead of bowed
+/// off the chord. Returns the primitives drawn.
+int paint_lane_path(ImDrawList* dl, const std::vector<ImVec2>& pts, float scale)
+{
+    if (pts.size() < 2) return 0;
+    dl->AddPolyline(pts.data(), static_cast<int>(pts.size()), with_alpha(col_sea_lane, 130),
+                    ImDrawFlags_None, lane_path_width(scale));
     return 1;
 }
 
@@ -1195,6 +1318,112 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
         seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
         seg.year_open = e.year;
         h.lane_segs.push_back(seg);
+    }
+
+    // --- The lanes' SEA PATHS (Ben, 2026-10-03: "sea lanes should always go
+    // over ocean, never over ground"). A lane was drawn as an arc between the
+    // two seats, which crossed whatever land lay between them. It is now drawn
+    // along the walk the campaign stamp lays (`stamp_sea_lanes`, LOGISTICS.md
+    // sec 4b), restated here on the lapse's own sea mask with the stamp's own
+    // pure pieces: each seat's port is its nearest sea tile within
+    // `kSeaLanePortRadius` (an inland seat takes its realm's nearest coastal
+    // seat, the realm read as the region's holder at this record's close);
+    // the walk is `sea_lane_walk` over ocean and coast on four cardinal steps,
+    // priced with the current at the span's own weight; and it runs toward
+    // the port more of this round's lanes land on, a tie from the lower
+    // raster index. A REPLAY, NEVER A RE-RUN still holds: this reads the
+    // record's ends and the ground, and decides nothing the record did not.
+    // It can differ from the campaign field in one way only -- the stamp
+    // counts the busier port over the LAST span's legs and realms, the lapse
+    // over its own round's -- and either way every tile it draws on is sea.
+    if (!h.lane_segs.empty())
+    {
+        std::vector<terrain_substrate> substrate(n);
+        std::vector<std::uint8_t>      sea(n, 0);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            substrate[i] = preview_substrate(packed[i]);
+            sea[i] = is_sea(substrate[i]) ? 1 : 0;
+        }
+        const history_sim_params lp = exploration_sim_params(world_params{});
+        const ocean_current_field currents =
+            (ocean_current_weight_valid(lp.sea_current_weight_q) && lp.sea_current_weight_q > 0)
+                ? build_ocean_currents(substrate, gw, gh, lp.sea_current_rotation_sense)
+                : ocean_current_field{};
+
+        // Each region's holder at the record's close: the last change wins
+        // (`changes` is in year order). -1 for unheld.
+        const std::size_t rc = h.region_col.size();
+        std::vector<int> realm(rc, -1);
+        for (const owner_change& c : h.lapse.changes)
+            if (c.region < rc)
+                realm[c.region] = (c.owner == owner_none) ? -1 : static_cast<int>(c.owner);
+
+        std::vector<int> own_port(rc, -2); // -2: not looked up yet
+        const auto port_of = [&](std::size_t ri) {
+            int& p = own_port[ri];
+            if (p == -2)
+                p = sea_lane_port(sea, gw, gh, h.region_col[ri], h.region_row[ri], kSeaLanePortRadius);
+            return p;
+        };
+        const auto pick_port = [&](std::size_t ri) {
+            if (port_of(ri) >= 0) return port_of(ri);
+            if (realm[ri] < 0) return -1;
+            int best = -1, best_d = std::numeric_limits<int>::max();
+            for (std::size_t rj = 0; rj < rc; ++rj) // ascending: a tie keeps the lower region
+            {
+                if (realm[rj] != realm[ri] || port_of(rj) < 0) continue;
+                int dc = std::abs(h.region_col[ri] - h.region_col[rj]);
+                if (dc > gw / 2) dc = gw - dc;
+                const int d = std::max(dc, std::abs(h.region_row[ri] - h.region_row[rj]));
+                if (d < best_d) { best_d = d; best = port_of(rj); }
+            }
+            return best;
+        };
+
+        std::vector<std::pair<int, int>> ports(h.lane_segs.size(), {-1, -1});
+        std::map<int, int> degree;
+        for (std::size_t li = 0; li < h.lane_segs.size(); ++li)
+        {
+            const int pa = pick_port(h.lane_segs[li].region_a);
+            const int pb = pick_port(h.lane_segs[li].region_b);
+            if (pa < 0 || pb < 0 || pa == pb) continue;
+            ports[li] = {pa, pb};
+            ++degree[pa];
+            ++degree[pb];
+        }
+        std::map<std::pair<int, int>, std::vector<int>> walked;
+        for (std::size_t li = 0; li < h.lane_segs.size(); ++li)
+        {
+            auto [pa, pb] = ports[li];
+            if (pa < 0) continue;
+            const int da = degree[pa], db = degree[pb];
+            const bool from_a = (da != db) ? (da < db) : (pa < pb);
+            const std::pair<int, int> key = from_a ? std::make_pair(pa, pb) : std::make_pair(pb, pa);
+            auto wit = walked.find(key);
+            if (wit == walked.end())
+                wit = walked.emplace(key, sea_lane_walk(sea, gw, gh, currents.empty() ? nullptr : &currents,
+                                                        lp.sea_current_weight_q, key.first, key.second)).first;
+            lapse_lane_seg& s = h.lane_segs[li];
+            s.path_c.clear();
+            s.path_r.clear();
+            std::vector<ImVec2> chain;
+            chain.reserve(wit->second.size());
+            float prev_c = 0.0f;
+            for (const int idx : wit->second)
+            {
+                float c = static_cast<float>(idx % gw) + 0.5f;
+                if (!chain.empty()) c = lapse_unwrap_col(prev_c, c, gw); // one continuous run over the seam
+                chain.push_back({c, static_cast<float>(idx / gw) + 0.5f});
+                prev_c = c;
+            }
+            const std::vector<ImVec2> smooth = lapse_smooth_sea_path(chain, sea, gw, gh);
+            for (const ImVec2& p : smooth)
+            {
+                s.path_c.push_back(p.x);
+                s.path_r.push_back(p.y);
+            }
+        }
     }
 
     // --- BL-1092: the kin arrows, baked once ---------------------------------
@@ -2527,20 +2756,33 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    uses come from the tribute leg, so a lane nearly always runs the same
     //    capital-to-capital line as its colonial tie: a thin dashed lane and
     //    then a straight soft band both vanished under the tie at the live
-    //    click. So the lane is a BOWED ARC (BL-1124; Ben, 2026-09-25, picked
-    //    from three forms at the live app; `paint_lane`): the tie keeps the
-    //    straight line and the lane curves south off it. Seam-crossing lanes
-    //    are stroked twice like the corridors above. ──
+    //    click. So the lane was given a CURVED FORM (BL-1124; Ben, 2026-09-25,
+    //    picked from three forms at the live app). It is now laid ON ITS SEA
+    //    PATH (Ben, 2026-10-03: "sea lanes should always go over ocean, never
+    //    over ground"; `paint_lane_path`): the stamp's own water-only walk,
+    //    port to port, smoothed -- which leaves the straight capital-to-capital
+    //    tie by construction, since it starts at the coast and goes round the
+    //    land. A lane with no water path draws nothing, as it lays nothing.
+    //    Seam-crossing lanes are stroked twice like the corridors above. ──
     if (L.has(lapse_layer::sea_lane))
+    {
+    std::vector<ImVec2> lane_pts;
     for (const lapse_lane_seg& s : h.lane_segs)
     {
         if (year < s.year_open) continue; // not yet a lane at this playhead
-        prims += paint_lane(dl, {px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, scale);
-        if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw)) // the seam, drawn off the other edge
-        {
-            const float shift = s.c1 < 0.0f ? world_w : -world_w;
-            prims += paint_lane(dl, {px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)}, scale);
-        }
+        if (s.path_c.size() < 2) continue; // no water joins its ports: nothing laid
+        float lo = s.path_c.front(), hi = lo;
+        for (const float c : s.path_c) { lo = std::min(lo, c); hi = std::max(hi, c); }
+        const auto stroke = [&](float shift) {
+            lane_pts.clear();
+            for (std::size_t i = 0; i < s.path_c.size(); ++i)
+                lane_pts.push_back({px(s.path_c[i]) + shift, py(s.path_r[i])});
+            prims += paint_lane_path(dl, lane_pts, scale);
+        };
+        stroke(0.0f);
+        if (lo < 0.0f)                      stroke(world_w);  // the seam, drawn off the other edge
+        if (hi > static_cast<float>(gw))    stroke(-world_w);
+    }
     }
 
     // ── 3c''. THE KIN ARROWS (BL-1092; Ben, 2026-09-24, rulings R11), the
@@ -3026,11 +3268,23 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             const float dx = (s.c1 - s.c0) * scale, dy = (s.r1 - s.r0) * scale;
             if (dx * dx + dy * dy < 64.0f) ++short_lanes;
         }
+        // 2026-10-03: how many lanes have no sea path (no port in reach, one
+        // port, no water joining them) and so draw nothing, and how many sea
+        // points the drawn ones carry -- the reading that says the lanes went
+        // over the water rather than vanishing.
+        int pathless = 0;
+        std::size_t path_points = 0;
+        for (const lapse_lane_seg& s : h.lane_segs)
+        {
+            if (s.path_c.size() < 2) ++pathless;
+            path_points += s.path_c.size();
+        }
         std::fprintf(stderr, "history_lapse: %zu base runs, %zu relief rims, %zu river segments, "
-                             "%zu road corridors, %zu trade corridors, %zu sea lanes (%d under 8 px), "
-                             "%d primitives this frame\n",
+                             "%zu road corridors, %zu trade corridors, %zu sea lanes (%d under 8 px, "
+                             "%d with no sea path, %zu drawn points), %d primitives this frame\n",
                      h.base_runs.size(), h.relief_segs.size(), h.river_segs.size(),
-                     h.road_segs.size(), h.trade_segs.size(), h.lane_segs.size(), short_lanes, prims);
+                     h.road_segs.size(), h.trade_segs.size(), h.lane_segs.size(), short_lanes,
+                     pathless, path_points, prims);
         std::fprintf(stderr, "history_lapse legend (%d-%d): %s\n", h.lapse.start_year,
                      h.lapse.start_year + h.lapse.years, listed.c_str());
         std::fprintf(stderr, "history_lapse pane: origin %.0f,%.0f avail %.0fx%.0f map %.0f,%.0f %.0fx%.0f\n",

@@ -361,6 +361,12 @@ struct ui_state
     /// capture shows the bake bare (BL-732 R1; the band's weight over painterly
     /// ground is BL-734's open call). No player control sets this.
     bool dbg_hide_border_band = false;
+    /// Verify-only: a multiplier on the Planetary canvas's road and sea-lane
+    /// stroke widths (the named per-tier constants, RENDERING.md § Roads and
+    /// sea lanes), so one capture run can frame a width pick side by side
+    /// (2026-10-03, roads as thinner curves). 1 is the shipped width. No
+    /// player control sets this.
+    float dbg_route_width_scale = 1.0f;
     /// Wheel accumulator for the stepped Planetary zoom: precision wheels and
     /// trackpads deliver fractional deltas per event, and each must NOT fire a
     /// full x2 rung — deltas accumulate here and a step fires per whole notch.
