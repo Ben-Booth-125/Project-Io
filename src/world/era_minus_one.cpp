@@ -604,6 +604,15 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     hp.fleet_men_per_hull        = 0;
     hp.fleet_power_halving_tiles = 0;
 
+    // BL-1169 (Ben, 2026-10-04): a crowded heartland yields less, at K = 1000
+    // -- the crowding at which a region converts half its treasury share. Read
+    // on the 16-seed ladder after BL-1168 and BL-1171 merged: the far rival
+    // (>= 25% of the leader) passes 14 of 16 against 12 off, with margin on
+    // the two seeds 2000 held only at 0.252 / 0.250, for 29% fewer industry
+    // points (the treasury withheld stays in the purse). It loosens the
+    // leader's grip on its own landmass; the top-landmass share stays ~0.89.
+    hp.industry_points_crowding_k = 1000;
+
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).
     return hp;

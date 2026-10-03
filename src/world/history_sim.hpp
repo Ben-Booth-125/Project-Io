@@ -633,7 +633,11 @@ struct history_sim_params
     /// outside it the run converts nothing and says so
     /// (`industry_points_params_valid`) -- rejected, never clamped.
     ///
-    /// UNSET, read on a 16-seed ladder before it is pinned. Measured
+    /// Off in the struct; Industrialisation sets K = 1000 (Ben, 2026-10-04,
+    /// `industrialisation_sim_params`). The ladder below predates BL-1168 and
+    /// BL-1171; re-read after them, off / 1000 / 2000 / 4000 gave the far
+    /// rival 12 / 14 / 14 / 12 of 16 and industry points 998M / 706M / 780M /
+    /// 840M. Measured
     /// 2026-10-03 at K off: receiving regions' crowding at 1800 / 1900 / 1955
     /// runs median 279 / 411 / 499, p90 1,120 / 1,375 / 1,621, max ~25k-62k,
     /// while the treasury's points land at a share-weighted median of

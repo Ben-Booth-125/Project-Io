@@ -759,7 +759,12 @@ lower rate where a region is already crowded with capital — industry points st
 thousand heads its works employ (Ben, 2026-10-03; works per head is flat everywhere, so it cannot
 find a heartland) — so a
 heartland's lead stops compounding on itself and the next-best ground catches up. Its size is a
-named parameter, read on the curated seeds before it is set.
+named parameter: **K = 1000 (Ben, 2026-10-04)**, the crowding at which a region converts half its
+share. On the 16 curated seeds it lifts the far rival (at least 25% of the leader's industry) from
+12 to 14 of 16, with margin, for 29% fewer industry points; the withheld treasury stays in the
+purse. It loosens a leader's grip on its own landmass but not the landmass's grip on the world (the
+top landmass holds about 0.89 of industry either way); a rival on another landmass is the overseas
+reach's to make (§ crowded heartlands reach overseas).
 
 **PROPOSED (Ben's direction, 2026-10-03): crowded heartlands reach overseas.** A heartland short of
 ground and long on people and capital colonises and exploits distant polities, and what it plants
