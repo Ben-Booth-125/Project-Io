@@ -46,13 +46,13 @@
     "treaties_standing_1660": 154
    },
    "fingerprint": {
-    "empire_battles": 14541,
-    "expl_battles": 1223,
-    "flows": 45,
-    "treasury_median": 15748517,
-    "living_polities": 74
+    "empire_battles": 19841,
+    "expl_battles": 1790,
+    "flows": 44,
+    "treasury_median": 8351615,
+    "living_polities": 78
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 28,
@@ -79,13 +79,13 @@
     "treaties_standing_1660": 22
    },
    "fingerprint": {
-    "empire_battles": 3418,
-    "expl_battles": 181,
-    "flows": 11,
-    "treasury_median": 66493,
-    "living_polities": 22
+    "empire_battles": 5114,
+    "expl_battles": 382,
+    "flows": 27,
+    "treasury_median": 216,
+    "living_polities": 32
    },
-   "fingerprint_blessed": "2026-09-17",
+   "fingerprint_blessed": "2026-10-03",
    "replaces": "seed 17 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
@@ -113,13 +113,13 @@
     "treaties_standing_1660": 166
    },
    "fingerprint": {
-    "empire_battles": 19204,
-    "expl_battles": 1850,
-    "flows": 84,
-    "treasury_median": 277,
-    "living_polities": 98
+    "empire_battles": 26050,
+    "expl_battles": 2126,
+    "flows": 98,
+    "treasury_median": 274,
+    "living_polities": 110
    },
-   "fingerprint_blessed": "2026-09-22"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 31,
@@ -145,13 +145,13 @@
     "treaties_standing_1660": 166
    },
    "fingerprint": {
-    "empire_battles": 17842,
-    "expl_battles": 1755,
-    "flows": 100,
-    "treasury_median": 312068,
-    "living_polities": 78
+    "empire_battles": 34221,
+    "expl_battles": 3388,
+    "flows": 99,
+    "treasury_median": 130,
+    "living_polities": 121
    },
-   "fingerprint_blessed": "2026-09-22"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 40,
@@ -178,13 +178,13 @@
     "treaties_standing_1660": 34
    },
    "fingerprint": {
-    "empire_battles": 5820,
-    "expl_battles": 254,
-    "flows": 36,
-    "treasury_median": 1643825,
-    "living_polities": 33
+    "empire_battles": 10184,
+    "expl_battles": 840,
+    "flows": 57,
+    "treasury_median": 83,
+    "living_polities": 52
    },
-   "fingerprint_blessed": "2026-09-17",
+   "fingerprint_blessed": "2026-10-03",
    "replaces": "seed 6 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
@@ -211,13 +211,13 @@
     "treaties_standing_1660": 47
    },
    "fingerprint": {
-    "empire_battles": 4905,
-    "expl_battles": 12,
-    "flows": 20,
-    "treasury_median": 274,
-    "living_polities": 50
+    "empire_battles": 4983,
+    "expl_battles": 208,
+    "flows": 24,
+    "treasury_median": 173,
+    "living_polities": 42
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 37,
@@ -243,13 +243,13 @@
     "treaties_standing_1660": 152
    },
    "fingerprint": {
-    "empire_battles": 12181,
-    "expl_battles": 950,
+    "empire_battles": 20112,
+    "expl_battles": 1374,
     "flows": 72,
-    "treasury_median": 282,
-    "living_polities": 64
+    "treasury_median": 102,
+    "living_polities": 73
    },
-   "fingerprint_blessed": "2026-09-22"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 13,
@@ -275,13 +275,13 @@
     "treaties_standing_1660": 79
    },
    "fingerprint": {
-    "empire_battles": 10250,
-    "expl_battles": 266,
-    "flows": 53,
-    "treasury_median": 38820,
-    "living_polities": 50
+    "empire_battles": 18772,
+    "expl_battles": 988,
+    "flows": 73,
+    "treasury_median": 336,
+    "living_polities": 73
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 41,
@@ -307,13 +307,13 @@
     "treaties_standing_1660": 68
    },
    "fingerprint": {
-    "empire_battles": 7329,
-    "expl_battles": 161,
-    "flows": 51,
-    "treasury_median": 281,
-    "living_polities": 45
+    "empire_battles": 10367,
+    "expl_battles": 281,
+    "flows": 57,
+    "treasury_median": 170,
+    "living_polities": 48
    },
-   "fingerprint_blessed": "2026-09-22"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 43,
@@ -340,13 +340,13 @@
     "treaties_standing_1660": 35
    },
    "fingerprint": {
-    "empire_battles": 4168,
-    "expl_battles": 401,
-    "flows": 43,
-    "treasury_median": 5686113,
-    "living_polities": 28
+    "empire_battles": 7361,
+    "expl_battles": 581,
+    "flows": 49,
+    "treasury_median": 21849427,
+    "living_polities": 31
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 32,
@@ -373,13 +373,13 @@
     "treaties_standing_1660": 108
    },
    "fingerprint": {
-    "empire_battles": 8389,
-    "expl_battles": 1502,
-    "flows": 35,
-    "treasury_median": 163,
-    "living_polities": 68
+    "empire_battles": 14867,
+    "expl_battles": 1924,
+    "flows": 37,
+    "treasury_median": 169,
+    "living_polities": 65
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 10,
@@ -405,13 +405,13 @@
     "treaties_standing_1660": 93
    },
    "fingerprint": {
-    "empire_battles": 11148,
-    "expl_battles": 458,
-    "flows": 57,
-    "treasury_median": 361521,
-    "living_polities": 58
+    "empire_battles": 20944,
+    "expl_battles": 1799,
+    "flows": 60,
+    "treasury_median": 106,
+    "living_polities": 72
    },
-   "fingerprint_blessed": "2026-09-22"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 25,
@@ -438,13 +438,13 @@
     "treaties_standing_1660": 160
    },
    "fingerprint": {
-    "empire_battles": 18776,
-    "expl_battles": 609,
-    "flows": 76,
-    "treasury_median": 18697,
-    "living_polities": 73
+    "empire_battles": 25795,
+    "expl_battles": 2371,
+    "flows": 84,
+    "treasury_median": 303,
+    "living_polities": 82
    },
-   "fingerprint_blessed": "2026-09-25"
+   "fingerprint_blessed": "2026-10-03"
   },
   {
    "seed": 38,
@@ -471,13 +471,13 @@
     "treaties_standing_1660": 36
    },
    "fingerprint": {
-    "empire_battles": 4453,
-    "expl_battles": 176,
-    "flows": 27,
-    "treasury_median": 8599359,
-    "living_polities": 30
+    "empire_battles": 4822,
+    "expl_battles": 153,
+    "flows": 33,
+    "treasury_median": 196,
+    "living_polities": 29
    },
-   "fingerprint_blessed": "2026-09-25",
+   "fingerprint_blessed": "2026-10-03",
    "replaces": "seed 19 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
@@ -505,13 +505,13 @@
     "treaties_standing_1660": 69
    },
    "fingerprint": {
-    "empire_battles": 5834,
-    "expl_battles": 229,
-    "flows": 41,
-    "treasury_median": 380,
-    "living_polities": 50
+    "empire_battles": 9467,
+    "expl_battles": 836,
+    "flows": 39,
+    "treasury_median": 153,
+    "living_polities": 52
    },
-   "fingerprint_blessed": "2026-09-17",
+   "fingerprint_blessed": "2026-10-03",
    "replaces": "seed 4 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
@@ -538,13 +538,13 @@
     "treaties_standing_1660": 87
    },
    "fingerprint": {
-    "empire_battles": 10103,
-    "expl_battles": 406,
-    "flows": 59,
-    "treasury_median": 310871,
-    "living_polities": 54
+    "empire_battles": 16712,
+    "expl_battles": 993,
+    "flows": 77,
+    "treasury_median": 8664,
+    "living_polities": 75
    },
-   "fingerprint_blessed": "2026-09-17"
+   "fingerprint_blessed": "2026-10-03"
   }
  ]
 }
