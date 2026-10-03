@@ -1948,6 +1948,72 @@
    "authority_doc": "docs/economy/FINANCE.md",
    "files": [],
    "design": "BEN (2026-10-03, sprint 49): a design session first. Today firms only exit; ~17 of 211 survive 450 ticks on seed 0. Design who founds an entrant (a nation, a parent, the market), what it costs, where it stands, and how the player sees it."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (BL-1168 cold review, 2026-10-03)",
+   "category": "Generation",
+   "id": "BL-1176",
+   "short_name": "NOTE_PRICE_MATCHES_CLOSE_ROW",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "A harness row runs the span's works-note price step against the close's reach price",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/industry_concentration.cpp"
+   ],
+   "design": "NR-907 requires the span and the close to price by one divisor and one reach. industry_concentration's REACH gate only checks the two landmass rasters agree; it never runs history_sim's per-region note step (landmass_of_region, ~5129-5215). Add a row that compares each region's note price in the span to sb.centre_firm_price for the same stock, so a change to how the sim labels a region fails."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (BL-1168 cold review, 2026-10-03)",
+   "category": "Generation",
+   "id": "BL-1177",
+   "short_name": "WORKS_NOTE_REAL_OR_RECORD",
+   "priority": "B",
+   "difficulty": 1,
+   "title": "Reconcile whether a works-chartered note is a real charter or record-only",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "docs/ui/STARTUP.md",
+    "src/world/era_timelapse.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "STARTUP.md (Company creation flashes) says each note is a real charter whose points are debited (NR-925); INDUSTRIALISATION.md says the record-only clause is overturned; era_timelapse.hpp's works_chartered comment and the sim's NOTHING MOVES block say record-only, no point debited. One of them is wrong; read the code, fix the docs or the code."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-03",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (BL-1168 cold review, 2026-10-03)",
+   "category": "Generation",
+   "id": "BL-1178",
+   "short_name": "WORKS_FRACTION_UNDER_REACH",
+   "priority": "C",
+   "difficulty": 2,
+   "title": "Re-read the works-note fraction (2000) and its clustering under the reach price",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "src/world/history_sim.hpp"
+   ],
+   "design": "works_event_fraction_q = 2000 was pinned on readings taken under the world price (3233 notes, 894 of 1297 charters dated). Under the reach price far landmasses note more and start cheaper, so the NR-940 early clustering may worsen there. Re-measure with industry_concentration DATING on the 16 library seeds and record the readings beside the pin; report, do not retune silently."
   }
  ]
 }
